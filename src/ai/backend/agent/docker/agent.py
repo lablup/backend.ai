@@ -210,6 +210,14 @@ _CGROUP_PATH_CACHE_SIZE: Final[int] = 2048
 # Docker `HostConfig.NetworkMode` value for host networking.
 _HOST_NETWORK_MODE: Final[str] = "host"
 
+_SOCKET_RELAY_UID: Final[int] = 65534
+_SOCKET_RELAY_GID: Final[int] = 65534
+_SOCKET_RELAY_PIDS_LIMIT: Final[int] = 64
+# Below the pids limit, which also counts docker-init and the listening socat process.
+_SOCKET_RELAY_MAX_CHILDREN: Final[int] = 32
+_SOCKET_RELAY_MEMORY_BYTES: Final[int] = 64 * 1024 * 1024
+_SOCKET_RELAY_NANO_CPUS: Final[int] = 1_000_000_000
+
 # Docker splits the configured total container-log size across this many files.
 _CONTAINER_LOG_FILE_COUNT: Final[int] = 5
 # Controllers the intrinsic plugins read, resolved together from a single inspect.
@@ -1709,23 +1717,39 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.id}.sock"
         # Workaround for Docker Desktop for Mac's UNIX socket mount failure with virtiofs
         if sys.platform != "darwin":
+            socket_dir = ipc_base_path / "container"
+            if os.geteuid() == 0:
+                relay_uid, relay_gid = _SOCKET_RELAY_UID, _SOCKET_RELAY_GID
+                os.chown(socket_dir, relay_uid, relay_gid)
+            else:
+                relay_uid, relay_gid = os.geteuid(), os.getegid()
             socket_relay_name = f"backendai-socket-relay.{self.id}"
             socket_relay_container = PersistentServiceContainer(
                 "backendai-socket-relay:latest",
                 {
                     "Cmd": [
-                        f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777",
+                        (
+                            f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,"
+                            f"max-children={_SOCKET_RELAY_MAX_CHILDREN},mode=777"
+                        ),
                         f"TCP-CONNECT:127.0.0.1:{self.local_config.agent.agent_sock_port}",
                     ],
+                    "User": f"{relay_uid}:{relay_gid}",
                     "HostConfig": {
                         "Mounts": [
                             {
                                 "Type": "bind",
-                                "Source": str(ipc_base_path / "container"),
+                                "Source": str(socket_dir),
                                 "Target": "/ipc",
                             },
                         ],
                         "NetworkMode": "host",
+                        "ReadonlyRootfs": True,
+                        "SecurityOpt": ["no-new-privileges"],
+                        "CapDrop": ["ALL"],
+                        "PidsLimit": _SOCKET_RELAY_PIDS_LIMIT,
+                        "Memory": _SOCKET_RELAY_MEMORY_BYTES,
+                        "NanoCpus": _SOCKET_RELAY_NANO_CPUS,
                     },
                 },
                 name=socket_relay_name,
