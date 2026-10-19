@@ -24,8 +24,8 @@ from ai.backend.manager.models.dotfile.updaters import DotfileEntryUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.services.dotfile.actions.search import SearchDotfilesAction
 from ai.backend.manager.services.dotfile.processors import DotfileProcessors
-from ai.backend.manager.services.user.actions.create_keypair_dotfile import (
-    CreateKeypairDotfileAction,
+from ai.backend.manager.services.user.actions.create_dotfile import (
+    CreateDotfileAction,
 )
 from ai.backend.manager.services.user.actions.delete_default_dotfile import (
     DeleteDefaultDotfileAction,
@@ -64,7 +64,7 @@ class UserConfigAdapter:
 
     async def create_dotfile(self, input: CreateDotfileInput) -> CreateDotfileResponse:
         await self._user.create_dotfile.run(
-            CreateKeypairDotfileAction(
+            CreateDotfileAction(
                 user_id=input.user_id,
                 creator=DotfileEntryCreator(
                     DotfileEntry(path=input.path, perm=input.perm, data=input.data)

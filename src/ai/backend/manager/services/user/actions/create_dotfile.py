@@ -12,7 +12,7 @@ from ai.backend.manager.models.dotfile.creators import DotfileEntryCreator
 
 
 @dataclass(frozen=True)
-class CreateKeypairDotfileAction(BaseSingleEntityAction):
+class CreateDotfileAction(BaseSingleEntityAction):
     """Add a dotfile in the user's configuration."""
 
     user_id: UserID
@@ -30,9 +30,9 @@ class CreateKeypairDotfileAction(BaseSingleEntityAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "create_keypair_dotfile"
+        return "create_dotfile"
 
 
 @dataclass(frozen=True)
-class CreateKeypairDotfileActionResult:
+class CreateDotfileActionResult:
     entries: tuple[DotfileEntry, ...]

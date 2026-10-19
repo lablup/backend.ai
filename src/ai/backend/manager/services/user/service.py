@@ -30,9 +30,9 @@ from ai.backend.manager.services.user.actions.bootstrap_script import (
     UpdateDefaultBootstrapScriptAction,
     UpdateDefaultBootstrapScriptActionResult,
 )
-from ai.backend.manager.services.user.actions.create_keypair_dotfile import (
-    CreateKeypairDotfileAction,
-    CreateKeypairDotfileActionResult,
+from ai.backend.manager.services.user.actions.create_dotfile import (
+    CreateDotfileAction,
+    CreateDotfileActionResult,
 )
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
@@ -361,15 +361,13 @@ class UserService:
             ssh_public_key=ssh_public_key,
         )
 
-    async def create_dotfile(
-        self, action: CreateKeypairDotfileAction
-    ) -> CreateKeypairDotfileActionResult:
+    async def create_dotfile(self, action: CreateDotfileAction) -> CreateDotfileActionResult:
         # Variants count too, so creation cannot grow a user's storage without bound.
         count = await self._user_repository.count_dotfiles(action.user_id)
         if count >= MAXIMUM_DOTFILE_COUNT:
             raise DotfileCreationFailed("Dotfile creation limit reached")
         entries = await self._user_repository.create_dotfile(action.user_id, action.creator)
-        return CreateKeypairDotfileActionResult(entries=entries.entries)
+        return CreateDotfileActionResult(entries=entries.entries)
 
     async def update_default_dotfile(
         self, action: UpdateDefaultDotfileAction
