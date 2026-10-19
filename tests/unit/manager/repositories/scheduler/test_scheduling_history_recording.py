@@ -30,6 +30,7 @@ from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AccessKey,
+    AgentId,
     ClusterMode,
     DefaultForUnspecified,
     ResourceSlot,
@@ -88,6 +89,7 @@ from ai.backend.manager.models.resource_policy.row import (
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow, ResourceSlotTypeRow
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -147,6 +149,7 @@ class TestEnqueueSessionSchedulingHistory:
                 KernelGroupEnvironRow,
                 ResourceAllocationRow,
                 SessionDependencyRow,
+                SessionDesignatedAgentRow,
                 SessionSchedulingHistoryRow,
             ],
         ):
@@ -447,6 +450,30 @@ class TestEnqueueSessionSchedulingHistory:
             ),
         )
 
+    @pytest.fixture
+    async def registered_agent_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group_name: str,
+    ) -> AgentId:
+        """An agent of the scaling group the specs enqueue into."""
+        agent_id = AgentId(f"i-{uuid.uuid4().hex[:12]}")
+        resource_group_id = await self._resource_group_id(db_with_cleanup, test_scaling_group_name)
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                AgentRow(
+                    id=agent_id,
+                    status=AgentStatus.ALIVE,
+                    region="local",
+                    scaling_group=test_scaling_group_name,
+                    resource_group_id=resource_group_id,
+                    addr="127.0.0.1:6001",
+                    version="1.0.0",
+                    architecture="x86_64",
+                )
+            )
+        return agent_id
+
     def _spec(
         self,
         *,
@@ -460,6 +487,7 @@ class TestEnqueueSessionSchedulingHistory:
         image_id: ImageID,
         dependencies: tuple[SessionID, ...] = (),
         groups: list[KernelGroup] | None = None,
+        designated_agents: tuple[AgentId, ...] = (),
     ) -> SessionSpec:
         kernel_groups = groups or [self._group(role="main", replica_count=1, image_id=image_id)]
         kernel_specs = tuple(
@@ -490,7 +518,7 @@ class TestEnqueueSessionSchedulingHistory:
                     is_preemptible=False,
                     cluster_mode=ClusterMode.SINGLE_NODE,
                     cluster_size=len(kernel_specs),
-                    scheduling_target=SchedulingTarget(),
+                    scheduling_target=SchedulingTarget(designated_agents=list(designated_agents)),
                     kernel_groups=kernel_groups,
                     handler_options=SessionHandlerOptions(),
                 ),
@@ -518,6 +546,54 @@ class TestEnqueueSessionSchedulingHistory:
                     )
                 )
             )
+
+    async def test_enqueue_writes_a_row_per_designated_agent_still_in_agents(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_image_id: ImageID,
+        registered_agent_id: AgentId,
+        enrolled_scopes: None,
+        resource_slot_types: None,
+    ) -> None:
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        session_id = SessionID(uuid.uuid4())
+        spec = self._spec(
+            session_id=session_id,
+            domain=test_domain,
+            resource_group_id=await self._resource_group_id(
+                db_with_cleanup, test_scaling_group_name
+            ),
+            resource_group_name=test_scaling_group_name,
+            project_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+            image_id=test_image_id,
+            designated_agents=(registered_agent_id, AgentId("i-not-registered")),
+        )
+
+        await db_source.enqueue_session_from_spec(spec)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            designated = (
+                (
+                    await db_sess.execute(
+                        sa.select(AgentRow.id)
+                        .join(
+                            SessionDesignatedAgentRow,
+                            SessionDesignatedAgentRow.agent_uuid == AgentRow.uuid,
+                        )
+                        .where(SessionDesignatedAgentRow.session_id == session_id)
+                    )
+                )
+                .scalars()
+                .all()
+            )
+        assert list(designated) == [registered_agent_id]
 
     async def test_enqueue_writes_the_session_its_kernels_and_the_history(
         self,
