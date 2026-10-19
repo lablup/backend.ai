@@ -220,7 +220,9 @@ class LoginClientTypeAdapter(BaseAdapter):
         action_result = await self._login_client_type.purge.run(
             PurgeLoginClientTypeAction(id=type_id)
         )
-        return PurgeLoginClientTypePayload(id=action_result.data.id)
+        return PurgeLoginClientTypePayload(
+            id=action_result.data.id, entity_id=action_result.data.id
+        )
 
     async def partial_bulk_update(
         self, input: PartialBulkUpdateLoginClientTypesInput

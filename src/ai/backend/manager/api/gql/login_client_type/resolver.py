@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.login_client_type.response import (
     DeleteLoginClientTypePayload,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -137,7 +137,9 @@ async def purge_login_client_type(
     id: UUID,
 ) -> PurgeLoginClientTypePayloadGQL:
     payload = await info.context.adapters.login_client_type.purge(id)
-    return PurgeLoginClientTypePayloadGQL.from_pydantic(payload)
+    return PurgeLoginClientTypePayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(LoginClientTypeGQL, payload.entity_id)}
+    )
 
 
 @gql_mutation(
@@ -199,5 +201,5 @@ async def admin_delete_login_client_type(
     check_admin_only()
     payload = await info.context.adapters.login_client_type.purge(id)
     return DeleteLoginClientTypePayloadGQL.from_pydantic(
-        DeleteLoginClientTypePayload(id=payload.id)
+        DeleteLoginClientTypePayload(id=payload.id, entity_id=payload.entity_id)
     )
