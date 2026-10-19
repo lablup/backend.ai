@@ -476,10 +476,11 @@ class SessionStoredOptions(_OptionsBaseModel):
 
     The fields that already have dedicated ``SessionRow`` columns
     (``priority``, ``is_preemptible``, ``cluster_mode``, ``cluster_size``,
-    ``scaling_group_name``) and the designated agents, kept as
-    ``session_designated_agents`` rows, deliberately do not live here — keeping them as columns preserves existing
-    ``WHERE`` / ``ORDER BY`` queries and indexes without JSONB path
-    operators. Everything else is stored in this blob.
+    ``scaling_group_name``) deliberately do not live here — keeping them
+    as columns preserves existing ``WHERE`` / ``ORDER BY`` queries and
+    indexes without JSONB path operators. The designated agents do not
+    either; they are ``session_designated_agents`` rows. Everything else
+    is stored in this blob.
 
     This is the ORM-facing shape plugged into ``PydanticColumn``. The
     full logical view is ``SessionOptions`` which composes this JSONB
