@@ -107,6 +107,7 @@ class Runner(BaseRunner):
                 print('c.NotebookApp.ip = "0.0.0.0"', file=config)
                 print("c.NotebookApp.port = {}".format(service_info["port"]), file=config)
                 print('c.NotebookApp.token = ""', file=config)
+                print('c.IdentityProvider.cookie_options = {"expires_days": None}', file=config)
                 print("c.FileContentsManager.delete_to_trash = False", file=config)
                 print("c.NotebookApp.tornado_settings = {'ws_ping_interval': 10000}", file=config)
             jupyter_service_type = service_info["name"]

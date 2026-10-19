@@ -931,6 +931,7 @@ class BaseRunner(metaclass=ABCMeta):
                             "status": "failed",
                             "error": error_reason,
                         }
+                    cmdargs = self._override_jupyter_cookie_name(service_info["name"], cmdargs)
                     service_env = {**self.child_env, **env}
                     # avoid conflicts with Python binary used by service apps.
                     if "LD_LIBRARY_PATH" in service_env:
@@ -1007,6 +1008,15 @@ class BaseRunner(metaclass=ABCMeta):
         finally:
             if error_reason:
                 log.warning("failed to start service {}: {}", service_info["name"], error_reason)
+
+    def _override_jupyter_cookie_name(
+        self, service_name: str, cmdargs: Sequence[str | os.PathLike[str]]
+    ) -> Sequence[str | os.PathLike[str]]:
+        # Jupyter's default cookie name carries the host port, which differs per session,
+        # so every session left a new cookie behind.
+        if service_name not in ("jupyter", "jupyterlab"):
+            return cmdargs
+        return [*cmdargs, "--IdentityProvider.cookie_name=bai-jupyter"]
 
     async def _wait_service_proc(
         self,
