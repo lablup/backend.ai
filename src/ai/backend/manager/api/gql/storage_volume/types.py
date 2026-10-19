@@ -5,10 +5,9 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self, override
+from typing import Any, Self, override
 from uuid import UUID
 
-import strawberry
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -20,12 +19,6 @@ from ai.backend.common.dto.manager.v2.storage_volume.request import (
 )
 from ai.backend.common.dto.manager.v2.storage_volume.request import (
     StorageVolumeScope,
-)
-from ai.backend.common.dto.manager.v2.storage_volume.request import (
-    StorageVolumeServiceAttachmentFilter as StorageVolumeServiceAttachmentFilterDTO,
-)
-from ai.backend.common.dto.manager.v2.storage_volume.request import (
-    StorageVolumeServiceAttachmentOrder as StorageVolumeServiceAttachmentOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.request import (
     UpdateStorageVolumeInput as UpdateStorageVolumeInputDTO,
@@ -40,11 +33,7 @@ from ai.backend.common.dto.manager.v2.storage_volume.response import (
     RestoreStorageVolumePayload as RestoreStorageVolumePayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.response import (
-    SearchStorageVolumeServiceAttachmentsPayload as SearchStorageVolumeServiceAttachmentsPayloadDTO,
-)
-from ai.backend.common.dto.manager.v2.storage_volume.response import (
     StorageVolumeNode,
-    StorageVolumeServiceAttachmentNode,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.response import (
     UpdateStorageVolumePayload as UpdateStorageVolumePayloadDTO,
@@ -78,9 +67,6 @@ from ai.backend.manager.api.gql.pydantic_compat import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
-if TYPE_CHECKING:
-    from ai.backend.manager.api.gql.service_catalog.types import ServiceCatalogGQL
-
 __all__ = (
     "DeleteStorageVolumePayloadGQL",
     "PurgeStorageVolumePayloadGQL",
@@ -91,10 +77,6 @@ __all__ = (
     "StorageVolumeGQL",
     "StorageVolumeOrderByGQL",
     "StorageVolumeScopeGQL",
-    "StorageVolumeServiceAttachmentFilterGQL",
-    "StorageVolumeServiceAttachmentGQL",
-    "StorageVolumeServiceAttachmentListGQL",
-    "StorageVolumeServiceAttachmentOrderByGQL",
     "StorageVolumeUsageFieldGQL",
     "UpdateStorageVolumeInputGQL",
     "UpdateStorageVolumePayloadGQL",
@@ -166,127 +148,6 @@ class StorageVolumeScopeGQL(PydanticInputMixin[StorageVolumeScope]):
     )
 
 
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="A storage volume as one service has it attached.",
-    ),
-    model=StorageVolumeServiceAttachmentNode,
-    name="StorageVolumeServiceAttachment",
-)
-class StorageVolumeServiceAttachmentGQL(PydanticOutputMixin[StorageVolumeServiceAttachmentNode]):
-    service_catalog_id: UUID = gql_field(description="ID of the service the volume is attached to.")
-    storage_volume_id: UUID = gql_field(description="ID of the attached volume.")
-    status_checked_at: datetime | None = gql_field(
-        description="When the service last checked the volume."
-    )
-    created_at: datetime = gql_field(description="Creation timestamp.")
-    updated_at: datetime = gql_field(description="Last update timestamp.")
-
-    @gql_field(description="The volume attached.")  # type: ignore[misc]
-    async def storage_volume(
-        self, info: Info[StrawberryGQLContext]
-    ) -> (
-        Annotated[
-            StorageVolumeGQL,
-            strawberry.lazy("ai.backend.manager.api.gql.storage_volume.types"),
-        ]
-        | None
-    ):
-        raise NotImplementedError
-
-    @gql_field(description="The service the volume is attached to.")  # type: ignore[misc]
-    async def service_catalog(
-        self, info: Info[StrawberryGQLContext]
-    ) -> (
-        Annotated[
-            ServiceCatalogGQL,
-            strawberry.lazy("ai.backend.manager.api.gql.service_catalog.types"),
-        ]
-        | None
-    ):
-        raise NotImplementedError
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "A page of the storage volume service attachments. Paged by limit and offset:"
-            " an attachment is keyed by its pair and carries no id of its own."
-        ),
-    ),
-    model=SearchStorageVolumeServiceAttachmentsPayloadDTO,
-    name="StorageVolumeServiceAttachmentList",
-)
-class StorageVolumeServiceAttachmentListGQL(
-    PydanticOutputMixin[SearchStorageVolumeServiceAttachmentsPayloadDTO]
-):
-    items: list[StorageVolumeServiceAttachmentGQL] = gql_field(
-        description="The storage volume service attachments read."
-    )
-    total_count: int = gql_field(
-        description="Total number of matching storage volume service attachments."
-    )
-    has_next_page: bool = gql_field(description="Whether more rows follow this page.")
-    has_previous_page: bool = gql_field(description="Whether more rows precede this page.")
-
-
-@gql_enum(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Fields available for ordering the storage volume service attachments.",
-    ),
-    name="StorageVolumeServiceAttachmentOrderField",
-)
-class StorageVolumeServiceAttachmentOrderFieldGQL(StrEnum):
-    SERVICE_CATALOG_ID = "service_catalog_id"
-    STORAGE_VOLUME_ID = "storage_volume_id"
-    STATUS_CHECKED_AT = "status_checked_at"
-    UPDATED_AT = "updated_at"
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Specifies ordering for the storage volume service attachments.",
-    ),
-    name="StorageVolumeServiceAttachmentOrderBy",
-)
-class StorageVolumeServiceAttachmentOrderByGQL(
-    PydanticInputMixin[StorageVolumeServiceAttachmentOrderDTO]
-):
-    field: StorageVolumeServiceAttachmentOrderFieldGQL = gql_field(
-        description="The field to order by."
-    )
-    direction: OrderDirection = gql_field(description="Sort direction.", default=OrderDirection.ASC)
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Filter for the storage volume service attachments.",
-    ),
-    name="StorageVolumeServiceAttachmentFilter",
-)
-class StorageVolumeServiceAttachmentFilterGQL(
-    PydanticInputMixin[StorageVolumeServiceAttachmentFilterDTO]
-):
-    service_catalog_id: UUIDFilter | None = gql_field(
-        description="Filter by the service the volume is attached to.", default=None
-    )
-    storage_volume_id: UUIDFilter | None = gql_field(
-        description="Filter by the attached volume's ID.", default=None
-    )
-    AND: list[Self] | None = gql_field(
-        description="Combine multiple filters with AND logic.", default=None
-    )
-    OR: list[Self] | None = gql_field(
-        description="Combine multiple filters with OR logic.", default=None
-    )
-    NOT: list[Self] | None = gql_field(description="Negate the given filters.", default=None)
-
-
 @gql_node_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
@@ -309,19 +170,6 @@ class StorageVolumeGQL(PydanticNodeMixin[StorageVolumeNode]):
     )
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime = gql_field(description="Last update timestamp.")
-
-    @gql_field(  # type: ignore[misc]
-        description="Which services have this volume attached, one row per service."
-    )
-    async def service_attachments(
-        self,
-        info: Info[StrawberryGQLContext],
-        filter: StorageVolumeServiceAttachmentFilterGQL | None = None,
-        order_by: list[StorageVolumeServiceAttachmentOrderByGQL] | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> StorageVolumeServiceAttachmentListGQL | None:
-        raise NotImplementedError
 
     @classmethod
     @override

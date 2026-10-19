@@ -15,7 +15,6 @@ from ai.backend.common.tristate.unset import UNSET, Unset
 from .types import (
     OrderDirection,
     StorageVolumeOrderField,
-    StorageVolumeServiceAttachmentOrderField,
     StorageVolumeUsageExposureInput,
 )
 
@@ -25,8 +24,6 @@ __all__ = (
     "StorageVolumeFilter",
     "StorageVolumeOrder",
     "StorageVolumeScope",
-    "StorageVolumeServiceAttachmentFilter",
-    "StorageVolumeServiceAttachmentOrder",
     "UpdateStorageVolumeInput",
 )
 
@@ -145,33 +142,3 @@ class UpdateStorageVolumeInput(BaseRequestModel):
         default=UNSET,
         description="Updated usage exposure. Omit to leave unchanged.",
     )
-
-
-class StorageVolumeServiceAttachmentFilter(BaseRequestModel):
-    """Filter conditions for the storage volume service attachments."""
-
-    service_catalog_id: UUIDFilter | None = Field(
-        default=None, description="Filter by the service the volume is attached to."
-    )
-    storage_volume_id: UUIDFilter | None = Field(
-        default=None, description="Filter by the attached volume's ID."
-    )
-    AND: list[StorageVolumeServiceAttachmentFilter] | None = Field(
-        default=None, description="Logical AND of multiple filter conditions."
-    )
-    OR: list[StorageVolumeServiceAttachmentFilter] | None = Field(
-        default=None, description="Logical OR of multiple filter conditions."
-    )
-    NOT: list[StorageVolumeServiceAttachmentFilter] | None = Field(
-        default=None, description="Logical NOT of filter conditions."
-    )
-
-
-StorageVolumeServiceAttachmentFilter.model_rebuild()
-
-
-class StorageVolumeServiceAttachmentOrder(BaseRequestModel):
-    """Order specification for the storage volume service attachments."""
-
-    field: StorageVolumeServiceAttachmentOrderField = Field(description="Field to order by.")
-    direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")

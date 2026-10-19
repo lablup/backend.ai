@@ -16,13 +16,11 @@ from ai.backend.common.dto.manager.v2.storage_volume.request import (
     StorageVolumeFilter,
     StorageVolumeOrder,
     StorageVolumeScope,
-    StorageVolumeServiceAttachmentFilter,
     UpdateStorageVolumeInput,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.types import (
     OrderDirection,
     StorageVolumeOrderField,
-    StorageVolumeServiceAttachmentOrderField,
     StorageVolumeUsageExposureInput,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
@@ -153,41 +151,3 @@ class TestScopedSearchStorageVolumesInput:
         )
         assert input.scope.storage_backend is not None
         assert input.scope.storage_backend[0].value == backend_id
-
-
-class TestStorageVolumeServiceAttachmentFilter:
-    def test_filter_names_either_side_of_the_pair(self) -> None:
-        service_id = uuid.uuid4()
-        volume_id = uuid.uuid4()
-        filter = StorageVolumeServiceAttachmentFilter(
-            service_catalog_id=UUIDFilter(equals=service_id),
-            storage_volume_id=UUIDFilter(equals=volume_id),
-        )
-        assert filter.service_catalog_id is not None
-        assert filter.service_catalog_id.equals == service_id
-        assert filter.storage_volume_id is not None
-        assert filter.storage_volume_id.equals == volume_id
-
-    def test_nested_filters_hold_their_own_conditions(self) -> None:
-        service_id = uuid.uuid4()
-        filter = StorageVolumeServiceAttachmentFilter(
-            NOT=[
-                StorageVolumeServiceAttachmentFilter(
-                    service_catalog_id=UUIDFilter(equals=service_id)
-                )
-            ]
-        )
-        assert filter.NOT is not None
-        nested = filter.NOT[0]
-        assert nested.service_catalog_id is not None
-        assert nested.service_catalog_id.equals == service_id
-
-
-class TestChildRowOrderFields:
-    def test_attachments_order_by_the_pair_the_check_time_or_the_update_time(self) -> None:
-        assert {f.value for f in StorageVolumeServiceAttachmentOrderField} == {
-            "service_catalog_id",
-            "storage_volume_id",
-            "status_checked_at",
-            "updated_at",
-        }
