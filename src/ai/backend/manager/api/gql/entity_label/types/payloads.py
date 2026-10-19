@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import strawberry
+
 from ai.backend.common.dto.manager.v2.entity_label.response import (
     PartialBulkPurgeEntityLabelPayload as PartialBulkPurgeEntityLabelPayloadDTO,
 )
@@ -25,6 +27,7 @@ from ai.backend.common.dto.manager.v2.entity_label.response import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_field,
     gql_pydantic_type,
 )
@@ -97,7 +100,20 @@ class PartialBulkUpsertEntityLabelPayloadGQL(
     name="PurgeEntityLabelPayload",
 )
 class PurgeEntityLabelPayloadGQL(PydanticOutputMixin[PurgeEntityLabelPayloadDTO]):
-    label: EntityLabelGQL = gql_field(description="The label taken off the entity.")
+    label: EntityLabelGQL = gql_field(
+        description="The label taken off the entity.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `fieldId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Global ID of the purged entity label."
+        ),
+    )
+    field_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="UUID of the purged entity label."
+        ),
+    )
 
 
 @gql_pydantic_type(
