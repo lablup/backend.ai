@@ -92,6 +92,7 @@ class UpdateRuntimeVariantPayload(BaseResponseModel):
 
 class DeleteRuntimeVariantPayload(BaseResponseModel):
     id: UUID = Field(description="ID of the deleted runtime variant.")
+    entity_id: UUID = Field(description="UUID of the deleted runtime variant. Added in 26.10.0.")
 
 
 class RuntimeVariantBulkFailureInfo(BaseResponseModel):
