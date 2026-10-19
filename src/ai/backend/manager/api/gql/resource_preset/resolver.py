@@ -13,7 +13,7 @@ from ai.backend.common.dto.manager.v2.resource_preset.request import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -29,6 +29,7 @@ from .types import (
     PartialBulkPurgeResourcePresetsInputGQL,
     PartialBulkResourcePresetsPayloadGQL,
     PartialBulkUpdateResourcePresetsInputGQL,
+    PurgeResourcePresetPayloadGQL,
     ResourcePresetConnection,
     ResourcePresetEdge,
     ResourcePresetFilterGQL,
@@ -156,9 +157,11 @@ async def update_resource_preset_v2(
 async def purge_resource_preset_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteResourcePresetPayloadGQL:
+) -> PurgeResourcePresetPayloadGQL:
     payload = await info.context.adapters.resource_preset.purge(id)
-    return DeleteResourcePresetPayloadGQL.from_pydantic(payload)
+    return PurgeResourcePresetPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(ResourcePresetGQL, payload.entity_id)}
+    )
 
 
 @gql_mutation(

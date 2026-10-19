@@ -51,6 +51,7 @@ class DeleteResourcePresetPayload(BaseResponseModel):
     """Payload for resource preset deletion."""
 
     id: UUID = Field(description="UUID of the deleted resource preset.")
+    entity_id: UUID = Field(description="UUID of the deleted resource preset. Added in 26.10.0.")
 
 
 class AdminSearchResourcePresetsPayload(BaseResponseModel):

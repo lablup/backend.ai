@@ -283,6 +283,19 @@ class DeleteResourcePresetPayloadGQL(PydanticOutputMixin[DeleteResourcePresetPay
     id: str = gql_field(description="UUID of the deleted resource preset.")
 
 
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for resource preset purge.",
+    ),
+    model=DeleteResourcePresetPayloadDTO,
+    name="PurgeResourcePresetPayload",
+)
+class PurgeResourcePresetPayloadGQL(PydanticOutputMixin[DeleteResourcePresetPayloadDTO]):
+    purged_id: strawberry.ID = gql_field(description="Global ID of the purged resource preset.")
+    entity_id: UUID = gql_field(description="UUID of the purged resource preset.")
+
+
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
