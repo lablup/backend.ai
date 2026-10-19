@@ -193,7 +193,7 @@ class IdleCheckerAdapter(BaseAdapter):
         error = action_result.errors().get(input.id)
         if error is not None:
             raise error
-        return PurgeIdleCheckerPayload(id=input.id)
+        return PurgeIdleCheckerPayload(id=input.id, entity_id=input.id)
 
     async def admin_partial_bulk_purge(
         self,

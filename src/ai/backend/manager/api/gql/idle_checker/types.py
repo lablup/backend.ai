@@ -7,6 +7,7 @@ from enum import StrEnum
 from typing import Any, Self, cast, override
 from uuid import UUID
 
+import strawberry
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -578,7 +579,21 @@ class UpdateIdleCheckerPayloadGQL(PydanticOutputMixin[UpdateIdleCheckerPayloadDT
     name="PurgeIdleCheckerPayload",
 )
 class PurgeIdleCheckerPayloadGQL(PydanticOutputMixin[PurgeIdleCheckerPayloadDTO]):
-    id: UUID = gql_field(description="Purged idle checker ID.")
+    id: UUID = gql_field(
+        description="Purged idle checker ID.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged idle checker.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="UUID of the purged idle checker."
+        ),
+    )
 
 
 @gql_pydantic_type(

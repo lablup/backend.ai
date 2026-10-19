@@ -5,7 +5,7 @@ from strawberry.relay import PageInfo
 
 from ai.backend.common.dto.manager.v2.idle_checker.request import SearchIdleCheckersInput
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -119,7 +119,9 @@ async def admin_purge_idle_checker(
 ) -> PurgeIdleCheckerPayloadGQL:
     check_admin_only()
     payload = await info.context.adapters.idle_checker.admin_purge(input.to_pydantic())
-    return PurgeIdleCheckerPayloadGQL.from_pydantic(payload)
+    return PurgeIdleCheckerPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(IdleCheckerGQL, payload.entity_id)}
+    )
 
 
 @gql_mutation(
