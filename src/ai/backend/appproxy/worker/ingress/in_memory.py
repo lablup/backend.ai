@@ -48,18 +48,14 @@ class InMemoryIngressState(IngressReader, IngressWriter):
         return list(self._ingresses.values())
 
     @override
-    async def apply(self, ingresses: Sequence[Ingress]) -> list[Ingress]:
-        held: list[Ingress] = []
+    async def apply(self, ingresses: Sequence[Ingress]) -> None:
         for ingress in ingresses:
             frontend_key = ingress.frontend.key()
             stored_ingress = self._ingresses.get(frontend_key)
             if stored_ingress is not None and ingress.revision < stored_ingress.revision:
-                held.append(stored_ingress)
                 continue
             self._ingresses[frontend_key] = ingress
             self._missing_keys.pop(frontend_key, None)
-            held.append(ingress)
-        return held
 
     @override
     async def remove(self, keys: Sequence[IngressKey]) -> None:
@@ -74,8 +70,7 @@ class InMemoryIngressState(IngressReader, IngressWriter):
         self._missing_keys[frontend_key] = True
 
     @override
-    async def replace_all(self, ingresses: Sequence[Ingress]) -> list[Ingress]:
+    async def replace_all(self, ingresses: Sequence[Ingress]) -> None:
         self._ingresses.clear()
         self._ingresses.update({ingress.frontend.key(): ingress for ingress in ingresses})
         self._missing_keys.clear()
-        return list(self._ingresses.values())

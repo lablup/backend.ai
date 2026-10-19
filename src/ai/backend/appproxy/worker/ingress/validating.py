@@ -32,7 +32,7 @@ class ValidatingIngressWriter(IngressWriter):
         self._lock = asyncio.Lock()
 
     @override
-    async def apply(self, ingresses: Sequence[Ingress]) -> list[Ingress]:
+    async def apply(self, ingresses: Sequence[Ingress]) -> None:
         self._check_authority([ingress.authority for ingress in ingresses])
         async with self._lock:
             for ingress in ingresses:
@@ -42,7 +42,7 @@ class ValidatingIngressWriter(IngressWriter):
                         f"frontend {ingress.frontend.key()} holds revision {held.revision}, "
                         f"got {ingress.revision}"
                     )
-            return await self._state.apply(ingresses)
+            await self._state.apply(ingresses)
 
     @override
     async def remove(self, keys: Sequence[IngressKey]) -> None:
@@ -51,10 +51,10 @@ class ValidatingIngressWriter(IngressWriter):
             await self._state.remove(keys)
 
     @override
-    async def replace_all(self, ingresses: Sequence[Ingress]) -> list[Ingress]:
+    async def replace_all(self, ingresses: Sequence[Ingress]) -> None:
         self._check_authority([ingress.authority for ingress in ingresses])
         async with self._lock:
-            return await self._state.replace_all(ingresses)
+            await self._state.replace_all(ingresses)
 
     async def _held(self, frontend_key: IngressFrontendKey) -> Ingress | None:
         try:
