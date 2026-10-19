@@ -7,7 +7,6 @@ from typing import Final, NewType
 
 from pydantic import ConfigDict, Field
 
-from ai.backend.common.data.entity.storage_volume import StorageVolumeID
 from ai.backend.common.type_adapters import VFolderIDField
 from ai.backend.common.types import BackendAISchema
 
@@ -125,11 +124,7 @@ class StorageStatusResult:
 
 @dataclass(frozen=True)
 class VfsVolumeStatusResult(StorageStatusResult):
-    """What a vfs volume's mount looked like, null where the observation failed.
-
-    ``marker_volume_id`` is the volume id read from the marker file, null when the file
-    is absent or does not hold one.
-    """
+    """What a vfs volume's mount looked like, null where the observation failed."""
 
     device_id: int | None
-    marker_volume_id: StorageVolumeID | None
+    marker: str | None
