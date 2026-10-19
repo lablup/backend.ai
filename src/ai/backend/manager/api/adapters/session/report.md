@@ -111,7 +111,9 @@ Given
   - 세션 그룹 session-group-1: 가능하면 세션들을 서로 다른 에이전트에 배치한다
   - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
   - 에이전트 agent-2: 살아 있고, 아직 보고한 슬롯이 없다
-  - 세션 session-1: 세션 그룹, designated_agent_ids 둘, requested_starts_at을 지정한 대기 세션
+  - 세션 session-1: 세션 그룹, requested_starts_at을 지정한 대기 세션
+  - 세션 session-1: 지정 agent 하나를 갖는다
+  - 세션 session-1: 지정 agent 하나를 갖는다
 
 When
 
