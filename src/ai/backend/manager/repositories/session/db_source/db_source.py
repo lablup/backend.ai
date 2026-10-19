@@ -270,7 +270,7 @@ class SessionDBSource:
                 .where(
                     (SessionRow.name == new_name)
                     & (SessionRow.user_uuid == session_row.user_uuid)
-                    & (~SessionRow.status.in_(DEAD_SESSION_STATUSES))
+                    & (~SessionRow.status.in_(TERMINAL_SESSION_STATUSES))
                 )
                 .limit(1)
             )
