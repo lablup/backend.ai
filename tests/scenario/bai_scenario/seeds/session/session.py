@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import override
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
@@ -29,10 +30,16 @@ from ai.backend.manager.data.session.spec import (
     SessionScope,
     SessionSpec,
 )
-from ai.backend.manager.data.session.types import SessionEntityData
+from ai.backend.manager.data.session.types import (
+    SessionDesignatedAgentData,
+    SessionEntityData,
+)
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.session.creators import SessionCreator
-from bai_scenario.seeds.seeder import Naming, TestSeedRowFromThree
+from ai.backend.manager.models.session_designated_agent.creators import (
+    SessionDesignatedAgentCreator,
+)
+from bai_scenario.seeds.seeder import Naming, TestSeedFieldCreator, TestSeedRowFromThree
 
 
 def session_spec(
@@ -133,3 +140,24 @@ class TestSeedSession(
             image_infos={},
             enqueue_time=datetime.now(UTC),
         )
+
+
+@dataclass(frozen=True)
+class TestSeedDesignatedAgentOf(
+    TestSeedFieldCreator[SessionEntityData, SessionDesignatedAgentData]
+):
+    """An agent the session designates, the one an earlier row answered."""
+
+    agent_uuid: AgentUUID
+
+    @override
+    def kind(self) -> str:
+        return "지정 agent 하나를 갖는다"
+
+    @override
+    def owner_id(self, owner: SessionEntityData) -> SessionID:
+        return SessionID(owner.id)
+
+    @override
+    def seed(self) -> SessionDesignatedAgentCreator:
+        return SessionDesignatedAgentCreator(agent_uuid=self.agent_uuid)
