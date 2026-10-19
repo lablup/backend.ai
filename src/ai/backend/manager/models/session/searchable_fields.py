@@ -82,7 +82,6 @@ class _SessionOwnFields(RowDataConverter[SessionRow, SessionEntityData]):
     )
     options = SearchableField(SessionRow.options, None, None)
     agent_ids = SearchableField(SessionRow.agent_ids, None, None)
-    designated_agent_ids = SearchableField(SessionRow.designated_agent_ids, None, None)
     session_group_id = SearchableField(
         SessionRow.session_group_id,
         UUIDConditions(SessionRow.session_group_id),
@@ -219,7 +218,6 @@ class _SessionOwnFields(RowDataConverter[SessionRow, SessionEntityData]):
             cluster_size=self.cluster_size.read(row),
             options=self.options.read(row),
             agent_ids=self.agent_ids.read(row),
-            designated_agent_ids=self.designated_agent_ids.read(row),
             session_group_id=self.session_group_id.read(row),
             resource_group_id=self.resource_group_id.read(row),
             resource_group_name=self.resource_group_name.read(row),

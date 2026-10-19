@@ -29,6 +29,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
 )
 from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 from ai.backend.common.types import (
+    AgentId,
     ClusterMode,
     KernelId,
     ResourceSlot,
@@ -68,6 +69,9 @@ from ai.backend.manager.errors.base.field import FieldNotFoundError
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
     BatchGetSessionResourceAllocationAction,
+)
+from ai.backend.manager.services.session.actions.bulk_get_session_designated_agents import (
+    BulkGetSessionDesignatedAgentsAction,
 )
 
 
@@ -148,13 +152,27 @@ class TestSessionDataToNode:
     def test_basic_conversion(self) -> None:
         """SessionData should convert to SessionNode with correct fields."""
         data = _create_session_data(name="my-session")
-        node = SessionAdapter._session_data_to_node(data, _create_allocation())
+        node = SessionAdapter._session_data_to_node(data, _create_allocation(), [])
 
         assert node.metadata.name == "my-session"
         assert node.metadata.session_type == "interactive"
         assert node.metadata.cluster_mode == "SINGLE_NODE"
         assert node.metadata.cluster_size == 1
         assert node.metadata.priority == 10
+
+    def test_the_designated_agents_reach_the_node(self) -> None:
+        node = SessionAdapter._session_data_to_node(
+            _create_session_data(), _create_allocation(), ["i-agent-1", "i-agent-2"]
+        )
+
+        assert node.resource.designated_agent_ids == ["i-agent-1", "i-agent-2"]
+
+    def test_a_session_designating_no_agent_answers_null(self) -> None:
+        node = SessionAdapter._session_data_to_node(
+            _create_session_data(), _create_allocation(), []
+        )
+
+        assert node.resource.designated_agent_ids is None
 
     def test_resource_allocation_conversion(self) -> None:
         """Resource slots should be converted to ResourceSlotInfo entries."""
@@ -164,6 +182,7 @@ class TestSessionDataToNode:
             _create_allocation(
                 requested={"cpu": Decimal("1"), "mem": Decimal("1073741824")},
             ),
+            [],
         )
 
         requested = node.resource.allocation.requested
@@ -175,25 +194,25 @@ class TestSessionDataToNode:
     def test_lifecycle_running_status(self) -> None:
         """RUNNING status should be preserved as RUNNING."""
         data = _create_session_data(status=SessionStatus.RUNNING)
-        node = SessionAdapter._session_data_to_node(data, _create_allocation())
+        node = SessionAdapter._session_data_to_node(data, _create_allocation(), [])
         assert node.lifecycle.status == "RUNNING"
 
     def test_lifecycle_pending_status(self) -> None:
         """PENDING status should be preserved as PENDING."""
         data = _create_session_data(status=SessionStatus.PENDING)
-        node = SessionAdapter._session_data_to_node(data, _create_allocation())
+        node = SessionAdapter._session_data_to_node(data, _create_allocation(), [])
         assert node.lifecycle.status == "PENDING"
 
     def test_lifecycle_result(self) -> None:
         """Result should be passed through as string value."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data, _create_allocation())
+        node = SessionAdapter._session_data_to_node(data, _create_allocation(), [])
         assert node.lifecycle.result == "undefined"
 
     def test_domain_and_user_fields(self) -> None:
         """Domain name and user/project IDs should be mapped."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data, _create_allocation())
+        node = SessionAdapter._session_data_to_node(data, _create_allocation(), [])
         assert node.domain_name == "default"
         assert node.user_id == data.user_uuid
         assert node.project_id == data.group_id
@@ -201,13 +220,13 @@ class TestSessionDataToNode:
     def test_network_host_network_false(self) -> None:
         """Network info should reflect use_host_network."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data, _create_allocation())
+        node = SessionAdapter._session_data_to_node(data, _create_allocation(), [])
         assert node.network.use_host_network is False
 
     def test_empty_occupying_slots(self) -> None:
         """Empty occupying slots should produce empty entries list."""
         data = _create_session_data()
-        node = SessionAdapter._session_data_to_node(data, _create_allocation())
+        node = SessionAdapter._session_data_to_node(data, _create_allocation(), [])
         assert len(node.resource.allocation.used.entries) == 0
 
 
@@ -218,6 +237,18 @@ async def _no_allocations(
     return PartialBulkResult(
         items=[
             PartialBulkEntityResult[ResourceAllocationAggregate].nothing(SessionID(sid))
+            for sid in action.session_ids
+        ]
+    )
+
+
+async def _no_designations(
+    action: BulkGetSessionDesignatedAgentsAction,
+) -> PartialBulkResult[list[AgentId]]:
+    """The read answers for every session named, each designating no agent."""
+    return PartialBulkResult(
+        items=[
+            PartialBulkEntityResult[list[AgentId]].succeeded(SessionID(sid), [])
             for sid in action.session_ids
         ]
     )
@@ -341,6 +372,7 @@ class TestBatchLoadSessions:
         processors.batch_get_session_resource_allocation.run = AsyncMock(
             side_effect=_no_allocations
         )
+        processors.bulk_get_session_designated_agents.run = AsyncMock(side_effect=_no_designations)
         return processors
 
     @pytest.fixture
@@ -538,6 +570,9 @@ class TestEnqueueActionBuilding:
         processors.session.enqueue_session.run = AsyncMock(return_value=result)
         processors.session.batch_get_session_resource_allocation.run = AsyncMock(
             side_effect=_no_allocations
+        )
+        processors.session.bulk_get_session_designated_agents.run = AsyncMock(
+            side_effect=_no_designations
         )
         return processors
 
