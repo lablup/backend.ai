@@ -8,11 +8,10 @@ from typing import Any, override
 
 from sqlalchemy.orm import InstrumentedAttribute
 
-from ai.backend.common.data.entity.session_group import SessionGroupEntityType, SessionGroupID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session_group.types import SessionGroupData
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.session_group import SessionGroupInUse
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
 from ai.backend.manager.models.specs.purger import GuardedEntityPurger
@@ -25,7 +24,7 @@ __all__ = ("SessionGroupPurger",)
 class SessionGroupPurger(GuardedEntityPurger[SessionGroupRow, SessionGroupData]):
     """Removes a session group; its member sessions stay, their group id cleared by the FK.
 
-    A group a replica group holds is answered for as not found.
+    A group a replica group still references is refused as in use.
     """
 
     group_id: SessionGroupID
@@ -47,10 +46,8 @@ class SessionGroupPurger(GuardedEntityPurger[SessionGroupRow, SessionGroupData])
         return (
             GuardCheck(
                 condition=SessionGroupSearchableFields.linked.replica_groups.not_exists(),
-                error=EntityNotFoundError(
-                    f"Session group {self.group_id} not found",
-                    entity_type=SessionGroupEntityType(),
-                    operation=ActionOperationType.PURGE,
+                error=SessionGroupInUse(
+                    f"Session group {self.group_id} cannot be purged while a replica group uses it"
                 ),
             ),
         )
