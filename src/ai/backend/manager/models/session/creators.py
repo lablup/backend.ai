@@ -85,10 +85,6 @@ class SessionCreator(EntityCreator[SessionRow, SessionEntityData]):
         session_bootstrap = main_kernel.execution_spec.bootstrap_script if main_kernel else None
         session_startup = main_kernel.execution_spec.startup_command if main_kernel else None
 
-        designated_agent_ids = [
-            str(agent) for agent in spec.resource_spec.options.scheduling_target.designated_agents
-        ] or None
-
         cluster_mode_value = (
             spec.resource_spec.options.cluster_mode.value
             if isinstance(spec.resource_spec.options.cluster_mode, ClusterMode)
@@ -127,7 +123,6 @@ class SessionCreator(EntityCreator[SessionRow, SessionEntityData]):
             image_ids=session_image_ids,
             network_type=spec.resource_spec.network.network_type,
             network_id=spec.resource_spec.network.network_id,
-            designated_agent_ids=designated_agent_ids,
             options=SessionStoredOptions(
                 kernel_groups=spec.resource_spec.options.kernel_groups,
                 handler_options=spec.resource_spec.options.handler_options,

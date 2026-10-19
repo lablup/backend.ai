@@ -163,6 +163,9 @@ from ai.backend.manager.services.session.actions.batch_get_session_resource_allo
 )
 from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
 from ai.backend.manager.services.session.actions.bulk_get_kernels import BulkGetKernelsAction
+from ai.backend.manager.services.session.actions.bulk_get_session_designated_agents import (
+    BulkGetSessionDesignatedAgentsAction,
+)
 from ai.backend.manager.services.session.actions.compute_schedule import (
     ComputeScheduleAction,
 )
@@ -593,15 +596,30 @@ class SessionAdapter(BaseAdapter):
         ]
 
     async def _session_data_to_nodes(self, data: Sequence[SessionData]) -> list[SessionNode]:
-        """Convert session data to nodes, batch-loading their slot allocations."""
-        allocations = await self.batch_resource_allocation_by_session([
-            SessionID(item.id) for item in data
-        ])
+        """Convert session data to nodes, batch-loading their slot allocations and
+        designated agents."""
+        session_ids = [SessionID(item.id) for item in data]
+        allocations = await self.batch_resource_allocation_by_session(session_ids)
+        designated = (
+            (
+                await self._session.bulk_get_session_designated_agents.run(
+                    BulkGetSessionDesignatedAgentsAction(
+                        session_ids=[SessionId(sid) for sid in session_ids]
+                    )
+                )
+            ).items
+            if session_ids
+            else []
+        )
         nodes: list[SessionNode] = []
-        for item, allocation in zip(data, allocations, strict=True):
+        for item, allocation, agents in zip(data, allocations, designated, strict=True):
             if isinstance(allocation, Exception):
                 raise allocation
-            nodes.append(self._session_data_to_node(item, allocation))
+            error = self.batch_load_failure(agents.error)
+            if error is not None:
+                raise error
+            agent_ids = [str(agent_id) for agent_id in agents.value or []]
+            nodes.append(self._session_data_to_node(item, allocation, agent_ids))
         return nodes
 
     async def _kernel_infos_to_nodes(self, data: Sequence[KernelInfo]) -> list[KernelNode]:
@@ -1299,7 +1317,7 @@ class SessionAdapter(BaseAdapter):
 
     @staticmethod
     def _session_data_to_node(
-        data: SessionData, allocation: ResourceAllocationGQLDTO
+        data: SessionData, allocation: ResourceAllocationGQLDTO, designated_agent_ids: list[str]
     ) -> SessionNode:
         environ = (
             EnvironmentVariablesInfoDTO(
@@ -1335,7 +1353,7 @@ class SessionAdapter(BaseAdapter):
                 allocation=allocation,
                 resource_group_name=data.resource_group_name,
                 session_group_id=data.session_group_id,
-                designated_agent_ids=data.designated_agent_ids,
+                designated_agent_ids=designated_agent_ids or None,
             ),
             lifecycle=SessionLifecycleInfoGQLDTO(
                 status=_fold_session_status(data.status),
