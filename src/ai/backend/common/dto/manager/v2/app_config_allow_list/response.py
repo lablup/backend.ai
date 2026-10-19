@@ -55,6 +55,9 @@ class PurgeAppConfigAllowListPayload(BaseResponseModel):
     """Payload for app config allow-list entry purge."""
 
     id: UUID = Field(description="UUID of the purged app config allow-list entry.")
+    entity_id: UUID = Field(
+        description="UUID of the purged app config allow-list entry. Added in 26.10.0."
+    )
 
 
 class SearchAppConfigAllowListPayload(BaseResponseModel):

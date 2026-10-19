@@ -176,7 +176,9 @@ class AppConfigFragmentAdapter(BaseAdapter):
         action_result = await self._app_config.fragment_purge.run(
             PurgeAppConfigFragmentAction(purger=AppConfigFragmentPurger(fragment_id=fragment_id))
         )
-        return PurgeAppConfigFragmentPayload(id=action_result.data.id)
+        return PurgeAppConfigFragmentPayload(
+            id=action_result.data.id, entity_id=action_result.data.id
+        )
 
     async def partial_bulk_purge(
         self, input: PartialBulkPurgeAppConfigFragmentsInput
