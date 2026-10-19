@@ -14,7 +14,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     ModifyQueryDefinitionGQLPayload as ModifyQueryDefinitionGQLPayloadDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import parse_uuid
+from ai.backend.manager.api.gql.base import parse_uuid, to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -29,9 +29,11 @@ from ai.backend.manager.api.gql.prometheus_query_preset.types.node import (
     CreateQueryDefinitionPayload,
     ModifyQueryDefinitionPayload,
     PartialBulkQueryDefinitionsPayloadGQL,
+    QueryDefinitionGQL,
 )
 from ai.backend.manager.api.gql.prometheus_query_preset.types.payloads import (
     DeleteQueryDefinitionPayload,
+    PurgeQueryDefinitionPayload,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -78,9 +80,11 @@ async def update_prometheus_query_preset(
 async def purge_prometheus_query_preset(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteQueryDefinitionPayload:
+) -> PurgeQueryDefinitionPayload:
     result = await info.context.adapters.prometheus_query_preset.purge(PrometheusQueryPresetID(id))
-    return DeleteQueryDefinitionPayload.from_pydantic(result)
+    return PurgeQueryDefinitionPayload.from_pydantic(
+        result, extra={"purged_id": to_global_id(QueryDefinitionGQL, result.entity_id)}
+    )
 
 
 @gql_mutation(

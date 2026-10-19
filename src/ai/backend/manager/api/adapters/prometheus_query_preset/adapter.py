@@ -256,7 +256,9 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             PurgePresetAction(preset_id=preset_id)
         )
 
-        return DeleteQueryDefinitionPayload(id=action_result.data.id)
+        return DeleteQueryDefinitionPayload(
+            id=action_result.data.id, entity_id=action_result.data.id
+        )
 
     async def partial_bulk_update(
         self, input: PartialBulkUpdateQueryDefinitionsInput
