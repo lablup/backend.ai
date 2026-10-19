@@ -24,7 +24,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 자기가 만든 세션 그룹을 지우면, 그 세션 그룹의 id가 오고 멤버 세션은 세션 그룹이 비워진 채 남는다](#purging-the-owner-purges-a-users-session-group-keeping-its-members) | 성공 |
-| [자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 지우면, 권한이 아니라 대상이 없다는 것으로 거부되고 세션 그룹은 남는다](#purging-a-deployments-session-group-is-not-found-for-a-purge) | 거부 |
+| [자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 지우면, replica group이 사용 중이라는 것으로 거부되고 세션 그룹은 남는다](#purging-a-deployments-session-group-is-refused-as-in-use) | 거부 |
 | [아무 권한도 받지 않은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 세션 그룹은 남는다](#purging-a-user-granted-nothing-may-not-purge-a-session-group) | 거부 |
 | [자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 세션 그룹은 남는다](#purging-a-user-granted-only-read-may-not-purge-a-session-group) | 거부 |
 
@@ -185,11 +185,11 @@ Then
 - 지운 사용자가 만든 세션 그룹의 id가 온다
   - id: 사용자가 만든 세션 그룹의 id와 같다
 
-<a id="purging-a-deployments-session-group-is-not-found-for-a-purge"></a>
+<a id="purging-a-deployments-session-group-is-refused-as-in-use"></a>
 
-#### [a-deployments-session-group-is-not-found-for-a-purge](/tests/scenario/bai_scenario/manager/session_group/test_purging.py) — pass
+#### [a-deployments-session-group-is-refused-as-in-use](/tests/scenario/bai_scenario/manager/session_group/test_purging.py) — pass
 
-자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 지우면, 권한이 아니라 대상이 없다는 것으로 거부되고 세션 그룹은 남는다
+자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 지우면, replica group이 사용 중이라는 것으로 거부되고 세션 그룹은 남는다
 
 Given
 
@@ -222,7 +222,7 @@ When
 Then
 
 - 거부된다
-  - 거부: EntityNotFoundError
+  - 거부: SessionGroupInUse
 
 <a id="purging-a-user-granted-nothing-may-not-purge-a-session-group"></a>
 

@@ -17,8 +17,8 @@ from ai.backend.common.data.entity.session_group import SessionGroupEntityType
 from ai.backend.common.dto.manager.v2.session_group.request import PurgeSessionGroupInput
 from ai.backend.common.dto.manager.v2.session_group.response import PurgeSessionGroupPayload
 from ai.backend.manager.api.adapters.session_group.adapter import SessionGroupAdapter
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.session_group import SessionGroupInUse
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -133,18 +133,18 @@ class TheOwnerPurgesTheUsersGroup(
 
 
 @dataclass(frozen=True)
-class ADeploymentsGroupIsNotFound(
+class ADeploymentsGroupIsInUse(
     Scenario[TestSeedingSession, Laid, SessionGroupAdapter, PurgeSessionGroupPayload]
 ):
     @override
     def summary(self) -> str:
-        return "a-deployments-session-group-is-not-found-for-a-purge"
+        return "a-deployments-session-group-is-refused-as-in-use"
 
     @override
     def describe(self) -> str:
         return (
             "자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 지우면, "
-            "권한이 아니라 대상이 없다는 것으로 거부되고 세션 그룹은 남는다"
+            "replica group이 사용 중이라는 것으로 거부되고 세션 그룹은 남는다"
         )
 
     @override
@@ -157,7 +157,7 @@ class ADeploymentsGroupIsNotFound(
 
     @override
     def then(self) -> Then[Laid, PurgeSessionGroupPayload]:
-        return TheCallIsRefused(EntityNotFoundError)
+        return TheCallIsRefused(SessionGroupInUse)
 
 
 @dataclass(frozen=True)
@@ -218,7 +218,7 @@ class AUserGrantedNothingMayNotPurge(
 
 SCENARIOS: list[PurgingStep] = [
     TheOwnerPurgesTheUsersGroup(),
-    ADeploymentsGroupIsNotFound(),
+    ADeploymentsGroupIsInUse(),
     AReaderMayNotPurge(),
     AUserGrantedNothingMayNotPurge(),
 ]
