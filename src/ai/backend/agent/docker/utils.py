@@ -87,8 +87,7 @@ class PersistentServiceContainer:
         image_version = await self.get_image_version()
         if image_version == 0:
             log.info("persistent service container installing", image_name=self.image_ref)
-            await self.install_latest()
-            image_version = await self.get_image_version()
+            image_version = await self.install_latest()
         elif image_version < self.img_version:
             log.info(
                 "persistent service container upgrading",
@@ -96,8 +95,7 @@ class PersistentServiceContainer:
                 current_version=image_version,
                 target_version=self.img_version,
             )
-            await self.install_latest()
-            image_version = await self.get_image_version()
+            image_version = await self.install_latest()
         container_version, is_running = await self.get_container_version_and_status()
         if container_version == 0 or image_version != container_version or not is_running:
             log.info("persistent service container recreating", image_name=self.image_ref)
@@ -105,7 +103,7 @@ class PersistentServiceContainer:
             log.info("persistent service container starting", image_name=self.image_ref)
             await self.start()
 
-    async def install_latest(self) -> None:
+    async def install_latest(self) -> int:
         with gzip.open(self.img_path, "rb") as reader:
             proc = await asyncio.create_subprocess_exec(
                 *["docker", "load"],
@@ -130,6 +128,7 @@ class PersistentServiceContainer:
                     proc.returncode,
                     stderr,
                 )
+        return await self.get_image_version()
 
     async def recreate(self) -> None:
         async with closing_async(Docker()) as docker:
