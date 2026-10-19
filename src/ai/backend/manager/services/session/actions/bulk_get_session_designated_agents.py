@@ -11,7 +11,7 @@ from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BasePartialBulkAction
 
 
-@dataclass
+@dataclass(frozen=True)
 class BulkGetSessionDesignatedAgentsAction(BasePartialBulkAction):
     """Read the agents the sessions the caller named designate.
 
