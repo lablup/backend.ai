@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import pytest
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair
 from ai.backend.web.config.unified import SessionConfig, WebServerUnifiedConfig
-from ai.backend.web.dependencies.infrastructure.redis import RedisProvider
+from ai.backend.web.dependencies.infrastructure.redis import RedisProvider, RedisProviderInput
 
 
 class TestRedisProvider:
@@ -41,7 +42,9 @@ class TestRedisProvider:
         """Provider should create and cleanup Valkey session client."""
         provider = RedisProvider()
 
-        async with provider.provide(web_config) as client:
+        async with provider.provide(
+            RedisProviderInput(config=web_config, sentinel_monitors=SentinelMonitorSet([]))
+        ) as client:
             assert isinstance(client, ValkeySessionClient)
             # Verify client is functional
             server_time = await client.get_server_time_second()
@@ -55,7 +58,9 @@ class TestRedisProvider:
         provider = RedisProvider()
 
         with pytest.raises(RuntimeError):
-            async with provider.provide(web_config) as client:
+            async with provider.provide(
+                RedisProviderInput(config=web_config, sentinel_monitors=SentinelMonitorSet([]))
+            ) as client:
                 assert isinstance(client, ValkeySessionClient)
                 raise RuntimeError("Test error")
 

@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -62,6 +63,7 @@ class OrchestrationInput:
     event_producer: EventProducer
     distributed_lock_factory: DistributedLockFactory
     valkey_profile_target: ValkeyProfileTarget
+    sentinel_monitors: SentinelMonitorSet
     valkey_schedule: ValkeyScheduleClient
     valkey_live: ValkeyLiveClient
     valkey_stat: ValkeyStatClient
@@ -140,6 +142,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             config_provider=setup_input.config_provider,
             event_producer=setup_input.event_producer,
             lock_factory=setup_input.distributed_lock_factory,
+            sentinel_monitors=setup_input.sentinel_monitors,
         )
         idle_checker_host = await stack.enter_dependency(
             idle_checker_dep,
@@ -183,6 +186,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
         leader_dep = LeaderElectionDependency()
         leader_input = LeaderElectionInput(
             valkey_profile_target=setup_input.valkey_profile_target,
+            sentinel_monitors=setup_input.sentinel_monitors,
             pidx=setup_input.pidx,
             config_provider=setup_input.config_provider,
             event_producer=setup_input.event_producer,

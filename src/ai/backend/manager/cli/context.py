@@ -175,6 +175,9 @@ async def config_provider_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerConfi
 
 @contextlib.asynccontextmanager
 async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
+    from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import (
+        SentinelMonitorSet,
+    )
     from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
     from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -200,33 +203,46 @@ async def redis_ctx(cli_ctx: CLIContext) -> AsyncIterator[RedisConnectionSet]:
         redis_config = RedisConfig(**raw_redis_config)
         redis_profile_target = redis_config.to_redis_profile_target()
 
-    valkey_live_client = await ValkeyLiveClient.create(
-        redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),
-        db_id=REDIS_LIVE_DB,
-        human_readable_name="mgr_cli.live",
-    )
-    valkey_stat_client = await ValkeyStatClient.create(
-        redis_profile_target.profile_target(RedisRole.STATISTICS).to_valkey_target(),
-        db_id=REDIS_STATISTICS_DB,
-        human_readable_name="mgr_cli.stat",
-    )
-    valkey_image_client = await ValkeyImageClient.create(
-        redis_profile_target.profile_target(RedisRole.IMAGE).to_valkey_target(),
-        db_id=REDIS_IMAGE_DB,
-        human_readable_name="mgr_cli.image",
-    )
-    valkey_stream_client = await ValkeyStreamClient.create(
-        redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target(),
-        db_id=REDIS_STREAM_DB,
-        human_readable_name="mgr_cli.stream",
-    )
-    yield RedisConnectionSet(
-        live=valkey_live_client,
-        stat=valkey_stat_client,
-        image=valkey_image_client,
-        stream=valkey_stream_client,
-    )
-    await valkey_stream_client.close()
-    await valkey_image_client.close()
-    await valkey_stat_client.close()
-    await valkey_live_client.close()
+    live_target = redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target()
+    stat_target = redis_profile_target.profile_target(RedisRole.STATISTICS).to_valkey_target()
+    image_target = redis_profile_target.profile_target(RedisRole.IMAGE).to_valkey_target()
+    stream_target = redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target()
+    sentinel_monitors = SentinelMonitorSet(redis_profile_target.valkey_targets())
+    await sentinel_monitors.start()
+    try:
+        valkey_live_client = await ValkeyLiveClient.create(
+            live_target,
+            db_id=REDIS_LIVE_DB,
+            human_readable_name="mgr_cli.live",
+            sentinel_monitor=sentinel_monitors.monitor_for(live_target),
+        )
+        valkey_stat_client = await ValkeyStatClient.create(
+            stat_target,
+            db_id=REDIS_STATISTICS_DB,
+            human_readable_name="mgr_cli.stat",
+            sentinel_monitor=sentinel_monitors.monitor_for(stat_target),
+        )
+        valkey_image_client = await ValkeyImageClient.create(
+            image_target,
+            db_id=REDIS_IMAGE_DB,
+            human_readable_name="mgr_cli.image",
+            sentinel_monitor=sentinel_monitors.monitor_for(image_target),
+        )
+        valkey_stream_client = await ValkeyStreamClient.create(
+            stream_target,
+            db_id=REDIS_STREAM_DB,
+            human_readable_name="mgr_cli.stream",
+            sentinel_monitor=sentinel_monitors.monitor_for(stream_target),
+        )
+        yield RedisConnectionSet(
+            live=valkey_live_client,
+            stat=valkey_stat_client,
+            image=valkey_image_client,
+            stream=valkey_stream_client,
+        )
+        await valkey_stream_client.close()
+        await valkey_image_client.close()
+        await valkey_stat_client.close()
+        await valkey_live_client.close()
+    finally:
+        await sentinel_monitors.close()

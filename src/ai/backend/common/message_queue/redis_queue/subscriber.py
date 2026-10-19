@@ -7,6 +7,7 @@ from typing import Any, Self, override
 
 import glide
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.message_queue.abc import AbstractSubscriber
 from ai.backend.common.message_queue.exceptions import InvalidMessagePayloadError
@@ -52,7 +53,13 @@ class RedisSubscriber(AbstractSubscriber):
         self._loop_task = asyncio.create_task(self._read_broadcast_messages_loop())
 
     @classmethod
-    async def create(cls, redis_target: RedisTarget, channels: set[str], db: int = 0) -> Self:
+    async def create(
+        cls,
+        redis_target: RedisTarget,
+        channels: set[str],
+        db: int = 0,
+        sentinel_monitor: AbstractSentinelMonitor | None = None,
+    ) -> Self:
         """
         Create a new RedisSubscriber instance.
 
@@ -69,6 +76,7 @@ class RedisSubscriber(AbstractSubscriber):
             human_readable_name="redis_subscriber",
             db_id=db,
             pubsub_channels=channels,
+            sentinel_monitor=sentinel_monitor,
         )
         return cls(client, channels)
 

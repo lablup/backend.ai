@@ -2165,6 +2165,10 @@ class ValkeyProfileTarget:
             return self._override_targets[role]
         return self._base_target
 
+    def targets(self) -> list[ValkeyTarget]:
+        """The base target and every override target."""
+        return [self._base_target, *(self._override_targets or {}).values()]
+
 
 # TODO: Remove this type
 @dataclass
@@ -2201,6 +2205,11 @@ class RedisProfileTarget:
         if self._override_targets and (role in self._override_targets):
             return self._override_targets[role]
         return self._base_target
+
+    def valkey_targets(self) -> list[ValkeyTarget]:
+        """The base target and every override target, converted to Valkey targets."""
+        targets = [self._base_target, *(self._override_targets or {}).values()]
+        return [target.to_valkey_target() for target in targets]
 
     @staticmethod
     def _parse_addr(addr_data: Any) -> HostPortPair:

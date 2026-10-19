@@ -51,6 +51,7 @@ def setup_api(
         valkey_image=r.infrastructure.valkey.image,
         valkey_live=r.infrastructure.valkey.live,
         valkey_schedule=r.infrastructure.valkey.schedule,
+        sentinel_monitors=r.infrastructure.sentinel_monitors,
         network_plugin_ctx=r.plugins.network_plugin_ctx,
         background_task_manager=r.system.background_task_manager,
         storage_manager=r.components.storage_manager,

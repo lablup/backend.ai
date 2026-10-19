@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.etcd import AsyncEtcd
@@ -28,6 +29,7 @@ class SystemComposerInput:
     local_config: StorageProxyUnifiedConfig
     etcd: AsyncEtcd
     redis_config: RedisConfig
+    sentinel_monitors: SentinelMonitorSet
     valkey: StorageProxyValkeyClients
     event_producer: EventProducer
 
@@ -66,6 +68,7 @@ class SystemComposer(DependencyComposer[SystemComposerInput, SystemResources]):
                 local_config=setup_input.local_config,
                 etcd=setup_input.etcd,
                 redis_config=setup_input.redis_config,
+                sentinel_monitors=setup_input.sentinel_monitors,
                 event_producer=setup_input.event_producer,
             ),
         )

@@ -53,6 +53,7 @@ from ai.backend.agent.resources import (
 from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo, Port
 from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cgroup import CgroupController
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.docker import ImageRef, KernelFeatures
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
@@ -855,6 +856,7 @@ class KubernetesAgent(
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
         agent_class: AgentClass,
+        sentinel_monitors: SentinelMonitorSet,
     ) -> None:
         super().__init__(
             etcd,
@@ -867,6 +869,7 @@ class KubernetesAgent(
             computers=computers,
             slots=slots,
             agent_class=agent_class,
+            sentinel_monitors=sentinel_monitors,
         )
         self._kernel_recovery = KubernetesKernelRegistryRecovery.create(
             KubernetesKernelRegistryRecoveryArgs(

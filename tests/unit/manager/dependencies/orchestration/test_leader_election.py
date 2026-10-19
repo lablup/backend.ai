@@ -50,6 +50,7 @@ class TestLeaderElectionDependency:
         dependency = LeaderElectionDependency()
         election_input = LeaderElectionInput(
             valkey_profile_target=mock_valkey_profile_target,
+            sentinel_monitors=MagicMock(),
             pidx=0,
             config_provider=mock_config_provider,
             event_producer=mock_event_producer,
@@ -93,6 +94,7 @@ class TestLeaderElectionDependency:
         dependency = LeaderElectionDependency()
         election_input = LeaderElectionInput(
             valkey_profile_target=MagicMock(),
+            sentinel_monitors=MagicMock(),
             pidx=1,
             config_provider=mock_config_provider,
             event_producer=MagicMock(),
@@ -131,6 +133,7 @@ class TestLeaderElectionDependency:
         dependency = LeaderElectionDependency()
         election_input = LeaderElectionInput(
             valkey_profile_target=MagicMock(),
+            sentinel_monitors=MagicMock(),
             pidx=0,
             config_provider=mock_config_provider,
             event_producer=MagicMock(),
@@ -172,6 +175,7 @@ class TestLeaderElectionDependency:
         dependency = LeaderElectionDependency()
         election_input = LeaderElectionInput(
             valkey_profile_target=MagicMock(),
+            sentinel_monitors=MagicMock(),
             pidx=0,
             config_provider=mock_config_provider,
             event_producer=MagicMock(),

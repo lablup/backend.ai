@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Self, override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.service_discovery.service_discovery import (
@@ -22,6 +23,7 @@ _DEFAULT_TTL = 60 * 3  # 3 minutes
 @dataclass
 class RedisServiceDiscoveryArgs:
     valkey_target: ValkeyTarget
+    sentinel_monitor: AbstractSentinelMonitor | None = None
     db_id: int = 0
     ttl: int = _DEFAULT_TTL  # 3 minutes
     prefix: str = _DEFAULT_PREFIX
@@ -45,6 +47,7 @@ class RedisServiceDiscovery(ServiceDiscovery):
             args.valkey_target,
             db_id=args.db_id,
             human_readable_name="service_discovery",
+            sentinel_monitor=args.sentinel_monitor,
         )
         return cls(valkey_client, args)
 

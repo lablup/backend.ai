@@ -29,6 +29,7 @@ from ai.backend.appproxy.common.types import (
     SerializableCircuit,
 )
 from ai.backend.common.clients.http_client.client_pool import ClientPool
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
@@ -340,6 +341,7 @@ class RootContext:
     proxy_frontend: BaseFrontend[Any, Any]
     event_dispatcher: EventDispatcher
     event_producer: EventProducer
+    sentinel_monitors: SentinelMonitorSet
     valkey_live: ValkeyLiveClient
     valkey_stat: ValkeyStatClient
     http_client_pool: ClientPool

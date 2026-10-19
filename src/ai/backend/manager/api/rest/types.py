@@ -9,6 +9,7 @@ from aiohttp import web
 from aiohttp.typedefs import Middleware
 
 from ai.backend.common.api_handlers import APIResponse, APIStreamResponse
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -71,6 +72,7 @@ class GQLContextDeps:
     valkey_image: ValkeyImageClient
     valkey_live: ValkeyLiveClient
     valkey_schedule: ValkeyScheduleClient
+    sentinel_monitors: SentinelMonitorSet
     network_plugin_ctx: NetworkPluginContext
     background_task_manager: BackgroundTaskManager
     storage_manager: StorageSessionManager

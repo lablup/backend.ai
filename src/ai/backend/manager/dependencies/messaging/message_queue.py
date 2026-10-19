@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Final, override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
@@ -22,6 +23,7 @@ class MessageQueueInput:
     """
 
     config: ManagerUnifiedConfig
+    sentinel_monitors: SentinelMonitorSet
 
 
 class MessageQueueDependency(
@@ -65,6 +67,7 @@ class MessageQueueDependency(
         queue = await RedisQueue.create(
             stream_redis_target,
             args,
+            setup_input.sentinel_monitors.monitor_for(stream_redis_target.to_valkey_target()),
         )
         try:
             yield queue

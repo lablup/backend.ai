@@ -15,6 +15,7 @@ from ai.backend.agent.agent import AgentClass
 from ai.backend.agent.docker.agent import DockerAgent
 from ai.backend.agent.kernel import KernelRegistry
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.types import AutoPullBehavior
@@ -43,6 +44,7 @@ async def agent(local_config: Any, test_id: str, mocker: Any, socket_relay_image
         computers={},
         slots={},
         agent_class=AgentClass.PRIMARY,
+        sentinel_monitors=SentinelMonitorSet([]),
     )  # for faster test iteration
     agent.local_instance_id = test_case_id  # use per-test private registry file
     try:

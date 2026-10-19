@@ -203,6 +203,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             valkey_target=valkey_target,
             db_id=REDIS_RATE_LIMIT_DB,
             human_readable_name="ratelimit",
+            sentinel_monitor=ctx.sentinel_monitors.monitor_for(valkey_target),
         )
         try:
             rlim_window = await valkey_client.get_user_rlim_window(UserID(self.user))

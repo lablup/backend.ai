@@ -33,6 +33,7 @@ class TestIdleCheckerHostDependency:
             config_provider=MagicMock(),
             event_producer=MagicMock(),
             lock_factory=MagicMock(),
+            sentinel_monitors=MagicMock(),
         )
 
         async with dependency.provide(checker_input) as checker_host:
@@ -42,6 +43,7 @@ class TestIdleCheckerHostDependency:
                 checker_input.config_provider,
                 checker_input.event_producer,
                 checker_input.lock_factory,
+                checker_input.sentinel_monitors,
             )
             mock_checker_host.start.assert_awaited_once()
 
@@ -62,6 +64,7 @@ class TestIdleCheckerHostDependency:
             config_provider=MagicMock(),
             event_producer=MagicMock(),
             lock_factory=MagicMock(),
+            sentinel_monitors=MagicMock(),
         )
 
         with pytest.raises(RuntimeError, match="test error"):

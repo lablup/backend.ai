@@ -76,6 +76,7 @@ from ai.backend.common import config, identity, msgpack, utils
 from ai.backend.common.asyncio import current_loop
 from ai.backend.common.auth import AgentAuthHandler, PublicKey, SecretKey
 from ai.backend.common.bgtask.reporter import ProgressReporter
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.docker import ImageRef
@@ -329,6 +330,7 @@ class AgentRPCServer(aobject):
     stats_monitor: AgentStatsPluginContext
     error_monitor: AgentErrorPluginContext
     health_probe: HealthProbe
+    sentinel_monitors: SentinelMonitorSet
 
     def __init__(
         self,
@@ -349,6 +351,12 @@ class AgentRPCServer(aobject):
 
         await self.read_agent_config()
         await self.read_agent_config_container()
+        if not self.local_config.redis:
+            raise ConfigurationError({"AgentRPCServer": "Redis runtime configuration is missing."})
+        self.sentinel_monitors = SentinelMonitorSet(
+            self.local_config.redis.to_redis_profile_target().valkey_targets()
+        )
+        await self.sentinel_monitors.start()
 
         self.stats_monitor = AgentStatsPluginContext(
             self.etcd, self.local_config.model_dump(by_alias=True)
@@ -396,6 +404,7 @@ class AgentRPCServer(aobject):
             self.stats_monitor,
             self.error_monitor,
             self.rpc_auth_agent_public_key,
+            self.sentinel_monitors,
         )
 
         # Start serving requests.
@@ -655,6 +664,7 @@ class AgentRPCServer(aobject):
         if not self.debug_server_task.done():
             await self.debug_server_task
         await self.runtime.__aexit__(*exc_info)
+        await self.sentinel_monitors.close()
         await self.stats_monitor.cleanup()
         await self.error_monitor.cleanup()
         await self.health_probe.stop()
@@ -1598,7 +1608,10 @@ async def service_discovery_ctx(
             valkey_profile_target = local_config.redis.to_valkey_profile_target()
             live_valkey_target = valkey_profile_target.profile_target(RedisRole.LIVE)
             service_discovery = await RedisServiceDiscovery.create(
-                args=RedisServiceDiscoveryArgs(valkey_target=live_valkey_target)
+                args=RedisServiceDiscoveryArgs(
+                    valkey_target=live_valkey_target,
+                    sentinel_monitor=agent_server.sentinel_monitors.monitor_for(live_valkey_target),
+                )
             )
     sd_loop = ServiceDiscoveryLoop(
         sd_type,

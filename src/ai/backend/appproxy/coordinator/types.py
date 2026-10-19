@@ -30,6 +30,7 @@ from ai.backend.appproxy.common.events import (
     AppProxyWorkerCircuitAddedEvent,
 )
 from ai.backend.appproxy.common.types import ProxyProtocol, RouteInfo, SerializableCircuit
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -401,6 +402,7 @@ class RootContext:
     core_event_dispatcher: EventDispatcher
     core_event_producer: EventProducer
 
+    sentinel_monitors: SentinelMonitorSet
     valkey_live: ValkeyLiveClient
     redis_lock: RedisConnectionInfo
     core_valkey_live: ValkeyLiveClient

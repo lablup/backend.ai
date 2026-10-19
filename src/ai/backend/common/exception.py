@@ -1049,6 +1049,23 @@ class ValkeySentinelMasterNotFound(BackendAIError, web.HTTPServiceUnavailable):
         )
 
 
+class ValkeySentinelMonitorNotFound(BackendAIError, web.HTTPInternalServerError):
+    """
+    Raised when a Valkey client for a Sentinel target is created without its Sentinel monitor.
+    """
+
+    error_type = "https://api.backend.ai/probs/valkey-sentinel-monitor-not-found"
+    error_title = "Valkey Sentinel Monitor Not Found"
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )
+
+
 class ValkeyRoleMismatchError(BackendAIError, web.HTTPServiceUnavailable):
     """
     Raised when a Valkey connection points to a node whose role is not the expected one
