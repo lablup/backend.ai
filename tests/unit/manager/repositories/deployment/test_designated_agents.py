@@ -15,6 +15,7 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ResourceSlot
 from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.deployment_designated_agent.row import (
     DeploymentDesignatedAgentRow,
@@ -205,6 +206,21 @@ class TestDeploymentDesignatedAgents:
 
         designated = await repository.fetch_designated_agents_by_deployment_ids({deployment_id})
         assert designated[deployment_id] == []
+
+    @pytest.mark.parametrize(
+        "agent_count",
+        [pytest.param(0, id="no-agents"), pytest.param(1, id="one-agent")],
+    )
+    async def test_replacing_for_a_missing_deployment_raises_not_found(
+        self,
+        repository: DeploymentRepository,
+        agent_uuids: list[AgentUUID],
+        agent_count: int,
+    ) -> None:
+        with pytest.raises(EndpointNotFound):
+            await repository.replace_designated_agents(
+                DeploymentID(uuid.uuid4()), set(agent_uuids[:agent_count])
+            )
 
     async def test_fetching_many_groups_by_deployment_with_an_empty_list_for_none(
         self,
