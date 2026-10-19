@@ -277,10 +277,30 @@
       # Added in 26.4.4
       interval = 30.0
 
-  # Process, memory, and CPU limits of the socket relay container that connects
-  # kernel containers to the agent socket.
+  # User, privilege, and resource limits of the socket relay container that
+  # connects kernel containers to the agent socket.
   # Added in 26.10.0
   [agent.socket-relay]
+    # Run socat in the socket relay container as a non-root user. A root agent
+    # changes the owner of the socket directory to uid/gid 65534 and runs the
+    # relay as that user; a non-root agent runs the relay as its own user. The
+    # setting applies when the relay container is created, so remove the
+    # backendai-socket-relay.<agent id> container before restarting the agent
+    # after changing it.
+    # Added in 26.10.0
+    non-root = true
+    # Create the socket relay container with the no-new-privileges security
+    # option, so its processes cannot gain privileges through setuid binaries.
+    # Added in 26.10.0
+    no-new-privileges = true
+    # Drop all Linux capabilities from the socket relay container. Without non-
+    # root, the relay then runs as root that cannot write to a socket directory
+    # owned by another user, such as the directory of a non-root agent.
+    # Added in 26.10.0
+    drop-all-capabilities = true
+    # Mount the root filesystem of the socket relay container read-only.
+    # Added in 26.10.0
+    read-only-rootfs = true
     # Maximum number of processes in the socket relay container. Unlimited if
     # not set.
     # Added in 26.10.0

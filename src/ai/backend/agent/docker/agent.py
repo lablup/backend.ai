@@ -1714,11 +1714,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         if sys.platform != "darwin":
             socket_dir = ipc_base_path / "container"
             relay_config = self.local_config.agent.socket_relay
-            if os.geteuid() == 0:
-                relay_uid, relay_gid = _SOCKET_RELAY_UID, _SOCKET_RELAY_GID
-                os.chown(socket_dir, relay_uid, relay_gid)
+            relay_user: str | None
+            if not relay_config.non_root:
+                relay_user = None
+            elif os.geteuid() == 0:
+                os.chown(socket_dir, _SOCKET_RELAY_UID, _SOCKET_RELAY_GID)
+                relay_user = f"{_SOCKET_RELAY_UID}:{_SOCKET_RELAY_GID}"
             else:
-                relay_uid, relay_gid = os.geteuid(), os.getegid()
+                relay_user = f"{os.geteuid()}:{os.getegid()}"
             listen_address = (
                 f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777"
             )
@@ -1731,10 +1734,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     },
                 ],
                 "NetworkMode": "host",
-                "ReadonlyRootfs": True,
-                "SecurityOpt": ["no-new-privileges"],
-                "CapDrop": ["ALL"],
             }
+            if relay_config.no_new_privileges:
+                relay_host_config["SecurityOpt"] = ["no-new-privileges"]
+            if relay_config.drop_all_capabilities:
+                relay_host_config["CapDrop"] = ["ALL"]
+            if relay_config.read_only_rootfs:
+                relay_host_config["ReadonlyRootfs"] = True
             # Unset limits are left out rather than sent as 0, which Podman applies literally.
             if relay_config.max_children is not None:
                 listen_address += f",max-children={relay_config.max_children}"
@@ -1744,17 +1750,19 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 relay_host_config["Memory"] = int(relay_config.memory)
             if relay_config.cpus is not None:
                 relay_host_config["NanoCpus"] = int(relay_config.cpus * 1_000_000_000)
+            relay_container_config: dict[str, Any] = {
+                "Cmd": [
+                    listen_address,
+                    f"TCP-CONNECT:127.0.0.1:{self.local_config.agent.agent_sock_port}",
+                ],
+                "HostConfig": relay_host_config,
+            }
+            if relay_user is not None:
+                relay_container_config["User"] = relay_user
             socket_relay_name = f"backendai-socket-relay.{self.id}"
             socket_relay_container = PersistentServiceContainer(
                 "backendai-socket-relay:latest",
-                {
-                    "Cmd": [
-                        listen_address,
-                        f"TCP-CONNECT:127.0.0.1:{self.local_config.agent.agent_sock_port}",
-                    ],
-                    "User": f"{relay_uid}:{relay_gid}",
-                    "HostConfig": relay_host_config,
-                },
+                relay_container_config,
                 name=socket_relay_name,
             )
             await socket_relay_container.ensure_running_latest()

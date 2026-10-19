@@ -137,6 +137,72 @@ class SyncContainerLifecyclesConfig(BaseConfigSchema):
 
 
 class SocketRelayConfig(BaseConfigSchema):
+    non_root: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("non-root", "non_root"),
+            serialization_alias="non-root",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Run socat in the socket relay container as a non-root user. A root agent "
+                "changes the owner of the socket directory to uid/gid 65534 and runs the relay "
+                "as that user; a non-root agent runs the relay as its own user. The setting "
+                "applies when the relay container is created, so remove the "
+                "backendai-socket-relay.<agent id> container before restarting the agent "
+                "after changing it."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="false", prod="true"),
+        ),
+    ]
+    no_new_privileges: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("no-new-privileges", "no_new_privileges"),
+            serialization_alias="no-new-privileges",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Create the socket relay container with the no-new-privileges security option, "
+                "so its processes cannot gain privileges through setuid binaries."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="false", prod="true"),
+        ),
+    ]
+    drop_all_capabilities: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("drop-all-capabilities", "drop_all_capabilities"),
+            serialization_alias="drop-all-capabilities",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Drop all Linux capabilities from the socket relay container. Without non-root, "
+                "the relay then runs as root that cannot write to a socket directory owned by "
+                "another user, such as the directory of a non-root agent."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="false", prod="true"),
+        ),
+    ]
+    read_only_rootfs: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("read-only-rootfs", "read_only_rootfs"),
+            serialization_alias="read-only-rootfs",
+        ),
+        BackendAIConfigMeta(
+            description="Mount the root filesystem of the socket relay container read-only.",
+            added_version="26.10.0",
+            example=ConfigExample(local="false", prod="true"),
+        ),
+    ]
     pids_limit: Annotated[
         int | None,
         Field(
@@ -860,7 +926,7 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description=(
-                "Process, memory, and CPU limits of the socket relay container "
+                "User, privilege, and resource limits of the socket relay container "
                 "that connects kernel containers to the agent socket."
             ),
             added_version="26.10.0",
