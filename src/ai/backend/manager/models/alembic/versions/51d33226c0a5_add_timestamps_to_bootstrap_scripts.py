@@ -1,0 +1,28 @@
+"""Add created_at and updated_at to bootstrap scripts."""
+
+import sqlalchemy as sa
+from alembic import op
+
+revision = "51d33226c0a5"
+down_revision = "a31e8d4c9b72"
+# Part of: NEXT_RELEASE_VERSION
+branch_labels = None
+depends_on = None
+
+
+def upgrade() -> None:
+    for column in ("created_at", "updated_at"):
+        op.add_column(
+            "bootstrap_scripts",
+            sa.Column(
+                column,
+                sa.DateTime(timezone=True),
+                nullable=False,
+                server_default=sa.func.now(),
+            ),
+        )
+
+
+def downgrade() -> None:
+    op.drop_column("bootstrap_scripts", "updated_at")
+    op.drop_column("bootstrap_scripts", "created_at")
