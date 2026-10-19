@@ -1,159 +1,186 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
+  "definitions": {
+    "seedValue": {
+      "description": "A color seed as a 6-digit hex: a string applies to both schemes, a [light, dark] tuple splits them (Astryx TokenValue semantics).",
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^#[0-9A-Fa-f]{6}$"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      ]
+    },
+    "colorValue": {
+      "description": "A CSS color applied verbatim: a string applies to both schemes, a [light, dark] tuple splits them.",
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      ]
+    },
+    "logoSize": {
+      "type": "object",
+      "properties": {
+        "width": {
+          "type": "number"
+        },
+        "height": {
+          "type": "number"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
   "properties": {
     "$schema": {
       "type": "string"
     },
-    "fontFamily": {
-      "type": "string",
-      "description": "The font family applied to both light and dark themes."
+    "schemaVersion": {
+      "const": 2,
+      "description": "Appearance document format version. v1 (antd-shaped light/dark documents) is not readable since FR-3605 — see the theme migration guide."
     },
-    "light": {
-      "$ref": "./antdThemeConfig.schema.json"
-    },
-    "dark": {
-      "$ref": "./antdThemeConfig.schema.json"
-    },
-    "families": {
+    "theme": {
       "type": "object",
-      "description": "Selectable theme families, keyed by family id (e.g. 'stained', 'glass'). The 'default' family is always synthesized from the top-level light/dark; a 'default' key here is ignored. When this block is omitted entirely (pre-family theme.json files), the catalog has only that synthesized default and family selection is unavailable.",
-      "additionalProperties": {
-        "type": "object",
-        "properties": {
-          "light": {
-            "$ref": "./antdThemeConfig.schema.json"
-          },
-          "dark": {
-            "$ref": "./antdThemeConfig.schema.json"
-          },
-          "label": {
-            "type": "string",
-            "description": "Human-readable label shown in the family selector. Falls back to the family key."
-          }
-        },
-        "required": ["light", "dark"]
-      }
-    },
-    "logo": {
-      "type": "object",
-      "description": "Properties to customize the site's logo, considering both light and dark modes.",
+      "description": "The Astryx-vocabulary half: everything that feeds the theme pipeline.",
       "properties": {
-        "src": {
+        "fontFamily": {
           "type": "string",
-          "description": "The source of the logo image."
+          "description": "The font family applied to both schemes."
         },
-        "srcCollapsed": {
+        "siderMode": {
           "type": "string",
-          "description": "The source of the collapsed logo image."
+          "enum": ["dark", "light"],
+          "description": "Forces the sider chrome's polarity regardless of the site's dark mode status. Omit to follow the page scheme."
         },
-        "srcDark": {
-          "type": "string",
-          "description": "The source of the logo image in dark mode."
-        },
-        "srcCollapsedDark": {
-          "type": "string",
-          "description": "The source of the collapsed logo image in dark mode."
-        },
-        "alt": {
-          "type": "string",
-          "description": "The alt text for the logo image."
-        },
-        "href": {
-          "type": "string",
-          "description": "The URL that the logo links to."
-        },
-        "size": {
-          "width": {
-            "type": "number",
-            "description": "The width of the logo image."
+        "families": {
+          "type": "object",
+          "description": "Selectable theme families keyed by family id. 'default' must exist; other entries appear in the family selector with their branding.familyLabels label.",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "seeds": {
+                "type": "object",
+                "description": "Brand color seeds. Roles derive from these: brand uses accent, admin uses info, secondary uses success.",
+                "properties": {
+                  "accent": {
+                    "$ref": "#/definitions/seedValue"
+                  },
+                  "link": {
+                    "$ref": "#/definitions/seedValue"
+                  },
+                  "info": {
+                    "$ref": "#/definitions/seedValue"
+                  },
+                  "error": {
+                    "$ref": "#/definitions/seedValue"
+                  },
+                  "success": {
+                    "$ref": "#/definitions/seedValue"
+                  },
+                  "warning": {
+                    "$ref": "#/definitions/seedValue"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "headerBg": {
+                "$ref": "#/definitions/colorValue",
+                "description": "Header band background color."
+              }
+            },
+            "additionalProperties": false
           },
-          "height": {
-            "type": "number",
-            "description": "The height of the logo image."
-          }
-        },
-        "sizeCollapsed": {
-          "width": {
-            "type": "number",
-            "description": "The width of the collapsed logo image."
-          },
-          "height": {
-            "type": "number",
-            "description": "The height of the collapsed logo image."
-          }
-        },
-        "loginLogoSrc": {
-          "type": "string",
-          "description": "The source of the login form logo image for light mode. Falls back to srcDark, then the default hardcoded path."
-        },
-        "loginLogoSrcDark": {
-          "type": "string",
-          "description": "The source of the login form logo image for dark mode. Falls back to src, then the default hardcoded path."
-        },
-        "loginLogoSize": {
-          "type": "object",
-          "properties": {
-            "width": {
-              "type": "number",
-              "description": "The width of the login form logo image."
-            },
-            "height": {
-              "type": "number",
-              "description": "The height of the login form logo image."
-            }
-          }
-        },
-        "aboutLogoSrc": {
-          "type": "string",
-          "description": "The source of the about modal logo image for light mode. Falls back to srcDark, then the default hardcoded path."
-        },
-        "aboutLogoSrcDark": {
-          "type": "string",
-          "description": "The source of the about modal logo image for dark mode. Falls back to src, then the default hardcoded path."
-        },
-        "aboutLogoSize": {
-          "type": "object",
-          "properties": {
-            "width": {
-              "type": "number",
-              "description": "The width of the about modal logo image."
-            },
-            "height": {
-              "type": "number",
-              "description": "The height of the about modal logo image."
-            }
-          }
-        },
-        "aboutModalSize": {
-          "type": "object",
-          "deprecated": true,
-          "description": "Deprecated. Use aboutLogoSize instead.",
-          "properties": {
-            "width": {
-              "type": "number"
-            },
-            "height": {
-              "type": "number"
-            }
-          }
+          "required": ["default"]
         }
-      }
-    },
-    "sider": {
-      "type": "object",
-      "properties": {
-        "theme": {
-          "type": ["string"],
-          "enum": ["dark", "light", "auto"],
-          "default": "auto",
-          "description": "The theme of the sider. If it's set to 'dark' or 'light', the entered theme will be applied to the sider regardless of the site's dark mode status."
-        }
-      }
+      },
+      "additionalProperties": false
     },
     "branding": {
       "type": "object",
+      "description": "Structural metadata no theme token can express.",
       "properties": {
+        "logo": {
+          "type": "object",
+          "description": "Properties to customize the site's logo, considering both light and dark modes.",
+          "properties": {
+            "src": {
+              "type": "string",
+              "description": "The source of the logo image."
+            },
+            "srcCollapsed": {
+              "type": "string",
+              "description": "The source of the collapsed logo image."
+            },
+            "srcDark": {
+              "type": "string",
+              "description": "The source of the logo image in dark mode."
+            },
+            "srcCollapsedDark": {
+              "type": "string",
+              "description": "The source of the collapsed logo image in dark mode."
+            },
+            "alt": {
+              "type": "string",
+              "description": "The alt text for the logo image."
+            },
+            "href": {
+              "type": "string",
+              "description": "The URL that the logo links to."
+            },
+            "size": {
+              "$ref": "#/definitions/logoSize"
+            },
+            "sizeCollapsed": {
+              "$ref": "#/definitions/logoSize"
+            },
+            "loginLogoSrc": {
+              "type": "string",
+              "description": "The login form logo for light mode. Falls back to srcDark, then the default path."
+            },
+            "loginLogoSrcDark": {
+              "type": "string",
+              "description": "The login form logo for dark mode. Falls back to src, then the default path."
+            },
+            "loginLogoSize": {
+              "$ref": "#/definitions/logoSize"
+            },
+            "aboutLogoSrc": {
+              "type": "string",
+              "description": "The about modal logo for light mode. Falls back to srcDark, then the default path."
+            },
+            "aboutLogoSrcDark": {
+              "type": "string",
+              "description": "The about modal logo for dark mode. Falls back to src, then the default path."
+            },
+            "aboutLogoSize": {
+              "$ref": "#/definitions/logoSize"
+            },
+            "aboutModalSize": {
+              "$ref": "#/definitions/logoSize",
+              "deprecated": true,
+              "description": "Deprecated. Use aboutLogoSize instead."
+            }
+          },
+          "additionalProperties": false
+        },
         "companyName": {
           "type": "string",
           "description": "The name of the company or organization."
@@ -161,9 +188,18 @@
         "brandName": {
           "type": "string",
           "description": "The name of the brand or product."
+        },
+        "familyLabels": {
+          "type": "object",
+          "description": "Family selector labels keyed by family id; falls back to the id.",
+          "additionalProperties": {
+            "type": "string"
+          }
         }
-      }
+      },
+      "additionalProperties": false
     }
   },
-  "required": ["$schema", "light", "dark", "logo", "sider"]
+  "required": ["schemaVersion"],
+  "additionalProperties": false
 }
