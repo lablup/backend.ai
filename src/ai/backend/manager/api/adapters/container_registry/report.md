@@ -168,7 +168,7 @@ Then
   - successes[1].url = 'https://other-1.scenario.local'
   - successes[1].registry_name = 'other-1'
   - successes[1].type = <ContainerRegistryType.HARBOR2: 'harbor2'>
-  - successes[1].project = None
+  - successes[1].project = 'other-1'
   - successes[1].username = None
   - successes[1].ssl_verify = True
   - successes[1].is_global = False
