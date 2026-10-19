@@ -434,7 +434,10 @@ class DeploymentService:
         await self._deployment_repository.get_endpoint_info(action.deployment_id)
         success = await self._deployment_controller.destroy_deployment(action.deployment_id)
         await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.DESTROYING)
-        return DestroyDeploymentActionResult(success=success)
+        deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
+        return DestroyDeploymentActionResult(
+            success=success, data=_convert_deployment_info_to_data(deployment_info)
+        )
 
     async def search_legacy_deployments(
         self, action: GlobalSearchLegacyDeploymentsAction

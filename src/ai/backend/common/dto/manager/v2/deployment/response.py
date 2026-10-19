@@ -221,6 +221,7 @@ class DeleteDeploymentPayload(BaseResponseModel):
     """Payload for deployment deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted deployment")
+    deployment: DeploymentNode = Field(description="The soft-deleted deployment. Added in 26.10.0.")
 
 
 class ActivateDeploymentPayload(BaseResponseModel):
@@ -382,6 +383,7 @@ class DeleteAccessTokenPayload(BaseResponseModel):
     """Payload for access token deletion result."""
 
     id: UUID = Field(description="ID of the deleted access token")
+    field_id: UUID = Field(description="UUID of the deleted access token. Added in 26.10.0.")
 
 
 class BulkDeleteAccessTokensPayload(BaseResponseModel):
@@ -412,6 +414,7 @@ class DeleteAutoScalingRulePayload(BaseResponseModel):
     """Payload for auto-scaling rule deletion result."""
 
     id: UUID = Field(description="ID of the deleted auto-scaling rule")
+    field_id: UUID = Field(description="UUID of the deleted auto-scaling rule. Added in 26.10.0.")
 
 
 class BulkDeleteAutoScalingRulesPayload(BaseResponseModel):

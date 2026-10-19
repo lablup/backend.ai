@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     CreateDeploymentRevisionPresetInputGQL,
@@ -34,6 +34,7 @@ from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     PartialBulkDeploymentRevisionPresetsPayloadGQL,
     PartialBulkPurgeDeploymentRevisionPresetsInputGQL,
     PartialBulkUpdateDeploymentRevisionPresetsInputGQL,
+    PurgeDeploymentRevisionPresetPayloadGQL,
     UpdateDeploymentRevisionPresetInputGQL,
     UpdateDeploymentRevisionPresetPayloadGQL,
 )
@@ -198,9 +199,11 @@ async def update_deployment_revision_preset(
 async def purge_deployment_revision_preset(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteDeploymentRevisionPresetPayloadGQL:
+) -> PurgeDeploymentRevisionPresetPayloadGQL:
     payload = await info.context.adapters.deployment_revision_preset.purge(id)
-    return DeleteDeploymentRevisionPresetPayloadGQL.from_pydantic(payload)
+    return PurgeDeploymentRevisionPresetPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(DeploymentRevisionPresetGQL, payload.entity_id)}
+    )
 
 
 @gql_mutation(

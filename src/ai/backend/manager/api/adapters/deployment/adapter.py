@@ -952,10 +952,12 @@ class DeploymentAdapter(BaseAdapter):
 
     async def delete(self, input: DeleteDeploymentInput) -> DeleteDeploymentPayload:
         """Delete a deployment."""
-        await self._deployment.destroy_deployment.run(
+        action_result = await self._deployment.destroy_deployment.run(
             DestroyDeploymentAction(deployment_id=DeploymentID(input.id))
         )
-        return DeleteDeploymentPayload(id=input.id)
+        return DeleteDeploymentPayload(
+            id=input.id, deployment=self._deployment_data_to_dto(action_result.data)
+        )
 
     # ------------------------------------------------------------------
     # Access token operations
@@ -1004,7 +1006,7 @@ class DeploymentAdapter(BaseAdapter):
         )
         if not action_result.success:
             raise EndpointTokenNotFound(f"Access token {token_id} not found")
-        return DeleteAccessTokenPayload(id=token_id)
+        return DeleteAccessTokenPayload(id=token_id, field_id=token_id)
 
     async def partial_bulk_purge_access_tokens(
         self, input: PartialBulkPurgeAccessTokensInput
@@ -1151,7 +1153,7 @@ class DeploymentAdapter(BaseAdapter):
                 auto_scaling_rule_id=rule_id,
             )
         )
-        return DeleteAutoScalingRulePayload(id=rule_id)
+        return DeleteAutoScalingRulePayload(id=rule_id, field_id=rule_id)
 
     async def partial_bulk_update_rules(
         self, input: PartialBulkUpdateAutoScalingRulesInput

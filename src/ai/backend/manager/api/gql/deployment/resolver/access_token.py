@@ -7,6 +7,7 @@ from uuid import UUID
 from strawberry import Info
 
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -19,6 +20,7 @@ from ai.backend.manager.api.gql.deployment.types.access_token import (
     DeleteAccessTokenPayload,
     PartialBulkAccessTokensPayload,
     PartialBulkPurgeAccessTokensInput,
+    PurgeAccessTokenPayload,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
@@ -51,11 +53,11 @@ async def delete_access_token(
         added_version=NEXT_RELEASE_VERSION, description="Permanently remove an access token."
     )
 )
-async def purge_access_token(
-    id: UUID, info: Info[StrawberryGQLContext]
-) -> DeleteAccessTokenPayload:
+async def purge_access_token(id: UUID, info: Info[StrawberryGQLContext]) -> PurgeAccessTokenPayload:
     payload = await info.context.adapters.deployment.purge_access_token(id)
-    return DeleteAccessTokenPayload(id=payload.id)
+    return PurgeAccessTokenPayload.from_pydantic(
+        payload, extra={"purged_id": to_global_id(AccessToken, payload.field_id)}
+    )
 
 
 @gql_mutation(

@@ -7,6 +7,7 @@ from uuid import UUID
 from strawberry import ID, Info
 
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -20,6 +21,7 @@ from ai.backend.manager.api.gql.deployment.types.auto_scaling import (
     PartialBulkAutoScalingRulesPayload,
     PartialBulkPurgeAutoScalingRulesInput,
     PartialBulkUpdateAutoScalingRulesInput,
+    PurgeAutoScalingRulePayload,
     UpdateAutoScalingRuleInput,
     UpdateAutoScalingRulePayload,
 )
@@ -65,9 +67,11 @@ async def delete_auto_scaling_rule(
 )
 async def purge_auto_scaling_rule(
     id: UUID, info: Info[StrawberryGQLContext]
-) -> DeleteAutoScalingRulePayload:
+) -> PurgeAutoScalingRulePayload:
     payload = await info.context.adapters.deployment.purge_rule(id)
-    return DeleteAutoScalingRulePayload(id=ID(str(payload.id)))
+    return PurgeAutoScalingRulePayload.from_pydantic(
+        payload, extra={"purged_id": to_global_id(AutoScalingRule, payload.field_id)}
+    )
 
 
 @gql_mutation(

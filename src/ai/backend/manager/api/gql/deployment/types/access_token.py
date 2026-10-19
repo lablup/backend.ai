@@ -177,6 +177,18 @@ class DeleteAccessTokenPayload:
     id: UUID
 
 
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Payload for access token purge."
+    ),
+    model=DeleteAccessTokenPayloadDTO,
+    name="PurgeAccessTokenPayload",
+)
+class PurgeAccessTokenPayload(PydanticOutputMixin[DeleteAccessTokenPayloadDTO]):
+    purged_id: ID = gql_field(description="Global ID of the purged access token.")
+    field_id: UUID = gql_field(description="UUID of the purged access token.")
+
+
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,

@@ -353,6 +353,18 @@ class DeleteAutoScalingRulePayload:
     id: ID
 
 
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Payload for auto-scaling rule purge."
+    ),
+    model=DeleteAutoScalingRulePayloadDTO,
+    name="PurgeAutoScalingRulePayload",
+)
+class PurgeAutoScalingRulePayload(PydanticOutputMixin[DeleteAutoScalingRulePayloadDTO]):
+    purged_id: ID = gql_field(description="Global ID of the purged auto-scaling rule.")
+    field_id: UUID = gql_field(description="UUID of the purged auto-scaling rule.")
+
+
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
