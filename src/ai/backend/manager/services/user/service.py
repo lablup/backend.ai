@@ -159,8 +159,8 @@ class UserService:
         return BulkUpdateUserActionResult(data=result)
 
     async def delete_user(self, action: DeleteUserAction) -> DeleteUserActionResult:
-        await self._user_repository.delete_user_by_uuid_validated(user_uuid=action.user_id)
-        return DeleteUserActionResult()
+        user = await self._user_repository.delete_user_by_uuid_validated(user_uuid=action.user_id)
+        return DeleteUserActionResult(user=user)
 
     async def restore_user(self, action: RestoreUserAction) -> RestoreUserActionResult:
         await self._user_repository.restore_user_by_uuid_validated(user_uuid=action.user_id)

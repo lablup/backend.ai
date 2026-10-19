@@ -50,6 +50,7 @@ from ai.backend.common.dto.manager.v2.user.response import (
 from ai.backend.common.dto.manager.v2.user.response import (
     UpdateUserPayload as UpdateUserPayloadDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -203,10 +204,16 @@ class BulkUpdateUsersV2PayloadGQL(PydanticOutputMixin[BulkUpdateUsersPayloadDTO]
     model=DeleteUserPayloadDTO,
     name="DeleteUserV2Payload",
 )
-class DeleteUserPayloadGQL:
+class DeleteUserPayloadGQL(PydanticOutputMixin[DeleteUserPayloadDTO]):
     """Payload for single user soft-delete."""
 
-    success: bool = gql_field(description="Whether the deletion was successful.")
+    success: bool = gql_field(
+        description="Whether the deletion was successful.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `user`.",
+    )
+    user: UserV2GQL = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="The soft-deleted user."),
+    )
 
 
 @gql_pydantic_type(

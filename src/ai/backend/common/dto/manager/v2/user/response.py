@@ -221,6 +221,7 @@ class DeleteUserPayload(BaseResponseModel):
     success: bool = Field(
         description="Whether the deletion was successful.",
     )
+    user: UserNode = Field(description="The soft-deleted user. Added in 26.10.0.")
 
 
 class RestoreUserPayload(BaseResponseModel):
