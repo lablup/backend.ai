@@ -92,7 +92,11 @@ def _request(body: dict[str, Any] | None = None) -> Mock:
 
 @pytest.fixture
 def writer() -> AsyncMock:
-    return AsyncMock(spec=ValidatingIngressWriter)
+    writer = AsyncMock(spec=ValidatingIngressWriter)
+    held_ingress = Ingress.model_validate({**INGRESS_PAYLOAD, "revision": 4})
+    writer.apply.return_value = [held_ingress]
+    writer.replace_all.return_value = [held_ingress]
+    return writer
 
 
 @pytest.fixture
@@ -103,14 +107,14 @@ def reader() -> AsyncMock:
 
 
 class TestIngressHandler:
-    async def test_upsert_reports_the_applied_revisions(
+    async def test_upsert_reports_the_held_revisions(
         self, reader: AsyncMock, writer: AsyncMock
     ) -> None:
         handler = IngressHandler(IngressState(reader=reader, writer=writer))
         response = await handler.upsert(_request({"ingresses": [INGRESS_PAYLOAD]}))
         assert isinstance(response, web.Response)
         assert response.status == HTTPStatus.OK
-        assert json.loads(response.text or "") == {"revisions": {"10205": 3}}
+        assert json.loads(response.text or "") == {"revisions": {"10205": 4}}
         writer.apply.assert_awaited_once()
 
     async def test_remove_removes_through_the_writer(
@@ -122,14 +126,14 @@ class TestIngressHandler:
         assert response.status == HTTPStatus.NO_CONTENT
         writer.remove.assert_awaited_once()
 
-    async def test_replace_reports_the_applied_revisions(
+    async def test_replace_reports_the_held_revisions(
         self, reader: AsyncMock, writer: AsyncMock
     ) -> None:
         handler = IngressHandler(IngressState(reader=reader, writer=writer))
         response = await handler.replace(_request({"ingresses": [INGRESS_PAYLOAD]}))
         assert isinstance(response, web.Response)
         assert response.status == HTTPStatus.OK
-        assert json.loads(response.text or "") == {"revisions": {"10205": 3}}
+        assert json.loads(response.text or "") == {"revisions": {"10205": 4}}
         writer.replace_all.assert_awaited_once()
 
     async def test_write_without_writer_is_not_supported(self, reader: AsyncMock) -> None:

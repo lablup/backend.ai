@@ -41,6 +41,12 @@ class _ElapsedCase:
 
 
 @dataclass(frozen=True)
+class _HeldCase:
+    applied_revision: int
+    held_revision: int
+
+
+@dataclass(frozen=True)
 class _ApplyCase:
     applied_after: float
     applied_revision: int
@@ -170,6 +176,23 @@ class TestInMemoryIngressState:
         assert read_back_ingress is not None
         assert read_back_ingress.revision == case.read_revision
 
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _HeldCase(applied_revision=6, held_revision=6),
+            _HeldCase(applied_revision=5, held_revision=5),
+            _HeldCase(applied_revision=4, held_revision=5),
+        ],
+        ids=lambda case: f"revision-{case.applied_revision}",
+    )
+    async def test_apply_returns_the_held_ingress(
+        self, state: InMemoryIngressState, stored_ingress: Ingress, case: _HeldCase
+    ) -> None:
+        [held_ingress] = await state.apply([
+            stored_ingress.model_copy(update={"revision": case.applied_revision})
+        ])
+        assert held_ingress.revision == case.held_revision
+
     async def test_apply_stores_a_new_key(
         self, state: InMemoryIngressState, other_ingress: Ingress
     ) -> None:
@@ -200,6 +223,11 @@ class TestInMemoryIngressState:
     ) -> None:
         await state.replace_all([other_ingress])
         assert await state.get_all() == [other_ingress]
+
+    async def test_replace_all_returns_every_held_ingress(
+        self, state: InMemoryIngressState, other_ingress: Ingress
+    ) -> None:
+        assert await state.replace_all([other_ingress]) == [other_ingress]
 
     async def test_replace_all_with_nothing_clears_every_stored_ingress(
         self, state: InMemoryIngressState

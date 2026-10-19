@@ -20,7 +20,8 @@ class IngressReader(ABC):
 
 class IngressWriter(ABC):
     @abstractmethod
-    async def apply(self, ingresses: Sequence[Ingress]) -> None:
+    async def apply(self, ingresses: Sequence[Ingress]) -> list[Ingress]:
+        """The ingress held for each given frontend after applying."""
         raise NotImplementedError
 
     @abstractmethod
@@ -28,5 +29,6 @@ class IngressWriter(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def replace_all(self, ingresses: Sequence[Ingress]) -> None:
+    async def replace_all(self, ingresses: Sequence[Ingress]) -> list[Ingress]:
+        """Every ingress held after replacing."""
         raise NotImplementedError

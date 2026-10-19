@@ -44,12 +44,9 @@ class IngressHandler:
 
     @api_handler
     async def upsert(self, body: BodyParam[IngressUpsertRequest]) -> APIResponse:
-        await self._writer().apply(body.parsed.ingresses)
-        # The writer applies every ingress or raises, so each sent revision is the one held.
+        held = await self._writer().apply(body.parsed.ingresses)
         response = IngressRevisionsResponse(
-            revisions={
-                ingress.frontend.key(): ingress.revision for ingress in body.parsed.ingresses
-            }
+            revisions={ingress.frontend.key(): ingress.revision for ingress in held}
         )
         return APIResponse.build(HTTPStatus.OK, response)
 
@@ -60,11 +57,9 @@ class IngressHandler:
 
     @api_handler
     async def replace(self, body: BodyParam[IngressReplaceRequest]) -> APIResponse:
-        await self._writer().replace_all(body.parsed.ingresses)
+        held = await self._writer().replace_all(body.parsed.ingresses)
         response = IngressRevisionsResponse(
-            revisions={
-                ingress.frontend.key(): ingress.revision for ingress in body.parsed.ingresses
-            }
+            revisions={ingress.frontend.key(): ingress.revision for ingress in held}
         )
         return APIResponse.build(HTTPStatus.OK, response)
 
