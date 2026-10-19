@@ -269,7 +269,7 @@ class NotificationAdapter(BaseAdapter):
             PurgeChannelAction(channel_id=NotificationChannelID(channel_id))
         )
 
-        return PurgeNotificationChannelPayload(id=channel_id)
+        return PurgeNotificationChannelPayload(id=channel_id, entity_id=channel_id)
 
     async def partial_bulk_update_channels(
         self, input: PartialBulkUpdateNotificationChannelsInput
@@ -344,7 +344,7 @@ class NotificationAdapter(BaseAdapter):
             PurgeRuleAction(rule_id=NotificationRuleID(rule_id))
         )
 
-        return PurgeNotificationRulePayload(id=rule_id)
+        return PurgeNotificationRulePayload(id=rule_id, entity_id=rule_id)
 
     async def partial_bulk_update_rules(
         self, input: PartialBulkUpdateNotificationRulesInput

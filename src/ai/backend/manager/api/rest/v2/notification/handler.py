@@ -101,7 +101,7 @@ class V2NotificationHandler:
     ) -> APIResponse:
         """Deprecated. Use `DELETE /v2/notifications/channels/{channel_id}`."""
         purged = await self._adapter.purge_channel(body.parsed.id)
-        result = DeleteNotificationChannelPayload(id=purged.id)
+        result = DeleteNotificationChannelPayload(id=purged.id, entity_id=purged.entity_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def search_channels(
@@ -178,7 +178,7 @@ class V2NotificationHandler:
     ) -> APIResponse:
         """Deprecated. Use `DELETE /v2/notifications/rules/{rule_id}`."""
         purged = await self._adapter.purge_rule(body.parsed.id)
-        result = DeleteNotificationRulePayload(id=purged.id)
+        result = DeleteNotificationRulePayload(id=purged.id, entity_id=purged.entity_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def search_rules(

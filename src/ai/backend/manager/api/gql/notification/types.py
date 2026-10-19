@@ -648,7 +648,22 @@ class DeleteNotificationRulePayload(PydanticOutputMixin[DeleteNotificationRulePa
     name="PurgeNotificationChannelPayload",
 )
 class PurgeNotificationChannelPayloadGQL(PydanticOutputMixin[PurgeNotificationChannelPayloadDTO]):
-    id: UUID = gql_field(description="ID of the purged notification channel.")
+    id: UUID = gql_field(
+        description="ID of the purged notification channel.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged notification channel.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the purged notification channel.",
+        ),
+    )
 
 
 @gql_pydantic_type(
@@ -659,7 +674,21 @@ class PurgeNotificationChannelPayloadGQL(PydanticOutputMixin[PurgeNotificationCh
     name="PurgeNotificationRulePayload",
 )
 class PurgeNotificationRulePayloadGQL(PydanticOutputMixin[PurgeNotificationRulePayloadDTO]):
-    id: UUID = gql_field(description="ID of the purged notification rule.")
+    id: UUID = gql_field(
+        description="ID of the purged notification rule.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged notification rule.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="UUID of the purged notification rule."
+        ),
+    )
 
 
 # Partial bulk mutations
