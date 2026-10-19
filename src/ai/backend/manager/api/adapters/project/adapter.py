@@ -258,10 +258,10 @@ class ProjectAdapter(BaseAdapter):
 
     async def delete(self, project_id: ProjectID) -> DeleteProjectPayload:
         """Soft-delete a project."""
-        await self._project.delete_project.run(
+        result = await self._project.delete_project.run(
             DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=project_id))
         )
-        return DeleteProjectPayload(deleted=True)
+        return DeleteProjectPayload(deleted=True, project=self._group_data_to_node(result.data))
 
     async def restore(self, project_id: ProjectID) -> RestoreProjectPayload:
         """Restore a soft-deleted project."""

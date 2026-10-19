@@ -159,6 +159,7 @@ class DeleteProjectPayload(BaseResponseModel):
     deleted: bool = Field(
         description="Whether the deletion was successful.",
     )
+    project: ProjectNode = Field(description="The soft-deleted project. Added in 26.10.0.")
 
 
 class RestoreProjectPayload(BaseResponseModel):
