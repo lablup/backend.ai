@@ -277,6 +277,36 @@
       # Added in 26.4.4
       interval = 30.0
 
+  # User, process, memory, and CPU limits of the socket relay container that
+  # connects kernel containers to the agent socket.
+  # Added in 26.10.0
+  [agent.socket-relay]
+    # User ID that the socket relay container runs socat as. The agent changes
+    # the owner of the socket directory to this user before creating the relay.
+    # Applied only when the agent runs as root; a non-root agent runs the relay
+    # as its own user.
+    # Added in 26.10.0
+    uid = "65534"
+    # Group ID that the socket relay container runs socat as. Applied only when
+    # the agent runs as root; a non-root agent runs the relay as its own group.
+    # Added in 26.10.0
+    gid = "65534"
+    # Maximum number of processes in the socket relay container, including
+    # docker-init and the listening socat process.
+    # Added in 26.10.0
+    pids-limit = 64
+    # Maximum number of connections that socat serves at once, each in its own
+    # child process. Must be at most pids-limit minus 2, since docker-init and
+    # the listening socat process also count toward pids-limit.
+    # Added in 26.10.0
+    max-children = 32
+    # Memory limit of the socket relay container.
+    # Added in 26.10.0
+    memory = "64M"
+    # CPU limit of the socket relay container, in cores.
+    # Added in 26.10.0
+    cpus = 1.0
+
 # Container runtime configuration including execution modes, user settings, and
 # networking. In multi-agent mode (when 'agents' field is populated), this
 # serves as the default configuration that individual agents inherit and can

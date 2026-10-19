@@ -136,6 +136,102 @@ class SyncContainerLifecyclesConfig(BaseConfigSchema):
     ]
 
 
+class SocketRelayConfig(BaseConfigSchema):
+    uid: Annotated[
+        UserID,
+        Field(default=UserID(65534)),
+        BackendAIConfigMeta(
+            description=(
+                "User ID that the socket relay container runs socat as. "
+                "The agent changes the owner of the socket directory to this user before "
+                "creating the relay. Applied only when the agent runs as root; "
+                "a non-root agent runs the relay as its own user."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="65534", prod="65534"),
+        ),
+    ]
+    gid: Annotated[
+        GroupID,
+        Field(default=GroupID(65534)),
+        BackendAIConfigMeta(
+            description=(
+                "Group ID that the socket relay container runs socat as. "
+                "Applied only when the agent runs as root; "
+                "a non-root agent runs the relay as its own group."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="65534", prod="65534"),
+        ),
+    ]
+    pids_limit: Annotated[
+        int,
+        Field(
+            default=64,
+            ge=3,
+            validation_alias=AliasChoices("pids-limit", "pids_limit"),
+            serialization_alias="pids-limit",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum number of processes in the socket relay container, "
+                "including docker-init and the listening socat process."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="64", prod="64"),
+        ),
+    ]
+    max_children: Annotated[
+        int,
+        Field(
+            default=32,
+            ge=1,
+            validation_alias=AliasChoices("max-children", "max_children"),
+            serialization_alias="max-children",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum number of connections that socat serves at once, each in its own "
+                "child process. Must be at most pids-limit minus 2, since docker-init and the "
+                "listening socat process also count toward pids-limit."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="32", prod="32"),
+        ),
+    ]
+    memory: Annotated[
+        BinarySizeField,
+        Field(default=BinarySize.finite_from_str("64M")),
+        BackendAIConfigMeta(
+            description="Memory limit of the socket relay container.",
+            added_version="26.10.0",
+            example=ConfigExample(local="64M", prod="64M"),
+        ),
+    ]
+    cpus: Annotated[
+        float,
+        Field(default=1.0, gt=0),
+        BackendAIConfigMeta(
+            description="CPU limit of the socket relay container, in cores.",
+            added_version="26.10.0",
+            example=ConfigExample(local="1.0", prod="1.0"),
+        ),
+    ]
+
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+    )
+
+    @model_validator(mode="after")
+    def _validate_max_children(self) -> Self:
+        if self.max_children > self.pids_limit - 2:
+            raise ValueError(
+                f"max-children ({self.max_children}) must be at most pids-limit minus 2 "
+                f"({self.pids_limit - 2})."
+            )
+        return self
+
+
 class NodeMetricConfig(BaseConfigSchema):
     enable: Annotated[
         bool,
@@ -775,6 +871,22 @@ class CommonAgentConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             example=ConfigExample(local="/tmp/backend.ai/ipc", prod="/var/run/backend.ai/ipc"),
+        ),
+    ]
+    socket_relay: Annotated[
+        SocketRelayConfig,
+        Field(
+            default_factory=SocketRelayConfig,
+            validation_alias=AliasChoices("socket-relay", "socket_relay"),
+            serialization_alias="socket-relay",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "User, process, memory, and CPU limits of the socket relay container "
+                "that connects kernel containers to the agent socket."
+            ),
+            added_version="26.10.0",
+            composite=CompositeType.FIELD,
         ),
     ]
     var_base_path: Annotated[
