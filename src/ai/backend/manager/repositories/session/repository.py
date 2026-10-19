@@ -19,7 +19,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AccessKey, KernelId, SessionId
+from ai.backend.common.types import AccessKey, AgentId, KernelId, SessionId
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
@@ -288,6 +288,14 @@ class SessionRepository:
         Pure lookup; session access authorization is the caller's responsibility.
         """
         return await self._db_source.get_session_with_routing_minimal(session_id)
+
+    @session_repository_resilience.apply()
+    async def bulk_get_designated_agents_by_session(
+        self,
+        session_ids: Sequence[SessionId],
+    ) -> dict[SessionId, list[AgentId]]:
+        """Read the agents each session designates, by agent id; one with none is absent."""
+        return await self._db_source.bulk_get_designated_agents_by_session(session_ids)
 
     @session_repository_resilience.apply()
     async def batch_get_resource_allocation_by_session(
