@@ -30,7 +30,6 @@ class DotfileEntryCreator(FieldCreator[EntityIdentifier, DotfileRow, DotfileData
             path=self.entry.path,
             perm=self.entry.perm,
             data=self.entry.data,
-            is_default=False,
         )
 
     @override

@@ -106,10 +106,11 @@ class TestMaxLength:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateUserDotfileRequest(path=path, data=data, permission="644")
 
-    def test_update_serialized_size_exceeds_limit(self) -> None:
+    def test_update_data_bytes_exceed_limit(self) -> None:
+        # Within max_length in characters, over the limit in UTF-8 bytes.
         with pytest.raises(InvalidAPIParameters, match="No leftover space"):
             UpdateUserDotfileRequest(
-                path=".bashrc", data="x" * MAXIMUM_DOTFILE_SIZE, permission="644"
+                path=".bashrc", data="가" * (MAXIMUM_DOTFILE_SIZE // 3 + 1), permission="644"
             )
 
     def test_bootstrap_script_exceeds_limit(self) -> None:

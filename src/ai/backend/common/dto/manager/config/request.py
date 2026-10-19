@@ -5,12 +5,10 @@ Shared between Client SDK and Manager API.
 
 from __future__ import annotations
 
-from typing import Self
 from uuid import UUID
 
-from pydantic import AliasChoices, Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, field_validator
 
-from ai.backend.common import msgpack
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.config.types import (
     MAXIMUM_DOTFILE_PATH_LENGTH,
@@ -71,12 +69,13 @@ class CreateUserDotfileRequest(BaseRequestModel):
             raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
         return value
 
-    @model_validator(mode="after")
-    def validate_serialized_size(self) -> Self:
-        packed = msgpack.packb([{"path": self.path, "perm": self.permission, "data": self.data}])
-        if len(packed) > MAXIMUM_DOTFILE_SIZE:
+    @field_validator("data")
+    @classmethod
+    def validate_data_size(cls, value: str) -> str:
+        # max_length counts characters; storage limits bytes.
+        if len(value.encode()) > MAXIMUM_DOTFILE_SIZE:
             raise InvalidAPIParameters("No leftover space for dotfile storage")
-        return self
+        return value
 
 
 class GetUserDotfileRequest(BaseRequestModel):
@@ -107,12 +106,13 @@ class UpdateUserDotfileRequest(BaseRequestModel):
         description="Access key of the target user (for superadmin delegation)",
     )
 
-    @model_validator(mode="after")
-    def validate_serialized_size(self) -> Self:
-        packed = msgpack.packb([{"path": self.path, "perm": self.permission, "data": self.data}])
-        if len(packed) > MAXIMUM_DOTFILE_SIZE:
+    @field_validator("data")
+    @classmethod
+    def validate_data_size(cls, value: str) -> str:
+        # max_length counts characters; storage limits bytes.
+        if len(value.encode()) > MAXIMUM_DOTFILE_SIZE:
             raise InvalidAPIParameters("No leftover space for dotfile storage")
-        return self
+        return value
 
 
 class DeleteUserDotfileRequest(BaseRequestModel):
