@@ -67,7 +67,6 @@ from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
-from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.user.db_source.db_source import UserDBSource
 from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.testutils.db import TableOrORM, with_tables
@@ -334,7 +333,6 @@ class TestUserNestedSearchIntegration:
             key_provider_pool=KeyProviderPool(
                 providers=[], write_provider_type=KeyProviderType.PLAIN
             ),
-            user_ops_provider=UserOpsProvider(db_with_cleanup),
         )
 
     @pytest.fixture

@@ -4,9 +4,8 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.dotfile import DotfileID
-from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
-from ai.backend.manager.data.dotfile.types import DotfileData
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
@@ -45,13 +44,3 @@ class DotfileRow(LifecycleTimestampsMixin, Base):
     perm: Mapped[str] = mapped_column(sa.Text, nullable=False)
     data: Mapped[str] = mapped_column(sa.Text, nullable=False)
     is_default: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, server_default=sa.false())
-
-    def to_data(self) -> DotfileData:
-        return DotfileData(
-            id=self.id,
-            entity=RuntimeEntityID(self.entity_type, self.entity_id),
-            path=self.path,
-            perm=self.perm,
-            data=self.data,
-            is_default=self.is_default,
-        )

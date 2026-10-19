@@ -12,7 +12,6 @@ import yarl
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 
 if TYPE_CHECKING:
     from tests.component.conftest import ServerInfo, UserFixtureData
@@ -118,7 +117,6 @@ def user_processors(
             ShareOpsProvider(database_engine),
             ResourcePolicyOpsProvider(database_engine),
             KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
-            user_ops_provider=UserOpsProvider(database_engine),
         ),
         scheduling_controller=AsyncMock(),
     )

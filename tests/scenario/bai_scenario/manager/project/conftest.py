@@ -38,7 +38,6 @@ from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
 )
 from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
-from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
 )
@@ -125,7 +124,6 @@ async def adapter(
                 ShareOpsProvider(engine),
                 ResourcePolicyOpsProvider(engine),
                 KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
-                user_ops_provider=UserOpsProvider(engine),
             ),
             unwired(SchedulingController, "only enqueue schedules"),
         ),

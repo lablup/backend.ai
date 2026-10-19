@@ -1,6 +1,7 @@
 """Legacy user config DTO conversion and user and dotfile processor calls."""
 
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.dto.manager.config.response import (
     CreateDotfileResponse,
     DeleteDotfileResponse,
@@ -15,9 +16,8 @@ from ai.backend.manager.dto.user_config_input import (
     UpdateDefaultDotfileInput,
 )
 from ai.backend.manager.errors.storage import DotfileNotFound
-from ai.backend.manager.models.dotfile.conditions import DotfileConditions
 from ai.backend.manager.models.dotfile.creators import DotfileEntryCreator
-from ai.backend.manager.models.dotfile.orders import DotfileOrders
+from ai.backend.manager.models.dotfile.searchable_fields import DotfileSearchableFields
 from ai.backend.manager.models.dotfile.searchers import DotfileSearcher
 from ai.backend.manager.models.dotfile.updaters import DotfileUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -42,16 +42,21 @@ class UserConfigAdapter:
     async def _search_default_dotfiles(
         self, user_id: UserID, path: str | None = None
     ) -> list[DotfileData]:
-        conditions = [DotfileConditions.by_is_default(True)]
+        fields = DotfileSearchableFields.own
+        conditions = [fields.is_default.filter.equals(True)]
         if path is not None:
-            conditions.append(DotfileConditions.by_path(path))
+            conditions.append(
+                fields.path.filter.equals(
+                    StringMatchSpec(value=path, case_insensitive=False, negated=False)
+                )
+            )
         result = await self._dotfile.search.run(
             SearchDotfilesAction(
                 user_id=user_id,
                 searcher=DotfileSearcher(
                     pagination=NoPagination(),
                     conditions=conditions,
-                    orders=[DotfileOrders.created_at(), DotfileOrders.id()],
+                    orders=[fields.created_at.order.apply(True), fields.field_id.order.apply(True)],
                 ),
             )
         )

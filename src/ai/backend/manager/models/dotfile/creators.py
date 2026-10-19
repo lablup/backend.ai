@@ -9,6 +9,7 @@ from ai.backend.manager.data.dotfile.types import DotfileData, DotfileEntry
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.dotfile.row import DotfileRow
+from ai.backend.manager.models.dotfile.searchable_fields import DotfileSearchableFields
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -38,4 +39,4 @@ class DotfileEntryCreator(FieldCreator[EntityIdentifier, DotfileRow, DotfileData
 
     @override
     def to_data(self, row: DotfileRow) -> DotfileData:
-        return row.to_data()
+        return DotfileSearchableFields.own.to_data(row)

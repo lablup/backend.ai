@@ -33,13 +33,13 @@ from ai.backend.manager.data.user.types import (
     UserSearchResult,
 )
 from ai.backend.manager.errors.bootstrap_script import DefaultBootstrapScriptNotFound
+from ai.backend.manager.errors.storage import DotfileCreationFailed
 from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.bootstrap_script.queriers import BootstrapScriptQuerier
 from ai.backend.manager.models.bootstrap_script.updaters import DefaultBootstrapScriptUpdater
-from ai.backend.manager.models.dotfile.conditions import DotfileConditions
 from ai.backend.manager.models.dotfile.creators import DotfileEntryCreator
-from ai.backend.manager.models.dotfile.orders import DotfileOrders
 from ai.backend.manager.models.dotfile.scopes import UserDotfileTarget
+from ai.backend.manager.models.dotfile.searchable_fields import DotfileSearchableFields
 from ai.backend.manager.models.dotfile.searchers import DotfileSearcher
 from ai.backend.manager.models.keypair.creators import KeypairCreator
 from ai.backend.manager.models.keypair.purgers import NonDefaultKeypairPurger
@@ -47,7 +47,7 @@ from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import generate_keypair_data
 from ai.backend.manager.models.keypair.updaters import KeypairUpdater
 from ai.backend.manager.models.session.row import SessionRow
-from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.searchers import UserSearcher
@@ -59,7 +59,6 @@ from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
-from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.repositories.user.db_source.db_source import UserDBSource
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -85,7 +84,6 @@ user_repository_resilience = Resilience(
 class UserRepository:
     _db_source: UserDBSource
     _v2_ops: V2DBOpsProvider
-    _user_ops: UserOpsProvider
     _policy_ops: ResourcePolicyOpsProvider
     _key_provider_pool: KeyProviderPool
 
@@ -96,18 +94,11 @@ class UserRepository:
         share_ops_provider: ShareOpsProvider,
         policy_ops_provider: ResourcePolicyOpsProvider,
         key_provider_pool: KeyProviderPool,
-        user_ops_provider: UserOpsProvider,
     ) -> None:
         self._db_source = UserDBSource(
-            db,
-            v2_ops_provider,
-            share_ops_provider,
-            policy_ops_provider,
-            key_provider_pool,
-            user_ops_provider,
+            db, v2_ops_provider, share_ops_provider, policy_ops_provider, key_provider_pool
         )
         self._v2_ops = v2_ops_provider
-        self._user_ops = user_ops_provider
         self._policy_ops = policy_ops_provider
         self._key_provider_pool = key_provider_pool
 
@@ -363,18 +354,20 @@ class UserRepository:
             return data
 
     @user_repository_resilience.apply()
-    async def count_dotfiles(self, user_id: UserID) -> int:
-        async with self._user_ops.write_ops() as ops:
-            return await ops.count_dotfiles(user_id)
-
-    @user_repository_resilience.apply()
     async def get_default_dotfiles(self, user_id: UserID) -> DotfileEntries:
         async with self._v2_ops.read_ops() as ops:
             return await self._default_dotfiles(ops, user_id)
 
     @user_repository_resilience.apply()
-    async def create_dotfile(self, creator: DotfileEntryCreator) -> DotfileEntries:
-        async with self._user_ops.write_ops() as ops:
+    async def create_dotfile(self, creator: DotfileEntryCreator, max_count: int) -> DotfileEntries:
+        """Add a file unless the user already holds ``max_count``, variants included."""
+        async with self._v2_ops.write_ops() as ops:
+            owned = await ops.search_with_scopes(
+                [UserDotfileTarget(creator.owner)],
+                DotfileSearcher(pagination=OffsetPagination(limit=1), conditions=[], orders=[]),
+            )
+            if owned.total_count >= max_count:
+                raise DotfileCreationFailed("Dotfile creation limit reached")
             await ops.create_field(creator.owner, creator)
             current = await self._default_dotfiles(ops, creator.owner)
             return DotfileEntries((*current.entries, creator.entry))
@@ -384,9 +377,12 @@ class UserRepository:
             [UserDotfileTarget(user_id)],
             DotfileSearcher(
                 pagination=NoPagination(),
-                conditions=[DotfileConditions.by_is_default(True)],
+                conditions=[DotfileSearchableFields.own.is_default.filter.equals(True)],
                 # Migrated rows share created_at; id keeps their original order.
-                orders=[DotfileOrders.created_at(), DotfileOrders.id()],
+                orders=[
+                    DotfileSearchableFields.own.created_at.order.apply(True),
+                    DotfileSearchableFields.own.field_id.order.apply(True),
+                ],
             ),
         )
         return DotfileEntries(

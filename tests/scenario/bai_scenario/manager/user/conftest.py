@@ -38,7 +38,6 @@ from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
-from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
@@ -97,7 +96,6 @@ async def adapter(
                 ShareOpsProvider(engine),
                 ResourcePolicyOpsProvider(engine),
                 key_pool,
-                user_ops_provider=UserOpsProvider(engine),
             ),
             unwired(SchedulingController, "only purging a user with sessions reaches it"),
         ),

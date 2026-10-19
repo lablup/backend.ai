@@ -26,7 +26,6 @@ from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
-from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
 )
@@ -90,7 +89,6 @@ async def adapter(
             share_provider,
             ResourcePolicyOpsProvider(engine),
             KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
-            user_ops_provider=UserOpsProvider(engine),
         ),
         valkey_stat_client=valkey.stat,
         own_check=BulkOwnCheck(

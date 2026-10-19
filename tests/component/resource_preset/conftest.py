@@ -47,7 +47,6 @@ from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
-from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
@@ -205,7 +204,6 @@ def user_processors(
         ShareOpsProvider(database_engine),
         ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
-        user_ops_provider=UserOpsProvider(database_engine),
     )
     service = UserService(storage_manager, valkey_clients.stat, AsyncMock(), user_repo, AsyncMock())
     return UserProcessors(

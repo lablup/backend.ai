@@ -7,6 +7,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.dotfile import DotfileID
 from ai.backend.manager.data.dotfile.types import DotfileData
 from ai.backend.manager.models.dotfile.row import DotfileRow
+from ai.backend.manager.models.dotfile.searchable_fields import DotfileSearchableFields
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 
@@ -43,4 +44,4 @@ class DotfileUpdater(DataUpdater[DotfileRow, DotfileData]):
 
     @override
     def to_data(self, row: DotfileRow) -> DotfileData:
-        return row.to_data()
+        return DotfileSearchableFields.own.to_data(row)

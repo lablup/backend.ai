@@ -42,6 +42,7 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.dotfile.row import DotfileRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -476,6 +477,27 @@ async def user_with_rbac_rows(
         await conn.execute(users.delete().where(users.c.uuid == str(user_id)))
 
 
+@pytest.fixture()
+async def target_user_dotfile_id(
+    db_engine: SAEngine,
+    target_user: CreateUserResponse,
+) -> uuid.UUID:
+    """A dotfile owned by ``target_user``, which purge takes with the user's graph node."""
+    async with db_engine.begin() as conn:
+        result = await conn.execute(
+            sa.insert(DotfileRow)
+            .values(
+                entity_type=UserEntityType(),
+                entity_id=target_user.user.id,
+                path=".bashrc",
+                perm="644",
+                data="export EDITOR=vim\n",
+            )
+            .returning(DotfileRow.id)
+        )
+        return result.scalar_one()
+
+
 class TestUserPurge:
     async def test_admin_purges_user(
         self,
@@ -518,6 +540,23 @@ class TestUserPurge:
                 .where(RoleRow.scope_id == user_id)
             )
         assert permissions_after == 0, "the role permissions should be gone after purge"
+
+    async def test_admin_purge_removes_dotfiles(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_user: CreateUserResponse,
+        target_user_dotfile_id: uuid.UUID,
+        db_engine: SAEngine,
+    ) -> None:
+        await admin_registry.user.purge(PurgeUserRequest(user_id=target_user.user.id))
+
+        async with db_engine.connect() as conn:
+            remaining = await conn.scalar(
+                sa.select(sa.func.count())
+                .select_from(DotfileRow)
+                .where(DotfileRow.id == target_user_dotfile_id)
+            )
+        assert remaining == 0
 
 
 class TestUserBulkOperations:

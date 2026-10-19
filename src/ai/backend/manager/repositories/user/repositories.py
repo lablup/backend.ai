@@ -5,7 +5,6 @@ from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
-from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.repositories.user.repository import UserRepository
 
@@ -22,7 +21,6 @@ class UserRepositories:
             ShareOpsProvider(args.db),
             ResourcePolicyOpsProvider(args.db),
             args.key_provider_pool,
-            UserOpsProvider(args.db),
         )
 
         return cls(

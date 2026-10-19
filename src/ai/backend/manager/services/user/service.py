@@ -15,7 +15,6 @@ from ai.backend.manager.data.user.types import (
     BulkUserPurgeResultData,
     UserInfoContext,
 )
-from ai.backend.manager.errors.storage import DotfileCreationFailed
 from ai.backend.manager.errors.user import UserPurgeFailure
 from ai.backend.manager.models.bootstrap_script.updaters import DefaultBootstrapScriptUpdater
 from ai.backend.manager.registry import AgentRegistry
@@ -355,10 +354,7 @@ class UserService:
 
     async def create_dotfile(self, action: CreateDotfileAction) -> CreateDotfileActionResult:
         # Variants count too, so creation cannot grow a user's storage without bound.
-        count = await self._user_repository.count_dotfiles(action.creator.owner)
-        if count >= MAXIMUM_DOTFILE_COUNT:
-            raise DotfileCreationFailed("Dotfile creation limit reached")
-        entries = await self._user_repository.create_dotfile(action.creator)
+        entries = await self._user_repository.create_dotfile(action.creator, MAXIMUM_DOTFILE_COUNT)
         return CreateDotfileActionResult(entries=entries.entries)
 
     async def get_default_bootstrap_script(
