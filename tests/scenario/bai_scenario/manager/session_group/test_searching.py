@@ -1,4 +1,4 @@
-"""세션 그룹 전체 검색 — 슈퍼관리자에게만, 배포의 그룹까지."""
+"""세션 그룹 전체 검색 — 슈퍼관리자에게만, replica group이 가진 세션 그룹까지."""
 
 from __future__ import annotations
 
@@ -47,7 +47,7 @@ type SearchingStep = Scenario[TestSeedingSession, Laid, SessionGroupAdapter, Sea
 
 @dataclass(frozen=True)
 class SearchingTheProject(When[Laid, SessionGroupAdapter, Searched]):
-    """그룹들이 있는 프로젝트로 걸러 전체 검색한다."""
+    """세션 그룹들이 있는 프로젝트로 걸러 전체 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -69,11 +69,11 @@ class SearchingTheProject(When[Laid, SessionGroupAdapter, Searched]):
 
 @dataclass(frozen=True)
 class BothGroupsOfTheProject(Then[Laid, Searched]):
-    """그 프로젝트의 사용자 그룹과 배포의 그룹이 모두 온다."""
+    """그 프로젝트의 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹이 모두 온다."""
 
     @override
     def says(self) -> str:
-        return "그 프로젝트의 사용자가 만든 그룹과 배포의 그룹이 모두 온다"
+        return "그 프로젝트의 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹이 모두 온다"
 
     @override
     def look(self, laid: Laid, answered: Answered[Searched]) -> list[Verdict]:
@@ -86,7 +86,7 @@ class BothGroupsOfTheProject(Then[Laid, Searched]):
                 [one.entity_id for one in payload.items],
                 TheseGroups(
                     frozenset({laid.users_group.id, laid.deployment_group.id}),
-                    "사용자가 만든 그룹과 배포의 그룹",
+                    "사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹",
                 ),
             ),
             Same("total_count", payload.total_count, 2),
@@ -107,7 +107,7 @@ class TheSuperadminFindsBothGroups(
     def describe(self) -> str:
         return (
             "아무 권한도 받지 않은 슈퍼관리자가 한 프로젝트로 걸러 전체 검색하면, 그 프로젝트의 "
-            "사용자가 만든 그룹과 배포의 그룹이 모두 온다. 이 문은 역할이라 행위자가 "
+            "사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹이 모두 온다. 이 문은 역할이라 행위자가 "
             "슈퍼관리자다"
         )
 

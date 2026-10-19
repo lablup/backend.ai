@@ -71,7 +71,7 @@ class TestSeedDeploymentSessionGroup(TestSeedRowFrom[DeploymentInfo, SessionGrou
 
     @override
     def detail(self) -> str:
-        return "배포가 replica group과 함께 만드는 그룹이다"
+        return "배포가 replica group과 함께 만드는 세션 그룹이다"
 
     @override
     def name(self, naming: Naming) -> str:

@@ -1,9 +1,9 @@
 """What a session group scenario table says besides the call.
 
-Two projects with a user-made group each, a deployment's group in the first, and another
-user's group in the second. The caller is the owner only when the grant sits in the owner's
-own scope, so what the caller reaches comes from the grant. The purge lays one project
-instead: a user-made group with member sessions beside a deployment's group.
+Two projects, each with a session group a user made; the first also has one a replica group
+holds, the second one another user made. The caller is the owner only when the grant sits in
+the owner's own scope, so the grant decides what the caller reaches. The purge lays one
+project: a session group a user made, with member sessions, beside one a replica group holds.
 """
 
 from __future__ import annotations
@@ -61,13 +61,13 @@ class GrantedIn(enum.Enum):
     """부르는 사람이 세션 그룹 읽기 권한을 받은 곳."""
 
     NOWHERE = "아무 데서도"
-    THE_PROJECT = "그룹들이 있는 프로젝트에서"
+    THE_PROJECT = "세션 그룹들이 있는 프로젝트에서"
     THE_OTHER_PROJECT = "다른 프로젝트에서만"
     THEIR_OWN = "자기 스코프에서"
     THEIR_OWN_AND_THE_OTHER_PROJECT = "자기 스코프와 다른 프로젝트에서"
 
     def is_the_owner(self) -> bool:
-        """부르는 사람이 그룹들을 만든 사람인지."""
+        """부르는 사람이 세션 그룹들을 만든 사람인지."""
         match self:
             case GrantedIn.THEIR_OWN | GrantedIn.THEIR_OWN_AND_THE_OTHER_PROJECT:
                 return True
@@ -84,13 +84,13 @@ class SessionGroupsAndACaller:
     other_project: ProjectData
     owner: UserData
     users_group: SessionGroupData
-    """그룹들이 있는 프로젝트에 사용자가 만든 그룹."""
+    """세션 그룹들이 있는 프로젝트에 사용자가 만든 세션 그룹."""
     deployment_group: SessionGroupData
-    """같은 프로젝트의 배포가 가진 그룹."""
+    """같은 프로젝트의 replica group이 가진 세션 그룹."""
     elsewhere_group: SessionGroupData
-    """다른 프로젝트에 사용자가 만든 그룹."""
+    """다른 프로젝트에 사용자가 만든 세션 그룹."""
     strangers_group: SessionGroupData
-    """다른 프로젝트에 다른 사용자가 만든 그룹."""
+    """다른 프로젝트에 다른 사용자가 만든 세션 그룹."""
     caller: UserData
 
 
@@ -98,7 +98,7 @@ class SessionGroupsAndACaller:
 class SomeoneReadingSessionGroups(TestSeedNest[Laid[UserData]]):
     """그 프로젝트에서 세션 그룹을 읽을 수 있는 사용자.
 
-    그룹은 프로젝트 스코프에 생기므로 역할도 거기 앉는다.
+    세션 그룹은 프로젝트 스코프에 생기므로 역할도 거기 앉는다.
     """
 
     domain: Laid[DomainData]
@@ -127,7 +127,7 @@ class SomeoneReadingSessionGroups(TestSeedNest[Laid[UserData]]):
 class SomeoneReadingTheirOwnSessionGroups(TestSeedNest[Laid[UserData]]):
     """자기 스코프에서 세션 그룹을 읽을 수 있는 사용자.
 
-    그룹은 만든 사람의 스코프에도 생기므로 역할이 거기 앉는다. ``also_in``이 있으면 그
+    세션 그룹은 만든 사람의 스코프에도 생기므로 역할이 거기 앉는다. ``also_in``이 있으면 그
     프로젝트에서도 읽을 수 있다.
     """
 
@@ -170,9 +170,9 @@ class SomeoneReadingTheirOwnSessionGroups(TestSeedNest[Laid[UserData]]):
 
 @dataclass(frozen=True)
 class SessionGroupsInTwoProjects(Given[Any, SessionGroupsAndACaller]):
-    """두 프로젝트의 사용자 그룹과 배포의 그룹, 그리고 정해진 곳에서 권한을 받은 사용자.
+    """두 프로젝트의 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 그리고 정해진 곳에서 권한을 받은 사용자.
 
-    권한이 자기 스코프에 있으면 부르는 사람이 그룹들을 만든 사람이다.
+    권한이 자기 스코프에 있으면 부르는 사람이 세션 그룹들을 만든 사람이다.
     """
 
     granted_in: GrantedIn = GrantedIn.NOWHERE
@@ -181,13 +181,13 @@ class SessionGroupsInTwoProjects(Given[Any, SessionGroupsAndACaller]):
     @override
     def describe(self) -> str:
         laid = (
-            "한 프로젝트에 사용자가 만든 그룹과 배포의 그룹, 다른 프로젝트에 같은 사용자가 만든 "
-            "그룹과 다른 사용자가 만든 그룹"
+            "한 프로젝트에 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 "
+            "세션 그룹과 다른 사용자가 만든 세션 그룹"
         )
         if self.granted_in.is_the_owner():
             return (
                 f"{laid}, 그리고 {self.granted_in.value} 세션 그룹 읽기 권한을 받은 "
-                "그룹들을 만든 사용자"
+                "세션 그룹들을 만든 사용자"
             )
         who = "슈퍼관리자" if self.role is UserRole.SUPERADMIN else "사용자"
         if self.granted_in is GrantedIn.NOWHERE:
@@ -251,7 +251,7 @@ class SessionGroupsInTwoProjects(Given[Any, SessionGroupsAndACaller]):
 
 
 class OwnerGrant(enum.Enum):
-    """그룹들을 만든 사람이 자기 스코프에서 받은 세션 그룹 권한."""
+    """세션 그룹들을 만든 사람이 자기 스코프에서 받은 세션 그룹 권한."""
 
     NOTHING = "없음"
     READ = "읽기"
@@ -269,14 +269,14 @@ class OwnerGrant(enum.Enum):
 
 @dataclass(frozen=True)
 class AGroupWithMembersAndItsOwner:
-    """멤버 세션이 있는 사용자 그룹과 배포의 그룹, 그리고 둘을 만든 사람."""
+    """멤버 세션이 있는 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 그리고 둘을 만든 사람."""
 
     project: ProjectData
     owner: UserData
     users_group: SessionGroupData
-    """사용자가 만든 그룹. 멤버 세션 둘을 갖는다."""
+    """사용자가 만든 세션 그룹. 멤버 세션 둘을 갖는다."""
     deployment_group: SessionGroupData
-    """같은 프로젝트의 배포가 가진 그룹."""
+    """같은 프로젝트의 replica group이 가진 세션 그룹."""
     members: tuple[SessionEntityData, ...]
 
 
@@ -307,18 +307,18 @@ class SomeoneGrantedOnTheirOwnSessionGroups(TestSeedNest[Laid[UserData]]):
 
 @dataclass(frozen=True)
 class AUsersGroupWithMembers(Given[Any, AGroupWithMembersAndItsOwner]):
-    """한 프로젝트에 멤버 세션 둘을 가진 사용자 그룹과 배포의 그룹, 둘을 만든 사람."""
+    """한 프로젝트에 멤버 세션 둘을 가진 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 둘을 만든 사람."""
 
     granted: OwnerGrant
 
     @override
     def describe(self) -> str:
-        laid = "한 프로젝트에 멤버 세션 둘을 가진 사용자 그룹과 배포의 그룹"
+        laid = "한 프로젝트에 멤버 세션 둘을 가진 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹"
         if self.granted is OwnerGrant.NOTHING:
-            return f"{laid}, 그리고 아무 권한도 받지 않은 그룹들을 만든 사용자"
+            return f"{laid}, 그리고 아무 권한도 받지 않은 세션 그룹들을 만든 사용자"
         return (
             f"{laid}, 그리고 자기 스코프에서 세션 그룹 {self.granted.value} 권한을 받은 "
-            "그룹들을 만든 사용자"
+            "세션 그룹들을 만든 사용자"
         )
 
     @override
@@ -370,7 +370,7 @@ class AUsersGroupWithMembers(Given[Any, AGroupWithMembersAndItsOwner]):
 
 @dataclass(frozen=True)
 class TheseGroups(Condition[Collection[UUID]]):
-    """답에 든 그룹이 정해진 그룹들과 같다. id는 실행마다 달라 레포트에는 무엇인지로 말한다."""
+    """답에 든 세션 그룹이 정해진 세션 그룹들과 같다. id는 실행마다 달라 레포트에는 무엇인지로 말한다."""
 
     wanted: frozenset[UUID]
     named: str
@@ -386,7 +386,7 @@ class TheseGroups(Condition[Collection[UUID]]):
 
 @dataclass(frozen=True)
 class UsersGroupLook:
-    """사용자가 만든 그룹의 노드가 어떤 값으로 와야 하는지."""
+    """사용자가 만든 세션 그룹의 노드가 어떤 값으로 와야 하는지."""
 
     started: datetime
 
@@ -398,7 +398,7 @@ class UsersGroupLook:
             Held[UUID](
                 f"{prefix}entity_id",
                 node.entity_id,
-                SameAs(laid.users_group.id, "사용자가 만든 그룹의 id"),
+                SameAs(laid.users_group.id, "사용자가 만든 세션 그룹의 id"),
             ),
             Held[UUID](
                 f"{prefix}domain_id", node.domain_id, SameAs(laid.domain.id, "그 도메인의 id")

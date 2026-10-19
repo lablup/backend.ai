@@ -16,43 +16,43 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [아무 권한도 받지 않은 슈퍼관리자가 한 프로젝트로 걸러 전체 검색하면, 그 프로젝트의 사용자가 만든 그룹과 배포의 그룹이 모두 온다. 이 문은 역할이라 행위자가 슈퍼관리자다](#searching-the-superadmin-finds-a-users-group-and-a-deployments-group) | 성공 |
+| [아무 권한도 받지 않은 슈퍼관리자가 한 프로젝트로 걸러 전체 검색하면, 그 프로젝트의 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹이 모두 온다. 이 문은 역할이라 행위자가 슈퍼관리자다](#searching-the-superadmin-finds-a-users-group-and-a-deployments-group) | 성공 |
 | [그 프로젝트에서 세션 그룹 읽기 권한을 받았어도 슈퍼관리자가 아닌 사용자가 전체 검색하면, 역할로 거부된다](#searching-a-user-who-is-not-a-superadmin-may-not-search-every-session-group) | 거부 |
 
 **purge**
 
 | 시나리오 | 판정 |
 |---|---|
-| [자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 자기가 만든 그룹을 지우면, 그 그룹의 id가 오고 멤버 세션은 그룹이 비워진 채 남는다](#purging-the-owner-purges-a-users-session-group-keeping-its-members) | 성공 |
-| [자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 배포의 그룹을 지우면, 권한이 아니라 대상이 없다는 것으로 거부되고 그룹은 남는다](#purging-a-deployments-session-group-is-not-found-for-a-purge) | 거부 |
-| [아무 권한도 받지 않은 사용자가 자기가 만든 그룹을 지우면, 권한 부족으로 거부되고 그룹은 남는다](#purging-a-user-granted-nothing-may-not-purge-a-session-group) | 거부 |
-| [자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 그룹을 지우면, 권한 부족으로 거부되고 그룹은 남는다](#purging-a-user-granted-only-read-may-not-purge-a-session-group) | 거부 |
+| [자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 자기가 만든 세션 그룹을 지우면, 그 세션 그룹의 id가 오고 멤버 세션은 세션 그룹이 비워진 채 남는다](#purging-the-owner-purges-a-users-session-group-keeping-its-members) | 성공 |
+| [자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 replica group이 가진 세션 그룹을 지우면, 권한이 아니라 대상이 없다는 것으로 거부되고 세션 그룹은 남는다](#purging-a-deployments-session-group-is-not-found-for-a-purge) | 거부 |
+| [아무 권한도 받지 않은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 세션 그룹은 남는다](#purging-a-user-granted-nothing-may-not-purge-a-session-group) | 거부 |
+| [자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 세션 그룹은 남는다](#purging-a-user-granted-only-read-may-not-purge-a-session-group) | 거부 |
 
 **scoped_search**
 
 | 시나리오 | 판정 |
 |---|---|
-| [그 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 그 프로젝트 범위로 검색하면, 배포의 그룹과 다른 프로젝트의 그룹은 빠지고 그 프로젝트의 사용자가 만든 그룹만 온다](#scoped_searching-a-granted-user-finds-only-the-users-group-of-the-project) | 성공 |
-| [자기 스코프와 다른 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 두 스코프를 함께 넘겨 검색하면, 자기가 만든 그룹과 그 프로젝트에서 다른 사용자가 만든 그룹이 합쳐져 오고 배포의 그룹은 빠진다](#scoped_searching-a-user-scope-and-a-project-scope-are-joined) | 성공 |
-| [자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자가 자기 스코프로 검색하면, 두 프로젝트에 자기가 만든 그룹이 오고 배포의 그룹과 다른 사용자의 그룹은 빠진다](#scoped_searching-an-owner-finds-the-groups-they-made-in-their-own-scope) | 성공 |
-| [다른 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 그룹들이 있는 프로젝트 범위로 검색하면, 권한 부족으로 거부된다](#scoped_searching-searching-a-project-not-granted-is-refused) | 거부 |
-| [그룹들이 있는 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 그룹들을 만든 사용자의 스코프로 검색하면, 권한 부족으로 거부된다](#scoped_searching-searching-another-users-scope-is-refused) | 거부 |
+| [그 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 그 프로젝트 범위로 검색하면, replica group이 가진 세션 그룹과 다른 프로젝트의 세션 그룹은 빠지고 그 프로젝트의 사용자가 만든 세션 그룹만 온다](#scoped_searching-a-granted-user-finds-only-the-users-group-of-the-project) | 성공 |
+| [자기 스코프와 다른 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 두 스코프를 함께 넘겨 검색하면, 자기가 만든 세션 그룹과 그 프로젝트에서 다른 사용자가 만든 세션 그룹이 합쳐져 오고 replica group이 가진 세션 그룹은 빠진다](#scoped_searching-a-user-scope-and-a-project-scope-are-joined) | 성공 |
+| [자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자가 자기 스코프로 검색하면, 두 프로젝트에 자기가 만든 세션 그룹이 오고 replica group이 가진 세션 그룹과 다른 사용자가 만든 세션 그룹은 빠진다](#scoped_searching-an-owner-finds-the-groups-they-made-in-their-own-scope) | 성공 |
+| [다른 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들이 있는 프로젝트 범위로 검색하면, 권한 부족으로 거부된다](#scoped_searching-searching-a-project-not-granted-is-refused) | 거부 |
+| [세션 그룹들이 있는 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들을 만든 사용자의 스코프로 검색하면, 권한 부족으로 거부된다](#scoped_searching-searching-another-users-scope-is-refused) | 거부 |
 
 **bulk_get_ids**
 
 | 시나리오 | 판정 |
 |---|---|
-| [그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 그룹과 배포의 그룹을 함께 읽으면, 요청한 순서대로 그 그룹과 빈 값이 온다](#bulk_reading-a-granted-user-bulk-reads-a-users-group-and-a-deployments-group) | 성공 |
-| [슈퍼관리자가 아무 그룹도 갖지 않은 id로 여럿 읽으면, 그 자리가 빈 값으로 온다. 권한 검사를 통과하는 사람이어야 읽기의 답을 볼 수 있어 행위자가 슈퍼관리자다](#bulk_reading-the-superadmin-bulk-reads-a-missing-id-as-empty) | 성공 |
-| [아무 권한도 받지 않은 사용자가 사용자가 만든 그룹을 id로 여럿 읽으면, 그 자리가 권한 부족으로 거부된다](#bulk_reading-a-user-granted-nothing-may-not-bulk-read-a-session-group) | 거부 |
+| [그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹을 함께 읽으면, 요청한 순서대로 그 세션 그룹과 빈 값이 온다](#bulk_reading-a-granted-user-bulk-reads-a-users-group-and-a-deployments-group) | 성공 |
+| [슈퍼관리자가 아무 세션 그룹도 갖지 않은 id로 여럿 읽으면, 그 자리가 빈 값으로 온다. 권한 검사를 통과하는 사람이어야 읽기의 답을 볼 수 있어 행위자가 슈퍼관리자다](#bulk_reading-the-superadmin-bulk-reads-a-missing-id-as-empty) | 성공 |
+| [아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 여럿 읽으면, 그 자리가 권한 부족으로 거부된다](#bulk_reading-a-user-granted-nothing-may-not-bulk-read-a-session-group) | 거부 |
 
 **get**
 
 | 시나리오 | 판정 |
 |---|---|
-| [그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 그룹을 id로 조회하면, 그 그룹이 온다](#reading-a-granted-user-reads-a-users-session-group) | 성공 |
-| [그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 배포의 그룹을 id로 조회하면, 권한이 아니라 대상이 없다는 것으로 거부된다](#reading-a-deployments-session-group-is-not-found-even-when-granted) | 거부 |
-| [아무 권한도 받지 않은 사용자가 사용자가 만든 그룹을 id로 조회하면, 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-a-session-group) | 거부 |
+| [그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹을 id로 조회하면, 그 세션 그룹이 온다](#reading-a-granted-user-reads-a-users-session-group) | 성공 |
+| [그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 replica group이 가진 세션 그룹을 id로 조회하면, 권한이 아니라 대상이 없다는 것으로 거부된다](#reading-a-deployments-session-group-is-not-found-even-when-granted) | 거부 |
+| [아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 조회하면, 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-a-session-group) | 거부 |
 
 ### global_search
 
@@ -60,11 +60,11 @@
 
 #### [the-superadmin-finds-a-users-group-and-a-deployments-group](/tests/scenario/bai_scenario/manager/session_group/test_searching.py) — pass
 
-아무 권한도 받지 않은 슈퍼관리자가 한 프로젝트로 걸러 전체 검색하면, 그 프로젝트의 사용자가 만든 그룹과 배포의 그룹이 모두 온다. 이 문은 역할이라 행위자가 슈퍼관리자다
+아무 권한도 받지 않은 슈퍼관리자가 한 프로젝트로 걸러 전체 검색하면, 그 프로젝트의 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹이 모두 온다. 이 문은 역할이라 행위자가 슈퍼관리자다
 
 Given
 
-- 한 프로젝트에 사용자가 만든 그룹과 배포의 그룹, 다른 프로젝트에 같은 사용자가 만든 그룹과 다른 사용자가 만든 그룹, 그리고 아무 권한도 받지 않은 슈퍼관리자 한 명
+- 한 프로젝트에 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 아무 권한도 받지 않은 슈퍼관리자 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -84,7 +84,7 @@ Given
   - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 그룹이다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
   - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
 
 When
@@ -93,8 +93,8 @@ When
 
 Then
 
-- 그 프로젝트의 사용자가 만든 그룹과 배포의 그룹이 모두 온다
-  - items: 사용자가 만든 그룹과 배포의 그룹
+- 그 프로젝트의 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹이 모두 온다
+  - items: 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
@@ -107,7 +107,7 @@ Then
 
 Given
 
-- 한 프로젝트에 사용자가 만든 그룹과 배포의 그룹, 다른 프로젝트에 같은 사용자가 만든 그룹과 다른 사용자가 만든 그룹, 그리고 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
+- 한 프로젝트에 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 세션 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -124,7 +124,7 @@ Given
   - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 그룹이다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
   - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
   - 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
@@ -150,11 +150,11 @@ Then
 
 #### [the-owner-purges-a-users-session-group-keeping-its-members](/tests/scenario/bai_scenario/manager/session_group/test_purging.py) — pass
 
-자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 자기가 만든 그룹을 지우면, 그 그룹의 id가 오고 멤버 세션은 그룹이 비워진 채 남는다
+자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 자기가 만든 세션 그룹을 지우면, 그 세션 그룹의 id가 오고 멤버 세션은 세션 그룹이 비워진 채 남는다
 
 Given
 
-- 한 프로젝트에 멤버 세션 둘을 가진 사용자 그룹과 배포의 그룹, 그리고 자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 그룹들을 만든 사용자
+- 한 프로젝트에 멤버 세션 둘을 가진 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 그리고 자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 세션 그룹들을 만든 사용자
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -173,27 +173,27 @@ Given
   - 세션 session-1: 세션 그룹의 멤버로 스케줄링을 기다리고 있다
   - 세션 session-2: 세션 그룹의 멤버로 스케줄링을 기다리고 있다
   - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 그룹이다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
   - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
 
 When
 
-- SessionGroupAdapter.purge — user-1이 사용자가 만든 그룹을 영구 삭제
+- SessionGroupAdapter.purge — user-1이 사용자가 만든 세션 그룹을 영구 삭제
 
 Then
 
-- 지운 사용자 그룹의 id가 온다
-  - id: 사용자가 만든 그룹의 id와 같다
+- 지운 사용자가 만든 세션 그룹의 id가 온다
+  - id: 사용자가 만든 세션 그룹의 id와 같다
 
 <a id="purging-a-deployments-session-group-is-not-found-for-a-purge"></a>
 
 #### [a-deployments-session-group-is-not-found-for-a-purge](/tests/scenario/bai_scenario/manager/session_group/test_purging.py) — pass
 
-자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 배포의 그룹을 지우면, 권한이 아니라 대상이 없다는 것으로 거부되고 그룹은 남는다
+자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 replica group이 가진 세션 그룹을 지우면, 권한이 아니라 대상이 없다는 것으로 거부되고 세션 그룹은 남는다
 
 Given
 
-- 한 프로젝트에 멤버 세션 둘을 가진 사용자 그룹과 배포의 그룹, 그리고 자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 그룹들을 만든 사용자
+- 한 프로젝트에 멤버 세션 둘을 가진 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 그리고 자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 세션 그룹들을 만든 사용자
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -212,12 +212,12 @@ Given
   - 세션 session-1: 세션 그룹의 멤버로 스케줄링을 기다리고 있다
   - 세션 session-2: 세션 그룹의 멤버로 스케줄링을 기다리고 있다
   - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 그룹이다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
   - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
 
 When
 
-- SessionGroupAdapter.purge — user-1이 배포의 그룹을 영구 삭제
+- SessionGroupAdapter.purge — user-1이 replica group이 가진 세션 그룹을 영구 삭제
 
 Then
 
@@ -228,11 +228,11 @@ Then
 
 #### [a-user-granted-nothing-may-not-purge-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_purging.py) — pass
 
-아무 권한도 받지 않은 사용자가 자기가 만든 그룹을 지우면, 권한 부족으로 거부되고 그룹은 남는다
+아무 권한도 받지 않은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 세션 그룹은 남는다
 
 Given
 
-- 한 프로젝트에 멤버 세션 둘을 가진 사용자 그룹과 배포의 그룹, 그리고 아무 권한도 받지 않은 그룹들을 만든 사용자
+- 한 프로젝트에 멤버 세션 둘을 가진 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 그리고 아무 권한도 받지 않은 세션 그룹들을 만든 사용자
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -247,12 +247,12 @@ Given
   - 세션 session-1: 세션 그룹의 멤버로 스케줄링을 기다리고 있다
   - 세션 session-2: 세션 그룹의 멤버로 스케줄링을 기다리고 있다
   - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 그룹이다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
   - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
 
 When
 
-- SessionGroupAdapter.purge — user-1이 사용자가 만든 그룹을 영구 삭제
+- SessionGroupAdapter.purge — user-1이 사용자가 만든 세션 그룹을 영구 삭제
 
 Then
 
@@ -263,11 +263,11 @@ Then
 
 #### [a-user-granted-only-read-may-not-purge-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_purging.py) — pass
 
-자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 그룹을 지우면, 권한 부족으로 거부되고 그룹은 남는다
+자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 세션 그룹은 남는다
 
 Given
 
-- 한 프로젝트에 멤버 세션 둘을 가진 사용자 그룹과 배포의 그룹, 그리고 자기 스코프에서 세션 그룹 읽기 권한을 받은 그룹들을 만든 사용자
+- 한 프로젝트에 멤버 세션 둘을 가진 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 그리고 자기 스코프에서 세션 그룹 읽기 권한을 받은 세션 그룹들을 만든 사용자
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -286,12 +286,12 @@ Given
   - 세션 session-1: 세션 그룹의 멤버로 스케줄링을 기다리고 있다
   - 세션 session-2: 세션 그룹의 멤버로 스케줄링을 기다리고 있다
   - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 그룹이다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
   - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
 
 When
 
-- SessionGroupAdapter.purge — user-1이 사용자가 만든 그룹을 영구 삭제
+- SessionGroupAdapter.purge — user-1이 사용자가 만든 세션 그룹을 영구 삭제
 
 Then
 
@@ -304,11 +304,11 @@ Then
 
 #### [a-granted-user-finds-only-the-users-group-of-the-project](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py) — pass
 
-그 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 그 프로젝트 범위로 검색하면, 배포의 그룹과 다른 프로젝트의 그룹은 빠지고 그 프로젝트의 사용자가 만든 그룹만 온다
+그 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 그 프로젝트 범위로 검색하면, replica group이 가진 세션 그룹과 다른 프로젝트의 세션 그룹은 빠지고 그 프로젝트의 사용자가 만든 세션 그룹만 온다
 
 Given
 
-- 한 프로젝트에 사용자가 만든 그룹과 배포의 그룹, 다른 프로젝트에 같은 사용자가 만든 그룹과 다른 사용자가 만든 그룹, 그리고 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
+- 한 프로젝트에 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 세션 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -325,7 +325,7 @@ Given
   - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 그룹이다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
   - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
   - 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
@@ -342,8 +342,8 @@ When
 
 Then
 
-- 그 프로젝트의 사용자가 만든 그룹만 남는다
-  - items: 그 프로젝트의 사용자가 만든 그룹
+- 그 프로젝트의 사용자가 만든 세션 그룹만 남는다
+  - items: 그 프로젝트의 사용자가 만든 세션 그룹
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
@@ -352,11 +352,11 @@ Then
 
 #### [a-user-scope-and-a-project-scope-are-joined](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py) — pass
 
-자기 스코프와 다른 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 두 스코프를 함께 넘겨 검색하면, 자기가 만든 그룹과 그 프로젝트에서 다른 사용자가 만든 그룹이 합쳐져 오고 배포의 그룹은 빠진다
+자기 스코프와 다른 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 두 스코프를 함께 넘겨 검색하면, 자기가 만든 세션 그룹과 그 프로젝트에서 다른 사용자가 만든 세션 그룹이 합쳐져 오고 replica group이 가진 세션 그룹은 빠진다
 
 Given
 
-- 한 프로젝트에 사용자가 만든 그룹과 배포의 그룹, 다른 프로젝트에 같은 사용자가 만든 그룹과 다른 사용자가 만든 그룹, 그리고 자기 스코프와 다른 프로젝트에서 세션 그룹 읽기 권한을 받은 그룹들을 만든 사용자
+- 한 프로젝트에 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 자기 스코프와 다른 프로젝트에서 세션 그룹 읽기 권한을 받은 세션 그룹들을 만든 사용자
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -381,7 +381,7 @@ Given
   - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 그룹이다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
   - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
 
 When
@@ -390,8 +390,8 @@ When
 
 Then
 
-- 그 사용자가 만든 그룹과 다른 프로젝트의 그룹이 합쳐져 남는다
-  - items: 그 사용자가 만든 그룹과 다른 프로젝트의 그룹
+- 그 사용자가 만든 세션 그룹과 다른 프로젝트의 세션 그룹이 합쳐져 남는다
+  - items: 그 사용자가 만든 세션 그룹과 다른 프로젝트의 세션 그룹
   - total_count = 3
   - has_next_page = False
   - has_previous_page = False
@@ -400,11 +400,11 @@ Then
 
 #### [an-owner-finds-the-groups-they-made-in-their-own-scope](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py) — pass
 
-자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자가 자기 스코프로 검색하면, 두 프로젝트에 자기가 만든 그룹이 오고 배포의 그룹과 다른 사용자의 그룹은 빠진다
+자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자가 자기 스코프로 검색하면, 두 프로젝트에 자기가 만든 세션 그룹이 오고 replica group이 가진 세션 그룹과 다른 사용자가 만든 세션 그룹은 빠진다
 
 Given
 
-- 한 프로젝트에 사용자가 만든 그룹과 배포의 그룹, 다른 프로젝트에 같은 사용자가 만든 그룹과 다른 사용자가 만든 그룹, 그리고 자기 스코프에서 세션 그룹 읽기 권한을 받은 그룹들을 만든 사용자
+- 한 프로젝트에 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 자기 스코프에서 세션 그룹 읽기 권한을 받은 세션 그룹들을 만든 사용자
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -426,7 +426,7 @@ Given
   - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 그룹이다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
   - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
 
 When
@@ -435,8 +435,8 @@ When
 
 Then
 
-- 그 사용자가 두 프로젝트에 만든 그룹만 남는다
-  - items: 그 사용자가 두 프로젝트에 만든 그룹
+- 그 사용자가 두 프로젝트에 만든 세션 그룹만 남는다
+  - items: 그 사용자가 두 프로젝트에 만든 세션 그룹
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
@@ -445,11 +445,11 @@ Then
 
 #### [searching-a-project-not-granted-is-refused](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py) — pass
 
-다른 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 그룹들이 있는 프로젝트 범위로 검색하면, 권한 부족으로 거부된다
+다른 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들이 있는 프로젝트 범위로 검색하면, 권한 부족으로 거부된다
 
 Given
 
-- 한 프로젝트에 사용자가 만든 그룹과 배포의 그룹, 다른 프로젝트에 같은 사용자가 만든 그룹과 다른 사용자가 만든 그룹, 그리고 다른 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자 한 명
+- 한 프로젝트에 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 다른 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -466,7 +466,7 @@ Given
   - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 그룹이다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
   - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
   - 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
@@ -490,11 +490,11 @@ Then
 
 #### [searching-another-users-scope-is-refused](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py) — pass
 
-그룹들이 있는 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 그룹들을 만든 사용자의 스코프로 검색하면, 권한 부족으로 거부된다
+세션 그룹들이 있는 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들을 만든 사용자의 스코프로 검색하면, 권한 부족으로 거부된다
 
 Given
 
-- 한 프로젝트에 사용자가 만든 그룹과 배포의 그룹, 다른 프로젝트에 같은 사용자가 만든 그룹과 다른 사용자가 만든 그룹, 그리고 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
+- 한 프로젝트에 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 세션 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -511,7 +511,7 @@ Given
   - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 그룹이다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
   - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
   - 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
@@ -537,11 +537,11 @@ Then
 
 #### [a-granted-user-bulk-reads-a-users-group-and-a-deployments-group](/tests/scenario/bai_scenario/manager/session_group/test_bulk_reading.py) — pass
 
-그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 그룹과 배포의 그룹을 함께 읽으면, 요청한 순서대로 그 그룹과 빈 값이 온다
+그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹을 함께 읽으면, 요청한 순서대로 그 세션 그룹과 빈 값이 온다
 
 Given
 
-- 한 프로젝트에 사용자가 만든 그룹과 배포의 그룹, 다른 프로젝트에 같은 사용자가 만든 그룹과 다른 사용자가 만든 그룹, 그리고 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
+- 한 프로젝트에 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 세션 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -558,7 +558,7 @@ Given
   - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 그룹이다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
   - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
   - 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
@@ -571,13 +571,13 @@ Given
 
 When
 
-- SessionGroupAdapter.bulk_get_ids — user-3이 사용자가 만든 그룹, 배포의 그룹 순으로 여럿 읽기
+- SessionGroupAdapter.bulk_get_ids — user-3이 사용자가 만든 세션 그룹, replica group이 가진 세션 그룹 순으로 여럿 읽기
 
 Then
 
-- 첫 자리에 사용자가 만든 그룹 전체가 오고, 배포의 그룹 자리는 빈 값이다
+- 첫 자리에 사용자가 만든 세션 그룹 전체가 오고, replica group이 가진 세션 그룹 자리는 빈 값이다
   - [0].id: 무시함 — 데이터베이스가 만든다
-  - [0].entity_id: 사용자가 만든 그룹의 id와 같다
+  - [0].entity_id: 사용자가 만든 세션 그룹의 id와 같다
   - [0].domain_id: 그 도메인의 id와 같다
   - [0].project_id: 그 프로젝트의 id와 같다
   - [0].owner_user_id: 만든 사람의 id와 같다
@@ -590,11 +590,11 @@ Then
 
 #### [the-superadmin-bulk-reads-a-missing-id-as-empty](/tests/scenario/bai_scenario/manager/session_group/test_bulk_reading.py) — pass
 
-슈퍼관리자가 아무 그룹도 갖지 않은 id로 여럿 읽으면, 그 자리가 빈 값으로 온다. 권한 검사를 통과하는 사람이어야 읽기의 답을 볼 수 있어 행위자가 슈퍼관리자다
+슈퍼관리자가 아무 세션 그룹도 갖지 않은 id로 여럿 읽으면, 그 자리가 빈 값으로 온다. 권한 검사를 통과하는 사람이어야 읽기의 답을 볼 수 있어 행위자가 슈퍼관리자다
 
 Given
 
-- 한 프로젝트에 사용자가 만든 그룹과 배포의 그룹, 다른 프로젝트에 같은 사용자가 만든 그룹과 다른 사용자가 만든 그룹, 그리고 아무 권한도 받지 않은 슈퍼관리자 한 명
+- 한 프로젝트에 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 아무 권한도 받지 않은 슈퍼관리자 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -614,12 +614,12 @@ Given
   - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 그룹이다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
   - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
 
 When
 
-- SessionGroupAdapter.bulk_get_ids — user-3이 아무 그룹도 갖지 않은 id로 여럿 읽기
+- SessionGroupAdapter.bulk_get_ids — user-3이 아무 세션 그룹도 갖지 않은 id로 여럿 읽기
 
 Then
 
@@ -630,11 +630,11 @@ Then
 
 #### [a-user-granted-nothing-may-not-bulk-read-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_bulk_reading.py) — pass
 
-아무 권한도 받지 않은 사용자가 사용자가 만든 그룹을 id로 여럿 읽으면, 그 자리가 권한 부족으로 거부된다
+아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 여럿 읽으면, 그 자리가 권한 부족으로 거부된다
 
 Given
 
-- 한 프로젝트에 사용자가 만든 그룹과 배포의 그룹, 다른 프로젝트에 같은 사용자가 만든 그룹과 다른 사용자가 만든 그룹, 그리고 아무 권한도 받지 않은 사용자 한 명
+- 한 프로젝트에 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 아무 권한도 받지 않은 사용자 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -654,12 +654,12 @@ Given
   - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 그룹이다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
   - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
 
 When
 
-- SessionGroupAdapter.bulk_get_ids — user-3이 사용자가 만든 그룹의 id로 여럿 읽기
+- SessionGroupAdapter.bulk_get_ids — user-3이 사용자가 만든 세션 그룹의 id로 여럿 읽기
 
 Then
 
@@ -672,11 +672,11 @@ Then
 
 #### [a-granted-user-reads-a-users-session-group](/tests/scenario/bai_scenario/manager/session_group/test_reading.py) — pass
 
-그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 그룹을 id로 조회하면, 그 그룹이 온다
+그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹을 id로 조회하면, 그 세션 그룹이 온다
 
 Given
 
-- 한 프로젝트에 사용자가 만든 그룹과 배포의 그룹, 다른 프로젝트에 같은 사용자가 만든 그룹과 다른 사용자가 만든 그룹, 그리고 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
+- 한 프로젝트에 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 세션 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -693,7 +693,7 @@ Given
   - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 그룹이다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
   - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
   - 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
@@ -706,13 +706,13 @@ Given
 
 When
 
-- SessionGroupAdapter.get — user-3이 사용자가 만든 그룹을 id로 조회
+- SessionGroupAdapter.get — user-3이 사용자가 만든 세션 그룹을 id로 조회
 
 Then
 
-- 사용자가 만든 그룹 전체가 온다
+- 사용자가 만든 세션 그룹 전체가 온다
   - id: 무시함 — 데이터베이스가 만든다
-  - entity_id: 사용자가 만든 그룹의 id와 같다
+  - entity_id: 사용자가 만든 세션 그룹의 id와 같다
   - domain_id: 그 도메인의 id와 같다
   - project_id: 그 프로젝트의 id와 같다
   - owner_user_id: 만든 사람의 id와 같다
@@ -725,11 +725,11 @@ Then
 
 #### [a-deployments-session-group-is-not-found-even-when-granted](/tests/scenario/bai_scenario/manager/session_group/test_reading.py) — pass
 
-그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 배포의 그룹을 id로 조회하면, 권한이 아니라 대상이 없다는 것으로 거부된다
+그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 replica group이 가진 세션 그룹을 id로 조회하면, 권한이 아니라 대상이 없다는 것으로 거부된다
 
 Given
 
-- 한 프로젝트에 사용자가 만든 그룹과 배포의 그룹, 다른 프로젝트에 같은 사용자가 만든 그룹과 다른 사용자가 만든 그룹, 그리고 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
+- 한 프로젝트에 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 세션 그룹들이 있는 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -746,7 +746,7 @@ Given
   - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 그룹이다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
   - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
   - 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
@@ -759,7 +759,7 @@ Given
 
 When
 
-- SessionGroupAdapter.get — user-3이 배포의 그룹을 id로 조회
+- SessionGroupAdapter.get — user-3이 replica group이 가진 세션 그룹을 id로 조회
 
 Then
 
@@ -770,11 +770,11 @@ Then
 
 #### [a-user-granted-nothing-may-not-read-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_reading.py) — pass
 
-아무 권한도 받지 않은 사용자가 사용자가 만든 그룹을 id로 조회하면, 권한 부족으로 거부된다
+아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 조회하면, 권한 부족으로 거부된다
 
 Given
 
-- 한 프로젝트에 사용자가 만든 그룹과 배포의 그룹, 다른 프로젝트에 같은 사용자가 만든 그룹과 다른 사용자가 만든 그룹, 그리고 아무 권한도 받지 않은 사용자 한 명
+- 한 프로젝트에 사용자가 만든 세션 그룹과 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 아무 권한도 받지 않은 사용자 한 명
   - 도메인 home-1
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
@@ -794,12 +794,12 @@ Given
   - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
   - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
-  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 그룹이다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
   - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
 
 When
 
-- SessionGroupAdapter.get — user-3이 사용자가 만든 그룹을 id로 조회
+- SessionGroupAdapter.get — user-3이 사용자가 만든 세션 그룹을 id로 조회
 
 Then
 

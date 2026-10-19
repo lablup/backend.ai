@@ -1,6 +1,6 @@
 """세션 그룹 영구 삭제 — 누가 지울 수 있고, 지운 뒤 무엇이 남는가.
 
-그룹 행과 그 그래프 노드가 사라지고 멤버 세션은 그룹 id가 비워진 채 남는 것은 답에 나오지
+세션 그룹 행과 그 그래프 노드가 사라지고 멤버 세션은 세션 그룹 id가 비워진 채 남는 것은 답에 나오지
 않는다. 실행 뒤 데이터베이스에서 따로 확인한다.
 """
 
@@ -50,7 +50,7 @@ type PurgingStep = Scenario[TestSeedingSession, Laid, SessionGroupAdapter, Purge
 
 @dataclass(frozen=True)
 class PurgingTheUsersGroup(When[Laid, SessionGroupAdapter, PurgeSessionGroupPayload]):
-    """사용자가 만든 그룹을 영구 삭제한다."""
+    """사용자가 만든 세션 그룹을 영구 삭제한다."""
 
     @override
     def operation(self) -> str:
@@ -58,7 +58,7 @@ class PurgingTheUsersGroup(When[Laid, SessionGroupAdapter, PurgeSessionGroupPayl
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.owner.username}이 사용자가 만든 그룹을 영구 삭제"
+        return f"{laid.owner.username}이 사용자가 만든 세션 그룹을 영구 삭제"
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> PurgeSessionGroupPayload:
@@ -68,7 +68,7 @@ class PurgingTheUsersGroup(When[Laid, SessionGroupAdapter, PurgeSessionGroupPayl
 
 @dataclass(frozen=True)
 class PurgingTheDeploymentGroup(When[Laid, SessionGroupAdapter, PurgeSessionGroupPayload]):
-    """배포의 그룹을 영구 삭제한다."""
+    """replica group이 가진 세션 그룹을 영구 삭제한다."""
 
     @override
     def operation(self) -> str:
@@ -76,7 +76,7 @@ class PurgingTheDeploymentGroup(When[Laid, SessionGroupAdapter, PurgeSessionGrou
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.owner.username}이 배포의 그룹을 영구 삭제"
+        return f"{laid.owner.username}이 replica group이 가진 세션 그룹을 영구 삭제"
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> PurgeSessionGroupPayload:
@@ -86,11 +86,11 @@ class PurgingTheDeploymentGroup(When[Laid, SessionGroupAdapter, PurgeSessionGrou
 
 @dataclass(frozen=True)
 class TheUsersGroupIsNamed(Then[Laid, PurgeSessionGroupPayload]):
-    """지운 그룹의 id가 온다."""
+    """지운 세션 그룹의 id가 온다."""
 
     @override
     def says(self) -> str:
-        return "지운 사용자 그룹의 id가 온다"
+        return "지운 사용자가 만든 세션 그룹의 id가 온다"
 
     @override
     def look(self, laid: Laid, answered: Answered[PurgeSessionGroupPayload]) -> list[Verdict]:
@@ -98,7 +98,9 @@ class TheUsersGroupIsNamed(Then[Laid, PurgeSessionGroupPayload]):
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
         return [
-            Held[UUID]("id", payload.id, SameAs(laid.users_group.id, "사용자가 만든 그룹의 id"))
+            Held[UUID](
+                "id", payload.id, SameAs(laid.users_group.id, "사용자가 만든 세션 그룹의 id")
+            )
         ]
 
 
@@ -113,8 +115,8 @@ class TheOwnerPurgesTheUsersGroup(
     @override
     def describe(self) -> str:
         return (
-            "자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 자기가 만든 그룹을 지우면, "
-            "그 그룹의 id가 오고 멤버 세션은 그룹이 비워진 채 남는다"
+            "자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 자기가 만든 세션 그룹을 지우면, "
+            "그 세션 그룹의 id가 오고 멤버 세션은 세션 그룹이 비워진 채 남는다"
         )
 
     @override
@@ -141,8 +143,8 @@ class ADeploymentsGroupIsNotFound(
     @override
     def describe(self) -> str:
         return (
-            "자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 배포의 그룹을 지우면, "
-            "권한이 아니라 대상이 없다는 것으로 거부되고 그룹은 남는다"
+            "자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 replica group이 가진 세션 그룹을 지우면, "
+            "권한이 아니라 대상이 없다는 것으로 거부되고 세션 그룹은 남는다"
         )
 
     @override
@@ -169,8 +171,8 @@ class AReaderMayNotPurge(
     @override
     def describe(self) -> str:
         return (
-            "자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 그룹을 지우면, "
-            "권한 부족으로 거부되고 그룹은 남는다"
+            "자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹을 지우면, "
+            "권한 부족으로 거부되고 세션 그룹은 남는다"
         )
 
     @override
@@ -197,8 +199,8 @@ class AUserGrantedNothingMayNotPurge(
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 받지 않은 사용자가 자기가 만든 그룹을 지우면, 권한 부족으로 거부되고 "
-            "그룹은 남는다"
+            "아무 권한도 받지 않은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 "
+            "세션 그룹은 남는다"
         )
 
     @override
@@ -259,7 +261,7 @@ async def what_is_left(engine: ExtendedAsyncSAEngine) -> WhatIsLeft:
 
 
 def expected_left(scenario: PurgingStep) -> WhatIsLeft:
-    """사용자 그룹을 지운 행만 그룹 하나와 그 노드를 잃고, 멤버 둘은 그룹 없이 남는다."""
+    """사용자가 만든 세션 그룹을 지운 행만 세션 그룹 하나와 그 노드를 잃고, 멤버 둘은 세션 그룹 없이 남는다."""
     match scenario:
         case TheOwnerPurgesTheUsersGroup():
             return WhatIsLeft(

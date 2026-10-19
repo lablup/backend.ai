@@ -43,7 +43,7 @@ type BulkReadingStep = Scenario[TestSeedingSession, Laid, SessionGroupAdapter, A
 
 @dataclass(frozen=True)
 class ReadingBothGroupsOfTheProject(When[Laid, SessionGroupAdapter, Answers]):
-    """사용자가 만든 그룹, 배포의 그룹 순으로 여럿 읽는다."""
+    """사용자가 만든 세션 그룹, replica group이 가진 세션 그룹 순으로 여럿 읽는다."""
 
     @override
     def operation(self) -> str:
@@ -51,7 +51,7 @@ class ReadingBothGroupsOfTheProject(When[Laid, SessionGroupAdapter, Answers]):
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.caller.username}이 사용자가 만든 그룹, 배포의 그룹 순으로 여럿 읽기"
+        return f"{laid.caller.username}이 사용자가 만든 세션 그룹, replica group이 가진 세션 그룹 순으로 여럿 읽기"
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> Answers:
@@ -64,7 +64,7 @@ class ReadingBothGroupsOfTheProject(When[Laid, SessionGroupAdapter, Answers]):
 
 @dataclass(frozen=True)
 class ReadingAMissingId(When[Laid, SessionGroupAdapter, Answers]):
-    """아무 그룹도 갖지 않은 id 하나를 여럿 읽기로 읽는다."""
+    """아무 세션 그룹도 갖지 않은 id 하나를 여럿 읽기로 읽는다."""
 
     @override
     def operation(self) -> str:
@@ -72,7 +72,7 @@ class ReadingAMissingId(When[Laid, SessionGroupAdapter, Answers]):
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.caller.username}이 아무 그룹도 갖지 않은 id로 여럿 읽기"
+        return f"{laid.caller.username}이 아무 세션 그룹도 갖지 않은 id로 여럿 읽기"
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> Answers:
@@ -82,7 +82,7 @@ class ReadingAMissingId(When[Laid, SessionGroupAdapter, Answers]):
 
 @dataclass(frozen=True)
 class ReadingTheUsersGroupById(When[Laid, SessionGroupAdapter, Answers]):
-    """사용자가 만든 그룹 하나를 id 목록으로 읽는다."""
+    """사용자가 만든 세션 그룹 하나를 id 목록으로 읽는다."""
 
     @override
     def operation(self) -> str:
@@ -90,7 +90,7 @@ class ReadingTheUsersGroupById(When[Laid, SessionGroupAdapter, Answers]):
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.caller.username}이 사용자가 만든 그룹의 id로 여럿 읽기"
+        return f"{laid.caller.username}이 사용자가 만든 세션 그룹의 id로 여럿 읽기"
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> Answers:
@@ -100,13 +100,13 @@ class ReadingTheUsersGroupById(When[Laid, SessionGroupAdapter, Answers]):
 
 @dataclass(frozen=True)
 class OnlyTheUsersGroupComesBack(Then[Laid, Answers]):
-    """첫 자리에 사용자가 만든 그룹이 오고, 배포의 그룹 자리는 비어 있다."""
+    """첫 자리에 사용자가 만든 세션 그룹이 오고, replica group이 가진 세션 그룹 자리는 비어 있다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "첫 자리에 사용자가 만든 그룹 전체가 오고, 배포의 그룹 자리는 빈 값이다"
+        return "첫 자리에 사용자가 만든 세션 그룹 전체가 오고, replica group이 가진 세션 그룹 자리는 빈 값이다"
 
     @override
     def look(self, laid: Laid, answered: Answered[Answers]) -> list[Verdict]:
@@ -177,8 +177,8 @@ class AGrantedUserReadsBothGroups(
     @override
     def describe(self) -> str:
         return (
-            "그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 그룹과 배포의 "
-            "그룹을 함께 읽으면, 요청한 순서대로 그 그룹과 빈 값이 온다"
+            "그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹과 "
+            "replica group이 가진 세션 그룹을 함께 읽으면, 요청한 순서대로 그 세션 그룹과 빈 값이 온다"
         )
 
     @override
@@ -205,7 +205,7 @@ class AUserGrantedNothingMayNotBulkRead(
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 받지 않은 사용자가 사용자가 만든 그룹을 id로 여럿 읽으면, "
+            "아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 여럿 읽으면, "
             "그 자리가 권한 부족으로 거부된다"
         )
 
@@ -233,7 +233,7 @@ class TheSuperadminReadsAMissingId(
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 아무 그룹도 갖지 않은 id로 여럿 읽으면, 그 자리가 빈 값으로 온다. "
+            "슈퍼관리자가 아무 세션 그룹도 갖지 않은 id로 여럿 읽으면, 그 자리가 빈 값으로 온다. "
             "권한 검사를 통과하는 사람이어야 읽기의 답을 볼 수 있어 행위자가 슈퍼관리자다"
         )
 
