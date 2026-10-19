@@ -105,7 +105,11 @@ from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
-from ai.backend.common.middlewares.exception import client_closed_response, is_client_disconnect
+from ai.backend.common.middlewares.exception import (
+    client_closed_response,
+    general_exception_middleware,
+    is_client_disconnect,
+)
 from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
@@ -815,12 +819,9 @@ def init_subapp(pkg_name: str, root_app: web.Application, create_subapp: AppCrea
 
 def build_internal_app(root_ctx: RootContext) -> web.Application:
     app = web.Application(
-        middlewares=[request_context_aware_middleware, exception_middleware, api_middleware]
+        middlewares=[request_context_aware_middleware, general_exception_middleware]
     )
-    app["_root.context"] = root_ctx
     app.on_response_prepare.append(on_prepare)
-    with importlib.resources.as_file(importlib.resources.files("ai.backend.appproxy.common")) as f:
-        aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(f / "templates"))
     app.add_subapp("/v2/ingress", create_ingress_app(root_ctx))
     return app
 
