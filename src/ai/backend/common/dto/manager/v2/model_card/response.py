@@ -56,6 +56,7 @@ class UpdateModelCardPayload(BaseResponseModel):
 
 class DeleteModelCardPayload(BaseResponseModel):
     id: UUID = Field(description="ID of the deleted model card.")
+    entity_id: UUID = Field(description="UUID of the deleted model card. Added in 26.10.0.")
 
 
 class SearchModelCardsPayload(BaseResponseModel):
