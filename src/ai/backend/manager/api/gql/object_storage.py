@@ -57,7 +57,7 @@ from ai.backend.common.dto.manager.v2.object_storage.response import (
     UpdateObjectStoragePayload as UpdateObjectStoragePayloadDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid, to_global_id
 from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -324,7 +324,21 @@ class DeleteObjectStoragePayload(PydanticOutputMixin[DeleteObjectStoragePayloadD
     name="PurgeObjectStoragePayload",
 )
 class PurgeObjectStoragePayloadGQL(PydanticOutputMixin[PurgeObjectStoragePayloadDTO]):
-    id: UUID = gql_field(description="ID of the purged object storage.")
+    id: UUID = gql_field(
+        description="ID of the purged object storage.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged object storage.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="UUID of the purged object storage."
+        ),
+    )
 
 
 @gql_pydantic_type(
@@ -424,7 +438,9 @@ async def delete_object_storage(
 ) -> DeleteObjectStoragePayload | None:
     dto = input.to_pydantic()
     purged = await info.context.adapters.object_storage.purge(ObjectStorageID(dto.id))
-    return DeleteObjectStoragePayload.from_pydantic(DeleteObjectStoragePayloadDTO(id=purged.id))
+    return DeleteObjectStoragePayload.from_pydantic(
+        DeleteObjectStoragePayloadDTO(id=purged.id, entity_id=purged.entity_id)
+    )
 
 
 @gql_mutation(
@@ -436,7 +452,9 @@ async def purge_object_storage(
     id: UUID, info: Info[StrawberryGQLContext]
 ) -> PurgeObjectStoragePayloadGQL:
     payload = await info.context.adapters.object_storage.purge(ObjectStorageID(id))
-    return PurgeObjectStoragePayloadGQL.from_pydantic(payload)
+    return PurgeObjectStoragePayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(ObjectStorage, payload.entity_id)}
+    )
 
 
 @gql_mutation(

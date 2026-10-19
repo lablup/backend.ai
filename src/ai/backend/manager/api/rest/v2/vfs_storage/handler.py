@@ -118,5 +118,6 @@ class V2VFSStorageHandler:
         """Deprecated. Use `DELETE /v2/vfs-storages/{storage_id}`."""
         purged = await self._adapter.purge(VFSStorageID(body.parsed.id))
         return APIResponse.build(
-            status_code=HTTPStatus.OK, response_model=DeleteVFSStoragePayload(id=purged.id)
+            status_code=HTTPStatus.OK,
+            response_model=DeleteVFSStoragePayload(id=purged.id, entity_id=purged.entity_id),
         )
