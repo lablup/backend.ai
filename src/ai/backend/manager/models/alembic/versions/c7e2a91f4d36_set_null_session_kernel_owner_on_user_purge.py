@@ -9,9 +9,6 @@ down_revision = "a31e8d4c9b72"
 branch_labels = None
 depends_on = None
 
-# Downgrade cannot recover purged owners, so null owners become this placeholder uuid.
-_NULL_OWNER = "00000000-0000-0000-0000-000000000000"
-
 
 def upgrade() -> None:
     op.alter_column("sessions", "user_uuid", nullable=True)
@@ -51,9 +48,17 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_constraint(op.f("fk_kernels_user_uuid_users"), "kernels", type_="foreignkey")
-    op.execute(sa.text(f"UPDATE kernels SET user_uuid = '{_NULL_OWNER}' WHERE user_uuid IS NULL"))
-    op.alter_column("kernels", "user_uuid", nullable=False)
-
     op.drop_constraint(op.f("fk_sessions_user_uuid_users"), "sessions", type_="foreignkey")
-    op.execute(sa.text(f"UPDATE sessions SET user_uuid = '{_NULL_OWNER}' WHERE user_uuid IS NULL"))
+
+    # Purged owners cannot be recovered. Each session gets its own id as the owner,
+    # so namesakes do not collide on the per-user name index; kernels follow their session.
+    op.execute(sa.text("UPDATE sessions SET user_uuid = id WHERE user_uuid IS NULL"))
+    op.execute(
+        sa.text("""
+        UPDATE kernels AS k SET user_uuid = s.user_uuid
+        FROM sessions AS s
+        WHERE k.session_id = s.id AND k.user_uuid IS NULL
+    """)
+    )
+    op.alter_column("kernels", "user_uuid", nullable=False)
     op.alter_column("sessions", "user_uuid", nullable=False)
