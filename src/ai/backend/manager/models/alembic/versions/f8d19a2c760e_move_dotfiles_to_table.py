@@ -10,7 +10,7 @@ from alembic import op
 from sqlalchemy.engine import Connection, RowMapping
 
 revision = "f8d19a2c760e"  # Part of: NEXT_RELEASE_VERSION
-down_revision = "a31e8d4c9b72"
+down_revision = "c7e2a91f4d36"
 branch_labels = None
 depends_on = None
 
