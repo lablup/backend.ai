@@ -16,6 +16,7 @@ from ai.backend.agent.docker.agent import DockerAgent
 from ai.backend.agent.kernel import KernelRegistry
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
 from ai.backend.common.docker import ImageRef
+from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.exception import ImageNotAvailable
 from ai.backend.common.types import AutoPullBehavior
 
@@ -23,6 +24,9 @@ from ai.backend.common.types import AutoPullBehavior
 class DummyEtcd:
     async def get_prefix(self, key: str) -> Mapping[str, Any]:
         return {}
+
+    async def put(self, key: str, val: str, *, scope: ConfigScopes = ConfigScopes.GLOBAL) -> None:
+        pass
 
 
 @pytest.fixture

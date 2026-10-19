@@ -83,6 +83,12 @@ from ai.backend.agent.kernel_registry.recovery.docker_recovery import (
     DockerKernelRegistryRecovery,
 )
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
+from ai.backend.agent.network.cni import (
+    CNI_ARG_KERNEL_ID,
+    CNI_ARG_SESSION_ID,
+    CNI_IFNAME,
+    CniRequest,
+)
 from ai.backend.agent.plugin.network import (
     ContainerNetworkCapability,
     ContainerNetworkInfo,
@@ -2305,6 +2311,24 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 log.exception("container stop failed", container_id=container_id)
                 await self.error_monitor.capture_exception()
 
+    async def _delete_container_network(self, kernel_id: KernelId, container_id: str) -> None:
+        """DEL the container from every network plugin; each ignores what it never attached."""
+        args = {CNI_ARG_KERNEL_ID: str(kernel_id)}
+        if (kernel := self.kernel_registry.get(kernel_id)) is not None:
+            args[CNI_ARG_SESSION_ID] = str(kernel.session_id)
+        request = CniRequest(
+            container_id=container_id, netns="", ifname=CNI_IFNAME, config={}, args=args
+        )
+        for name, plugin in self.cni_plugin_ctx.plugins.items():
+            try:
+                await plugin.delete(request)
+            except Exception:
+                log.exception(
+                    "network plugin could not detach container",
+                    plugin=name,
+                    container_id=container_id,
+                )
+
     @override
     async def clean_kernel(
         self,
@@ -2353,6 +2377,10 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                             domain_socket_proxy.host_proxy_path.unlink()
                         except OSError:
                             pass
+
+            if container_id is not None:
+                # Before the container goes: its network plugin gives back what the ADD took.
+                await self._delete_container_network(kernel_id, str(container_id))
 
             if not self.local_config.debug.skip_container_deletion and container_id is not None:
                 container = docker.containers.container(container_id)
