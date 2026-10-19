@@ -7,32 +7,32 @@ from functools import partial
 from typing import override
 
 from ai.backend.common.cron.base import PeriodicTask
-from ai.backend.common.storage.probe.check import AbstractAsyncProbeCheck
+from ai.backend.common.storage.probe.check import AbstractProbeCheck
 
 
 @dataclass
-class AsyncProbeArgs[TID: Hashable]:
+class ProbeArgs[TID: Hashable]:
     name: str
-    checks: Sequence[AbstractAsyncProbeCheck[TID]]
+    checks: Sequence[AbstractProbeCheck[TID]]
     interval: float
     initial_delay: float
 
 
-class AsyncProbeTask[TID: Hashable](PeriodicTask):
+class ProbeTask[TID: Hashable](PeriodicTask):
     """
-    Runs every async status check it is given, each as an asyncio task of its own.
+    Runs every status check it is given, each as an asyncio task of its own.
 
     It keeps no status: a check records what it found and whoever reports it reads that
     off the check. A check still running is not started again.
     """
 
     _name: str
-    _checks: Sequence[AbstractAsyncProbeCheck[TID]]
+    _checks: Sequence[AbstractProbeCheck[TID]]
     _interval: float
     _initial_delay: float
     _inflight: dict[TID, asyncio.Task[None]]
 
-    def __init__(self, args: AsyncProbeArgs[TID]) -> None:
+    def __init__(self, args: ProbeArgs[TID]) -> None:
         self._name = args.name
         self._checks = args.checks
         self._interval = args.interval

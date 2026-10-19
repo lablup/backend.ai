@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import uuid
+from collections.abc import Iterator
+from concurrent.futures import Executor, ThreadPoolExecutor
 from pathlib import Path
 
 import pytest
@@ -16,17 +18,23 @@ MARKER_FILENAME = ".backend.ai-volume-id"
 MARKER_VOLUME_ID = StorageVolumeID(uuid.uuid4())
 
 
-def _make_check(mount_path: Path) -> VfsVolumeStatusCheck:
+def _make_check(mount_path: Path, executor: Executor) -> VfsVolumeStatusCheck:
     return VfsVolumeStatusCheck(
         VfsVolumeStatusCheckArgs(
             volume_id=StorageVolumeID(uuid.uuid4()),
             mount_path=mount_path,
             marker_filename=MARKER_FILENAME,
+            executor=executor,
         )
     )
 
 
 class TestVfsVolumeStatusCheck:
+    @pytest.fixture
+    def executor(self) -> Iterator[Executor]:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            yield executor
+
     @pytest.fixture
     def mount_with_marker(self, tmp_path: Path) -> Path:
         (tmp_path / MARKER_FILENAME).write_text(f"{MARKER_VOLUME_ID}\n")
@@ -55,15 +63,19 @@ class TestVfsVolumeStatusCheck:
     def missing_mount(self, tmp_path: Path) -> Path:
         return tmp_path / "missing"
 
-    def test_latest_is_none_before_any_check(self, mount_with_marker: Path) -> None:
-        check = _make_check(mount_with_marker)
+    def test_latest_is_none_before_any_check(
+        self, mount_with_marker: Path, executor: Executor
+    ) -> None:
+        check = _make_check(mount_with_marker, executor)
 
         assert check.latest() is None
 
-    def test_records_device_id_and_marker_volume_id(self, mount_with_marker: Path) -> None:
-        check = _make_check(mount_with_marker)
+    async def test_records_device_id_and_marker_volume_id(
+        self, mount_with_marker: Path, executor: Executor
+    ) -> None:
+        check = _make_check(mount_with_marker, executor)
 
-        check.check_status()
+        await check.check_status()
 
         result = check.latest()
         assert result is not None
@@ -79,13 +91,17 @@ class TestVfsVolumeStatusCheck:
             ("mount_with_invalid_marker", "is not a volume id"),
         ],
     )
-    def test_records_error_when_marker_does_not_hold_a_volume_id(
-        self, mount_fixture: str, reason: str, request: pytest.FixtureRequest
+    async def test_records_error_when_marker_does_not_hold_a_volume_id(
+        self,
+        mount_fixture: str,
+        reason: str,
+        executor: Executor,
+        request: pytest.FixtureRequest,
     ) -> None:
         mount_path: Path = request.getfixturevalue(mount_fixture)
-        check = _make_check(mount_path)
+        check = _make_check(mount_path, executor)
 
-        check.check_status()
+        await check.check_status()
 
         result = check.latest()
         assert result is not None
@@ -95,10 +111,12 @@ class TestVfsVolumeStatusCheck:
         assert result.device_id == os.stat(mount_path).st_dev
         assert result.marker_volume_id is None
 
-    def test_records_error_when_mount_cannot_be_read(self, missing_mount: Path) -> None:
-        check = _make_check(missing_mount)
+    async def test_records_error_when_mount_cannot_be_read(
+        self, missing_mount: Path, executor: Executor
+    ) -> None:
+        check = _make_check(missing_mount, executor)
 
-        check.check_status()
+        await check.check_status()
 
         result = check.latest()
         assert result is not None
@@ -107,12 +125,12 @@ class TestVfsVolumeStatusCheck:
         assert result.device_id is None
         assert result.marker_volume_id is None
 
-    def test_records_error_when_marker_cannot_be_read(
-        self, mount_with_unreadable_marker: Path
+    async def test_records_error_when_marker_cannot_be_read(
+        self, mount_with_unreadable_marker: Path, executor: Executor
     ) -> None:
-        check = _make_check(mount_with_unreadable_marker)
+        check = _make_check(mount_with_unreadable_marker, executor)
 
-        check.check_status()
+        await check.check_status()
 
         result = check.latest()
         assert result is not None

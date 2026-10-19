@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
 import uuid
+from concurrent.futures import Executor
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -30,6 +32,7 @@ class VfsVolumeStatusCheckArgs:
     volume_id: StorageVolumeID
     mount_path: Path
     marker_filename: str
+    executor: Executor
 
 
 class VfsVolumeStatusCheck(AbstractStatusCheck[StorageVolumeID, VfsVolumeStatusResult]):
@@ -37,18 +40,21 @@ class VfsVolumeStatusCheck(AbstractStatusCheck[StorageVolumeID, VfsVolumeStatusR
 
     It records the mount's device id and the volume id an operator wrote in the marker
     file, and decides nothing about them: whoever reads the result compares them
-    against what it expects.
+    against what it expects. The mount is read in the executor it is given, so a mount
+    hung in the kernel blocks a thread there and not the event loop.
     """
 
     _volume_id: StorageVolumeID
     _mount_path: Path
     _marker_path: Path
+    _executor: Executor
     _latest: VfsVolumeStatusResult | None
 
     def __init__(self, args: VfsVolumeStatusCheckArgs) -> None:
         self._volume_id = args.volume_id
         self._mount_path = args.mount_path
         self._marker_path = args.mount_path / args.marker_filename
+        self._executor = args.executor
         self._latest = None
 
     @override
@@ -60,14 +66,15 @@ class VfsVolumeStatusCheck(AbstractStatusCheck[StorageVolumeID, VfsVolumeStatusR
         return self._latest
 
     @override
-    def check_status(self) -> None:
+    async def check_status(self) -> None:
         started_at = datetime.now(UTC)
         start_counter = time.perf_counter()
         device_id: int | None = None
         marker_volume_id: StorageVolumeID | None = None
         error_msg: str | None = None
         try:
-            observed = self._read_mount()
+            loop = asyncio.get_running_loop()
+            observed = await loop.run_in_executor(self._executor, self._read_mount)
             device_id = observed.device_id
         except OSError as e:
             log.exception(
