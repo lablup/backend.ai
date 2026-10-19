@@ -138,23 +138,25 @@ class SyncContainerLifecyclesConfig(BaseConfigSchema):
 
 class SocketRelayConfig(BaseConfigSchema):
     pids_limit: Annotated[
-        int,
+        int | None,
         Field(
-            default=64,
+            default=None,
             ge=2,
             validation_alias=AliasChoices("pids-limit", "pids_limit"),
             serialization_alias="pids-limit",
         ),
         BackendAIConfigMeta(
-            description="Maximum number of processes in the socket relay container.",
+            description=(
+                "Maximum number of processes in the socket relay container. Unlimited if not set."
+            ),
             added_version="26.10.0",
             example=ConfigExample(local="64", prod="64"),
         ),
     ]
     max_children: Annotated[
-        int,
+        int | None,
         Field(
-            default=32,
+            default=None,
             ge=1,
             validation_alias=AliasChoices("max-children", "max_children"),
             serialization_alias="max-children",
@@ -162,26 +164,29 @@ class SocketRelayConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Maximum number of connections that socat serves at once, each in its own "
-                "child process. Must be smaller than pids-limit."
+                "child process. Must be smaller than pids-limit when both are set. "
+                "Unlimited if not set."
             ),
             added_version="26.10.0",
             example=ConfigExample(local="32", prod="32"),
         ),
     ]
     memory: Annotated[
-        BinarySizeField,
-        Field(default=BinarySize.finite_from_str("64M")),
+        BinarySizeField | None,
+        Field(default=None),
         BackendAIConfigMeta(
-            description="Memory limit of the socket relay container.",
+            description="Memory limit of the socket relay container. Unlimited if not set.",
             added_version="26.10.0",
             example=ConfigExample(local="64M", prod="64M"),
         ),
     ]
     cpus: Annotated[
-        float,
-        Field(default=1.0, gt=0),
+        float | None,
+        Field(default=None, gt=0),
         BackendAIConfigMeta(
-            description="CPU limit of the socket relay container, in cores.",
+            description=(
+                "CPU limit of the socket relay container, in cores. Unlimited if not set."
+            ),
             added_version="26.10.0",
             example=ConfigExample(local="1.0", prod="1.0"),
         ),
@@ -193,7 +198,11 @@ class SocketRelayConfig(BaseConfigSchema):
 
     @model_validator(mode="after")
     def _validate_max_children(self) -> Self:
-        if self.max_children >= self.pids_limit:
+        if (
+            self.max_children is not None
+            and self.pids_limit is not None
+            and self.max_children >= self.pids_limit
+        ):
             raise ValueError(
                 f"max-children ({self.max_children}) must be smaller than "
                 f"pids-limit ({self.pids_limit})."

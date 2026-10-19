@@ -281,19 +281,21 @@
   # kernel containers to the agent socket.
   # Added in 26.10.0
   [agent.socket-relay]
-    # Maximum number of processes in the socket relay container.
+    # Maximum number of processes in the socket relay container. Unlimited if
+    # not set.
     # Added in 26.10.0
-    pids-limit = 64
+    ## pids-limit = 64
     # Maximum number of connections that socat serves at once, each in its own
-    # child process. Must be smaller than pids-limit.
+    # child process. Must be smaller than pids-limit when both are set.
+    # Unlimited if not set.
     # Added in 26.10.0
-    max-children = 32
-    # Memory limit of the socket relay container.
+    ## max-children = 32
+    # Memory limit of the socket relay container. Unlimited if not set.
     # Added in 26.10.0
-    memory = "64M"
-    # CPU limit of the socket relay container, in cores.
+    ## memory = "64M"
+    # CPU limit of the socket relay container, in cores. Unlimited if not set.
     # Added in 26.10.0
-    cpus = 1.0
+    ## cpus = 1.0
 
 # Container runtime configuration including execution modes, user settings, and
 # networking. In multi-agent mode (when 'agents' field is populated), this

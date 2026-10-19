@@ -1719,34 +1719,41 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 os.chown(socket_dir, relay_uid, relay_gid)
             else:
                 relay_uid, relay_gid = os.geteuid(), os.getegid()
+            listen_address = (
+                f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777"
+            )
+            relay_host_config: dict[str, Any] = {
+                "Mounts": [
+                    {
+                        "Type": "bind",
+                        "Source": str(socket_dir),
+                        "Target": "/ipc",
+                    },
+                ],
+                "NetworkMode": "host",
+                "ReadonlyRootfs": True,
+                "SecurityOpt": ["no-new-privileges"],
+                "CapDrop": ["ALL"],
+            }
+            # Unset limits are left out rather than sent as 0, which Podman applies literally.
+            if relay_config.max_children is not None:
+                listen_address += f",max-children={relay_config.max_children}"
+            if relay_config.pids_limit is not None:
+                relay_host_config["PidsLimit"] = relay_config.pids_limit
+            if relay_config.memory is not None:
+                relay_host_config["Memory"] = int(relay_config.memory)
+            if relay_config.cpus is not None:
+                relay_host_config["NanoCpus"] = int(relay_config.cpus * 1_000_000_000)
             socket_relay_name = f"backendai-socket-relay.{self.id}"
             socket_relay_container = PersistentServiceContainer(
                 "backendai-socket-relay:latest",
                 {
                     "Cmd": [
-                        (
-                            f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,"
-                            f"max-children={relay_config.max_children},mode=777"
-                        ),
+                        listen_address,
                         f"TCP-CONNECT:127.0.0.1:{self.local_config.agent.agent_sock_port}",
                     ],
                     "User": f"{relay_uid}:{relay_gid}",
-                    "HostConfig": {
-                        "Mounts": [
-                            {
-                                "Type": "bind",
-                                "Source": str(socket_dir),
-                                "Target": "/ipc",
-                            },
-                        ],
-                        "NetworkMode": "host",
-                        "ReadonlyRootfs": True,
-                        "SecurityOpt": ["no-new-privileges"],
-                        "CapDrop": ["ALL"],
-                        "PidsLimit": relay_config.pids_limit,
-                        "Memory": int(relay_config.memory),
-                        "NanoCpus": int(relay_config.cpus * 1_000_000_000),
-                    },
+                    "HostConfig": relay_host_config,
                 },
                 name=socket_relay_name,
             )
