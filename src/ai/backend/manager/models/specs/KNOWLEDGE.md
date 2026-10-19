@@ -172,9 +172,11 @@ transition with. Splitting delete and restore into their own updaters with const
 `build_values()` closes the rest: a transition value taken as an argument is a value
 that can be passed wrong.
 
-Which column carries the state is domain knowledge and varies (`deleted` on a role
-preset, `status` on a vfolder or user), which is why this is a rule about the general
-updater's fields rather than about a column name.
+Which column carries the state still varies today (`deleted` on a role preset, `status`
+on a vfolder or user). BEP-1069 moves it to the soft delete mixin's `deleted_at`. A
+business state and a deletion hold at once (a user deleted while inactive); in one enum,
+restore loses the earlier business state. User and role restore currently always write
+`active`.
 
 ## own and govern are different relations, and creation composes them
 

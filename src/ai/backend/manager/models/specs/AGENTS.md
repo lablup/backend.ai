@@ -19,15 +19,18 @@ declare a spec there.
 - A row linking two entities belongs to neither: both own it. It is not a field row,
   which has exactly one owner, and it is not an entity, which has a node in the graph.
 - Its specs are `RelationCreator` / `RelationLifecycleUpdater` / `RelationPurger`
-  (`relation.py`), and they name the pair rather than a row id — a relation row's id
-  never leaves the layer that wrote it.
-- Create inserts a new pair only. A pair already linked, switched off or not, is left
-  as it stands and answered `False`; switching it back on is the restore updater's.
-- Switching off / restoring (`RelationLifecycleUpdater`) writes the row's lifecycle
-  column alone. What each side reads of the other stays, so a relation switched off is
-  still listed on both sides and can be switched back on. Only purge removes access.
-  Only relations carrying a lifecycle column declare this updater, one class per
-  direction, each answering a constant.
+  (`relation.py`), and they name the pair.
+- A relation table has no row id column. The pair of ends is its primary key; a polymorphic
+  side adds its type column to the key.
+- Create inserts a new pair only. A pair already linked, soft-deleted or not, is left
+  as it stands and answered `False`; bringing it back is the restore updater's.
+- Soft delete / restore (`RelationLifecycleUpdater`) writes the soft delete mixin's
+  `deleted_at` alone. What each side reads of the other stays, so a soft-deleted relation
+  is still listed on both sides and can be restored. Only purge removes access. Only
+  relations carrying the soft delete mixin declare this updater, one class per direction,
+  each answering a constant.
+- A business value switched on and off, such as `idle_checker_bindings.enabled`, is not a
+  soft delete. The general updater writes it.
 - Do NOT carry a relation as a field on a `DataUpdater`. A value whose change drags
   other writes along does not belong on the general edit path — the same rule soft
   delete follows.
@@ -201,14 +204,27 @@ is created in no scope.
 
 ## Soft delete belongs to its own updaters
 
-- The lifecycle column a domain deletes by — `deleted`, `status`, whichever carries
-  the removed state — is NOT exposed on the general `DataUpdater`. With no field for
-  it, the ordinary edit path cannot make the transition at all.
+Target layout from BEP-1069. Until the soft delete mixin lands, rows keep the column they
+delete by today.
+
+- Whether a row is soft-deleted is the soft delete mixin's `deleted_at` (nullable
+  timestamp) alone; NULL means alive. Do NOT add a `deleted` boolean beside it.
+- Do NOT put a deletion value (`deleted`, `DELETED`, `delete-pending`) in a business
+  `status` enum. Restore resets `deleted_at` only, and the business state stays.
+- A lifecycle that ends by a `status` transition (session `TERMINATED`, deployment
+  `DESTROYED`) is a finished record, not a soft delete. It gets no `deleted_at`; retention
+  removes the row.
+- An entity whose purge has to clean up external resources carries a separate
+  `purge_status`: a NOT NULL enum with a named default. `purging` and `purge-error` occur
+  only on a row with `deleted_at` set (CHECK).
+- `deleted_at` and `purge_status` are NOT exposed on the general `DataUpdater`. With no
+  field for them, the ordinary edit path cannot make the transition at all.
 - Soft delete and restore each get their own updater, and `build_values()` returns a
   constant. A transition value taken as an argument is a value that can be passed
-  wrong.
-- Naming: `<Entity>SoftDeleteUpdater` / `<Entity>RestoreUpdater`, carried by a
-  `Delete*` and a `Restore*` action base respectively.
+  wrong. Rows with the mixin share one updater pair; do not declare one per entity.
+- An entity not yet on the mixin keeps `<Entity>SoftDeleteUpdater` /
+  `<Entity>RestoreUpdater`, carried by a `Delete*` and a `Restore*` action base
+  respectively.
 - A domain that offers soft delete offers restore.
 - ops executes both as an update — the DB operation is an UPDATE, so no delete
   operation exists to generalize. What records the run as a delete is the action's
