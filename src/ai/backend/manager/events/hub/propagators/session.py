@@ -109,10 +109,12 @@ class SessionEventPropagator(EventPropagator):
             return
 
         # Build response data
+        owner = event_data["user_uuid"]
         response_data = {
             "reason": event_data.get("reason", ""),
             "sessionName": event_data.get("session_name", ""),
             "ownerAccessKey": event_data.get("access_key", ""),
+            "ownerUserId": str(owner) if owner is not None else None,
             "sessionId": str(event_data.get("session_id", "")),
             "exitCode": event_data.get("exit_code"),
         }

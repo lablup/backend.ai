@@ -185,7 +185,10 @@ _PRIORITY_RENAMED = (
 @gql_enum(
     BackendAIGQLMeta(added_version="26.3.0", description="Fields available for ordering sessions."),
     name="SessionV2OrderField",
-    deprecated_values={"PRIORITY": _PRIORITY_RENAMED},
+    deprecated_values={
+        "PRIORITY": _PRIORITY_RENAMED,
+        "ACCESS_KEY": f"Deprecated since {NEXT_RELEASE_VERSION}. Order by `USER_ID`.",
+    },
 )
 class SessionV2OrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
@@ -394,6 +397,7 @@ class SessionV2FilterGQL(PydanticInputMixin[SessionFilter]):
             description="Filter by the access key the session was created with.",
         ),
         default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `userUuid`.",
     )
     tag: StringFilter | None = gql_added_field(
         BackendAIGQLMeta(
@@ -522,7 +526,10 @@ class SessionV2MetadataInfoGQL:
     session_type: SessionV2TypeGQL = gql_field(
         description="Type of the session (interactive, batch, inference)."
     )
-    access_key: str = gql_field(description="Access key used to create this session.")
+    access_key: str = gql_field(
+        description="Access key used to create this session.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `user` on the session.",
+    )
     cluster_mode: ClusterModeGQL = gql_field(
         description="Cluster mode for distributed sessions (single-node, multi-node)."
     )

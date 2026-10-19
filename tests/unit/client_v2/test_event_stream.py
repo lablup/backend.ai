@@ -11,6 +11,7 @@ from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.event_stream import EventStreamClient
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.client.v2.streaming_types import SSEConnection
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.event_stream import (
     BgtaskDonePayload,
     BgtaskUpdatedPayload,
@@ -216,12 +217,14 @@ class TestSessionEventPayloads:
             "reason": "",
             "sessionName": "my-session",
             "ownerAccessKey": "AKTEST",
+            "ownerUserId": "6f1c2b9e-3d4a-4e5f-8a7b-1c2d3e4f5a6b",
             "sessionId": "550e8400-e29b-41d4-a716-446655440000",
             "exitCode": None,
         }
         payload = SessionEventPayload.model_validate(data)
         assert payload.session_name == "my-session"
         assert payload.owner_access_key == "AKTEST"
+        assert payload.owner_user_id == UserID(UUID("6f1c2b9e-3d4a-4e5f-8a7b-1c2d3e4f5a6b"))
         assert payload.session_id == "550e8400-e29b-41d4-a716-446655440000"
         assert payload.exit_code is None
 
@@ -230,6 +233,7 @@ class TestSessionEventPayloads:
             "reason": "",
             "sessionName": "my-session",
             "ownerAccessKey": "AKTEST",
+            "ownerUserId": "6f1c2b9e-3d4a-4e5f-8a7b-1c2d3e4f5a6b",
             "sessionId": "550e8400-e29b-41d4-a716-446655440000",
             "exitCode": 0,
             "kernelId": "kernel-001",
@@ -243,7 +247,9 @@ class TestSessionEventPayloads:
         assert payload.exit_code == 0
 
     def test_session_event_payload_defaults(self) -> None:
-        payload = SessionEventPayload.model_validate({})
+        payload = SessionEventPayload.model_validate({
+            "ownerUserId": "6f1c2b9e-3d4a-4e5f-8a7b-1c2d3e4f5a6b"
+        })
         assert payload.reason == ""
         assert payload.session_name == ""
         assert payload.owner_access_key == ""

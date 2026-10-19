@@ -7897,7 +7897,7 @@ type KernelV2UserInfo {
   userId: UUID
 
   """The access key used to create this kernel."""
-  accessKey: String
+  accessKey: String @deprecated(reason: "Deprecated since 26.10.0. Use `userId`.")
 
   """The domain this kernel belongs to."""
   domainName: String
@@ -8397,7 +8397,9 @@ type LoginHistoryV2Edge {
 input LoginSessionFilter {
   userId: UUIDFilter = null
   status: LoginSessionStatusFilter = null
-  accessKey: StringFilter = null
+
+  """Filter by the access key associated with the session."""
+  accessKey: StringFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `userId`.")
   createdAt: DateTimeFilter = null
   lastAccessedAt: DateTimeFilter = null
 
@@ -8454,7 +8456,7 @@ type LoginSessionV2 implements Node {
   userId: UUID!
 
   """Access key associated with the session."""
-  accessKey: String!
+  accessKey: String! @deprecated(reason: "Deprecated since 26.10.0. Use `userId`.")
 
   """Current status of the login session."""
   status: LoginSessionStatus!
@@ -19678,7 +19680,7 @@ input SessionV2Filter {
   """
   Added in 26.9.0. Filter by the access key the session was created with.
   """
-  accessKey: StringFilter = null
+  accessKey: StringFilter = null @deprecated(reason: "Deprecated since 26.10.0. Use `userUuid`.")
 
   """Added in 26.9.0. Filter by the user-supplied tag."""
   tag: StringFilter = null
@@ -19757,7 +19759,7 @@ type SessionV2MetadataInfo {
   sessionType: SessionV2Type!
 
   """Access key used to create this session."""
-  accessKey: String!
+  accessKey: String! @deprecated(reason: "Deprecated since 26.10.0. Use `user` on the session.")
 
   """Cluster mode for distributed sessions (single-node, multi-node)."""
   clusterMode: ClusterMode!
@@ -19843,7 +19845,7 @@ enum SessionV2OrderField {
   DOMAIN_NAME
   PROJECT_ID
   USER_ID
-  ACCESS_KEY
+  ACCESS_KEY @deprecated(reason: "Deprecated since 26.10.0. Order by `USER_ID`.")
   TAG
   USE_HOST_NETWORK
   BATCH_TIMEOUT

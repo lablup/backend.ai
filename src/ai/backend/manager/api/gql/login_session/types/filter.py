@@ -49,7 +49,11 @@ class LoginSessionStatusFilterGQL(PydanticInputMixin[LoginSessionStatusFilter]):
 class LoginSessionFilterGQL(PydanticInputMixin[LoginSessionFilter]):
     user_id: UUIDFilter | None = None
     status: LoginSessionStatusFilterGQL | None = None
-    access_key: StringFilter | None = None
+    access_key: StringFilter | None = gql_field(
+        description="Filter by the access key associated with the session.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `userId`.",
+    )
     created_at: DateTimeFilter | None = None
     last_accessed_at: DateTimeFilter | None = None
     field_id: UUIDFilter | None = gql_added_field(

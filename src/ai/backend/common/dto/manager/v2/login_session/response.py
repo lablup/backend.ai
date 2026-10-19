@@ -8,6 +8,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import LoginSessionStatus
 
@@ -28,7 +29,10 @@ class LoginSessionNode(BaseResponseModel):
         description="UUID of the login session. Added in 26.9.0.",
     )
     user_id: UUID = Field(description="UUID of the user who owns the session")
-    access_key: str = Field(description="Access key associated with the session")
+    access_key: str = Field(
+        deprecated=True,
+        description=f"Access key associated with the session. Deprecated since {NEXT_RELEASE_VERSION}. Use `user_id`",
+    )
     status: LoginSessionStatus = Field(description="Current status of the login session")
     created_at: datetime = Field(description="Timestamp when the session was created")
     last_accessed_at: datetime | None = Field(
