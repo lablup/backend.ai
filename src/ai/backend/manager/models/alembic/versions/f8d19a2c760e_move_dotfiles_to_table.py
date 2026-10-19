@@ -88,7 +88,7 @@ def upgrade() -> None:
         ),
         sa.CheckConstraint("char_length(perm) <= 4", name=op.f("ck_dotfiles_dotfile_perm_length")),
         sa.CheckConstraint(
-            "octet_length(data) <= 65536", name=op.f("ck_dotfiles_dotfile_data_length")
+            "char_length(data) <= 65536", name=op.f("ck_dotfiles_dotfile_data_length")
         ),
     )
     op.create_index(

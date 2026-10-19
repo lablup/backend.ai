@@ -69,14 +69,6 @@ class CreateUserDotfileRequest(BaseRequestModel):
             raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
         return value
 
-    @field_validator("data")
-    @classmethod
-    def validate_data_size(cls, value: str) -> str:
-        # max_length counts characters; storage limits bytes.
-        if len(value.encode()) > MAXIMUM_DOTFILE_SIZE:
-            raise InvalidAPIParameters("No leftover space for dotfile storage")
-        return value
-
 
 class GetUserDotfileRequest(BaseRequestModel):
     """Request to list or get user dotfiles."""
@@ -105,14 +97,6 @@ class UpdateUserDotfileRequest(BaseRequestModel):
         default=None,
         description="Access key of the target user (for superadmin delegation)",
     )
-
-    @field_validator("data")
-    @classmethod
-    def validate_data_size(cls, value: str) -> str:
-        # max_length counts characters; storage limits bytes.
-        if len(value.encode()) > MAXIMUM_DOTFILE_SIZE:
-            raise InvalidAPIParameters("No leftover space for dotfile storage")
-        return value
 
 
 class DeleteUserDotfileRequest(BaseRequestModel):

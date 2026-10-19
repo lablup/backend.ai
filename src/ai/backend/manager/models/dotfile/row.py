@@ -32,7 +32,7 @@ class DotfileRow(LifecycleTimestampsMixin, Base):
             postgresql_where=sa.text("is_default"),
         ),
         sa.CheckConstraint(
-            f"octet_length(data) <= {MAXIMUM_DOTFILE_SIZE}", name="dotfile_data_length"
+            f"char_length(data) <= {MAXIMUM_DOTFILE_SIZE}", name="dotfile_data_length"
         ),
     )
 

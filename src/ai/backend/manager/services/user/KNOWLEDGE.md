@@ -41,7 +41,7 @@ row is a change to that user.
 - `(entity_type, entity_id)` references `virtual_entities` with `ON DELETE CASCADE`. Creating for an entity with no node fails, and a row created while its owner is purged goes with the node.
 - Project and domain dotfiles remain in their existing columns.
 - Creation stores a non-default file. Its ActionResult retains `entries`: the existing default files followed by the new file. No runtime operation currently selects a default; migrated default files remain available.
-- Requests limit each file's `data` to `MAXIMUM_DOTFILE_SIZE` bytes, the limit the row's CHECK enforces.
+- Requests limit each file's `data` to `MAXIMUM_DOTFILE_SIZE` characters, the limit the row's CHECK enforces.
 - The adapter creates `DotfileEntryCreator`. `CreateDotfileAction` passes it to `UserRepository`, which calls write ops in one transaction. `DotfileEntryCreator` names the owner, and `CreateDotfileAction` takes its user from there.
 - Migration unpacks keypair bytes, deduplicates `(path, perm, data)` per user, and preserves whether any source was the default keypair. It reads rows in batches and writes up to 1,000 file rows per insert before dropping `keypairs.dotfiles`.
 - Downgrade packs each user’s default files into msgpack and restores them to all of that user’s keypairs.
