@@ -4,7 +4,7 @@ from typing import override
 import strawberry
 from graphql import GraphQLError
 from graphql.pyutils.undefined import Undefined as GraphQLUndefined
-from strawberry.extensions import MaxAliasesLimiter, QueryDepthLimiter
+from strawberry.extensions import QueryDepthLimiter
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 from strawberry.types import ExecutionContext
@@ -16,6 +16,7 @@ from ai.backend.manager.api.gql.extensions import (
     GQLMetricExtension,
     GQLValidationExtension,
 )
+from ai.backend.manager.api.gql.extensions.max_aliases import GQLMaxAliasesExtension
 
 from .agent import (
     agent_stats,
@@ -1005,7 +1006,7 @@ schema = CustomizedSchema(
         GQLMetricExtension,
         GQLValidationExtension,
         lambda: QueryDepthLimiter(max_depth=MAX_QUERY_DEPTH),
-        lambda: MaxAliasesLimiter(max_alias_count=MAX_ALIAS_COUNT),
+        lambda: GQLMaxAliasesExtension(max_alias_count=MAX_ALIAS_COUNT),
         GQLExceptionHandlerExtension,
     ],
 )
