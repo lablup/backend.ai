@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import strawberry
 from strawberry.scalars import JSON
 
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
@@ -39,6 +40,7 @@ from ai.backend.manager.api.gql.container_registry.types import (
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_field,
     gql_pydantic_input,
     gql_pydantic_type,
@@ -148,7 +150,21 @@ class DeleteContainerRegistryPayloadGQL(PydanticOutputMixin[DeleteContainerRegis
     name="PurgeContainerRegistryPayload",
 )
 class PurgeContainerRegistryPayloadGQL(PydanticOutputMixin[PurgeContainerRegistryPayloadDTO]):
-    id: UUID = gql_field(description="ID of the purged registry.")
+    id: UUID = gql_field(
+        description="ID of the purged registry.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged container registry.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="UUID of the purged container registry."
+        ),
+    )
 
 
 @gql_pydantic_type(

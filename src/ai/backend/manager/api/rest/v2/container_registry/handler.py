@@ -80,5 +80,6 @@ class V2ContainerRegistryHandler:
         """Deprecated. Use `DELETE /v2/container-registries/{registry_id}`."""
         result = await self._adapter.admin_purge(ContainerRegistryID(body.parsed.id))
         return APIResponse.build(
-            status_code=HTTPStatus.OK, response_model=DeleteContainerRegistryPayload(id=result.id)
+            status_code=HTTPStatus.OK,
+            response_model=DeleteContainerRegistryPayload(id=result.id, entity_id=result.entity_id),
         )

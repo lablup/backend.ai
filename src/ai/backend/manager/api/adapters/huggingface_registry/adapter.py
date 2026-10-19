@@ -240,7 +240,9 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
         action_result = await self._artifact_registry.delete_huggingface_registry.run(
             DeleteHuggingFaceRegistryAction(registry_id=ArtifactRegistryID(registry_id))
         )
-        return PurgeHuggingFaceRegistryPayload(id=action_result.deleted_registry_id)
+        return PurgeHuggingFaceRegistryPayload(
+            id=action_result.deleted_registry_id, entity_id=action_result.deleted_registry_id
+        )
 
     async def partial_bulk_purge(
         self, input: PartialBulkPurgeHuggingFaceRegistriesInput
@@ -253,7 +255,7 @@ class HuggingFaceRegistryAdapter(BaseAdapter):
         )
         return PartialBulkPayload[PurgeHuggingFaceRegistryPayload](
             successes=[
-                PurgeHuggingFaceRegistryPayload(id=item.value)
+                PurgeHuggingFaceRegistryPayload(id=item.value, entity_id=item.value)
                 for item in result.items
                 if item.value is not None
             ],

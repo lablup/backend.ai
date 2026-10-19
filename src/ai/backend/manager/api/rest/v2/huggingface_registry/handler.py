@@ -99,5 +99,7 @@ class V2HuggingFaceRegistryHandler:
         result = await self._adapter.purge(body.parsed.id)
         return APIResponse.build(
             status_code=HTTPStatus.OK,
-            response_model=DeleteHuggingFaceRegistryPayload(id=result.id),
+            response_model=DeleteHuggingFaceRegistryPayload(
+                id=result.id, entity_id=result.entity_id
+            ),
         )

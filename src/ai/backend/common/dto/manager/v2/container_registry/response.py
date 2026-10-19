@@ -66,12 +66,14 @@ class DeleteContainerRegistryPayload(BaseResponseModel):
     """Payload for container registry deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted container registry.")
+    entity_id: UUID = Field(description="UUID of the deleted container registry. Added in 26.10.0.")
 
 
 class PurgeContainerRegistryPayload(BaseResponseModel):
     """Payload for container registry purge mutation result."""
 
     id: UUID = Field(description="ID of the purged container registry.")
+    entity_id: UUID = Field(description="UUID of the purged container registry. Added in 26.10.0.")
 
 
 class AdminSearchContainerRegistriesPayload(BaseResponseModel):

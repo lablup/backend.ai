@@ -11,7 +11,7 @@ from ai.backend.common.dto.manager.v2.container_registry.response import (
     DeleteContainerRegistryPayload,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import parse_uuid
+from ai.backend.manager.api.gql.base import parse_uuid, to_global_id
 from ai.backend.manager.api.gql.container_registry.mutations import (
     CreateContainerRegistryInputGQL,
     CreateContainerRegistryPayloadGQL,
@@ -22,6 +22,7 @@ from ai.backend.manager.api.gql.container_registry.mutations import (
     UpdateContainerRegistryInputGQL,
     UpdateContainerRegistryPayloadGQL,
 )
+from ai.backend.manager.api.gql.container_registry.types import ContainerRegistryGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -72,7 +73,9 @@ async def admin_purge_container_registry_v2(
 ) -> PurgeContainerRegistryPayloadGQL:
     check_admin_only()
     payload = await info.context.adapters.container_registry.admin_purge(ContainerRegistryID(id))
-    return PurgeContainerRegistryPayloadGQL.from_pydantic(payload)
+    return PurgeContainerRegistryPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(ContainerRegistryGQL, payload.entity_id)}
+    )
 
 
 @gql_mutation(
@@ -110,5 +113,5 @@ async def admin_delete_container_registry_v2(
         ContainerRegistryID(parse_uuid(id))
     )
     return DeleteContainerRegistryPayloadGQL.from_pydantic(
-        DeleteContainerRegistryPayload(id=payload.id)
+        DeleteContainerRegistryPayload(id=payload.id, entity_id=payload.entity_id)
     )
