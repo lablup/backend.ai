@@ -10,7 +10,7 @@ from typing import Final, override
 
 from ai.backend.common.data.entity.storage_volume import StorageVolumeID
 from ai.backend.common.data.storage.types import VfsVolumeStatusResult
-from ai.backend.common.storage.abc import AbstractStatusCheck
+from ai.backend.common.storage.probe.check import AbstractStatusCheck
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
