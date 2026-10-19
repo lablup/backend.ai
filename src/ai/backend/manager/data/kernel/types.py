@@ -221,7 +221,7 @@ class ClusterConfig:
 
 @dataclass
 class UserPermission:
-    user_uuid: UUID
+    user_uuid: UUID | None
     access_key: str
     domain_name: str
     group_id: UUID

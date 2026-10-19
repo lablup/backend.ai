@@ -24,7 +24,6 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common import validators as tx
 from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
 from ai.backend.common.exception import SessionWithInvalidStateError
 from ai.backend.common.types import (
@@ -395,9 +394,9 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             # ownership
             domain_name=row.domain_name,
             project_id=row.group_id,
-            user_id=UserID(row.user_uuid),
+            user_id=row.user_uuid,
             access_key=row.access_key,
-            owner=UserNode.from_row(ctx, row.user),
+            owner=UserNode.from_row(ctx, row.user) if row.user is not None else None,
             # status
             status=row.status.name,
             # status_changed=row.status_changed,  # FIXME: generated attribute
@@ -454,7 +453,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             # ownership
             domain_name=session_data.domain_name,
             project_id=session_data.group_id,
-            user_id=UserID(session_data.user_uuid),
+            user_id=session_data.user_uuid,
             access_key=session_data.access_key,
             owner=UserNode.from_dataclass(ctx, session_data.owner),
             # status

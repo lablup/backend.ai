@@ -75,6 +75,7 @@ class TestSessionIdleCheckRow:
         project_id = uuid.uuid4()
         resource_group_id = ResourceGroupID(uuid.uuid4())
         session_id = SessionId(uuid.uuid4())
+        user_id = uuid.uuid4()
         checker_id = IdleCheckerID(uuid.uuid4())
         created_at = datetime(2026, 1, 1, tzinfo=UTC)
         expire_at = datetime(2026, 1, 2, tzinfo=UTC)
@@ -119,6 +120,25 @@ class TestSessionIdleCheckRow:
                 )
             )
             db_sess.add(
+                UserResourcePolicyRow(
+                    name="session-idle-check-user-policy",
+                    max_vfolder_count=10,
+                    max_quota_scope_size=1024,
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
+            db_sess.add(
+                UserRow(
+                    uuid=user_id,
+                    username="session-idle-check-user",
+                    email="session-idle-check-user@example.com",
+                    domain_name="session-idle-check-domain",
+                    domain_id=domain_id,
+                    resource_policy="session-idle-check-user-policy",
+                )
+            )
+            db_sess.add(
                 SessionRow(
                     id=session_id,
                     creation_id=str(session_id)[:32],
@@ -130,7 +150,7 @@ class TestSessionIdleCheckRow:
                     domain_id=domain_id,
                     resource_group_id=resource_group_id,
                     group_id=project_id,
-                    user_uuid=uuid.uuid4(),
+                    user_uuid=user_id,
                     access_key=None,
                     tag=None,
                     status=SessionStatus.RUNNING,

@@ -477,8 +477,13 @@ class SessionRow(CreatedAtMixin, Base):
         "group_id", GUID(ProjectID), sa.ForeignKey("groups.id"), nullable=False
     )
     group: Mapped[ProjectRow] = relationship("ProjectRow")
-    user_uuid: Mapped[UserID] = mapped_column("user_uuid", GUID(UserID), nullable=False)
-    user: Mapped[UserRow] = relationship(
+    user_uuid: Mapped[UserID | None] = mapped_column(
+        "user_uuid",
+        GUID(UserID),
+        sa.ForeignKey("users.uuid", ondelete="SET NULL"),
+        nullable=True,
+    )
+    user: Mapped[UserRow | None] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
         foreign_keys=[user_uuid],
@@ -1336,7 +1341,8 @@ class ComputeSessionPermissionContext(
             permissions = overriding_perm
         else:
             permissions |= self.object_id_to_additional_permission_map.get(session_id, set())
-            permissions |= self.user_id_to_permission_map.get(session_row.user_uuid, set())
+            if session_row.user_uuid is not None:
+                permissions |= self.user_id_to_permission_map.get(session_row.user_uuid, set())
             permissions |= self.project_id_to_permission_map.get(session_row.group_id, set())
             permissions |= self.domain_name_to_permission_map.get(session_row.domain_name, set())
         return permissions
