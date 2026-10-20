@@ -21,7 +21,7 @@ from ai.backend.manager.data.resource_group.types import (
     ResourceGroupData,
     ResourceInfo,
 )
-from ai.backend.manager.data.session.options import DefaultSessionOptions
+from ai.backend.manager.data.session.options import AgentSelectionPolicy, DefaultSessionOptions
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
 from ai.backend.manager.models.resource_group.purgers import ResourceGroupPurger
@@ -153,8 +153,11 @@ class ResourceGroupRepository:
         self,
         name: ResourceGroupName,
         options: DeploymentOptions,
+        agent_selection_policy: AgentSelectionPolicy | None,
     ) -> DeploymentOptions:
         """Fully replace a resource group's ``default_deployment_options``.
+
+        ``agent_selection_policy`` replaces the policy; ``None`` keeps the stored one.
 
         Returns the persisted :class:`DeploymentOptions` value via
         ``UPDATE ... RETURNING`` so this path does a single round-trip and
@@ -163,7 +166,9 @@ class ResourceGroupRepository:
         Raises:
             ScalingGroupNotFound: If the resource group does not exist.
         """
-        return await self._db_source.replace_default_deployment_options(name, options)
+        return await self._db_source.replace_default_deployment_options(
+            name, options, agent_selection_policy
+        )
 
     @resource_group_repository_resilience.apply()
     async def replace_default_session_options(

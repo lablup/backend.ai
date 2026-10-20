@@ -184,6 +184,7 @@ from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.tristate.unset import Unset
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.api.adapter_options.deployment.options import (
+    agent_selection_policy_from_input,
     deployment_options_from_input,
     deployment_options_to_info,
 )
@@ -902,6 +903,7 @@ class DeploymentAdapter(BaseAdapter):
             ReplaceDeploymentOptionsAction(
                 deployment_id=deployment_id,
                 options=options,
+                agent_selection_policy=agent_selection_policy_from_input(input.options),
             )
         )
         return ReplaceDeploymentOptionsPayload(

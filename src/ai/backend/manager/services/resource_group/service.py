@@ -145,7 +145,7 @@ class ResourceGroupService:
         and does not re-materialise the surrounding resource group node.
         """
         options = await self._repository.replace_default_deployment_options(
-            action.resource_group, action.options
+            action.resource_group, action.options, action.agent_selection_policy
         )
         return ReplaceDefaultDeploymentOptionsActionResult(
             resource_group=action.resource_group,

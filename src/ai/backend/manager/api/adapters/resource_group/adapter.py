@@ -76,6 +76,7 @@ from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import PreemptionMode, PreemptionOrder, SlotQuantity
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.deployment.options import (
+    agent_selection_policy_from_input,
     deployment_options_from_input,
     deployment_options_to_info,
 )
@@ -1128,6 +1129,7 @@ class ResourceGroupAdapter(BaseAdapter):
                 resource_group_id=await self.lookup_name(name),
                 resource_group=name,
                 options=options,
+                agent_selection_policy=agent_selection_policy_from_input(input.options),
             )
         )
         return ReplaceResourceGroupDefaultDeploymentOptionsPayload(

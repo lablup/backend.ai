@@ -88,6 +88,13 @@ class DeploymentHandlerOptionsInputGQL(PydanticInputMixin[DeploymentHandlerOptio
 )
 class DeploymentOptionsInputGQL(PydanticInputMixin[DeploymentOptionsInputDTO]):
     handler_options: DeploymentHandlerOptionsInputGQL
+    agent_selection_policy: AgentSelectionPolicyGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="How the designated agents are enforced. null keeps the stored policy.",
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_type(
