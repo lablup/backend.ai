@@ -176,6 +176,8 @@ class ContainerLifecycleEvent:
     done_future: asyncio.Future[Any] | None = None
     exit_code: int | None = None
     suppress_events: bool = False
+    # Set by a report of a failed creation, dropped when a newer attempt for the kernel started.
+    create_attempt: object | None = None
 
     @override
     def __str__(self) -> str:

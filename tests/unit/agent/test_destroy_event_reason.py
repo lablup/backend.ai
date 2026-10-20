@@ -50,3 +50,34 @@ class TestHandleDestroyEventForMissingKernel:
         assert isinstance(anycast, KernelTerminatedAnycastEvent)
         assert anycast.kernel_id == kernel_id
         assert anycast.reason == expected
+
+
+class TestHandleDestroyEventForStaleCreationFailure:
+    @pytest.mark.parametrize(("current", "handled"), [(True, True), (False, False)])
+    async def test_report_of_a_superseded_attempt_is_dropped(
+        self, current: bool, handled: bool
+    ) -> None:
+        kernel_id = KernelId(uuid.uuid4())
+        attempt = object()
+        agent = MagicMock()
+        agent.kernel_registry = {}
+        agent._ongoing_destruction_tasks = {}
+        agent.registry_lock = AsyncMock()
+        agent.reconstruct_resource_usage = AsyncMock()
+        agent.anycast_and_broadcast_event = AsyncMock()
+        agent.create_attempts = {kernel_id: attempt if current else object()}
+
+        await AbstractAgent._handle_destroy_event(
+            agent,
+            ContainerLifecycleEvent(
+                kernel_id,
+                SessionId(uuid.uuid4()),
+                None,
+                LifecycleEvent.DESTROY,
+                KernelLifecycleEventReason.FAILED_TO_CREATE,
+                create_attempt=attempt,
+            ),
+        )
+
+        assert (agent.anycast_and_broadcast_event.await_count == 1) is handled
+        assert (kernel_id in agent.create_attempts) is not current

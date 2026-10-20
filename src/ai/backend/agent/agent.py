@@ -875,6 +875,8 @@ class AbstractAgent[
     _active_creates: dict[KernelId, CreateTaskInfo]
     # Kernels registered by an ongoing `create_kernel`, which reports their failures itself.
     failure_reporting_kernels: set[KernelId]
+    # The latest creation attempt of each kernel, so a stale failure report can be told apart.
+    create_attempts: dict[KernelId, object]
 
     @contextmanager
     def track_pull(self, image: str) -> Generator[bool, None, None]:
@@ -961,6 +963,7 @@ class AbstractAgent[
         self._active_pulls = {}
         self._active_creates = {}
         self.failure_reporting_kernels = set()
+        self.create_attempts = {}
         self._sync_container_lifecycle_observer = SyncContainerLifecycleObserver.instance()
         self._clean_kernel_registry_task = asyncio.create_task(self._clean_kernel_registry_loop())
 
@@ -1425,6 +1428,12 @@ class AbstractAgent[
 
     async def _handle_destroy_event(self, ev: ContainerLifecycleEvent) -> None:
         log.debug("destroy event handling", container_id=ev.container_id)
+        if ev.create_attempt is not None:
+            if self.create_attempts.get(ev.kernel_id) is not ev.create_attempt:
+                log.debug("stale creation failure report dropped", container_id=ev.container_id)
+                ev.set_done_future_result(None)
+                return
+            del self.create_attempts[ev.kernel_id]
         try:
             current_task = asyncio.current_task()
             if current_task is None:
@@ -1522,6 +1531,7 @@ class AbstractAgent[
                 else:
                     # Forget as we are done with this kernel.
                     kernel_obj = self.kernel_registry.pop(ev.kernel_id, None)
+                    self.create_attempts.pop(ev.kernel_id, None)
                 try:
                     if kernel_obj is not None:
                         host_ports = kernel_obj.get("host_ports")
@@ -1678,6 +1688,7 @@ class AbstractAgent[
         exit_code: int | None = None,
         done_future: asyncio.Future[Any] | None = None,
         suppress_events: bool = False,
+        create_attempt: object | None = None,
     ) -> None:
         cid: ContainerId | None = None
         try:
@@ -1734,6 +1745,7 @@ class AbstractAgent[
                 done_future,
                 exit_code,
                 suppress_events,
+                create_attempt,
             ),
         )
 
@@ -2576,6 +2588,7 @@ class AbstractAgent[
         *,
         restarting: bool = False,
         throttle_sema: asyncio.Semaphore | None = None,
+        attempt: object | None = None,
     ) -> KernelCreationResult:
         """
         Create a new kernel.
@@ -2588,6 +2601,8 @@ class AbstractAgent[
             if not should_proceed:
                 log.debug("kernel creation already in progress")
                 raise KernelCreationInProgressError("Kernel creation already in progress")
+            if attempt is not None:
+                self.create_attempts[kernel_id] = attempt
 
             if throttle_sema is None:
                 # make a local semaphore
