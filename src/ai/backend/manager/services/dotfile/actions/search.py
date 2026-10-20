@@ -16,9 +16,9 @@ from ai.backend.manager.models.scopes import OperationScope
 
 @dataclass(frozen=True)
 class SearchDotfilesAction(OperationScopeOpsAction[DotfileRow, DotfileData]):
-    """Page through the dotfiles a user owns."""
+    """Page through the dotfiles the named users own, OR'd across them."""
 
-    user_id: UserID
+    user_ids: Sequence[UserID]
     searcher: DotfileSearcher
 
     @override
@@ -29,12 +29,12 @@ class SearchDotfilesAction(OperationScopeOpsAction[DotfileRow, DotfileData]):
     @final
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return (self.user_id,)
+        return tuple(self.user_ids)
 
     @final
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return (UserDotfileTarget(self.user_id),)
+        return tuple(UserDotfileTarget(user_id) for user_id in self.user_ids)
 
     @override
     def to_searcher(self) -> DotfileSearcher:

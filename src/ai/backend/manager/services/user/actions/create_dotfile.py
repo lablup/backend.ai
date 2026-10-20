@@ -6,7 +6,7 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
-from ai.backend.manager.data.dotfile.types import DotfileEntry
+from ai.backend.manager.data.dotfile.types import DotfileData
 from ai.backend.manager.models.dotfile.creators import DotfileEntryCreator
 
 
@@ -33,4 +33,4 @@ class CreateDotfileAction(BaseSingleEntityAction):
 
 @dataclass(frozen=True)
 class CreateDotfileActionResult:
-    entries: tuple[DotfileEntry, ...]
+    data: DotfileData

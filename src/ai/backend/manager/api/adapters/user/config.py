@@ -52,7 +52,7 @@ class UserConfigAdapter:
             )
         result = await self._dotfile.search.run(
             SearchDotfilesAction(
-                user_id=user_id,
+                user_ids=[user_id],
                 searcher=DotfileSearcher(
                     pagination=NoPagination(),
                     conditions=conditions,

@@ -23,7 +23,7 @@ from ai.backend.common.utils import nmget
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
-from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry
+from ai.backend.manager.data.dotfile.types import DotfileData, DotfileEntries, DotfileEntry
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
@@ -359,7 +359,7 @@ class UserRepository:
             return await self._default_dotfiles(ops, user_id)
 
     @user_repository_resilience.apply()
-    async def create_dotfile(self, creator: DotfileEntryCreator, max_count: int) -> DotfileEntries:
+    async def create_dotfile(self, creator: DotfileEntryCreator, max_count: int) -> DotfileData:
         """Add a file unless the user already holds ``max_count``, variants included."""
         async with self._v2_ops.write_ops() as ops:
             owned = await ops.search_with_scopes(
@@ -368,9 +368,7 @@ class UserRepository:
             )
             if owned.total_count >= max_count:
                 raise DotfileCreationFailed("Dotfile creation limit reached")
-            await ops.create_field(creator.owner, creator)
-            current = await self._default_dotfiles(ops, creator.owner)
-            return DotfileEntries((*current.entries, creator.entry))
+            return await ops.create_field(creator.owner, creator)
 
     async def _default_dotfiles(self, ops: V2ReadOps, user_id: UserID) -> DotfileEntries:
         result = await ops.search_with_scopes(
