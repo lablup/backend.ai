@@ -167,6 +167,15 @@ if TYPE_CHECKING:
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
+# Protocols whose workers refresh `circuit.{id}.last_access`. With Traefik only HTTP does.
+_IDLE_COLLECTED_PROTOCOLS: Final[frozenset[ProxyProtocol]] = frozenset({
+    ProxyProtocol.HTTP,
+    ProxyProtocol.TCP,
+})
+_IDLE_COLLECTED_PROTOCOLS_TRAEFIK: Final[frozenset[ProxyProtocol]] = frozenset({
+    ProxyProtocol.HTTP,
+})
+
 global_subapp_pkgs: Final[list[str]] = [
     ".circuit_v1",
     ".circuit_v2",
@@ -718,16 +727,22 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @asynccontextmanager
 async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     async def _collect(_context: None, _src: AgentId, _event: DoCheckUnusedPortEvent) -> None:
+        collected_protocols = (
+            _IDLE_COLLECTED_PROTOCOLS_TRAEFIK
+            if root_ctx.local_config.proxy_coordinator.enable_traefik
+            else _IDLE_COLLECTED_PROTOCOLS
+        )
+
         async def _update(sess: SASession) -> list[Circuit]:
-            non_inference_http_circuits = [
+            idle_collectable_circuits = [
                 c
                 for c in (await Circuit.list_circuits(sess))
-                if c.app_mode != AppMode.INFERENCE and c.protocol == ProxyProtocol.HTTP
+                if c.app_mode != AppMode.INFERENCE and c.protocol in collected_protocols
             ]
-            if len(non_inference_http_circuits) == 0:
+            if len(idle_collectable_circuits) == 0:
                 return []
             last_access = await root_ctx.valkey_live.get_multiple_live_data([
-                f"circuit.{c.id!s}.last_access" for c in non_inference_http_circuits
+                f"circuit.{c.id!s}.last_access" for c in idle_collectable_circuits
             ])
             unused_circuits: list[Circuit] = []
 
@@ -738,7 +753,7 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
                 if access:
                     last_access_time = current_time - float(access.decode("utf-8"))
                 else:
-                    circuit_created_at = non_inference_http_circuits[idx].created_at
+                    circuit_created_at = idle_collectable_circuits[idx].created_at
                     last_access_time = (
                         current_time - circuit_created_at.timestamp() if circuit_created_at else 0.0
                     )
@@ -746,7 +761,7 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
                     last_access_time
                     > root_ctx.local_config.proxy_coordinator.unused_circuit_collection_timeout
                 ):
-                    unused_circuits.append(non_inference_http_circuits[idx])
+                    unused_circuits.append(idle_collectable_circuits[idx])
             if len(unused_circuits) == 0:
                 return []
 
