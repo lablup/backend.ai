@@ -55,6 +55,7 @@ from ai.backend.common.dto.manager.v2.deployment_options.response import (
     DeploymentOptionsInfo,
     HandlerOptionsInfo,
 )
+from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.common.types import MountPermission
 
@@ -94,6 +95,7 @@ def _make_deployment_options(**kwargs: object) -> DeploymentOptionsInfo:
             default=HandlerOptionsInfo(timeout_sec=None, max_retry_count=None),
             by_handler=[],
         ),
+        "agent_selection_policy": AgentSelectionPolicyEnum.PREFERRED,
     }
     defaults.update(kwargs)
     return DeploymentOptionsInfo(**defaults)
