@@ -288,14 +288,15 @@
     # backendai-socket-relay.<agent id> container before restarting the agent
     # after changing it.
     # Added in 26.10.0
-    non-root = false
+    run-as-non-root = false
     # Create the socket relay container with the no-new-privileges security
     # option, so its processes cannot gain privileges through setuid binaries.
     # Added in 26.10.0
     no-new-privileges = false
-    # Drop all Linux capabilities from the socket relay container. Without non-
-    # root, the relay then runs as root that cannot write to a socket directory
-    # owned by another user, such as the directory of a non-root agent.
+    # Drop all Linux capabilities from the socket relay container. Without run-
+    # as-non-root, the relay then runs as root that cannot write to a socket
+    # directory owned by another user, such as the directory of a non-root
+    # agent.
     # Added in 26.10.0
     drop-all-capabilities = false
     # Mount the root filesystem of the socket relay container read-only.

@@ -137,12 +137,12 @@ class SyncContainerLifecyclesConfig(BaseConfigSchema):
 
 
 class SocketRelayConfig(BaseConfigSchema):
-    non_root: Annotated[
+    run_as_non_root: Annotated[
         bool,
         Field(
             default=False,
-            validation_alias=AliasChoices("non-root", "non_root"),
-            serialization_alias="non-root",
+            validation_alias=AliasChoices("run-as-non-root", "run_as_non_root"),
+            serialization_alias="run-as-non-root",
         ),
         BackendAIConfigMeta(
             description=(
@@ -182,9 +182,9 @@ class SocketRelayConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description=(
-                "Drop all Linux capabilities from the socket relay container. Without non-root, "
-                "the relay then runs as root that cannot write to a socket directory owned by "
-                "another user, such as the directory of a non-root agent."
+                "Drop all Linux capabilities from the socket relay container. Without "
+                "run-as-non-root, the relay then runs as root that cannot write to a socket "
+                "directory owned by another user, such as the directory of a non-root agent."
             ),
             added_version="26.10.0",
             example=ConfigExample(local="false", prod="false"),
