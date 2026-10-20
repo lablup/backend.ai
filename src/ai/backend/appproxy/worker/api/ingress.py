@@ -7,7 +7,12 @@ from http import HTTPStatus
 from aiohttp import web
 
 from ai.backend.appproxy.common.errors.http import AuthorizationFailed
-from ai.backend.appproxy.common.types import CORSOptions, WebMiddleware, WebRequestHandler
+from ai.backend.appproxy.common.types import (
+    CORSOptions,
+    IngressUpdateMode,
+    WebMiddleware,
+    WebRequestHandler,
+)
 from ai.backend.appproxy.worker.dto.context import IngressStateCtx
 from ai.backend.appproxy.worker.errors.ingress import IngressWriteNotSupportedError
 from ai.backend.appproxy.worker.ingress.factory import IngressState
@@ -77,10 +82,9 @@ class IngressHandler:
         return APIResponse.build(HTTPStatus.OK, response)
 
     def _writer(self, state: IngressState) -> ValidatingIngressWriter:
-        writer = state.api_writer
-        if writer is None:
+        if state.mode != IngressUpdateMode.API or state.writer is None:
             raise IngressWriteNotSupportedError
-        return writer
+        return state.writer
 
 
 def create_app(

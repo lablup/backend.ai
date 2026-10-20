@@ -17,8 +17,9 @@ from ai.backend.common.exception import InvalidConfigError
 @dataclass(frozen=True)
 class IngressState:
     reader: LayeredIngressState
-    api_writer: ValidatingIngressWriter | None
-    circuit_writer: ValidatingIngressWriter | None
+    writer: ValidatingIngressWriter | None
+    """None when the worker holds no in-memory layer."""
+    mode: IngressUpdateMode
 
 
 class IngressStateFactory:
@@ -49,8 +50,8 @@ class IngressStateFactory:
             raise InvalidConfigError("No ingress layer is configured")
         return IngressState(
             reader=LayeredIngressState(readers, in_memory=in_memory),
-            api_writer=writer if self._config.mode == IngressUpdateMode.API else None,
-            circuit_writer=writer if self._config.mode == IngressUpdateMode.CIRCUIT else None,
+            writer=writer,
+            mode=self._config.mode,
         )
 
     def _in_memory(self) -> InMemoryIngressState:

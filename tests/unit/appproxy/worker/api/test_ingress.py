@@ -10,6 +10,7 @@ from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 
 from ai.backend.appproxy.common.errors.http import AuthorizationFailed
+from ai.backend.appproxy.common.types import IngressUpdateMode
 from ai.backend.appproxy.worker.api.ingress import (
     TOKEN_HEADER,
     IngressHandler,
@@ -103,12 +104,12 @@ def reader() -> AsyncMock:
 
 @pytest.fixture
 def api_mode_state(reader: AsyncMock, writer: AsyncMock) -> IngressState:
-    return IngressState(reader=reader, api_writer=writer, circuit_writer=None)
+    return IngressState(reader=reader, writer=writer, mode=IngressUpdateMode.API)
 
 
 @pytest.fixture
 def circuit_mode_state(reader: AsyncMock, writer: AsyncMock) -> IngressState:
-    return IngressState(reader=reader, api_writer=None, circuit_writer=writer)
+    return IngressState(reader=reader, writer=writer, mode=IngressUpdateMode.CIRCUIT)
 
 
 class TestIngressHandler:
