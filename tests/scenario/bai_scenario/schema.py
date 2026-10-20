@@ -69,6 +69,12 @@ import ai.backend.manager.models.image
 import ai.backend.manager.models.image.row
 import ai.backend.manager.models.kernel
 import ai.backend.manager.models.kernel.row
+import ai.backend.manager.models.kernel_group
+import ai.backend.manager.models.kernel_group.row
+import ai.backend.manager.models.kernel_group_environ
+import ai.backend.manager.models.kernel_group_environ.row
+import ai.backend.manager.models.kernel_group_resource_slot
+import ai.backend.manager.models.kernel_group_resource_slot.row
 import ai.backend.manager.models.keypair
 import ai.backend.manager.models.keypair.row
 import ai.backend.manager.models.login_client_type

@@ -85,7 +85,7 @@ container registry
 
 | Relation | Targets |
 |---|---|
-| field | kernel |
+| field | kernel, kernel group, kernel group resource slot |
 | reference | image, vfolder, session group, resource group |
 
 ### deployment

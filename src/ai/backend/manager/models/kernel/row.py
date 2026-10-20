@@ -23,6 +23,7 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.kernel_group import KernelGroupID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
@@ -156,6 +157,20 @@ class KernelRow(CreatedAtMixin, Base):
         unique=False,
         index=True,
         nullable=False,
+    )
+    # NULL until the enqueue write sets it. `use_alter` keeps the FK out of the
+    # CREATE TABLE so table subsets that omit ``kernel_groups`` still build.
+    kernel_group_id: Mapped[KernelGroupID | None] = mapped_column(
+        "kernel_group_id",
+        GUID(KernelGroupID),
+        sa.ForeignKey(
+            "kernel_groups.id",
+            ondelete="SET NULL",
+            use_alter=True,
+            name="fk_kernels_kernel_group_id_kernel_groups",
+        ),
+        index=True,
+        nullable=True,
     )
     session_creation_id: Mapped[str | None] = mapped_column(
         "session_creation_id", sa.String(length=32), unique=False, index=False, nullable=True
