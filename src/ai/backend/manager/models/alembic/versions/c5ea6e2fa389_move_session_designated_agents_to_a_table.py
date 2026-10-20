@@ -8,7 +8,7 @@ holding one could never be placed, so it is cancelled the way the scheduler canc
 pending session: the session and its kernels, and the kernels' allocations freed.
 
 Revision ID: c5ea6e2fa389
-Revises: b2e7c8a94610
+Revises: c7e2a91f4d36
 Create Date: 2026-10-19 21:00:00.000000
 
 """
@@ -24,7 +24,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "c5ea6e2fa389"
-down_revision = "b2e7c8a94610"
+down_revision = "c7e2a91f4d36"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
