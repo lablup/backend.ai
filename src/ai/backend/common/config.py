@@ -24,7 +24,7 @@ from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
 from .exception import BackendAIError, ConfigurationError, ModelDefinitionValidationError
 from .model_service_start_command_compat import resolve_model_service_start_command
-from .types import BackendAISchema, RedisHelperConfig, SchemaValidationFailureInfo
+from .types import BackendAISchema, EndpointProtocol, RedisHelperConfig, SchemaValidationFailureInfo
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -304,11 +304,33 @@ class ModelServiceConfig(BaseConfigModel):
         default=None,
         description="Health check configuration for the model service.",
     )
+    # Provisional: the source of this value (model-definition ``service.protocol``)
+    # is not decided by core yet; the field may move or be renamed.
+    protocol: EndpointProtocol = Field(
+        default=EndpointProtocol.HTTP,
+        description=(
+            "Wire protocol the app-proxy uses for this model service. ``http`` (default) "
+            "terminates HTTP at the proxy; ``tcp`` passes bytes through so TLS terminates "
+            "inside the replica. ``tcp`` cannot be combined with an enabled health check."
+        ),
+        examples=["http", "tcp"],
+    )
 
     @model_validator(mode="before")
     @classmethod
     def _resolve_start_command(cls, data: Any) -> Any:
         return resolve_model_service_start_command(data)
+
+    @model_validator(mode="after")
+    def _reject_tcp_with_health_check(self) -> Self:
+        # The manager probe is ``http://`` and TLS ends inside the replica.
+        if (
+            self.protocol is EndpointProtocol.TCP
+            and self.health_check is not None
+            and self.health_check.enable
+        ):
+            raise ValueError("health_check cannot be enabled when protocol is 'tcp'")
+        return self
 
 
 class ModelMetadata(BaseConfigModel):
@@ -456,6 +478,7 @@ def _merge_service_config(
         shell=_pick(base.shell, override.shell, "shell" in s),
         port=_pick(base.port, override.port, "port" in s),
         health_check=health_check,
+        protocol=_pick(base.protocol, override.protocol, "protocol" in s),
     )
 
 
@@ -531,6 +554,13 @@ class ModelDefinition(BaseConfigModel):
                 return model.service.health_check
         return None
 
+    def service_protocol(self) -> EndpointProtocol:
+        """Protocol of the first model service; ``http`` when none is declared."""
+        for model in self.models:
+            if model.service:
+                return model.service.protocol
+        return EndpointProtocol.HTTP
+
     def health_check_setting(self) -> ModelHealthCheck | None:
         """The configured health check, preserved even when disabled.
 
@@ -599,6 +629,7 @@ class ModelServiceConfigDraft(BaseConfigModel):
     shell: str | None = None
     port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
+    protocol: EndpointProtocol | None = None  # provisional, see ModelServiceConfig
 
     @model_validator(mode="before")
     @classmethod
@@ -687,6 +718,7 @@ def _merge_service_config_draft(
         shell=_pick(base.shell, override.shell, "shell" in s),
         port=_pick_non_null_override(base.port, override.port, "port" in s),
         health_check=health_check,
+        protocol=_pick_non_null_override(base.protocol, override.protocol, "protocol" in s),
     )
 
 
@@ -794,6 +826,7 @@ class DefaultModelServiceConfig(BaseConfigModel):
     shell: str | None = None
     port: int = Field(gt=1)
     health_check: ModelHealthCheckDraft | None = None
+    protocol: EndpointProtocol | None = None  # provisional, see ModelServiceConfig
 
     @model_validator(mode="before")
     @classmethod
@@ -833,6 +866,7 @@ class PresetModelServiceConfig(BaseConfigModel):
     shell: str | None = None
     port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
+    protocol: EndpointProtocol | None = None  # provisional, see ModelServiceConfig
 
     @model_validator(mode="before")
     @classmethod
@@ -870,6 +904,7 @@ class PresetModelServiceConfigDraft(BaseConfigModel):
     shell: str | None = None
     port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
+    protocol: EndpointProtocol | None = None  # provisional, see ModelServiceConfig
 
     @model_validator(mode="before")
     @classmethod
@@ -919,6 +954,7 @@ def _merge_preset_service_config_draft(
         shell=_pick(base.shell, override.shell, "shell" in s),
         port=_pick_non_null_override(base.port, override.port, "port" in s),
         health_check=health_check,
+        protocol=_pick_non_null_override(base.protocol, override.protocol, "protocol" in s),
     )
 
 

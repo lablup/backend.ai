@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from typing import override
 
+from aiohttp import web
+
 from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
@@ -57,4 +59,19 @@ class InvalidCircuitStateError(BackendAIError):
             domain=ErrorDomain.KERNEL,
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.MISMATCH,
+        )
+
+
+class EndpointProtocolMismatchError(BackendAIError, web.HTTPConflict):
+    """Raised when an endpoint sync requests a protocol its existing circuit does not have."""
+
+    error_type = "https://api.backend.ai/probs/appproxy/endpoint-protocol-mismatch"
+    error_title = "Endpoint protocol differs from its existing circuit."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.ENDPOINT,
+            operation=ErrorOperation.UPDATE,
+            error_detail=ErrorDetail.CONFLICT,
         )

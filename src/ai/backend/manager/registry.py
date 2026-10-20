@@ -82,6 +82,7 @@ from ai.backend.common.types import (
     ClusterMode,
     ClusterSSHKeyPair,
     CommitStatus,
+    EndpointProtocol,
     HardwareMetadata,
     ImageRegistry,
     KernelEnqueueingConfig,
@@ -1884,6 +1885,12 @@ class AgentRegistry:
             raise InvalidAPIParameters("Model not set for endpoint")
 
         health_check_config = self._resolve_health_check(endpoint)
+        # Provisional: ``service.protocol`` as the source is not decided by core.
+        protocol = (
+            endpoint.model_definition.service_protocol()
+            if endpoint.model_definition is not None
+            else EndpointProtocol.HTTP
+        )
 
         # ``EndpointData`` carries ``runtime_variant_id`` only. AppProxy's
         # wire API keys on the variant name string, so resolve the id into
@@ -1914,6 +1921,7 @@ class AgentRegistry:
             ),
             open_to_public=endpoint.open_to_public,
             health_check=health_check_config,
+            protocol=protocol,
         )
         endpoint_json = await wsproxy_client.create_endpoint(endpoint.id, request_body)
         return cast(str, endpoint_json["endpoint"])
