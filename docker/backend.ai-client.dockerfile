@@ -1,11 +1,7 @@
-# Build context MUST be the repository root (the paths below are context-relative):
-#   docker build -f docker/backend.ai-client.dockerfile --build-arg PYTHON_VERSION=<ver> --build-arg PKGVER=<ver> .
-ARG PYTHON_VERSION
-FROM python:${PYTHON_VERSION} AS builder
-ARG PKGVER
-COPY ./dist /dist
-RUN pip wheel --wheel-dir=/wheels --no-cache-dir backend.ai-client==${PKGVER} --find-links=/dist
+# Build context MUST be the repository root.  Starts FROM the shared
+# backend.ai-base image (docker/backend.ai-base.dockerfile), which must be
+# buildable at the same PKGVER — bake builds both (see docker-bake.hcl):
+#   docker buildx bake backend_ai-client --set '*.platform=linux/amd64' --load
 
-FROM python:${PYTHON_VERSION}
-COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir /wheels/*.whl && rm -rf /wheels /dist
+ARG PKGVER
+FROM lablup/backend.ai-base:${PKGVER}
