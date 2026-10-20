@@ -378,16 +378,16 @@ whether the entity has `purge_status`; the same entity's purge does not answer d
 | Item | Synchronous purge (no `purge_status`) | Asynchronous purge (`purge_status`) |
 | --- | --- | --- |
 | What the request does | Finishes through the row removal | Moves `purge_status` to `purging` and returns. The coordinator advances the cleanup on each tick |
-| GQL response | `deletedId: ID!` and `entityId` or `fieldId` | The Node (`purgeStatus: PURGING`). No `deletedId` |
+| GQL response | `purgedId: ID!` and `entityId` or `fieldId` | The Node (`purgeStatus: PURGING`). No `purgedId` |
 | REST response | 200, the UUID | 202 Accepted, the entity |
-| Client store | Applies `@deleteEdge` and `@deleteRecord` to the response's `deletedId` | Updates the Node from the response. The record is not removed yet |
+| Client store | Applies `@deleteEdge` and `@deleteRecord` to the response's `purgedId` | Updates the Node from the response. The record is not removed yet |
 | Completion check | Not needed | Done when `node(id:)` returns null |
 | Failure | The request ends in an error | `purgeStatus: PURGE_ERROR` on the same Node |
 | Other requests while in progress | n/a | update, delete, and restore return 409. A repeated purge returns the same Node |
-| Force purge | n/a | Synchronous. GQL returns `deletedId`, REST and the DTO return the UUID |
+| Force purge | n/a | Synchronous. GQL returns `purgedId`, REST and the DTO return the UUID |
 
 - Only the GQL layer builds global IDs. Pydantic DTOs carry UUIDs only.
-- `deletedId` is the global ID that Relay's `@deleteEdge` and `@deleteRecord` take. It is returned only when the row is actually gone.
+- `purgedId` is the global ID that Relay's `@deleteEdge` and `@deleteRecord` take. It is returned only when the row is actually gone.
 - When a row leaves a list needs no handling. Purge comes after soft delete, and soft-deleted rows are already
   out of the default lists.
 
@@ -473,7 +473,8 @@ external resource relocate into this BEP's cleanup stages.
 | D1 | 2026-10-20 | Split business state (`status`), soft delete (`deleted_at`), and purge progress (`purge_status`) into three columns. The business status carries no deletion values. | Business state and deletion hold at the same time, and one enum makes restore lose the previous state. The coordinator reads one `purge_status` regardless of entity. | One status enum per entity carrying the deletion and purge progress values (this BEP's previous design). |
 | D2 | 2026-10-20 | Soft delete is decided by one nullable `deleted_at`, added by a shared mixin. | The deletion time is the retention reference. A boolean kept beside it can disagree with it. | A `deleted` boolean; both a boolean and a timestamp. |
 | D3 | 2026-10-20 | `purge_status` is a NOT NULL enum with a named default, only on entities that clean up external resources. | Without a name for the everyday value, a row in the normal state cannot be told apart. | A nullable `purge_status`. |
-| D4 | 2026-10-20 | v2 purge of an entity with `purge_status` answers without waiting, with the Node (GQL) or 202 and the entity (REST). Entities without it and force purge answer synchronously with `deletedId` (GQL) or the UUID. | A response does not report a Node that still exists as deleted. `deletedId` removes a record from the Relay store, so it is returned only when the row is gone. | v2 also waits for completion and answers with `deletedId`. |
+| D4 | 2026-10-20 | v2 purge of an entity with `purge_status` answers without waiting, with the Node (GQL) or 202 and the entity (REST). Entities without it and force purge answer synchronously with `purgedId` (GQL) or the UUID. | A response does not report a Node that still exists as deleted. `purgedId` removes a record from the Relay store, so it is returned only when the row is gone. | v2 also waits for completion and answers with `purgedId`. |
+| D5 | 2026-10-20 | The field of a purge response holding the removed target's global ID is `purgedId`, for an entity, a field row and a relation alike. | Here delete is a soft delete (`deleted_at`), and a soft delete response returns the Node. The field's verb matches the mutation's verb, `purge`. | `deletedId` — collides with soft delete. A name per type (`purgedRoleId`) — clients handle a different field per payload. |
 
 ## Open Questions
 

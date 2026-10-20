@@ -253,7 +253,9 @@ class ReservoirRegistryAdapter(BaseAdapter):
         action_result = await self._artifact_registry.delete_reservoir_registry.run(
             DeleteReservoirRegistryAction(registry_id=ArtifactRegistryID(registry_id))
         )
-        return PurgeReservoirRegistryPayload(id=action_result.deleted_reservoir_id)
+        return PurgeReservoirRegistryPayload(
+            id=action_result.deleted_reservoir_id, entity_id=action_result.deleted_reservoir_id
+        )
 
     async def partial_bulk_purge(
         self, input: PartialBulkPurgeReservoirRegistriesInput
@@ -266,7 +268,7 @@ class ReservoirRegistryAdapter(BaseAdapter):
         )
         return PartialBulkPayload[PurgeReservoirRegistryPayload](
             successes=[
-                PurgeReservoirRegistryPayload(id=item.value)
+                PurgeReservoirRegistryPayload(id=item.value, entity_id=item.value)
                 for item in result.items
                 if item.value is not None
             ],

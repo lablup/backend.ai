@@ -17,7 +17,7 @@ from ai.backend.common.dto.manager.v2.retention_policy.response import (
 )
 from ai.backend.common.dto.manager.v2.retention_policy.types import RetentionPolicyOrderField
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.retention_policy.types import (
     CreateRetentionPolicyInputGQL,
@@ -155,7 +155,9 @@ async def purge_retention_policy(
     id: UUID,
 ) -> PurgeRetentionPolicyPayloadGQL:
     payload = await info.context.adapters.retention_policy.purge(RetentionPolicyID(id))
-    return PurgeRetentionPolicyPayloadGQL.from_pydantic(payload)
+    return PurgeRetentionPolicyPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(RetentionPolicyGQL, payload.entity_id)}
+    )
 
 
 @gql_mutation(
@@ -217,7 +219,7 @@ async def admin_delete_retention_policy(
     check_admin_only()
     payload = await info.context.adapters.retention_policy.purge(RetentionPolicyID(id))
     return DeleteRetentionPolicyPayloadGQL.from_pydantic(
-        DeleteRetentionPolicyPayload(id=payload.id)
+        DeleteRetentionPolicyPayload(id=payload.id, entity_id=payload.entity_id)
     )
 
 
@@ -234,4 +236,6 @@ async def admin_purge_retention_policy(
 ) -> PurgeRetentionPolicyPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.retention_policy.purge(RetentionPolicyID(id))
-    return PurgeRetentionPolicyPayloadGQL.from_pydantic(payload)
+    return PurgeRetentionPolicyPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(RetentionPolicyGQL, payload.entity_id)}
+    )

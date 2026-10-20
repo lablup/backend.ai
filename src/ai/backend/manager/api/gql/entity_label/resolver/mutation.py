@@ -6,7 +6,7 @@ from strawberry import ID, Info
 
 from ai.backend.common.data.entity.entity_label import EntityLabelID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import parse_uuid
+from ai.backend.manager.api.gql.base import parse_uuid, to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -16,6 +16,7 @@ from ai.backend.manager.api.gql.entity_label.types.inputs import (
     PartialBulkUpsertEntityLabelInputGQL,
     UpsertEntityLabelInputGQL,
 )
+from ai.backend.manager.api.gql.entity_label.types.node import EntityLabelGQL
 from ai.backend.manager.api.gql.entity_label.types.payloads import (
     PartialBulkPurgeEntityLabelPayloadGQL,
     PartialBulkUpsertEntityLabelPayloadGQL,
@@ -93,7 +94,9 @@ async def purge_entity_label(
     id: ID,
 ) -> PurgeEntityLabelPayloadGQL | None:
     payload = await info.context.adapters.entity_label.purge(EntityLabelID(parse_uuid(id)))
-    return PurgeEntityLabelPayloadGQL.from_pydantic(payload)
+    return PurgeEntityLabelPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(EntityLabelGQL, payload.field_id)}
+    )
 
 
 @gql_mutation(

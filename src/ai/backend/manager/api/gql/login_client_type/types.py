@@ -7,6 +7,7 @@ from enum import StrEnum
 from typing import Any, Self, override
 from uuid import UUID
 
+import strawberry
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -292,7 +293,21 @@ class DeleteLoginClientTypePayloadGQL(PydanticOutputMixin[DeleteLoginClientTypeP
     name="PurgeLoginClientTypePayload",
 )
 class PurgeLoginClientTypePayloadGQL(PydanticOutputMixin[PurgeLoginClientTypePayloadDTO]):
-    id: UUID = gql_field(description="UUID of the purged login client type.")
+    id: UUID = gql_field(
+        description="UUID of the purged login client type.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged login client type.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="UUID of the purged login client type."
+        ),
+    )
 
 
 @gql_pydantic_input(

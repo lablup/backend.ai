@@ -208,7 +208,7 @@ side effect of a business operation is invisible to the permission model.
 | Operation | DTO · REST | GraphQL payload |
 | --- | --- | --- |
 | link (create) · update · soft delete · restore | relation DTO | relation Node |
-| unlink (purge) | end UUIDs | `deletedId: ID!` (the relation's global ID) + end UUIDs |
+| unlink (purge) | end UUIDs | `purgedId: ID!` (the relation's global ID) + end UUIDs |
 
 The rule is the same as for a Node. An operation the relation survives returns the relation; one it
 does not returns the global ID Relay's `@deleteEdge` · `@deleteRecord` take. The full rule is in
@@ -305,7 +305,7 @@ relation rows it leaves are cleaned up there or by a retention sweep. A relation
 | --- | --- | --- | --- | --- |
 | D1 | 2026-10-20 | A relation is identified by the UUIDs of its ends alone. Its id in the API is a global ID built from the ends, and repositories and permission checks look it up by the ends only. | An id outside the pair is a second name for the same relation, and a relation found by that id has to be read again by its ends before its permission can be asked. | Keep the row id as the Node id — a client has to store the row id to change the relation. |
 | D2 | 2026-10-20 | Drop every relation table's row id column and make the pair of ends the primary key. | No table references the row id by foreign key, and five tables do not use it. The first four had the pair as their primary key originally. | Keep the row id and hide it in the API — an unused key stays and can reach the API again. |
-| D3 | 2026-10-20 | A relation's unlink (purge) answers `deletedId` (the relation's global ID) and the end UUIDs in GraphQL, and the end UUIDs in the DTO and REST. An operation the relation survives returns the relation. | Relay's `@deleteEdge` · `@deleteRecord` take a global ID. The global ID is built in the GraphQL layer only. | A global ID in the payload's `id` — it becomes the same key as the removed relation in the Relay store and collides. |
+| D3 | 2026-10-20 | A relation's unlink (purge) answers `purgedId` (the relation's global ID) and the end UUIDs in GraphQL, and the end UUIDs in the DTO and REST. An operation the relation survives returns the relation. | Relay's `@deleteEdge` · `@deleteRecord` take a global ID. The global ID is built in the GraphQL layer only. | A global ID in the payload's `id` — it becomes the same key as the removed relation in the Relay store and collides. |
 | D4 | 2026-10-20 | Resource group ↔ domain and ↔ project are handled by link and unlink. Replacing the whole name list is deprecated. | A wholesale replacement cannot ask the permission of one pair on its own and does not name a relation by its end UUIDs. |  |
 | D5 | 2026-10-20 | Relation types implement Node. The global ID serves `node(id:)` only, and individual queries and mutations take the end UUIDs. `node(id:)` asks read on both end scopes. | A global ID built from the ends lets the relation be read again from its id alone, keeping the Node contract. The global ID carries both ends, so both permissions are asked. | Keep relation types off Node with no `id` — the Relay store cannot normalize a relation, and an unlink response cannot remove its edge. |
 

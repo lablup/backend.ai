@@ -199,7 +199,9 @@ class AppConfigAllowListAdapter(BaseAdapter):
         action_result = await self._app_config.allow_list_purge.run(
             PurgeAppConfigAllowListAction(purger=purger)
         )
-        return PurgeAppConfigAllowListPayload(id=action_result.data.id)
+        return PurgeAppConfigAllowListPayload(
+            id=action_result.data.id, entity_id=action_result.data.id
+        )
 
     async def partial_bulk_update(
         self, input: PartialBulkUpdateAppConfigAllowListsInput

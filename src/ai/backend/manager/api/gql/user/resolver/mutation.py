@@ -332,8 +332,8 @@ async def admin_delete_user_v2(
     """
     check_admin_only()
     ctx = info.context
-    await ctx.adapters.user.delete_user_by_id(DeleteUserInput(user_id=user_id))
-    return DeleteUserPayloadGQL(success=True)
+    payload = await ctx.adapters.user.delete_user_by_id(DeleteUserInput(user_id=user_id))
+    return DeleteUserPayloadGQL.from_pydantic(payload)
 
 
 @gql_mutation(

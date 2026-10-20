@@ -69,6 +69,7 @@ class DeleteQueryDefinitionPayload(BaseResponseModel):
     """Payload for deleting a query definition."""
 
     id: UUID = Field(description="Deleted query definition ID")
+    entity_id: UUID = Field(description="UUID of the deleted query definition. Added in 26.10.0.")
 
 
 class GetQueryDefinitionPayload(BaseResponseModel):

@@ -50,12 +50,18 @@ class DeleteHuggingFaceRegistryPayload(BaseResponseModel):
     """Payload for HuggingFace registry deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted HuggingFace registry")
+    entity_id: UUID = Field(
+        description="UUID of the deleted HuggingFace registry. Added in 26.10.0."
+    )
 
 
 class PurgeHuggingFaceRegistryPayload(BaseResponseModel):
     """Payload for HuggingFace registry purge result."""
 
     id: UUID = Field(description="ID of the purged HuggingFace registry")
+    entity_id: UUID = Field(
+        description="UUID of the purged HuggingFace registry. Added in 26.10.0."
+    )
 
 
 class AdminSearchHuggingFaceRegistriesPayload(BaseResponseModel):

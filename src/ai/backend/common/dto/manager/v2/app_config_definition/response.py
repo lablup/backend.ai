@@ -41,6 +41,9 @@ class PurgeAppConfigDefinitionPayload(BaseResponseModel):
     """Payload for app config definition purge."""
 
     id: UUID = Field(description="UUID of the purged app config definition.")
+    entity_id: UUID = Field(
+        description="UUID of the purged app config definition. Added in 26.10.0."
+    )
 
 
 class SearchAppConfigDefinitionsPayload(BaseResponseModel):

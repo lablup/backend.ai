@@ -8,6 +8,7 @@ from enum import StrEnum
 from typing import Any, Self, cast, override
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 from strawberry.scalars import JSON
@@ -279,7 +280,22 @@ class AtomicBulkUpsertAppConfigFragmentsPayloadGQL(
     name="PurgeAppConfigFragmentPayload",
 )
 class PurgeAppConfigFragmentPayloadGQL(PydanticOutputMixin[PurgeAppConfigFragmentPayloadDTO]):
-    id: UUID = gql_field(description="Id of the purged app config fragment.")
+    id: UUID = gql_field(
+        description="Id of the purged app config fragment.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged app config fragment.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the purged app config fragment.",
+        ),
+    )
 
 
 @gql_pydantic_input(

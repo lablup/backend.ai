@@ -1060,7 +1060,16 @@ class PartialBulkPurgeRolesInputGQL(PydanticInputMixin[PartialBulkPurgeRolesInpu
     name="DeleteRolePayload",
 )
 class DeleteRolePayload(PydanticOutputMixin[DeleteRolePayloadDTO]):
-    id: UUID = gql_field(description="ID of the deleted role.")
+    id: UUID = gql_field(
+        description="ID of the deleted role.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `role`.",
+    )
+    role: RoleGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The soft-deleted role.",
+        ),
+    )
 
 
 @gql_pydantic_type(
@@ -1069,7 +1078,21 @@ class DeleteRolePayload(PydanticOutputMixin[DeleteRolePayloadDTO]):
     name="PurgeRolePayload",
 )
 class PurgeRolePayload(PydanticOutputMixin[PurgeRolePayloadDTO]):
-    id: UUID = gql_field(description="ID of the purged role.")
+    id: UUID = gql_field(
+        description="ID of the purged role.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged role.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="UUID of the purged role."
+        ),
+    )
 
 
 @gql_pydantic_type(
@@ -1080,7 +1103,13 @@ class PurgeRolePayload(PydanticOutputMixin[PurgeRolePayloadDTO]):
     name="RestoreRolePayload",
 )
 class RestoreRolePayload(PydanticOutputMixin[RestoreRolePayloadDTO]):
-    id: UUID = gql_field(description="ID of the restored role.")
+    id: UUID = gql_field(
+        description="ID of the restored role.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `role`.",
+    )
+    role: RoleGQL = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="The restored role."),
+    )
 
 
 @gql_pydantic_type(

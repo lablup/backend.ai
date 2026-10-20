@@ -6,7 +6,7 @@ from enum import StrEnum
 from typing import Self, override
 from uuid import UUID
 
-from strawberry import UNSET, Info
+from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
@@ -361,6 +361,19 @@ class UpdateRuntimeVariantPayloadGQL(PydanticOutputMixin[UpdateRuntimeVariantPay
 )
 class DeleteRuntimeVariantPayloadGQL(PydanticOutputMixin[DeleteRuntimeVariantPayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted runtime variant.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for runtime variant purge.",
+    ),
+    model=DeleteRuntimeVariantPayloadDTO,
+    name="PurgeRuntimeVariantPayload",
+)
+class PurgeRuntimeVariantPayloadGQL(PydanticOutputMixin[DeleteRuntimeVariantPayloadDTO]):
+    purged_id: ID = gql_field(description="Global ID of the purged runtime variant.")
+    entity_id: UUID = gql_field(description="UUID of the purged runtime variant.")
 
 
 @gql_pydantic_input(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import strawberry
 from strawberry import UNSET
 
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
@@ -502,6 +503,23 @@ class DeleteKeypairResourcePolicyPayloadGQL(
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for keypair resource policy purge.",
+    ),
+    model=DeleteKeypairResourcePolicyPayloadDTO,
+    name="PurgeKeypairResourcePolicyPayload",
+)
+class PurgeKeypairResourcePolicyPayloadGQL(
+    PydanticOutputMixin[DeleteKeypairResourcePolicyPayloadDTO]
+):
+    purged_id: strawberry.ID = gql_field(
+        description="Global ID of the purged keypair resource policy."
+    )
+    entity_id: UUID = gql_field(description="UUID of the purged keypair resource policy.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Payload for user resource policy create/update mutations.",
     ),
@@ -538,6 +556,21 @@ class UpdateUserResourcePolicyPayloadGQL(PydanticOutputMixin[UpdateUserResourceP
 )
 class DeleteUserResourcePolicyPayloadGQL(PydanticOutputMixin[DeleteUserResourcePolicyPayloadDTO]):
     name: str = gql_field(description="Name of the deleted policy.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for user resource policy purge.",
+    ),
+    model=DeleteUserResourcePolicyPayloadDTO,
+    name="PurgeUserResourcePolicyPayload",
+)
+class PurgeUserResourcePolicyPayloadGQL(PydanticOutputMixin[DeleteUserResourcePolicyPayloadDTO]):
+    purged_id: strawberry.ID = gql_field(
+        description="Global ID of the purged user resource policy."
+    )
+    entity_id: UUID = gql_field(description="UUID of the purged user resource policy.")
 
 
 @gql_pydantic_type(
@@ -584,6 +617,23 @@ class DeleteProjectResourcePolicyPayloadGQL(
     PydanticOutputMixin[DeleteProjectResourcePolicyPayloadDTO]
 ):
     name: str = gql_field(description="Name of the deleted policy.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for project resource policy purge.",
+    ),
+    model=DeleteProjectResourcePolicyPayloadDTO,
+    name="PurgeProjectResourcePolicyPayload",
+)
+class PurgeProjectResourcePolicyPayloadGQL(
+    PydanticOutputMixin[DeleteProjectResourcePolicyPayloadDTO]
+):
+    purged_id: strawberry.ID = gql_field(
+        description="Global ID of the purged project resource policy."
+    )
+    entity_id: UUID = gql_field(description="UUID of the purged project resource policy.")
 
 
 @gql_pydantic_type(

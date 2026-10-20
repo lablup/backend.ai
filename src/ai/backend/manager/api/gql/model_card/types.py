@@ -679,6 +679,19 @@ class DeleteModelCardPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for model card purge.",
+    ),
+    model=DeletePayloadDTO,
+    name="PurgeModelCardPayload",
+)
+class PurgeModelCardPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
+    purged_id: strawberry.ID = gql_field(description="Global ID of the purged model card.")
+    entity_id: UUID = gql_field(description="UUID of the purged model card.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Result of scanning a MODEL_STORE project for model cards.",
     ),

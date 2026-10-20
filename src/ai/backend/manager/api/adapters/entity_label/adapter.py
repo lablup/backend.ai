@@ -125,7 +125,8 @@ class EntityLabelAdapter(BaseAdapter):
         action_result = await self._entity_label.purge.run(
             PurgeEntityLabelAction(label_id=label_id)
         )
-        return PurgeEntityLabelPayload(label=self._data_to_node(action_result.data))
+        label = self._data_to_node(action_result.data)
+        return PurgeEntityLabelPayload(label=label, field_id=label.field_id)
 
     async def partial_bulk_purge(
         self, input: PartialBulkPurgeEntityLabelInput

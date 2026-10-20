@@ -8,6 +8,7 @@ from enum import StrEnum
 from typing import Any, Self, cast, override
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -339,11 +340,25 @@ class PurgeAppConfigAllowListInputGQL(PydanticInputMixin[PurgeAppConfigAllowList
         description="Payload for app config allow-list entry purge.",
     ),
     model=PurgeAppConfigAllowListPayloadDTO,
-    all_fields=True,
     name="PurgeAppConfigAllowListPayload",
 )
 class PurgeAppConfigAllowListPayloadGQL(PydanticOutputMixin[PurgeAppConfigAllowListPayloadDTO]):
-    pass
+    id: UUID = gql_field(
+        description="UUID of the purged app config allow-list entry.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged app config allow-list entry.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the purged app config allow-list entry.",
+        ),
+    )
 
 
 @gql_pydantic_input(

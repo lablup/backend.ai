@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     RuntimeVariantPresetOrderField,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.runtime_variant_preset.types import (
     CreateRuntimeVariantPresetInputGQL,
@@ -24,6 +24,7 @@ from ai.backend.manager.api.gql.runtime_variant_preset.types import (
     PartialBulkPurgeRuntimeVariantPresetsInputGQL,
     PartialBulkRuntimeVariantPresetsPayloadGQL,
     PartialBulkUpdateRuntimeVariantPresetsInputGQL,
+    PurgeRuntimeVariantPresetPayloadGQL,
     RuntimeVariantPresetConnection,
     RuntimeVariantPresetEdge,
     RuntimeVariantPresetFilterGQL,
@@ -148,9 +149,11 @@ async def update_runtime_variant_preset(
 async def purge_runtime_variant_preset(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteRuntimeVariantPresetPayloadGQL:
+) -> PurgeRuntimeVariantPresetPayloadGQL:
     payload = await info.context.adapters.runtime_variant_preset.purge(id)
-    return DeleteRuntimeVariantPresetPayloadGQL.from_pydantic(payload)
+    return PurgeRuntimeVariantPresetPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(RuntimeVariantPresetGQL, payload.entity_id)}
+    )
 
 
 @gql_mutation(

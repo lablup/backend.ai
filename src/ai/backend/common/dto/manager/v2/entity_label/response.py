@@ -64,6 +64,7 @@ class PurgeEntityLabelPayload(BaseResponseModel):
     """Payload for the label that was removed."""
 
     label: EntityLabelNode = Field(description="The label taken off the entity")
+    field_id: UUID = Field(description="UUID of the purged entity label. Added in 26.10.0.")
 
 
 class PurgeEntityLabelError(BaseResponseModel):

@@ -21,7 +21,7 @@ from ai.backend.common.dto.manager.v2.resource_group.response import (
     UpdateResourceGroupConfigPayloadNode,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -41,6 +41,7 @@ from .types import (
     PartialBulkPurgeResourceGroupsInputGQL,
     PartialBulkResourceGroupsPayloadGQL,
     PartialBulkUpdateResourceGroupsInputGQL,
+    PurgeResourceGroupPayloadGQL,
     ReplaceResourceGroupDefaultDeploymentOptionsInputGQL,
     ReplaceResourceGroupDefaultDeploymentOptionsPayloadGQL,
     ReplaceResourceGroupDefaultSessionOptionsInputGQL,
@@ -441,9 +442,12 @@ async def admin_create_resource_group_v2(
 async def purge_resource_group_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteResourceGroupPayloadGQL:
+) -> PurgeResourceGroupPayloadGQL:
     result = await info.context.adapters.resource_group.purge(ResourceGroupID(id))
-    return DeleteResourceGroupPayloadGQL.from_pydantic(DeleteResourceGroupPayload(id=result.id))
+    return PurgeResourceGroupPayloadGQL.from_pydantic(
+        DeleteResourceGroupPayload(id=result.id, entity_id=result.entity_id),
+        extra={"purged_id": to_global_id(ResourceGroupGQL, result.id)},
+    )
 
 
 @gql_mutation(
@@ -460,7 +464,7 @@ async def admin_delete_resource_group_v2(
     check_admin_only()
     adapter = info.context.adapters.resource_group
     result = await adapter.purge(await adapter.lookup_name(name))
-    payload = DeleteResourceGroupPayload(id=result.id)
+    payload = DeleteResourceGroupPayload(id=result.id, entity_id=result.entity_id)
     return DeleteResourceGroupPayloadGQL.from_pydantic(payload)
 
 

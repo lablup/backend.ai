@@ -70,6 +70,7 @@ class UpdateIdleCheckerPayload(BaseResponseModel):
 
 class PurgeIdleCheckerPayload(BaseResponseModel):
     id: IdleCheckerID
+    entity_id: UUID = Field(description="UUID of the purged idle checker. Added in 26.10.0.")
 
 
 class SearchIdleCheckerPayload(BaseResponseModel):

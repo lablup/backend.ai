@@ -96,5 +96,6 @@ class V2ObjectStorageHandler:
         """Deprecated. Use `DELETE /v2/object-storages/{storage_id}`."""
         purged = await self._adapter.purge(ObjectStorageID(body.parsed.id))
         return APIResponse.build(
-            status_code=HTTPStatus.OK, response_model=DeleteObjectStoragePayload(id=purged.id)
+            status_code=HTTPStatus.OK,
+            response_model=DeleteObjectStoragePayload(id=purged.id, entity_id=purged.entity_id),
         )

@@ -22,7 +22,7 @@ from ai.backend.common.dto.manager.v2.notification.response import (
     DeleteNotificationRulePayload as DeleteNotificationRulePayloadDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid, to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
@@ -435,7 +435,9 @@ async def purge_notification_channel(
     id: UUID,
 ) -> PurgeNotificationChannelPayloadGQL:
     payload = await info.context.adapters.notification.purge_channel(id)
-    return PurgeNotificationChannelPayloadGQL.from_pydantic(payload)
+    return PurgeNotificationChannelPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(NotificationChannel, payload.entity_id)}
+    )
 
 
 @gql_mutation(
@@ -482,7 +484,7 @@ async def admin_delete_notification_channel(
     check_admin_only()
     payload = await info.context.adapters.notification.purge_channel(input.to_pydantic().id)
     return DeleteNotificationChannelPayload.from_pydantic(
-        DeleteNotificationChannelPayloadDTO(id=payload.id)
+        DeleteNotificationChannelPayloadDTO(id=payload.id, entity_id=payload.entity_id)
     )
 
 
@@ -495,7 +497,7 @@ async def delete_notification_channel(
 ) -> DeleteNotificationChannelPayload | None:
     payload = await info.context.adapters.notification.purge_channel(input.to_pydantic().id)
     return DeleteNotificationChannelPayload.from_pydantic(
-        DeleteNotificationChannelPayloadDTO(id=payload.id)
+        DeleteNotificationChannelPayloadDTO(id=payload.id, entity_id=payload.entity_id)
     )
 
 
@@ -564,7 +566,9 @@ async def purge_notification_rule(
     id: UUID,
 ) -> PurgeNotificationRulePayloadGQL:
     payload = await info.context.adapters.notification.purge_rule(id)
-    return PurgeNotificationRulePayloadGQL.from_pydantic(payload)
+    return PurgeNotificationRulePayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(NotificationRule, payload.entity_id)}
+    )
 
 
 @gql_mutation(
@@ -607,7 +611,7 @@ async def admin_delete_notification_rule(
     check_admin_only()
     payload = await info.context.adapters.notification.purge_rule(input.to_pydantic().id)
     return DeleteNotificationRulePayload.from_pydantic(
-        DeleteNotificationRulePayloadDTO(id=payload.id)
+        DeleteNotificationRulePayloadDTO(id=payload.id, entity_id=payload.entity_id)
     )
 
 
@@ -620,7 +624,7 @@ async def delete_notification_rule(
 ) -> DeleteNotificationRulePayload | None:
     payload = await info.context.adapters.notification.purge_rule(input.to_pydantic().id)
     return DeleteNotificationRulePayload.from_pydantic(
-        DeleteNotificationRulePayloadDTO(id=payload.id)
+        DeleteNotificationRulePayloadDTO(id=payload.id, entity_id=payload.entity_id)
     )
 
 

@@ -337,8 +337,10 @@ async def delete_model_deployment(
     input: DeleteDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> DeleteDeploymentPayload | None:
     """Delete a model deployment."""
-    await info.context.adapters.deployment.delete(input.to_pydantic())
-    return DeleteDeploymentPayload(id=input.id)
+    payload = await info.context.adapters.deployment.delete(input.to_pydantic())
+    return DeleteDeploymentPayload(
+        id=input.id, deployment=ModelDeployment.from_pydantic(payload.deployment)
+    )
 
 
 @gql_mutation(

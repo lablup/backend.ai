@@ -408,7 +408,7 @@ class ResourcePolicyAdapter(BaseAdapter):
         result = await self._keypair_resource_policy.purge.run(
             PurgeKeyPairResourcePolicyAction(policy_id=policy_id)
         )
-        return DeleteKeypairResourcePolicyPayload(name=result.data.name)
+        return DeleteKeypairResourcePolicyPayload(name=result.data.name, entity_id=result.data.uuid)
 
     async def partial_bulk_purge_keypair_resource_policies(
         self, input: PartialBulkPurgeKeypairResourcePoliciesInput
@@ -574,7 +574,7 @@ class ResourcePolicyAdapter(BaseAdapter):
         result = await self._user_resource_policy.purge.run(
             PurgeUserResourcePolicyAction(policy_id=policy_id)
         )
-        return DeleteUserResourcePolicyPayload(name=result.data.name)
+        return DeleteUserResourcePolicyPayload(name=result.data.name, entity_id=result.data.uuid)
 
     async def partial_bulk_purge_user_resource_policies(
         self, input: PartialBulkPurgeUserResourcePoliciesInput
@@ -759,7 +759,7 @@ class ResourcePolicyAdapter(BaseAdapter):
         result = await self._project_resource_policy.purge.run(
             PurgeProjectResourcePolicyAction(policy_id=policy_id)
         )
-        return DeleteProjectResourcePolicyPayload(name=result.data.name)
+        return DeleteProjectResourcePolicyPayload(name=result.data.name, entity_id=result.data.uuid)
 
     async def partial_bulk_purge_project_resource_policies(
         self, input: PartialBulkPurgeProjectResourcePoliciesInput

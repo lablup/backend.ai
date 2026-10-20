@@ -201,7 +201,7 @@ class ObjectStorageAdapter(BaseAdapter):
         action_result = await self._object_storage.purge.run(
             PurgeObjectStorageAction(storage_id=storage_id)
         )
-        return PurgeObjectStoragePayload(id=action_result.data.id)
+        return PurgeObjectStoragePayload(id=action_result.data.id, entity_id=action_result.data.id)
 
     async def partial_bulk_update(
         self, input: PartialBulkUpdateObjectStoragesInput

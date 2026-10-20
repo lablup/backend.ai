@@ -285,7 +285,7 @@ class ContainerRegistryAdapter(BaseAdapter):
         await self._container_registry.delete_container_registry.run(
             DeleteContainerRegistryAction(purger=ContainerRegistryPurger(registry_id=registry_id))
         )
-        return PurgeContainerRegistryPayload(id=registry_id)
+        return PurgeContainerRegistryPayload(id=registry_id, entity_id=registry_id)
 
     async def admin_partial_bulk_purge(
         self, input: PartialBulkPurgeContainerRegistriesInput

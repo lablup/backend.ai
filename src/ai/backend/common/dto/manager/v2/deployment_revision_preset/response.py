@@ -134,6 +134,7 @@ class UpdateDeploymentRevisionPresetPayload(BaseResponseModel):
 
 class DeleteDeploymentRevisionPresetPayload(BaseResponseModel):
     id: UUID = Field(description="ID of the deleted preset.")
+    entity_id: UUID = Field(description="UUID of the deleted preset. Added in 26.10.0.")
 
 
 class SearchDeploymentRevisionPresetsPayload(BaseResponseModel):

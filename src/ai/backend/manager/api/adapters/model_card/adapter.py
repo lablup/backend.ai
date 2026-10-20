@@ -414,7 +414,7 @@ class ModelCardAdapter(BaseAdapter):
                 options=options,
             )
         )
-        return DeleteModelCardPayload(id=result.id)
+        return DeleteModelCardPayload(id=result.id, entity_id=result.id)
 
     async def partial_bulk_update(
         self, input: PartialBulkUpdateModelCardsInput

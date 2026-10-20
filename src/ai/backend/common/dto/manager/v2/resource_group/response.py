@@ -100,6 +100,7 @@ class DeleteResourceGroupPayload(BaseResponseModel):
     """Payload for resource group deletion mutation result."""
 
     id: ResourceGroupID = Field(description="UUID of the deleted resource group.")
+    entity_id: UUID = Field(description="UUID of the deleted resource group. Added in 26.10.0.")
 
 
 class AdminSearchResourceGroupsPayload(BaseResponseModel):

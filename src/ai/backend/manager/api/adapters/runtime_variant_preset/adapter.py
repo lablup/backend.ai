@@ -213,7 +213,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
         result = await self._runtime_variant_preset.purge.run(
             PurgeRuntimeVariantPresetAction(id=RuntimeVariantPresetID(preset_id))
         )
-        return DeleteRuntimeVariantPresetPayload(id=result.data.id)
+        return DeleteRuntimeVariantPresetPayload(id=result.data.id, entity_id=result.data.id)
 
     async def partial_bulk_update(
         self, input: PartialBulkUpdateRuntimeVariantPresetsInput

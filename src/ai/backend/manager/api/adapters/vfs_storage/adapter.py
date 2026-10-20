@@ -141,7 +141,7 @@ class VFSStorageAdapter(BaseAdapter):
         action_result = await self._vfs_storage.purge.run(
             PurgeVFSStorageAction(storage_id=storage_id)
         )
-        return PurgeVFSStoragePayload(id=action_result.data.id)
+        return PurgeVFSStoragePayload(id=action_result.data.id, entity_id=action_result.data.id)
 
     async def partial_bulk_update(
         self, input: PartialBulkUpdateVFSStoragesInput

@@ -109,6 +109,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
 from ai.backend.common.dto.manager.v2.scheduling_history.types import (
     ReplicaGroupHistoryScopeDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     IntFilter,
@@ -946,7 +947,16 @@ class UpdateDeploymentPayload:
     model=DeleteDeploymentPayloadDTO,
 )
 class DeleteDeploymentPayload:
-    id: ID
+    id: ID = gql_field(
+        description="ID of the deleted deployment.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deployment`.",
+    )
+    deployment: ModelDeployment = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The soft-deleted deployment.",
+        ),
+    )
 
 
 @gql_pydantic_type(

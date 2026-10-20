@@ -1,9 +1,9 @@
 ---
 name: gql-federation-and-pagination
 type: constraints
-description: adapter-backed resolvers and the scoped/admin_/public operation surface, federation name-collision caveat (V2-suffixed schema names), cursor vs offset pagination mode behavior, Node types by entity/field declaration, relation types as Nodes with a global ID built from the end UUIDs, relation-type connections with end-key cursors and relation-type filters, mutation payloads (target Node vs deletedId for Relay @deleteEdge/@deleteRecord, asynchronous purge), published relation Nodes and their targets
+description: adapter-backed resolvers and the scoped/admin_/public operation surface, federation name-collision caveat (V2-suffixed schema names), cursor vs offset pagination mode behavior, Node types by entity/field declaration, relation types as Nodes with a global ID built from the end UUIDs, relation-type connections with end-key cursors and relation-type filters, mutation payloads (target Node vs purgedId for Relay @deleteEdge/@deleteRecord, asynchronous purge), published relation Nodes and their targets
 scope: src/ai/backend/manager/api/gql
-keywords: [federation, supergraph, Strawberry, Graphene, V2, cursor, offset, pagination, Connection, Edge, RoleAssignment, IdleCheckerAssignment, SessionIdleCheck, EntityShare, deletedId, deleteEdge, purge_status, global ID]
+keywords: [federation, supergraph, Strawberry, Graphene, V2, cursor, offset, pagination, Connection, Edge, RoleAssignment, IdleCheckerAssignment, SessionIdleCheck, EntityShare, purgedId, deleteEdge, purge_status, global ID]
 sources:
   - scripts/generate-graphql-schema.sh
   - src/ai/backend/manager/api/gql/rbac/types/role.py
@@ -60,7 +60,7 @@ A search query accepts both cursor and offset arguments.
 - A relation table has no row id; the pair of ends is its primary key (BEP-1075). An id outside the pair is a
   second name for the same relation, and a relation found by it has to be read again by its ends before its
   permission can be asked.
-- As a Node, a relation is normalized by the Relay store, and the `deletedId` of an unlink response feeds
+- As a Node, a relation is normalized by the Relay store, and the `purgedId` of an unlink response feeds
   `@deleteEdge`.
 - The global ID stays in the GQL layer, so an id a client stored does not turn into a request changing the
   relation. Arguments that change a relation are the end UUIDs.
@@ -97,17 +97,22 @@ idle check status and deadline. Of the two ways to expose them, a connection of 
 | Target at response time | Payload | Why |
 |---|---|---|
 | exists (create, update, soft delete, restore, purge of an entity with `purge_status`) | the target Node | the Relay store updates the record with the same id |
-| gone (purge finishing within the request, force purge) | `deletedId` + UUID | `@deleteEdge` and `@deleteRecord` take an `ID` or `[ID]` field and remove that node's edges and record |
+| gone (purge finishing within the request, force purge) | `purgedId` + UUID | `@deleteEdge` and `@deleteRecord` take an `ID` or `[ID]` field and remove that node's edges and record |
 
 - A global ID in the payload's own `id` becomes the same Relay store key as the removed Node and collides. The
   Relay example (`deletedTodoId`), GitHub (`deletedItemId`) and Shopify (`deletedProductId`) use a field of
   their own.
 - Returning the removed target as a Node fails its child connections on the removed target's permission check
   (`PurgeRolePresetPayload.rolePreset.permissionPresets`).
-- An entity with `purge_status` (BEP-1069) still has its row when the purge request returns. A `deletedId` there
+- An entity with `purge_status` (BEP-1069) still has its row when the purge request returns. A `purgedId` there
   would report a Node that still exists as removed. Kubernetes answers a DELETE on an object with pending
   finalizers with 202 and the remaining object; Shopify's asynchronous `productDelete` returns an operation
   object and fills `deletedProductId` once it completes.
+- The field is `purgedId`, not `deletedId`: here delete is a soft delete (`deleted_at`) whose response returns
+  the Node. The examples above name the field after their own mutation verb (`productDelete` →
+  `deletedProductId`).
+- A purge payload is a type of its own (`Purge<X>Payload`). A `Delete*Payload` shared with a soft delete or a
+  deprecated delete would put `purgedId` on a response whose target may still exist.
 - REST and DTOs do not carry global IDs. Azure Key Vault's purge answers 204 with no body, and AIP-165 `Purge`
   returns the removed count only.
 

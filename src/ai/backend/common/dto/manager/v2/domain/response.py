@@ -133,6 +133,7 @@ class DeleteDomainPayload(BaseResponseModel):
     deleted: bool = Field(
         description="Whether the deletion was successful.",
     )
+    domain: DomainNode = Field(description="The soft-deleted domain. Added in 26.10.0.")
 
 
 class RestoreDomainPayload(BaseResponseModel):
@@ -141,6 +142,7 @@ class RestoreDomainPayload(BaseResponseModel):
     restored: bool = Field(
         description="Whether the restore was successful.",
     )
+    domain: DomainNode = Field(description="The restored domain. Added in 26.10.0.")
 
 
 class PurgeDomainPayload(BaseResponseModel):

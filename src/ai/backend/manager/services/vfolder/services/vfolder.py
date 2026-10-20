@@ -1371,8 +1371,10 @@ class VFolderService:
         )
         if result.failures:
             raise result.failures[0].exception
+        if not result.succeeded:
+            raise UnreachableError(f"VFolder disappeared while purging: {vfolder_data.id}")
         await self._remove_vfolder_from_storage(vfolder_data)
-        return PurgeVFolderV2ActionResult(vfolder_id=action.vfolder_uuid)
+        return PurgeVFolderV2ActionResult(vfolder=result.succeeded[0])
 
     async def clone_v2(self, action: CloneVFolderV2Action) -> CloneVFolderV2ActionResult:
         """Clone a vfolder (v2). Resolves policy internally from user_id."""

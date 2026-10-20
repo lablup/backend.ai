@@ -49,7 +49,7 @@ from ai.backend.common.dto.manager.v2.huggingface_registry.response import (
     UpdateHuggingFaceRegistryPayload as UpdateHuggingFaceRegistryPayloadDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid, to_global_id
 from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -325,7 +325,22 @@ class PartialBulkPurgeHuggingFaceRegistriesInputGQL(
     name="PurgeHuggingFaceRegistryPayload",
 )
 class PurgeHuggingFaceRegistryPayloadGQL(PydanticOutputMixin[PurgeHuggingFaceRegistryPayloadDTO]):
-    id: UUID = gql_field(description="ID of the purged HuggingFace registry.")
+    id: UUID = gql_field(
+        description="ID of the purged HuggingFace registry.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged HuggingFace registry.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="UUID of the purged HuggingFace registry.",
+        ),
+    )
 
 
 @gql_pydantic_type(
@@ -383,7 +398,9 @@ async def purge_huggingface_registry(
     id: UUID,
 ) -> PurgeHuggingFaceRegistryPayloadGQL:
     payload = await info.context.adapters.huggingface_registry.purge(id)
-    return PurgeHuggingFaceRegistryPayloadGQL.from_pydantic(payload)
+    return PurgeHuggingFaceRegistryPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(HuggingFaceRegistry, payload.entity_id)}
+    )
 
 
 @gql_mutation(
@@ -415,4 +432,12 @@ async def partial_bulk_purge_huggingface_registries(
     payload = await info.context.adapters.huggingface_registry.partial_bulk_purge(
         input.to_pydantic()
     )
-    return PartialBulkPurgeHuggingFaceRegistriesPayloadGQL.from_pydantic(payload)
+    return PartialBulkPurgeHuggingFaceRegistriesPayloadGQL(
+        successes=[
+            PurgeHuggingFaceRegistryPayloadGQL.from_pydantic(
+                purged, extra={"purged_id": to_global_id(HuggingFaceRegistry, purged.entity_id)}
+            )
+            for purged in payload.successes
+        ],
+        failed=[PartialBulkFailureGQL.from_pydantic(failure) for failure in payload.failed],
+    )

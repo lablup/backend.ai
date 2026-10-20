@@ -340,7 +340,9 @@ class ResourceSlotAdapter(BaseAdapter):
         action_result = await self._resource_slot.purge_resource_slot_type.run(
             PurgeResourceSlotTypeAction(purger=ResourceSlotTypePurger(slot_type_id=slot_type_id))
         )
-        return PurgeResourceSlotTypePayload(slot_name=action_result.data.slot_name)
+        return PurgeResourceSlotTypePayload(
+            slot_name=action_result.data.slot_name, entity_id=action_result.data.uuid
+        )
 
     async def partial_bulk_purge_slot_types(
         self, input: PartialBulkPurgeResourceSlotTypesInput

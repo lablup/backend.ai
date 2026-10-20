@@ -12,6 +12,7 @@ from ai.backend.common.data.entity.resource_policy import (
     UserResourcePolicyUUID,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -35,12 +36,20 @@ from ai.backend.manager.api.gql.resource_policy_v2.types.mutations import (
     PartialBulkUpdateProjectResourcePoliciesInputGQL,
     PartialBulkUpdateUserResourcePoliciesInputGQL,
     PartialBulkUserResourcePoliciesPayloadGQL,
+    PurgeKeypairResourcePolicyPayloadGQL,
+    PurgeProjectResourcePolicyPayloadGQL,
+    PurgeUserResourcePolicyPayloadGQL,
     UpdateKeypairResourcePolicyInputGQL,
     UpdateKeypairResourcePolicyPayloadGQL,
     UpdateProjectResourcePolicyInputGQL,
     UpdateProjectResourcePolicyPayloadGQL,
     UpdateUserResourcePolicyInputGQL,
     UpdateUserResourcePolicyPayloadGQL,
+)
+from ai.backend.manager.api.gql.resource_policy_v2.types.node import (
+    KeypairResourcePolicyV2GQL,
+    ProjectResourcePolicyV2GQL,
+    UserResourcePolicyV2GQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -91,11 +100,13 @@ async def update_keypair_resource_policy_v2(
 async def purge_keypair_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteKeypairResourcePolicyPayloadGQL:
+) -> PurgeKeypairResourcePolicyPayloadGQL:
     payload = await info.context.adapters.resource_policy.purge_keypair_resource_policy(
         KeyPairResourcePolicyUUID(id)
     )
-    return DeleteKeypairResourcePolicyPayloadGQL.from_pydantic(payload)
+    return PurgeKeypairResourcePolicyPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(KeypairResourcePolicyV2GQL, payload.name)}
+    )
 
 
 @gql_mutation(
@@ -217,11 +228,13 @@ async def update_user_resource_policy_v2(
 async def purge_user_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteUserResourcePolicyPayloadGQL:
+) -> PurgeUserResourcePolicyPayloadGQL:
     payload = await info.context.adapters.resource_policy.purge_user_resource_policy(
         UserResourcePolicyUUID(id)
     )
-    return DeleteUserResourcePolicyPayloadGQL.from_pydantic(payload)
+    return PurgeUserResourcePolicyPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(UserResourcePolicyV2GQL, payload.name)}
+    )
 
 
 @gql_mutation(
@@ -343,11 +356,13 @@ async def update_project_resource_policy_v2(
 async def purge_project_resource_policy_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> DeleteProjectResourcePolicyPayloadGQL:
+) -> PurgeProjectResourcePolicyPayloadGQL:
     payload = await info.context.adapters.resource_policy.purge_project_resource_policy(
         ProjectResourcePolicyUUID(id)
     )
-    return DeleteProjectResourcePolicyPayloadGQL.from_pydantic(payload)
+    return PurgeProjectResourcePolicyPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(ProjectResourcePolicyV2GQL, payload.name)}
+    )
 
 
 @gql_mutation(

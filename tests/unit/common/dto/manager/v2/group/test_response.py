@@ -310,15 +310,15 @@ class TestDeleteProjectPayload:
     """Tests for DeleteProjectPayload model."""
 
     def test_deleted_true(self) -> None:
-        payload = DeleteProjectPayload(deleted=True)
+        payload = DeleteProjectPayload(deleted=True, project=make_project_node())
         assert payload.deleted is True
 
     def test_deleted_false(self) -> None:
-        payload = DeleteProjectPayload(deleted=False)
+        payload = DeleteProjectPayload(deleted=False, project=make_project_node())
         assert payload.deleted is False
 
     def test_round_trip(self) -> None:
-        payload = DeleteProjectPayload(deleted=True)
+        payload = DeleteProjectPayload(deleted=True, project=make_project_node())
         json_str = payload.model_dump_json()
         restored = DeleteProjectPayload.model_validate_json(json_str)
         assert restored.deleted is True

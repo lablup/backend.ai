@@ -373,16 +373,16 @@ DB 행과 외부 자원이 어긋나는 구간은 없앨 수 없다. 그 동안 
 | 항목 | 동기 purge (`purge_status` 없음) | 비동기 purge (`purge_status` 있음) |
 | --- | --- | --- |
 | 요청이 하는 일 | 행 삭제까지 끝낸다 | `purge_status` 를 `purging` 으로 바꾸고 끝낸다. 정리는 coordinator 가 tick 마다 진행한다 |
-| GQL 응답 | `deletedId: ID!` 와 `entityId` 또는 `fieldId` | Node (`purgeStatus: PURGING`). `deletedId` 는 없다 |
+| GQL 응답 | `purgedId: ID!` 와 `entityId` 또는 `fieldId` | Node (`purgeStatus: PURGING`). `purgedId` 는 없다 |
 | REST 응답 | 200, UUID | 202 Accepted, 엔티티 |
-| 클라이언트 store | 응답의 `deletedId` 에 `@deleteEdge`, `@deleteRecord` 를 쓴다 | 응답으로 Node 를 갱신한다. 레코드는 아직 지우지 않는다 |
+| 클라이언트 store | 응답의 `purgedId` 에 `@deleteEdge`, `@deleteRecord` 를 쓴다 | 응답으로 Node 를 갱신한다. 레코드는 아직 지우지 않는다 |
 | 완료 확인 | 필요 없음 | `node(id:)` 가 null 을 돌려주면 끝 |
 | 실패 | 요청이 오류로 끝난다 | 같은 Node 의 `purgeStatus: PURGE_ERROR` |
 | 진행 중 다른 요청 | 없음 | update, delete, restore 는 409. purge 를 다시 보내면 같은 Node 를 돌려준다 |
-| force purge | 없음 | 동기. GQL 은 `deletedId`, REST 와 DTO 는 UUID |
+| force purge | 없음 | 동기. GQL 은 `purgedId`, REST 와 DTO 는 UUID |
 
 - global ID 는 GQL 층만 만든다. pydantic DTO 는 UUID 까지만 가진다.
-- `deletedId` 는 Relay 의 `@deleteEdge`, `@deleteRecord` 가 받는 global ID 다. 행이 실제로 사라진 응답에만 준다.
+- `purgedId` 는 Relay 의 `@deleteEdge`, `@deleteRecord` 가 받는 global ID 다. 행이 실제로 사라진 응답에만 준다.
 - 목록에서 빠지는 시점은 따로 다루지 않는다. purge 는 soft delete 다음에 오고, soft delete 된 행은 기본 목록에서
   이미 빠져 있다.
 
@@ -465,7 +465,8 @@ BA-7443, BA-7444, BA-7449 의 purger `models/` 이전은 **계획대로 계속�
 | D1 | 2026-10-20 | 업무 상태(`status`), soft delete(`deleted_at`), purge 진행(`purge_status`)을 컬럼 셋으로 나눈다. 업무 status 에 삭제 값을 두지 않는다. | 업무 상태와 삭제는 동시에 성립하고, 한 enum 에 두면 restore 가 이전 상태를 잃는다. coordinator 가 엔티티와 상관없이 `purge_status` 하나를 읽는다. | 엔티티마다 status enum 하나에 삭제와 purge 진행 값을 넣음 (이 BEP 의 이전 안). |
 | D2 | 2026-10-20 | soft delete 는 nullable `deleted_at` 하나로 판단하고 공통 Mixin 이 붙인다. | 삭제 시각이 retention 기준이 된다. boolean 을 함께 두면 두 값이 어긋날 수 있다. | `deleted` boolean, boolean 과 시각 둘 다. |
 | D3 | 2026-10-20 | `purge_status` 는 외부 자원을 정리하는 엔티티에만 두는 NOT NULL enum 이고 기본값에 이름을 붙인다. | 평소 값에 이름이 없으면 행이 정상인지 구분할 수 없다. | nullable `purge_status`. |
-| D4 | 2026-10-20 | `purge_status` 가 있는 엔티티의 v2 purge 는 기다리지 않고 Node(GQL) 또는 202 와 엔티티(REST)로 답한다. 없는 엔티티와 force purge 는 동기로 `deletedId`(GQL) 또는 UUID 를 준다. | 응답 시점에 남아 있는 Node 를 지웠다고 답하지 않는다. `deletedId` 는 Relay store 에서 레코드를 빼는 데 쓰이므로 행이 사라졌을 때만 준다. | v2 도 완료를 기다렸다 `deletedId` 로 답함. |
+| D4 | 2026-10-20 | `purge_status` 가 있는 엔티티의 v2 purge 는 기다리지 않고 Node(GQL) 또는 202 와 엔티티(REST)로 답한다. 없는 엔티티와 force purge 는 동기로 `purgedId`(GQL) 또는 UUID 를 준다. | 응답 시점에 남아 있는 Node 를 지웠다고 답하지 않는다. `purgedId` 는 Relay store 에서 레코드를 빼는 데 쓰이므로 행이 사라졌을 때만 준다. | v2 도 완료를 기다렸다 `purgedId` 로 답함. |
+| D5 | 2026-10-20 | purge 응답이 지운 대상의 global ID 를 담는 필드는 `purgedId` 다. 엔티티, field 행, 관계 모두 같다. | 이 코드베이스에서 delete 는 soft delete(`deleted_at`)이고, soft delete 응답은 Node 를 돌려준다. 필드 이름의 동사를 mutation 의 동사 `purge` 와 맞춘다. | `deletedId` — soft delete 와 이름이 겹친다. 타입마다 다른 이름(`purgedRoleId`) — 클라이언트가 payload 마다 다른 필드를 다룬다. |
 
 ## 열린 질문
 

@@ -41,7 +41,7 @@ from ai.backend.common.dto.manager.v2.vfs_storage.response import (
     VFSStorageNode,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid, to_global_id
 from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -241,7 +241,21 @@ class DeleteVFSStoragePayload(PydanticOutputMixin[DeleteVFSStoragePayloadDTO]):
     name="PurgeVFSStoragePayload",
 )
 class PurgeVFSStoragePayloadGQL(PydanticOutputMixin[PurgeVFSStoragePayloadDTO]):
-    id: UUID = gql_field(description="ID of the purged VFS storage.")
+    id: UUID = gql_field(
+        description="ID of the purged VFS storage.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged VFS storage.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="UUID of the purged VFS storage."
+        ),
+    )
 
 
 @gql_pydantic_type(
@@ -297,7 +311,9 @@ async def delete_vfs_storage(
 ) -> DeleteVFSStoragePayload | None:
     dto = input.to_pydantic()
     purged = await info.context.adapters.vfs_storage.purge(VFSStorageID(dto.id))
-    return DeleteVFSStoragePayload.from_pydantic(DeleteVFSStoragePayloadDTO(id=purged.id))
+    return DeleteVFSStoragePayload.from_pydantic(
+        DeleteVFSStoragePayloadDTO(id=purged.id, entity_id=purged.entity_id)
+    )
 
 
 @gql_mutation(
@@ -310,7 +326,9 @@ async def purge_vfs_storage(
     id: UUID, info: Info[StrawberryGQLContext]
 ) -> PurgeVFSStoragePayloadGQL:
     payload = await info.context.adapters.vfs_storage.purge(VFSStorageID(id))
-    return PurgeVFSStoragePayloadGQL.from_pydantic(payload)
+    return PurgeVFSStoragePayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(VFSStorage, payload.entity_id)}
+    )
 
 
 @gql_mutation(

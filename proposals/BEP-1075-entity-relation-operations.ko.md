@@ -199,7 +199,7 @@ resource group 마다 간선을 둘 필요가 없다. 관계에서 권한을 끌
 | 연산 | DTO · REST | GraphQL payload |
 | --- | --- | --- |
 | link (create) · update · soft delete · restore | 관계 DTO | 관계 Node |
-| unlink (purge) | 양 끝 UUID | `deletedId: ID!`(관계의 global ID) + 양 끝 UUID |
+| unlink (purge) | 양 끝 UUID | `purgedId: ID!`(관계의 global ID) + 양 끝 UUID |
 
 Node 와 같은 규칙이다. 관계가 남는 연산은 관계를 돌려주고, 사라지는 연산은 Relay 의 `@deleteEdge` ·
 `@deleteRecord` 가 쓸 global ID 를 돌려준다. 규칙 전체는 `api/gql/AGENTS.md` 에 있다.
@@ -286,7 +286,7 @@ sweep 이 치운다. 관계 테이블은 `RetentionCategory` 에 자기 항목�
 | --- | --- | --- | --- | --- |
 | D1 | 2026-10-20 | 관계는 양 끝 엔티티의 UUID 로만 식별한다. API 의 관계 id 는 양 끝으로 만든 global ID 이고, repository 와 권한 검사는 양 끝으로만 조회한다. | 쌍 밖의 id 는 같은 관계의 두 번째 이름이고, 그 id 로 찾은 관계는 양 끝을 다시 읽어야 권한을 물을 수 있다. | 행 id 를 Node id 로 유지 — 클라이언트가 행 id 를 저장해야 관계를 바꿀 수 있다. |
 | D2 | 2026-10-20 | 관계 테이블의 행 id 컬럼을 모두 지우고 양 끝 쌍을 기본 키로 둔다. | 행 id 를 FK 로 참조하는 테이블이 없고, 다섯 테이블은 행 id 를 쓰지 않는다. 앞의 네 테이블은 원래 쌍이 기본 키였다. | 행 id 를 남기고 API 에서만 숨김 — 쓰지 않는 키가 남아 다시 API 로 나갈 수 있다. |
-| D3 | 2026-10-20 | 관계의 unlink(purge) 응답은 GraphQL 에서 `deletedId`(관계 global ID)와 양 끝 UUID, DTO · REST 에서 양 끝 UUID 를 준다. 관계가 남는 연산은 관계를 돌려준다. | Relay 의 `@deleteEdge` · `@deleteRecord` 는 global ID 를 받는다. global ID 는 GraphQL 층만 만든다. | payload `id` 에 global ID — Relay store 에서 지운 관계와 같은 키가 되어 충돌한다. |
+| D3 | 2026-10-20 | 관계의 unlink(purge) 응답은 GraphQL 에서 `purgedId`(관계 global ID)와 양 끝 UUID, DTO · REST 에서 양 끝 UUID 를 준다. 관계가 남는 연산은 관계를 돌려준다. | Relay 의 `@deleteEdge` · `@deleteRecord` 는 global ID 를 받는다. global ID 는 GraphQL 층만 만든다. | payload `id` 에 global ID — Relay store 에서 지운 관계와 같은 키가 되어 충돌한다. |
 | D4 | 2026-10-20 | resource group 과 domain, project 의 연결은 link · unlink 로 다룬다. 이름 목록 통째 교체는 deprecated. | 통째 교체는 한 쌍의 권한을 따로 물을 수 없고 양 끝 UUID 로 관계를 가리키지 않는다. |  |
 | D5 | 2026-10-20 | 관계 타입은 Node 를 구현한다. global ID 는 `node(id:)` 에만 쓰고, 개별 query · mutation 은 양 끝 UUID 를 받는다. `node(id:)` 는 양 끝 scope 모두의 read 를 묻는다. | 양 끝으로 만든 global ID 로 id 만 가지고 다시 읽을 수 있어 Node 계약을 지킨다. global ID 가 양 끝을 모두 담으므로 양쪽 권한을 묻는다. | 관계 타입을 Node 가 아닌 타입으로 두고 `id` 를 두지 않음 — Relay store 가 관계를 정규화하지 못하고 unlink 응답으로 edge 를 지울 수 없다. |
 

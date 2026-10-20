@@ -257,7 +257,9 @@ class ResourcePresetAdapter(BaseAdapter):
         result = await self._resource_preset.delete_preset.run(
             DeleteResourcePresetAction(preset_id=ResourcePresetID(preset_id))
         )
-        return DeleteResourcePresetPayload(id=result.resource_preset.id)
+        return DeleteResourcePresetPayload(
+            id=result.resource_preset.id, entity_id=result.resource_preset.id
+        )
 
     async def partial_bulk_update(
         self, input: PartialBulkUpdateResourcePresetsInput

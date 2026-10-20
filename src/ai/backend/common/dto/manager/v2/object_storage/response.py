@@ -54,12 +54,14 @@ class DeleteObjectStoragePayload(BaseResponseModel):
     """Payload for object storage deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted object storage")
+    entity_id: UUID = Field(description="UUID of the deleted object storage. Added in 26.10.0.")
 
 
 class PurgeObjectStoragePayload(BaseResponseModel):
     """Payload for object storage permanent purge."""
 
     id: UUID = Field(description="ID of the purged object storage")
+    entity_id: UUID = Field(description="UUID of the purged object storage. Added in 26.10.0.")
 
 
 class PresignedUploadURLPayload(BaseResponseModel):

@@ -693,8 +693,8 @@ class UserAdapter(BaseAdapter):
 
     async def delete_user_by_id(self, input: DeleteUserInput) -> DeleteUserPayload:
         """Soft-delete a user by UUID."""
-        await self._user.delete_user.run(DeleteUserAction(user_id=UserID(input.user_id)))
-        return DeleteUserPayload(success=True)
+        result = await self._user.delete_user.run(DeleteUserAction(user_id=UserID(input.user_id)))
+        return DeleteUserPayload(success=True, user=await self._user_node(result.user))
 
     async def restore_user_by_id(self, input: RestoreUserInput) -> RestoreUserPayload:
         """Restore a soft-deleted user by UUID."""
@@ -1012,11 +1012,11 @@ class UserAdapter(BaseAdapter):
         )
         return KeyPairID(result.field_id)
 
-    async def _purge_keypair(self, access_key: str) -> str:
+    async def _purge_keypair(self, access_key: str) -> KeyPairData:
         result = await self._user.purge_keypair.run(
             PurgeKeypairAction(keypair_id=await self._resolve_keypair(access_key))
         )
-        return str(result.keypair.access_key)
+        return result.keypair
 
     async def admin_update_keypair(
         self, input: AdminUpdateKeypairInput
@@ -1035,7 +1035,8 @@ class UserAdapter(BaseAdapter):
 
     async def admin_delete_keypair(self, access_key: str) -> AdminDeleteKeypairPayload:
         """Admin deletes any keypair."""
-        return AdminDeleteKeypairPayload(access_key=await self._purge_keypair(access_key))
+        keypair = await self._purge_keypair(access_key)
+        return AdminDeleteKeypairPayload(access_key=str(keypair.access_key), field_id=keypair.id)
 
     async def admin_get_keypair(self, access_key: str) -> KeypairNode:
         """Admin retrieves a single keypair by access key."""

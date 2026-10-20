@@ -8,6 +8,7 @@ from strawberry import Info
 
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -27,6 +28,7 @@ from ai.backend.manager.api.gql.role_preset.types.inputs import (
     UpdateRolePresetBodyInputGQL,
     UpdateRolePresetInputGQL,
 )
+from ai.backend.manager.api.gql.role_preset.types.node import RolePresetGQL
 from ai.backend.manager.api.gql.role_preset.types.payloads import (
     BulkDeleteRolePresetsPayloadGQL,
     BulkPurgeRolePresetsPayloadGQL,
@@ -113,7 +115,9 @@ async def purge_role_preset(
     id: UUID,
 ) -> PurgeRolePresetPayloadGQL:
     payload = await info.context.adapters.role_preset.purge(RolePresetID(id))
-    return PurgeRolePresetPayloadGQL.from_pydantic(payload)
+    return PurgeRolePresetPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(RolePresetGQL, payload.entity_id)}
+    )
 
 
 @gql_mutation(

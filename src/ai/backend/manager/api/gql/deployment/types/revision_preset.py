@@ -1211,6 +1211,21 @@ class DeleteDeploymentRevisionPresetPayloadGQL(PydanticOutputMixin[DeletePayload
     id: UUID = gql_field(description="ID of the deleted preset.")
 
 
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for deployment revision preset purge.",
+    ),
+    model=DeletePayloadDTO,
+    name="PurgeDeploymentRevisionPresetPayload",
+)
+class PurgeDeploymentRevisionPresetPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
+    purged_id: strawberry.ID = gql_field(
+        description="Global ID of the purged deployment revision preset."
+    )
+    entity_id: UUID = gql_field(description="UUID of the purged deployment revision preset.")
+
+
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,

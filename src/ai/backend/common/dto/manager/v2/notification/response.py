@@ -101,12 +101,18 @@ class DeleteNotificationChannelPayload(BaseResponseModel):
     """Payload for notification channel deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted notification channel")
+    entity_id: UUID = Field(
+        description="UUID of the deleted notification channel. Added in 26.10.0."
+    )
 
 
 class PurgeNotificationChannelPayload(BaseResponseModel):
     """Payload for notification channel purge."""
 
     id: UUID = Field(description="ID of the purged notification channel")
+    entity_id: UUID = Field(
+        description="UUID of the purged notification channel. Added in 26.10.0."
+    )
 
 
 class CreateNotificationRulePayload(BaseResponseModel):
@@ -125,12 +131,14 @@ class DeleteNotificationRulePayload(BaseResponseModel):
     """Payload for notification rule deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted notification rule")
+    entity_id: UUID = Field(description="UUID of the deleted notification rule. Added in 26.10.0.")
 
 
 class PurgeNotificationRulePayload(BaseResponseModel):
     """Payload for notification rule purge."""
 
     id: UUID = Field(description="ID of the purged notification rule")
+    entity_id: UUID = Field(description="UUID of the purged notification rule. Added in 26.10.0.")
 
 
 class ValidateNotificationChannelPayload(BaseResponseModel):

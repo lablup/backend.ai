@@ -159,7 +159,9 @@ class AppConfigDefinitionAdapter(BaseAdapter):
         action_result = await self._app_config.definition_purge.run(
             PurgeAppConfigDefinitionAction(definition_id=AppConfigDefinitionID(input.id))
         )
-        return PurgeAppConfigDefinitionPayload(id=action_result.data.id)
+        return PurgeAppConfigDefinitionPayload(
+            id=action_result.data.id, entity_id=action_result.data.id
+        )
 
     async def partial_bulk_purge(
         self, input: PartialBulkPurgeAppConfigDefinitionsInput

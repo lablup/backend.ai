@@ -22,7 +22,7 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
     UpsertAppConfigFragmentsPayload,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -159,7 +159,9 @@ async def purge_app_config_fragment(
     id: UUID,
 ) -> PurgeAppConfigFragmentPayloadGQL:
     payload = await info.context.adapters.app_config_fragment.purge(AppConfigFragmentID(id))
-    return PurgeAppConfigFragmentPayloadGQL.from_pydantic(payload)
+    return PurgeAppConfigFragmentPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(AppConfigFragmentGQL, payload.entity_id)}
+    )
 
 
 @gql_mutation(

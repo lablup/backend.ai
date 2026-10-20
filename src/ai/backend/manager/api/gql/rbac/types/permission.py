@@ -500,6 +500,19 @@ class DeletePermissionPayload(PydanticOutputMixin[DeletePermissionPayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted permission.")
 
 
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for permission purge.",
+    ),
+    model=DeletePermissionPayloadDTO,
+    name="PurgePermissionPayload",
+)
+class PurgePermissionPayload(PydanticOutputMixin[DeletePermissionPayloadDTO]):
+    purged_id: strawberry.ID = gql_field(description="Global ID of the purged permission.")
+    field_id: UUID = gql_field(description="UUID of the purged permission.")
+
+
 # -------- Bulk role-permission payloads --------
 
 

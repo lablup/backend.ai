@@ -46,7 +46,7 @@ from ai.backend.common.dto.manager.v2.reservoir_registry.response import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.artifact_registry_meta import ArtifactRegistryMetaConnection
-from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid, to_global_id
 from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -336,7 +336,21 @@ class PartialBulkPurgeReservoirRegistriesInputGQL(
     name="PurgeReservoirRegistryPayload",
 )
 class PurgeReservoirRegistryPayloadGQL(PydanticOutputMixin[PurgeReservoirRegistryPayloadDTO]):
-    id: UUID = gql_field(description="ID of the purged Reservoir registry.")
+    id: UUID = gql_field(
+        description="ID of the purged Reservoir registry.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged Reservoir registry.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="UUID of the purged Reservoir registry."
+        ),
+    )
 
 
 @gql_pydantic_type(
@@ -394,7 +408,9 @@ async def purge_reservoir_registry(
     id: UUID,
 ) -> PurgeReservoirRegistryPayloadGQL:
     payload = await info.context.adapters.reservoir_registry.purge(id)
-    return PurgeReservoirRegistryPayloadGQL.from_pydantic(payload)
+    return PurgeReservoirRegistryPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(ReservoirRegistry, payload.entity_id)}
+    )
 
 
 @gql_mutation(
@@ -424,4 +440,12 @@ async def partial_bulk_purge_reservoir_registries(
     input: PartialBulkPurgeReservoirRegistriesInputGQL,
 ) -> PartialBulkPurgeReservoirRegistriesPayloadGQL:
     payload = await info.context.adapters.reservoir_registry.partial_bulk_purge(input.to_pydantic())
-    return PartialBulkPurgeReservoirRegistriesPayloadGQL.from_pydantic(payload)
+    return PartialBulkPurgeReservoirRegistriesPayloadGQL(
+        successes=[
+            PurgeReservoirRegistryPayloadGQL.from_pydantic(
+                purged, extra={"purged_id": to_global_id(ReservoirRegistry, purged.entity_id)}
+            )
+            for purged in payload.successes
+        ],
+        failed=[PartialBulkFailureGQL.from_pydantic(failure) for failure in payload.failed],
+    )

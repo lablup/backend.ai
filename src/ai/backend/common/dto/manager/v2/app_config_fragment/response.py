@@ -80,6 +80,7 @@ class PurgeAppConfigFragmentPayload(BaseResponseModel):
     """Payload for app config fragment purge."""
 
     id: AppConfigFragmentID = Field(description="Id of the purged app config fragment.")
+    entity_id: UUID = Field(description="UUID of the purged app config fragment. Added in 26.10.0.")
 
 
 class AppConfigFragmentBulkErrorInfo(BaseResponseModel):

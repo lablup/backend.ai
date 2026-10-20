@@ -361,7 +361,16 @@ class UpdateVFolderPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]):
     name="DeleteVFolderV2Payload",
 )
 class DeleteVFolderPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
-    id: UUID = gql_field(description="ID of the deleted virtual folder.")
+    id: UUID = gql_field(
+        description="ID of the deleted virtual folder.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `vfolder`.",
+    )
+    vfolder: VFolderGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The soft-deleted virtual folder.",
+        ),
+    )
 
 
 @gql_pydantic_type(
@@ -373,7 +382,16 @@ class DeleteVFolderPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
     name="PurgeVFolderV2Payload",
 )
 class PurgeVFolderPayloadGQL(PydanticOutputMixin[PurgePayloadDTO]):
-    id: UUID = gql_field(description="ID of the purged virtual folder.")
+    id: UUID = gql_field(
+        description="ID of the purged virtual folder.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `vfolder`.",
+    )
+    vfolder: VFolderGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The virtual folder being purged.",
+        ),
+    )
 
 
 @gql_pydantic_type(

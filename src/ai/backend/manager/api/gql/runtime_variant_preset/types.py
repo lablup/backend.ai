@@ -593,6 +593,21 @@ class DeleteRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]
     id: UUID = gql_field(description="ID of the deleted preset.")
 
 
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for runtime variant preset purge.",
+    ),
+    model=DeletePayloadDTO,
+    name="PurgeRuntimeVariantPresetPayload",
+)
+class PurgeRuntimeVariantPresetPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
+    purged_id: strawberry.ID = gql_field(
+        description="Global ID of the purged runtime variant preset."
+    )
+    entity_id: UUID = gql_field(description="UUID of the purged runtime variant preset.")
+
+
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,

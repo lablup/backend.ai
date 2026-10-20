@@ -163,12 +163,14 @@ class DeleteVFolderPayload(BaseResponseModel):
     """Payload for virtual folder soft-deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted virtual folder")
+    vfolder: VFolderNode = Field(description="The soft-deleted virtual folder. Added in 26.10.0.")
 
 
 class PurgeVFolderPayload(BaseResponseModel):
     """Payload for virtual folder purge mutation result."""
 
     id: UUID = Field(description="ID of the purged virtual folder.")
+    vfolder: VFolderNode = Field(description="The virtual folder being purged. Added in 26.10.0.")
 
 
 class BulkDeleteVFolderV2Error(BaseResponseModel):

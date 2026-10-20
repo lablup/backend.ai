@@ -89,6 +89,7 @@ class PurgeRolePresetPayload(BaseResponseModel):
     """Payload for role preset purge."""
 
     role_preset: RolePresetNode = Field(description="Purged role preset, as it stood.")
+    entity_id: UUID = Field(description="UUID of the purged role preset. Added in 26.10.0.")
 
 
 class BulkRolePresetFailureInfo(BaseResponseModel):

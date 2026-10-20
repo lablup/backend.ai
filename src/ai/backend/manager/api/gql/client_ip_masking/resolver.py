@@ -10,12 +10,15 @@ from ai.backend.common.dto.manager.v2.client_ip_masking.request import (
     AdminSearchClientIPMaskingPoliciesInput,
     ClientIPMaskingPolicyOrder,
 )
+from ai.backend.common.dto.manager.v2.client_ip_masking.response import (
+    PurgeClientIPMaskingPolicyPayload,
+)
 from ai.backend.common.dto.manager.v2.client_ip_masking.types import (
     ClientIPMaskingPolicyOrderField,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.client_ip_masking.types import (
     ClientIPMaskingPolicyConnectionGQL,
     ClientIPMaskingPolicyEdgeGQL,
@@ -25,6 +28,7 @@ from ai.backend.manager.api.gql.client_ip_masking.types import (
     ClientIPMaskingPolicyPayloadGQL,
     PartialBulkClientIPMaskingPoliciesPayloadGQL,
     PartialBulkPurgeClientIPMaskingPoliciesInputGQL,
+    PurgeClientIPMaskingPolicyPayloadGQL,
     UpsertClientIPMaskingPolicyInputGQL,
 )
 from ai.backend.manager.api.gql.decorators import (
@@ -114,9 +118,12 @@ async def upsert_client_ip_masking_policy(
 async def purge_client_ip_masking_policy(
     info: Info[StrawberryGQLContext],
     id: UUID,
-) -> ClientIPMaskingPolicyPayloadGQL:
+) -> PurgeClientIPMaskingPolicyPayloadGQL:
     payload = await info.context.adapters.client_ip_masking.purge(ClientIPMaskingPolicyID(id))
-    return ClientIPMaskingPolicyPayloadGQL.from_pydantic(payload)
+    return PurgeClientIPMaskingPolicyPayloadGQL.from_pydantic(
+        PurgeClientIPMaskingPolicyPayload(entity_id=payload.policy.entity_id),
+        extra={"purged_id": to_global_id(ClientIPMaskingPolicyGQL, payload.policy.id)},
+    )
 
 
 @gql_mutation(

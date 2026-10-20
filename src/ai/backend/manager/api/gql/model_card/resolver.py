@@ -29,7 +29,7 @@ from ai.backend.common.dto.manager.v2.model_card.types import ModelCardOrderFiel
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.deployment.types.revision_preset import (
     DeploymentRevisionPresetConnection,
@@ -59,6 +59,7 @@ from ai.backend.manager.api.gql.model_card.types import (
     PartialBulkPurgeModelCardsInputGQL,
     PartialBulkUpdateModelCardsInputGQL,
     ProjectModelCardScopeGQL,
+    PurgeModelCardPayloadGQL,
     ScanProjectModelCardsPayloadGQL,
     UpdateModelCardInputGQL,
     UpdateModelCardPayloadGQL,
@@ -287,10 +288,12 @@ async def purge_model_card_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
     options: DeleteModelCardOptionsGQL | None = None,
-) -> DeleteModelCardPayloadGQL:
+) -> PurgeModelCardPayloadGQL:
     options_dto = options.to_pydantic() if options is not None else DeleteModelCardOptions()
     payload = await info.context.adapters.model_card.purge(id, options=options_dto)
-    return DeleteModelCardPayloadGQL.from_pydantic(payload)
+    return PurgeModelCardPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(ModelCardGQL, payload.entity_id)}
+    )
 
 
 @gql_mutation(

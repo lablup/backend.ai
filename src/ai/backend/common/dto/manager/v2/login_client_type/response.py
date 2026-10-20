@@ -48,12 +48,14 @@ class DeleteLoginClientTypePayload(BaseResponseModel):
     """Payload for login client type deletion."""
 
     id: UUID = Field(description="UUID of the deleted login client type.")
+    entity_id: UUID = Field(description="UUID of the deleted login client type. Added in 26.10.0.")
 
 
 class PurgeLoginClientTypePayload(BaseResponseModel):
     """Payload for login client type purge."""
 
     id: UUID = Field(description="UUID of the purged login client type.")
+    entity_id: UUID = Field(description="UUID of the purged login client type. Added in 26.10.0.")
 
 
 class SearchLoginClientTypesPayload(BaseResponseModel):

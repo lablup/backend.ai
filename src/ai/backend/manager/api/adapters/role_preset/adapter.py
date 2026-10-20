@@ -299,7 +299,8 @@ class RolePresetAdapter(BaseAdapter):
     async def purge(self, role_preset_id: RolePresetID) -> PurgeRolePresetPayload:
         """Purge a role preset together with its permission entries."""
         result = await self._role_preset.purge.run(PurgeRolePresetAction(preset_id=role_preset_id))
-        return PurgeRolePresetPayload(role_preset=self._data_to_node(result.data))
+        node = self._data_to_node(result.data)
+        return PurgeRolePresetPayload(role_preset=node, entity_id=node.entity_id)
 
     async def partial_bulk_update(
         self, input: PartialBulkUpdateRolePresetsInput

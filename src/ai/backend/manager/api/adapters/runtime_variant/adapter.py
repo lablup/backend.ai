@@ -178,7 +178,7 @@ class RuntimeVariantAdapter(BaseAdapter):
         result = await self._runtime_variant.purge.run(
             PurgeRuntimeVariantAction(id=RuntimeVariantID(variant_id))
         )
-        return DeleteRuntimeVariantPayload(id=result.data.id)
+        return DeleteRuntimeVariantPayload(id=result.data.id, entity_id=result.data.id)
 
     async def partial_bulk_update(
         self, input: PartialBulkUpdateRuntimeVariantsInput

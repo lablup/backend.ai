@@ -12,7 +12,7 @@ from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     SearchAppConfigAllowListInput,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -148,7 +148,9 @@ async def purge_app_config_allow_list(
     input: PurgeAppConfigAllowListInputGQL,
 ) -> PurgeAppConfigAllowListPayloadGQL:
     payload = await info.context.adapters.app_config_allow_list.purge(input.to_pydantic())
-    return PurgeAppConfigAllowListPayloadGQL.from_pydantic(payload)
+    return PurgeAppConfigAllowListPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(AppConfigAllowListGQL, payload.entity_id)}
+    )
 
 
 @gql_mutation(
@@ -214,4 +216,6 @@ async def admin_purge_app_config_allow_list(
 ) -> PurgeAppConfigAllowListPayloadGQL | None:
     check_admin_only()
     payload = await info.context.adapters.app_config_allow_list.purge(input.to_pydantic())
-    return PurgeAppConfigAllowListPayloadGQL.from_pydantic(payload)
+    return PurgeAppConfigAllowListPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(AppConfigAllowListGQL, payload.entity_id)}
+    )

@@ -134,6 +134,7 @@ class AdminDeleteKeypairPayload(BaseResponseModel):
     """Payload returned after admin deletes a keypair."""
 
     access_key: str = Field(description="The access key of the deleted keypair.")
+    field_id: UUID = Field(description="UUID of the deleted keypair. Added in 26.10.0.")
 
 
 class AdminSearchKeypairsPayload(BaseResponseModel):

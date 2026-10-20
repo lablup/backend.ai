@@ -371,22 +371,25 @@ class TestDeleteNotificationChannelPayload:
 
     def test_creation_with_uuid(self) -> None:
         channel_id = uuid.uuid4()
-        payload = DeleteNotificationChannelPayload(id=channel_id)
+        payload = DeleteNotificationChannelPayload(id=channel_id, entity_id=channel_id)
         assert payload.id == channel_id
 
     def test_id_is_uuid_instance(self) -> None:
         channel_id = uuid.uuid4()
-        payload = DeleteNotificationChannelPayload(id=channel_id)
+        payload = DeleteNotificationChannelPayload(id=channel_id, entity_id=channel_id)
         assert isinstance(payload.id, uuid.UUID)
 
     def test_creation_from_uuid_string(self) -> None:
         channel_id = uuid.uuid4()
-        payload = DeleteNotificationChannelPayload.model_validate({"id": str(channel_id)})
+        payload = DeleteNotificationChannelPayload.model_validate({
+            "id": str(channel_id),
+            "entity_id": str(channel_id),
+        })
         assert payload.id == channel_id
 
     def test_round_trip_serialization(self) -> None:
         channel_id = uuid.uuid4()
-        payload = DeleteNotificationChannelPayload(id=channel_id)
+        payload = DeleteNotificationChannelPayload(id=channel_id, entity_id=channel_id)
         json_str = payload.model_dump_json()
         restored = DeleteNotificationChannelPayload.model_validate_json(json_str)
         assert restored.id == channel_id
@@ -471,22 +474,25 @@ class TestDeleteNotificationRulePayload:
 
     def test_creation_with_uuid(self) -> None:
         rule_id = uuid.uuid4()
-        payload = DeleteNotificationRulePayload(id=rule_id)
+        payload = DeleteNotificationRulePayload(id=rule_id, entity_id=rule_id)
         assert payload.id == rule_id
 
     def test_id_is_uuid_instance(self) -> None:
         rule_id = uuid.uuid4()
-        payload = DeleteNotificationRulePayload(id=rule_id)
+        payload = DeleteNotificationRulePayload(id=rule_id, entity_id=rule_id)
         assert isinstance(payload.id, uuid.UUID)
 
     def test_creation_from_uuid_string(self) -> None:
         rule_id = uuid.uuid4()
-        payload = DeleteNotificationRulePayload.model_validate({"id": str(rule_id)})
+        payload = DeleteNotificationRulePayload.model_validate({
+            "id": str(rule_id),
+            "entity_id": str(rule_id),
+        })
         assert payload.id == rule_id
 
     def test_round_trip_serialization(self) -> None:
         rule_id = uuid.uuid4()
-        payload = DeleteNotificationRulePayload(id=rule_id)
+        payload = DeleteNotificationRulePayload(id=rule_id, entity_id=rule_id)
         json_str = payload.model_dump_json()
         restored = DeleteNotificationRulePayload.model_validate_json(json_str)
         assert restored.id == rule_id

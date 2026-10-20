@@ -375,23 +375,26 @@ class UserDBSource:
         async with self._db.begin_session() as session:
             return await self._update_single_user_validated(session, updater)
 
-    async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> None:
+    async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> UserData:
         """Soft delete a user by UUID, setting status to DELETED.
 
         The user's keypairs are left active: what keeps a deleted account out of the
         API is the status gate the auth middleware applies.
         """
-        async with self._db.begin() as conn:
-            result = await conn.execute(
-                sa.update(users)
+        async with self._db.begin_session() as session:
+            result = await session.execute(
+                sa.update(UserRow)
                 .values(status=UserStatus.DELETED, status_info="admin-requested")
                 .where(
-                    (users.c.uuid == user_uuid)
-                    & users.c.status.not_in(UserStatus.purge_in_progress())
+                    (UserRow.uuid == user_uuid)
+                    & UserRow.status.not_in(UserStatus.purge_in_progress())
                 )
+                .returning(UserRow)
             )
-            if result.rowcount == 0:
-                await self._raise_missing_or_purging(conn, user_uuid)
+            deleted_user = result.scalars().one_or_none()
+            if deleted_user is None:
+                await self._raise_missing_or_purging(await session.connection(), user_uuid)
+            return UserSearchableFields.own.to_data(deleted_user)
 
     async def restore_user_by_uuid_validated(self, user_uuid: UUID) -> None:
         """Restore a soft-deleted user by UUID, setting status back to ACTIVE."""

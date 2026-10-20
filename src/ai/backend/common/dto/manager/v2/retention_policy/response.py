@@ -34,10 +34,12 @@ class UpdateRetentionPolicyPayload(BaseResponseModel):
 
 class DeleteRetentionPolicyPayload(BaseResponseModel):
     id: UUID = Field(description="ID of the deleted retention policy.")
+    entity_id: UUID = Field(description="UUID of the deleted retention policy. Added in 26.10.0.")
 
 
 class PurgeRetentionPolicyPayload(BaseResponseModel):
     id: UUID = Field(description="ID of the purged retention policy.")
+    entity_id: UUID = Field(description="UUID of the purged retention policy. Added in 26.10.0.")
 
 
 class SearchRetentionPoliciesPayload(BaseResponseModel):

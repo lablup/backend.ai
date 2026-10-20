@@ -175,11 +175,12 @@ class TestDeleteResourceGroupPayload:
 
     def test_valid_creation(self) -> None:
         rg_id = ResourceGroupID(uuid.uuid4())
-        payload = DeleteResourceGroupPayload(id=rg_id)
+        payload = DeleteResourceGroupPayload(id=rg_id, entity_id=rg_id)
         assert payload.id == rg_id
 
     def test_round_trip(self) -> None:
-        payload = DeleteResourceGroupPayload(id=ResourceGroupID(uuid.uuid4()))
+        rg_id = ResourceGroupID(uuid.uuid4())
+        payload = DeleteResourceGroupPayload(id=rg_id, entity_id=rg_id)
         json_data = payload.model_dump_json()
         restored = DeleteResourceGroupPayload.model_validate_json(json_data)
         assert restored.id == payload.id

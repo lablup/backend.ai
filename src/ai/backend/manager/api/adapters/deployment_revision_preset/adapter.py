@@ -371,7 +371,7 @@ class DeploymentRevisionPresetAdapter(BaseAdapter):
         result = await self._deployment_revision_preset.purge.run(
             PurgeDeploymentPresetAction(preset_id=DeploymentPresetID(preset_id))
         )
-        return DeleteDeploymentRevisionPresetPayload(id=result.data.id)
+        return DeleteDeploymentRevisionPresetPayload(id=result.data.id, entity_id=result.data.id)
 
     async def partial_bulk_update(
         self, input: PartialBulkUpdateDeploymentRevisionPresetsInput

@@ -1108,6 +1108,19 @@ class DeleteResourceGroupPayloadGQL(PydanticOutputMixin[DeleteResourceGroupPaylo
     )
 
 
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for resource group purge.",
+    ),
+    model=DeleteResourceGroupPayloadDTO,
+    name="PurgeResourceGroupPayload",
+)
+class PurgeResourceGroupPayloadGQL(PydanticOutputMixin[DeleteResourceGroupPayloadDTO]):
+    purged_id: strawberry.ID = gql_field(description="Global ID of the purged resource group.")
+    entity_id: UUID = gql_field(description="UUID of the purged resource group.")
+
+
 # Allow / Disallow types
 
 
