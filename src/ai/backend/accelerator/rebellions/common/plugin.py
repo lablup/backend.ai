@@ -132,6 +132,8 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
             self.enabled = False
 
     async def list_devices(self) -> list[TATOMDevice]:
+        if not self.enabled:
+            return []
         if self._all_devices is None:
             devices = await self._list_devices()
             self._all_devices = devices

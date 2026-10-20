@@ -423,7 +423,7 @@ class TestStatPathConfig:
         which.assert_not_called()
         assert plugin._rbln_stat_path == "/opt/rbln/rbln-smi"
 
-    async def test_missing_executable_disables_and_skips_node_stats(self) -> None:
+    async def test_missing_executable_disables_and_reports_no_devices(self) -> None:
         plugin = Rebel100Plugin.__new__(Rebel100Plugin)
         plugin.plugin_config = {}
         with (
@@ -438,5 +438,7 @@ class TestStatPathConfig:
         ):
             await plugin.init()
         assert not plugin.enabled
+        assert await plugin.list_devices() == []
+        assert await plugin.available_slots() == {SlotName("rebel100.device"): Decimal(0)}
         measures = await plugin.gather_node_measures(MagicMock())
         assert all(m.per_node.value == 0 for m in measures)
