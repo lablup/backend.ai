@@ -6,7 +6,6 @@ from typing import Self, override
 
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.types import SessionId
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.base import BasePartialBulkAction
 
@@ -18,7 +17,7 @@ class BulkGetSessionDesignatedAgentsAction(BasePartialBulkAction):
     Answered for by each session the ids name.
     """
 
-    session_ids: list[SessionId]
+    session_ids: list[SessionID]
 
     @override
     @classmethod
@@ -32,12 +31,12 @@ class BulkGetSessionDesignatedAgentsAction(BasePartialBulkAction):
 
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:
-        return [SessionID(_id) for _id in self.session_ids]
+        return self.session_ids
 
     @override
     def narrowed_to(self, entity_ids: Sequence[EntityIdentifier]) -> Self:
         allowed = frozenset(entity_ids)
         return replace(
             self,
-            session_ids=[sid for sid in self.session_ids if SessionID(sid) in allowed],
+            session_ids=[sid for sid in self.session_ids if sid in allowed],
         )
