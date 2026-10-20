@@ -15,7 +15,7 @@ from aiodocker import Docker
 
 from ai.backend.accelerator.rebellions import __version__
 
-from .atom_api import ATOMAPI, ATOMDeviceStat, LibraryError
+from .atom_api import ATOMAPI, DEFAULT_STAT_ARGS, ATOMDeviceStat, LibraryError
 from .types import AbstractATOMDevice
 
 try:
@@ -53,9 +53,11 @@ from ai.backend.logging.structured import StructuredLogger
 
 _atom_config_iv = t.Dict({
     "general": t.Dict({
-        t.Key("rbln_stat_path"): t.Null | t.String,
+        t.Key("rbln_stat_path", default=None): t.Null | t.String(allow_blank=True),
         t.Key("enforce_singular_numa_affinity", default=False): t.Null | t.Bool,
-        t.Key("enable_rsd", default=True): t.Null | t.Bool,
+        t.Key("enable_rsd", default=None): t.Null | t.Bool,
+        t.Key("cdi_device_id", default=None): t.Null | t.String,
+        t.Key("device_ids_env_var", default=None): t.Null | t.String,
     }).allow_extra("*"),
 }).allow_extra("*")
 
@@ -73,6 +75,19 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
     enabled: bool = True
     atom_config: Any
 
+    # Name of the TOML config file read at init (`<config_name>.toml`).
+    config_name: str = "atom"
+    # Executables looked up in PATH when `rbln_stat_path` is not configured, in order.
+    executable_names: Sequence[str] = ("rbln-stat",)
+    # Arguments of the stat tool that print the device list as JSON.
+    stat_args: Sequence[str] = DEFAULT_STAT_ARGS
+    # CDI device id requested for the container runtime; overridable in config.
+    cdi_device_id: str = "rebellions.ai/npu=runtime"
+    # Container env var carrying "local:global" device ids; overridable in config.
+    device_ids_env_var: str = "ATOM_GLOBAL_DEVICE_IDS"
+    # Used when `enable_rsd` is not set in the config.
+    enable_rsd_default: bool = True
+
     _rbln_stat_path: str
     _all_devices: list[TATOMDevice] | None
     _enable_rsd: bool
@@ -86,16 +101,26 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
                 *map(lambda dev_id: DeviceId(dev_id), raw_device_mask.split(",")),
             ]
 
-        raw_cfg, cfg_src_path = config.read_from_file(None, "atom")
+        raw_cfg, cfg_src_path = config.read_from_file(None, self.config_name)
         self.atom_config = _atom_config_iv.check(raw_cfg)
         log.info("device config loaded", plugin_name=self.key, config_path=str(cfg_src_path))
-        _rbln_stat_path = self.atom_config["general"]["rbln_stat_path"] or shutil.which("rbln-stat")
+        general_cfg = self.atom_config["general"]
+        self.cdi_device_id = general_cfg["cdi_device_id"] or type(self).cdi_device_id
+        self.device_ids_env_var = general_cfg["device_ids_env_var"] or type(self).device_ids_env_var
+        _rbln_stat_path = general_cfg["rbln_stat_path"] or next(
+            (p for name in self.executable_names if (p := shutil.which(name))), None
+        )
         if _rbln_stat_path is None:
-            log.error("accelerator disabled: rbln-stat executable not found", plugin_name=self.key)
+            log.error(
+                "accelerator disabled: rbln executable not found",
+                plugin_name=self.key,
+                searched=list(self.executable_names),
+            )
             self.enabled = False
             return
         self._rbln_stat_path = _rbln_stat_path
-        self._enable_rsd = self.atom_config["general"]["enable_rsd"]
+        enable_rsd = general_cfg["enable_rsd"]
+        self._enable_rsd = type(self).enable_rsd_default if enable_rsd is None else enable_rsd
         try:
             detected_devices = await self.list_devices()
             log.debug("detected devices:\n{}", pformat(detected_devices))
@@ -107,6 +132,8 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
             self.enabled = False
 
     async def list_devices(self) -> list[TATOMDevice]:
+        if not self.enabled:
+            return []
         if self._all_devices is None:
             devices = await self._list_devices()
             self._all_devices = devices
@@ -144,8 +171,8 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
 
         stat_prefix = self.key.replace("-", "_")
 
-        stats = await ATOMAPI.get_stats(self._rbln_stat_path)
         if self.enabled:
+            stats = await ATOMAPI.get_stats(self._rbln_stat_path, self.stat_args)
             for device in await self.list_devices():
                 device_id = device.device_id
                 pci_bus_id = device.hw_location
@@ -182,6 +209,10 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
             ),
         ]
 
+    def _container_device_files(self, container_info: Mapping[str, Any]) -> list[str]:
+        """Host device files of the cards attached to a container."""
+        return [d["PathOnHost"] for d in container_info["HostConfig"]["Devices"]]
+
     async def gather_container_measures(
         self,
         ctx: StatContext,
@@ -202,7 +233,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
 
             # rbln-stat returns all devices
             # filtering devices relevant to actual containers is necessary
-            stats = await ATOMAPI.get_stats(self._rbln_stat_path)
+            stats = await ATOMAPI.get_stats(self._rbln_stat_path, self.stat_args)
             device_stats_by_device_filename: dict[str, ATOMDeviceStat] = {}
             for device_stat in stats.devices:
                 device_filename = "/dev/" + device_stat.device
@@ -215,9 +246,9 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
                     util_stats[cid] = Decimal("0")
                     number_of_devices_per_container[cid] = 0
                     container_info = await docker.containers.get(cid)
-                    for device in container_info["HostConfig"]["Devices"]:
-                        if device["PathOnHost"] in device_stats_by_device_filename:
-                            device_stat = device_stats_by_device_filename[device["PathOnHost"]]
+                    for path in self._container_device_files(container_info):
+                        if path in device_stats_by_device_filename:
+                            device_stat = device_stats_by_device_filename[path]
                             mem_stats[cid] += int(device_stat.memory.used)
                             mem_sizes[cid] += int(device_stat.memory.total)
                             util_stats[cid] += Decimal(device_stat.util)
@@ -350,7 +381,7 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
                     {
                         "Driver": "cdi",
                         "Count": 0,
-                        "DeviceIDs": ["rebellions.ai/npu=runtime"],
+                        "DeviceIDs": [self.cdi_device_id],
                         "Capabilities": None,
                     }
                 ],
@@ -430,12 +461,11 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
                 if alloc > 0:
                     active_device_id_set.add(dev_id)
         active_device_ids = sorted(active_device_id_set, key=lambda v: int(v.replace("rbln", "")))
-        data["ATOM_GLOBAL_DEVICE_IDS"] = ",".join(
+        data[self.device_ids_env_var] = ",".join(
             f"{local_idx}:{global_id}" for local_idx, global_id in enumerate(active_device_ids)
         )
         return data
 
-    @abstractmethod
     async def _group_npus(self, devices: list[TATOMDevice]) -> int:
         raise NotImplementedError
 

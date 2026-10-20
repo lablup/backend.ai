@@ -38,7 +38,7 @@ class ATOMMaxPlugin(AbstractATOMPlugin[ATOMMaxDevice]):
     _all_devices: list[ATOMMaxDevice] | None
 
     async def _list_devices(self) -> list[ATOMMaxDevice]:
-        stats = await ATOMAPI.get_stats(self._rbln_stat_path)
+        stats = await ATOMAPI.get_stats(self._rbln_stat_path, self.stat_args)
         devices: list[ATOMMaxDevice] = []
         devices_by_sid: defaultdict[DeviceId, list[ATOMMaxChildDevice]] = defaultdict(list)
         for device_info in stats.devices:
@@ -87,7 +87,7 @@ class ATOMMaxPlugin(AbstractATOMPlugin[ATOMMaxDevice]):
 
         stat_prefix = self.key.replace("-", "_")
 
-        stats = await ATOMAPI.get_stats(self._rbln_stat_path)
+        stats = await ATOMAPI.get_stats(self._rbln_stat_path, self.stat_args)
         if self.enabled:
             for device in await self.list_devices():
                 device_id = device.device_id
@@ -147,7 +147,7 @@ class ATOMMaxPlugin(AbstractATOMPlugin[ATOMMaxDevice]):
         for d in live_devices:
             if d.device_id in unique_ids:
                 device_indexes.extend([dd.rbln_stat_info.npu for dd in d.children])
-        return await ATOMAPI.create_group(self._rbln_stat_path, device_indexes)
+        return await ATOMAPI.create_group(self._rbln_stat_path, device_indexes, self.stat_args)
 
     async def list_device_files(self, device: ATOMMaxDevice) -> Iterable[str]:
         return [f"/dev/{c.rbln_stat_info.device}" for c in device.children]
