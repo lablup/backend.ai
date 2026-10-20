@@ -4953,11 +4953,19 @@ enum DeploymentHistoryOrderField {
 type DeploymentOptionsInfo {
   """Handler-keyed scheduler policy (timeout + retry)."""
   handlerOptions: DeploymentHandlerOptionsInfo!
+
+  """Added in 26.10.0. How the designated agents are enforced."""
+  agentSelectionPolicy: SessionAgentSelectionPolicy!
 }
 
 """Added in 26.4.4. Deployment options payload input."""
 input DeploymentOptionsInput {
   handlerOptions: DeploymentHandlerOptionsInput!
+
+  """
+  Added in 26.10.0. How the designated agents are enforced. null keeps the stored policy.
+  """
+  agentSelectionPolicy: SessionAgentSelectionPolicy = null
 }
 
 """Added in 25.19.0. """
@@ -9883,6 +9891,11 @@ type Mutation {
 
   """Added in 25.16.0. Delete model deployment."""
   deleteModelDeployment(input: DeleteDeploymentInput!): DeleteDeploymentPayload
+
+  """
+  Added in 26.10.0. Fully replace the ``options`` surface of a deployment. Replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
+  """
+  replaceDeploymentOptions(input: ReplaceDeploymentOptionsInput!): ReplaceDeploymentOptionsPayload
 
   """
   Added in 25.16.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers.
@@ -16370,6 +16383,25 @@ Added in 26.4.4. Input for rejecting a role invitation. Deprecated since 26.9.0.
 """
 input RejectRoleInvitationInput {
   invitationId: UUID!
+}
+
+"""
+Added in 26.10.0. Input for the replaceDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
+"""
+input ReplaceDeploymentOptionsInput {
+  deploymentId: UUID!
+  options: DeploymentOptionsInput!
+}
+
+"""
+Added in 26.10.0. Payload returned after replacing a deployment's options. Only the refreshed options surface is returned.
+"""
+type ReplaceDeploymentOptionsPayload {
+  """ID of the deployment whose ``options`` were replaced."""
+  deploymentId: ID!
+
+  """The newly persisted ``options`` surface."""
+  options: DeploymentOptionsInfo!
 }
 
 """
