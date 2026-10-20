@@ -885,13 +885,11 @@ class DeploymentAdapter(BaseAdapter):
     ) -> ReplaceDeploymentOptionsPayload:
         """Fully replace the ``options`` surface of a deployment.
 
-        Accepts the REST/GQL DTO input, converts to the domain
-        :class:`DeploymentOptions` (duplicate or unknown handler names
-        are rejected inside :func:`deployment_handler_options_from_input`
-        against the coordinator's live registration), dispatches the
-        :class:`ReplaceDeploymentOptionsAction`, and returns only the
-        refreshed options surface (the repository path uses ``UPDATE ...
-        RETURNING`` and does not read the surrounding deployment node).
+        Converts the handler options to the domain
+        :class:`DeploymentHandlerOptions` (duplicate or unknown handler names
+        are rejected inside :func:`deployment_handler_options_from_input`),
+        passes the agent selection policy apart, and returns only the
+        refreshed options surface.
         """
         handler_options = deployment_handler_options_from_input(
             input.options,
