@@ -35,6 +35,12 @@ class FrontendServerMode(enum.StrEnum):
     TRAEFIK = "traefik"
 
 
+class IngressUpdateMode(enum.StrEnum):
+    CIRCUIT = "circuit"
+    API = "api"
+    REDIS = "redis"
+
+
 class ProxyProtocol(enum.StrEnum):
     HTTP = "http"
     GRPC = "grpc"

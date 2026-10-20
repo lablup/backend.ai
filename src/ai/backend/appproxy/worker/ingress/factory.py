@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ai.backend.appproxy.common.types import IngressUpdateMode
 from ai.backend.appproxy.worker.config import IngressConfig, IngressLayerType
 from ai.backend.appproxy.worker.ingress.abc import IngressReader
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
@@ -16,8 +17,8 @@ from ai.backend.common.exception import InvalidConfigError
 @dataclass(frozen=True)
 class IngressState:
     reader: LayeredIngressState
-    writer: ValidatingIngressWriter | None
-    """None when the worker holds no in-memory layer."""
+    api_writer: ValidatingIngressWriter | None
+    circuit_writer: ValidatingIngressWriter | None
 
 
 class IngressStateFactory:
@@ -46,7 +47,11 @@ class IngressStateFactory:
                     readers.append(self._redis())
         if not readers:
             raise InvalidConfigError("No ingress layer is configured")
-        return IngressState(reader=LayeredIngressState(readers, in_memory=in_memory), writer=writer)
+        return IngressState(
+            reader=LayeredIngressState(readers, in_memory=in_memory),
+            api_writer=writer if self._config.mode == IngressUpdateMode.API else None,
+            circuit_writer=writer if self._config.mode == IngressUpdateMode.CIRCUIT else None,
+        )
 
     def _in_memory(self) -> InMemoryIngressState:
         return InMemoryIngressState(

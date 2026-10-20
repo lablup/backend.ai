@@ -45,6 +45,9 @@ from ai.backend.appproxy.common.defs import (
     ERROR_TEMPLATE_NAME,
     MEDIA_TYPE_HTML,
     MEDIA_TYPE_JSON,
+    WORKER_AUTHORITY_LABEL,
+    WORKER_INGRESS_MODE_LABEL,
+    WORKER_SERVICE_GROUP,
 )
 from ai.backend.appproxy.common.errors import (
     CoordinatorConnectionError,
@@ -529,7 +532,7 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     for circuit in circuits:
         await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info)
     # Applied rather than replaced, so circuits from events handled meanwhile are kept.
-    ingress_writer = root_ctx.ingress_state.writer
+    ingress_writer = root_ctx.ingress_state.circuit_writer
     if ingress_writer is not None:
         ingress_authority = IngressAuthority(root_ctx.local_config.proxy_worker.authority)
         await ingress_writer.apply([circuit.to_ingress(ingress_authority) for circuit in circuits])
@@ -597,7 +600,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         service_discovery,
         ServiceMetadata.for_endpoint(
             display_name=f"appproxy-worker-{root_ctx.local_config.proxy_worker.authority}",
-            service_group="appproxy-worker",
+            service_group=WORKER_SERVICE_GROUP,
             version=__version__,
             endpoint=ServiceEndpoint(
                 address=announce_addr.host,
@@ -606,6 +609,10 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 # It can be separated into an internal-purpose port later.
                 prometheus_address=str(announce_addr),
             ),
+            labels={
+                WORKER_AUTHORITY_LABEL: root_ctx.local_config.proxy_worker.authority,
+                WORKER_INGRESS_MODE_LABEL: root_ctx.local_config.proxy_worker.ingress.mode,
+            },
         ),
     )
 
@@ -732,7 +739,7 @@ async def handle_proxy_route_event(
     if event.target_worker_authority != context.local_config.proxy_worker.authority:
         return
 
-    ingress_writer = context.ingress_state.writer
+    ingress_writer = context.ingress_state.circuit_writer
     ingress_authority = IngressAuthority(context.local_config.proxy_worker.authority)
     match event:
         case AppProxyCircuitCreatedEvent():

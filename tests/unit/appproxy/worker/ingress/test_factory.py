@@ -30,16 +30,16 @@ class TestIngressStateFactory:
         state = _create(["in-memory"], valkey_client)
         [in_memory] = state.reader.layers
         assert isinstance(in_memory, InMemoryIngressState)
-        assert isinstance(state.writer, ValidatingIngressWriter)
+        assert isinstance(state.circuit_writer, ValidatingIngressWriter)
 
     def test_in_memory_and_redis_read_in_order(self, valkey_client: ValkeyLiveClient) -> None:
         state = _create(["in-memory", "redis"], valkey_client)
         in_memory, redis = state.reader.layers
         assert isinstance(in_memory, InMemoryIngressState)
         assert isinstance(redis, RedisIngressState)
-        assert isinstance(state.writer, ValidatingIngressWriter)
+        assert isinstance(state.circuit_writer, ValidatingIngressWriter)
 
     def test_redis_only_has_no_writer(self, valkey_client: ValkeyLiveClient) -> None:
         state = _create(["redis"], valkey_client)
         assert [type(layer) for layer in state.reader.layers] == [RedisIngressState]
-        assert state.writer is None
+        assert state.circuit_writer is None
