@@ -31,12 +31,15 @@ from ai.backend.common.dto.manager.v2.session_options.request import (
 from ai.backend.common.dto.manager.v2.session_options.request import (
     HandlerOptionsInput as HandlerOptionsInputDTO,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
+    gql_added_field,
     gql_pydantic_input,
     gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.session_options.types import AgentSelectionPolicyGQL
 
 
 @gql_pydantic_input(
@@ -137,3 +140,9 @@ class DeploymentHandlerOptionsInfoGQL:
 )
 class DeploymentOptionsInfoGQL:
     handler_options: DeploymentHandlerOptionsInfoGQL
+    agent_selection_policy: AgentSelectionPolicyGQL = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="How the designated agents are enforced.",
+        ),
+    )

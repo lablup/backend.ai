@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.deployment_options.response import (
     HandlerOptionsEntryInfo,
     HandlerOptionsInfo,
 )
+from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerOptions,
@@ -58,6 +59,7 @@ def deployment_options_to_info(options: DeploymentOptions) -> DeploymentOptionsI
     """Project the domain model to the API response DTO."""
     return DeploymentOptionsInfo(
         handler_options=_handler_options_to_info(options.handler_options),
+        agent_selection_policy=AgentSelectionPolicyEnum(options.agent_selection_policy.value),
     )
 
 
