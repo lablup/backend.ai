@@ -119,8 +119,7 @@ async def _run(db: ExtendedAsyncSAEngine, step: Callable[[Connection], None]) ->
 
 
 async def _move(db: ExtendedAsyncSAEngine) -> None:
-    await _run(db, revision.cancel_unplaceable_sessions)
-    await _run(db, revision.backfill_designations)
+    await _run(db, revision.move_designations)
 
 
 async def _designations(db: ExtendedAsyncSAEngine) -> set[tuple[uuid.UUID, uuid.UUID]]:
