@@ -416,7 +416,7 @@ class ProxyCoordinatorConfig(BaseSchema):
         BackendAIConfigMeta(
             description="Maximum bytes of a single request header. Larger ones get 400.",
             added_version=NEXT_RELEASE_VERSION,
-            example=ConfigExample(local="8190", prod="65536"),
+            example=ConfigExample(local="8190", prod="8190"),
         ),
     ]
     advertised_addr: Annotated[

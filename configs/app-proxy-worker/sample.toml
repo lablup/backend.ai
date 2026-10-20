@@ -85,7 +85,7 @@
   ## api_advertised_addr = { host = "worker.example.com", port = 10201 }
   # Maximum bytes of a single request header. Larger ones get 400.
   # Added in 26.10.0
-  max_header_field_size = 65536
+  max_header_field_size = 8190
   # The HTTP(S) URL of the proxy coordinator's API endpoint. The worker connects
   # to this endpoint to register itself, receive proxy configuration updates,
   # and report status. Use https:// in production for secure communication.
