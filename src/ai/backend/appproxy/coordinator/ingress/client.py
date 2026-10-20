@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from http import HTTPStatus
 
 import aiohttp
 
 from ai.backend.appproxy.common.config import SecretConfig
-from ai.backend.appproxy.coordinator.errors.ingress import ApiDeliveryWorkerRequestError
+from ai.backend.appproxy.coordinator.errors.ingress import (
+    ApiDeliveryWorkerRejectedError,
+    ApiDeliveryWorkerServerError,
+    ApiDeliveryWorkerUnreachableError,
+)
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.appproxy.v2.ingress.request import (
     IngressRemoveRequest,
@@ -73,17 +76,23 @@ class ApiDeliveryWorkerClient:
                 headers={_TOKEN_HEADER: self._secrets.api_secret},
             ) as resp:
                 body = await resp.read()
-                if resp.status >= HTTPStatus.BAD_REQUEST:
-                    raise ApiDeliveryWorkerRequestError(
-                        extra_msg=f"worker {self._addr} answered {resp.status}",
-                        extra_data={
-                            "worker_addr": self._addr,
-                            "status": resp.status,
-                            "body": body.decode(errors="replace"),
-                        },
-                    )
+                extra_msg = f"worker {self._addr} answered {resp.status}"
+                extra_data = {
+                    "worker_addr": self._addr,
+                    "status": resp.status,
+                    "body": body.decode(errors="replace"),
+                }
+                match resp.status // 100:
+                    case 4:
+                        raise ApiDeliveryWorkerRejectedError(
+                            extra_msg=extra_msg, extra_data=extra_data
+                        )
+                    case 5:
+                        raise ApiDeliveryWorkerServerError(
+                            extra_msg=extra_msg, extra_data=extra_data
+                        )
         except aiohttp.ClientError as e:
-            raise ApiDeliveryWorkerRequestError(
+            raise ApiDeliveryWorkerUnreachableError(
                 extra_msg=f"worker {self._addr} is unreachable",
                 extra_data={"worker_addr": self._addr},
             ) from e

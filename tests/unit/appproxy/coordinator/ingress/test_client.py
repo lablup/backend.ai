@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from http import HTTPStatus
 from unittest.mock import AsyncMock, MagicMock
 
@@ -7,7 +8,11 @@ import aiohttp
 import pytest
 
 from ai.backend.appproxy.common.config import SecretConfig
-from ai.backend.appproxy.coordinator.errors.ingress import ApiDeliveryWorkerRequestError
+from ai.backend.appproxy.coordinator.errors.ingress import (
+    ApiDeliveryWorkerRejectedError,
+    ApiDeliveryWorkerServerError,
+    ApiDeliveryWorkerUnreachableError,
+)
 from ai.backend.appproxy.coordinator.ingress.client import (
     ApiDeliveryWorkerClient,
     ApiDeliveryWorkerClientPool,
@@ -27,9 +32,16 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
     IngressTargetGroupID,
     PortFrontend,
 )
+from ai.backend.common.exception import BackendAIError
 
 API_SECRET = "api-secret"
 WORKER_ADDR = "10.0.0.1:10201"
+
+
+@dataclass(frozen=True)
+class _ErrorAnswerCase:
+    status: HTTPStatus
+    expected_error: type[BackendAIError]
 
 
 def _answering_session(status: int, body: bytes) -> MagicMock:
@@ -90,25 +102,37 @@ class TestApiDeliveryWorkerClient:
         }
 
     @pytest.mark.parametrize(
-        "status",
+        "case",
         [
-            HTTPStatus.BAD_REQUEST,
-            HTTPStatus.UNAUTHORIZED,
-            HTTPStatus.CONFLICT,
-            HTTPStatus.NOT_IMPLEMENTED,
+            _ErrorAnswerCase(
+                status=HTTPStatus.BAD_REQUEST, expected_error=ApiDeliveryWorkerRejectedError
+            ),
+            _ErrorAnswerCase(
+                status=HTTPStatus.UNAUTHORIZED, expected_error=ApiDeliveryWorkerRejectedError
+            ),
+            _ErrorAnswerCase(
+                status=HTTPStatus.CONFLICT, expected_error=ApiDeliveryWorkerRejectedError
+            ),
+            _ErrorAnswerCase(
+                status=HTTPStatus.INTERNAL_SERVER_ERROR,
+                expected_error=ApiDeliveryWorkerServerError,
+            ),
+            _ErrorAnswerCase(
+                status=HTTPStatus.NOT_IMPLEMENTED, expected_error=ApiDeliveryWorkerServerError
+            ),
         ],
-        ids=lambda status: str(status.value),
+        ids=lambda case: str(case.status.value),
     )
     async def test_error_answer_raises_with_the_worker_status(
-        self, status: HTTPStatus, secrets: SecretConfig, ingress: Ingress
+        self, case: _ErrorAnswerCase, secrets: SecretConfig, ingress: Ingress
     ) -> None:
-        session = _answering_session(status, b"rejected")
+        session = _answering_session(case.status, b"rejected")
         client = ApiDeliveryWorkerClient(session, WORKER_ADDR, secrets)
-        with pytest.raises(ApiDeliveryWorkerRequestError) as exc_info:
+        with pytest.raises(case.expected_error) as exc_info:
             await client.upsert([ingress])
         assert exc_info.value.extra_data == {
             "worker_addr": WORKER_ADDR,
-            "status": status,
+            "status": case.status,
             "body": "rejected",
         }
 
@@ -116,7 +140,7 @@ class TestApiDeliveryWorkerClient:
         self, unreachable_session: MagicMock, secrets: SecretConfig, ingress: Ingress
     ) -> None:
         client = ApiDeliveryWorkerClient(unreachable_session, WORKER_ADDR, secrets)
-        with pytest.raises(ApiDeliveryWorkerRequestError):
+        with pytest.raises(ApiDeliveryWorkerUnreachableError):
             await client.upsert([ingress])
 
 
