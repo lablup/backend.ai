@@ -5,8 +5,7 @@ Tests for the TUS upload handlers.
 from __future__ import annotations
 
 from collections.abc import Generator
-from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -15,7 +14,6 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.clients.valkey_client.valkey_tus import TusSessionId
-from ai.backend.common.clients.valkey_client.valkey_tus.client import TusUploadState
 from ai.backend.storage.api.client import (
     _drain_into_upload_file,
     tus_check_session,
@@ -41,7 +39,6 @@ class TestTusUploadPartOffsetValidation:
             "session": "test-session",
             "size": "10240",
             "relpath": "test-file.txt",
-            "exp": int((datetime.now(UTC) + timedelta(hours=1)).timestamp()),
         }
 
     @pytest.fixture(autouse=True)
@@ -80,10 +77,9 @@ class TestTusUploadPartOffsetValidation:
 
         # Mock Valkey TUS coordinator (try_load_offset / advance_offset).
         valkey_tus_client = AsyncMock()
+        valkey_tus_client.get_offset = AsyncMock(return_value=server_offset)
         valkey_tus_client.try_load_offset = AsyncMock(return_value=server_offset or 0)
-        valkey_tus_client.advance_offset = AsyncMock(
-            return_value=TusUploadState(offset=server_offset or 0, ttl_seconds=24 * 60 * 60)
-        )
+        valkey_tus_client.advance_offset = AsyncMock(return_value=server_offset or 0)
         valkey_tus_client.extend_lease = AsyncMock(return_value=None)
         valkey_tus_client.release_lease = AsyncMock(return_value=None)
 
@@ -342,25 +338,19 @@ class TestDrainOrphanBytesRecovery:
         assert orphan_tail not in final_bytes[committed_offset:]
 
 
-_NOW = datetime(2026, 10, 20, 9, 0, 0, tzinfo=UTC)
-
-
-@dataclass(frozen=True)
-class _UploadExpiresCase:
-    earlier_deadline: str
-    token_expires_in: timedelta
-    offset_ttl: timedelta
-    expected_upload_expires: str
-
-
 class TestTusUploadExpiration:
-    """``Upload-Expires`` is the earlier of the upload token's ``exp`` and the offset TTL."""
+    """``Upload-Expires`` reports the upload token's ``exp``."""
 
     @pytest.fixture
-    def frozen_now(self) -> Generator[None, None, None]:
-        with patch("ai.backend.storage.api.client.datetime", wraps=datetime) as mock_datetime:
-            mock_datetime.now.return_value = _NOW
-            yield
+    def token_data(self) -> dict[str, Any]:
+        return {
+            "volume": "test-volume",
+            "vfid": MagicMock(),
+            "session": "test-session",
+            "size": "10240",
+            "relpath": "test-file.txt",
+            "exp": int(datetime(2026, 10, 20, 10, 0, 0, tzinfo=UTC).timestamp()),
+        }
 
     @pytest.fixture
     def volume(self, tmp_path: Path) -> MagicMock:
@@ -372,30 +362,11 @@ class TestTusUploadExpiration:
         return volume
 
     @pytest.fixture
-    def token_data(self, case: _UploadExpiresCase) -> dict[str, Any]:
-        return {
-            "volume": "test-volume",
-            "vfid": MagicMock(),
-            "session": "test-session",
-            "size": "10240",
-            "relpath": "test-file.txt",
-            "exp": int((_NOW + case.token_expires_in).timestamp()),
-        }
-
-    @pytest.fixture
-    def ctx(self, case: _UploadExpiresCase, volume: MagicMock) -> MagicMock:
+    def ctx(self, volume: MagicMock) -> MagicMock:
         valkey_tus_client = AsyncMock()
-        valkey_tus_client.get_upload_state = AsyncMock(
-            return_value=TusUploadState(
-                offset=1024, ttl_seconds=int(case.offset_ttl.total_seconds())
-            )
-        )
+        valkey_tus_client.get_offset = AsyncMock(return_value=1024)
         valkey_tus_client.try_load_offset = AsyncMock(return_value=1024)
-        valkey_tus_client.advance_offset = AsyncMock(
-            return_value=TusUploadState(
-                offset=1024, ttl_seconds=int(case.offset_ttl.total_seconds())
-            )
-        )
+        valkey_tus_client.advance_offset = AsyncMock(return_value=1024)
         ctx = MagicMock()
         ctx.node_id = "test-node"
         ctx.valkey_tus_client = valkey_tus_client
@@ -419,11 +390,6 @@ class TestTusUploadExpiration:
     def patch_request(
         self, ctx: MagicMock, token_data: dict[str, Any]
     ) -> Generator[MagicMock, None, None]:
-        """The offset entry read before the drain still has 60 seconds left;
-        ``advance_offset`` refreshes it to ``case.offset_ttl``."""
-        ctx.valkey_tus_client.get_upload_state = AsyncMock(
-            return_value=TusUploadState(offset=1024, ttl_seconds=60)
-        )
         request = MagicMock(spec=web.Request)
         request.app = {"ctx": ctx}
         request.headers = {"Upload-Offset": "1024"}
@@ -449,58 +415,12 @@ class TestTusUploadExpiration:
         assert response.headers["Tus-Extension"] == "expiration"
         assert "Upload-Expires" in response.headers["Access-Control-Expose-Headers"]
 
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _UploadExpiresCase(
-                earlier_deadline="token-exp",
-                token_expires_in=timedelta(hours=1),
-                offset_ttl=timedelta(hours=24),
-                expected_upload_expires="Tue, 20 Oct 2026 10:00:00 GMT",
-            ),
-            _UploadExpiresCase(
-                earlier_deadline="offset-ttl",
-                token_expires_in=timedelta(hours=48),
-                offset_ttl=timedelta(minutes=30),
-                expected_upload_expires="Tue, 20 Oct 2026 09:30:00 GMT",
-            ),
-        ],
-        ids=lambda case: case.earlier_deadline,
-    )
-    async def test_head_reports_upload_expires(
-        self,
-        case: _UploadExpiresCase,
-        frozen_now: None,
-        head_request: MagicMock,
-    ) -> None:
+    async def test_head_reports_token_expiry(self, head_request: MagicMock) -> None:
         response = await tus_check_session(head_request)
 
-        assert response.headers["Upload-Expires"] == case.expected_upload_expires
+        assert response.headers["Upload-Expires"] == "Tue, 20 Oct 2026 10:00:00 GMT"
 
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _UploadExpiresCase(
-                earlier_deadline="token-exp",
-                token_expires_in=timedelta(hours=1),
-                offset_ttl=timedelta(hours=24),
-                expected_upload_expires="Tue, 20 Oct 2026 10:00:00 GMT",
-            ),
-            _UploadExpiresCase(
-                earlier_deadline="offset-ttl",
-                token_expires_in=timedelta(hours=48),
-                offset_ttl=timedelta(hours=24),
-                expected_upload_expires="Wed, 21 Oct 2026 09:00:00 GMT",
-            ),
-        ],
-        ids=lambda case: case.earlier_deadline,
-    )
-    async def test_patch_reports_refreshed_upload_expires(
-        self,
-        case: _UploadExpiresCase,
-        frozen_now: None,
-        patch_request: MagicMock,
-    ) -> None:
+    async def test_patch_reports_token_expiry(self, patch_request: MagicMock) -> None:
         response = await tus_upload_part(patch_request)
 
-        assert response.headers["Upload-Expires"] == case.expected_upload_expires
+        assert response.headers["Upload-Expires"] == "Tue, 20 Oct 2026 10:00:00 GMT"

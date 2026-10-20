@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import dataclass
 from typing import Final, NewType, Self, cast
 
 from glide import Batch, ConditionalChange, ExpirySet, ExpiryType, Script
@@ -46,12 +45,6 @@ valkey_tus_resilience = Resilience(
 )
 
 TusSessionId = NewType("TusSessionId", str)
-
-
-@dataclass(frozen=True)
-class TusUploadState:
-    offset: int
-    ttl_seconds: int
 
 
 _OFFSET_KEY_PREFIX: Final = "tus.upload.offset"
@@ -153,24 +146,13 @@ class ValkeyTusClient:
             )
 
     @valkey_tus_resilience.apply()
-    async def get_upload_state(self, session_id: TusSessionId) -> TusUploadState | None:
-        """Read the committed offset and its remaining TTL in one MULTI/EXEC round-trip."""
-        offset_key = self._offset_key(session_id)
-        tx = self._create_batch(is_atomic=True)
-        tx.get(offset_key)
-        tx.ttl(offset_key)
+    async def get_offset(self, session_id: TusSessionId) -> int | None:
         async with self._client.client() as conn:
-            results = await conn.exec(tx, raise_on_error=True)
-        if results is None:
-            raise UnreachableError(
-                "get_upload_state: MULTI/EXEC returned no results — no WATCH in use, "
-                "so this path should be unreachable."
-            )
-        offset_raw, ttl = results
-        if offset_raw is None:
+            raw = await conn.get(self._offset_key(session_id))
+        if raw is None:
             return None
-        decoded = offset_raw.decode() if isinstance(offset_raw, bytes) else cast(str, offset_raw)
-        return TusUploadState(offset=int(decoded), ttl_seconds=cast(int, ttl))
+        decoded = raw.decode() if isinstance(raw, bytes) else raw
+        return int(decoded)
 
     @valkey_tus_resilience.apply()
     async def try_load_offset(
@@ -281,12 +263,12 @@ class ValkeyTusClient:
         length: int,
         *,
         offset_ttl_seconds: int = _DEFAULT_TTL_SECONDS,
-    ) -> TusUploadState:
+    ) -> int:
         """Advance the committed offset and release the lease atomically.
 
         Runs ``ADVANCE_OFFSET_SCRIPT`` so the ownership check, ``INCRBY``,
         TTL refresh, and lease ``DEL`` all happen in a single Redis step.
-        Returns the new committed offset and its refreshed TTL. Raises :class:`TusLeaseLostError`
+        Returns the new committed offset. Raises :class:`TusLeaseLostError`
         if the lease is no longer owned by ``holder_token`` (expired and
         reclaimed by another storage-proxy while we were writing).
         """
@@ -303,4 +285,4 @@ class ValkeyTusClient:
             raise TusLeaseLostError(
                 f"TUS session {session_id} lease was reclaimed by another storage-proxy"
             )
-        return TusUploadState(offset=new_offset, ttl_seconds=offset_ttl_seconds)
+        return new_offset
