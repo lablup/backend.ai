@@ -23,6 +23,7 @@ from aiodocker.exceptions import DockerError
 from aiotools import TaskGroup
 
 from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.agent.defs import KRUNNER_ENTRYPOINT_GROUP
 from ai.backend.agent.docker.utils import PersistentServiceContainer
 from ai.backend.agent.errors import KernelRunnerNotInitializedError, SubprocessStreamError
 from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
@@ -595,8 +596,7 @@ async def prepare_krunner_env(_local_config: Mapping[str, Any]) -> Mapping[str, 
     """
 
     all_distros: list[tuple[str, str]] = []
-    entry_prefix = "backendai_krunner_v10"
-    for entrypoint in scan_entrypoints(entry_prefix):
+    for entrypoint in scan_entrypoints(KRUNNER_ENTRYPOINT_GROUP):
         log.debug("loading krunner pkg: {}", entrypoint.module)
         plugin = entrypoint.load()
         await plugin.init({})  # currently does nothing

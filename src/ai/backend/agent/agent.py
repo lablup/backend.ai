@@ -244,6 +244,7 @@ from ai.backend.logging.formatter import pretty
 from . import __version__ as VERSION
 from .affinity_map import AffinityMap
 from .config.unified import AgentUnifiedConfig, ContainerSandboxType
+from .defs import FALLBACK_KERNEL_PYTHON_VERSION
 from .errors import (
     ContainerCreationError,
     ContainerCreationFailedError,
@@ -264,6 +265,7 @@ from .kernel import (
     AbstractKernel,
     KernelRegistry,
     match_distro_data,
+    read_krunner_python_version,
 )
 from .kernel_registry.writer.types import KernelRegistrySaveMetadata
 from .observer.host_port import HostPortObserver
@@ -531,23 +533,9 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         matched_libc_style = "glibc"
         if distro.startswith("alpine"):
             matched_libc_style = "musl"
-        krunner_pyver = "3.6"  # fallback
-        if m := re.search(r"^([a-z-]+)(\d+(\.\d+)*)?$", matched_distro):
-            matched_distro_pkgname = m.group(1).replace("-", "_")
-            try:
-                krunner_pyver = (
-                    Path(
-                        str(
-                            files(f"ai.backend.krunner.{matched_distro_pkgname}").joinpath(
-                                f"krunner-python.{matched_distro}.txt"
-                            )
-                        )
-                    )
-                    .read_text()
-                    .strip()
-                )
-            except FileNotFoundError:
-                pass
+        krunner_pyver = (
+            read_krunner_python_version(matched_distro) or FALLBACK_KERNEL_PYTHON_VERSION
+        )
         log.debug("selected krunner: {}", matched_distro)
         log.debug("selected libc style: {}", matched_libc_style)
         log.debug("krunner volume: {}", krunner_volume)

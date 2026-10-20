@@ -16,6 +16,7 @@ from kubernetes_asyncio import client as kube_client
 from kubernetes_asyncio import config as kube_config
 from kubernetes_asyncio import watch
 
+from ai.backend.agent.defs import KRUNNER_ENTRYPOINT_GROUP
 from ai.backend.agent.errors import KernelRunnerNotInitializedError
 from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
 from ai.backend.agent.resources import KernelResourceSpec
@@ -561,8 +562,7 @@ async def prepare_krunner_env(local_config: Mapping[str, Any]) -> Mapping[str, s
     """
 
     all_distros: list[tuple[str, str]] = []
-    entry_prefix = "backendai_krunner_v10"
-    for entrypoint in scan_entrypoints(entry_prefix):
+    for entrypoint in scan_entrypoints(KRUNNER_ENTRYPOINT_GROUP):
         log.debug("loading krunner pkg: {}", entrypoint.module)
         plugin = entrypoint.load()
         await plugin.init({})  # currently does nothing
