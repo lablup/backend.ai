@@ -80,7 +80,7 @@ path the image's default command reads:
 
 | Service | Config mount target | Notes |
 |---|---|---|
-| manager | `/etc/backend.ai/manager.toml` | also mount `fixtures/` at `/app/fixtures` **read-write** — manager RPC keypair (auto-generated at first start) + DB fixtures |
+| manager | `/etc/backend.ai/manager.toml` | also mount `fixtures/` at `/app/fixtures` **read-write** — manager RPC keypair (auto-generated at first start) + DB fixtures; and an `alembic.ini` at `/app/alembic.ini` read-only for `mgr schema` (see below) |
 | agent | `/etc/backend.ai/agent.toml` | see the privilege and path-parity sections below |
 | webserver | `/etc/backend.ai/webserver.conf` | note the `.conf` target name, not `.toml` |
 | storage-proxy | `/etc/backend.ai/storage-proxy.toml` | to run unprivileged with the chown watcher, set the `user`/`group` knobs in `storage-proxy.toml` (the daemon drops privileges itself after starting as root); when the watcher is not used, compose `user:` works too — the DOCKER install mode runs it as the installing user this way. If TLS is enabled, mount the cert material read-only at whatever path `ssl-cert`/`ssl-privkey` point to |
@@ -100,6 +100,24 @@ Shared prerequisites:
 | `supergraph.graphql` + a GraphQL gateway (e.g. `ghcr.io/graphql-hive/gateway`) | GraphQL federation | the supergraph schema is generated per release (`scripts/generate-graphql-schema.sh`); the gateway composes manager subgraphs |
 | RPC auth key distribution | manager, agent | the agent needs the manager's RPC **public** key to authenticate RPC calls — e.g. share the parity-mounted fixtures directory across nodes, or mount a common key directory at `/etc/backend.ai/keys:ro` |
 | `wheelhouse/` mount at `/app/wheelhouse` | manager, agent | staging dir for extra plugin wheels (e.g. accelerator plugins) — the DOCKER install mode creates and mounts `<install-dir>/wheelhouse` read-write (installing from it unpacks the wheels in place); nothing in the images consumes it automatically, so install with `docker exec <container> pip install /app/wheelhouse/*.whl` or build a derived image |
+
+### Database schema
+
+The image ships no `alembic.ini`, and `backend.ai mgr schema` takes the DB
+URL from that file's `sqlalchemy.url`, not from `manager.toml`. Mount one
+read-only at `/app/alembic.ini`: `/app` is the image `WORKDIR`, so the
+default `-f alembic.ini` finds it. Start from
+`configs/manager/halfstack.alembic.ini`, keep
+`script_location = ai.backend.manager.models:alembic`, and set
+`sqlalchemy.url` to the same database as `manager.toml` `[db]`.
+
+| DB state | Command |
+|---|---|
+| fresh (empty) | `docker compose run --rm manager-cli backend.ai mgr schema oneshot -f /app/alembic.ini` |
+| existing (after an upgrade) | `docker compose exec manager alembic upgrade head` |
+
+The DOCKER install mode generates `<install-dir>/alembic.ini` and mounts it
+on both `manager` and `manager-cli`.
 
 ## Container privileges
 
@@ -266,6 +284,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock   # needed only when the `local` container registry is used
       - /etc/machine-id:/etc/machine-id:ro
       - <install-dir>/manager.toml:/etc/backend.ai/manager.toml:ro
+      # read by `backend.ai mgr schema` (default `-f alembic.ini` in WORKDIR /app)
+      - <install-dir>/alembic.ini:/app/alembic.ini:ro
       # the image entrypoint generates the RPC keypair here at first start
       - <install-dir>/fixtures:/app/fixtures
     restart: unless-stopped

@@ -215,6 +215,20 @@ def test_rendered_compose_config_mounts_follow_default_command_paths(template: s
             assert "working_dir" not in service
 
 
+def test_rendered_compose_alembic_ini_mounts(template: str) -> None:
+    # `mgr schema` needs an alembic.ini (script_location + sqlalchemy.url) and
+    # the image ships none; the installer-generated one is mounted read-only
+    # at the path the installer's `schema oneshot` call passes via `-f`.
+    doc = render(template, enable_gpu=False)
+    services = doc["services"]
+    mount = f"{BASE_PATH}/alembic.ini:{DockerContext.ALEMBIC_INI_MOUNT}:ro"
+    for name, service in services.items():
+        if name in ("manager", "manager-cli"):
+            assert mount in service["volumes"], name
+        else:
+            assert not any("alembic.ini" in v for v in service["volumes"]), name
+
+
 def test_rendered_compose_parity_mounts(template: str) -> None:
     doc = render(template, enable_gpu=False)
     services = doc["services"]
