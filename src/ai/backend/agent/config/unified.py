@@ -154,7 +154,7 @@ class SocketRelayConfig(BaseConfigSchema):
                 "after changing it."
             ),
             added_version="26.10.0",
-            example=ConfigExample(local="false", prod="true"),
+            example=ConfigExample(local="false", prod="false"),
         ),
     ]
     no_new_privileges: Annotated[
@@ -170,7 +170,7 @@ class SocketRelayConfig(BaseConfigSchema):
                 "so its processes cannot gain privileges through setuid binaries."
             ),
             added_version="26.10.0",
-            example=ConfigExample(local="false", prod="true"),
+            example=ConfigExample(local="false", prod="false"),
         ),
     ]
     drop_all_capabilities: Annotated[
@@ -187,7 +187,7 @@ class SocketRelayConfig(BaseConfigSchema):
                 "another user, such as the directory of a non-root agent."
             ),
             added_version="26.10.0",
-            example=ConfigExample(local="false", prod="true"),
+            example=ConfigExample(local="false", prod="false"),
         ),
     ]
     read_only_rootfs: Annotated[
@@ -200,7 +200,7 @@ class SocketRelayConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description="Mount the root filesystem of the socket relay container read-only.",
             added_version="26.10.0",
-            example=ConfigExample(local="false", prod="true"),
+            example=ConfigExample(local="false", prod="false"),
         ),
     ]
     pids_limit: Annotated[
