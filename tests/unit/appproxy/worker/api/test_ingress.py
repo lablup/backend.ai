@@ -16,6 +16,7 @@ from ai.backend.appproxy.worker.api.ingress import (
     IngressHandler,
     coordinator_auth_middleware,
 )
+from ai.backend.appproxy.worker.config import IngressConfig
 from ai.backend.appproxy.worker.errors.ingress import IngressWriteNotSupportedError
 from ai.backend.appproxy.worker.ingress.factory import IngressState
 from ai.backend.appproxy.worker.ingress.layered import LayeredIngressState
@@ -104,12 +105,14 @@ def reader() -> AsyncMock:
 
 @pytest.fixture
 def api_mode_state(reader: AsyncMock, writer: AsyncMock) -> IngressState:
-    return IngressState(reader=reader, writer=writer, mode=IngressUpdateMode.API)
+    config = IngressConfig.model_validate({"mode": IngressUpdateMode.API, "layers": ["in-memory"]})
+    return IngressState(reader=reader, writer=writer, config=config)
 
 
 @pytest.fixture
 def redis_mode_state(reader: AsyncMock, writer: AsyncMock) -> IngressState:
-    return IngressState(reader=reader, writer=writer, mode=IngressUpdateMode.REDIS)
+    config = IngressConfig.model_validate({"mode": IngressUpdateMode.REDIS})
+    return IngressState(reader=reader, writer=writer, config=config)
 
 
 class TestIngressHandler:

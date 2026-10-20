@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ai.backend.appproxy.common.types import IngressUpdateMode
 from ai.backend.appproxy.worker.config import IngressConfig, IngressLayerType
 from ai.backend.appproxy.worker.ingress.abc import IngressReader
 from ai.backend.appproxy.worker.ingress.in_memory import InMemoryIngressState
@@ -19,7 +18,7 @@ class IngressState:
     reader: LayeredIngressState
     writer: ValidatingIngressWriter | None
     """None when the worker holds no in-memory layer."""
-    mode: IngressUpdateMode
+    config: IngressConfig
 
 
 class IngressStateFactory:
@@ -51,7 +50,7 @@ class IngressStateFactory:
         return IngressState(
             reader=LayeredIngressState(readers, in_memory=in_memory),
             writer=writer,
-            mode=self._config.mode,
+            config=self._config,
         )
 
     def _in_memory(self) -> InMemoryIngressState:

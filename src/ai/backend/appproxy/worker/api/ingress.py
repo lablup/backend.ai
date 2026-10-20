@@ -82,7 +82,7 @@ class IngressHandler:
         return APIResponse.build(HTTPStatus.OK, response)
 
     def _writer(self, state: IngressState) -> ValidatingIngressWriter:
-        if state.mode != IngressUpdateMode.API or state.writer is None:
+        if state.config.mode != IngressUpdateMode.API or state.writer is None:
             raise IngressWriteNotSupportedError
         return state.writer
 
