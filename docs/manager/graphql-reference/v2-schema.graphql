@@ -14620,15 +14620,6 @@ type PurgeRuntimeVariantPresetPayload {
   entityId: UUID!
 }
 
-"""Added in 26.10.0. Payload for user resource policy purge."""
-type PurgeUserResourcePolicyPayload {
-  """Global ID of the purged user resource policy."""
-  purgedId: ID!
-
-  """UUID of the purged user resource policy."""
-  entityId: UUID!
-}
-
 """Added in 26.10.0. Identifies the session group to purge."""
 input PurgeSessionGroupInput {
   """ID of the session group to purge."""
@@ -14641,6 +14632,15 @@ Added in 26.10.0. Names the session group removed. Its member sessions remain.
 type PurgeSessionGroupPayload {
   """ID of the purged session group."""
   id: UUID!
+}
+
+"""Added in 26.10.0. Payload for user resource policy purge."""
+type PurgeUserResourcePolicyPayload {
+  """Global ID of the purged user resource policy."""
+  purgedId: ID!
+
+  """UUID of the purged user resource policy."""
+  entityId: UUID!
 }
 
 """
