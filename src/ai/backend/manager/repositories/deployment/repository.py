@@ -411,9 +411,8 @@ class DeploymentRepository:
 
         ``agent_selection_policy`` replaces the policy; ``None`` keeps the stored one.
 
-        Returns the persisted :class:`DeploymentOptions` value in a
-        single ``UPDATE ... RETURNING`` round-trip. Callers that need
-        the full deployment node should re-read separately.
+        Returns the persisted :class:`DeploymentOptions` value. Callers that
+        need the full deployment node should re-read separately.
 
         Raises:
             EndpointNotFound: If the deployment does not exist.

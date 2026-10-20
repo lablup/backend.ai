@@ -1110,13 +1110,10 @@ class ResourceGroupAdapter(BaseAdapter):
     ) -> ReplaceResourceGroupDefaultDeploymentOptionsPayload:
         """Fully replace a resource group's ``default_deployment_options``.
 
-        Admin-only. The DTO payload is converted to the domain
-        :class:`DeploymentOptions` (duplicate or unknown handler names
-        are rejected against the coordinator's live registration), the
-        :class:`ReplaceDefaultDeploymentOptionsAction` is dispatched, and
-        only the refreshed options surface is returned (the repository
-        path uses ``UPDATE ... RETURNING`` and does not re-read the
-        surrounding scaling group node).
+        Admin-only. The handler options are converted to the domain
+        :class:`DeploymentHandlerOptions` (duplicate or unknown handler names
+        are rejected), the agent selection policy is passed apart, and only
+        the refreshed options surface is returned.
         """
         handler_options = deployment_handler_options_from_input(
             input.options,

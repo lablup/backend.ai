@@ -159,9 +159,8 @@ class ResourceGroupRepository:
 
         ``agent_selection_policy`` replaces the policy; ``None`` keeps the stored one.
 
-        Returns the persisted :class:`DeploymentOptions` value via
-        ``UPDATE ... RETURNING`` so this path does a single round-trip and
-        does not re-materialise the surrounding resource group node.
+        Returns the persisted :class:`DeploymentOptions` value without
+        re-materialising the surrounding resource group node.
 
         Raises:
             ScalingGroupNotFound: If the resource group does not exist.
