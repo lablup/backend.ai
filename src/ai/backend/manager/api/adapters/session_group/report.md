@@ -183,7 +183,7 @@ When
 Then
 
 - 지운 사용자가 만든 세션 그룹의 id가 온다
-  - id: 사용자가 만든 세션 그룹의 id와 같다
+  - entity_id: 사용자가 만든 세션 그룹의 id와 같다
 
 <a id="purging-a-deployments-session-group-is-refused-as-in-use"></a>
 

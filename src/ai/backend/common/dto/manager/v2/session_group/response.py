@@ -57,4 +57,4 @@ class AdminSearchSessionGroupsPayload(BaseResponseModel):
 class PurgeSessionGroupPayload(BaseResponseModel):
     """Payload naming the session group removed."""
 
-    id: UUID = Field(description="ID of the purged session group.")
+    entity_id: UUID = Field(description="UUID of the purged session group.")

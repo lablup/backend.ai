@@ -99,7 +99,9 @@ class TheUsersGroupIsNamed(Then[Laid, PurgeSessionGroupPayload]):
             return [Refused(NotEnoughPermission, answered.raised)]
         return [
             Held[UUID](
-                "id", payload.id, SameAs(laid.users_group.id, "사용자가 만든 세션 그룹의 id")
+                "entity_id",
+                payload.entity_id,
+                SameAs(laid.users_group.id, "사용자가 만든 세션 그룹의 id"),
             )
         ]
 

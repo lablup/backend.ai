@@ -20,10 +20,11 @@ from ai.backend.common.dto.manager.v2.session_group.types import (
     SessionGroupPlacementEnforcementEnum,
     SessionGroupScope,
 )
-from ai.backend.manager.api.gql.base import UUIDScopeGQL
+from ai.backend.manager.api.gql.base import UUIDScopeGQL, to_global_id
 from ai.backend.manager.api.gql.session_group import resolver
 from ai.backend.manager.api.gql.session_group.types import (
     PurgeSessionGroupInputGQL,
+    SessionGroupGQL,
     SessionGroupScopeGQL,
 )
 from ai.backend.manager.errors.auth import InsufficientPrivilege
@@ -153,7 +154,7 @@ class TestPurgeSessionGroup:
     def info(self, group_id: uuid.UUID) -> MagicMock:
         info = MagicMock()
         info.context.adapters.session_group.purge = AsyncMock(
-            return_value=PurgeSessionGroupPayload(id=group_id)
+            return_value=PurgeSessionGroupPayload(entity_id=group_id)
         )
         return info
 
@@ -175,4 +176,5 @@ class TestPurgeSessionGroup:
             info, PurgeSessionGroupInputGQL(id=group_id)
         )
 
-        assert result.id == group_id
+        assert result.entity_id == group_id
+        assert result.purged_id == to_global_id(SessionGroupGQL, group_id)

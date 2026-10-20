@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any, Self, cast, override
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -314,4 +315,5 @@ class PurgeSessionGroupInputGQL(PydanticInputMixin[PurgeSessionGroupInputDTO]):
     name="PurgeSessionGroupPayload",
 )
 class PurgeSessionGroupPayloadGQL(PydanticOutputMixin[PurgeSessionGroupPayloadDTO]):
-    id: UUID = gql_field(description="ID of the purged session group.")
+    purged_id: strawberry.ID = gql_field(description="Global ID of the purged session group.")
+    entity_id: UUID = gql_field(description="UUID of the purged session group.")

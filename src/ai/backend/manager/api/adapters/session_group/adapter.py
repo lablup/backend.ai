@@ -161,7 +161,7 @@ class SessionGroupAdapter(BaseAdapter):
         result = await self._session_group.purge.run(
             PurgeSessionGroupAction(purger=SessionGroupPurger(group_id=SessionGroupID(input.id)))
         )
-        return PurgeSessionGroupPayload(id=result.data.id)
+        return PurgeSessionGroupPayload(entity_id=result.data.id)
 
     def _search_conditions(self, filter: SessionGroupFilter | None) -> list[QueryCondition]:
         """The filter's conditions; groups marked deleted are left out unless the top-level
