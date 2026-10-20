@@ -53,7 +53,7 @@ from ai.backend.logging.structured import StructuredLogger
 
 _atom_config_iv = t.Dict({
     "general": t.Dict({
-        t.Key("rbln_stat_path"): t.Null | t.String,
+        t.Key("rbln_stat_path", default=None): t.Null | t.String(allow_blank=True),
         t.Key("enforce_singular_numa_affinity", default=False): t.Null | t.Bool,
         t.Key("enable_rsd", default=None): t.Null | t.Bool,
         t.Key("cdi_device_id", default=None): t.Null | t.String,
@@ -169,8 +169,8 @@ class AbstractATOMPlugin[TATOMDevice: AbstractATOMDevice](AbstractComputePlugin,
 
         stat_prefix = self.key.replace("-", "_")
 
-        stats = await ATOMAPI.get_stats(self._rbln_stat_path, self.stat_args)
         if self.enabled:
+            stats = await ATOMAPI.get_stats(self._rbln_stat_path, self.stat_args)
             for device in await self.list_devices():
                 device_id = device.device_id
                 pci_bus_id = device.hw_location

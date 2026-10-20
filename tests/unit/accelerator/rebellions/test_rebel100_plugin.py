@@ -340,7 +340,7 @@ class TestConfigName:
     ) -> None:
         plugin = plugin_cls.__new__(plugin_cls)
         plugin.plugin_config = {}
-        raw_cfg = {"general": {"rbln_stat_path": None}}
+        raw_cfg: dict[str, Any] = {"general": {}}
         with (
             patch(
                 "ai.backend.accelerator.rebellions.common.plugin.config.read_from_file",
@@ -362,7 +362,7 @@ class TestConfigName:
     async def test_rebel100_forces_rsd_off(self, raw_enable_rsd: dict[str, bool]) -> None:
         plugin = Rebel100Plugin.__new__(Rebel100Plugin)
         plugin.plugin_config = {}
-        raw_cfg = {"general": {"rbln_stat_path": None, **raw_enable_rsd}}
+        raw_cfg = {"general": {**raw_enable_rsd}}
         with (
             patch(
                 "ai.backend.accelerator.rebellions.common.plugin.config.read_from_file",
@@ -379,3 +379,64 @@ class TestConfigName:
 
     def test_atom_enable_rsd_stays_on_by_default(self) -> None:
         assert ATOMPlugin.enable_rsd_default is True
+
+
+class TestStatPathConfig:
+    @pytest.mark.parametrize(
+        "raw_general",
+        [{}, {"rbln_stat_path": ""}],
+        ids=["omitted", "blank"],
+    )
+    async def test_unset_path_searches_path(self, raw_general: dict[str, str]) -> None:
+        plugin = Rebel100Plugin.__new__(Rebel100Plugin)
+        plugin.plugin_config = {}
+        with (
+            patch(
+                "ai.backend.accelerator.rebellions.common.plugin.config.read_from_file",
+                return_value=({"general": raw_general}, Path("/etc/rebel100.toml")),
+            ),
+            patch(
+                "ai.backend.accelerator.rebellions.common.plugin.shutil.which",
+                side_effect=lambda name: "/usr/bin/rbln-smi" if name == "rbln-smi" else None,
+            ),
+            patch.object(Rebel100Plugin, "list_devices", AsyncMock(return_value=[])),
+        ):
+            await plugin.init()
+        assert plugin.enabled
+        assert plugin._rbln_stat_path == "/usr/bin/rbln-smi"
+
+    async def test_configured_path_skips_search(self) -> None:
+        plugin = Rebel100Plugin.__new__(Rebel100Plugin)
+        plugin.plugin_config = {}
+        with (
+            patch(
+                "ai.backend.accelerator.rebellions.common.plugin.config.read_from_file",
+                return_value=(
+                    {"general": {"rbln_stat_path": "/opt/rbln/rbln-smi"}},
+                    Path("/etc/rebel100.toml"),
+                ),
+            ),
+            patch("ai.backend.accelerator.rebellions.common.plugin.shutil.which") as which,
+            patch.object(Rebel100Plugin, "list_devices", AsyncMock(return_value=[])),
+        ):
+            await plugin.init()
+        which.assert_not_called()
+        assert plugin._rbln_stat_path == "/opt/rbln/rbln-smi"
+
+    async def test_missing_executable_disables_and_skips_node_stats(self) -> None:
+        plugin = Rebel100Plugin.__new__(Rebel100Plugin)
+        plugin.plugin_config = {}
+        with (
+            patch(
+                "ai.backend.accelerator.rebellions.common.plugin.config.read_from_file",
+                return_value=({"general": {}}, Path("/etc/rebel100.toml")),
+            ),
+            patch(
+                "ai.backend.accelerator.rebellions.common.plugin.shutil.which",
+                return_value=None,
+            ),
+        ):
+            await plugin.init()
+        assert not plugin.enabled
+        measures = await plugin.gather_node_measures(MagicMock())
+        assert all(m.per_node.value == 0 for m in measures)
