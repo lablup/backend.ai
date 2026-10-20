@@ -489,8 +489,10 @@ class TestCheckStatusTlsTaskExit:
     ) -> None:
         del fake.tasks[running]
 
-        with pytest.raises(KernelTaskExited, match="gone"):
+        with pytest.raises(KernelTaskExited, match="gone") as exc_info:
             await tls_kernel.check_status()
+
+        assert exc_info.value.exit_status is None
 
     async def test_failed_task_lookup_keeps_retrying(
         self,

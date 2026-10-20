@@ -1524,8 +1524,8 @@ class AbstractAgent[
                         restart_tracker.destroy_event.set()
                     else:
                         await self.reconstruct_resource_usage()
-                        exit_code = -1 if ev.exit_code is None else ev.exit_code
                         if not ev.suppress_events:
+                            exit_code = -1 if ev.exit_code is None else ev.exit_code
                             await self.anycast_and_broadcast_event(
                                 KernelTerminatedAnycastEvent(
                                     kernel_id=ev.kernel_id,

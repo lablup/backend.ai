@@ -2437,7 +2437,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             if kernel_obj is not None:
                 reason = kernel_obj.termination_reason
             try:
-                exit_code = evdata["Actor"]["Attributes"]["exitCode"]
+                exit_code = int(evdata["Actor"]["Attributes"]["exitCode"])
             except KeyError:
                 exit_code = 255
             await self.inject_container_lifecycle_event(
