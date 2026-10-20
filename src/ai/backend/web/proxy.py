@@ -4,6 +4,7 @@ import asyncio
 import base64
 import json
 import logging
+import posixpath
 from collections.abc import AsyncIterator, Awaitable, Callable, Iterable
 from contextlib import AbstractAsyncContextManager, asynccontextmanager
 from typing import Any, Final, cast
@@ -21,6 +22,7 @@ from ai.backend.common.endpoint_pool.exceptions import NoHealthyEndpointError
 from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
 from ai.backend.common.endpoint_pool.types import AcquiredEndpoint
 from ai.backend.common.exception import InvalidAPIParameters, MalformedRequestBody
+from ai.backend.common.middlewares.exception import is_client_disconnect
 from ai.backend.common.web.session import STORAGE_KEY, extra_config_headers, get_session
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.web.config.unified import WebServerUnifiedConfig
@@ -28,6 +30,7 @@ from ai.backend.web.errors import (
     InvalidAPIConfigurationError,
     ManagerConnectionUnavailable,
     ProxyTargetUnreachableError,
+    SignupDisabledError,
     UnexpectedProxyError,
 )
 
@@ -44,6 +47,7 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 HTTP_HEADERS_TO_FORWARD = [
     "Accept-Language",
     "Authorization",
+    "X-BackendAI-Act-As",
 ]
 
 CHUNK_SIZE: Final[int] = 64 * 1024
@@ -215,6 +219,14 @@ def _strip_route_prefix(request: web.Request, *, prefix: str) -> str | None:
     return None
 
 
+def _reject_disabled_signup(request: web.Request, path: str | None) -> None:
+    config: WebServerUnifiedConfig = request.app["config"]
+    if config.service.enable_signup or path is None:
+        return
+    if posixpath.normpath("/" + path).strip("/") == "auth/signup":
+        raise SignupDisabledError()
+
+
 async def _run_proxy_request(
     frontend_rqst: web.Request,
     *,
@@ -316,13 +328,14 @@ async def _run_proxy_request(
     except BackendClientError as e:
         log.warning("upstream connection failed", exc_info=True, handler_name=log_prefix)
         raise ProxyTargetUnreachableError() from e
-    except ClientConnectionError:
-        log.warning(
-            "connection closed during proxying",
-            handler_name=log_prefix,
-            request_method=frontend_rqst.method,
-            request_path=path,
-        )
+    except ClientConnectionError as e:
+        if not is_client_disconnect(frontend_rqst, e):
+            log.warning(
+                "connection closed during proxying",
+                handler_name=log_prefix,
+                request_method=frontend_rqst.method,
+                request_path=path,
+            )
         raise
     except NoHealthyEndpointError as e:
         raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
@@ -343,6 +356,8 @@ async def web_handler(
     is_anonymous: bool = False,
     http_headers_to_forward_extra: Iterable[str] | None = None,
 ) -> web.StreamResponse:
+    path = _strip_route_prefix(frontend_rqst, prefix="/func")
+    _reject_disabled_signup(frontend_rqst, path)
     if _is_websocket_upgrade(frontend_rqst):
         return await websocket_handler(
             frontend_rqst,
@@ -352,7 +367,7 @@ async def web_handler(
     return await _run_proxy_request(
         frontend_rqst,
         acquire_ctx=endpoint_pool.acquire(),
-        path=_strip_route_prefix(frontend_rqst, prefix="/func"),
+        path=path,
         is_anonymous=is_anonymous,
         http_headers_to_forward_extra=http_headers_to_forward_extra,
         log_prefix="web_handler",
@@ -518,13 +533,14 @@ async def web_handler_with_jwt(
             "upstream connection failed", exc_info=True, handler_name="web_handler_with_jwt"
         )
         raise ProxyTargetUnreachableError() from e
-    except ClientConnectionError:
-        log.warning(
-            "connection closed during proxying",
-            handler_name="web_handler_with_jwt",
-            request_method=frontend_rqst.method,
-            request_path=path,
-        )
+    except ClientConnectionError as e:
+        if not is_client_disconnect(frontend_rqst, e):
+            log.warning(
+                "connection closed during proxying",
+                handler_name="web_handler_with_jwt",
+                request_method=frontend_rqst.method,
+                request_path=path,
+            )
         raise
     except NoHealthyEndpointError as e:
         raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
@@ -587,9 +603,10 @@ async def web_plugin_handler(
     content-type and content-length headers before sending up-requests.
     It also configures the domain in the json body for "auth/signup" requests.
     """
+    path = frontend_rqst.match_info["path"]
+    _reject_disabled_signup(frontend_rqst, path)
     stats: WebStats = frontend_rqst.app["stats"]
     stats.active_proxy_plugin_handlers.add(asyncio.current_task())  # type: ignore
-    path = frontend_rqst.match_info["path"]
     config: WebServerUnifiedConfig = frontend_rqst.app["config"]
     open_session = get_anonymous_session if is_anonymous else get_api_session
     try:

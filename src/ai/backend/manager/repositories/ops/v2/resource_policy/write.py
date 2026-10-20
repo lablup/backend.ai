@@ -6,7 +6,7 @@ lends a project its members: an uncapped membership would carry the enclosing
 scope's admin roles onto a shared catalog row.
 
 The cap grants nothing by itself. What a scope may do with the policy it reaches is
-the read its own roles state (``data/permission/seed/roles/``).
+the read its own roles state (``seeds/manager/role_preset/``).
 
 Restating is the whole surface: each method reads the policy the scope is subject to
 now, drops whatever policy of that type the scope held, and lends the current one.
@@ -90,25 +90,25 @@ class V2ResourcePolicyWriteOps(V2WriteOps, V2CapOps):
         target: ScopeTarget,
     ) -> None:
         policy = await self._sess.scalar(sa.select(id_column).where(target.to_condition()()))
-        await self._drop_shares(scope, entity_type)
+        await self._drop_shares(scope, entity_type, keep=policy)
         if policy is None:
             return
         # A row written before the graph, or by a data migration, has no node yet.
         await self._provision([scope, policy])
-        share_id = await self._reset_share(scope, policy)
-        await self._insert_caps(share_id, dict.fromkeys(self._bits_of(self._POLICY_CAP)))
+        await self._widen_share(scope, policy, dict.fromkeys(self._bits_of(self._POLICY_CAP)))
 
-    async def _drop_shares(self, scope: EntityIdentifier, entity_type: EntityType) -> None:
-        """Take back every policy of this type the scope was lent. What the scope owns
-        is not a share and stays."""
+    async def _drop_shares(
+        self, scope: EntityIdentifier, entity_type: EntityType, keep: EntityIdentifier | None
+    ) -> None:
+        """Take back every policy of this type the scope was lent except ``keep``, so a
+        restate that changes nothing rewrites nothing. What the scope owns stays."""
+        dropped = sa.select(VirtualEntityRow.id).where(VirtualEntityRow.entity_type == entity_type)
+        if keep is not None:
+            dropped = dropped.where(VirtualEntityRow.id.is_distinct_from(self._node_id_query(keep)))
         await self._sess.execute(
             sa.delete(EntityMembershipRow).where(
                 EntityMembershipRow.virtual_entity_id == self._node_id_query(scope),
-                EntityMembershipRow.member_entity_id.in_(
-                    sa.select(VirtualEntityRow.id).where(
-                        VirtualEntityRow.entity_type == entity_type
-                    )
-                ),
+                EntityMembershipRow.member_entity_id.in_(dropped),
                 EntityMembershipRow.capped.is_(True),
             )
         )

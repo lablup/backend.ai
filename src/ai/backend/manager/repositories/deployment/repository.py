@@ -16,6 +16,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import Valke
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
@@ -413,6 +414,27 @@ class DeploymentRepository:
             EndpointNotFound: If the deployment does not exist.
         """
         return await self._db_source.replace_deployment_options(deployment_id, options)
+
+    @deployment_repository_resilience.apply()
+    async def replace_designated_agents(
+        self,
+        deployment_id: DeploymentID,
+        agent_uuids: set[AgentUUID],
+    ) -> None:
+        """Replace the agents a deployment designates with ``agent_uuids``.
+
+        Raises:
+            EndpointNotFound: If the deployment does not exist.
+        """
+        await self._db_source.replace_designated_agents(deployment_id, agent_uuids)
+
+    @deployment_repository_resilience.apply()
+    async def fetch_designated_agents_by_deployment_ids(
+        self,
+        deployment_ids: set[DeploymentID],
+    ) -> Mapping[DeploymentID, list[AgentUUID]]:
+        """Fetch the designated agents of each deployment; one with none maps to ``[]``."""
+        return await self._db_source.fetch_designated_agents_by_deployment_ids(deployment_ids)
 
     @deployment_repository_resilience.apply()
     async def delete_endpoint(

@@ -31,6 +31,12 @@ from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url
     GetUploadPresignedURLActionResult,
 )
 from ai.backend.manager.services.object_storage.actions.list import ListObjectStorageAction
+from ai.backend.manager.services.object_storage.actions.partial_bulk_purge_object_storages import (
+    PartialBulkPurgeObjectStoragesAction,
+)
+from ai.backend.manager.services.object_storage.actions.partial_bulk_update_object_storages import (
+    PartialBulkUpdateObjectStoragesAction,
+)
 from ai.backend.manager.services.object_storage.actions.purge import PurgeObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.search import (
     SearchObjectStoragesAction,
@@ -51,6 +57,12 @@ class ObjectStorageProcessors:
         UpdateObjectStorageAction, EntityOpsResult[ObjectStorageData]
     ]
     purge: SingleEntityActionProcessor[PurgeObjectStorageAction, EntityOpsResult[ObjectStorageData]]
+    partial_bulk_update: PartialBulkActionProcessor[
+        PartialBulkUpdateObjectStoragesAction, ObjectStorageData
+    ]
+    partial_bulk_purge: PartialBulkActionProcessor[
+        PartialBulkPurgeObjectStoragesAction, ObjectStorageData
+    ]
     get: SingleEntityActionProcessor[GetObjectStorageAction, EntityOpsResult[ObjectStorageData]]
     bulk_get: PartialBulkActionProcessor[BulkGetObjectStoragesAction, ObjectStorageData]
     global_list_storages: GlobalActionProcessor[
@@ -75,6 +87,12 @@ class ObjectStorageProcessors:
         self.global_create = group.global_create_ops(CreateObjectStorageAction)
         self.update = group.single_update_ops(UpdateObjectStorageAction)
         self.purge = group.entity_purge_ops(PurgeObjectStorageAction)
+        self.partial_bulk_update = group.partial_bulk_update_ops(
+            PartialBulkUpdateObjectStoragesAction
+        )
+        self.partial_bulk_purge = group.entity_partial_bulk_purge_ops(
+            PartialBulkPurgeObjectStoragesAction
+        )
         self.get = group.single_get_ops(GetObjectStorageAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetObjectStoragesAction)
         self.global_list_storages = group.global_searcher_ops(ListObjectStorageAction)

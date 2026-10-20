@@ -5,18 +5,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.resource.types import ProjectResourcePolicyData
 from ai.backend.manager.models.project.creators import ProjectCreator
-from bai_scenario.seeds.seeder import Naming, SeedRowFromTwo
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFromTwo
 
 
 @dataclass(frozen=True)
-class SeedProject(SeedRowFromTwo[DomainData, ProjectResourcePolicyData, ProjectData]):
+class TestSeedProject(TestSeedRowFromTwo[DomainData, ProjectResourcePolicyData, ProjectData]):
     """A project of the given domain, under the given policy."""
 
     name_hint: str = "project"
+    container_registry: ImageCommitRegistry | None = None
 
     @override
     def kind(self) -> str:
@@ -40,4 +42,5 @@ class SeedProject(SeedRowFromTwo[DomainData, ProjectResourcePolicyData, ProjectD
             domain_name=first.name,
             description=f"{name} was already here",
             resource_policy=second.name,
+            container_registry=self.container_registry,
         )

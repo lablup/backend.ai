@@ -22,11 +22,12 @@ from ai.backend.common.data.entity.agent import AgentEntityType
 from ai.backend.common.data.entity.artifact import ArtifactEntityType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
-from ai.backend.common.data.entity.audit_log import AuditLogFieldType
+from ai.backend.common.data.entity.audit_log import AuditLogFieldType, AuditLogScopeFieldType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.dotfile import DotfileFieldType
 from ai.backend.common.data.entity.entity_label import EntityLabelFieldType
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
@@ -40,6 +41,7 @@ from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.session_group import SessionGroupEntityType
 from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
@@ -57,10 +59,14 @@ from ai.backend.manager.actions.registry.types import (
 from ai.backend.manager.actions.types import ActionBacking, ActionGate, ActionKind
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction
 from ai.backend.manager.actions.v2.field.base import (
+    BaseNestedFieldSearchAction,
     BaseRuntimeSingleFieldAction,
     BaseSingleFieldAction,
 )
-from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
+from ai.backend.manager.actions.v2.field.bulk_base import (
+    BaseBulkFieldAction,
+    BasePartialBulkOwnerCandidatesFieldAction,
+)
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
     RefusingGlobalActionValidator,
@@ -74,10 +80,15 @@ from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
-from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
+from ai.backend.manager.data.dotfile.types import DotfileData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.data.image.types import ImageAliasData
 from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.models.audit_log.owner_candidates import (
+    AuditLogOwnerCandidates,
+    AuditLogScopeOwnerCandidates,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
 from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
@@ -129,19 +140,36 @@ from ai.backend.manager.services.artifact_registry.actions.common.get_multi impo
 from ai.backend.manager.services.artifact_registry.actions.huggingface.bulk_get import (
     BulkGetHuggingFaceRegistriesAction,
 )
+from ai.backend.manager.services.artifact_registry.actions.huggingface.partial_bulk_purge import (
+    PartialBulkPurgeHuggingFaceRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.huggingface.partial_bulk_update import (
+    PartialBulkUpdateHuggingFaceRegistriesAction,
+)
 from ai.backend.manager.services.artifact_registry.actions.reservoir.bulk_get import (
     BulkGetReservoirRegistriesAction,
 )
+from ai.backend.manager.services.artifact_registry.actions.reservoir.partial_bulk_purge import (
+    PartialBulkPurgeReservoirRegistriesAction,
+)
+from ai.backend.manager.services.artifact_registry.actions.reservoir.partial_bulk_update import (
+    PartialBulkUpdateReservoirRegistriesAction,
+)
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.audit_log.actions.bulk_get import BulkGetAuditLogsAction
-from ai.backend.manager.services.audit_log.actions.lookup_owner import (
-    LookupAuditLogOwnerAction,
-    LookupBulkAuditLogOwnerAction,
+from ai.backend.manager.services.audit_log.actions.bulk_get_scopes import (
+    BulkGetAuditLogScopesAction,
+)
+from ai.backend.manager.services.audit_log.actions.scoped_search_scopes import (
+    ScopedSearchAuditLogScopesAction,
 )
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.catalog import load_wiring_catalog
 from ai.backend.manager.services.container_registry.actions.bulk_get import (
     BulkGetContainerRegistriesAction,
+)
+from ai.backend.manager.services.container_registry.actions.lookup import (
+    LookupContainerRegistryAction,
 )
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
@@ -159,6 +187,9 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.bulk_get_a
 from ai.backend.manager.services.deployment.actions.bulk_get import BulkGetDeploymentsAction
 from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_deployment_policies import (
     BulkGetDeploymentPoliciesAction,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.partial_bulk_get_deployment_policies import (
+    PartialBulkGetDeploymentPoliciesAction,
 )
 from ai.backend.manager.services.deployment.actions.lookup_owner import (
     LookupBulkAutoScalingRuleOwnerAction,
@@ -197,9 +228,21 @@ from ai.backend.manager.services.domain.actions.create_domain import CreateDomai
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.actions.scoped_search import ScopedSearchDomainsAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.dotfile.actions.lookup_owner import (
+    LookupBulkDotfileOwnerAction,
+    LookupDotfileOwnerAction,
+)
+from ai.backend.manager.services.dotfile.actions.search import SearchDotfilesAction
+from ai.backend.manager.services.dotfile.processors import DotfileProcessors
 from ai.backend.manager.services.entity_label.actions.lookup_owner import (
     LookupBulkEntityLabelOwnerAction,
     LookupEntityLabelOwnerAction,
+)
+from ai.backend.manager.services.entity_label.actions.partial_bulk_purge import (
+    PartialBulkPurgeEntityLabelAction,
+)
+from ai.backend.manager.services.entity_label.actions.partial_bulk_upsert import (
+    PartialBulkUpsertEntityLabelAction,
 )
 from ai.backend.manager.services.entity_label.processors import EntityLabelProcessors
 from ai.backend.manager.services.export.actions.get_report import GetReportAction
@@ -245,13 +288,13 @@ from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
 )
 from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
-from ai.backend.manager.services.role_preset.actions.bulk_add_permissions import (
-    BulkAddRolePermissionPresetsAction,
-)
-from ai.backend.manager.services.role_preset.actions.bulk_remove_permissions import (
-    BulkRemoveRolePermissionPresetsAction,
+from ai.backend.manager.services.role_preset.actions.atomic_bulk_add_permissions import (
+    AtomicBulkAddRolePresetPermissionsAction,
 )
 from ai.backend.manager.services.role_preset.actions.create import CreateRolePresetAction
+from ai.backend.manager.services.role_preset.actions.partial_bulk_remove_permissions import (
+    PartialBulkRemoveRolePresetPermissionsAction,
+)
 from ai.backend.manager.services.role_preset.actions.update import UpdateRolePresetAction
 from ai.backend.manager.services.runtime_variant.actions.purge import PurgeRuntimeVariantAction
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_deployment_histories import (
@@ -259,6 +302,9 @@ from ai.backend.manager.services.scheduling_history.actions.bulk_get_deployment_
 )
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_kernel_histories import (
     BulkGetKernelHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_replica_group_histories import (
+    BulkGetReplicaGroupHistoriesAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_route_histories import (
     BulkGetRouteHistoriesAction,
@@ -288,7 +334,10 @@ from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
     ResourceAllocationProcessors,
 )
+from ai.backend.manager.services.session_group.actions.bulk_get import BulkGetSessionGroupsAction
+from ai.backend.manager.services.session_group.processors import SessionGroupProcessors
 from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
+from ai.backend.manager.services.user.actions.bulk_lookup import BulkLookupUsersAction
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.vfolder.actions.bulk_get import BulkGetVFoldersAction
 from ai.backend.manager.services.vfolder.actions.storage_ops import PublicListAllowedTypesAction
@@ -308,6 +357,8 @@ _V2_ACTION_BASES: tuple[type[Any], ...] = (
     BaseSingleFieldAction,
     BaseRuntimeSingleFieldAction,
     BaseBulkFieldAction,
+    BaseNestedFieldSearchAction,
+    BasePartialBulkOwnerCandidatesFieldAction,
 )
 
 _SNAKE_CASE = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
@@ -547,8 +598,8 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
 
 
 def test_artifact_registry_metas_read_is_a_partial_bulk_permission_read() -> None:
-    """The named artifact, HuggingFace and Reservoir registries are read one permission check
-    per registry, not superadmin-only."""
+    """The named artifact, HuggingFace and Reservoir registries are read, updated and purged
+    one permission check per registry, not superadmin-only."""
     registry = _ops_registry()
     ArtifactRegistryProcessors(
         registry.group(GroupMeta(ArtifactRegistryEntityType())),
@@ -576,6 +627,17 @@ def test_artifact_registry_metas_read_is_a_partial_bulk_permission_read() -> Non
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
+    for action_cls in (
+        PartialBulkUpdateHuggingFaceRegistriesAction,
+        PartialBulkPurgeHuggingFaceRegistriesAction,
+        PartialBulkUpdateReservoirRegistriesAction,
+        PartialBulkPurgeReservoirRegistriesAction,
+    ):
+        assert recorded[action_cls] == (
+            ArtifactRegistryEntityType(),
+            ActionKind.BULK,
+            ActionGate.PERMISSION,
+        )
 
 
 def test_rg_domain_read_is_a_scoped_permission_read() -> None:
@@ -663,8 +725,10 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
     assert recorded[BulkGetAccessTokensAction] == partial
     assert recorded[BulkGetAutoScalingRulesAction] == partial
     assert recorded[BulkGetDeploymentPoliciesAction] == partial
+    assert recorded[PartialBulkGetDeploymentPoliciesAction] == partial
     assert recorded[BulkGetDeploymentHistoriesAction] == partial
     assert recorded[BulkGetRouteHistoriesAction] == partial
+    assert recorded[BulkGetReplicaGroupHistoriesAction] == partial
     assert recorded[BulkGetSessionHistoriesAction] == (
         SessionEntityType(),
         ActionKind.BULK,
@@ -723,13 +787,22 @@ def test_session_and_kernel_data_loader_reads_are_checked_per_session() -> None:
 
 
 def test_entity_data_loader_reads_are_checked_per_entity() -> None:
-    """The resource group, notification, artifact, domain, user and project DataLoaders
-    read per named entity."""
+    """The resource group, notification, artifact, domain, user, project and session group
+    DataLoaders read per named entity."""
     registry = _ops_registry()
     ResourceGroupProcessors(registry.group(GroupMeta(ResourceGroupEntityType())), MagicMock())
     DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
     UserProcessors(registry.group(GroupMeta(UserEntityType())), MagicMock())
+    DotfileProcessors(
+        registry.dangling_lookup_field_group(
+            FieldGroupMeta(DotfileFieldType()),
+            DotfileData,
+            LookupDotfileOwnerAction,
+            LookupBulkDotfileOwnerAction,
+        )
+    )
     ProjectProcessors(registry.group(GroupMeta(ProjectEntityType())), MagicMock())
+    SessionGroupProcessors(registry.group(GroupMeta(SessionGroupEntityType())), MagicMock())
     NotificationProcessors(
         registry.group(GroupMeta(NotificationChannelEntityType())),
         registry.group(GroupMeta(NotificationRuleEntityType())),
@@ -768,6 +841,11 @@ def test_entity_data_loader_reads_are_checked_per_entity() -> None:
         record.action_cls: (record.entity_type, record.kind, record.gate)
         for record in registry.wired_processors()
     }
+    assert recorded[SearchDotfilesAction] == (
+        GlobalEntityType(),
+        ActionKind.SCOPE,
+        ActionGate.PERMISSION,
+    )
     assert recorded[BulkGetDeploymentsAction] == (
         DeploymentEntityType(),
         ActionKind.BULK,
@@ -833,8 +911,18 @@ def test_entity_data_loader_reads_are_checked_per_entity() -> None:
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
+    assert recorded[BulkLookupUsersAction] == (
+        UserEntityType(),
+        ActionKind.LOOKUP,
+        ActionGate.PERMISSION,
+    )
     assert recorded[BulkGetProjectsAction] == (
         ProjectEntityType(),
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+    )
+    assert recorded[BulkGetSessionGroupsAction] == (
+        SessionGroupEntityType(),
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
@@ -899,6 +987,11 @@ def test_container_registry_loader_read_is_a_partial_permission_read() -> None:
         record.action_cls: (record.entity_type, record.kind, record.gate)
         for record in registry.wired_processors()
     }
+    assert recorded[LookupContainerRegistryAction] == (
+        ContainerRegistryEntityType(),
+        ActionKind.LOOKUP,
+        ActionGate.PERMISSION,
+    )
     assert recorded[BulkGetContainerRegistriesAction] == (
         ContainerRegistryEntityType(),
         ActionKind.BULK,
@@ -927,35 +1020,30 @@ def test_idle_checker_loader_read_is_a_partial_permission_read() -> None:
 
 
 def test_audit_log_loader_read_is_a_partial_field_permission_read() -> None:
-    """The audit log DataLoader reads per named record, checked per entity each is about."""
+    """The audit log DataLoader reads per named record, checked per owner each belongs to."""
     registry = _ops_registry()
     AuditLogProcessors(
-        registry.dangling_lookup_field_group(
-            FieldGroupMeta(AuditLogFieldType()),
-            AuditLogData,
-            LookupAuditLogOwnerAction,
-            LookupBulkAuditLogOwnerAction,
-        )
+        registry.dangling_owner_candidates_field_group(
+            FieldGroupMeta(AuditLogFieldType()), AuditLogData, AuditLogOwnerCandidates()
+        ),
+        registry.dangling_owner_candidates_field_group(
+            FieldGroupMeta(AuditLogScopeFieldType()),
+            AuditLogScopeData,
+            AuditLogScopeOwnerCandidates(),
+        ),
     )
 
     recorded = {
         record.action_cls: (record.kind, record.gate) for record in registry.wired_processors()
     }
     assert recorded[BulkGetAuditLogsAction] == (ActionKind.BULK, ActionGate.PERMISSION)
+    assert recorded[ScopedSearchAuditLogScopesAction] == (ActionKind.BULK, ActionGate.PERMISSION)
+    assert recorded[BulkGetAuditLogScopesAction] == (ActionKind.BULK, ActionGate.PERMISSION)
 
 
-def test_dangling_lookup_field_group_records_its_owner_lookups_under_its_concern() -> None:
-    """Built from a concern, the lookups name that concern; built from the registry,
-    they name the field type, as the entity label wiring always has."""
+def test_dangling_lookup_field_group_records_its_owner_lookups_under_its_field_type() -> None:
+    """Built from the registry, the lookups name the field type."""
     registry = _ops_registry()
-    AuditLogProcessors(
-        registry.concern(ConcernMeta(Concern.VISIBILITY)).dangling_lookup_field_group(
-            FieldGroupMeta(AuditLogFieldType()),
-            AuditLogData,
-            LookupAuditLogOwnerAction,
-            LookupBulkAuditLogOwnerAction,
-        )
-    )
     EntityLabelProcessors(
         registry.dangling_lookup_field_group(
             FieldGroupMeta(EntityLabelFieldType()),
@@ -973,20 +1061,63 @@ def test_dangling_lookup_field_group_records_its_owner_lookups_under_its_concern
                 record.kind,
                 record.gate,
             ))
-    assert recorded[LookupAuditLogOwnerAction] == {
-        (Concern.VISIBILITY, ActionKind.LOOKUP, ActionGate.PERMISSION)
-    }
-    # The partial bulk get records its owner lookup public beside the gated one.
-    assert recorded[LookupBulkAuditLogOwnerAction] == {
-        (Concern.VISIBILITY, ActionKind.LOOKUP, ActionGate.PERMISSION),
-        (Concern.VISIBILITY, ActionKind.LOOKUP, ActionGate.PUBLIC),
-    }
     assert recorded[LookupEntityLabelOwnerAction] == {
         (EntityLabelFieldType(), ActionKind.LOOKUP, ActionGate.PERMISSION)
     }
+    # The bulk owner lookup is recorded twice: gated, for the group's own bulk reads,
+    # and public, as the step the partial bulk purge runs first.
     assert recorded[LookupBulkEntityLabelOwnerAction] == {
-        (EntityLabelFieldType(), ActionKind.LOOKUP, ActionGate.PERMISSION)
+        (EntityLabelFieldType(), ActionKind.LOOKUP, ActionGate.PERMISSION),
+        (EntityLabelFieldType(), ActionKind.LOOKUP, ActionGate.PUBLIC),
     }
+
+
+def test_entity_label_bulk_writes_are_partial_and_checked_per_owner() -> None:
+    """Both bulk label writes answer per owner, so each is wired bulk-shaped behind
+    the permission gate."""
+    registry = _ops_registry()
+    EntityLabelProcessors(
+        registry.dangling_lookup_field_group(
+            FieldGroupMeta(EntityLabelFieldType()),
+            EntityLabelData,
+            LookupEntityLabelOwnerAction,
+            LookupBulkEntityLabelOwnerAction,
+        )
+    )
+
+    recorded = {
+        record.action_cls: (record.kind, record.gate, record.backing)
+        for record in registry.wired_processors()
+    }
+    assert recorded[PartialBulkUpsertEntityLabelAction] == (
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+        ActionBacking.GENERIC,
+    )
+    assert recorded[PartialBulkPurgeEntityLabelAction] == (
+        ActionKind.BULK,
+        ActionGate.PERMISSION,
+        ActionBacking.GENERIC,
+    )
+
+
+def test_owner_candidates_field_group_records_no_lookup_under_its_concern() -> None:
+    """Owners are read as part of each operation, so nothing is recorded as a lookup."""
+    registry = _ops_registry()
+    AuditLogProcessors(
+        registry.concern(ConcernMeta(Concern.VISIBILITY)).dangling_owner_candidates_field_group(
+            FieldGroupMeta(AuditLogFieldType()), AuditLogData, AuditLogOwnerCandidates()
+        ),
+        registry.concern(ConcernMeta(Concern.VISIBILITY)).dangling_owner_candidates_field_group(
+            FieldGroupMeta(AuditLogScopeFieldType()),
+            AuditLogScopeData,
+            AuditLogScopeOwnerCandidates(),
+        ),
+    )
+
+    records = registry.wired_processors()
+    assert [record for record in records if record.kind == ActionKind.LOOKUP] == []
+    assert {record.concern for record in records} == {Concern.VISIBILITY}
 
 
 # An ops-family action wired through a service function, and why the generic service
@@ -1005,8 +1136,8 @@ _OPS_ACTIONS_WIRED_TO_A_SERVICE: dict[type[Any], str] = {
     CreatePresetAction: "validates the query template before insert",
     CreateRolePresetAction: "validates that the role name template renders",
     UpdateRolePresetAction: "validates the template and re-syncs the derived roles",
-    BulkAddRolePermissionPresetsAction: "re-syncs the derived roles in the same transaction",
-    BulkRemoveRolePermissionPresetsAction: "re-syncs the derived roles in the same transaction",
+    AtomicBulkAddRolePresetPermissionsAction: "re-syncs the derived roles in the same transaction",
+    PartialBulkRemoveRolePresetPermissionsAction: "re-syncs the derived roles in the same transaction",
 }
 
 

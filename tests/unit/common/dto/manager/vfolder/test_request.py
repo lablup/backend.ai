@@ -58,7 +58,7 @@ class TestVFolderCreateReq:
         assert req.name == "test-folder"
         assert req.folder_host is None
         assert req.usage_mode == VFolderUsageMode.GENERAL
-        assert req.permission == VFolderPermissionField.READ_WRITE
+        assert req.permission is None
         assert req.cloneable is False
 
     def test_full_creation(self) -> None:
@@ -156,7 +156,7 @@ class TestCloneVFolderReq:
         assert req.target_host is None
         assert req.cloneable is False
         assert req.usage_mode == VFolderUsageMode.GENERAL
-        assert req.permission == VFolderPermissionField.READ_WRITE
+        assert req.permission is None
 
     def test_target_host_alias(self) -> None:
         req = CloneVFolderReq.model_validate({"target_name": "clone", "folder_host": "storage-1"})

@@ -35,13 +35,13 @@ from bai_scenario.components.resource_policy import (
     ThePolicyNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 NOBODY = "nobody"
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
-type ReadingStep = Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+type ReadingStep = Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 
 
 @dataclass(frozen=True)
@@ -67,7 +67,7 @@ class ReadingByName(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
 
 @dataclass(frozen=True)
 class TheSuperadminReadsItByName(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
     started: datetime
@@ -84,7 +84,7 @@ class TheSuperadminReadsItByName(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
@@ -98,7 +98,7 @@ class TheSuperadminReadsItByName(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
 
@@ -114,7 +114,7 @@ class AUserGrantedNothingMayNotRead(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family)
 
     @override
@@ -128,7 +128,7 @@ class AUserGrantedNothingMayNotRead(
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: Family[Any, Any]
 
@@ -144,7 +144,7 @@ class ANameNothingAnswersToIsNotFound(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family, role=UserRole.SUPERADMIN)
 
     @override
@@ -158,7 +158,7 @@ class ANameNothingAnswersToIsNotFound(
 
 @dataclass(frozen=True)
 class EnforcementOffOpensTheRead(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any], Configured
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any], Configured
 ):
     family: Family[Any, Any]
     started: datetime
@@ -176,7 +176,7 @@ class EnforcementOffOpensTheRead(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return APolicyAndSomeone(self.family)
 
     @override

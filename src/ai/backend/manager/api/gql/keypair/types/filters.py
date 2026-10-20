@@ -45,7 +45,7 @@ class KeypairFilterGQL(PydanticInputMixin[KeypairFilterDTO]):
     is_admin: bool | None = None
     is_default: bool | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Filter keypairs by whether they are their owner's default one.",
         ),
         default=None,
@@ -61,6 +61,10 @@ class KeypairFilterGQL(PydanticInputMixin[KeypairFilterDTO]):
     )
     created_at: DateTimeFilter | None = None
     last_used: DateTimeFilter | None = None
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by keypair ID."),
+        default=None,
+    )
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None

@@ -35,7 +35,7 @@ from ai.backend.common.data.entity.resource_group import (
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.events.event_types.kernel.types import (
     KernelCreationInfo,
@@ -59,7 +59,12 @@ from ai.backend.common.types import (
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntry, SSHKeypair
+from ai.backend.manager.data.dotfile.types import (
+    DotfileBundle,
+    DotfileEntries,
+    DotfileEntry,
+    SSHKeypair,
+)
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.network.types import NetworkData
@@ -84,18 +89,19 @@ from ai.backend.manager.errors.resource import DomainNotFound, ResourceGroupNotF
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.domain.row import DomainRow, domains, query_domain_dotfiles
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow, domains
+from ai.backend.manager.models.dotfile.row import DotfileRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.creators import KernelCreator
 from ai.backend.manager.models.kernel.row import (
-    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     KernelRow,
 )
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.keypair.row import KeyPairRow, keypairs
 from ai.backend.manager.models.network.row import NetworkRow
-from ai.backend.manager.models.project.row import ProjectRow, query_group_dotfiles
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
 from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
@@ -113,7 +119,6 @@ from ai.backend.manager.models.scheduling_history.creators import SessionSchedul
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.creators import SessionCreator, SessionDependencyCreator
 from ai.backend.manager.models.session.row import (
-    PRIVATE_SESSION_TYPES,
     SessionDependencyRow,
     SessionRow,
 )
@@ -201,7 +206,7 @@ from ai.backend.manager.views.sokovan.workload import (
     WorkloadOwner,
 )
 
-from .types import AgentResourcesByAgent, KeypairConcurrencyData
+from .types import AgentResourcesByAgent
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -519,6 +524,9 @@ class ScheduleDBSource:
                 # Matches the previous join semantics: a pending session
                 # without pending kernels is not schedulable.
                 continue
+            if row.user_uuid is None:
+                # The owner was purged; the purge marks the session for termination.
+                continue
             workloads.append(
                 SessionWorkload(
                     meta=WorkloadMeta(
@@ -526,7 +534,7 @@ class ScheduleDBSource:
                         resource_group_id=row.resource_group_id,
                         owner=WorkloadOwner(
                             access_key=AccessKey(row.access_key or ""),
-                            user_uuid=UserID(row.user_uuid),
+                            user_uuid=row.user_uuid,
                             project_id=ProjectID(row.group_id),
                             domain_id=DomainID(row.domain_id),
                         ),
@@ -2336,39 +2344,31 @@ class ScheduleDBSource:
         user_scope: UserScope,
         access_key: AccessKey,
     ) -> DotfileBundle:
-        """Read SSH keypair + keypair/group/domain dotfiles for a user.
-
-        Ports the read-side of the legacy ``prepare_dotfiles`` helper
-        (``models/dotfile.py`` — removed) into the repository layer so
-        the query does not live in ``models/``. The conflict check
-        against resolved vfolder mounts is owned by the validator rule
-        :class:`DotfileVFolderConflictRule`; this method only fetches.
-
-        Returns a typed :class:`DotfileBundle` with an ordered dotfile
-        sequence (keypair > group > domain, with duplicate paths dropped
-        and reversed so higher-priority entries overwrite on conflict)
-        and an optional :class:`SSHKeypair`. The agent-facing JSONB dict
-        is rendered by :meth:`DotfileBundle.to_internal_data` at the
-        preparer boundary.
-        """
+        """Read the keypair owner's dotfiles and SSH keys, then merge project/domain dotfiles."""
         conn = cast(SAConnection, db_sess.bind)
-
         row = (
             await conn.execute(
                 sa.select(
                     keypairs.c.ssh_public_key,
                     keypairs.c.ssh_private_key,
-                    keypairs.c.dotfiles,
+                    keypairs.c.user,
                 ).where(keypairs.c.access_key == access_key)
             )
         ).first()
         if row is None:
             return DotfileBundle()
 
-        keypair_dotfiles = list(msgpack.unpackb(row.dotfiles))
-        ordered_entries: list[DotfileEntry] = [
-            DotfileEntry(path=entry["path"], perm=entry["perm"], data=entry["data"])
-            for entry in keypair_dotfiles
+        user_dotfiles = await conn.execute(
+            sa.select(DotfileRow.path, DotfileRow.perm, DotfileRow.data)
+            .where(
+                DotfileRow.entity_type == UserEntityType(),
+                DotfileRow.entity_id == row.user,
+                DotfileRow.is_default,
+            )
+            .order_by(DotfileRow.id)
+        )
+        ordered_entries = [
+            DotfileEntry(entry.path, entry.perm, entry.data) for entry in user_dotfiles
         ]
         ssh_keypair: SSHKeypair | None = None
         if row.ssh_public_key and row.ssh_private_key:
@@ -2378,15 +2378,21 @@ class ScheduleDBSource:
             )
         seen_paths = {entry.path for entry in ordered_entries}
 
-        group_dotfiles, _ = await query_group_dotfiles(conn, user_scope.group_id)
-        for entry in group_dotfiles:
-            if entry["path"] not in seen_paths:
-                ordered_entries.append(
-                    DotfileEntry(path=entry["path"], perm=entry["perm"], data=entry["data"])
-                )
-                seen_paths.add(entry["path"])
+        packed = await conn.scalar(
+            sa.select(ProjectRow.dotfiles).where(ProjectRow.id == user_scope.group_id)
+        )
+        group_dotfiles = DotfileEntries.unpack(packed).entries if packed is not None else ()
+        for group_entry in group_dotfiles:
+            if group_entry.path not in seen_paths:
+                ordered_entries.append(group_entry)
+                seen_paths.add(group_entry.path)
 
-        domain_dotfiles, _ = await query_domain_dotfiles(conn, user_scope.domain_name)
+        packed_domain_dotfiles = await conn.scalar(
+            sa.select(DomainRow.dotfiles).where(DomainRow.name == user_scope.domain_name)
+        )
+        domain_dotfiles = (
+            msgpack.unpackb(packed_domain_dotfiles) if packed_domain_dotfiles is not None else []
+        )
         for entry in domain_dotfiles:
             if entry["path"] not in seen_paths:
                 ordered_entries.append(
@@ -3597,17 +3603,18 @@ class ScheduleDBSource:
 
         # Query all images at once with registry info using ImageConditions
         condition = ImageConditions.by_identifiers(identifiers)
-        stmt = sa.select(ImageRow).where(condition()).options(selectinload(ImageRow.registry_row))
-
+        stmt = (
+            sa.select(ImageRow, ContainerRegistryRow)
+            .join(ContainerRegistryRow, ImageRow.registry_id == ContainerRegistryRow.id)
+            .where(condition())
+        )
         result = await db_sess.execute(stmt)
-        image_rows = result.scalars().all()
 
         # Convert to ImageConfigData
         image_configs: dict[UUID, ImageConfigData] = {}
-        for image_row in image_rows:
+        for image_row, registry_row in result.tuples().all():
             try:
                 img_ref = image_row.image_ref
-                registry_row = image_row.registry_row
 
                 image_config = ImageConfigData(
                     id=image_row.id,
@@ -3852,37 +3859,19 @@ class ScheduleDBSource:
             )
             await db_sess.execute(kernel_stmt)
 
-    async def get_keypair_concurrencies_from_db(
-        self, access_key: AccessKey
-    ) -> KeypairConcurrencyData:
-        """
-        Calculate both regular and SFTP concurrency from database with two simple queries.
-
-        :param access_key: The access key to query
-        :return: KeypairConcurrencyData with both regular and sftp counts
-        """
+    async def count_user_active_sessions(self, user_id: UserID) -> int:
+        """The user's active non-private sessions, counted as the scheduler's concurrency check does."""
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            # Base query for active kernels
-            base_query = (
+            count = await db_sess.scalar(
                 sa.select(sa.func.count())
-                .select_from(KernelRow)
+                .select_from(SessionRow)
                 .where(
-                    (KernelRow.access_key == access_key)
-                    & (KernelRow.status.in_(USER_RESOURCE_OCCUPYING_KERNEL_STATUSES))
+                    SessionRow.user_uuid == user_id,
+                    SessionRow.status.in_(SessionStatus.resource_occupied_statuses()),
+                    SessionRow.session_type.not_in(SessionTypes.private_types()),
                 )
             )
-
-            # Query for regular sessions
-            regular_query = base_query.where(KernelRow.session_type.not_in(PRIVATE_SESSION_TYPES))
-            regular_result = await db_sess.execute(regular_query)
-            regular_count = regular_result.scalar() or 0
-
-            # Query for SFTP sessions
-            sftp_query = base_query.where(KernelRow.session_type.in_(PRIVATE_SESSION_TYPES))
-            sftp_result = await db_sess.execute(sftp_query)
-            sftp_count = sftp_result.scalar() or 0
-
-            return KeypairConcurrencyData(regular_count=regular_count, sftp_count=sftp_count)
+            return count or 0
 
     async def get_attached_network(self, network_id: NetworkID) -> NetworkData:
         """
@@ -4514,7 +4503,8 @@ class ScheduleDBSource:
                     "network_id": session.network_id,
                     "kernels": [],
                 }
-                user_uuids.add(session.user_uuid)
+                if session.user_uuid is not None:
+                    user_uuids.add(session.user_uuid)
 
             # 2. Query kernels for these sessions
             kernel_query = (

@@ -61,6 +61,9 @@
   purge a relation), share write (`ShareOpsProvider` / `V2ShareWriteOps`: share, widen,
   narrow, unshare, accept an invitation, transfer). A repository is injected the one
   pair it needs.
+- The seed write (`SeedOpsProvider` / `V2SeedWriteOps`) extends the relation, roster and
+  resource policy ops and calls the primitive the API calls for the same relation. There
+  is no seed-only graph write.
 - Do NOT assume the graph ops are reachable from anywhere. The own and govern
   primitives live on the base the three ops share (`V2GraphWriteOpsBase`), and no
   provider hands that base out.

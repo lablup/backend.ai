@@ -40,7 +40,6 @@ __all__ = (
 )
 
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
@@ -108,7 +107,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     is_active = graphene.Boolean()
     is_admin = graphene.Boolean()
     is_default = graphene.Boolean(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Whether this is the owner's default keypair."
+        description="Added in 26.9.0. Whether this is the owner's default keypair."
     )
     resource_policy = graphene.String()
     created_at = GQLDateTime()
@@ -204,6 +203,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             valkey_target=valkey_target,
             db_id=REDIS_RATE_LIMIT_DB,
             human_readable_name="ratelimit",
+            sentinel_monitor=ctx.sentinel_monitors.monitor_for(valkey_target),
         )
         try:
             rlim_window = await valkey_client.get_user_rlim_window(UserID(self.user))
@@ -229,14 +229,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
 
     async def resolve_concurrency_used(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-
-        # Get repository from context
-        repository = ctx.scheduler_repository
-
-        # Get concurrency through repository (cache-through pattern)
-        # Convert graphene.String to str, then to AccessKey type
-        access_key = AccessKey(str(self.access_key))
-        return await repository.get_keypair_concurrency(access_key, is_sftp=False)
+        return await ctx.scheduler_repository.get_user_concurrency(UserID(self.user))
 
     async def resolve_last_used(self, info: graphene.ResolveInfo) -> datetime | None:
         ctx: GraphQueryContext = info.context

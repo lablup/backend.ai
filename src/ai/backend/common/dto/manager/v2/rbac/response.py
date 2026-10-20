@@ -11,8 +11,8 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import (
     PermissionBitDTO,
@@ -45,6 +45,7 @@ __all__ = (
     "PurgeRolePayload",
     "ReplaceRolePermissionFailureInfo",
     "ReplaceRolePermissionsPayload",
+    "RestoreRolePayload",
     "RoleAssignmentNode",
     "RoleNode",
     "ScopeEntityCombinationInfo",
@@ -59,7 +60,7 @@ class RoleNode(BaseResponseModel):
 
     id: UUID = Field(description="Role ID")
     entity_id: UUID = Field(
-        description=f"UUID of the role. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the role. Added in 26.9.0.",
     )
     name: str = Field(description="Role name")
     description: str | None = Field(default=None, description="Role description")
@@ -77,6 +78,14 @@ class RoleNode(BaseResponseModel):
     deleted_at: datetime | None = Field(default=None, description="Deletion timestamp")
     scope_type: EntityType = Field(description="Type of the scope the role belongs to")
     scope_id: UUID = Field(description="ID of the scope the role belongs to")
+    role_preset_id: RolePresetID | None = Field(
+        default=None,
+        description=(
+            "ID of the role preset the role was instantiated from. Null when the role "
+            "was not created from a preset or the preset has been purged. "
+            "Added in 26.9.0."
+        ),
+    )
 
 
 class CreateRolePayload(BaseResponseModel):
@@ -95,12 +104,21 @@ class DeleteRolePayload(BaseResponseModel):
     """Payload for role soft-deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted role")
+    role: RoleNode = Field(description="The soft-deleted role. Added in 26.10.0.")
+
+
+class RestoreRolePayload(BaseResponseModel):
+    """Payload for role restore mutation result."""
+
+    id: UUID = Field(description="ID of the restored role")
+    role: RoleNode = Field(description="The restored role. Added in 26.10.0.")
 
 
 class PurgeRolePayload(BaseResponseModel):
     """Payload for role purge mutation result."""
 
     id: UUID = Field(description="ID of the purged role")
+    entity_id: UUID = Field(description="UUID of the purged role. Added in 26.10.0.")
 
 
 class CreateRoleInvitationPayload(BaseResponseModel):
@@ -113,6 +131,7 @@ class DeletePermissionPayload(BaseResponseModel):
     """Payload for permission deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted permission")
+    field_id: UUID = Field(description="UUID of the deleted permission row. Added in 26.10.0.")
 
 
 class RoleAssignmentNode(BaseResponseModel):
@@ -228,7 +247,7 @@ class PermissionNode(BaseResponseModel):
 
     id: UUID = Field(description="Permission ID")
     field_id: UUID = Field(
-        description=f"UUID of the permission row. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the permission row. Added in 26.9.0.",
     )
     role_id: UUID = Field(description="Role this permission belongs to")
     entity_type: EntityType = Field(description="Entity element type")

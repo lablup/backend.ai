@@ -96,6 +96,7 @@ if TYPE_CHECKING:
         DomainProcessors,
     )
     from ai.backend.manager.services.domain.service import DomainService
+    from ai.backend.manager.services.dotfile.processors import DotfileProcessors
     from ai.backend.manager.services.entity_label.processors import (
         EntityLabelProcessors,
     )
@@ -257,6 +258,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.service_catalog.processors import (
         ServiceCatalogProcessors,
     )
+    from ai.backend.manager.services.service_catalog.service import (
+        ServiceCatalogService,
+    )
     from ai.backend.manager.services.session.processors import (
         SessionProcessors,
     )
@@ -264,6 +268,8 @@ if TYPE_CHECKING:
         ResourceAllocationService,
     )
     from ai.backend.manager.services.session.service import SessionService
+    from ai.backend.manager.services.session_group.processors import SessionGroupProcessors
+    from ai.backend.manager.services.session_group.service import SessionGroupService
     from ai.backend.manager.services.storage_namespace.processors import (
         StorageNamespaceProcessors,
     )
@@ -372,6 +378,7 @@ class Services:
     vfolder_sharing: VFolderSharingService
     vfolder_mount_policy: VFolderMountPolicyService
     session: SessionService
+    session_group: SessionGroupService
     manager_admin: ManagerAdminService
     secret: SecretService
     prometheus_query_preset: PrometheusQueryPresetService
@@ -386,6 +393,7 @@ class Services:
     runtime_variant_preset: RuntimeVariantPresetService
     deployment_revision_preset: DeploymentPresetService
     model_card: ModelCardService
+    service_catalog: ServiceCatalogService
     resource_group: ResourceGroupService
     metric: MetricService
     model_serving: ModelServingService
@@ -437,6 +445,7 @@ class Processors:
     vfolder_mount_policy: VFolderMountPolicyProcessors
     vfolder_file: VFolderFileProcessors
     session: SessionProcessors
+    session_group: SessionGroupProcessors
     container_registry: ContainerRegistryProcessors
     keypair_resource_policy: KeypairResourcePolicyProcessors
     manager_admin: ManagerAdminProcessors
@@ -472,6 +481,7 @@ class Processors:
     storage_namespace: StorageNamespaceProcessors
     audit_log: AuditLogProcessors
     entity_label: EntityLabelProcessors
+    dotfile: DotfileProcessors
     idle_checker_assignment: IdleCheckerAssignmentProcessors
     scheduling_history: SchedulingHistoryProcessors
     service_catalog: ServiceCatalogProcessors

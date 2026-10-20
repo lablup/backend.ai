@@ -18,6 +18,9 @@ __all__ = (
     "BulkRestoreRolePresetsPayload",
     "BulkRolePresetFailureInfo",
     "CreateRolePresetPayload",
+    "DeleteRolePresetPayload",
+    "PurgeRolePresetPayload",
+    "RestoreRolePresetPayload",
     "RolePresetNode",
     "SearchRolePresetsPayload",
     "UpdateRolePresetPayload",
@@ -33,7 +36,7 @@ class RolePresetNode(BaseResponseModel):
 
     id: RolePresetID = Field(description="Role preset UUID.")
     entity_id: UUID = Field(
-        description=f"UUID of the role preset. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the role preset. Added in 26.9.0.",
     )
     name: str = Field(description="Role preset name.")
     scope_type: EntityType = Field(description="Scope type this preset targets.")
@@ -44,9 +47,14 @@ class RolePresetNode(BaseResponseModel):
         ),
     )
     deleted: bool = Field(
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deleted_at`.",
+        deprecated=True,
+    )
+    deleted_at: datetime | None = Field(
+        default=None,
         description=(
-            "Soft-delete flag. Set by the Delete mutation and cleared by the Restore "
-            "mutation; archived rows are excluded from default searches."
+            f"Added in {NEXT_RELEASE_VERSION}. Soft-delete time. Set by the Delete mutation and "
+            "cleared by the Restore mutation; null while the preset is in use."
         ),
     )
     created_at: datetime = Field(description="Creation timestamp.")
@@ -63,6 +71,25 @@ class UpdateRolePresetPayload(BaseResponseModel):
     """Payload for role preset update."""
 
     role_preset: RolePresetNode = Field(description="Updated role preset.")
+
+
+class DeleteRolePresetPayload(BaseResponseModel):
+    """Payload for role preset soft deletion."""
+
+    role_preset: RolePresetNode = Field(description="Soft-deleted role preset.")
+
+
+class RestoreRolePresetPayload(BaseResponseModel):
+    """Payload for role preset restoration."""
+
+    role_preset: RolePresetNode = Field(description="Restored role preset.")
+
+
+class PurgeRolePresetPayload(BaseResponseModel):
+    """Payload for role preset purge."""
+
+    role_preset: RolePresetNode = Field(description="Purged role preset, as it stood.")
+    entity_id: UUID = Field(description="UUID of the purged role preset. Added in 26.10.0.")
 
 
 class BulkRolePresetFailureInfo(BaseResponseModel):

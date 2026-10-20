@@ -14,27 +14,30 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.image.request import (
     AdminSearchImageAliasesInput,
     AdminSearchImagesInput,
     AliasImageInput,
     DealiasImageInput,
-    ForgetImageInput,
     ImageAliasFilterInputDTO,
     ImageAliasOrderByInputDTO,
     ImageFilterInputDTO,
     ImageOrderByInputDTO,
+    PartialBulkDeleteImagesInput,
+    PartialBulkRestoreImagesInput,
+    PartialBulkUpdateImagesInput,
     PurgeImageInput,
-    RestoreImageInput,
+    ScanImageInput,
     ScopedSearchImagesInput,
     SearchImageAliasesInput,
-    UpdateImageInput,
+    UpdateImageBody,
 )
 from ai.backend.common.dto.manager.v2.image.response import (
     AdminSearchImageAliasesPayload,
     AdminSearchImagesPayload,
     AliasImagePayload,
-    ForgetImagePayload,
+    DeleteImagePayload,
     ImageAliasNode,
     ImageIdentityInfoDTO,
     ImageMetadataInfoDTO,
@@ -42,6 +45,7 @@ from ai.backend.common.dto.manager.v2.image.response import (
     ImageRequirementsInfoDTO,
     PurgeImagePayload,
     RestoreImagePayload,
+    ScanImagePayload,
     ScopedSearchImagesPayload,
     SearchImageAliasesPayload,
     UpdateImagePayload,
@@ -60,6 +64,7 @@ from ai.backend.common.dto.manager.v2.image.types import (
     OrderDirection,
 )
 from ai.backend.common.types import ImageID
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationOptions,
     PaginationSpec,
@@ -67,7 +72,11 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.image.types import ImageAliasData, ImageData, ImageType
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.scopes import (
     ContainerRegistryImageTarget,
@@ -82,16 +91,31 @@ from ai.backend.manager.models.image.searchable_fields import (
     ImageSearchableFields,
 )
 from ai.backend.manager.models.image.searchers import ImageAliasSearcher, ImageSearcher
-from ai.backend.manager.models.image.updaters import ImageUpdate
+from ai.backend.manager.models.image.updaters import (
+    ImageRestoreUpdater,
+    ImageSoftDeleteUpdater,
+    ImageUpdate,
+    ImageUpdater,
+)
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.services.image.actions.alias_image import AliasImageByIdAction
 from ai.backend.manager.services.image.actions.bulk_get import BulkGetImagesAction
 from ai.backend.manager.services.image.actions.bulk_get_aliases import BulkGetImageAliasesAction
 from ai.backend.manager.services.image.actions.dealias_image import DealiasImageAction
-from ai.backend.manager.services.image.actions.forget_image import ForgetImageByIdAction
+from ai.backend.manager.services.image.actions.delete_image_by_id import DeleteImageByIdAction
+from ai.backend.manager.services.image.actions.partial_bulk_delete_images import (
+    PartialBulkDeleteImagesAction,
+)
+from ai.backend.manager.services.image.actions.partial_bulk_restore_images import (
+    PartialBulkRestoreImagesAction,
+)
+from ai.backend.manager.services.image.actions.partial_bulk_update_images import (
+    PartialBulkUpdateImagesAction,
+)
 from ai.backend.manager.services.image.actions.purge_images import PurgeImageByIdAction
 from ai.backend.manager.services.image.actions.restore_image import RestoreImageByIdAction
+from ai.backend.manager.services.image.actions.scan_image import GlobalScanImageAction
 from ai.backend.manager.services.image.actions.scoped_search import (
     ScopedSearchImagesAction,
 )
@@ -337,19 +361,61 @@ class ImageAdapter(BaseAdapter):
 
     # ------------------------------------------------------------------ mutations
 
-    async def admin_forget(self, input: ForgetImageInput) -> ForgetImagePayload:
-        """Forget (soft-delete) an image by ID."""
-        result = await self._image.forget_image_by_id.run(
-            ForgetImageByIdAction(image_id=ImageID(input.image_id))
+    async def admin_scan_image(self, input: ScanImageInput) -> ScanImagePayload:
+        result = await self._image.global_scan_image.run(
+            GlobalScanImageAction(canonical=input.canonical, architecture=input.architecture)
         )
-        return ForgetImagePayload(item=self._data_to_dto(result.image))
+        return ScanImagePayload(item=self._data_to_dto(result.image))
 
-    async def admin_restore(self, input: RestoreImageInput) -> RestoreImagePayload:
-        """Restore a forgotten (soft-deleted) image by ID."""
-        result = await self._image.restore_image_by_id.run(
-            RestoreImageByIdAction(image_id=ImageID(input.image_id))
+    async def update(self, image_id: ImageID, input: UpdateImageBody) -> UpdateImagePayload:
+        """Update an image. Only provided fields will be updated."""
+        result = await self._image.update_image_by_id.run(
+            UpdateImageByIdAction(updater=self._to_updater(image_id, input))
         )
-        return RestoreImagePayload(item=self._data_to_dto(result.image))
+        return UpdateImagePayload(item=self._data_to_dto(result.data))
+
+    async def delete(self, image_id: ImageID) -> DeleteImagePayload:
+        """Forget (soft-delete) an image."""
+        result = await self._image.delete_image_by_id.run(
+            DeleteImageByIdAction(updater=ImageSoftDeleteUpdater(image_id=image_id))
+        )
+        return DeleteImagePayload(item=self._data_to_dto(result.data))
+
+    async def restore(self, image_id: ImageID) -> RestoreImagePayload:
+        """Restore a forgotten (soft-deleted) image."""
+        result = await self._image.restore_image_by_id.run(
+            RestoreImageByIdAction(updater=ImageRestoreUpdater(image_id=image_id))
+        )
+        return RestoreImagePayload(item=self._data_to_dto(result.data))
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateImagesInput
+    ) -> PartialBulkPayload[ImageNode]:
+        """Update several images, answering for each one."""
+        result = await self._image.partial_bulk_update.run(
+            PartialBulkUpdateImagesAction(
+                updaters=[self._to_updater(ImageID(item.id), item.input) for item in input.items]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_delete(
+        self, input: PartialBulkDeleteImagesInput
+    ) -> PartialBulkPayload[ImageNode]:
+        """Forget several images, answering for each one."""
+        result = await self._image.partial_bulk_delete.run(
+            PartialBulkDeleteImagesAction(ids=[ImageID(image_id) for image_id in input.ids])
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_restore(
+        self, input: PartialBulkRestoreImagesInput
+    ) -> PartialBulkPayload[ImageNode]:
+        """Restore several forgotten images, answering for each one."""
+        result = await self._image.partial_bulk_restore.run(
+            PartialBulkRestoreImagesAction(ids=[ImageID(image_id) for image_id in input.ids])
+        )
+        return self._to_partial_bulk_payload(result)
 
     async def admin_purge(self, input: PurgeImageInput) -> PurgeImagePayload:
         """Purge (hard-delete) an image by ID."""
@@ -378,8 +444,7 @@ class ImageAdapter(BaseAdapter):
             image_id=result.image_id,
         )
 
-    async def admin_update(self, input: UpdateImageInput) -> UpdateImagePayload:
-        """Update an image by ID (superadmin only)."""
+    def _to_updater(self, image_id: ImageID, input: UpdateImageBody) -> ImageUpdater:
         update = ImageUpdate(
             name=OptionalState.from_unset(input.name),
             registry=OptionalState.from_unset(input.registry),
@@ -394,10 +459,21 @@ class ImageAdapter(BaseAdapter):
             accelerators=TriState.from_unset(input.supported_accelerators),
             resources=OptionalState.from_unset(input.resource_limits),
         )
-        result = await self._image.update_image_by_id.run(
-            UpdateImageByIdAction(image_id=ImageID(input.image_id), update=update)
+        return ImageUpdater(image_id=image_id, update=update)
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[ImageData]
+    ) -> PartialBulkPayload[ImageNode]:
+        return PartialBulkPayload[ImageNode](
+            successes=[
+                self._data_to_dto(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
         )
-        return UpdateImagePayload(item=self._data_to_dto(result.image))
 
     # ------------------------------------------------------------------ querier builders
 
@@ -406,6 +482,7 @@ class ImageAdapter(BaseAdapter):
         alias_fields = ImageAliasSearchableFields.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
             *self.apply_string_filter(filter.name, fields.name.filter),
             *self.apply_string_filter(filter.architecture, fields.architecture.filter),
             *self.apply_uuid_filter(filter.registry_id, fields.registry_id.filter),
@@ -418,6 +495,8 @@ class ImageAdapter(BaseAdapter):
             *self.apply_string_filter(filter.accelerators, fields.accelerators.filter),
             *self.apply_int_filter(filter.size_bytes, fields.size_bytes.filter),
             *self.apply_bool_filter(filter.is_local, fields.is_local.filter),
+            *self.apply_bool_filter(filter.customized, fields.customized.filter),
+            *self.apply_uuid_filter(filter.creator_id, fields.creator_id.filter),
             *self.apply_enum_filter(filter.type, fields.type.filter),
             *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
             *self.apply_datetime_filter(filter.last_used, fields.last_used_at.filter),
@@ -443,16 +522,17 @@ class ImageAdapter(BaseAdapter):
         if filter.OR:
             or_sub: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_sub.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_sub.append(combine_conditions_and(sub_conditions))
             if or_sub:
                 conditions.append(combine_conditions_or(or_sub))
 
         if filter.NOT:
-            not_sub: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_sub.extend(self._convert_filter(sub_filter))
-            if not_sub:
-                conditions.append(negate_conditions(not_sub))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 
@@ -471,16 +551,17 @@ class ImageAdapter(BaseAdapter):
         if filter.OR:
             or_sub: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_sub.extend(self._convert_alias_filter(sub_filter))
+                sub_conditions = self._convert_alias_filter(sub_filter)
+                if sub_conditions:
+                    or_sub.append(combine_conditions_and(sub_conditions))
             if or_sub:
                 conditions.append(combine_conditions_or(or_sub))
 
         if filter.NOT:
-            not_sub: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_sub.extend(self._convert_alias_filter(sub_filter))
-            if not_sub:
-                conditions.append(negate_conditions(not_sub))
+                sub_conditions = self._convert_alias_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 
@@ -582,6 +663,8 @@ class ImageAdapter(BaseAdapter):
             is_local=data.is_local,
             created_at=data.created_at,
             last_used_at=data.last_used_at,
+            customized=data.customized,
+            creator_id=data.creator_id,
             identity=ImageIdentityInfoDTO(
                 canonical_name=str(data.name),
                 namespace=data.image,

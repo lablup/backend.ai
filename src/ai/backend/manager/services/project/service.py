@@ -13,12 +13,12 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.dotfile.types import DotfileEntries
+from ai.backend.manager.data.dotfile.types import DotfileEntries, verify_dotfile_name
 from ai.backend.manager.data.project.types import ProjectData
-from ai.backend.manager.models.domain.row import verify_dotfile_name
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater
 from ai.backend.manager.models.resource_usage import (
     ProjectResourceUsage,
@@ -35,6 +35,9 @@ from ai.backend.manager.services.project.actions.create_project_dotfile import (
 from ai.backend.manager.services.project.actions.delete_project_dotfile import (
     DeleteProjectDotfileAction,
     DeleteProjectDotfileActionResult,
+)
+from ai.backend.manager.services.project.actions.partial_bulk_update_projects import (
+    PartialBulkUpdateProjectsAction,
 )
 from ai.backend.manager.services.project.actions.purge_project import (
     PurgeProjectAction,
@@ -90,6 +93,23 @@ class ProjectService:
     async def update_group(self, action: UpdateProjectAction) -> UpdateProjectActionResult:
         group_data = await self._group_repository.modify_validated(action.updater)
         return UpdateProjectActionResult(data=group_data)
+
+    async def partial_bulk_update(
+        self, action: PartialBulkUpdateProjectsAction
+    ) -> PartialBulkResult[ProjectData]:
+        result = await self._group_repository.partial_bulk_modify_validated(action.updaters)
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[ProjectData].succeeded(
+                    updater.project_id, result.successes[updater.project_id]
+                )
+                if updater.project_id in result.successes
+                else PartialBulkEntityResult[ProjectData].failed(
+                    updater.project_id, result.errors[updater.project_id]
+                )
+                for updater in action.updaters
+            ]
+        )
 
     async def purge_group(self, action: PurgeProjectAction) -> PurgeProjectActionResult:
         await self._group_repository.purge_group(action.project_id)

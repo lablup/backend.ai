@@ -28,11 +28,11 @@ from bai_scenario.components.app_config import (
     TheMergedConfigs,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type ReadingStep = Scenario[
-    SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload
+    TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload
 ]
 
 PUBLIC = {"theme": "light", "menu": {"home": True, "docs": True}}
@@ -60,7 +60,7 @@ class ReadingMine(When[AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 
 @dataclass(frozen=True)
 class ANameWithNoFragmentAnswersEmpty(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -74,7 +74,7 @@ class ANameWithNoFragmentAnswersEmpty(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross()
 
     @override
@@ -88,7 +88,7 @@ class ANameWithNoFragmentAnswersEmpty(
 
 @dataclass(frozen=True)
 class AnUnregisteredNameAnswersEmpty(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -102,7 +102,7 @@ class AnUnregisteredNameAnswersEmpty(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(defined=False)
 
     @override
@@ -116,7 +116,7 @@ class AnUnregisteredNameAnswersEmpty(
 
 @dataclass(frozen=True)
 class OnlyAPublicFragmentAnswersItself(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -127,7 +127,7 @@ class OnlyAPublicFragmentAnswersItself(
         return "공개 스코프에만 조각이 있는 이름을 조회하면, 그 조각의 값이 그대로 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(public=PUBLIC)
 
     @override
@@ -141,7 +141,7 @@ class OnlyAPublicFragmentAnswersItself(
 
 @dataclass(frozen=True)
 class MyFragmentOverridesTheDomains(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -155,7 +155,7 @@ class MyFragmentOverridesTheDomains(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(domain=DOMAIN, user=MINE)
 
     @override
@@ -171,7 +171,7 @@ class MyFragmentOverridesTheDomains(
 
 @dataclass(frozen=True)
 class TheDomainsFragmentOverridesThePublic(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -185,7 +185,7 @@ class TheDomainsFragmentOverridesThePublic(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(public=PUBLIC, domain=DOMAIN)
 
     @override
@@ -201,7 +201,7 @@ class TheDomainsFragmentOverridesThePublic(
 
 @dataclass(frozen=True)
 class AFlippedRankLetsTheDomainWin(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -215,7 +215,7 @@ class AFlippedRankLetsTheDomainWin(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(domain=DOMAIN, user=MINE, ranks={AppConfigScopeType.DOMAIN: 400})
 
     @override
@@ -231,7 +231,7 @@ class AFlippedRankLetsTheDomainWin(
 
 @dataclass(frozen=True)
 class AnotherUsersFragmentStaysOut(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -245,7 +245,7 @@ class AnotherUsersFragmentStaysOut(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(user=MINE, another_user={"theme": "theirs", "secret": 1})
 
     @override
@@ -259,7 +259,7 @@ class AnotherUsersFragmentStaysOut(
 
 @dataclass(frozen=True)
 class AnotherDomainsFragmentStaysOut(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -270,7 +270,7 @@ class AnotherDomainsFragmentStaysOut(
         return "다른 도메인이 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 자기 도메인 조각의 값만 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(domain=DOMAIN, another_domain={"theme": "elsewhere"})
 
     @override
@@ -284,7 +284,7 @@ class AnotherDomainsFragmentStaysOut(
 
 @dataclass(frozen=True)
 class SeveralNamesAnswerInRequestOrder(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     publics: tuple[Mapping[str, Any], ...] = ({"n": 1}, {"n": 2}, {"n": 3})
 
@@ -297,7 +297,7 @@ class SeveralNamesAnswerInRequestOrder(
         return "이름 셋을 한 번에 조회하면, 각각의 병합 결과가 요청한 순서대로 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return SeveralConfigsLaid(publics=self.publics)
 
     @override
@@ -311,7 +311,7 @@ class SeveralNamesAnswerInRequestOrder(
 
 @dataclass(frozen=True)
 class ANameAskedTwiceAnswersTwice(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -322,7 +322,7 @@ class ANameAskedTwiceAnswersTwice(
         return "같은 이름을 두 번 지정해 조회하면, 같은 값이 두 번 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(public=PUBLIC, asked=2)
 
     @override
@@ -336,7 +336,7 @@ class ANameAskedTwiceAnswersTwice(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRead(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload]
 ):
     @override
     def summary(self) -> str:
@@ -347,7 +347,7 @@ class AUserGrantedNothingMayNotRead(
         return "아무 권한도 없는 사용자가 자기 설정을 조회하면, 스코프 권한 검사에서 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(public=PUBLIC, granted=False)
 
     @override
@@ -361,7 +361,8 @@ class AUserGrantedNothingMayNotRead(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneRead(
-    Scenario[SeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload], Configured
+    Scenario[TestSeedingSession, AMergeAndACaller, AppConfigAdapter, GetAppConfigsPayload],
+    Configured,
 ):
     @override
     def summary(self) -> str:
@@ -376,7 +377,7 @@ class EnforcementOffLetsAnyoneRead(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AMergeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AMergeAndACaller]:
         return AConfigLaidAcross(public=PUBLIC, granted=False)
 
     @override

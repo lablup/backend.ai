@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import Any, override
+from uuid import UUID
+
+import sqlalchemy as sa
 
 from ai.backend.common.data.entity.resource_policy import (
     KeyPairResourcePolicyEntityType,
@@ -21,7 +24,7 @@ from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.specs.lookup import DataLookup
+from ai.backend.manager.models.specs.lookup import BulkDataLookup, DataLookup
 
 
 @dataclass
@@ -95,3 +98,48 @@ class UserResourcePolicyNameLookup(DataLookup[UserResourcePolicyRow, UserResourc
     @override
     def to_entity_id(self, row: UserResourcePolicyRow) -> UserResourcePolicyUUID:
         return row.uuid
+
+
+@dataclass
+class KeypairResourcePolicyNamesLookup(BulkDataLookup[str, KeyPairResourcePolicyUUID]):
+    """Resolves several names into the policies they name."""
+
+    @override
+    def build_query(self, keys: Sequence[str]) -> sa.sql.Select[Any]:
+        return sa.select(KeyPairResourcePolicyRow.name, KeyPairResourcePolicyRow.uuid).where(
+            KeyPairResourcePolicyRow.name.in_(keys)
+        )
+
+    @override
+    def to_entity_id(self, value: UUID) -> KeyPairResourcePolicyUUID:
+        return KeyPairResourcePolicyUUID(value)
+
+
+@dataclass
+class ProjectResourcePolicyNamesLookup(BulkDataLookup[str, ProjectResourcePolicyUUID]):
+    """Resolves several names into the policies they name."""
+
+    @override
+    def build_query(self, keys: Sequence[str]) -> sa.sql.Select[Any]:
+        return sa.select(ProjectResourcePolicyRow.name, ProjectResourcePolicyRow.uuid).where(
+            ProjectResourcePolicyRow.name.in_(keys)
+        )
+
+    @override
+    def to_entity_id(self, value: UUID) -> ProjectResourcePolicyUUID:
+        return ProjectResourcePolicyUUID(value)
+
+
+@dataclass
+class UserResourcePolicyNamesLookup(BulkDataLookup[str, UserResourcePolicyUUID]):
+    """Resolves several names into the policies they name."""
+
+    @override
+    def build_query(self, keys: Sequence[str]) -> sa.sql.Select[Any]:
+        return sa.select(UserResourcePolicyRow.name, UserResourcePolicyRow.uuid).where(
+            UserResourcePolicyRow.name.in_(keys)
+        )
+
+    @override
+    def to_entity_id(self, value: UUID) -> UserResourcePolicyUUID:
+        return UserResourcePolicyUUID(value)

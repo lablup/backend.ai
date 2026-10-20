@@ -13,7 +13,7 @@ from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.model_card.searchable_fields import (
     ModelCardSearchableFields,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
 @dataclass
@@ -34,6 +34,22 @@ class ModelCardQuerier(DataQuerier[ModelCardRow, ModelCardData]):
     @override
     def entity_id_value(self) -> ModelCardID:
         return self.model_card_id
+
+    @override
+    def to_data(self, row: ModelCardRow) -> ModelCardData:
+        return ModelCardSearchableFields.own.to_data(row)
+
+
+class BulkModelCardQuerier(BulkEntityQuerier[ModelCardRow, ModelCardData]):
+    """The model cards the caller named."""
+
+    @override
+    def row_class(self) -> type[ModelCardRow]:
+        return ModelCardRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return ModelCardRow.id
 
     @override
     def to_data(self, row: ModelCardRow) -> ModelCardData:

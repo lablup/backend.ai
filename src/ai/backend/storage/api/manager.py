@@ -33,6 +33,7 @@ from ai.backend.common.api_handlers import (
     api_handler,
 )
 from ai.backend.common.clients.valkey_client.valkey_tus import TusSessionId
+from ai.backend.common.data.storage.types import StorageBackendCapability
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.dto.internal.health import (
     ConnectivityCheckResponse,
@@ -59,6 +60,7 @@ from ai.backend.common.events.event_types.volume.broadcast import (
 )
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import (
+    SystemMetricUpdater,
     build_api_metric_middleware,
     build_prometheus_metrics_handler,
 )
@@ -271,7 +273,7 @@ def _vfolder_log_context(volume_name: str, vfolder_id: VFolderID) -> AbstractCon
 
 
 async def get_volumes(request: web.Request) -> web.Response:
-    async def _get_caps(ctx: RootContext, volume_name: str) -> list[str]:
+    async def _get_caps(ctx: RootContext, volume_name: str) -> list[StorageBackendCapability]:
         volume = ctx.volume_pool.get_volume_by_name(volume_name)
         return [*await volume.get_capabilities()]
 
@@ -1433,6 +1435,7 @@ def init_internal_app(ctx: RootContext) -> web.Application:
     app.router.add_route("GET", "/livez", check_livez)
     app.router.add_route("GET", "/readyz", check_readyz)
     app.router.add_route("GET", "/metrics", build_prometheus_metrics_handler(metric_registry))
+    app.cleanup_ctx.append(SystemMetricUpdater(metric_registry.system).cleanup_ctx)
     return app
 
 

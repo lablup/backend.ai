@@ -33,16 +33,16 @@ import click
 import uvloop
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
-from opentelemetry.instrumentation.aiohttp_server import (
-    middleware as otel_server_middleware,
-)
 from setproctitle import setproctitle
 
 from ai.backend.common.cli import LazyGroup
 from ai.backend.common.config import find_config_file
 from ai.backend.common.dependencies import DependencyBuilderStack
 from ai.backend.common.json import dump_json_str
-from ai.backend.common.metrics.http import build_prometheus_metrics_handler
+from ai.backend.common.metrics.http import (
+    SystemMetricUpdater,
+    build_prometheus_metrics_handler,
+)
 from ai.backend.common.metrics.metric import CommonMetricRegistry
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
@@ -53,8 +53,8 @@ from ai.backend.logging.otel import (
     LegacyOtelLogging,
     OpenTelemetrySpec,
     apply_otel_tracer,
+    build_otel_server_middleware,
     instrument_aiohttp_client,
-    instrument_aiohttp_server,
 )
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.structured_otel import StructuredOtelLogging
@@ -81,6 +81,7 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "manager"
 SHUTDOWN_CLEANUP_MARGIN: Final = 10.0
+IN_FLIGHT_SHUTDOWN_TIMEOUT: Final = 5.0
 
 
 @asynccontextmanager
@@ -105,6 +106,7 @@ async def webapp_plugin_ctx(
     root_app["_config_provider"] = r.bootstrap.config_provider
     root_app["_etcd"] = r.bootstrap.etcd
     root_app["_valkey_stat"] = r.infrastructure.valkey.stat
+    root_app["_sentinel_monitors"] = r.infrastructure.sentinel_monitors
     root_app["_key_provider_pool"] = r.bootstrap.key_provider_pool
     root_app["_auth_repository"] = r.domain.repositories.auth.repository
     for plugin_name, plugin_instance in plugin_ctx.plugins.items():
@@ -227,6 +229,7 @@ def build_internal_app(
 ) -> web.Application:
     app = web.Application()
     metric_registry = CommonMetricRegistry.instance()
+    app.cleanup_ctx.append(SystemMetricUpdater(metric_registry.system).cleanup_ctx)
     app.router.add_route("GET", r"/metrics", build_prometheus_metrics_handler(metric_registry))
     app.router.add_route(
         "GET",
@@ -302,7 +305,7 @@ async def server_main(
         runner = web.AppRunner(
             root_app,
             keepalive_timeout=30.0,
-            shutdown_timeout=shutdown_config.shutdown_grace_period,
+            shutdown_timeout=IN_FLIGHT_SHUTDOWN_TIMEOUT,
         )
 
         internal_app = build_internal_app(dep_resources, drain_notifier)
@@ -310,7 +313,7 @@ async def server_main(
         internal_runner = web.AppRunner(
             internal_app,
             keepalive_timeout=30.0,
-            shutdown_timeout=shutdown_config.shutdown_grace_period,
+            shutdown_timeout=IN_FLIGHT_SHUTDOWN_TIMEOUT,
         )
 
         ssl_ctx = None
@@ -349,11 +352,11 @@ async def server_main(
         finally:
             try:
                 if started:
-                    drain_notifier.notify_draining()
                     log.info(
                         "draining API requests",
                         grace_period=shutdown_config.shutdown_grace_period,
                     )
+                    await drain_notifier.drain(shutdown_config.shutdown_grace_period)
             finally:
                 results = await asyncio.gather(
                     runner.cleanup(), internal_runner.cleanup(), return_exceptions=True
@@ -431,10 +434,6 @@ async def server_main(
         config_provider = dep_resources.bootstrap.config_provider
         await manager_init_stack.enter_async_context(manager_status_ctx(pidx, config_provider))
 
-        # TODO: Remove manual middleware injection once the manager startup is
-        # decoupled from the aiohttp Application lifecycle. Currently root_app is
-        # instantiated before OTel config is available, so instrument_aiohttp_server()
-        # (which patches the class via setattr) cannot take effect automatically.
         if config_provider.config.otel.enabled:
             meta = dep_resources.system.sd_loop.metadata
             otel_spec = OpenTelemetrySpec(
@@ -450,9 +449,8 @@ async def server_main(
             LegacyOtelLogging(otel_spec).attach()
             apply_otel_tracer(otel_spec)
             StructuredOtelLogging(otel_spec).attach(config_provider.config.logging.pkg_ns.keys())
-            instrument_aiohttp_server()
             instrument_aiohttp_client()
-            root_app.middlewares.insert(0, otel_server_middleware)
+            root_app.middlewares.insert(0, build_otel_server_middleware())
 
         # Plugin webapps should be loaded before runner.setup() because root_app is frozen upon on_startup event.
         await manager_init_stack.enter_async_context(

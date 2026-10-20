@@ -21,6 +21,8 @@ __all__ = (
     "EnvironmentVariablesInfo",
     "EnvironmentVariablesInput",
     "OrderDirection",
+    "PartialBulkFailure",
+    "PartialBulkPayload",
     "ResourceLimitEntryInfo",
     "ResourceSlotEntryInfo",
     "ResourceSlotEntryInput",
@@ -198,4 +200,20 @@ class EnvironmentVariablesInfo(BaseResponseModel):
 
     entries: list[EnvironmentVariableEntryInfo] = Field(
         description="List of environment variable entries."
+    )
+
+
+class PartialBulkFailure(BaseResponseModel):
+    """One entity a partial bulk operation named and did not process."""
+
+    id: UUID = Field(description="ID of the entity the failed item named.")
+    message: str = Field(description="Reason the item failed.")
+
+
+class PartialBulkPayload[TNode: BaseResponseModel](BaseResponseModel):
+    """Result of a partial bulk operation: the entities processed and the ones that failed."""
+
+    successes: list[TNode] = Field(description="The entities processed, as they now stand.")
+    failed: list[PartialBulkFailure] = Field(
+        description="The entities not processed, each with the reason."
     )

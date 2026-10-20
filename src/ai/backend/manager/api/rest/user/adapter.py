@@ -68,14 +68,14 @@ class UserAdapter(BaseFilterAdapter):
         request: UpdateUserRequest,
         user_id: UserID,
         password_info: PasswordInfo | None = None,
+        status: UserStatus | None = None,
     ) -> UserUpdater:
-        """Convert update request to updater."""
+        """Convert update request to updater; ``status`` replaces the request's status."""
         username = OptionalState[str].nop()
         password = OptionalState[PasswordInfo].nop()
         need_password_change = OptionalState[bool].nop()
         full_name = TriState[str].nop()
         description = TriState[str].nop()
-        status = OptionalState[UserStatus].nop()
         domain_name = OptionalState[str].nop()
         role: OptionalState[UserRole] = OptionalState.nop()
         allowed_client_ip = TriState[list[str]].nop()
@@ -97,8 +97,6 @@ class UserAdapter(BaseFilterAdapter):
             full_name = TriState.update(request.full_name)
         if request.description is not None:
             description = TriState.update(request.description)
-        if request.status is not None:
-            status = OptionalState.update(UserStatus(request.status.value))
         if request.domain_name is not None:
             domain_name = OptionalState.update(request.domain_name)
         if request.role is not None:
@@ -127,7 +125,7 @@ class UserAdapter(BaseFilterAdapter):
             need_password_change=need_password_change,
             full_name=full_name,
             description=description,
-            status=status,
+            status=OptionalState.nop() if status is None else OptionalState.update(status),
             domain_name=domain_name,
             role=role,
             allowed_client_ip=allowed_client_ip,

@@ -5,6 +5,7 @@ from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 
 import pytest
+import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 
 from ai.backend.common.data.entity.domain import DomainID
@@ -394,26 +395,36 @@ class TestSessionUniqueNamePerUser(SessionFixtures):
             await db_sess.flush()
 
 
-class TestSessionOwnerRequired(SessionFixtures):
-    async def test_session_without_owner_is_rejected(
+class TestSessionOwnerPurge(SessionFixtures):
+    async def test_purging_owner_nulls_session_owner(
         self,
         database_with_tables: ExtendedAsyncSAEngine,
+        user_one: UserData,
         group: ProjectRow,
         domain: DomainRow,
         resource_group: ResourceGroupRow,
     ) -> None:
-        session = SessionRow(
-            name=f"test-{uuid.uuid4()!s}",
-            group_id=group.id,
-            domain_id=domain.id,
-            domain_name=domain.name,
-            resource_group_id=resource_group.id,
-            scaling_group_name=resource_group.name,
-            status=SessionStatus.PENDING,
-            vfolder_mounts=[],
-        )
+        session_id = uuid.uuid4()
+        async with database_with_tables.begin_session() as db_sess:
+            db_sess.add(
+                SessionRow(
+                    id=session_id,
+                    name=f"test-{uuid.uuid4()!s}",
+                    user_uuid=user_one.uuid,
+                    group_id=group.id,
+                    domain_id=domain.id,
+                    domain_name=domain.name,
+                    resource_group_id=resource_group.id,
+                    scaling_group_name=resource_group.name,
+                    status=SessionStatus.TERMINATED,
+                    vfolder_mounts=[],
+                )
+            )
+            await db_sess.flush()
+            await db_sess.execute(sa.delete(UserRow).where(UserRow.uuid == user_one.uuid))
 
-        with pytest.raises(IntegrityError):
-            async with database_with_tables.begin_session() as db_sess:
-                db_sess.add(session)
-                await db_sess.flush()
+        async with database_with_tables.begin_readonly_session() as db_sess:
+            owner = await db_sess.scalar(
+                sa.select(SessionRow.user_uuid).where(SessionRow.id == session_id)
+            )
+        assert owner is None

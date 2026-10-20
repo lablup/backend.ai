@@ -29,6 +29,12 @@ from ai.backend.manager.services.vfs_storage.actions.list import ListVFSStorageA
 from ai.backend.manager.services.vfs_storage.actions.lookup import (
     LookupVFSStorageAction,
 )
+from ai.backend.manager.services.vfs_storage.actions.partial_bulk_purge_vfs_storages import (
+    PartialBulkPurgeVFSStoragesAction,
+)
+from ai.backend.manager.services.vfs_storage.actions.partial_bulk_update_vfs_storages import (
+    PartialBulkUpdateVFSStoragesAction,
+)
 from ai.backend.manager.services.vfs_storage.actions.purge import PurgeVFSStorageAction
 from ai.backend.manager.services.vfs_storage.actions.search import SearchVFSStoragesAction
 from ai.backend.manager.services.vfs_storage.actions.search_quota_scopes import (
@@ -55,6 +61,12 @@ class VFSStorageProcessors:
     ]
     update: SingleEntityActionProcessor[UpdateVFSStorageAction, EntityOpsResult[VFSStorageData]]
     purge: SingleEntityActionProcessor[PurgeVFSStorageAction, EntityOpsResult[VFSStorageData]]
+    partial_bulk_update: PartialBulkActionProcessor[
+        PartialBulkUpdateVFSStoragesAction, VFSStorageData
+    ]
+    partial_bulk_purge: PartialBulkActionProcessor[
+        PartialBulkPurgeVFSStoragesAction, VFSStorageData
+    ]
     get: SingleEntityActionProcessor[GetVFSStorageAction, EntityOpsResult[VFSStorageData]]
     bulk_get: PartialBulkActionProcessor[BulkGetVFSStoragesAction, VFSStorageData]
     lookup: LookupActionProcessor[LookupVFSStorageAction, LookupOpsResult[VFSStorageID]]
@@ -84,6 +96,10 @@ class VFSStorageProcessors:
         self.global_create = group.global_create_ops(CreateVFSStorageAction)
         self.update = group.single_update_ops(UpdateVFSStorageAction)
         self.purge = group.entity_purge_ops(PurgeVFSStorageAction)
+        self.partial_bulk_update = group.partial_bulk_update_ops(PartialBulkUpdateVFSStoragesAction)
+        self.partial_bulk_purge = group.entity_partial_bulk_purge_ops(
+            PartialBulkPurgeVFSStoragesAction
+        )
         self.get = group.single_get_ops(GetVFSStorageAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetVFSStoragesAction)
         self.lookup = group.lookup_ops(LookupVFSStorageAction)

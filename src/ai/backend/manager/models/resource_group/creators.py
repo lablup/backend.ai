@@ -6,6 +6,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
+import sqlalchemy as sa
+
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
@@ -19,16 +21,18 @@ from ai.backend.manager.data.resource_group.types import (
     ResourceGroupData,
 )
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.errors.user import KeyPairNotFound
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForDomainRow,
     ResourceGroupForKeypairsRow,
     ResourceGroupForProjectRow,
-    ResourceGroupOpts,
     ResourceGroupRow,
 )
 from ai.backend.manager.models.resource_group.searchable_fields import (
     ResourceGroupSearchableFields,
 )
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.specs.created_in import CreatedInGlobal
 from ai.backend.manager.models.specs.creator import RoleManagedEntityCreator
 from ai.backend.manager.models.specs.relation import RelationCreator
@@ -167,7 +171,15 @@ class ResourceGroupForKeypairRelationCreator(
     def precondition_checks(
         self, scope: UserID, target: ResourceGroupID
     ) -> Sequence[PreconditionCheck]:
-        return ()
+        """The access key held by a user other than the scope."""
+        return (
+            PreconditionCheck(
+                finder=sa.select(KeyPairRow.access_key).where(
+                    KeyPairRow.access_key == self.access_key, KeyPairRow.user != scope
+                ),
+                error=KeyPairNotFound(f"User {scope} holds no keypair {self.access_key}"),
+            ),
+        )
 
     @override
     def row_class(self) -> type[ResourceGroupForKeypairsRow]:

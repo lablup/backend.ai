@@ -1,7 +1,6 @@
 """DataUpdater implementations for the role preset repository.
 
-The ``deleted`` column is split off from the general updater, so the ordinary edit
-path has no field to make the transition with (`models/specs/AGENTS.md`).
+Soft delete and restore are the shared updaters in ``models/specs/soft_delete.py``.
 """
 
 from __future__ import annotations
@@ -26,7 +25,7 @@ from ai.backend.manager.types import OptionalState, TriState
 
 @dataclass
 class RolePresetUpdater(DataUpdater[RolePresetRow, RolePresetData]):
-    """Edits a preset's declaration. Carries no ``deleted`` field."""
+    """Edits a preset's declaration. Carries no ``deleted_at`` field."""
 
     preset_id: RolePresetID
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
@@ -60,72 +59,6 @@ class RolePresetUpdater(DataUpdater[RolePresetRow, RolePresetData]):
         self.scope_type.update_dict(to_update, "scope_type")
         self.auto_assign.update_dict(to_update, "auto_assign")
         return to_update
-
-    @override
-    def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return RolePresetSearchableFields.own.to_data(row)
-
-
-@dataclass
-class RolePresetSoftDeleteUpdater(DataUpdater[RolePresetRow, RolePresetData]):
-    """Marks a preset deleted; the value is constant so it cannot be passed wrong."""
-
-    preset_id: RolePresetID
-
-    @property
-    @override
-    def row_class(self) -> type[RolePresetRow]:
-        return RolePresetRow
-
-    @override
-    def target_id_column(self) -> InstrumentedAttribute[Any]:
-        return RolePresetRow.id
-
-    @override
-    def target_id_value(self) -> RolePresetID:
-        return self.preset_id
-
-    @property
-    @override
-    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
-
-    @override
-    def build_values(self) -> dict[str, Any]:
-        return {"deleted": True}
-
-    @override
-    def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return RolePresetSearchableFields.own.to_data(row)
-
-
-@dataclass
-class RolePresetRestoreUpdater(DataUpdater[RolePresetRow, RolePresetData]):
-    """Undoes the soft delete; the mirror of :class:`RolePresetSoftDeleteUpdater`."""
-
-    preset_id: RolePresetID
-
-    @property
-    @override
-    def row_class(self) -> type[RolePresetRow]:
-        return RolePresetRow
-
-    @override
-    def target_id_column(self) -> InstrumentedAttribute[Any]:
-        return RolePresetRow.id
-
-    @override
-    def target_id_value(self) -> RolePresetID:
-        return self.preset_id
-
-    @property
-    @override
-    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
-
-    @override
-    def build_values(self) -> dict[str, Any]:
-        return {"deleted": False}
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:

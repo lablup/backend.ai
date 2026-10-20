@@ -18,7 +18,10 @@ from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.project.types import ProjectType
-from ai.backend.manager.errors.resource import PersonalProjectMemberAdditionError
+from ai.backend.manager.errors.resource import (
+    PersonalProjectMemberAdditionError,
+    ProjectMemberNotJoinableError,
+)
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
@@ -597,6 +600,123 @@ class TestEnrollUsersInProject:
         """The membership-only write is refused for a personal project too."""
         with pytest.raises(PersonalProjectMemberAdditionError):
             await roster_repository.join_member(personal_project, same_domain_user_1)
+
+    async def _roster_place(
+        self, db: ExtendedAsyncSAEngine, project_id: ProjectID, user_id: UserID
+    ) -> tuple[uuid.UUID | None, set[Permission], set[uuid.UUID]]:
+        """The user's membership id in the project, its caps, and the project roles the
+        user holds."""
+        async with db.begin_readonly_session() as session:
+            membership_id = await session.scalar(
+                sa.select(EntityMembershipRow.id).where(
+                    EntityMembershipRow.virtual_entity_id == _node(project_id, ProjectEntityType()),
+                    EntityMembershipRow.member_entity_id == _node(user_id, UserEntityType()),
+                    EntityMembershipRow.capped.is_(True),
+                )
+            )
+            caps = (
+                await session.scalars(
+                    sa.select(EntityMembershipCapRow.permission).where(
+                        EntityMembershipCapRow.membership_id == membership_id
+                    )
+                )
+            ).all()
+            role_ids = (
+                await session.scalars(
+                    sa.select(UserRoleRow.role_id)
+                    .join(RoleRow, RoleRow.id == UserRoleRow.role_id)
+                    .where(
+                        UserRoleRow.user_id == user_id,
+                        RoleRow.scope_type == ProjectEntityType(),
+                        RoleRow.scope_id == project_id,
+                    )
+                )
+            ).all()
+        return membership_id, set(caps), set(role_ids)
+
+    async def test_join_one_leaves_a_member_already_on_the_roster(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        roster_repository: RbacRosterRepository,
+        test_project: ProjectID,
+        test_role: RoleID,
+        same_domain_user_1: UserID,
+    ) -> None:
+        """Joining a user already on the roster keeps the membership row and its caps."""
+        await roster_repository.join_members(test_project, [same_domain_user_1], test_role)
+        before = await self._roster_place(db_with_cleanup, test_project, same_domain_user_1)
+
+        await roster_repository.join_member(test_project, same_domain_user_1)
+
+        after = await self._roster_place(db_with_cleanup, test_project, same_domain_user_1)
+        assert before[0] is not None
+        assert after == before
+
+    async def test_join_one_and_join_many_leave_the_same_rows(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        roster_repository: RbacRosterRepository,
+        test_project: ProjectID,
+        same_domain_user_1: UserID,
+        same_domain_user_2: UserID,
+    ) -> None:
+        """Both primitives leave a read-capped membership and the same project roles."""
+        await roster_repository.join_member(test_project, same_domain_user_1)
+        await roster_repository.join_members(test_project, [same_domain_user_2])
+
+        _, caps_1, roles_1 = await self._roster_place(
+            db_with_cleanup, test_project, same_domain_user_1
+        )
+        _, caps_2, roles_2 = await self._roster_place(
+            db_with_cleanup, test_project, same_domain_user_2
+        )
+        assert caps_1 == caps_2 == {Permission.READ}
+        assert roles_1 == roles_2
+
+    async def test_join_one_refuses_cross_domain_user(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        roster_repository: RbacRosterRepository,
+        test_project: ProjectID,
+        cross_domain_user: UserID,
+    ) -> None:
+        """A user of another domain is refused and not put on the roster."""
+        with pytest.raises(ProjectMemberNotJoinableError):
+            await roster_repository.join_member(test_project, cross_domain_user)
+
+        membership_id, _, _ = await self._roster_place(
+            db_with_cleanup, test_project, cross_domain_user
+        )
+        assert membership_id is None
+
+    async def test_join_one_refuses_nonexistent_user(
+        self,
+        roster_repository: RbacRosterRepository,
+        test_project: ProjectID,
+    ) -> None:
+        """A user id naming no user is refused."""
+        with pytest.raises(ProjectMemberNotJoinableError):
+            await roster_repository.join_member(test_project, UserID(uuid.uuid4()))
+
+    async def test_join_each_fails_only_the_user_who_cannot_join(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        roster_repository: RbacRosterRepository,
+        test_project: ProjectID,
+        same_domain_user_1: UserID,
+        cross_domain_user: UserID,
+    ) -> None:
+        """A refused user is reported alone; the users before and after it still join."""
+        result = await roster_repository.join_each(
+            test_project, [cross_domain_user, same_domain_user_1]
+        )
+
+        assert result.joined == [same_domain_user_1]
+        assert [f.user_id for f in result.failures] == [cross_domain_user]
+        membership_id, _, _ = await self._roster_place(
+            db_with_cleanup, test_project, same_domain_user_1
+        )
+        assert membership_id is not None
 
 
 class TestWithdrawUsersFromProject:

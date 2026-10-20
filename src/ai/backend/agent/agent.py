@@ -88,6 +88,7 @@ from ai.backend.agent.tasks import (
 from ai.backend.common.asyncio import cancel_tasks, current_loop, run_in_executor_with_context
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.cgroup import CgroupController
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
 from ai.backend.common.clients.valkey_client.valkey_container_log.client import (
     ValkeyContainerLogClient,
@@ -638,6 +639,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         mount_static_binary(f"dropbearmulti.{arch}.bin", "/opt/kernel/dropbearmulti")
         mount_static_binary(f"sftp-server.{arch}.bin", "/opt/kernel/sftp-server")
         mount_static_binary(f"tmux.{arch}.bin", "/opt/kernel/tmux")
+        mount_static_binary(f"etty.{arch}.bin", "/opt/kernel/etty")
         mount_static_binary(f"ttyd_linux.{arch}.bin", "/opt/kernel/ttyd")
         mount_static_binary("yank.sh", "/opt/kernel/yank.sh")
         mount_static_binary(f"all-smi.{arch}.bin", "/usr/local/bin/all-smi")
@@ -852,6 +854,7 @@ class AbstractAgent[
     container_lifecycle_queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel]
 
     agent_public_key: PublicKey | None
+    _sentinel_monitors: SentinelMonitorSet
 
     stat_ctx: StatContext
     stat_sync_sockpath: Path
@@ -919,8 +922,10 @@ class AbstractAgent[
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
         agent_class: AgentClass,
+        sentinel_monitors: SentinelMonitorSet,
     ) -> None:
         self._skip_initial_scan = skip_initial_scan
+        self._sentinel_monitors = sentinel_monitors
         self.loop = current_loop()
         self.etcd = etcd
         self.local_config = local_config
@@ -977,6 +982,15 @@ class AbstractAgent[
         redis_profile_target = self.local_config.redis.to_redis_profile_target()
         stream_redis_target = redis_profile_target.profile_target(RedisRole.STREAM)
         mq = await self._make_message_queue(stream_redis_target)
+        sentinel_monitors = self._sentinel_monitors
+        container_log_target = redis_profile_target.profile_target(
+            RedisRole.CONTAINER_LOG
+        ).to_valkey_target()
+        stream_target = stream_redis_target.to_valkey_target()
+        stat_target = redis_profile_target.profile_target(RedisRole.STATISTICS).to_valkey_target()
+        bgtask_target = redis_profile_target.profile_target(RedisRole.BGTASK).to_valkey_target()
+        image_target = redis_profile_target.profile_target(RedisRole.IMAGE).to_valkey_target()
+        live_target = redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target()
         self.event_producer = EventProducer(
             mq,
             source=self.id,
@@ -988,34 +1002,40 @@ class AbstractAgent[
             event_observer=self._metric_registry.event,
         )
         self.valkey_container_log_client = await ValkeyContainerLogClient.create(
-            redis_profile_target.profile_target(RedisRole.CONTAINER_LOG).to_valkey_target(),
+            container_log_target,
             human_readable_name="agent.container_log",
             db_id=REDIS_CONTAINER_LOG,
+            sentinel_monitor=sentinel_monitors.monitor_for(container_log_target),
         )
         self.valkey_stream_client = await ValkeyStreamClient.create(
-            redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target(),
+            stream_target,
             human_readable_name="event_producer.stream",
             db_id=REDIS_STREAM_DB,
+            sentinel_monitor=sentinel_monitors.monitor_for(stream_target),
         )
         self.valkey_stat_client = await ValkeyStatClient.create(
-            redis_profile_target.profile_target(RedisRole.STATISTICS).to_valkey_target(),
+            stat_target,
             human_readable_name="agent.stat",
             db_id=REDIS_STATISTICS_DB,
+            sentinel_monitor=sentinel_monitors.monitor_for(stat_target),
         )
         self.valkey_bgtask_client = await ValkeyBgtaskClient.create(
-            redis_profile_target.profile_target(RedisRole.BGTASK).to_valkey_target(),
+            bgtask_target,
             human_readable_name="agent.bgtask",
             db_id=REDIS_BGTASK_DB,
+            sentinel_monitor=sentinel_monitors.monitor_for(bgtask_target),
         )
         self.valkey_image_client = await ValkeyImageClient.create(
-            redis_profile_target.profile_target(RedisRole.IMAGE).to_valkey_target(),
+            image_target,
             human_readable_name="agent.image",
             db_id=REDIS_IMAGE_DB,
+            sentinel_monitor=sentinel_monitors.monitor_for(image_target),
         )
         self.valkey_schedule_client = await ValkeyScheduleClient.create(
-            redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),
+            live_target,
             human_readable_name="agent.kernel_presence",
             db_id=REDIS_LIVE_DB,
+            sentinel_monitor=sentinel_monitors.monitor_for(live_target),
         )
         self.background_task_manager = BackgroundTaskManager(
             BackgroundTaskManagerArgs(
@@ -1117,6 +1137,7 @@ class AbstractAgent[
         return await RedisQueue.create(
             stream_redis_target,
             args,
+            self._sentinel_monitors.monitor_for(stream_redis_target.to_valkey_target()),
         )
 
     async def shutdown(self, stop_signal: signal.Signals) -> None:
@@ -2824,6 +2845,13 @@ class AbstractAgent[
                         "name": "ttyd",
                         "protocol": ServicePortProtocols.HTTP,
                         "container_ports": (7681,),
+                        "host_ports": (None,),
+                        "is_inference": False,
+                    })
+                    service_ports.append({
+                        "name": "etty",
+                        "protocol": ServicePortProtocols.HTTP,
+                        "container_ports": (7682,),
                         "host_ports": (None,),
                         "is_inference": False,
                     })

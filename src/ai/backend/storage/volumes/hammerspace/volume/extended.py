@@ -11,32 +11,37 @@ from typing import (
     override,
 )
 
-from yarl import URL
-
+from ai.backend.common.clients.storage_backends.hammerspace.client import (
+    HammerspaceAPIClient,
+    HammerspaceAPIClientArgs,
+)
+from ai.backend.common.clients.storage_backends.hammerspace.exceptions import (
+    AuthenticationError,
+)
+from ai.backend.common.data.storage.types import (
+    StorageBackendCapability,
+    StorageBackendType,
+)
+from ai.backend.common.dto.clients.storage_backends.hammerspace.request import (
+    HammerspaceCreateShareRequest,
+)
+from ai.backend.common.dto.clients.storage_backends.hammerspace.response import (
+    Share,
+    SimpleShare,
+    ValidClusterMetricRow,
+)
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.events.event_types.volume.broadcast import DoVolumeMountEvent
 from ai.backend.common.types import QuotaConfig, QuotaScopeID
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.storage.errors import VolumeNotInitializedError
 from ai.backend.storage.types import CapacityUsage, QuotaUsage
 from ai.backend.storage.volumes.abc import (
-    CAP_QUOTA,
-    CAP_VFOLDER,
     AbstractQuotaModel,
 )
-from ai.backend.storage.volumes.hammerspace.client import HammerspaceAPIClient
-from ai.backend.storage.volumes.hammerspace.exception import (
-    AuthenticationError,
-    ConfigurationError,
-)
-from ai.backend.storage.volumes.hammerspace.request import (
-    ClusterMetricParams,
-    CreateShareParams,
-    GetShareParams,
-)
-from ai.backend.storage.volumes.hammerspace.schema.metric import ValidClusterMetricRow
-from ai.backend.storage.volumes.hammerspace.schema.share import Share, SimpleShare
-from ai.backend.storage.volumes.hammerspace.types import APIConnectionInfo, SSLConfig
+from ai.backend.storage.volumes.hammerspace.exception import ConfigurationError
+from ai.backend.storage.volumes.hammerspace.types import SSLConfig
 from ai.backend.storage.volumes.vfs import BaseQuotaModel
 from ai.backend.storage.watcher import WatcherClient
 
@@ -44,7 +49,6 @@ from .base import BaseHammerspaceVolume
 
 METRIC_PRECEDING_DURATION = "1h"
 METRIC_INTERVAL_DURATION = "5m"
-
 
 log = StructuredLogger(logging.getLogger(__name__))
 
@@ -61,6 +65,10 @@ class HammerspaceQuotaModelBaseArgs:
 class HammerspaceQuotaModel(BaseQuotaModel):
     _client: HammerspaceAPIClient
     _event_producer: EventProducer
+    _mount_source: str
+    _mount_target_path: Path
+    _share_query_retry: int
+    _share_query_wait_sec: int
 
     def __init__(
         self,
@@ -71,16 +79,16 @@ class HammerspaceQuotaModel(BaseQuotaModel):
         self._client = client
         self._event_producer = base_args.event_producer
         self._mount_source = base_args.mount_source
-        # `_mount_target_path` is not used becase:
-        # Agents has `mount_path` config which is the base path for all mounts
         self._mount_target_path = base_args.mount_target_path
 
         self._share_query_retry = base_args.share_query_retry
         self._share_query_wait_sec = base_args.share_query_wait_sec
 
+    async def _ensure_login(self) -> None:
+        if not self._client.is_logged_in:
+            await self._client.login()
+
     def _get_share_name(self, quota_scope_id: QuotaScopeID) -> str:
-        # Not allowed to name Share with the following characters:
-        # \"/\\[]:|<>+;,?*=
         return quota_scope_id.pathname
 
     def _get_share_path(self, quota_scope_id: QuotaScopeID) -> Path:
@@ -100,16 +108,17 @@ class HammerspaceQuotaModel(BaseQuotaModel):
         path = self._get_share_path(quota_scope_id)
         share_size_limit = options.limit_bytes if options is not None else None
 
+        await self._ensure_login()
         share = await self._client.create_share(
-            CreateShareParams(
+            HammerspaceCreateShareRequest(
                 name=name,
-                path=path,
-                share_size_limit=share_size_limit,
-                create_path=True,
-                validate_only=False,
+                path=str(path),
+                shareSizeLimit=share_size_limit,
             ),
             retry=self._share_query_retry,
             wait_sec=self._share_query_wait_sec,
+            create_path=True,
+            validate_only=False,
         )
         dir_name = str(self.mangle_qspath(quota_scope_id))
         await self._event_producer.broadcast_event(
@@ -129,9 +138,8 @@ class HammerspaceQuotaModel(BaseQuotaModel):
         quota_scope_id: QuotaScopeID,
     ) -> QuotaUsage | None:
         name = self._get_share_name(quota_scope_id)
-        share = await self._client.get_share(
-            GetShareParams(name=name),
-        )
+        await self._ensure_login()
+        share = await self._client.get_share(name)
         if share is None:
             return None
         return QuotaUsage(
@@ -145,8 +153,6 @@ class HammerspaceQuotaModel(BaseQuotaModel):
         quota_scope_id: QuotaScopeID,
         config: QuotaConfig,
     ) -> None:
-        # Hammerspace does not support updating shares.
-        # TODO: Raise not implemented error and handle it in Manager
         pass
 
     @override
@@ -158,7 +164,12 @@ class HammerspaceQuotaModel(BaseQuotaModel):
 
 
 class HammerspaceVolume(BaseHammerspaceVolume):
-    name: ClassVar[str] = "hammerspace"
+    name: ClassVar[StorageBackendType] = StorageBackendType("hammerspace")
+    _client: HammerspaceAPIClient | None
+    _client_args: HammerspaceAPIClientArgs
+    _mount_source: str
+    _share_query_retry: int
+    _share_query_wait_sec: int
 
     def __init__(
         self,
@@ -178,6 +189,7 @@ class HammerspaceVolume(BaseHammerspaceVolume):
         self.event_dispatcher = event_dispatcher
         self.event_producer = event_producer
         self.watcher = watcher
+        self._client = None
 
         address = self.config.get("address")
         if address is None:
@@ -201,29 +213,42 @@ class HammerspaceVolume(BaseHammerspaceVolume):
 
         ssl_enabled = self.config.get("ssl_enabled", False)
         raw_ssl_config = self.config.get("ssl_config", None)
-        ssl_config: SSLConfig | None = None
         if raw_ssl_config is not None:
-            ssl_config = SSLConfig.model_validate(raw_ssl_config)
-        self._connection_info = APIConnectionInfo(
-            address=URL(address),
+            SSLConfig.model_validate(raw_ssl_config)
+        self._client_args = HammerspaceAPIClientArgs(
+            address=str(address),
             username=username,
             password=password,
-            ssl_enabled=ssl_enabled,
-            ssl_config=ssl_config,
+            ssl_enabled=bool(ssl_enabled),
         )
+
+    @property
+    def client(self) -> HammerspaceAPIClient:
+        if self._client is None:
+            raise VolumeNotInitializedError("Hammerspace client is not initialized")
+        return self._client
+
+    async def _ensure_login(self) -> None:
+        if not self.client.is_logged_in:
+            await self.client.login()
 
     @override
     async def init(self) -> None:
-        self._client = HammerspaceAPIClient(self._connection_info)
+        self._client = HammerspaceAPIClient(self._client_args)
         try:
-            await self._client.try_login()
+            await self._client.login()
         except AuthenticationError as e:
             raise ConfigurationError(
                 "Failed to authenticate to Hammerspace. "
-                f"Please check your user account. (username: {self._client._connection_info.username})"
+                f"Please check your user account. (username: {self._client_args.username})"
             ) from e
 
         await super().init()
+
+    @override
+    async def shutdown(self) -> None:
+        if self._client is not None:
+            await self._client.aclose()
 
     @override
     async def create_quota_model(self) -> AbstractQuotaModel:
@@ -236,27 +261,27 @@ class HammerspaceVolume(BaseHammerspaceVolume):
         )
         return HammerspaceQuotaModel(
             base_args,
-            self._client,
+            self.client,
         )
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
-        return frozenset([CAP_VFOLDER, CAP_QUOTA])
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
+        return frozenset([StorageBackendCapability.VFOLDER, StorageBackendCapability.QUOTA])
 
     async def _get_site_id(self) -> uuid.UUID | None:
-        sites = await self._client.get_sites()
+        await self._ensure_login()
+        sites = await self.client.get_sites()
         if not sites:
             return None
         site = sites[0]
         return site.uoid.uuid
 
     async def _get_site_metric_series_row(self, site_id: uuid.UUID) -> ValidClusterMetricRow | None:
-        metrics = await self._client.get_cluster_metrics(
-            params=ClusterMetricParams(
-                site_id=site_id,
-                preceding_duration=METRIC_PRECEDING_DURATION,
-                interval_duration=METRIC_INTERVAL_DURATION,
-            )
+        await self._ensure_login()
+        metrics = await self.client.get_cluster_metrics(
+            site_id,
+            METRIC_PRECEDING_DURATION,
+            METRIC_INTERVAL_DURATION,
         )
         if not metrics.series:
             return None
@@ -267,8 +292,11 @@ class HammerspaceVolume(BaseHammerspaceVolume):
 
         sorted_rows = sorted(metric_series.rows, key=lambda r: r.time, reverse=True)
         for row in sorted_rows:
-            if (valid_row := row.parse()) is not None:
-                return valid_row
+            if row.total is None or row.used is None or row.free is None:
+                continue
+            return ValidClusterMetricRow(
+                time=row.time, total=row.total, used=row.used, free=row.free
+            )
         return None
 
     @override

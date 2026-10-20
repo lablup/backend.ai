@@ -18,6 +18,8 @@ import textwrap
 import time
 import uuid
 from collections.abc import AsyncIterator, Callable
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -26,8 +28,12 @@ from urllib.parse import quote_plus as urlquote
 import jwt as pyjwt
 import pytest
 import sqlalchemy as sa
-from authlib.jose import JsonWebKey  # pants: no-infer-dep
-from authlib.jose import jwt as jose_jwt  # pants: no-infer-dep
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import NameOID
+from joserfc import jwt as jose_jwt
+from joserfc.jwk import RSAKey
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from ai.backend.common.data.entity.domain import DomainID
@@ -95,8 +101,7 @@ IDP_ISSUER = "https://idp.example.com"
 @pytest.fixture(scope="session")
 def oidc_rsa_key() -> dict[str, Any]:
     """RSA private key used by the mock IdP to sign ID tokens."""
-    key = JsonWebKey.generate_key("RSA", 2048, is_private=True)
-    key_dict: dict[str, Any] = key.as_dict(is_private=True)
+    key_dict: dict[str, Any] = RSAKey.generate_key(2048).as_dict(private=True)
     key_dict.update({"kid": "test-key-1", "use": "sig", "alg": "RS256"})
     return key_dict
 
@@ -158,6 +163,51 @@ def plugin_config() -> dict[str, Any]:
     }
 
 
+@dataclass(frozen=True)
+class ClientCertificate:
+    private_key: str
+    certificate: str
+    certificate_der: bytes
+
+
+@pytest.fixture(scope="session")
+def client_certificate() -> ClientCertificate:
+    """Self-signed certificate registered with the IdP for private_key_jwt."""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "test-client")])
+    now = datetime.now(UTC)
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now)
+        .not_valid_after(now + timedelta(days=1))
+        .sign(key, hashes.SHA256())
+    )
+    return ClientCertificate(
+        private_key=key.private_bytes(
+            serialization.Encoding.PEM,
+            serialization.PrivateFormat.PKCS8,
+            serialization.NoEncryption(),
+        ).decode(),
+        certificate=certificate.public_bytes(serialization.Encoding.PEM).decode(),
+        certificate_der=certificate.public_bytes(serialization.Encoding.DER),
+    )
+
+
+@pytest.fixture
+def private_key_plugin_config(
+    plugin_config: dict[str, Any], client_certificate: ClientCertificate
+) -> dict[str, Any]:
+    """Plugin configuration that authenticates the client with a certificate."""
+    openid = {k: v for k, v in plugin_config["openid"].items() if k != "client_secret"}
+    openid["private_key"] = client_certificate.private_key
+    openid["certificate"] = client_certificate.certificate
+    return {**plugin_config, "openid": openid}
+
+
 # ---------------------------------------------------------------------------
 # ID token creation
 # ---------------------------------------------------------------------------
@@ -186,8 +236,7 @@ def sign_id_token(oidc_rsa_key: dict[str, Any]) -> Callable[..., str]:
 
     def _sign(claims: dict[str, Any]) -> str:
         header = {"alg": "RS256", "kid": oidc_rsa_key["kid"]}
-        token_bytes = jose_jwt.encode(header, claims, oidc_rsa_key)
-        return token_bytes.decode("utf-8") if isinstance(token_bytes, bytes) else token_bytes
+        return jose_jwt.encode(header, claims, RSAKey.import_key(oidc_rsa_key))
 
     return _sign
 
@@ -281,7 +330,9 @@ def db_config(postgres_container: Any, test_db: str) -> DatabaseConfig:  # noqa:
     _, addr = postgres_container
     return DatabaseConfig(
         type="postgresql",
-        addr=HostPortPairModel(host=addr.host, port=addr.port),
+        addr=None,
+        addrs=[HostPortPairModel(host=addr.host, port=addr.port)],
+        connect_timeout=10.0,
         name=test_db,
         user=POSTGRES_USER,
         password=POSTGRES_PASSWORD,
@@ -299,7 +350,7 @@ def database(request: pytest.FixtureRequest, db_config: DatabaseConfig, test_db:
     Create the test database and install the schema via Alembic oneshot.
     Must be synchronous because cli_schema_oneshot internally calls asyncio.run().
     """
-    addr = db_config.addr
+    addr = db_config.addrs[0]
     address = f"{addr.host}:{addr.port}"
     user = db_config.user or "postgres"
     password = db_config.password or ""
@@ -734,11 +785,3 @@ def group_mapping() -> dict[str, Any]:
 # ===========================================================================
 # Webapp handler test fixtures
 # ===========================================================================
-
-
-@pytest.fixture
-def failing_oauth2_client() -> MagicMock:
-    """Mock OAuth2Client whose fetch_token raises an Exception."""
-    client = MagicMock()
-    client.fetch_token = AsyncMock(side_effect=Exception("token exchange failed"))
-    return client

@@ -19,8 +19,10 @@ import more_itertools
 import tqdm
 import yarl
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.data.storage.types import StorageBackendCapability
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
@@ -39,7 +41,7 @@ from .config.unified import StorageProxyUnifiedConfig
 from .context import EVENT_DISPATCHER_CONSUMER_GROUP, RootContext
 from .context_types import ArtifactVerifierContext
 from .types import VFolderID
-from .volumes.abc import CAP_FAST_SIZE, AbstractVolume
+from .volumes.abc import AbstractVolume
 from .volumes.backends import DEFAULT_BACKENDS
 from .volumes.pool import VolumePool
 
@@ -117,7 +119,9 @@ async def upgrade_2_to_3(
     rx_rest_digits_hex = re.compile(r"^[a-f0-9]{28}$")
     log.info("volume upgrade started", mount_path=volume.mount_path)
     volume_id = os.fsdecode(volume.mount_path)
-    scan_folder_size = force_scan_folder_size or (CAP_FAST_SIZE in await volume.get_capabilities())
+    scan_folder_size = force_scan_folder_size or (
+        StorageBackendCapability.FAST_SIZE in await volume.get_capabilities()
+    )
 
     def scan_vfolders(root: Path, *, depth: int = 0) -> Iterator[Path]:
         for p in root.iterdir():
@@ -237,9 +241,12 @@ async def check_and_upgrade(
     )
     redis_config = RedisConfig.model_validate(raw_redis_config)
     redis_profile_target = redis_config.to_redis_profile_target()
+    stream_target = redis_profile_target.profile_target(RedisRole.STREAM)
+    sentinel_monitors = SentinelMonitorSet(redis_profile_target.valkey_targets())
+    await sentinel_monitors.start()
     node_id = local_config.storage_proxy.node_id
     redis_mq = await RedisQueue.create(
-        redis_profile_target.profile_target(RedisRole.STREAM),
+        stream_target,
         RedisMQArgs(
             anycast_stream_key="events",
             broadcast_channel="events_all",
@@ -249,6 +256,7 @@ async def check_and_upgrade(
             node_id=node_id,
             db=REDIS_STREAM_DB,
         ),
+        sentinel_monitors.monitor_for(stream_target.to_valkey_target()),
     )
     event_producer = EventProducer(
         redis_mq,
@@ -308,6 +316,7 @@ async def check_and_upgrade(
             report_path=report_path,
             force_scan_folder_size=force_scan_folder_size,
         )
+    await sentinel_monitors.close()
 
 
 @click.command()
@@ -349,7 +358,7 @@ async def check_and_upgrade(
     is_flag=True,
     help=(
         "Also scan size of the folder residing in FSOp solution without fast folder size scan"
-        " (CAP_FAST_SIZE) capability."
+        " (StorageBackendCapability.FAST_SIZE) capability."
         "WARNING: Enabling this option can slow down whole total migration process a lot!"
     ),
 )

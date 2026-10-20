@@ -1,6 +1,4 @@
 import copy
-import json
-import os
 import tempfile
 import textwrap
 import unittest.mock
@@ -12,7 +10,6 @@ from typing import Any, Protocol, cast
 from unittest import mock
 
 import pytest
-from aioresponses import aioresponses
 from pytest_mock import MockerFixture
 
 from ai.backend.accelerator.mock.plugin import MockPlugin
@@ -104,33 +101,6 @@ def test_num_nodes() -> None:
         mock_libnuma.numa_num_configured_nodes.assert_called_once_with()
 
     linux._numa_supported = original_numa_supported
-
-
-@pytest.mark.skip(reason="aioresponses 0.7 is incompatible with aiohttp 3.7+")
-async def test_get_available_cores_without_docker(monkeypatch: Any) -> None:
-    def mock_sched_getaffinity(pid: Any) -> None:
-        raise AttributeError
-
-    def mock_sched_getaffinity2(pid: Any) -> set[int]:
-        return {0, 1}
-
-    numa = linux.libnuma()
-    with aioresponses() as m:
-        m.get(
-            "http://docker/info",
-            body=json.dumps({
-                "NCPU": 4,
-            }),
-        )
-
-        monkeypatch.setattr(os, "sched_getaffinity", mock_sched_getaffinity, raising=False)
-        monkeypatch.setattr(os, "cpu_count", lambda: 4)
-        numa.get_available_cores.cache_clear()
-        assert (await numa.get_available_cores()) == {0, 1, 2, 3}
-
-        monkeypatch.setattr(os, "sched_getaffinity", mock_sched_getaffinity2, raising=False)
-        numa.get_available_cores.cache_clear()
-        assert (await numa.get_available_cores()) == {0, 1}
 
 
 async def test_get_core_topology(mocker: MockerFixture) -> None:

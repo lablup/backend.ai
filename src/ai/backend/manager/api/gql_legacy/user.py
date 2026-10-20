@@ -22,8 +22,8 @@ from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UserNotFound
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.api.gql.base import resolve_entity_id
 from ai.backend.manager.data.user.types import (
     UserData,
 )
@@ -38,6 +38,7 @@ from ai.backend.manager.models.minilang import (
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.project.row import ProjectRow, groups
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.row import (
     ACTIVE_USER_STATUSES,
@@ -59,6 +60,7 @@ from ai.backend.manager.services.user.actions.create_user import (
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
 )
+from ai.backend.manager.services.user.actions.get_user import GetUserAction
 from ai.backend.manager.services.user.actions.keypair_ops import (
     GetDefaultKeypairsAction,
     SwitchDefaultAccessKeyAction,
@@ -66,6 +68,7 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
 from ai.backend.manager.services.user.actions.purge_user import (
     PurgeUserAction,
 )
+from ai.backend.manager.services.user.actions.restore_user import RestoreUserAction
 from ai.backend.manager.services.user.actions.update_user import (
     UpdateUserAction,
     UpdateUserActionResult,
@@ -228,7 +231,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> Self:
         graph_ctx: GraphQueryContext = info.context
 
-        _, user_id = AsyncNode.resolve_global_id(info, id)
+        user_id = resolve_entity_id(id, UserID)
         query = sa.select(UserRow).where(UserRow.uuid == user_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             user_row = (await db_session.scalars(query)).first()
@@ -492,7 +495,7 @@ class UserNode(graphene.ObjectType):  # type: ignore[misc]
             total_cnt = await db_session.scalar(cnt_query)
             async for row in await db_session.stream_scalars(prj_query):
                 prj_row = cast(ProjectRow, row)
-                result.append(GroupNode.from_row(graph_ctx, prj_row))
+                result.append(GroupNode.from_data(ProjectSearchableFields.own.to_data(prj_row)))
             return ConnectionResolverResult(result, cursor, pagination_order, page_size, total_cnt)
 
     async def __resolve_reference(self, info: graphene.ResolveInfo, **kwargs: Any) -> UserNode:
@@ -568,12 +571,12 @@ class User(graphene.ObjectType):  # type: ignore[misc]
     sudo_session_enabled = graphene.Boolean()
     main_access_key = graphene.String(
         description=(
-            f"Added in 24.03.0. Deprecated since {NEXT_RELEASE_VERSION}. Use the keypair's is_default field. Used as the default authentication credential for"
+            "Added in 24.03.0. Deprecated since 26.9.0. Use the keypair's is_default field. Used as the default authentication credential for"
             " password-based logins and sets the user's total resource usage limit. User's"
             " main_access_key cannot be deleted, and only super-admin can replace"
             " main_access_key."
         ),
-        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use the keypair's is_default field.",
+        deprecation_reason="Deprecated since 26.9.0. Use the keypair's is_default field.",
     )
     container_uid = graphene.Int(
         description="Added in 25.2.0. The user ID (UID) assigned to processes running inside the container."
@@ -983,7 +986,9 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
         description="Added in 25.2.0. Supplementary group IDs assigned to processes running inside the container.",
     )
 
-    def to_action(self, user_id: UserID, graph_ctx: GraphQueryContext) -> UpdateUserAction:
+    def to_action(
+        self, user_id: UserID, graph_ctx: GraphQueryContext, status: UserStatus | None
+    ) -> UpdateUserAction:
         # Create PasswordInfo if password is being changed
         password_state = OptionalState[PasswordInfo].nop()
         if self.password is not Undefined and self.password is not None:
@@ -1014,11 +1019,7 @@ class ModifyUserInput(graphene.InputObjectType):  # type: ignore[misc]
             is_active=OptionalState[bool].from_graphql(
                 self.is_active,
             ),
-            status=OptionalState[UserStatus].from_graphql(
-                self.status
-                if (self.status is Undefined or self.status is None)
-                else UserStatus(self.status),
-            ),
+            status=OptionalState.nop() if status is None else OptionalState.update(status),
             domain_name=OptionalState[str].from_graphql(
                 self.domain_name,
             ),
@@ -1146,15 +1147,34 @@ class ModifyUser(graphene.Mutation):  # type: ignore[misc]
         validate_user_mutation_props(props)
 
         user_data = await graph_ctx.user_repository.get_by_email_validated(email)
-        action: UpdateUserAction = props.to_action(UserID(user_data.id), graph_ctx)
+        user_id = UserID(user_data.id)
+        current = UserStatus(user_data.status)
+        requested = (
+            None if props.status is Undefined or props.status is None else UserStatus(props.status)
+        )
+        if requested is not None and requested.restores_from(current):
+            await graph_ctx.processors.user.restore_user.run(RestoreUserAction(user_id=user_id))
+        action: UpdateUserAction = props.to_action(
+            user_id,
+            graph_ctx,
+            requested
+            if requested is not None and requested.is_updater_value_from(current)
+            else None,
+        )
         res: UpdateUserActionResult = await graph_ctx.processors.user.update_user.run(action)
+        data = res.data
         if props.main_access_key is not Undefined and props.main_access_key is not None:
             await graph_ctx.processors.user.switch_default_access_key.run(
                 SwitchDefaultAccessKeyAction(
-                    user_id=UserID(user_data.id),
+                    user_id=user_id,
                     access_key=AccessKey(props.main_access_key),
                 )
             )
+        if requested is not None and requested.deletes_from(current):
+            await graph_ctx.processors.user.delete_user.run(DeleteUserAction(user_id=user_id))
+            data = (
+                await graph_ctx.processors.user.get_user.run(GetUserAction(user_id=user_id))
+            ).user
 
         designated = await graph_ctx.processors.user.get_default_keypairs.run(
             GetDefaultKeypairsAction(user_ids=[UserID(user_data.id)])
@@ -1163,7 +1183,7 @@ class ModifyUser(graphene.Mutation):  # type: ignore[misc]
         return cls(
             ok=True,
             msg="success",
-            user=User.from_dto(res.data, main_access_key.access_key if main_access_key else None),
+            user=User.from_dto(data, main_access_key.access_key if main_access_key else None),
         )
 
 

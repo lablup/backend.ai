@@ -23,7 +23,6 @@ from ai.backend.common.dto.manager.v2.vfolder.response import (
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     VFolderMountPolicyNode as NodeDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -36,7 +35,7 @@ from ai.backend.manager.api.gql.vfolder_v2.types.enum import VFolderMountPermiss
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="The mount level one user gets on a virtual folder.",
     ),
     model=NodeDTO,
@@ -53,7 +52,7 @@ class VFolderMountPolicyGQL(PydanticOutputMixin[NodeDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Input for setting the mount level one user gets on a virtual folder.",
     ),
     name="SetVFolderMountPolicyInput",
@@ -67,7 +66,7 @@ class SetVFolderMountPolicyInputGQL(PydanticInputMixin[SetInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Payload returned after setting a mount policy.",
     ),
     model=SetPayloadDTO,
@@ -79,7 +78,7 @@ class SetVFolderMountPolicyPayloadGQL(PydanticOutputMixin[SetPayloadDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Input for taking back the mount level one user was given on a virtual folder.",
     ),
     name="UnsetVFolderMountPolicyInput",
@@ -90,7 +89,7 @@ class UnsetVFolderMountPolicyInputGQL(PydanticInputMixin[UnsetInputDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Payload returned after unsetting a mount policy.",
     ),
     model=UnsetPayloadDTO,
@@ -104,7 +103,7 @@ class UnsetVFolderMountPolicyPayloadGQL(PydanticOutputMixin[UnsetPayloadDTO]):
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="The mount levels set on a virtual folder, one row per user.",
     ),
     model=ListPayloadDTO,

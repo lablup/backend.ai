@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
 from functools import lru_cache
 from uuid import UUID
 
@@ -22,9 +21,11 @@ from ai.backend.common.data.entity.types import (
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.rbac import (
     BulkAddRolePermissionFailureInfo,
     BulkAddRolePermissionsPayload,
+    BulkAssignRoleFailureInfo,
     BulkAssignRoleResultPayload,
     BulkRemoveRolePermissionFailureInfo,
     BulkRemoveRolePermissionsPayload,
@@ -53,6 +54,10 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchPermissionsGQLInput,
     MyAtomicBulkScopePermissionsInput,
     MyScopePermissionsInput,
+    PartialBulkDeleteRolesInput,
+    PartialBulkPurgeRolesInput,
+    PartialBulkRestoreRolesInput,
+    PartialBulkUpdateRolesInput,
     PermissionTarget,
     SearchRoleAssignmentsInput,
     SearchRolesInput,
@@ -120,6 +125,7 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
 from ai.backend.common.dto.manager.v2.rbac.response import (
     MyAtomicBulkScopePermissionsPayload,
     MyScopePermissionsPayload,
+    RestoreRolePayload,
     ScopeEntityPermission,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import (
@@ -138,6 +144,8 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
 )
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.tristate.unset import Unset
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.common.types import SearchResult
@@ -150,9 +158,7 @@ from ai.backend.manager.data.permission.role import (
     BulkUserRoleRevocationInput,
     RoleData,
     RoleDetailData,
-    UserRoleAssignmentData,
     UserRoleAssignmentInput,
-    UserRoleRevocationData,
     UserRoleRevocationInput,
 )
 from ai.backend.manager.data.permission.status import RoleStatus as InternalRoleStatus
@@ -167,7 +173,11 @@ from ai.backend.manager.errors.permission import (
 )
 from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.rbac.exceptions import InvalidScope
 from ai.backend.manager.models.rbac_models.permission.creators import RolePermissionCreator
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -189,7 +199,11 @@ from ai.backend.manager.models.rbac_models.role.searchable_fields import (
     RoleSearchableFields,
 )
 from ai.backend.manager.models.rbac_models.role.searchers import RoleSearcher
-from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater, RoleUpdater
+from ai.backend.manager.models.rbac_models.role.updaters import (
+    RoleRestoreUpdater,
+    RoleSoftDeleteUpdater,
+    RoleUpdater,
+)
 from ai.backend.manager.models.rbac_models.user_role.deprecated_search import (
     DeprecatedRoleAssignmentConditions,
 )
@@ -239,9 +253,24 @@ from ai.backend.manager.services.permission_contoller.actions.get_permission_mat
 from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
     GetRoleDetailAction,
 )
+from ai.backend.manager.services.permission_contoller.actions.partial_bulk_delete_roles import (
+    PartialBulkDeleteRolesAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.partial_bulk_purge_roles import (
+    PartialBulkPurgeRolesAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.partial_bulk_restore_roles import (
+    PartialBulkRestoreRolesAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.partial_bulk_update_roles import (
+    PartialBulkUpdateRolesAction,
+)
 from ai.backend.manager.services.permission_contoller.actions.purge_role import PurgeRoleAction
 from ai.backend.manager.services.permission_contoller.actions.replace_role_permissions import (
     ReplaceRolePermissionsAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.restore_role import (
+    RestoreRoleAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.search_my_role_assignments import (
     ScopedSearchRoleAssignmentsAction,
@@ -829,12 +858,23 @@ class RBACAdapter(BaseAdapter):
     # ------------------------------------------------------------------ update
 
     async def update(self, role_id: UUID, input: UpdateRoleInput) -> UpdateRolePayload:
-        """Update an existing role."""
+        """Update an existing role; a deprecated ``status`` goes to delete or restore."""
         updater = self._build_updater(role_id, input)
         result = await self._permission_controller.update_role.run(
             UpdateRoleAction(updater=updater)
         )
-        return UpdateRolePayload(role=self._role_data_to_node(result.data))
+        data = result.data
+        if self._requests_soft_delete(input, data):
+            deleted = await self._permission_controller.delete_role.run(
+                DeleteRoleAction(updater=RoleSoftDeleteUpdater(role_id=data.id))
+            )
+            data = deleted.data
+        elif self._requests_restore(input, data):
+            restored = await self._permission_controller.restore_role.run(
+                RestoreRoleAction(updater=RoleRestoreUpdater(role_id=data.id))
+            )
+            data = restored.data
+        return UpdateRolePayload(role=self._role_data_to_node(data))
 
     # ------------------------------------------------------------------ delete
 
@@ -843,7 +883,16 @@ class RBACAdapter(BaseAdapter):
         result = await self._permission_controller.delete_role.run(
             DeleteRoleAction(updater=RoleSoftDeleteUpdater(role_id=RoleID(role_id)))
         )
-        return DeleteRolePayload(id=result.data.id)
+        return DeleteRolePayload(id=result.data.id, role=self._role_data_to_node(result.data))
+
+    # ------------------------------------------------------------------ restore
+
+    async def restore(self, role_id: UUID) -> RestoreRolePayload:
+        """Restore a soft-deleted role (marks status as ACTIVE)."""
+        result = await self._permission_controller.restore_role.run(
+            RestoreRoleAction(updater=RoleRestoreUpdater(role_id=RoleID(role_id)))
+        )
+        return RestoreRolePayload(id=result.data.id, role=self._role_data_to_node(result.data))
 
     # ------------------------------------------------------------------ purge
 
@@ -852,16 +901,98 @@ class RBACAdapter(BaseAdapter):
         result = await self._permission_controller.purge_role.run(
             PurgeRoleAction(role_id=RoleID(role_id))
         )
-        return PurgeRolePayload(id=result.data.id)
+        return PurgeRolePayload(id=result.data.id, entity_id=result.data.id)
 
-    # ------------------------------------------------------------------ delete_permission
+    # ------------------------------------------------------------------ partial bulk
 
-    async def delete_permission(self, permission_id: UUID) -> DeletePermissionPayloadDTO:
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateRolesInput
+    ) -> PartialBulkPayload[RoleNode]:
+        """Update several roles, answering for each one; a deprecated ``status`` goes to
+        delete or restore per role."""
+        result = await self._permission_controller.partial_bulk_update_roles.run(
+            PartialBulkUpdateRolesAction(
+                updaters=[self._build_updater(item.id, item.input) for item in input.items]
+            )
+        )
+        inputs = {RoleID(item.id): item.input for item in input.items}
+        to_delete: list[RoleID] = []
+        to_restore: list[RoleID] = []
+        for item in result.items:
+            if item.value is None:
+                continue
+            if self._requests_soft_delete(inputs[item.value.id], item.value):
+                to_delete.append(item.value.id)
+            elif self._requests_restore(inputs[item.value.id], item.value):
+                to_restore.append(item.value.id)
+        transitioned: dict[EntityIdentifier, PartialBulkEntityResult[RoleData]] = {}
+        if to_delete:
+            deleted = await self._permission_controller.partial_bulk_delete_roles.run(
+                PartialBulkDeleteRolesAction(ids=to_delete)
+            )
+            transitioned.update({item.entity_id: item for item in deleted.items})
+        if to_restore:
+            restored = await self._permission_controller.partial_bulk_restore_roles.run(
+                PartialBulkRestoreRolesAction(ids=to_restore)
+            )
+            transitioned.update({item.entity_id: item for item in restored.items})
+        return self._to_partial_bulk_payload(
+            PartialBulkResult(
+                items=[transitioned.get(item.entity_id, item) for item in result.items]
+            )
+        )
+
+    async def partial_bulk_delete(
+        self, input: PartialBulkDeleteRolesInput
+    ) -> PartialBulkPayload[RoleNode]:
+        """Soft-delete several roles, answering for each one."""
+        result = await self._permission_controller.partial_bulk_delete_roles.run(
+            PartialBulkDeleteRolesAction(ids=[RoleID(role_id) for role_id in input.ids])
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_restore(
+        self, input: PartialBulkRestoreRolesInput
+    ) -> PartialBulkPayload[RoleNode]:
+        """Restore several soft-deleted roles, answering for each one."""
+        result = await self._permission_controller.partial_bulk_restore_roles.run(
+            PartialBulkRestoreRolesAction(ids=[RoleID(role_id) for role_id in input.ids])
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeRolesInput
+    ) -> PartialBulkPayload[RoleNode]:
+        """Permanently remove several roles, answering for each one."""
+        result = await self._permission_controller.partial_bulk_purge_roles.run(
+            PartialBulkPurgeRolesAction(ids=[RoleID(role_id) for role_id in input.ids])
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[RoleData]
+    ) -> PartialBulkPayload[RoleNode]:
+        return PartialBulkPayload[RoleNode](
+            successes=[
+                self._role_data_to_node(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
+
+    # ------------------------------------------------------------------ purge_permission
+
+    async def purge_permission(self, permission_id: UUID) -> DeletePermissionPayloadDTO:
         """Hard-delete a scoped permission."""
         await self._permission_controller.delete_permission.run(
             DeletePermissionAction(permission_id=PermissionID(permission_id))
         )
-        return DeletePermissionPayloadDTO(id=permission_id)
+        return DeletePermissionPayloadDTO(id=permission_id, field_id=permission_id)
 
     # ------------------------------------------------------------------ create_permission / update_permission
 
@@ -891,24 +1022,21 @@ class RBACAdapter(BaseAdapter):
     # ------------------------------------------------------------------ assign_role / revoke_role
 
     async def assign_role(self, input: AssignRoleInputDTO) -> RoleAssignmentNode:
-        """Assign a role to a user."""
+        """Assign a role to a user, granted by the current authenticated user."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
         action_result = await self._rbac.assign_role.run(
             AssignRoleAction(
                 input=UserRoleAssignmentInput(
                     user_id=input.user_id,
                     role_id=input.role_id,
+                    granted_by=UserID(me.user_id),
                     project_id=input.project_id,
                 )
             )
         )
-        data: UserRoleAssignmentData = action_result.data
-        return RoleAssignmentNode(
-            id=data.id,
-            user_id=data.user_id,
-            role_id=data.role_id,
-            granted_by=data.granted_by,
-            granted_at=datetime.now(tz=UTC),
-        )
+        return self._assignment_data_to_node(action_result.data)
 
     async def revoke_role(self, input: RevokeRoleInputDTO) -> RoleAssignmentNode:
         """Revoke a role from a user."""
@@ -917,40 +1045,31 @@ class RBACAdapter(BaseAdapter):
                 input=UserRoleRevocationInput(user_id=input.user_id, role_id=input.role_id)
             )
         )
-        data: UserRoleRevocationData = action_result.data
-        return RoleAssignmentNode(
-            id=data.user_role_id,
-            user_id=data.user_id,
-            role_id=data.role_id,
-            granted_by=None,
-            granted_at=datetime.now(tz=UTC),
-        )
+        return self._assignment_data_to_node(action_result.data)
 
     # ------------------------------------------------------------------ bulk_assign_role / bulk_revoke_role
 
     async def bulk_assign_role(self, input: BulkAssignRoleInputDTO) -> BulkAssignRoleResultPayload:
-        """Bulk-assign a role to multiple users."""
+        """Bulk-assign a role to multiple users, granted by the current authenticated user.
+        A user already holding the role is reported in `failed`."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
         action_result = await self._rbac.bulk_assign_role.run(
             BulkAssignRoleAction(
-                role_id=RoleID(input.role_id),
-                user_ids=[UserID(uid) for uid in input.user_ids],
+                role_id=input.role_id,
+                user_ids=input.user_ids,
+                granted_by=UserID(me.user_id),
                 project_id=input.project_id,
             )
         )
         result: BulkRoleAssignmentResultData = action_result.data
-        now = datetime.now(tz=UTC)
         return BulkAssignRoleResultPayload(
-            assigned=[
-                RoleAssignmentNode(
-                    id=s.id,
-                    user_id=s.user_id,
-                    role_id=s.role_id,
-                    granted_by=s.granted_by,
-                    granted_at=now,
-                )
-                for s in result.successes
+            assigned=[self._assignment_data_to_node(s) for s in result.successes],
+            failed=[
+                BulkAssignRoleFailureInfo(user_id=f.user_id, message=f.message)
+                for f in result.failures
             ],
-            failed=[],
         )
 
     async def bulk_add_role_permissions(
@@ -1061,18 +1180,8 @@ class RBACAdapter(BaseAdapter):
             )
         )
         result: BulkRoleRevocationResultData = action_result.data
-        now = datetime.now(tz=UTC)
         return BulkRevokeRoleResultPayload(
-            revoked=[
-                RoleAssignmentNode(
-                    id=s.user_role_id,
-                    user_id=s.user_id,
-                    role_id=s.role_id,
-                    granted_by=None,
-                    granted_at=now,
-                )
-                for s in result.successes
-            ],
+            revoked=[self._assignment_data_to_node(s) for s in result.successes],
             failed=[
                 BulkRevokeRoleFailureInfo(user_id=f.user_id, message=f.message)
                 for f in result.failures
@@ -1111,6 +1220,7 @@ class RBACAdapter(BaseAdapter):
     def _convert_permission_filter(self, f: PermissionFilterDTO) -> list[QueryCondition]:
         fields = PermissionSearchableFields.own
         conditions = [
+            *self.apply_uuid_filter(f.field_id, fields.id.filter),
             *self.apply_uuid_filter(f.role_id, fields.role_id.filter),
             *self.apply_string_filter(f.entity_type, fields.entity_type.filter),
             *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
@@ -1125,15 +1235,16 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_permission_filter(sub))
+                sub_conditions = self._convert_permission_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_permission_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_permission_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_permission_orders(self, orders: list[PermissionOrderByDTO]) -> list[QueryOrder]:
@@ -1152,6 +1263,7 @@ class RBACAdapter(BaseAdapter):
     def _convert_role_filter_gql(self, f: RoleFilterDTO) -> list[QueryCondition]:
         fields = RoleSearchableFields.own
         conditions = [
+            *self.apply_uuid_filter(f.entity_id, fields.id.filter),
             *self.apply_string_filter(f.name, fields.name.filter),
             *self._convert_role_source_filter(f.source, fields.source.filter),
             *self._convert_role_status_filter(f.status, fields.status.filter),
@@ -1169,15 +1281,16 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_role_filter_gql(sub))
+                sub_conditions = self._convert_role_filter_gql(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_role_filter_gql(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_role_filter_gql(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_role_source_filter(
@@ -1232,15 +1345,16 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_assigned_user_nested_filter(sub))
+                sub_conditions = self._convert_assigned_user_nested_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_assigned_user_nested_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_assigned_user_nested_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_mapped_scope_nested_filter(
@@ -1260,15 +1374,16 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_mapped_scope_nested_filter(sub))
+                sub_conditions = self._convert_mapped_scope_nested_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_mapped_scope_nested_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_mapped_scope_nested_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_role_orders_gql(self, orders: list[RoleOrderByDTO]) -> list[QueryOrder]:
@@ -1303,15 +1418,16 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_role_nested_filter(sub))
+                sub_conditions = self._convert_role_nested_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_role_nested_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_role_nested_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_permission_nested_filter(
@@ -1338,15 +1454,16 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_permission_nested_filter(sub))
+                sub_conditions = self._convert_permission_nested_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_permission_nested_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_permission_nested_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_assignment_filter(self, f: RoleAssignmentFilterDTO) -> list[QueryCondition]:
@@ -1371,15 +1488,16 @@ class RBACAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_assignment_filter(sub))
+                sub_conditions = self._convert_assignment_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_assignment_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_assignment_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_assignment_orders(
@@ -1397,6 +1515,23 @@ class RBACAdapter(BaseAdapter):
             elif o.field == "granted_at":
                 result.append(fields.granted_at.order.apply(ascending))
         return result
+
+    def _requests_soft_delete(self, input: UpdateRoleInput, data: RoleData) -> bool:
+        return (
+            self._requested_status(input) == InternalRoleStatus.DELETED
+            and data.status != InternalRoleStatus.DELETED
+        )
+
+    def _requests_restore(self, input: UpdateRoleInput, data: RoleData) -> bool:
+        return (
+            self._requested_status(input) == InternalRoleStatus.ACTIVE
+            and data.status == InternalRoleStatus.DELETED
+        )
+
+    def _requested_status(self, input: UpdateRoleInput) -> InternalRoleStatus | None:
+        if input.status is None or isinstance(input.status, Unset):
+            return None
+        return InternalRoleStatus(input.status.value)
 
     def _build_updater(self, role_id: UUID, input: UpdateRoleInput) -> RoleUpdater:
         return RoleUpdater(
@@ -1421,6 +1556,7 @@ class RBACAdapter(BaseAdapter):
             deleted_at=data.deleted_at,
             scope_type=data.scope_type,
             scope_id=data.scope_id,
+            role_preset_id=data.role_preset_id,
         )
 
     @staticmethod
@@ -1438,6 +1574,7 @@ class RBACAdapter(BaseAdapter):
             deleted_at=data.deleted_at,
             scope_type=data.scope_type,
             scope_id=data.scope_id,
+            role_preset_id=data.role_preset_id,
         )
 
     @staticmethod

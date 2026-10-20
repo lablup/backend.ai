@@ -58,12 +58,12 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.resource_group import AGroupAndACaller, AGroupAndSomeone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Deployed = ReplaceResourceGroupDefaultDeploymentOptionsPayload
 type Sessioned = ReplaceResourceGroupDefaultSessionOptionsPayload
-type OptionsStep = Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Any]
+type OptionsStep = Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, Any]
 
 DEPLOYMENT_HANDLER = CheckReplicaDeploymentHandler.name()
 SESSION_HANDLER = TerminateSessionsLifecycleHandler.name()
@@ -240,7 +240,7 @@ class TheSessionOptionsAreReplaced(Then[AGroupAndACaller, Sessioned]):
 
 @dataclass(frozen=True)
 class TheSuperadminReplacesTheDeploymentOptions(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Deployed]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, Deployed]
 ):
     @override
     def summary(self) -> str:
@@ -251,7 +251,7 @@ class TheSuperadminReplacesTheDeploymentOptions(
         return "슈퍼관리자가 등록된 처리기 하나의 설정을 담아 기본 배포 옵션을 갈아끼우면 준 옵션이 통째로 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -265,7 +265,7 @@ class TheSuperadminReplacesTheDeploymentOptions(
 
 @dataclass(frozen=True)
 class AnUnregisteredDeploymentHandlerIsRefused(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Deployed]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, Deployed]
 ):
     @override
     def summary(self) -> str:
@@ -276,7 +276,7 @@ class AnUnregisteredDeploymentHandlerIsRefused(
         return "등록되지 않은 배포 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -290,7 +290,7 @@ class AnUnregisteredDeploymentHandlerIsRefused(
 
 @dataclass(frozen=True)
 class AUserGrantedUpdateReplacesTheDeploymentOptions(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Deployed]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, Deployed]
 ):
     @override
     def summary(self) -> str:
@@ -301,7 +301,7 @@ class AUserGrantedUpdateReplacesTheDeploymentOptions(
         return "그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 기본 배포 옵션을 갈아끼우면 준 옵션이 통째로 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(granted=Permission.UPDATE)
 
     @override
@@ -315,7 +315,7 @@ class AUserGrantedUpdateReplacesTheDeploymentOptions(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReplaceTheDeploymentOptions(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Deployed]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, Deployed]
 ):
     @override
     def summary(self) -> str:
@@ -326,7 +326,7 @@ class AUserGrantedNothingMayNotReplaceTheDeploymentOptions(
         return "아무 권한도 없는 사용자가 기본 배포 옵션을 갈아끼우려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override
@@ -340,7 +340,7 @@ class AUserGrantedNothingMayNotReplaceTheDeploymentOptions(
 
 @dataclass(frozen=True)
 class TheSuperadminReplacesTheSessionOptions(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Sessioned]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, Sessioned]
 ):
     @override
     def summary(self) -> str:
@@ -354,7 +354,7 @@ class TheSuperadminReplacesTheSessionOptions(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -368,7 +368,7 @@ class TheSuperadminReplacesTheSessionOptions(
 
 @dataclass(frozen=True)
 class AnUnregisteredSessionHandlerIsRefused(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Sessioned]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, Sessioned]
 ):
     @override
     def summary(self) -> str:
@@ -379,7 +379,7 @@ class AnUnregisteredSessionHandlerIsRefused(
         return "등록되지 않은 세션 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -393,7 +393,7 @@ class AnUnregisteredSessionHandlerIsRefused(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReplaceTheSessionOptions(
-    Scenario[SeedingSession, AGroupAndACaller, ResourceGroupAdapter, Sessioned]
+    Scenario[TestSeedingSession, AGroupAndACaller, ResourceGroupAdapter, Sessioned]
 ):
     @override
     def summary(self) -> str:
@@ -404,7 +404,7 @@ class AUserGrantedNothingMayNotReplaceTheSessionOptions(
         return "아무 권한도 없는 사용자가 기본 세션 옵션을 갈아끼우려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AGroupAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AGroupAndACaller]:
         return AGroupAndSomeone()
 
     @override

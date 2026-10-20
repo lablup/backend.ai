@@ -26,7 +26,6 @@ from ai.backend.manager.api.rest.shutdown import ServerDrainNotifier
 from ai.backend.manager.api.rest.tree import build_api_routes
 from ai.backend.manager.data.common.sentinel import Undefined, undefined
 from ai.backend.manager.data.manager_status.types import ManagerStatus
-from ai.backend.manager.models.vfolder.row import VFolderPermissionValidator
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -168,8 +167,6 @@ def _traverse(scheme: t.Trafaret) -> dict[str, Any]:
         return {"type": "string", "format": "uri"}
     if isinstance(scheme, tx.UUID):
         return {"type": "string", "format": "uuid"}
-    if isinstance(scheme, VFolderPermissionValidator):
-        return {"type": "string", "enum": ["ro", "rw", "wd"]}
 
     if scheme == t.Email:
         return {"type": "string", "format": "email"}

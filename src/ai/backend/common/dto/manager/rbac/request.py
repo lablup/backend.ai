@@ -10,7 +10,9 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import DeclaredEntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
@@ -76,18 +78,15 @@ class PurgeRoleRequest(BaseRequestModel):
 class AssignRoleRequest(BaseRequestModel):
     """Request to assign a role to a user."""
 
-    user_id: UUID = Field(description="User ID to assign the role to")
-    role_id: UUID = Field(description="Role ID to assign")
-    granted_by: UUID | None = Field(
-        default=None, description="User ID who granted this role assignment"
-    )
+    user_id: UserID = Field(description="User ID to assign the role to")
+    role_id: RoleID = Field(description="Role ID to assign")
 
 
 class RevokeRoleRequest(BaseRequestModel):
     """Request to revoke a role from a user."""
 
-    user_id: UUID = Field(description="User ID to revoke the role from")
-    role_id: UUID = Field(description="Role ID to revoke")
+    user_id: UserID = Field(description="User ID to revoke the role from")
+    role_id: RoleID = Field(description="Role ID to revoke")
 
 
 class RoleFilter(BaseRequestModel):

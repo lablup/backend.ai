@@ -186,6 +186,7 @@ from pathlib import Path
 from pprint import pformat
 from typing import Annotated, Any, Literal, Self, override
 
+import sqlalchemy as sa
 from pydantic import (
     AliasChoices,
     ConfigDict,
@@ -277,16 +278,47 @@ class DatabaseConfig(BaseConfigSchema):
         ),
     ]
     addr: Annotated[
-        HostPortPair,
-        Field(default=HostPortPair(host="127.0.0.1", port=5432)),
+        HostPortPair | None,
+        Field(default=None),
         BackendAIConfigMeta(
             description=(
                 "Network address and port of the PostgreSQL database server. "
-                "Default is the standard PostgreSQL port (5432) on localhost. "
-                "In production, point this to your database server or cluster endpoint."
+                "Read as a one-member addrs list when addrs is not set."
             ),
             added_version="25.8.0",
-            example=ConfigExample(local="127.0.0.1:5432", prod="db.example.com:5432"),
+            deprecated_version="26.9.0",
+            deprecation_hint="Use addrs instead.",
+        ),
+    ]
+    addrs: Annotated[
+        list[HostPortPair],
+        Field(default_factory=lambda: [HostPortPair(host="127.0.0.1", port=5432)], min_length=1),
+        BackendAIConfigMeta(
+            description=(
+                "Addresses of the PostgreSQL cluster members. "
+                "List every member of an HA cluster, or a single address of a standalone "
+                "server or a proxy in front of the cluster."
+            ),
+            added_version="26.9.0",
+            composite=CompositeType.LIST,
+            example=ConfigExample(local="127.0.0.1:5432", prod="db1.example.com:5432"),
+        ),
+    ]
+    connect_timeout: Annotated[
+        float,
+        Field(
+            default=10.0,
+            gt=0,
+            validation_alias=AliasChoices("connect-timeout", "connect_timeout"),
+            serialization_alias="connect-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for connecting to one member of addrs. "
+                "When it expires, the next member is tried."
+            ),
+            added_version="26.9.0",
+            example=ConfigExample(local="10", prod="5"),
         ),
     ]
     name: Annotated[
@@ -425,6 +457,30 @@ class DatabaseConfig(BaseConfigSchema):
         ),
     ]
 
+    @model_validator(mode="before")
+    @classmethod
+    def _read_addr_as_addrs(cls, data: Any) -> Any:
+        if (
+            not isinstance(data, Mapping)
+            or data.get("addr") is None
+            or data.get("addrs") is not None
+        ):
+            return data
+        return {**data, "addrs": [data["addr"]]}
+
+    def sqlalchemy_url(self) -> sa.engine.URL:
+        return sa.engine.URL.create(
+            "postgresql+asyncpg",
+            username=self.user,
+            password=self.password,
+            database=self.name,
+            query={
+                "host": ",".join(addr.host for addr in self.addrs),
+                "port": ",".join(str(addr.port) for addr in self.addrs),
+                "target_session_attrs": "primary",
+            },
+        )
+
 
 class EventLoopType(enum.StrEnum):
     ASYNCIO = "asyncio"
@@ -550,7 +606,7 @@ class ConfigKeyProviderConfig(BaseConfigSchema):
                 "id to the key list and pointing this at it; the previous ids stay so their "
                 "values keep decrypting."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             example=ConfigExample(local="v1", prod="v1"),
         ),
     ]
@@ -565,7 +621,7 @@ class ConfigKeyProviderConfig(BaseConfigSchema):
                 "values themselves, so an id may be retired only once no stored value still "
                 "names it."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             secret=True,
         ),
     ]
@@ -604,7 +660,7 @@ class SecretEncryptionConfig(BaseConfigSchema):
                 "secrets written earlier keep decrypting through the provider they name, and "
                 "a batch re-encryption normalizes stored secrets to whatever this names."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             example=ConfigExample(local="plain", prod="config"),
         ),
     ]
@@ -621,7 +677,7 @@ class SecretEncryptionConfig(BaseConfigSchema):
                 "id 'config'. Omit this section to leave that provider unconfigured, in which "
                 "case no stored secret naming it can be read."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             composite=CompositeType.FIELD,
         ),
     ]
@@ -661,7 +717,11 @@ class ManagerConfig(BaseConfigSchema):
             serialization_alias="shutdown-grace-period",
         ),
         BackendAIConfigMeta(
-            description="Seconds to wait for in-flight HTTP requests during shutdown.",
+            description=(
+                "Seconds to keep accepting and serving requests after announcing the drain, "
+                "before closing the listeners. "
+                "Set it to about three times the health check interval of the clients' endpoint pool."
+            ),
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="30.0", prod="30.0"),
         ),
@@ -1623,7 +1683,7 @@ class AuditLogConfig(BaseConfigSchema):
                 "operations are always recorded and listing them here is rejected. Failed "
                 "and denied reads are recorded either way."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
         ),
     ]
 
@@ -3777,7 +3837,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "failures and permission denials; this section only opts successful read "
                 "operations in."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             composite=CompositeType.FIELD,
         ),
     ]
@@ -3913,7 +3973,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "Names which key provider writes new secrets and configures the providers. "
                 "New secrets are stored as plaintext until a write provider is named."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             composite=CompositeType.FIELD,
         ),
     ]

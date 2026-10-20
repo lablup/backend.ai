@@ -19,6 +19,7 @@ from opentelemetry import trace
 from opentelemetry.trace import StatusCode
 from sqlalchemy.orm import joinedload, selectinload
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyImageClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
@@ -145,9 +146,11 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupRow,
     and_names,
 )
-from ai.backend.manager.models.vfolder.row import ensure_quota_scope_accessible_by_user
 from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_exists
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.vfolder.quota_scope import (
+    ensure_quota_scope_accessible_by_user,
+)
 from ai.backend.manager.secret.pool import KeyProviderPool
 
 from .acl import PredefinedAtomicPermission
@@ -337,6 +340,7 @@ class GraphQueryContext:
     valkey_live: ValkeyLiveClient
     valkey_image: ValkeyImageClient
     valkey_schedule: ValkeyScheduleClient  # TODO: Remove this client from here
+    sentinel_monitors: SentinelMonitorSet
     manager_status: ManagerStatus
     known_slot_types: Mapping[SlotName, SlotTypes]
     background_task_manager: BackgroundTaskManager
@@ -2662,7 +2666,10 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             result = result[offset:]
         if after is not None:
             _, raw_session_id = AsyncNode.resolve_global_id(info, after)
-            target_id = uuid.UUID(raw_session_id)
+            try:
+                target_id = uuid.UUID(raw_session_id)
+            except ValueError as e:
+                raise InvalidAPIParameters(f"Invalid cursor value: {after}") from e
             idx = 0
             for idx, session_node in enumerate(result):
                 if session_node.id == target_id:
@@ -2674,7 +2681,10 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             page_size = first
         if before is not None:
             _, raw_session_id = AsyncNode.resolve_global_id(info, before)
-            target_id = uuid.UUID(raw_session_id)
+            try:
+                target_id = uuid.UUID(raw_session_id)
+            except ValueError as e:
+                raise InvalidAPIParameters(f"Invalid cursor value: {before}") from e
             idx = len(result)
             for idx, session_node in enumerate(result):
                 if session_node.id == target_id:
@@ -2693,7 +2703,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         )
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
+    @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_compute_container_list(
         root: Any,
         info: graphene.ResolveInfo,
@@ -2707,6 +2717,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: AccessKey | None = None,
+        user_id: uuid.UUID | None = None,
     ) -> ComputeContainerList:
         # TODO: adopt the generic queryfilter language
         total_count = await ComputeContainer.load_count(
@@ -2715,7 +2726,8 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             cluster_role=role,  # filter
             domain_name=domain_name,  # scope
             group_id=group_id,  # scope
-            access_key=access_key,  # scope
+            access_key=access_key,  # filter
+            user_id=user_id,  # scope
             filter=filter,
         )
         items = await ComputeContainer.load_slice(
@@ -2726,14 +2738,15 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             cluster_role=role,  # filter
             domain_name=domain_name,  # scope
             group_id=group_id,  # scope
-            access_key=access_key,  # scope
+            access_key=access_key,  # filter
+            user_id=user_id,  # scope
             filter=filter,
             order=order,
         )
         return ComputeContainerList(items, total_count)
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
+    @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_compute_container(
         root: Any,
         info: graphene.ResolveInfo,
@@ -2741,6 +2754,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         *,
         domain_name: str | None = None,
         access_key: AccessKey | None = None,
+        user_id: uuid.UUID | None = None,
     ) -> ComputeContainer:
         # We need to check the group membership of the designated kernel,
         # but practically a user cannot guess the IDs of kernels launched
@@ -2752,11 +2766,12 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             "ComputeContainer.detail",
             domain_name=domain_name,
             access_key=access_key,
+            user_id=user_id,
         )
         return cast(ComputeContainer, await loader.load(id))
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
+    @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_compute_session_list(
         root: Any,
         info: graphene.ResolveInfo,
@@ -2768,6 +2783,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: AccessKey | None = None,
+        user_id: uuid.UUID | None = None,
         status: str | None = None,
     ) -> ComputeSessionList:
         total_count = await ComputeSession.load_count(
@@ -2775,7 +2791,8 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             status=status,  # filter
             domain_name=domain_name,  # scope
             group_id=group_id,  # scope
-            access_key=access_key,  # scope
+            access_key=access_key,  # filter
+            user_id=user_id,  # scope
             filter=filter,
         )
         items = await ComputeSession.load_slice(
@@ -2785,14 +2802,15 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             status=status,  # filter
             domain_name=domain_name,  # scope
             group_id=group_id,  # scope
-            access_key=access_key,  # scope
+            access_key=access_key,  # filter
+            user_id=user_id,  # scope
             filter=filter,
             order=order,
         )
         return ComputeSessionList(items, total_count)
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
+    @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_compute_session(
         root: Any,
         info: graphene.ResolveInfo,
@@ -2800,6 +2818,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         *,
         domain_name: str | None = None,
         access_key: AccessKey | None = None,
+        user_id: uuid.UUID | None = None,
     ) -> ComputeSession:
         # We need to check the group membership of the designated kernel,
         # but practically a user cannot guess the IDs of kernels launched
@@ -2811,11 +2830,12 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             "ComputeSession.detail",
             domain_name=domain_name,
             access_key=access_key,
+            user_id=user_id,
         )
         return cast(ComputeSession, await loader.load(id))
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
+    @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_legacy_compute_session_list(
         root: Any,
         info: graphene.ResolveInfo,
@@ -2825,6 +2845,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: AccessKey | None = None,
+        user_id: uuid.UUID | None = None,
         status: str | None = None,
         order_key: str | None = None,
         order_asc: bool = True,
@@ -2834,6 +2855,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             domain_name=domain_name,
             group_id=group_id,
             access_key=access_key,
+            user_id=user_id,
             status=status,
         )
         items = await LegacyComputeSession.load_slice(
@@ -2843,6 +2865,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             domain_name=domain_name,
             group_id=group_id,
             access_key=access_key,
+            user_id=user_id,
             status=status,
             order_key=order_key,
             order_asc=order_asc,
@@ -2850,7 +2873,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         return LegacyComputeSessionList(items, total_count)
 
     @staticmethod
-    @scoped_query(autofill_user=False, user_key="access_key")
+    @scoped_query(autofill_user=False, user_key="user_id")
     async def resolve_legacy_compute_session(
         root: Any,
         info: graphene.ResolveInfo,
@@ -2858,6 +2881,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
         *,
         domain_name: str | None = None,
         access_key: AccessKey | None = None,
+        user_id: uuid.UUID | None = None,
         status: str | None = None,
     ) -> LegacyComputeSession | None:
         # We need to check the group membership of the designated kernel,
@@ -2870,6 +2894,7 @@ class Query(graphene.ObjectType):  # type: ignore[misc]
             "LegacyComputeSession.detail",
             domain_name=domain_name,
             access_key=access_key,
+            user_id=user_id,
             status=status,
         )
 
@@ -3443,6 +3468,8 @@ class GQLMetricMiddleware:
         operation_name = (
             info.operation.name.value if info.operation.name is not None else "anonymous"
         )
+        # Metrics cover root fields only; nested fields stay in the trace.
+        is_root_field = info.path.prev is None
 
         tracer = trace.get_tracer(__name__)
         span = tracer.start_span(
@@ -3464,6 +3491,8 @@ class GQLMetricMiddleware:
                 span.end()
 
         def _observe(*, duration: float, error: BaseException | None = None) -> None:
+            if not is_root_field:
+                return
             match error:
                 case None:
                     error_code = None
@@ -3475,7 +3504,6 @@ class GQLMetricMiddleware:
                 operation_type=operation_type,
                 field_name=field_name,
                 parent_type=parent_type,
-                operation_name=operation_name,
                 error_code=error_code,
                 success=error is None,
                 duration=duration,

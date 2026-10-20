@@ -7,13 +7,12 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.retention.types import RetentionCategory
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 
 class RetentionPolicyNode(BaseResponseModel):
     id: UUID = Field(description="Retention policy ID.")
     entity_id: UUID = Field(
-        description=f"UUID of the retention policy. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the retention policy. Added in 26.9.0.",
     )
     category: RetentionCategory = Field(description="Retention category.")
     retention_period_days: int = Field(description="Retention period in days.")
@@ -35,10 +34,12 @@ class UpdateRetentionPolicyPayload(BaseResponseModel):
 
 class DeleteRetentionPolicyPayload(BaseResponseModel):
     id: UUID = Field(description="ID of the deleted retention policy.")
+    entity_id: UUID = Field(description="UUID of the deleted retention policy. Added in 26.10.0.")
 
 
 class PurgeRetentionPolicyPayload(BaseResponseModel):
     id: UUID = Field(description="ID of the purged retention policy.")
+    entity_id: UUID = Field(description="UUID of the purged retention policy. Added in 26.10.0.")
 
 
 class SearchRetentionPoliciesPayload(BaseResponseModel):

@@ -8,7 +8,6 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import LoginAttemptResult
 
@@ -24,7 +23,7 @@ class LoginHistoryNode(BaseResponseModel):
 
     id: UUID = Field(description="Login history entry ID")
     field_id: UUID = Field(
-        description=f"UUID of the login history record. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the login history record. Added in 26.9.0.",
     )
     user_id: UUID = Field(description="UUID of the user who attempted to log in")
     domain_name: str = Field(description="Domain name of the user at the time of the attempt")
@@ -35,7 +34,7 @@ class LoginHistoryNode(BaseResponseModel):
     client_ip: str | None = Field(
         default=None,
         description=(
-            f"Added in {NEXT_RELEASE_VERSION}. IP address of the request that produced this "
+            "Added in 26.9.0. IP address of the request that produced this "
             "entry, masked per the client IP masking policy. Null when the policy records "
             "none, or when the address was unavailable or unusable."
         ),

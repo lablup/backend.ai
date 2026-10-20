@@ -29,11 +29,11 @@ from bai_scenario.components.secret import (
     UsersHoldingSecrets,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type StatusStep = Scenario[
-    SeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload
+    TestSeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload
 ]
 
 
@@ -59,7 +59,7 @@ class ReadingTheStatus(When[AKeyringAndACaller, SecretAdapter, AdminSecretStatus
 
 @dataclass(frozen=True)
 class TheSuperadminCountsPlaintextSecrets(
-    Scenario[SeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]
+    Scenario[TestSeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]
 ):
     @override
     def summary(self) -> str:
@@ -73,7 +73,7 @@ class TheSuperadminCountsPlaintextSecrets(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyringAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyringAndACaller]:
         return UsersHoldingSecrets(role=UserRole.SUPERADMIN, plaintext_besides=1)
 
     @override
@@ -87,7 +87,7 @@ class TheSuperadminCountsPlaintextSecrets(
 
 @dataclass(frozen=True)
 class MixedKeysAreCountedApart(
-    Scenario[SeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload],
+    Scenario[TestSeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload],
     Configured,
 ):
     @override
@@ -106,7 +106,7 @@ class MixedKeysAreCountedApart(
         return {WRITE_PROVIDER: KeyProviderType.CONFIG.value, CONFIG_PROVIDER: CONFIG_KEYS}
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyringAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyringAndACaller]:
         return UsersHoldingSecrets(
             role=UserRole.SUPERADMIN, plaintext_besides=0, encrypted_besides=1
         )
@@ -122,7 +122,7 @@ class MixedKeysAreCountedApart(
 
 @dataclass(frozen=True)
 class TheMonitorReadsTheStatusLikeTheSuperadmin(
-    Scenario[SeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]
+    Scenario[TestSeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]
 ):
     @override
     def summary(self) -> str:
@@ -133,7 +133,7 @@ class TheMonitorReadsTheStatusLikeTheSuperadmin(
         return "모니터 역할이 상태를 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyringAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyringAndACaller]:
         return UsersHoldingSecrets(role=UserRole.MONITOR, plaintext_besides=1)
 
     @override
@@ -147,7 +147,7 @@ class TheMonitorReadsTheStatusLikeTheSuperadmin(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotReadTheStatus(
-    Scenario[SeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]
+    Scenario[TestSeedingSession, AKeyringAndACaller, SecretAdapter, AdminSecretStatusPayload]
 ):
     @override
     def summary(self) -> str:
@@ -158,7 +158,7 @@ class AUserWhoIsNotTheSuperadminMayNotReadTheStatus(
         return "슈퍼관리자가 아닌 사용자가 상태를 조회하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKeyringAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKeyringAndACaller]:
         return UsersHoldingSecrets(role=UserRole.USER, plaintext_besides=0)
 
     @override

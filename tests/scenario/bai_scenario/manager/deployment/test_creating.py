@@ -43,7 +43,7 @@ from bai_scenario.components.deployment import (
     TheNewDeploymentNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 MADE = "serving"
@@ -51,7 +51,9 @@ ENFORCEMENT = "manager.rbac.enforcement_enabled"
 SURGE = IntOrPercent(count=2)
 UNAVAILABLE = IntOrPercent(count=0)
 
-type CreatingStep = Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
+type CreatingStep = Scenario[
+    TestSeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode
+]
 
 
 @dataclass(frozen=True)
@@ -97,7 +99,7 @@ class Creating(When[APlaceAndACaller, DeploymentAdapter, DeploymentNode]):
 
 @dataclass(frozen=True)
 class TheWholeNodeComesBack(
-    Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     started: datetime
 
@@ -113,7 +115,7 @@ class TheWholeNodeComesBack(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APlaceAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APlaceAndACaller]:
         return APlaceForDeployments(granted=(Permission.CREATE,))
 
     @override
@@ -133,7 +135,7 @@ class TheWholeNodeComesBack(
 
 @dataclass(frozen=True)
 class ANamelessOneIsNamedAfterItsMaker(
-    Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     started: datetime
 
@@ -146,7 +148,7 @@ class ANamelessOneIsNamedAfterItsMaker(
         return "이름을 대지 않고 배포를 만들면, 만든 사람에게서 이름이 지어진다"
 
     @override
-    def given(self) -> Given[SeedingSession, APlaceAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APlaceAndACaller]:
         return APlaceForDeployments(granted=(Permission.CREATE,))
 
     @override
@@ -166,7 +168,7 @@ class ANamelessOneIsNamedAfterItsMaker(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotCreate(
-    Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     @override
     def summary(self) -> str:
@@ -177,7 +179,7 @@ class AUserGrantedNothingMayNotCreate(
         return "아무 배포 권한도 받지 않은 사용자가 배포를 만들면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, APlaceAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APlaceAndACaller]:
         return APlaceForDeployments()
 
     @override
@@ -191,7 +193,7 @@ class AUserGrantedNothingMayNotCreate(
 
 @dataclass(frozen=True)
 class AGrantInAnotherProjectDoesNotReachHere(
-    Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
+    Scenario[TestSeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode]
 ):
     @override
     def summary(self) -> str:
@@ -204,7 +206,7 @@ class AGrantInAnotherProjectDoesNotReachHere(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APlaceAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APlaceAndACaller]:
         return AProjectGrantedElsewhere(granted=(Permission.CREATE,))
 
     @override
@@ -218,7 +220,7 @@ class AGrantInAnotherProjectDoesNotReachHere(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneCreate(
-    Scenario[SeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode], Configured
+    Scenario[TestSeedingSession, APlaceAndACaller, DeploymentAdapter, DeploymentNode], Configured
 ):
     started: datetime
 
@@ -238,7 +240,7 @@ class EnforcementOffLetsAnyoneCreate(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APlaceAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APlaceAndACaller]:
         return APlaceForDeployments()
 
     @override

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import replace
 from decimal import Decimal
 from functools import lru_cache
@@ -15,6 +15,7 @@ from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResour
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 
+from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.config import (
     ModelConfig,
     ModelDefinition,
@@ -23,6 +24,7 @@ from ai.backend.common.config import (
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
@@ -48,10 +50,16 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
     BulkDeleteAutoScalingRulesInput,
     CreateAutoScalingRuleInput,
-    DeleteAutoScalingRuleInput,
+    PartialBulkPurgeAutoScalingRulesInput,
+    PartialBulkUpdateAutoScalingRulesInput,
     UpdateAutoScalingRuleInput,
 )
-from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInfo, ResourceSlotInfo
+from ai.backend.common.dto.manager.v2.common import (
+    PartialBulkFailure,
+    PartialBulkPayload,
+    ResourceSlotEntryInfo,
+    ResourceSlotInfo,
+)
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AccessTokenFilter,
     AccessTokenOrder,
@@ -65,11 +73,11 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     BulkDeleteAccessTokensInput,
     CreateAccessTokenInput,
     CreateDeploymentInput,
-    DeleteAccessTokenInput,
     DeleteDeploymentInput,
     DeploymentFilter,
     DeploymentOrder,
     DeploymentStatusFilter,
+    PartialBulkPurgeAccessTokensInput,
     ReplaceDeploymentOptionsInput,
     ReplicaFilter,
     ReplicaOrder,
@@ -174,6 +182,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
 from ai.backend.common.model_service_start_command_compat import to_legacy_start_command
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.tristate.unset import Unset
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.api.adapter_options.deployment.options import (
     deployment_options_from_input,
     deployment_options_to_info,
@@ -309,6 +318,12 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.delete_aut
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_scaling_rule import (
     GetAutoScalingRuleAction,
 )
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.partial_bulk_purge_auto_scaling_rules import (
+    PartialBulkPurgeAutoScalingRulesAction,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.partial_bulk_update_auto_scaling_rules import (
+    PartialBulkUpdateAutoScalingRulesAction,
+)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
 )
@@ -322,6 +337,9 @@ from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_d
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy.get_deployment_policy import (
     GetDeploymentPolicyAction,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.partial_bulk_get_deployment_policies import (
+    PartialBulkGetDeploymentPoliciesAction,
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy.search_deployment_policies import (
     SearchDeploymentPoliciesAction,
@@ -934,10 +952,12 @@ class DeploymentAdapter(BaseAdapter):
 
     async def delete(self, input: DeleteDeploymentInput) -> DeleteDeploymentPayload:
         """Delete a deployment."""
-        await self._deployment.destroy_deployment.run(
+        action_result = await self._deployment.destroy_deployment.run(
             DestroyDeploymentAction(deployment_id=DeploymentID(input.id))
         )
-        return DeleteDeploymentPayload(id=input.id)
+        return DeleteDeploymentPayload(
+            id=input.id, deployment=self._deployment_data_to_dto(action_result.data)
+        )
 
     # ------------------------------------------------------------------
     # Access token operations
@@ -979,17 +999,31 @@ class DeploymentAdapter(BaseAdapter):
             access_token=self._access_token_data_to_dto(action_result.data)
         )
 
-    async def delete_access_token(
-        self,
-        input: DeleteAccessTokenInput,
-    ) -> DeleteAccessTokenPayload:
-        """Delete an access token."""
+    async def purge_access_token(self, token_id: UUID) -> DeleteAccessTokenPayload:
+        """Permanently remove an access token."""
         action_result = await self._deployment.delete_access_token.run(
-            DeleteAccessTokenAction(access_token_id=DeploymentTokenID(input.id))
+            DeleteAccessTokenAction(access_token_id=DeploymentTokenID(token_id))
         )
         if not action_result.success:
-            raise EndpointTokenNotFound(f"Access token {input.id} not found")
-        return DeleteAccessTokenPayload(id=input.id)
+            raise EndpointTokenNotFound(f"Access token {token_id} not found")
+        return DeleteAccessTokenPayload(id=token_id, field_id=token_id)
+
+    async def partial_bulk_purge_access_tokens(
+        self, input: PartialBulkPurgeAccessTokensInput
+    ) -> PartialBulkPayload[AccessTokenNode]:
+        """Permanently remove several access tokens, answering for each one."""
+        try:
+            result = await self._deployment.bulk_delete_access_tokens.run(
+                BulkDeleteAccessTokensAction(
+                    access_token_ids=[DeploymentTokenID(token_id) for token_id in input.ids]
+                )
+            )
+        except FieldNotFoundError as e:
+            return PartialBulkPayload[AccessTokenNode](
+                successes=[],
+                failed=[PartialBulkFailure(id=token_id, message=str(e)) for token_id in input.ids],
+            )
+        return self._to_partial_bulk_payload(input.ids, result, self._access_token_data_to_dto)
 
     async def bulk_delete_access_tokens(
         self,
@@ -1100,7 +1134,69 @@ class DeploymentAdapter(BaseAdapter):
         input: UpdateAutoScalingRuleInput,
     ) -> UpdateAutoScalingRulePayload:
         """Update an auto-scaling rule."""
-        modifier = ModelDeploymentAutoScalingRuleModifier(
+        action_result = await self._deployment.update_auto_scaling_rule.run(
+            UpdateAutoScalingRuleAction(
+                deployment_id=await self._auto_scaling_rule_deployment(input.id),
+                auto_scaling_rule_id=input.id,
+                modifier=self._to_rule_modifier(input),
+            )
+        )
+        return UpdateAutoScalingRulePayload(
+            rule=self._auto_scaling_rule_data_to_dto(action_result.data)
+        )
+
+    async def purge_rule(self, rule_id: UUID) -> DeleteAutoScalingRulePayload:
+        """Permanently remove an auto-scaling rule."""
+        await self._deployment.delete_auto_scaling_rule.run(
+            DeleteAutoScalingRuleAction(
+                deployment_id=await self._auto_scaling_rule_deployment(rule_id),
+                auto_scaling_rule_id=rule_id,
+            )
+        )
+        return DeleteAutoScalingRulePayload(id=rule_id, field_id=rule_id)
+
+    async def partial_bulk_update_rules(
+        self, input: PartialBulkUpdateAutoScalingRulesInput
+    ) -> PartialBulkPayload[AutoScalingRuleNode]:
+        """Update several auto-scaling rules, answering for each one."""
+        ids = [item.id for item in input.items]
+        try:
+            result = await self._deployment.partial_bulk_update_auto_scaling_rules.run(
+                PartialBulkUpdateAutoScalingRulesAction(
+                    modifiers={
+                        AutoScalingRuleID(item.id): self._to_rule_modifier(item)
+                        for item in input.items
+                    }
+                )
+            )
+        except FieldNotFoundError as e:
+            return PartialBulkPayload[AutoScalingRuleNode](
+                successes=[],
+                failed=[PartialBulkFailure(id=rule_id, message=str(e)) for rule_id in ids],
+            )
+        return self._to_partial_bulk_payload(ids, result, self._auto_scaling_rule_data_to_dto)
+
+    async def partial_bulk_purge_rules(
+        self, input: PartialBulkPurgeAutoScalingRulesInput
+    ) -> PartialBulkPayload[AutoScalingRuleNode]:
+        """Permanently remove several auto-scaling rules, answering for each one."""
+        try:
+            result = await self._deployment.partial_bulk_purge_auto_scaling_rules.run(
+                PartialBulkPurgeAutoScalingRulesAction(
+                    rule_ids=[AutoScalingRuleID(rule_id) for rule_id in input.ids]
+                )
+            )
+        except FieldNotFoundError as e:
+            return PartialBulkPayload[AutoScalingRuleNode](
+                successes=[],
+                failed=[PartialBulkFailure(id=rule_id, message=str(e)) for rule_id in input.ids],
+            )
+        return self._to_partial_bulk_payload(input.ids, result, self._auto_scaling_rule_data_to_dto)
+
+    def _to_rule_modifier(
+        self, input: UpdateAutoScalingRuleInput
+    ) -> ModelDeploymentAutoScalingRuleModifier:
+        return ModelDeploymentAutoScalingRuleModifier(
             metric_source=OptionalState.from_unset(input.metric_source),
             metric_name=OptionalState.from_unset(input.metric_name),
             min_threshold=TriState.from_unset(input.min_threshold),
@@ -1111,26 +1207,20 @@ class DeploymentAdapter(BaseAdapter):
             max_replicas=TriState.from_unset(input.max_replicas),
             prometheus_query_preset_id=TriState.from_unset(input.prometheus_query_preset_id),
         )
-        action_result = await self._deployment.update_auto_scaling_rule.run(
-            UpdateAutoScalingRuleAction(
-                deployment_id=await self._auto_scaling_rule_deployment(input.id),
-                auto_scaling_rule_id=input.id,
-                modifier=modifier,
-            )
-        )
-        return UpdateAutoScalingRulePayload(
-            rule=self._auto_scaling_rule_data_to_dto(action_result.data)
-        )
 
-    async def delete_rule(self, input: DeleteAutoScalingRuleInput) -> DeleteAutoScalingRulePayload:
-        """Delete an auto-scaling rule."""
-        await self._deployment.delete_auto_scaling_rule.run(
-            DeleteAutoScalingRuleAction(
-                deployment_id=await self._auto_scaling_rule_deployment(input.id),
-                auto_scaling_rule_id=input.id,
-            )
+    def _to_partial_bulk_payload[TData, TNode: BaseResponseModel](
+        self,
+        ids: Sequence[UUID],
+        result: BulkFieldOpsResult[TData],
+        to_node: Callable[[TData], TNode],
+    ) -> PartialBulkPayload[TNode]:
+        """Answer in the order the caller named the rows."""
+        successes: dict[UUID, TData] = dict(result.successes.items())
+        errors: dict[UUID, Exception] = dict(result.errors.items())
+        return PartialBulkPayload[TNode](
+            successes=[to_node(successes[i]) for i in ids if i in successes],
+            failed=[PartialBulkFailure(id=i, message=str(errors[i])) for i in ids if i in errors],
         )
-        return DeleteAutoScalingRulePayload(id=input.id)
 
     async def bulk_delete_rules(
         self, input: BulkDeleteAutoScalingRulesInput
@@ -1614,6 +1704,20 @@ class DeploymentAdapter(BaseAdapter):
             self._auto_scaling_rule_data_to_dto,
         )
 
+    async def batch_load_policies_by_ids(
+        self, ids: Sequence[DeploymentPolicyID]
+    ) -> list[DeploymentPolicyNode | Exception | None]:
+        """Batch load deployment policies for DataLoader use, checked per deployment."""
+        if not ids:
+            return []
+        policy_ids = [DeploymentPolicyID(policy_id) for policy_id in ids]
+        return await self.batch_load_fields(
+            self._deployment.partial_bulk_get_deployment_policies,
+            PartialBulkGetDeploymentPoliciesAction(ids=policy_ids),
+            policy_ids,
+            self._policy_data_to_dto,
+        )
+
     async def batch_load_policies_by_endpoint_ids(
         self,
         endpoint_ids: Sequence[DeploymentID],
@@ -1804,7 +1908,9 @@ class DeploymentAdapter(BaseAdapter):
 
     def _convert_route_filter(self, f: RouteFilter) -> list[QueryCondition]:
         fields = ReplicaSearchableFields.own
-        conditions: list[QueryCondition] = []
+        conditions: list[QueryCondition] = [
+            *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
+        ]
         if f.status is not None:
             conditions.append(
                 fields.status.filter.in_([ManagerRouteStatus(s.value) for s in f.status])

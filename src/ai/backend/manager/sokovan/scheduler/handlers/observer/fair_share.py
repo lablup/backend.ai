@@ -105,6 +105,7 @@ class FairShareObserver(KernelObserver):
             return sa.and_(
                 KernelRow.resource_group_id == resource_group_id,
                 KernelRow.starts_at.isnot(None),
+                KernelRow.user_uuid.is_not(None),
                 sa.or_(
                     KernelRow.terminated_at.is_(None),
                     sa.and_(

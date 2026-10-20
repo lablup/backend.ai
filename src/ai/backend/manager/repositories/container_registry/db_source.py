@@ -1,11 +1,15 @@
 """Container registry reads: one by its id, and the lookups that name one."""
 
-from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.container_registry import (
+    ContainerRegistryID,
+    ContainerRegistryName,
+    ContainerRegistryProjectName,
+)
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
 from ai.backend.manager.models.container_registry.lookups import (
-    ContainerRegistryByNameAndProjectLookup,
+    ContainerRegistryByNameAndRegistryProjectLookup,
 )
 from ai.backend.manager.models.container_registry.queriers import ContainerRegistryQuerier
 from ai.backend.manager.models.project.queriers import ProjectQuerier
@@ -25,18 +29,20 @@ class ContainerRegistryDBSource:
                 raise ContainerRegistryNotFound(f"Container registry {registry_id} not found")
             return registry
 
-    async def lookup_id_by_name_and_project(
-        self, registry_name: str, project_name: str | None
+    async def lookup_id_by_name_and_registry_project(
+        self,
+        registry_name: ContainerRegistryName,
+        registry_project_name: ContainerRegistryProjectName | None,
     ) -> ContainerRegistryID:
         async with self._ops_provider.read_ops() as ops:
             registry_id = await ops.lookup_entity_id(
-                ContainerRegistryByNameAndProjectLookup(
-                    registry_name=registry_name, project_name=project_name
+                ContainerRegistryByNameAndRegistryProjectLookup(
+                    registry_name=registry_name, registry_project_name=registry_project_name
                 )
             )
             if registry_id is None:
                 raise ContainerRegistryNotFound(
-                    f"Container registry row not found. (registry: {registry_name}, project: {project_name})"
+                    f"Container registry row not found. (registry: {registry_name}, project: {registry_project_name})"
                 )
             return registry_id
 
@@ -49,8 +55,13 @@ class ContainerRegistryDBSource:
                 )
             target = project.container_registry
             registry_id = await ops.lookup_entity_id(
-                ContainerRegistryByNameAndProjectLookup(
-                    registry_name=target.registry_name, project_name=target.project_name
+                ContainerRegistryByNameAndRegistryProjectLookup(
+                    registry_name=ContainerRegistryName(target.registry_name),
+                    registry_project_name=(
+                        ContainerRegistryProjectName(target.project_name)
+                        if target.project_name is not None
+                        else None
+                    ),
                 )
             )
             if registry_id is None:

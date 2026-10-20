@@ -31,10 +31,10 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.app_config import UNREGISTERED
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
-from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES, SeedAllowListEntry
-from bai_scenario.seeds.app_config.definition import SeedDefinition
-from bai_scenario.seeds.app_config.fragment import SeedPublicFragment
-from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES, TestSeedAllowListEntry
+from bai_scenario.seeds.app_config.definition import TestSeedDefinition
+from bai_scenario.seeds.app_config.fragment import TestSeedPublicFragment
+from bai_scenario.seeds.domain.domain import TestSeedDomain
 
 
 def _who(role: UserRole) -> str:
@@ -90,20 +90,22 @@ class AnEntryAndSomeone(Given[Any, AnEntryAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AnEntryAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(SomeoneOf(home, role=self.role))
         if not self.defined or self.opened is None:
             name = UNREGISTERED
             if self.defined:
-                definition = await seeding.creating(SeedDefinition())
+                definition = await seeding.creating(TestSeedDefinition())
                 name = seeding.made(definition).config_name
             return AnEntryAndACaller(
                 domain=seeding.made(home), caller=seeding.made(caller), name=name, entry=None
             )
-        definition = await seeding.creating(SeedDefinition())
-        entry = await seeding.creating_from(SeedAllowListEntry(scope_type=self.opened), definition)
+        definition = await seeding.creating(TestSeedDefinition())
+        entry = await seeding.creating_from(
+            TestSeedAllowListEntry(scope_type=self.opened), definition
+        )
         if self.with_fragment:
-            await seeding.creating_from(SeedPublicFragment(config={"theme": "light"}), entry)
+            await seeding.creating_from(TestSeedPublicFragment(config={"theme": "light"}), entry)
         return AnEntryAndACaller(
             domain=seeding.made(home),
             caller=seeding.made(caller),
@@ -137,13 +139,13 @@ class EntriesLaidAcross(Given[Any, ManyEntriesAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyEntriesAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         laid = []
         for _ in range(self.names):
-            definition = await seeding.creating(SeedDefinition(name_hint="definition"))
+            definition = await seeding.creating(TestSeedDefinition(name_hint="definition"))
             for kind in self.kinds:
                 laid.append(
-                    await seeding.creating_from(SeedAllowListEntry(scope_type=kind), definition)
+                    await seeding.creating_from(TestSeedAllowListEntry(scope_type=kind), definition)
                 )
         caller = await seeding.within(SomeoneOf(home, role=self.role))
         return ManyEntriesAndACaller(
@@ -173,13 +175,15 @@ class TwoEntriesAndSomeone(Given[Any, TwoEntriesAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> TwoEntriesAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        definition = await seeding.creating(SeedDefinition())
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        definition = await seeding.creating(TestSeedDefinition())
         first = await seeding.creating_from(
-            SeedAllowListEntry(scope_type=AppConfigScopeType.PUBLIC, name_hint="first"), definition
+            TestSeedAllowListEntry(scope_type=AppConfigScopeType.PUBLIC, name_hint="first"),
+            definition,
         )
         second = await seeding.creating_from(
-            SeedAllowListEntry(scope_type=AppConfigScopeType.USER, name_hint="second"), definition
+            TestSeedAllowListEntry(scope_type=AppConfigScopeType.USER, name_hint="second"),
+            definition,
         )
         caller = await seeding.within(SomeoneOf(home, role=self.role))
         return TwoEntriesAndACaller(

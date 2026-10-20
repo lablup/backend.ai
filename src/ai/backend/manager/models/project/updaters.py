@@ -31,7 +31,6 @@ class ProjectUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
     project_id: ProjectID
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
-    is_active: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
     domain_name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     total_resource_slots: OptionalState[ResourceSlot] = field(
         default_factory=OptionalState[ResourceSlot].nop
@@ -75,7 +74,6 @@ class ProjectUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
         to_update: dict[str, Any] = {}
         self.name.update_dict(to_update, "name")
         self.description.update_dict(to_update, "description")
-        self.is_active.update_dict(to_update, "is_active")
         self.domain_name.update_dict(to_update, "domain_name")
         self.total_resource_slots.update_dict(to_update, "total_resource_slots")
         self.allowed_vfolder_hosts.update_dict(to_update, "allowed_vfolder_hosts")

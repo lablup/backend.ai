@@ -15,11 +15,10 @@
   # PostgreSQL is supported for storing proxy routing and circuit data.
   # Added in 25.9.0
   type = "postgresql"
-  # The network address (host:port) of the PostgreSQL database server. In local
-  # development, typically points to localhost. In production, should point to
-  # your PostgreSQL server or cluster endpoint.
-  # Added in 25.9.0
-  addr = { host = "db-server", port = 5432 }
+  # Timeout in seconds for connecting to one member of addrs. When it expires,
+  # the next member is tried.
+  # Added in 26.9.0
+  connect_timeout = 5.0
   # The name of the PostgreSQL database to use for the proxy coordinator. This
   # database stores proxy routing rules, circuit states, and session mappings.
   # Ensure this database is created before starting the coordinator.
@@ -46,6 +45,31 @@
   # entirely.
   # Added in 25.9.0
   max_overflow = 128
+  # Maximum lifetime of a connection in seconds before it's recycled. Set to -1
+  # to disable connection recycling. Useful for handling database connections
+  # closed by the server after inactivity or by network equipment with idle
+  # timeouts.
+  # Added in 26.8.0
+  pool_recycle = 3600.0
+  # Whether to test connections with a lightweight ping before using them.
+  # Detects connections closed by the server or the network at pool checkout and
+  # replaces them. Adds a small overhead per checkout but is recommended for
+  # production.
+  # Added in 26.8.0
+  pool_pre_ping = true
+
+  # Addresses of the PostgreSQL cluster members. List every member of an HA
+  # cluster, or a single address of a standalone server or a proxy in front of
+  # the cluster.
+  # Added in 26.9.0
+  [[db.addrs]]
+  # Add multiple [[db.addrs]] sections as needed
+    # Hostname or IP address.
+    # Added in 25.13.0
+    host = "db-server"
+    # Port number.
+    # Added in 25.13.0
+    port = 5432
 
 # Redis configuration for the proxy coordinator's internal operations including
 # caching, pub/sub messaging, and distributed locking (when using Redlock).
@@ -263,11 +287,6 @@
       # related keys will be stored under this namespace.
       # Added in 22.03.0
       namespace = "backend"
-      # Network address of the etcd server. Default is the standard etcd port on
-      # localhost. In production, should point to one or more etcd instance
-      # endpoint(s).
-      # Added in 22.03.0
-      addr = { host = "etcd-cluster", port = 2379 }
       # Username for authenticating with etcd. Optional if etcd doesn't require
       # authentication. Should be set along with password for secure
       # deployments.
@@ -278,6 +297,41 @@
       # authentication.
       # Added in 22.03.0
       ## password = "ETCD_PASSWORD"
+
+      # Addresses of the etcd cluster members. List every member of an etcd
+      # cluster, or a single address of a standalone server.
+      # Added in 26.10.0
+      [[proxy_coordinator.traefik.etcd.addrs]]
+      # Add multiple [[proxy_coordinator.traefik.etcd.addrs]] sections as needed
+        # Host address of the service. Can be a hostname, IP address, or special
+        # addresses like 0.0.0.0 to bind to all interfaces.
+        # Added in 22.03.0
+        host = "etcd1.example.com"
+        # Port number of the service. Must be between 1 and 65535. Ports below
+        # 1024 require root/admin privileges.
+        # Added in 22.03.0
+        port = 2379
+
+    # Strategy for resolving the real client IP behind a load balancer / reverse
+    # proxy when enforcing per-circuit client-IP allowlists via Traefik's
+    # ipAllowList middleware. Leave unset when Traefik is directly exposed to
+    # clients.
+    # Added in 26.4.5
+    [proxy_coordinator.traefik.client_ip_strategy]
+      # Number of trusted proxy hops in front of Traefik. Traefik selects the IP
+      # at this depth (counted from the rightmost, i.e. nearest-proxy, entry) of
+      # 'X-Forwarded-For' as the client IP. Mutually exclusive with
+      # 'excluded_ips'. Use this when a fixed number of proxies always front
+      # Traefik.
+      # Added in 26.4.5
+      ## depth = 1
+      # CIDR blocks (or bare IPs) of trusted proxies in front of Traefik.
+      # Traefik scans 'X-Forwarded-For' right-to-left, skipping these networks,
+      # and uses the first remaining address as the client IP. Mutually
+      # exclusive with 'depth'. Prefer this for environments where the proxy
+      # chain length varies.
+      # Added in 26.4.5
+      excluded_ips = ["10.0.0.0/8"]
 
 # Performance profiling configuration for debugging and optimization. Includes
 # settings for cProfile and Pyroscope continuous profiling.
@@ -488,6 +542,15 @@
   # OTLP receiver.
   # Added in 25.7.0
   endpoint = "http://otel-collector:4317"
+  # Maximum number of spans queued for export. Spans are dropped when the queue
+  # is full. The default (65536) accommodates burst traffic from GraphQL
+  # workloads.
+  # Added in 26.2.0
+  max-queue-size = 65536
+  # Maximum number of spans exported in a single batch. Larger batches reduce
+  # export overhead but increase memory usage.
+  # Added in 26.2.0
+  max-export-batch-size = 4096
 
 # Service discovery configuration for locating other Backend.AI components in
 # the cluster. Supports Redis-based or etcd-based service registration and
@@ -497,6 +560,46 @@
   # Type of service discovery to use. Supported types are 'etcd' and 'redis'.
   # Added in 25.9.0
   type = "redis"
+  # Unique instance identifier for this service instance.
+  # Added in 26.3.0
+  ## instance-id = "..."
+  # Logical group name for this service (e.g., 'manager', 'agent', 'storage-
+  # proxy').
+  # Added in 26.3.0
+  ## service-group = "..."
+  # Human-readable display name for this service instance.
+  # Added in 26.3.0
+  ## display-name = "..."
+
+  # Additional labels for service categorization and filtering.
+  # Added in 26.3.0
+  # Replace <name> with your actual key (e.g., 'default', 'local')
+  [service_discovery.extra-labels.<name>]
+
+  # List of endpoints exposed by this service instance.
+  # Added in 26.3.0
+  [[service_discovery.endpoints]]
+  # Add multiple [[service_discovery.endpoints]] sections as needed
+    # Role of this endpoint (e.g., 'main', 'health', 'internal').
+    # Added in 26.3.0
+    role = "main"
+    # Network scope of this endpoint (e.g., 'public', 'private', 'internal').
+    # Added in 26.3.0
+    scope = "public"
+    # Hostname or IP address of the endpoint.
+    # Added in 26.3.0
+    address = "manager.example.com"
+    # Port number of the endpoint.
+    # Added in 26.3.0
+    port = 443
+    # Protocol used by the endpoint (e.g., 'grpc', 'http', 'https').
+    # Added in 26.3.0
+    protocol = "https"
+
+    # Additional metadata for the endpoint.
+    # Added in 26.3.0
+    # Replace <name> with your actual key (e.g., 'default', 'local')
+    [service_discovery.endpoints.metadata.<name>]
 
 # etcd connection configuration for distributed coordination and configuration
 # management. Used for service discovery (if etcd-based) and Traefik
@@ -508,11 +611,6 @@
   # keys will be stored under this namespace.
   # Added in 22.03.0
   namespace = "backend"
-  # Network address of the etcd server. Default is the standard etcd port on
-  # localhost. In production, should point to one or more etcd instance
-  # endpoint(s).
-  # Added in 22.03.0
-  addr = { host = "etcd-cluster", port = 2379 }
   # Username for authenticating with etcd. Optional if etcd doesn't require
   # authentication. Should be set along with password for secure deployments.
   # Added in 22.03.0
@@ -521,6 +619,20 @@
   # environments. Set together with the user field for authentication.
   # Added in 22.03.0
   ## password = "ETCD_PASSWORD"
+
+  # Addresses of the etcd cluster members. List every member of an etcd cluster,
+  # or a single address of a standalone server.
+  # Added in 26.10.0
+  [[etcd.addrs]]
+  # Add multiple [[etcd.addrs]] sections as needed
+    # Host address of the service. Can be a hostname, IP address, or special
+    # addresses like 0.0.0.0 to bind to all interfaces.
+    # Added in 22.03.0
+    host = "etcd1.example.com"
+    # Port number of the service. Must be between 1 and 65535. Ports below 1024
+    # require root/admin privileges.
+    # Added in 22.03.0
+    port = 2379
 
 # Pyroscope continuous profiling configuration for production performance
 # analysis. Sends CPU and memory profiling data to a Pyroscope server for flame

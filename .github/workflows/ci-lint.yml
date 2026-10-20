@@ -100,12 +100,6 @@ jobs:
           echo "(skipping matchers for fork pull request)"
         fi
         pants lint --changed-since=$BASE_REF
-    - name: Check the seed role declaration
-      # Always, not only when the declaration changed: the entity types it answers
-      # for are read at run time, so adding one changes the answer without touching
-      # any file `--changed-since` would select.
-      run: |
-        pants test tests/unit/manager/data/permission/seed::
     - name: Decide whether this run saves the caches
       id: cache-save
       if: inputs.cache-branch != ''

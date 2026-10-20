@@ -36,9 +36,9 @@ class _ClientEnvContext(Context):
         return name
 
 
-async def test_configure_client_writes_env_per_fixture_user(tmp_path: Path) -> None:
-    """Guards against fixture-key drift: the manager fixtures are symlinked into the
-    installer, so a key rename there silently breaks this step.
+async def test_configure_client_writes_env_per_seed_user(tmp_path: Path) -> None:
+    """Guards against seed-key drift: the example seeds are symlinked into the installer,
+    so a key rename there silently breaks this step.
     """
     await _ClientEnvContext(tmp_path).configure_client()
 

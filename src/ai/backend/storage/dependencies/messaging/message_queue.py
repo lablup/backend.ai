@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import REDIS_STREAM_DB, RedisRole
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
@@ -18,6 +19,7 @@ class MessageQueueInput:
     """Input required for the message queue setup."""
 
     redis_config: RedisConfig
+    sentinel_monitors: SentinelMonitorSet
     node_id: str
 
 
@@ -35,8 +37,9 @@ class MessageQueueProvider(
     @override
     async def provide(self, setup_input: MessageQueueInput) -> AsyncIterator[AbstractMessageQueue]:
         redis_profile_target = setup_input.redis_config.to_redis_profile_target()
+        stream_target = redis_profile_target.profile_target(RedisRole.STREAM)
         queue = await RedisQueue.create(
-            redis_profile_target.profile_target(RedisRole.STREAM),
+            stream_target,
             RedisMQArgs(
                 anycast_stream_key="events",
                 broadcast_channel="events_all",
@@ -48,5 +51,6 @@ class MessageQueueProvider(
                 node_id=setup_input.node_id,
                 db=REDIS_STREAM_DB,
             ),
+            setup_input.sentinel_monitors.monitor_for(stream_target.to_valkey_target()),
         )
         yield queue

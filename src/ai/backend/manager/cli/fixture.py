@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 import click
 from sqlalchemy.ext.asyncio import create_async_engine
-from yarl import URL
 
 from ai.backend.cli.types import ExitCode
 from ai.backend.common.json import load_json
@@ -31,6 +30,12 @@ def cli() -> None:
 @click.pass_obj
 def populate(cli_ctx: CLIContext, fixture_path: Path) -> None:
     async def _impl() -> None:
+        log.warning(
+            "fixture populate is deprecated and will be removed in the next LTS; use"
+            " `mgr seed apply`. A fixture without the RBAC rows (virtual_entities,"
+            " entity_memberships, scope_bindings) of the entities it writes may leave them"
+            " unreachable through permission checks"
+        )
         log.info("populating the fixture", fixture_path=fixture_path)
         try:
             fixture = load_json(fixture_path.read_text(encoding="utf8"))
@@ -38,18 +43,7 @@ def populate(cli_ctx: CLIContext, fixture_path: Path) -> None:
             log.error("no such fixture", fixture_path=fixture_path)
             return
         bootstrap_config = await cli_ctx.get_bootstrap_config()
-        db_username = bootstrap_config.db.user
-        db_password = bootstrap_config.db.password
-        db_addr = bootstrap_config.db.addr
-        db_name = bootstrap_config.db.name
-        db_url = (
-            URL(f"postgresql+asyncpg://{db_addr.host}/{db_name}")
-            .with_port(db_addr.port)
-            .with_user(db_username)
-        )
-        if db_password is not None:
-            db_url = db_url.with_password(db_password)
-        engine = create_async_engine(str(db_url))
+        engine = create_async_engine(bootstrap_config.db.sqlalchemy_url())
         try:
             await populate_fixture(engine, fixture)
         except Exception:
@@ -60,7 +54,7 @@ def populate(cli_ctx: CLIContext, fixture_path: Path) -> None:
         finally:
             await engine.dispose()
 
-    """Populate fixtures."""
+    """Populate fixtures (deprecated: use `mgr seed apply`)."""
     asyncio.run(_impl())
 
 

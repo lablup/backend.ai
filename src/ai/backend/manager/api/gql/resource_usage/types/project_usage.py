@@ -78,7 +78,7 @@ class ProjectUsageBucketGQL(PydanticNodeMixin[ProjectUsageBucketNode]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the usage bucket.",
         ),
     )
@@ -288,6 +288,12 @@ class ProjectUsageBucketFilter(PydanticInputMixin[ProjectUsageBucketFilterDTO], 
     )
     period_end: DateFilter | None = gql_field(
         description="Filter by usage measurement period end date.", default=None
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by project usage bucket ID."
+        ),
+        default=None,
     )
 
     AND: list[Self] | None = gql_field(

@@ -3,11 +3,17 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, overload
 
 from ai.backend.common.data.entity.types import FieldIdentifier
-from ai.backend.manager.actions.v2.field.bulk_base import BasePartialBulkFieldAction
-from ai.backend.manager.actions.v2.field.bulk_processor import PartialBulkFieldActionProcessor
+from ai.backend.manager.actions.v2.field.bulk_base import (
+    BasePartialBulkFieldAction,
+    BasePartialBulkOwnerCandidatesFieldAction,
+)
+from ai.backend.manager.actions.v2.field.bulk_processor import (
+    PartialBulkFieldActionProcessor,
+    PartialBulkOwnerCandidatesFieldActionProcessor,
+)
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import (
     PaginationOptions,
@@ -17,7 +23,11 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import (
 )
 from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelSearchableFields
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
@@ -54,6 +64,7 @@ class BaseAdapter(BaseFilterAdapter):
             *self.apply_string_filter(f.value, fields.value.filter),
             *self.apply_string_filter(f.entity_type, fields.entity_type.filter),
             *self.apply_uuid_filter(f.entity_id, fields.entity_id.filter),
+            *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
         ]
         if f.AND:
             for sub in f.AND:
@@ -61,21 +72,45 @@ class BaseAdapter(BaseFilterAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_entity_label_filter(sub))
+                sub_conditions = self._convert_entity_label_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_entity_label_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_entity_label_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
+    @overload
     async def batch_load_fields[TAction: BasePartialBulkFieldAction[Any, Any], TData, TNode](
         self,
         processor: PartialBulkFieldActionProcessor[TAction, TData],
         action: TAction,
+        field_ids: Sequence[FieldIdentifier],
+        to_node: Callable[[TData], TNode],
+    ) -> list[TNode | Exception | None]: ...
+
+    @overload
+    async def batch_load_fields[
+        TAction: BasePartialBulkOwnerCandidatesFieldAction[Any],
+        TData,
+        TNode,
+    ](
+        self,
+        processor: PartialBulkOwnerCandidatesFieldActionProcessor[TAction, TData],
+        action: TAction,
+        field_ids: Sequence[FieldIdentifier],
+        to_node: Callable[[TData], TNode],
+    ) -> list[TNode | Exception | None]: ...
+
+    async def batch_load_fields[TData, TNode](
+        self,
+        processor: PartialBulkFieldActionProcessor[Any, TData]
+        | PartialBulkOwnerCandidatesFieldActionProcessor[Any, TData],
+        action: Any,
         field_ids: Sequence[FieldIdentifier],
         to_node: Callable[[TData], TNode],
     ) -> list[TNode | Exception | None]:

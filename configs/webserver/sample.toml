@@ -498,7 +498,7 @@
   # Added in 26.4.4
   health-check-interval = 10.0
   # Consecutive probe (or caller-reported) failures required before an endpoint
-  # flips from healthy to unhealthy.
+  # flips from healthy to unhealthy. A 503 probe excludes it immediately.
   # Added in 26.4.4
   health-check-failure-threshold = 3
   # Seconds the unhealthy_since timestamp is retained after an endpoint is
@@ -728,11 +728,6 @@
   # keys will be stored under this namespace.
   # Added in 22.03.0
   namespace = "backend"
-  # Network address of the etcd server. Default is the standard etcd port on
-  # localhost. In production, should point to one or more etcd instance
-  # endpoint(s).
-  # Added in 22.03.0
-  addr = { host = "etcd-cluster", port = 2379 }
   # Username for authenticating with etcd. Optional if etcd doesn't require
   # authentication. Should be set along with password for secure deployments.
   # Added in 22.03.0
@@ -741,6 +736,20 @@
   # environments. Set together with the user field for authentication.
   # Added in 22.03.0
   ## password = "ETCD_PASSWORD"
+
+  # Addresses of the etcd cluster members. List every member of an etcd cluster,
+  # or a single address of a standalone server.
+  # Added in 26.10.0
+  [[etcd.addrs]]
+  # Add multiple [[etcd.addrs]] sections as needed
+    # Host address of the service. Can be a hostname, IP address, or special
+    # addresses like 0.0.0.0 to bind to all interfaces.
+    # Added in 22.03.0
+    host = "etcd1.example.com"
+    # Port number of the service. Must be between 1 and 65535. Ports below 1024
+    # require root/admin privileges.
+    # Added in 22.03.0
+    port = 2379
 
 # Pyroscope continuous profiling integration for performance analysis.
 # Added in 25.12.0
@@ -837,7 +846,8 @@
   # Added in 26.4.4
   health-check-interval = 10.0
   # Consecutive probe (or caller-reported) failures required before an Apollo
-  # Router endpoint flips from healthy to unhealthy.
+  # Router endpoint flips from healthy to unhealthy. A 503 probe excludes it
+  # immediately.
   # Added in 26.4.4
   health-check-failure-threshold = 3
   # Seconds the unhealthy_since timestamp is retained after an Apollo Router

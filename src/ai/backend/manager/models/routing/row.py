@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import uuid
 from collections.abc import Sequence
 from datetime import datetime
@@ -10,7 +9,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
 from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.entity.deployment import DeploymentID
@@ -20,14 +19,12 @@ from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
     RouteHealthStatus,
     RouteStatus,
     RouteSubStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.data.model_serving.types import RoutingData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -37,13 +34,9 @@ from ai.backend.manager.models.base import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.endpoint.row import EndpointRow
-    from ai.backend.manager.models.session.row import SessionRow
 
 
-__all__ = ("RouteStatus", "RoutingRow")
-
-
-log = StructuredLogger(logging.getLogger(__spec__.name))
+__all__ = ("RoutingRow",)
 
 
 class RoutingRow(Base):
@@ -165,65 +158,25 @@ class RoutingRow(Base):
     )
 
     endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", back_populates="routings")
-    session_row: Mapped[SessionRow | None] = relationship(
-        "SessionRow", foreign_keys="RoutingRow.session"
-    )
 
-    @classmethod
-    async def get_by_session(
-        cls,
-        db_sess: AsyncSession,
-        session_id: uuid.UUID,
-        load_endpoint: bool = False,
-        project: uuid.UUID | None = None,
-        domain: str | None = None,
-        user_uuid: uuid.UUID | None = None,
-    ) -> RoutingRow:
-        """
-        :raises: sqlalchemy.orm.exc.NoResultFound
-        """
-        query = sa.select(RoutingRow).where(RoutingRow.session == session_id)
-        if load_endpoint:
-            query = query.options(selectinload(RoutingRow.endpoint_row))
-        if project:
-            query = query.filter(RoutingRow.project == project)
-        if domain:
-            query = query.filter(RoutingRow.domain == domain)
-        if user_uuid:
-            query = query.filter(RoutingRow.session_owner == user_uuid)
-        result = await db_sess.execute(query)
-        row = result.scalar()
-        if row is None:
-            raise NoResultFound
-        return row
+    # The two reads below serve api/gql_legacy only; delete them together with gql_legacy.
 
     @classmethod
     async def list(
         cls,
         db_sess: AsyncSession,
         endpoint_id: uuid.UUID,
-        load_endpoint: bool = False,
-        load_session: bool = False,
-        status_filter: list[RouteStatus] | None = None,
         project: uuid.UUID | None = None,
         domain: str | None = None,
         user_uuid: uuid.UUID | None = None,
     ) -> Sequence[RoutingRow]:
-        """
-        :raises: sqlalchemy.orm.exc.NoResultFound
-        """
-        if status_filter is None:
-            status_filter = list(RouteStatus.active_route_statuses())
+        """Used only by Routing.load_all, which nothing calls."""
         query = (
             sa.select(RoutingRow)
             .filter(RoutingRow.endpoint == endpoint_id)
-            .filter(RoutingRow.status.in_(status_filter))
+            .filter(RoutingRow.status.in_(list(RouteStatus.active_route_statuses())))
             .order_by(sa.desc(RoutingRow.created_at))
         )
-        if load_endpoint:
-            query = query.options(selectinload(RoutingRow.endpoint_row))
-        if load_session:
-            query = query.options(selectinload(RoutingRow.session_row))
         if project:
             query = query.filter(RoutingRow.project == project)
         if domain:
@@ -238,8 +191,6 @@ class RoutingRow(Base):
         cls,
         db_sess: AsyncSession,
         route_id: uuid.UUID,
-        load_session: bool = False,
-        load_endpoint: bool = False,
         project: uuid.UUID | None = None,
         domain: str | None = None,
         user_uuid: uuid.UUID | None = None,
@@ -248,10 +199,6 @@ class RoutingRow(Base):
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
         query = sa.select(RoutingRow).where(RoutingRow.id == route_id)
-        if load_session:
-            query = query.options(selectinload(RoutingRow.session_row))
-        if load_endpoint:
-            query = query.options(selectinload(RoutingRow.endpoint_row))
         if project:
             query = query.filter(RoutingRow.project == project)
         if domain:
@@ -263,18 +210,3 @@ class RoutingRow(Base):
         if row is None:
             raise NoResultFound
         return row
-
-    def delegate_ownership(self, user_uuid: UserID) -> None:
-        self.session_owner = user_uuid
-
-    def to_data(self) -> RoutingData:
-        return RoutingData(
-            id=self.id,
-            endpoint=self.endpoint,
-            session=self.session,
-            status=self.status,
-            health_status=self.health_status,
-            traffic_ratio=self.traffic_ratio,
-            created_at=self.created_at,
-            error_data=self.error_data or {},
-        )

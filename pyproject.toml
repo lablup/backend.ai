@@ -208,7 +208,7 @@ ignore = [
 [tool.ruff.lint.isort]
 known-first-party = ["ai.backend", "bai_scenario"]
 known-local-folder = ["src"]
-known-third-party = ["alembic", "redis", "kubernetes"]
+known-third-party = ["alembic", "kubernetes"]
 split-on-trailing-comma = true
 
 [tool.ruff.lint.per-file-ignores]
@@ -336,11 +336,6 @@ split-on-trailing-comma = true
 
 [tool.ruff.format]
 preview = true  # enable the black's preview style
-
-[tool.black]
-# unused for our codebase but preserved for `pants tailor`
-line-length = 100
-preview = true
 
 [tool.mypy]
 plugins = ["pydantic.mypy", "strawberry.ext.mypy_plugin"]

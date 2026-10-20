@@ -6,7 +6,7 @@ from dataclasses import dataclass, replace
 from typing import Any, override
 
 import sqlalchemy as sa
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_expression
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.manager.data.deployment.types import (
@@ -28,6 +28,7 @@ from ai.backend.manager.models.endpoint.searchable_fields import (
     DeploymentAccessTokenSearchableFields,
     DeploymentSearchableFields,
 )
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -57,6 +58,15 @@ class AutoScalingRuleSearcher(
         return AutoScalingRuleSearchableFields.own.to_data(row)
 
 
+def current_revision_id_subquery() -> sa.ScalarSelect[Any]:
+    """The primary replica group's current revision id, for ``EndpointRow.current_revision_id``."""
+    return (
+        sa.select(ReplicaGroupRow.current_revision_id)
+        .where(ReplicaGroupRow.id == EndpointRow.primary_replica_group_id)
+        .scalar_subquery()
+    )
+
+
 @dataclass
 class DeploymentSearcher(Searcher[EndpointRow, ModelDeploymentData]):
     """The deployment rows a page read returns.
@@ -68,8 +78,7 @@ class DeploymentSearcher(Searcher[EndpointRow, ModelDeploymentData]):
     @override
     def build_select(self) -> sa.sql.Select[Any]:
         return sa.select(EndpointRow).options(
-            selectinload(EndpointRow.primary_replica_group_row),
-            selectinload(EndpointRow.target_replica_group_row),
+            with_expression(EndpointRow.current_revision_id, current_revision_id_subquery()),
             selectinload(EndpointRow.deployment_policy),
         )
 

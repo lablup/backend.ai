@@ -12,11 +12,17 @@ from ai.backend.common.data.entity.idle_checker import (
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
 from ai.backend.common.data.filter_specs import StringInMatchSpec, StringMatchSpec
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import (
+    OrderDirection,
+    PartialBulkFailure,
+    PartialBulkPayload,
+)
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     CreateIdleCheckerAssignmentInput,
     IdleCheckerAssignmentFilter,
     IdleCheckerAssignmentOrder,
+    PartialBulkPurgeIdleCheckerAssignmentsInput,
+    PartialBulkUpdateIdleCheckerAssignmentsInput,
     PurgeIdleCheckerAssignmentInput,
     ScopedSearchIdleCheckerAssignmentsInput,
     SearchIdleCheckerAssignmentsInput,
@@ -33,6 +39,7 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import (
     IdleCheckerAssignmentOrderField,
     IdleCheckerScopeTypeDTO,
 )
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
@@ -41,7 +48,11 @@ from ai.backend.manager.errors.idle_checker import (
     IdleCheckerAssignmentNotFound,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.idle_checker.creators import IdleCheckerAssignmentCreator
 from ai.backend.manager.models.idle_checker.purgers import IdleCheckerAssignmentPurger
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow
@@ -143,7 +154,48 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
     async def purge(
         self, input: PurgeIdleCheckerAssignmentInput
     ) -> PurgeIdleCheckerAssignmentPayload:
-        current = await self._resolve(input.id)
+        purged = await self._purge(input.id)
+        return PurgeIdleCheckerAssignmentPayload(id=IdleCheckerAssignmentID(purged.id))
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateIdleCheckerAssignmentsInput
+    ) -> PartialBulkPayload[IdleCheckerAssignmentNode]:
+        """Switch several bindings on or off, answering for each one.
+
+        Each item is its own relation write, so a refused item leaves the others done.
+        """
+        successes: list[IdleCheckerAssignmentNode] = []
+        failed: list[PartialBulkFailure] = []
+        for item in input.items:
+            try:
+                payload = await self.update(item)
+            except BackendAIError as e:
+                failed.append(PartialBulkFailure(id=item.id, message=str(e)))
+                continue
+            successes.append(payload.idle_checker_assignment)
+        return PartialBulkPayload[IdleCheckerAssignmentNode](successes=successes, failed=failed)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeIdleCheckerAssignmentsInput
+    ) -> PartialBulkPayload[IdleCheckerAssignmentNode]:
+        """Remove several bindings for good, answering for each one with the binding as it
+        stood before removal.
+
+        Each item is its own relation write, so a refused item leaves the others done.
+        """
+        successes: list[IdleCheckerAssignmentNode] = []
+        failed: list[PartialBulkFailure] = []
+        for assignment_id in input.ids:
+            try:
+                purged = await self._purge(assignment_id)
+            except BackendAIError as e:
+                failed.append(PartialBulkFailure(id=assignment_id, message=str(e)))
+                continue
+            successes.append(self._data_to_node(purged))
+        return PartialBulkPayload[IdleCheckerAssignmentNode](successes=successes, failed=failed)
+
+    async def _purge(self, assignment_id: IdleCheckerAssignmentID) -> IdleCheckerAssignmentData:
+        current = await self._resolve(assignment_id)
         result = await self._rbac.purge_relation.run(
             PurgeRelationAction(
                 pairs=[RelationPair(scope=current.scope_entity(), target=current.idle_checker_id)],
@@ -152,7 +204,7 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
         )
         if not any(unlink.unlinked for unlink in result.results):
             raise IdleCheckerAssignmentNotFound(str(current.id))
-        return PurgeIdleCheckerAssignmentPayload(id=current.id)
+        return current
 
     async def _read_by_pair(
         self, scope: EntityIdentifier, idle_checker_id: IdleCheckerID
@@ -259,15 +311,16 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in f.OR:
-                or_conditions.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in f.NOT:
-                not_conditions.extend(self._convert_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod

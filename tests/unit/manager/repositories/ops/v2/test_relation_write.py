@@ -6,10 +6,16 @@ What these tests pin down:
   shares the scope to the target under READ.
 - Linking adds READ to what the target already holds of the scope and unlinking
   takes only READ back, so a share set beside the relation survives.
-- Linking a pair already linked is a unique violation.
+- Linking a pair already linked leaves it as it stands and answers False.
 - Switching a relation off and back on touches the row alone: both reads stay.
 - Unlinking removes the row, the govern and the share, and is silent on a pair never
   linked.
+- An upsert links a pair not linked yet as a create does and updates the row of a pair
+  already linked; with no update values it leaves that row as it stands.
+- An insert if absent links the pairs not linked yet and leaves the rows of the rest as
+  they stand.
+- Both register the govern and the share for every pair, so a pair missing them has
+  them again.
 """
 
 from __future__ import annotations
@@ -33,6 +39,7 @@ from ai.backend.manager.models.specs.relation import (
     RelationCreator,
     RelationLifecycleUpdater,
     RelationPurger,
+    RelationUpserter,
 )
 from ai.backend.manager.models.specs.types import (
     ConflictCheck,
@@ -140,6 +147,41 @@ class _Purger(RelationPurger[_ScopeID, _TargetID, RelationTestRow]):
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
         return ()
+
+
+class _Upserter(RelationUpserter[_ScopeID, _TargetID, RelationTestRow]):
+    _off: bool
+
+    def __init__(self, off: bool) -> None:
+        self._off = off
+
+    @override
+    def row_class(self) -> type[RelationTestRow]:
+        return RelationTestRow
+
+    @override
+    def index_elements(self) -> list[str]:
+        return ["scope_id", "target_id"]
+
+    @override
+    def build_insert_values(self, scope: _ScopeID, target: _TargetID) -> dict[str, Any]:
+        return {"id": uuid.uuid4(), "scope_id": scope, "target_id": target, "off": self._off}
+
+    @override
+    def build_update_values(self) -> dict[str, Any]:
+        return {"off": self._off}
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+
+class _KeepingUpserter(_Upserter):
+    """Takes no update values, so a pair already linked keeps what its row holds."""
+
+    @override
+    def build_update_values(self) -> dict[str, Any]:
+        return {}
 
 
 @pytest.fixture
@@ -312,6 +354,38 @@ class TestCreateRelation:
         assert await _share_cap(database, target, scope) == Permission.UPDATE
         assert await _govern_cap(database, scope, target) is False
 
+    async def test_linking_again_registers_the_graph_reads_a_row_is_missing(
+        self,
+        database: ExtendedAsyncSAEngine,
+        provider: RelationOpsProvider,
+        pair: tuple[_ScopeID, _TargetID],
+    ) -> None:
+        """A pair already linked keeps its row and gets back the govern and the share."""
+        scope, target = pair
+        async with provider.write_ops() as ops:
+            await ops.create_relations(_Creator(), [(scope, target)])
+        async with database.begin_session() as sess:
+            await sess.execute(
+                sa.delete(ScopeBindingRow).where(
+                    ScopeBindingRow.virtual_entity_id == _node(target),
+                    ScopeBindingRow.scope_entity_id == _node(scope),
+                )
+            )
+            await sess.execute(
+                sa.delete(EntityMembershipRow).where(
+                    EntityMembershipRow.virtual_entity_id == _node(target),
+                    EntityMembershipRow.member_entity_id == _node(scope),
+                )
+            )
+
+        async with provider.write_ops() as ops:
+            written = await ops.create_relations(_Creator(), [(scope, target)])
+
+        assert written == [False]
+        assert await _row_count(database) == 1
+        assert await _govern_cap(database, scope, target) == Permission.READ
+        assert await _share_cap(database, target, scope) == Permission.READ
+
     async def test_a_precondition_the_spec_names_turns_the_link_away(
         self,
         database: ExtendedAsyncSAEngine,
@@ -469,3 +543,104 @@ class TestManyPairsInOneRun:
 
         assert unlinked == [True, False]
         assert await _row_count(database) == 0
+
+
+async def _drop_graph_reads(
+    database: ExtendedAsyncSAEngine, scope: EntityIdentifier, target: EntityIdentifier
+) -> None:
+    """Remove the govern and the share a link wrote, leaving the relation row."""
+    async with database.begin_session() as sess:
+        await sess.execute(
+            sa.delete(ScopeBindingRow).where(
+                ScopeBindingRow.virtual_entity_id == _node(target),
+                ScopeBindingRow.scope_entity_id == _node(scope),
+            )
+        )
+        await sess.execute(
+            sa.delete(EntityMembershipRow).where(
+                EntityMembershipRow.virtual_entity_id == _node(target),
+                EntityMembershipRow.member_entity_id == _node(scope),
+            )
+        )
+
+
+class TestPartialUpsertRelations:
+    async def test_a_pair_not_linked_yet_is_linked_as_a_create_links_it(
+        self,
+        database: ExtendedAsyncSAEngine,
+        provider: RelationOpsProvider,
+        pair: tuple[_ScopeID, _TargetID],
+    ) -> None:
+        scope, target = pair
+        async with provider.write_ops() as ops:
+            result = await ops.partial_upsert_relations(_Upserter(off=True), [(scope, target)])
+
+        assert [(item.written, item.error) for item in result.results] == [(True, None)]
+        assert await _off(database) is True
+        assert await _govern_cap(database, scope, target) == Permission.READ
+        assert await _share_cap(database, target, scope) == Permission.READ
+
+    async def test_a_pair_already_linked_takes_the_update_and_its_graph_reads_back(
+        self,
+        database: ExtendedAsyncSAEngine,
+        provider: RelationOpsProvider,
+        pair: tuple[_ScopeID, _TargetID],
+    ) -> None:
+        scope, target = pair
+        async with provider.write_ops() as ops:
+            await ops.partial_upsert_relations(_Upserter(off=False), [(scope, target)])
+        await _drop_graph_reads(database, scope, target)
+
+        async with provider.write_ops() as ops:
+            result = await ops.partial_upsert_relations(_Upserter(off=True), [(scope, target)])
+
+        assert [(item.written, item.error) for item in result.results] == [(True, None)]
+        assert await _off(database) is True
+        assert await _govern_cap(database, scope, target) == Permission.READ
+        assert await _share_cap(database, target, scope) == Permission.READ
+
+    async def test_no_update_values_leave_a_pair_already_linked_as_it_stands(
+        self,
+        database: ExtendedAsyncSAEngine,
+        provider: RelationOpsProvider,
+        pair: tuple[_ScopeID, _TargetID],
+    ) -> None:
+        scope, target = pair
+        async with provider.write_ops() as ops:
+            await ops.partial_upsert_relations(_Upserter(off=False), [(scope, target)])
+
+        async with provider.write_ops() as ops:
+            result = await ops.partial_upsert_relations(
+                _KeepingUpserter(off=True), [(scope, target)]
+            )
+
+        assert [(item.written, item.error) for item in result.results] == [(False, None)]
+        assert await _off(database) is False
+
+
+class TestAtomicInsertRelationsIfAbsent:
+    async def test_links_the_pairs_not_linked_yet(
+        self,
+        database: ExtendedAsyncSAEngine,
+        provider: RelationOpsProvider,
+        pair: tuple[_ScopeID, _TargetID],
+        other_target: _TargetID,
+    ) -> None:
+        scope, target = pair
+        async with provider.write_ops() as ops:
+            await ops.partial_upsert_relations(_Upserter(off=True), [(scope, target)])
+
+        async with provider.write_ops() as ops:
+            inserted = await ops.atomic_insert_relations_if_absent(
+                _Upserter(off=False), [(scope, target), (scope, other_target)]
+            )
+
+        assert inserted == [False, True]
+        assert await _row_count(database) == 2
+        assert await _govern_cap(database, scope, other_target) == Permission.READ
+        assert await _share_cap(database, other_target, scope) == Permission.READ
+        async with database.begin_readonly_session() as sess:
+            kept = await sess.scalar(
+                sa.select(RelationTestRow.off).where(RelationTestRow.target_id == target)
+            )
+        assert kept is True

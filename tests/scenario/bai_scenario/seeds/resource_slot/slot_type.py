@@ -9,11 +9,11 @@ from ai.backend.common.types import IntrinsicSlotNames, SlotTypes
 from ai.backend.manager.data.resource_slot.types import ResourceSlotTypeData
 from ai.backend.manager.models.resource_slot.creators import ResourceSlotTypeCreator
 from ai.backend.manager.models.resource_slot.types import NumberFormat
-from bai_scenario.seeds.seeder import Naming, SeedRow
+from bai_scenario.seeds.seeder import Naming, TestSeedRow
 
 
 @dataclass(frozen=True)
-class SeedSlotType(SeedRow[ResourceSlotTypeData]):
+class TestSeedSlotType(TestSeedRow[ResourceSlotTypeData]):
     """A slot type in the global catalog.
 
     The manager fixes the name, so the row answers with it. A slot a revision allocates
@@ -54,7 +54,7 @@ class SeedSlotType(SeedRow[ResourceSlotTypeData]):
 
 
 @dataclass(frozen=True)
-class SeedResourceSlotType(SeedRow[ResourceSlotTypeData]):
+class TestSeedResourceSlotType(TestSeedRow[ResourceSlotTypeData]):
     """A slot type in the global catalog. Its name is what every call addresses it by."""
 
     name_hint: str = "slot"

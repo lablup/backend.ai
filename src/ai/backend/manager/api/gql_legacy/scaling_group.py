@@ -40,13 +40,13 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForDomainRow,
     ResourceGroupForKeypairsRow,
     ResourceGroupForProjectRow,
-    ResourceGroupOpts,
     ResourceGroupRow,
     resource_groups,
     sgroups_for_domains,
     sgroups_for_groups,
     sgroups_for_keypairs,
 )
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction

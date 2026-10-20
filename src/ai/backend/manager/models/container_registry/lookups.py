@@ -9,6 +9,8 @@ from typing import override
 from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryEntityType,
     ContainerRegistryID,
+    ContainerRegistryName,
+    ContainerRegistryProjectName,
 )
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.models.clauses import QueryCondition
@@ -17,13 +19,13 @@ from ai.backend.manager.models.specs.lookup import DataLookup
 
 
 @dataclass
-class ContainerRegistryByNameAndProjectLookup(
+class ContainerRegistryByNameAndRegistryProjectLookup(
     DataLookup[ContainerRegistryRow, ContainerRegistryID]
 ):
-    """Resolves a registry name and a project name into the registry they name."""
+    """Resolves a registry name and its internal project name into the registry they name."""
 
-    registry_name: str
-    project_name: str | None
+    registry_name: ContainerRegistryName
+    registry_project_name: ContainerRegistryProjectName | None
 
     @override
     def row_class(self) -> type[ContainerRegistryRow]:
@@ -38,7 +40,7 @@ class ContainerRegistryByNameAndProjectLookup(
         # A None project renders as IS NULL, which is how a registry without one is named.
         return [
             lambda: ContainerRegistryRow.registry_name == self.registry_name,
-            lambda: ContainerRegistryRow.project == self.project_name,
+            lambda: ContainerRegistryRow.project == self.registry_project_name,
         ]
 
     @override

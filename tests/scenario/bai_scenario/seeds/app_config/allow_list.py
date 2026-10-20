@@ -11,7 +11,7 @@ from ai.backend.manager.data.app_config.types import (
     AppConfigDefinitionData,
 )
 from ai.backend.manager.models.app_config_allow_list.creators import AppConfigAllowListCreator
-from bai_scenario.seeds.seeder import Naming, SeedRowFrom
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFrom
 
 SCOPE_NAMES = {
     AppConfigScopeType.PUBLIC: "공개",
@@ -22,7 +22,7 @@ SCOPE_NAMES = {
 
 
 @dataclass(frozen=True)
-class SeedAllowListEntry(SeedRowFrom[AppConfigDefinitionData, AppConfigAllowListData]):
+class TestSeedAllowListEntry(TestSeedRowFrom[AppConfigDefinitionData, AppConfigAllowListData]):
     """The entry opening the given definition's name to one scope kind.
 
     The row carries no name of its own; the seeder's name only tells the rows apart in

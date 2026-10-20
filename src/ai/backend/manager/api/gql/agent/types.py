@@ -37,7 +37,7 @@ from ai.backend.common.dto.manager.v2.agent.types import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AgentId
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -127,13 +127,19 @@ class AgentStatusFilterGQL(PydanticInputMixin[AgentStatusFilter]):
 )
 class AgentFilterGQL(PydanticInputMixin[AgentFilter]):
     id: StringFilter | None = None
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by agent entity ID."
+        ),
+        default=None,
+    )
     status: AgentStatusFilterGQL | None = None
     schedulable: bool | None = None
     scaling_group: StringFilter | None = None
 
     labels: EntityLabelNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Select entities by the labels on them.",
         ),
         default=None,
@@ -147,7 +153,7 @@ class AgentFilterGQL(PydanticInputMixin[AgentFilter]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Entities whose use of an agent narrows the read.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="AgentUsedBy",
 )
@@ -166,7 +172,7 @@ class AgentUsedByGQL(PydanticInputMixin[AgentUsedBy]):
             "read each listed entity, or the request is refused. Only agents the caller can "
             "read are returned, even when a listed entity is tied to others."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="AgentUsage",
 )
@@ -399,21 +405,21 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
     id: NodeID[str]
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the agent.",
         ),
     )
     uuid: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "Agent UUID. The agent's primary key is its name, so rows keyed on the "
                 "agent carry this instead."
             ),
-            deprecated_version=NEXT_RELEASE_VERSION,
+            deprecated_version="26.9.0",
             deprecation_hint="entityId",
         ),
-        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use entityId.",
+        deprecation_reason="Deprecated since 26.9.0. Use entityId.",
     )
     resource_info: AgentResourceGQL = gql_field(
         description="Hardware resource capacity, usage, and availability information. Contains capacity (total), used (occupied by sessions), and free (available) resource slots including CPU cores, memory, accelerators (GPUs, TPUs), and other compute resources."
@@ -436,7 +442,7 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="The labels on this agent.",
         )
     )  # type: ignore[misc]
@@ -642,8 +648,6 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         | None
     ):
         """Fetch per-slot resource capacity and usage for this agent."""
-        from decimal import Decimal
-
         import strawberry as _strawberry
 
         from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
@@ -668,12 +672,8 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
         if filter is not None:
             pydantic_filter = filter.to_pydantic()
             if pydantic_filter.agent_id is None:
-                pydantic_filter = AgentResourceFilterDTO(
-                    slot_name=pydantic_filter.slot_name,
-                    agent_id=StringFilterDTO(equals=agent_id),
-                    AND=pydantic_filter.AND,
-                    OR=pydantic_filter.OR,
-                    NOT=pydantic_filter.NOT,
+                pydantic_filter = pydantic_filter.model_copy(
+                    update={"agent_id": StringFilterDTO(equals=agent_id)},
                 )
         else:
             pydantic_filter = AgentResourceFilterDTO(
@@ -698,14 +698,7 @@ class AgentV2GQL(PydanticNodeMixin[AgentNode]):
 
         edges = []
         for item in payload.items:
-            slot_name = item.slot_name
-            node = AgentResourceSlotGQL(
-                id=_strawberry.ID(item.id),
-                field_id=item.field_id,
-                slot_name=slot_name,
-                capacity=Decimal(item.capacity),
-                used=Decimal(item.used),
-            )
+            node = AgentResourceSlotGQL.from_pydantic(item)
             cursor = encode_cursor(item.field_id)
             edges.append(AgentResourceSlotEdgeGQL(node=node, cursor=cursor))
 

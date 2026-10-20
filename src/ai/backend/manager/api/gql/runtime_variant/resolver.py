@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.request import (
 )
 from ai.backend.common.dto.manager.v2.runtime_variant.types import RuntimeVariantOrderField
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.runtime_variant.types import (
     CreateRuntimeVariantInputGQL,
@@ -23,6 +23,10 @@ from ai.backend.manager.api.gql.runtime_variant.types import (
     DeleteRuntimeVariantPayloadGQL,
     DeleteRuntimeVariantsInputGQL,
     DeleteRuntimeVariantsPayloadGQL,
+    PartialBulkPurgeRuntimeVariantsInputGQL,
+    PartialBulkRuntimeVariantsPayloadGQL,
+    PartialBulkUpdateRuntimeVariantsInputGQL,
+    PurgeRuntimeVariantPayloadGQL,
     RuntimeVariantConnection,
     RuntimeVariantEdge,
     RuntimeVariantFilterGQL,
@@ -48,7 +52,7 @@ async def runtime_variants(
         RuntimeVariantUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller."
             )
         ),
@@ -137,9 +141,68 @@ async def admin_create_runtime_variant(
 
 @gql_mutation(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update a runtime variant. Only provided fields will be updated.",
+    )
+)
+async def update_runtime_variant(
+    info: Info[StrawberryGQLContext],
+    input: UpdateRuntimeVariantInputGQL,
+) -> UpdateRuntimeVariantPayloadGQL:
+    payload = await info.context.adapters.runtime_variant.update(input.to_pydantic())
+    return UpdateRuntimeVariantPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Purge a runtime variant with the presets in its catalog.",
+    )
+)
+async def purge_runtime_variant(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> PurgeRuntimeVariantPayloadGQL:
+    payload = await info.context.adapters.runtime_variant.purge(id)
+    return PurgeRuntimeVariantPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(RuntimeVariantGQL, payload.entity_id)}
+    )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update several runtime variants, answering for each one.",
+    )
+)
+async def partial_bulk_update_runtime_variants(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkUpdateRuntimeVariantsInputGQL,
+) -> PartialBulkRuntimeVariantsPayloadGQL:
+    payload = await info.context.adapters.runtime_variant.partial_bulk_update(input.to_pydantic())
+    return PartialBulkRuntimeVariantsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Purge several runtime variants with their presets, answering for each one.",
+    )
+)
+async def partial_bulk_purge_runtime_variants(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeRuntimeVariantsInputGQL,
+) -> PartialBulkRuntimeVariantsPayloadGQL:
+    payload = await info.context.adapters.runtime_variant.partial_bulk_purge(input.to_pydantic())
+    return PartialBulkRuntimeVariantsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Update a runtime variant (superadmin only).",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `updateRuntimeVariant`.",
 )
 async def admin_update_runtime_variant(
     info: Info[StrawberryGQLContext],
@@ -155,14 +218,15 @@ async def admin_update_runtime_variant(
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Delete a runtime variant (superadmin only).",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeRuntimeVariant`.",
 )
 async def admin_delete_runtime_variant(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> DeleteRuntimeVariantPayloadGQL | None:
     check_admin_only()
-    payload = await info.context.adapters.runtime_variant.delete(id)
+    payload = await info.context.adapters.runtime_variant.purge(id)
     return DeleteRuntimeVariantPayloadGQL.from_pydantic(payload)
 
 
@@ -170,7 +234,10 @@ async def admin_delete_runtime_variant(
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Delete multiple runtime variants (superadmin only).",
-    )
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `partialBulkPurgeRuntimeVariants`."
+    ),
 )
 async def admin_delete_runtime_variants(
     info: Info[StrawberryGQLContext],

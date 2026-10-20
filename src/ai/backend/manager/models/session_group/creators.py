@@ -19,6 +19,7 @@ from ai.backend.manager.data.session_group.types import (
 )
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -67,7 +68,7 @@ class SessionGroupCreator(EntityCreator[SessionGroupRow, SessionGroupData]):
 
     @override
     def to_data(self, row: SessionGroupRow) -> SessionGroupData:
-        return row.to_data()
+        return SessionGroupSearchableFields.own.to_data(row)
 
     @classmethod
     def for_replica_group(

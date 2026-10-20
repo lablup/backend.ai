@@ -21,6 +21,7 @@ api/ → services/ → repositories/ → models/
 - `views/` — internal-only value objects
 - `secret/` — at-rest encryption for secret columns
 - `sokovan/` — coordinator and scheduling
+- `seed/` — seed kinds that `mgr seed` reads from `seeds/`
 
 ## Cross-layer rules
 

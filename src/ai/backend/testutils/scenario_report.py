@@ -34,6 +34,10 @@ class OperationWords:
     REPRESENTATIVE_REFUSAL: ClassVar[str] = "대표 실패"
     SUCCESS: ClassVar[str] = "성공"
     REFUSAL: ClassVar[str] = "실패"
+    SCENARIO: ClassVar[str] = "시나리오"
+    VERDICT: ClassVar[str] = "판정"
+    ANSWERED: ClassVar[str] = "성공"
+    REFUSED: ClassVar[str] = "거부"
     PRESENT: ClassVar[str] = "있음"
     ABSENT: ClassVar[str] = "없음"
     COVERED: ClassVar[str] = "✓"
@@ -93,6 +97,10 @@ class ScenarioRecord:
     def source(self) -> str:
         """이 행이 사는 파일. 레포트가 거기로 걸어준다."""
         return "/tests/scenario/" + self.module.replace(".", "/") + ".py"
+
+    def anchor(self) -> str:
+        """Where the report links to this row's details; a summary can repeat across modules."""
+        return f"{self.behaviour}-{self.summary}"
 
     def called(self) -> str:
         """어느 엔티티의 어느 호출인지. 이름만으로는 잘 안 보인다."""
@@ -186,6 +194,10 @@ class ComponentReport:
     @property
     def rows(self) -> tuple[ScenarioRecord, ...]:
         return tuple(row for behaviour in self.behaviours for row in behaviour.rows)
+
+    @property
+    def adapters(self) -> tuple[str, ...]:
+        return tuple(sorted({row.adapter for row in self.rows if row.adapter}))
 
     @property
     def failing(self) -> int:
@@ -533,10 +545,14 @@ class MarkdownFormat(ReportFormat):
             out.append("")
             out.extend(self._operations(component.operations))
             out.append("")
-        for behaviour in component.behaviours:
-            out.append(f"### {behaviour.behaviour}")
+        calls = self._calls(component)
+        for operation, rows in calls:
+            out.extend(self._table(operation, rows))
             out.append("")
-            for row in behaviour.rows:
+        for operation, rows in calls:
+            out.append(f"### {operation}")
+            out.append("")
+            for row in rows:
                 out.extend(self._row(row))
         return out
 
@@ -587,8 +603,42 @@ class MarkdownFormat(ReportFormat):
     def _count(self, rows: int) -> str:
         return f"{OperationWords.PRESENT} {rows}" if rows else OperationWords.ABSENT
 
+    def _calls(self, component: ComponentReport) -> list[tuple[str, list[ScenarioRecord]]]:
+        """The rows by operation, in the order the list names them and then any it does not.
+
+        Successes come before refusals, each in summary order.
+        """
+        several_adapters = len(component.adapters) > 1
+        calls: dict[str, list[ScenarioRecord]] = {}
+        for row in sorted(component.rows, key=lambda r: (r.expects_refusal(), r.summary)):
+            name = row.called() if several_adapters else row.operation
+            calls.setdefault(name, []).append(row)
+        listed = [
+            one.operation
+            for composition in Composition
+            for one in component.operations
+            if one.composition is composition
+        ]
+        return [
+            (operation, calls[operation])
+            for operation in [*listed, *sorted(set(calls) - set(listed))]
+            if operation in calls
+        ]
+
+    def _table(self, operation: str, rows: Sequence[ScenarioRecord]) -> list[str]:
+        """One line per row, linking to its details below."""
+        words = OperationWords
+        out = [f"**{operation}**", "", f"| {words.SCENARIO} | {words.VERDICT} |", "|---|---|"]
+        for row in rows:
+            verdict = words.REFUSED if row.expects_refusal() else words.ANSWERED
+            description = row.description.replace("|", "\\|")
+            out.append(f"| [{description}](#{row.anchor()}) | {verdict} |")
+        return out
+
     def _row(self, row: ScenarioRecord) -> list[str]:
         out = [
+            f'<a id="{row.anchor()}"></a>',
+            "",
             f"#### [{row.summary}]({row.source()}) — {row.mark}",
             "",
             row.description,

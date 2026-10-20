@@ -53,8 +53,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment_options.response import (
     DeploymentHandlerOptionsInfo,
     DeploymentOptionsInfo,
-)
-from ai.backend.common.dto.manager.v2.session_options.response import (
     HandlerOptionsInfo,
 )
 from ai.backend.common.schema.deployment import IntOrPercent
@@ -582,22 +580,19 @@ class TestUpdateDeploymentPayload:
 class TestDeleteDeploymentPayload:
     """Tests for DeleteDeploymentPayload model."""
 
-    def test_creation_with_uuid(self) -> None:
-        deployment_id = uuid.uuid4()
-        payload = DeleteDeploymentPayload(id=deployment_id)
-        assert payload.id == deployment_id
-
-    def test_id_is_uuid_instance(self) -> None:
-        deployment_id = uuid.uuid4()
-        payload = DeleteDeploymentPayload(id=deployment_id)
-        assert isinstance(payload.id, uuid.UUID)
+    def test_creation_with_deployment_node(self) -> None:
+        node = _make_deployment_node()
+        payload = DeleteDeploymentPayload(id=node.id, deployment=node)
+        assert payload.id == node.id
+        assert payload.deployment.entity_id == node.entity_id
 
     def test_round_trip(self) -> None:
-        deployment_id = uuid.uuid4()
-        payload = DeleteDeploymentPayload(id=deployment_id)
+        node = _make_deployment_node()
+        payload = DeleteDeploymentPayload(id=node.id, deployment=node)
         json_str = payload.model_dump_json()
         restored = DeleteDeploymentPayload.model_validate_json(json_str)
-        assert restored.id == deployment_id
+        assert restored.id == node.id
+        assert restored.deployment == node
 
 
 class TestActivateDeploymentPayload:

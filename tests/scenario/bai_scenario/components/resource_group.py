@@ -17,6 +17,7 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     AllowedDomainsPayload,
     AllowedProjectsPayload,
@@ -48,20 +49,21 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
+from bai_scenario.components.domain import WAS_HERE, Mentions, SomeoneOf, WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, role_named
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.rbac.role import SeedPermission, SeedRole
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.project.project import TestSeedProject
+from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.resource_group.resource_group import (
     LinkToDomain,
     LinkToProject,
-    SeedResourceGroup,
+    TestSeedResourceGroup,
 )
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 
 type Loaded = list[ResourceGroupDetailNode | Exception | None]
+type Processed = PartialBulkPayload[ResourceGroupDetailNode]
 
 SCHEDULER = "fifo"
 
@@ -106,7 +108,7 @@ class AProjectAGroupAndACaller:
 
 
 @dataclass(frozen=True)
-class SomeoneGrantedOnTheGroup(SeedNest[Laid[None]]):
+class SomeoneGrantedOnTheGroup(TestSeedNest[Laid[None]]):
     """그 그룹에 앉힌 역할로 권한 하나를 받은 사용자."""
 
     group: Laid[ResourceGroupData]
@@ -118,12 +120,12 @@ class SomeoneGrantedOnTheGroup(SeedNest[Laid[None]]):
         return f"리소스 그룹 범위의 {self.permission.name} 역할을 받은 사용자 준비"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[None]:
+    def lay(self, seed: TestSeeder) -> Laid[None]:
         role = seed.creating_from(
-            SeedRole(lambda g: ResourceGroupID(g.id), name_hint="group-role"), self.group
+            TestSeedRole(lambda g: ResourceGroupID(g.id), name_hint="group-role"), self.group
         )
         seed.adding(
-            SeedPermission(entity_type=ResourceGroupEntityType(), permission=self.permission),
+            TestSeedPermission(entity_type=ResourceGroupEntityType(), permission=self.permission),
             role,
         )
         return seed.granting(
@@ -132,7 +134,7 @@ class SomeoneGrantedOnTheGroup(SeedNest[Laid[None]]):
 
 
 @dataclass(frozen=True)
-class SomeoneReadingGroupsInTheDomain(SeedNest[Laid[None]]):
+class SomeoneReadingGroupsInTheDomain(TestSeedNest[Laid[None]]):
     """그 도메인 범위에서 리소스 그룹을 읽을 수 있는 사용자."""
 
     domain: Laid[DomainData]
@@ -143,10 +145,12 @@ class SomeoneReadingGroupsInTheDomain(SeedNest[Laid[None]]):
         return "도메인 범위의 리소스 그룹 읽기 역할을 받은 사용자 준비"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[None]:
-        role = seed.creating_from(SeedRole(lambda d: d.id, name_hint="group-reader"), self.domain)
+    def lay(self, seed: TestSeeder) -> Laid[None]:
+        role = seed.creating_from(
+            TestSeedRole(lambda d: d.id, name_hint="group-reader"), self.domain
+        )
         seed.adding(
-            SeedPermission(entity_type=ResourceGroupEntityType(), permission=Permission.READ),
+            TestSeedPermission(entity_type=ResourceGroupEntityType(), permission=Permission.READ),
             role,
         )
         return seed.granting(
@@ -173,9 +177,9 @@ class AGroupAndSomeone(Given[Any, AGroupAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AGroupAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         group = await seeding.creating(
-            SeedResourceGroup(
+            TestSeedResourceGroup(
                 description=self.description, is_active=self.is_active, is_default=self.is_default
             )
         )
@@ -199,9 +203,9 @@ class AGroupBesideTheDefaultAndSomeone(Given[Any, AGroupAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AGroupAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        await seeding.creating(SeedResourceGroup(name_hint="default-group", is_default=True))
-        group = await seeding.creating(SeedResourceGroup())
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        await seeding.creating(TestSeedResourceGroup(name_hint="default-group", is_default=True))
+        group = await seeding.creating(TestSeedResourceGroup())
         caller = await seeding.within(SomeoneOf(home, role=self.role))
         return AGroupAndACaller(seeding.made(group), seeding.made(caller))
 
@@ -218,9 +222,9 @@ class TwoGroupsAndSomeone(Given[Any, ManyGroupsAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyGroupsAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        wanted = await seeding.creating(SeedResourceGroup(name_hint="wanted"))
-        other = await seeding.creating(SeedResourceGroup(name_hint="other"))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        wanted = await seeding.creating(TestSeedResourceGroup(name_hint="wanted"))
+        other = await seeding.creating(TestSeedResourceGroup(name_hint="other"))
         caller = await seeding.within(SomeoneOf(home, role=self.role))
         return ManyGroupsAndACaller(
             laid=(seeding.made(wanted), seeding.made(other)),
@@ -241,9 +245,9 @@ class AnActiveAndAnInactiveGroup(Given[Any, ManyGroupsAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyGroupsAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        active = await seeding.creating(SeedResourceGroup(name_hint="active"))
-        await seeding.creating(SeedResourceGroup(name_hint="inactive", is_active=False))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        active = await seeding.creating(TestSeedResourceGroup(name_hint="active"))
+        await seeding.creating(TestSeedResourceGroup(name_hint="inactive", is_active=False))
         caller = await seeding.within(SomeoneOf(home, role=self.role))
         return ManyGroupsAndACaller(
             laid=(seeding.made(active),),
@@ -278,9 +282,9 @@ class ADomainGroupsAndSomeone(Given[Any, ADomainGroupsAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ADomainGroupsAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        linked = await seeding.creating(SeedResourceGroup(name_hint="linked"))
-        other = await seeding.creating(SeedResourceGroup(name_hint="other"))
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        linked = await seeding.creating(TestSeedResourceGroup(name_hint="linked"))
+        other = await seeding.creating(TestSeedResourceGroup(name_hint="other"))
         if self.linked:
             await seeding.linking(LinkToDomain(), home, linked)
         caller = await seeding.within(SomeoneOf(home, role=self.role))
@@ -305,10 +309,10 @@ class AProjectAGroupAndSomeone(Given[Any, AProjectAGroupAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> AProjectAGroupAndACaller:
-        home = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        policy = await seeding.once(SeedProjectPolicy())
-        project = await seeding.creating_from_two(SeedProject(name_hint="team"), home, policy)
-        group = await seeding.creating(SeedResourceGroup())
+        home = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), home, policy)
+        group = await seeding.creating(TestSeedResourceGroup())
         if self.linked:
             await seeding.linking(LinkToProject(), project, group)
         caller = await seeding.within(SomeoneOf(home, role=self.role))
@@ -627,6 +631,65 @@ class TheGroupsInTheOrderAsked(Then[ManyGroupsAndACaller, Loaded]):
             seen.extend(look.verdicts(f"items[{i}].", got, expected))
         last = items[asked - 1] if len(items) >= asked else "없음"
         seen.append(Same(f"items[{asked - 1}]", last, None))
+        return seen
+
+
+@dataclass(frozen=True)
+class EveryGroupIsProcessed(Then[ManyGroupsAndACaller, Processed]):
+    """그룹이 모두 처리된 목록에 온다. ``missing``이 있으면 그 id 만 실패 목록에 온다."""
+
+    look_for: GroupLook
+    missing: UUID | None = None
+
+    @override
+    def says(self) -> str:
+        if self.missing is None:
+            return "그룹이 모두 처리된 목록에 오고, 실패한 것은 없다"
+        return "그룹이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
+
+    @override
+    def look(self, laid: ManyGroupsAndACaller, answered: Answered[Processed]) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        seen: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.laid))]
+        for i, (node, group) in enumerate(zip(payload.successes, laid.laid, strict=False)):
+            seen += self.look_for.verdicts(f"successes[{i}].", node, group)
+        if self.missing is None:
+            return [*seen, Same("failed", payload.failed, [])]
+        seen.append(Same("failed count", len(payload.failed), 1))
+        for failure in payload.failed:
+            seen += [
+                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Held("failed[0].message", failure.message, Mentions("not found")),
+            ]
+        return seen
+
+
+@dataclass(frozen=True)
+class NoGroupIsProcessed(Then[ManyGroupsAndACaller, Processed]):
+    """처리된 그룹 없이, 그룹이 모두 같은 이유로 실패 목록에 온다."""
+
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return "처리된 그룹 없이 그룹이 모두 실패 목록에 온다"
+
+    @override
+    def look(self, laid: ManyGroupsAndACaller, answered: Answered[Processed]) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        seen: list[Verdict] = [
+            Same("successes", payload.successes, []),
+            Same("failed count", len(payload.failed), len(laid.laid)),
+        ]
+        for i, (failure, group) in enumerate(zip(payload.failed, laid.laid, strict=False)):
+            seen += [
+                Held[UUID](f"failed[{i}].id", failure.id, SameAs(group.id, "그룹의 id")),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+            ]
         return seen
 
 

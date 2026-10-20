@@ -19,17 +19,17 @@ from ai.backend.common.dto.manager.v2.deployment_options.response import (
 from ai.backend.common.dto.manager.v2.deployment_options.response import (
     DeploymentOptionsInfo as DeploymentOptionsInfoDTO,
 )
+from ai.backend.common.dto.manager.v2.deployment_options.response import (
+    HandlerOptionsEntryInfo as HandlerOptionsEntryInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment_options.response import (
+    HandlerOptionsInfo as HandlerOptionsInfoDTO,
+)
 from ai.backend.common.dto.manager.v2.session_options.request import (
     HandlerOptionsEntryInput as HandlerOptionsEntryInputDTO,
 )
 from ai.backend.common.dto.manager.v2.session_options.request import (
     HandlerOptionsInput as HandlerOptionsInputDTO,
-)
-from ai.backend.common.dto.manager.v2.session_options.response import (
-    HandlerOptionsEntryInfo as HandlerOptionsEntryInfoDTO,
-)
-from ai.backend.common.dto.manager.v2.session_options.response import (
-    HandlerOptionsInfo as HandlerOptionsInfoDTO,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,

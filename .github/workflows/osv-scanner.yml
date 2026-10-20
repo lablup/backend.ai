@@ -28,10 +28,14 @@ jobs:
   scan-scheduled:
     uses: "google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@6fc714450122bda9d00e4ad5d639ad6a39eedb1f" # v2.0.1
     with:
-      # Example of specifying custom arguments
+      # requirements.txt holds only lower bounds; the uv lockfiles hold the installed versions.
       scan-args: |-
-        -r
-        ./
+        --lockfile=uv.lock:python.lock
+        --lockfile=uv.lock:tools/coverage-py.lock
+        --lockfile=uv.lock:tools/pants-plugins.lock
+        --lockfile=uv.lock:tools/setuptools.lock
+        --lockfile=uv.lock:tools/towncrier.lock
+        --lockfile=uv.lock:python-kernel.lock
 
   prepare-container-matrix:
     name: Discover Dockerfiles

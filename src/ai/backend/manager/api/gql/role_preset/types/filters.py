@@ -15,7 +15,12 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
     RolePresetPermissionNestedFilter as RolePresetPermissionNestedFilterDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import (
+    NullableDateTimeFilter,
+    OrderDirection,
+    StringFilter,
+    UUIDFilter,
+)
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -31,7 +36,7 @@ from .permission import RolePermissionPresetFilterGQL
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter role presets by conditions on the permission entries they carry.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="RolePresetPermissionNestedFilter",
 )
@@ -68,6 +73,20 @@ class RolePresetPermissionNestedFilterGQL(PydanticInputMixin[RolePresetPermissio
     name="RolePresetFilter",
 )
 class RolePresetFilterGQL(PydanticInputMixin[RolePresetFilterDTO]):
+    id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by role preset ID.",
+        ),
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entityId`.",
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by role preset ID."
+        ),
+        default=None,
+    )
     name: StringFilter | None = gql_field(description="Filter by name.", default=None)
     scope_type: StringFilter | None = gql_field(description="Filter by scope type.", default=None)
     auto_assign: bool | None = gql_field(description="Filter by auto-assign flag.", default=None)
@@ -77,10 +96,21 @@ class RolePresetFilterGQL(PydanticInputMixin[RolePresetFilterDTO]):
             "set this explicitly to `true` to inspect archived presets."
         ),
         default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deletedAt`.",
+    )
+    deleted_at: NullableDateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Filter by soft-delete time. Setting it on the top-level filter includes "
+                "soft-deleted presets; inside AND, OR or NOT it does not."
+            ),
+        ),
+        default=None,
     )
     permissions: RolePresetPermissionNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Filter by conditions on the permission entries the preset carries.",
         ),
         default=None,

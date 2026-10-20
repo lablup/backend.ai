@@ -10,8 +10,10 @@ from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotEntryInfo,
     ResourceSlotInfo,
@@ -23,7 +25,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AgentResourceFilter,
     AgentResourceOrder,
     CreateResourceSlotTypeInput,
-    PurgeResourceSlotTypeInput,
+    PartialBulkPurgeResourceSlotTypesInput,
     ResourceAllocationFilter,
     ResourceAllocationOrder,
     ResourceSlotTypeFilter,
@@ -52,6 +54,7 @@ from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceSlotTypeOrderField,
 )
 from ai.backend.common.types import AgentId
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.resource_slot.types import (
@@ -60,6 +63,11 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceSlotTypeData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.resource_slot.creators import ResourceSlotTypeCreator
 from ai.backend.manager.models.resource_slot.purgers import ResourceSlotTypePurger
 from ai.backend.manager.models.resource_slot.row import (
@@ -110,6 +118,9 @@ from ai.backend.manager.services.resource_slot.actions.lookup import (
 )
 from ai.backend.manager.services.resource_slot.actions.lookup_kernel_owner import (
     LookupKernelOwnerAction,
+)
+from ai.backend.manager.services.resource_slot.actions.partial_bulk_purge import (
+    PartialBulkPurgeResourceSlotTypesAction,
 )
 from ai.backend.manager.services.resource_slot.actions.purge import PurgeResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.scoped_search_resource_slot_types import (
@@ -221,7 +232,29 @@ class ResourceSlotAdapter(BaseAdapter):
 
     def _convert_slot_type_filter(self, filter: ResourceSlotTypeFilter) -> list[QueryCondition]:
         fields = ResourceSlotTypeSearchableFields.own
-        return self.apply_string_filter(filter.slot_name, fields.slot_name.filter)
+        conditions = [
+            *self.apply_string_filter(filter.slot_name, fields.slot_name.filter),
+            *self.apply_uuid_filter(filter.entity_id, fields.uuid.filter),
+            *self.apply_string_filter(filter.slot_type, fields.slot_type.filter),
+            *self.apply_string_filter(filter.display_name, fields.display_name.filter),
+        ]
+        if filter.AND:
+            for sub in filter.AND:
+                conditions.extend(self._convert_slot_type_filter(sub))
+        if filter.OR:
+            or_groups: list[QueryCondition] = []
+            for sub in filter.OR:
+                sub_conditions = self._convert_slot_type_filter(sub)
+                if sub_conditions:
+                    or_groups.append(combine_conditions_and(sub_conditions))
+            if or_groups:
+                conditions.append(combine_conditions_or(or_groups))
+        if filter.NOT:
+            for sub in filter.NOT:
+                sub_conditions = self._convert_slot_type_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+        return conditions
 
     def _convert_slot_type_orders(self, orders: list[ResourceSlotTypeOrder]) -> list[QueryOrder]:
         fields = ResourceSlotTypeSearchableFields.own
@@ -293,21 +326,50 @@ class ResourceSlotAdapter(BaseAdapter):
             resource_slot_type=self._slot_type_data_to_node(action_result.data),
         )
 
-    async def admin_purge_slot_type(
-        self, input: PurgeResourceSlotTypeInput
+    async def lookup_slot_type(self, slot_name: str) -> ResourceSlotTypeUUID:
+        """The id of the resource slot type the slot name names."""
+        result = await self._resource_slot.lookup_resource_slot_type.run(
+            LookupResourceSlotTypeAction(slot_name=slot_name)
+        )
+        return result.entity_id()
+
+    async def purge_slot_type(
+        self, slot_type_id: ResourceSlotTypeUUID
     ) -> PurgeResourceSlotTypePayload:
         """Remove a resource slot type, refusing while anything still references it."""
-        target = await self._resource_slot.lookup_resource_slot_type.run(
-            LookupResourceSlotTypeAction(slot_name=input.slot_name)
-        )
         action_result = await self._resource_slot.purge_resource_slot_type.run(
-            PurgeResourceSlotTypeAction(
-                purger=ResourceSlotTypePurger(
-                    slot_name=input.slot_name, slot_type_id=target.entity_id()
-                )
+            PurgeResourceSlotTypeAction(purger=ResourceSlotTypePurger(slot_type_id=slot_type_id))
+        )
+        return PurgeResourceSlotTypePayload(
+            slot_name=action_result.data.slot_name, entity_id=action_result.data.uuid
+        )
+
+    async def partial_bulk_purge_slot_types(
+        self, input: PartialBulkPurgeResourceSlotTypesInput
+    ) -> PartialBulkPayload[ResourceSlotTypeNode]:
+        """Remove several resource slot types, answering for each one."""
+        result = await self._resource_slot.partial_bulk_purge_resource_slot_types.run(
+            PartialBulkPurgeResourceSlotTypesAction(
+                ids=[ResourceSlotTypeUUID(slot_type_id) for slot_type_id in input.ids]
             )
         )
-        return PurgeResourceSlotTypePayload(slot_name=action_result.data.slot_name)
+        return self._to_partial_bulk_payload(result)
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[ResourceSlotTypeData]
+    ) -> PartialBulkPayload[ResourceSlotTypeNode]:
+        return PartialBulkPayload[ResourceSlotTypeNode](
+            successes=[
+                self._slot_type_data_to_node(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
 
     @staticmethod
     def _to_number_format(input: NumberFormatInput | None) -> NumberFormat:
@@ -419,10 +481,30 @@ class ResourceSlotAdapter(BaseAdapter):
 
     def _convert_agent_resource_filter(self, filter: AgentResourceFilter) -> list[QueryCondition]:
         fields = AgentResourceSearchableFields.own
-        return [
+        conditions = [
             *self.apply_string_filter(filter.slot_name, fields.slot_name.filter),
             *self.apply_string_filter(filter.agent_id, fields.agent_id.filter),
+            *self.apply_decimal_filter(filter.reserved, fields.reserved.filter),
+            *self.apply_decimal_filter(filter.prereserved, fields.prereserved.filter),
+            *self.apply_uuid_filter(filter.field_id, fields.id.filter),
         ]
+        if filter.AND:
+            for sub in filter.AND:
+                conditions.extend(self._convert_agent_resource_filter(sub))
+        if filter.OR:
+            or_groups: list[QueryCondition] = []
+            for sub in filter.OR:
+                sub_conditions = self._convert_agent_resource_filter(sub)
+                if sub_conditions:
+                    or_groups.append(combine_conditions_and(sub_conditions))
+            if or_groups:
+                conditions.append(combine_conditions_or(or_groups))
+        if filter.NOT:
+            for sub in filter.NOT:
+                sub_conditions = self._convert_agent_resource_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+        return conditions
 
     @staticmethod
     def _convert_agent_resource_orders(orders: list[AgentResourceOrder]) -> list[QueryOrder]:
@@ -437,6 +519,10 @@ class ResourceSlotAdapter(BaseAdapter):
                     converted.append(fields.slot_name.order.apply(ascending))
                 case AgentResourceOrderField.CAPACITY:
                     converted.append(fields.capacity.order.apply(ascending))
+                case AgentResourceOrderField.RESERVED:
+                    converted.append(fields.reserved.order.apply(ascending))
+                case AgentResourceOrderField.PRERESERVED:
+                    converted.append(fields.prereserved.order.apply(ascending))
                 case AgentResourceOrderField.USED:
                     converted.append(fields.used.order.apply(ascending))
                 case _:
@@ -452,6 +538,8 @@ class ResourceSlotAdapter(BaseAdapter):
             agent_id=data.agent_id,
             slot_name=data.slot_name,
             capacity=str(data.capacity),
+            reserved=str(data.reserved),
+            prereserved=str(data.prereserved),
             used=str(data.used),
         )
 
@@ -515,10 +603,28 @@ class ResourceSlotAdapter(BaseAdapter):
         self, filter: ResourceAllocationFilter
     ) -> list[QueryCondition]:
         fields = ResourceAllocationSearchableFields.own
-        return [
+        conditions = [
             *self.apply_string_filter(filter.slot_name, fields.slot_name.filter),
             *self.apply_uuid_filter(filter.kernel_id, fields.kernel_id.filter),
+            *self.apply_uuid_filter(filter.field_id, fields.id.filter),
         ]
+        if filter.AND:
+            for sub in filter.AND:
+                conditions.extend(self._convert_resource_allocation_filter(sub))
+        if filter.OR:
+            or_groups: list[QueryCondition] = []
+            for sub in filter.OR:
+                sub_conditions = self._convert_resource_allocation_filter(sub)
+                if sub_conditions:
+                    or_groups.append(combine_conditions_and(sub_conditions))
+            if or_groups:
+                conditions.append(combine_conditions_or(or_groups))
+        if filter.NOT:
+            for sub in filter.NOT:
+                sub_conditions = self._convert_resource_allocation_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+        return conditions
 
     @staticmethod
     def _convert_resource_allocation_orders(

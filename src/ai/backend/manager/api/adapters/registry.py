@@ -69,9 +69,11 @@ from ai.backend.manager.api.adapters.scheduling_history.adapter import Schedulin
 from ai.backend.manager.api.adapters.secret.adapter import SecretAdapter
 from ai.backend.manager.api.adapters.service_catalog.adapter import ServiceCatalogAdapter
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
+from ai.backend.manager.api.adapters.session_group.adapter import SessionGroupAdapter
 from ai.backend.manager.api.adapters.storage_host.adapter import StorageHostAdapter
 from ai.backend.manager.api.adapters.storage_namespace.adapter import StorageNamespaceAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
+from ai.backend.manager.api.adapters.user.config import UserConfigAdapter
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.api.adapters.vfs_storage.adapter import VFSStorageAdapter
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -141,9 +143,11 @@ class Adapters:
         scheduling_history: SchedulingHistoryAdapter,
         service_catalog: ServiceCatalogAdapter,
         session: SessionAdapter,
+        session_group: SessionGroupAdapter,
         storage_host: StorageHostAdapter,
         storage_namespace: StorageNamespaceAdapter,
         user: UserAdapter,
+        user_config: UserConfigAdapter,
         vfolder: VFolderAdapter,
         vfs_storage: VFSStorageAdapter,
     ) -> None:
@@ -194,9 +198,11 @@ class Adapters:
         self.scheduling_history = scheduling_history
         self.service_catalog = service_catalog
         self.session = session
+        self.session_group = session_group
         self.storage_host = storage_host
         self.storage_namespace = storage_namespace
         self.user = user
+        self.user_config = user_config
         self.vfolder = vfolder
         self.vfs_storage = vfs_storage
 
@@ -305,9 +311,11 @@ class Adapters:
             ),
             service_catalog=ServiceCatalogAdapter(processors.service_catalog),
             session=SessionAdapter(processors.session, processors.idle_checker),
+            session_group=SessionGroupAdapter(processors.session_group),
             storage_host=StorageHostAdapter(processors.vfolder),
             storage_namespace=StorageNamespaceAdapter(processors.storage_namespace),
             user=UserAdapter(processors.user, processors.domain, auth_config, key_provider_pool),
+            user_config=UserConfigAdapter(processors.user, processors.dotfile),
             vfolder=VFolderAdapter(
                 processors.vfolder,
                 processors.vfolder_file,

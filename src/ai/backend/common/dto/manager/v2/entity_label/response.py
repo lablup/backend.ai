@@ -8,12 +8,15 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "UpsertEntityLabelPayload",
+    "UpsertEntityLabelError",
+    "PartialBulkUpsertEntityLabelPayload",
     "EntityLabelNode",
     "PurgeEntityLabelPayload",
+    "PurgeEntityLabelError",
+    "PartialBulkPurgeEntityLabelPayload",
     "SearchEntityLabelsPayload",
 )
 
@@ -23,7 +26,7 @@ class EntityLabelNode(BaseResponseModel):
 
     id: UUID = Field(description="Label ID")
     field_id: UUID = Field(
-        description=f"UUID of the entity label. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the entity label. Added in 26.9.0.",
     )
     entity_type: str = Field(description="Type of the labeled entity")
     entity_id: UUID = Field(description="ID of the labeled entity")
@@ -39,10 +42,45 @@ class UpsertEntityLabelPayload(BaseResponseModel):
     label: EntityLabelNode = Field(description="The label put on the entity")
 
 
+class UpsertEntityLabelError(BaseResponseModel):
+    """One item of a bulk upsert that was not written, named as the request named it."""
+
+    entity_type: str = Field(description="Type of the entity the failed item targeted")
+    entity_id: UUID = Field(description="ID of the entity the failed item targeted")
+    key: str = Field(description="The key that was to be put on the entity")
+    message: str = Field(description="Reason the item failed")
+
+
+class PartialBulkUpsertEntityLabelPayload(BaseResponseModel):
+    """Partial-success payload for a bulk label upsert, answered per entity."""
+
+    items: list[EntityLabelNode] = Field(description="The labels put on the entities")
+    failed: list[UpsertEntityLabelError] = Field(
+        description="Per-item failures, each naming the entity and the key it targeted"
+    )
+
+
 class PurgeEntityLabelPayload(BaseResponseModel):
     """Payload for the label that was removed."""
 
     label: EntityLabelNode = Field(description="The label taken off the entity")
+    field_id: UUID = Field(description="UUID of the purged entity label. Added in 26.10.0.")
+
+
+class PurgeEntityLabelError(BaseResponseModel):
+    """One label a bulk purge could not take off."""
+
+    id: UUID = Field(description="ID of the label the failed item targeted")
+    message: str = Field(description="Reason the item failed")
+
+
+class PartialBulkPurgeEntityLabelPayload(BaseResponseModel):
+    """Partial-success payload for a bulk label purge, answered per label."""
+
+    successes: list[UUID] = Field(description="Ids of the labels taken off")
+    failed: list[PurgeEntityLabelError] = Field(
+        description="Per-label failures, each naming the label it targeted"
+    )
 
 
 class SearchEntityLabelsPayload(BaseResponseModel):

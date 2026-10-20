@@ -27,9 +27,9 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForProjectRow,
-    ResourceGroupOpts,
     ResourceGroupRow,
 )
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
@@ -848,7 +848,7 @@ class TestProjectExportExecuteStreamingDB:
                 AssociationContainerRegistriesGroupsRow(
                     id=uuid.uuid4(),
                     registry_id=registry_id,
-                    group_id=project_id,
+                    project_id=project_id,
                 )
             )
             await db_sess.commit()
@@ -1117,7 +1117,7 @@ class TestGlobalContainerRegistryExport:
                 AssociationContainerRegistriesGroupsRow(
                     id=uuid.uuid4(),
                     registry_id=scoped_registry_id,
-                    group_id=project_id,
+                    project_id=project_id,
                 )
             )
             await db_sess.commit()

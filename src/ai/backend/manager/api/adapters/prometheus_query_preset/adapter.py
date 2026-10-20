@@ -12,11 +12,13 @@ from ai.backend.common.data.entity.prometheus_query_preset_category import (
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.clients.prometheus.request import QueryTimeRange
 from ai.backend.common.dto.clients.prometheus.response import PrometheusResponse
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.request import (
     CreateQueryDefinitionInput,
-    DeleteQueryDefinitionInput,
     ModifyQueryDefinitionInput,
     ModifyQueryDefinitionOptionsInput,
+    PartialBulkPurgeQueryDefinitionsInput,
+    PartialBulkUpdateQueryDefinitionsInput,
     PreviewQueryDefinitionInput,
     QueryDefinitionFilter,
     QueryDefinitionOrder,
@@ -42,6 +44,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
     OrderDirection,
     QueryDefinitionOptionsInfo,
 )
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.prometheus_query_preset.types import (
@@ -49,7 +52,11 @@ from ai.backend.manager.data.prometheus_query_preset.types import (
     PrometheusQueryPresetData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.prometheus_query_preset.creators import (
     PrometheusQueryPresetCreator,
 )
@@ -73,6 +80,12 @@ from ai.backend.manager.services.prometheus_query_preset.actions.execute_preset 
     ExecutePresetAction,
 )
 from ai.backend.manager.services.prometheus_query_preset.actions.get import GetPresetAction
+from ai.backend.manager.services.prometheus_query_preset.actions.partial_bulk_purge import (
+    PartialBulkPurgePresetsAction,
+)
+from ai.backend.manager.services.prometheus_query_preset.actions.partial_bulk_update import (
+    PartialBulkUpdatePresetsAction,
+)
 from ai.backend.manager.services.prometheus_query_preset.actions.preview import (
     PreviewPresetAction,
 )
@@ -237,13 +250,54 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
             ],
         )
 
-    async def delete(self, input: DeleteQueryDefinitionInput) -> DeleteQueryDefinitionPayload:
-        """Delete a query definition by ID."""
+    async def purge(self, preset_id: PrometheusQueryPresetID) -> DeleteQueryDefinitionPayload:
+        """Permanently remove a query definition."""
         action_result = await self._prometheus_query_preset.purge_preset.run(
-            PurgePresetAction(preset_id=PrometheusQueryPresetID(input.id))
+            PurgePresetAction(preset_id=preset_id)
         )
 
-        return DeleteQueryDefinitionPayload(id=action_result.data.id)
+        return DeleteQueryDefinitionPayload(
+            id=action_result.data.id, entity_id=action_result.data.id
+        )
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateQueryDefinitionsInput
+    ) -> PartialBulkPayload[QueryDefinitionNode]:
+        """Update several query definitions, answering for each one."""
+        result = await self._prometheus_query_preset.partial_bulk_update_presets.run(
+            PartialBulkUpdatePresetsAction(
+                updaters=[
+                    self._build_updater(PrometheusQueryPresetID(item.id), item.input)
+                    for item in input.items
+                ]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeQueryDefinitionsInput
+    ) -> PartialBulkPayload[QueryDefinitionNode]:
+        """Permanently remove several query definitions, answering for each one."""
+        result = await self._prometheus_query_preset.partial_bulk_purge_presets.run(
+            PartialBulkPurgePresetsAction(
+                ids=[PrometheusQueryPresetID(preset_id) for preset_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[PrometheusQueryPresetData]
+    ) -> PartialBulkPayload[QueryDefinitionNode]:
+        return PartialBulkPayload[QueryDefinitionNode](
+            successes=[
+                self._data_to_dto(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
 
     _PAGINATION_SPEC = PaginationSpec(
         forward_order=PrometheusQueryPresetSearchableFields.own.created_at.order.apply(
@@ -281,6 +335,7 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         conditions: list[QueryCondition] = [
             *self.apply_string_filter(filter.name, fields.name.filter),
             *self.apply_uuid_filter(filter.category_id, fields.category_id.filter),
+            *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
         ]
 
         if filter.AND:
@@ -290,16 +345,17 @@ class PrometheusQueryPresetAdapter(BaseAdapter):
         if filter.OR:
             or_sub_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_sub_conditions.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_sub_conditions.append(combine_conditions_and(sub_conditions))
             if or_sub_conditions:
                 conditions.append(combine_conditions_or(or_sub_conditions))
 
         if filter.NOT:
-            not_sub_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_sub_conditions.extend(self._convert_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 

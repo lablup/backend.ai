@@ -36,12 +36,12 @@ from bai_scenario.components.resource_policy import (
     ThePolicyNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
-type OwnStep = Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+type OwnStep = Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 
 
 @dataclass(frozen=True)
@@ -66,7 +66,7 @@ class ReadingMine(When[APolicyAndACaller[Any], ResourcePolicyAdapter, Any]):
 
 @dataclass(frozen=True)
 class TheGrantedUserReadsTheirOwn(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: OwnFamily[Any, Any]
     started: datetime
@@ -83,7 +83,7 @@ class TheGrantedUserReadsTheirOwn(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return SomeoneHeldToTheirPolicy(self.family)
 
     @override
@@ -97,7 +97,7 @@ class TheGrantedUserReadsTheirOwn(
 
 @dataclass(frozen=True)
 class TheDefaultKeyDecidesAmongMany(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     started: datetime
 
@@ -113,7 +113,7 @@ class TheDefaultKeyDecidesAmongMany(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return SomeoneWithAnotherKey()
 
     @override
@@ -127,7 +127,7 @@ class TheDefaultKeyDecidesAmongMany(
 
 @dataclass(frozen=True)
 class AnInactiveDefaultKeyYieldsToAnActiveOne(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     started: datetime
 
@@ -143,7 +143,7 @@ class AnInactiveDefaultKeyYieldsToAnActiveOne(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return SomeoneWithAnotherKey(active=False)
 
     @override
@@ -157,7 +157,7 @@ class AnInactiveDefaultKeyYieldsToAnActiveOne(
 
 @dataclass(frozen=True)
 class NoActiveKeyFindsNoPolicy(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     @override
     def summary(self) -> str:
@@ -171,7 +171,7 @@ class NoActiveKeyFindsNoPolicy(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return SomeoneWithNoActiveKey()
 
     @override
@@ -185,7 +185,7 @@ class NoActiveKeyFindsNoPolicy(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadTheirOwn(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any]
 ):
     family: OwnFamily[Any, Any]
 
@@ -201,7 +201,7 @@ class AUserGrantedNothingMayNotReadTheirOwn(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return SomeoneHeldToTheirPolicy(self.family, granted=False)
 
     @override
@@ -215,7 +215,7 @@ class AUserGrantedNothingMayNotReadTheirOwn(
 
 @dataclass(frozen=True)
 class EnforcementOffOpensTheirOwn(
-    Scenario[SeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any], Configured
+    Scenario[TestSeedingSession, APolicyAndACaller[Any], ResourcePolicyAdapter, Any], Configured
 ):
     family: OwnFamily[Any, Any]
     started: datetime
@@ -235,7 +235,7 @@ class EnforcementOffOpensTheirOwn(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, APolicyAndACaller[Any]]:
+    def given(self) -> Given[TestSeedingSession, APolicyAndACaller[Any]]:
         return SomeoneHeldToTheirPolicy(self.family, granted=False)
 
     @override

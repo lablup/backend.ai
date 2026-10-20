@@ -20,6 +20,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotEntryInfo,
     ResourceSlotInfo,
@@ -28,6 +29,8 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
     CreateResourceGroupInput,
+    PartialBulkPurgeResourceGroupsInput,
+    PartialBulkUpdateResourceGroupsInput,
     ReplaceResourceGroupDefaultDeploymentOptionsInput,
     ReplaceResourceGroupDefaultSessionOptionsInput,
     ResourceGroupFilter,
@@ -71,6 +74,7 @@ from ai.backend.common.dto.manager.v2.resource_group.types import (
 from ai.backend.common.exception import DomainNotFound, UnreachableError
 from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import PreemptionMode, PreemptionOrder, SlotQuantity
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.deployment.options import (
     deployment_options_from_input,
     deployment_options_to_info,
@@ -90,7 +94,11 @@ from ai.backend.manager.data.resource_group.types import (
 )
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.resource_group.creators import (
     ResourceGroupCreator,
     ResourceGroupForDomainRelationCreator,
@@ -147,6 +155,12 @@ from ai.backend.manager.services.resource_group.actions.list_resource_groups imp
     SearchResourceGroupsAction,
 )
 from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
+from ai.backend.manager.services.resource_group.actions.partial_bulk_purge_resource_groups import (
+    PartialBulkPurgeResourceGroupsAction,
+)
+from ai.backend.manager.services.resource_group.actions.partial_bulk_update_resource_groups import (
+    PartialBulkUpdateResourceGroupsAction,
+)
 from ai.backend.manager.services.resource_group.actions.purge_resource_group import (
     PurgeResourceGroupAction,
 )
@@ -418,6 +432,7 @@ class ResourceGroupAdapter(BaseAdapter):
             *self.apply_bool_filter(filter_.is_active, fields.is_active.filter),
             *self.apply_bool_filter(filter_.is_public, fields.is_public.filter),
             *self.apply_bool_filter(filter_.is_default, fields.is_default.filter),
+            *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
             *self.apply_to_many_filter(
                 filter_.labels,
                 ResourceGroupSearchableFields.nested.labels.correlation,
@@ -430,15 +445,16 @@ class ResourceGroupAdapter(BaseAdapter):
         if filter_.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter_.OR:
-                or_conds.extend(self._convert_filter(sub))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter_.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter_.NOT:
-                not_conds.extend(self._convert_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_orders(self, orders: list[ResourceGroupOrder]) -> list[Any]:
@@ -500,30 +516,91 @@ class ResourceGroupAdapter(BaseAdapter):
 
     async def update(
         self,
-        name: str,
+        resource_group_id: ResourceGroupID,
         input: UpdateResourceGroupInput,
     ) -> UpdateResourceGroupPayload:
-        """Update an existing resource group.
-
-        Args:
-            name: Name of the resource group to update.
-            input: Pydantic DTO with partial update parameters.
-
-        Returns:
-            Pydantic payload containing the updated resource group node.
-        """
-        updater = ResourceGroupUpdater(
-            resource_group_id=await self.lookup_name(name),
-            is_active=OptionalState.from_unset(input.is_active),
-            is_default=OptionalState.from_unset(input.is_default),
-            description=TriState.from_unset(input.description),
-        )
+        """Update an existing resource group."""
         action_result = await self._resource_group.update_resource_group.run(
-            UpdateResourceGroupAction(resource_group_id=updater.resource_group_id, updater=updater)
+            UpdateResourceGroupAction(
+                resource_group_id=resource_group_id,
+                updater=self._to_updater(resource_group_id, input),
+            )
         )
-
         return UpdateResourceGroupPayload(
             resource_group=self._data_to_detail_node(action_result.resource_group),
+        )
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateResourceGroupsInput
+    ) -> PartialBulkPayload[ResourceGroupDetailNode]:
+        """Update several resource groups, answering for each one."""
+        result = await self._resource_group.partial_bulk_update.run(
+            PartialBulkUpdateResourceGroupsAction(
+                updaters=[
+                    self._to_updater(ResourceGroupID(item.id), item.input) for item in input.items
+                ]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeResourceGroupsInput
+    ) -> PartialBulkPayload[ResourceGroupDetailNode]:
+        """Purge several resource groups, answering for each one."""
+        result = await self._resource_group.partial_bulk_purge.run(
+            PartialBulkPurgeResourceGroupsAction(
+                ids=[ResourceGroupID(resource_group_id) for resource_group_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_updater(
+        self, resource_group_id: ResourceGroupID, input: UpdateResourceGroupInput
+    ) -> ResourceGroupUpdater:
+        scheduler: OptionalState[str] = OptionalState.nop()
+        if not isinstance(input.scheduler_type, Unset) and input.scheduler_type is not None:
+            scheduler = OptionalState.update(SchedulerType(input.scheduler_type).value)
+        preemption_config: OptionalState[DataPreemptionConfig] = OptionalState.nop()
+        if not isinstance(input.preemption, Unset) and input.preemption is not None:
+            preemption_config = OptionalState.update(
+                DataPreemptionConfig(
+                    enabled=input.preemption.enabled,
+                    preemptible_priority=input.preemption.preemptible_priority,
+                    order=PreemptionOrder(input.preemption.order),
+                    mode=PreemptionMode(input.preemption.mode),
+                    preemption_min_runtime=timedelta(
+                        seconds=input.preemption.preemption_min_runtime
+                    ),
+                    victim_scope=input.preemption.victim_scope,
+                )
+            )
+        return ResourceGroupUpdater(
+            resource_group_id=resource_group_id,
+            is_active=OptionalState.from_unset(input.is_active),
+            is_public=OptionalState.from_unset(input.is_public),
+            is_default=OptionalState.from_unset(input.is_default),
+            description=TriState.from_unset(input.description),
+            wsproxy_addr=TriState.from_unset(input.app_proxy_addr),
+            wsproxy_api_token=TriState.from_unset(input.appproxy_api_token),
+            use_host_network=OptionalState.from_unset(input.use_host_network),
+            scheduler=scheduler,
+            preemption_config=preemption_config,
+        )
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[ResourceGroupData]
+    ) -> PartialBulkPayload[ResourceGroupDetailNode]:
+        return PartialBulkPayload[ResourceGroupDetailNode](
+            successes=[
+                self._data_to_detail_node(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
         )
 
     async def get_resource_info(self, resource_group: str) -> ResourceInfoNode:
@@ -644,68 +721,27 @@ class ResourceGroupAdapter(BaseAdapter):
         self,
         input: UpdateResourceGroupConfigInput,
     ) -> UpdateResourceGroupConfigPayloadNode:
-        """Update resource group configuration (status, metadata, network, scheduler).
-
-        Args:
-            input: Pydantic DTO with partial configuration update parameters.
-
-        Returns:
-            Payload DTO containing the updated resource group.
-        """
-        scheduler: OptionalState[str] = OptionalState.nop()
-        if not isinstance(input.scheduler_type, Unset) and input.scheduler_type is not None:
-            scheduler = OptionalState.update(SchedulerType(input.scheduler_type).value)
-        preemption_config: OptionalState[DataPreemptionConfig] = OptionalState.nop()
-        if not isinstance(input.preemption, Unset) and input.preemption is not None:
-            preemption_config = OptionalState.update(
-                DataPreemptionConfig(
-                    enabled=input.preemption.enabled,
-                    preemptible_priority=input.preemption.preemptible_priority,
-                    order=PreemptionOrder(input.preemption.order),
-                    mode=PreemptionMode(input.preemption.mode),
-                    preemption_min_runtime=timedelta(
-                        seconds=input.preemption.preemption_min_runtime
-                    ),
-                    victim_scope=input.preemption.victim_scope,
-                )
-            )
-        updater = ResourceGroupUpdater(
-            resource_group_id=await self.lookup_name(input.resource_group_name),
-            is_active=OptionalState.from_unset(input.is_active),
-            is_public=OptionalState.from_unset(input.is_public),
-            is_default=OptionalState.from_unset(input.is_default),
-            description=TriState.from_unset(input.description),
-            wsproxy_addr=TriState.from_unset(input.app_proxy_addr),
-            wsproxy_api_token=TriState.from_unset(input.appproxy_api_token),
-            use_host_network=OptionalState.from_unset(input.use_host_network),
-            scheduler=scheduler,
-            preemption_config=preemption_config,
+        """Update a resource group named by name. Calls the same update as :meth:`update`."""
+        payload = await self.update(
+            await self.lookup_name(input.resource_group_name),
+            UpdateResourceGroupInput(
+                is_active=input.is_active,
+                is_public=input.is_public,
+                is_default=input.is_default,
+                description=input.description,
+                app_proxy_addr=input.app_proxy_addr,
+                appproxy_api_token=input.appproxy_api_token,
+                use_host_network=input.use_host_network,
+                scheduler_type=input.scheduler_type,
+                preemption=input.preemption,
+            ),
         )
+        return UpdateResourceGroupConfigPayloadNode(resource_group=payload.resource_group)
 
-        action_result = await self._resource_group.update_resource_group.run(
-            UpdateResourceGroupAction(
-                resource_group_id=updater.resource_group_id,
-                updater=updater,
-            )
-        )
-        return UpdateResourceGroupConfigPayloadNode(
-            resource_group=self._data_to_detail_node(action_result.resource_group),
-        )
-
-    async def purge(
-        self,
-        name: str,
-    ) -> ResourceGroupDetailNode:
-        """Purge a resource group by name.
-
-        Args:
-            name: Name of the resource group to purge.
-
-        Returns:
-            Pydantic node representing the purged resource group.
-        """
+    async def purge(self, resource_group_id: ResourceGroupID) -> ResourceGroupDetailNode:
+        """Purge a resource group, answering with it as it stood."""
         action_result = await self._resource_group.purge_resource_group.run(
-            PurgeResourceGroupAction(resource_group_id=await self.lookup_name(name))
+            PurgeResourceGroupAction(resource_group_id=resource_group_id)
         )
 
         return self._data_to_detail_node(action_result.data)

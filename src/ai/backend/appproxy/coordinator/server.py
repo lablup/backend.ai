@@ -80,12 +80,12 @@ from ai.backend.appproxy.common.utils import (
     BackendAIAccessLogger,
     ensure_json_serializable,
     mime_match,
-    ping_redis_connection,
 )
 from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
-from ai.backend.common import redis_helper
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_lock.client import ValkeyLockClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.contexts.request_id import with_request_context
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK, RedisRole
@@ -106,8 +106,9 @@ from ai.backend.common.leader.tasks import (
 from ai.backend.common.lock import FileLock, RedisLock
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.metrics.http import build_api_metric_middleware
+from ai.backend.common.metrics.http import SystemMetricUpdater, build_api_metric_middleware
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
+from ai.backend.common.middlewares.exception import client_closed_response, is_client_disconnect
 from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
@@ -124,13 +125,17 @@ from ai.backend.common.service_discovery.service_discovery import (
 )
 from ai.backend.common.types import (
     AgentId,
-    HostPortPair,
     RedisProfileTarget,
     ServiceDiscoveryType,
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import Logger, LogLevel
-from ai.backend.logging.otel import LegacyOtelLogging, OpenTelemetrySpec, apply_otel_tracer
+from ai.backend.logging.otel import (
+    LegacyOtelLogging,
+    OpenTelemetrySpec,
+    apply_otel_tracer,
+    build_otel_server_middleware,
+)
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.logging.structured_otel import StructuredOtelLogging
 
@@ -284,6 +289,13 @@ async def exception_middleware(
             log.trace("request cancelled", http_method=method, route_path=endpoint)
             raise e
         except Exception as e:
+            if is_client_disconnect(request, e):
+                log.trace(
+                    "client disconnected while writing the response",
+                    http_method=method,
+                    route_path=endpoint,
+                )
+                return client_closed_response()
             log.exception(
                 "request failed with uncaught exception", http_method=method, route_path=endpoint
             )
@@ -295,37 +307,63 @@ async def exception_middleware(
 
 
 @asynccontextmanager
+async def sentinel_monitor_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    redis_profile_target = RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
+    core_redis_profile_target = RedisProfileTarget.from_dict(
+        (root_ctx.local_config.core_redis or root_ctx.local_config.redis).to_dict()
+    )
+    root_ctx.sentinel_monitors = SentinelMonitorSet([
+        *redis_profile_target.valkey_targets(),
+        *core_redis_profile_target.valkey_targets(),
+    ])
+    await root_ctx.sentinel_monitors.start()
+    try:
+        yield
+    finally:
+        await root_ctx.sentinel_monitors.close()
+
+
+@asynccontextmanager
 async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     redis_profile_target = RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
     core_redis_profile_target = RedisProfileTarget.from_dict(
         (root_ctx.local_config.core_redis or root_ctx.local_config.redis).to_dict()
     )
+    sentinel_monitors = root_ctx.sentinel_monitors
+    live_target = redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target()
+    core_live_target = core_redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target()
+    core_stream_target = core_redis_profile_target.profile_target(
+        RedisRole.STREAM
+    ).to_valkey_target()
 
     # Create valkey clients for live data access
     root_ctx.valkey_live = await ValkeyLiveClient.create(
-        valkey_target=redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),
+        valkey_target=live_target,
         db_id=REDIS_LIVE_DB,
         human_readable_name="appproxy-coordinator-live",
+        sentinel_monitor=sentinel_monitors.monitor_for(live_target),
     )
     root_ctx.core_valkey_live = await ValkeyLiveClient.create(
-        valkey_target=core_redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),
+        valkey_target=core_live_target,
         db_id=REDIS_LIVE_DB,
         human_readable_name="appproxy-coordinator-core-live",
+        sentinel_monitor=sentinel_monitors.monitor_for(core_live_target),
     )
 
-    # Keep redis_lock for distributed locking (not yet migrated)
-    root_ctx.redis_lock = redis_helper.get_redis_object_for_lock(
-        redis_profile_target.profile_target(RedisRole.STREAM),
-        name="lock",  # distributed locks
-        db=REDIS_STREAM_LOCK,
+    lock_target = redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target()
+    root_ctx.valkey_lock = await ValkeyLockClient.create(
+        valkey_target=lock_target,
+        db_id=REDIS_STREAM_LOCK,
+        human_readable_name="appproxy-coordinator-lock",
+        sentinel_monitor=sentinel_monitors.monitor_for(lock_target),
     )
-    await ping_redis_connection(root_ctx.redis_lock)
 
     # Initialize ValkeyScheduleClient for health status updates
     root_ctx.valkey_schedule = await ValkeyScheduleClient.create(
-        valkey_target=core_redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target(),
+        valkey_target=core_stream_target,
         db_id=REDIS_LIVE_DB,
         human_readable_name="appproxy-schedule",
+        sentinel_monitor=sentinel_monitors.monitor_for(core_stream_target),
     )
     log.debug("valkey schedule client initialized")
     try:
@@ -334,12 +372,13 @@ async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         await root_ctx.valkey_live.close()
         await root_ctx.core_valkey_live.close()
         await root_ctx.valkey_schedule.close()
-        await root_ctx.redis_lock.close()
+        await root_ctx.valkey_lock.close()
 
 
 async def _make_message_queue(
     node_id: str,
     redis_config: RedisConfig,
+    sentinel_monitors: SentinelMonitorSet,
     *,
     anycast_stream_key: str = APPPROXY_ANYCAST_STREAM_KEY,
     broadcast_channel: str = APPPROXY_BROADCAST_CHANNEL,
@@ -364,6 +403,7 @@ async def _make_message_queue(
     return await RedisQueue.create(
         stream_redis_target,
         args,
+        sentinel_monitors.monitor_for(stream_redis_target.to_valkey_target()),
     )
 
 
@@ -372,6 +412,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     mq = await _make_message_queue(
         root_ctx.local_config.proxy_coordinator.id,
         root_ctx.local_config.redis,
+        root_ctx.sentinel_monitors,
     )
     root_ctx.event_producer = EventProducer(
         mq,
@@ -386,6 +427,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     core_mq = await _make_message_queue(
         root_ctx.local_config.proxy_coordinator.id,
         root_ctx.local_config.core_redis or root_ctx.local_config.redis,
+        root_ctx.sentinel_monitors,
         anycast_stream_key="events",
         broadcast_channel="events_all",
     )
@@ -420,10 +462,12 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     # Create ValkeyLeaderClient for leader election
     redis_profile_target = RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
+    leader_valkey_target = redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target()
     valkey_leader_client = await ValkeyLeaderClient.create(
-        valkey_target=redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target(),
+        valkey_target=leader_valkey_target,
         db_id=REDIS_STREAM_LOCK,
         human_readable_name="appproxy-leader",
+        sentinel_monitor=root_ctx.sentinel_monitors.monitor_for(leader_valkey_target),
     )
 
     # Create leader election configuration
@@ -502,23 +546,17 @@ async def etcd_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         if traefik_config.etcd.password:
             creds = {"password": traefik_config.etcd.password}
 
-        # Handle addr as either single HostPortPair or list
-        addr = traefik_config.etcd.addr
-        if isinstance(addr, list):
-            # Use first address from the list
-            host_port = addr[0]
-        else:
-            host_port = addr
-
-        root_ctx.traefik_etcd = TraefikEtcd(
-            HostPortPair(host_port.host, host_port.port),
+        async with TraefikEtcd(
+            [addr.to_legacy() for addr in traefik_config.etcd.addrs],
             traefik_config.etcd.namespace,
             {ConfigScopes.GLOBAL: ""},
             credentials=creds,
-        )
+        ) as traefik_etcd:
+            root_ctx.traefik_etcd = traefik_etcd
+            yield
     else:
         root_ctx.traefik_etcd = None
-    yield
+        yield
 
 
 async def on_worker_lost_event(
@@ -753,9 +791,14 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             core_redis_profile_target = RedisProfileTarget.from_dict(
                 (root_ctx.local_config.core_redis or root_ctx.local_config.redis).to_dict()
             )
-            live_redis_target = core_redis_profile_target.profile_target(RedisRole.LIVE)
+            live_valkey_target = core_redis_profile_target.profile_target(
+                RedisRole.LIVE
+            ).to_valkey_target()
             service_discovery = await RedisServiceDiscovery.create(
-                RedisServiceDiscoveryArgs(valkey_target=live_redis_target.to_valkey_target())
+                RedisServiceDiscoveryArgs(
+                    valkey_target=live_valkey_target,
+                    sentinel_monitor=root_ctx.sentinel_monitors.monitor_for(live_valkey_target),
+                )
             )
         case _:
             raise RuntimeError(
@@ -995,7 +1038,7 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
 
             return lambda lock_id, lifetime_hint: RedisLock(
                 str(lock_id),
-                root_ctx.redis_lock,
+                root_ctx.valkey_lock,
                 lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
                 lock_retry_interval=redlock_config.lock_retry_interval,
             )
@@ -1021,6 +1064,8 @@ def build_root_app(
             build_api_metric_middleware(root_ctx.metrics.api),
         ]
     )
+    if local_config.otel.enabled:
+        app.middlewares.insert(0, build_otel_server_middleware(parent_required_prefixes=("/api/",)))
     global_exception_handler = functools.partial(handle_loop_error, root_ctx)
     loop = asyncio.get_running_loop()
     loop.set_exception_handler(global_exception_handler)
@@ -1039,6 +1084,7 @@ def build_root_app(
 
     if cleanup_contexts is None:
         cleanup_contexts = [
+            sentinel_monitor_ctx,
             redis_ctx,
             distributed_lock_ctx,
             database_ctx,
@@ -1076,6 +1122,7 @@ def build_root_app(
 
     app.on_shutdown.append(_trigger_shutdown)
     app.cleanup_ctx.append(_cleanup_context_wrapper)
+    app.cleanup_ctx.append(SystemMetricUpdater(root_ctx.metrics.system).cleanup_ctx)
     cors = aiohttp_cors.setup(app, defaults=root_ctx.cors_options)
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", "/status", status))

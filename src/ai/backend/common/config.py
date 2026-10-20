@@ -95,13 +95,22 @@ class BaseConfigModel(BackendAISchema):
     )
 
 
+def _align_etcd_addr_and_addrs(etcd: dict[str, Any]) -> dict[str, Any]:
+    if etcd.get("addrs") is not None:
+        return {**etcd, "addr": etcd["addrs"]}
+    addr = etcd["addr"]
+    return {**etcd, "addrs": addr if isinstance(addr, list) else [addr]}
+
+
 etcd_config_iv = t.Dict({
     t.Key("etcd"): t.Dict({
         t.Key("namespace"): t.String,
         t.Key("addr", default=("127.0.0.1", 2379)): tx.HostPortPair | t.List(tx.HostPortPair),
+        t.Key("addrs", optional=True): t.List(tx.HostPortPair, min_length=1),
         t.Key("user", default=""): t.Null | t.String(allow_blank=True),
         t.Key("password", default=""): t.Null | t.String(allow_blank=True),
-    }).allow_extra("*"),
+    }).allow_extra("*")
+    & _align_etcd_addr_and_addrs,
 }).allow_extra("*")
 
 redis_helper_default_config: RedisHelperConfig = {

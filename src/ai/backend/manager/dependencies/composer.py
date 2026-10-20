@@ -199,7 +199,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
         # Stage 5: Messaging (event hub, message queue, event producer, event fetcher)
         messaging = await stack.enter_composer(
             MessagingComposer(),
-            MessagingInput(config=config),
+            MessagingInput(config=config, sentinel_monitors=infrastructure.sentinel_monitors),
         )
 
         # Stage 5.5: Prometheus client (depends only on config, needed by Domain and System)
@@ -219,6 +219,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 valkey_schedule=infrastructure.valkey.schedule,
                 valkey_image=infrastructure.valkey.image,
                 prometheus_client=prometheus_client,
+                sentinel_monitors=infrastructure.sentinel_monitors,
             ),
         )
 
@@ -252,6 +253,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 db=infrastructure.db,
                 event_producer=messaging.event_producer,
                 valkey_profile_target=config.redis.to_valkey_profile_target(),
+                sentinel_monitors=infrastructure.sentinel_monitors,
                 prometheus_client=prometheus_client,
             ),
         )
@@ -292,6 +294,7 @@ class ManagerDependencyComposer(DependencyComposer[DependencyInput, DependencyRe
                 event_producer=messaging.event_producer,
                 distributed_lock_factory=domain.distributed_lock_factory,
                 valkey_profile_target=config.redis.to_valkey_profile_target(),
+                sentinel_monitors=infrastructure.sentinel_monitors,
                 valkey_schedule=infrastructure.valkey.schedule,
                 valkey_live=infrastructure.valkey.live,
                 valkey_stat=infrastructure.valkey.stat,

@@ -49,9 +49,15 @@
 ## Relations
 
 Rules for a table row joining two entities with neither an entity type nor a field type declared for it
-(user↔role, scope↔idle checker, session↔idle checker). Background: `KNOWLEDGE.md`.
+(user↔role, scope↔idle checker, session↔idle checker). Background: `KNOWLEDGE.md`, BEP-1075.
 
-- Expose a relation row as a relation type, NOT a Node. It has no `id` field and no `node(id)` lookup.
+- Expose a relation row as a relation type. A relation type implements Node.
+- A relation type's `id` is a global ID built from the type name and the end UUIDs. A polymorphic side adds
+  its type (`IdleCheckerAssignment`: scope type, scope id, idle checker). Do NOT use a row id.
+- Build and decode the global ID in the GQL layer only. Adapters and DTOs carry the end UUIDs only.
+- Use the global ID for `node(id:)` and the Relay store key only. Individual queries and mutations take the end
+  UUIDs as arguments.
+- Reading a relation through `node(id:)` asks read on both end scopes.
 - A relation type carries both end entities as Node fields and the relation values as plain fields. One per
   relation, whichever direction it is read from (`SessionIdleCheck`).
 - Name a relation type after the relation's Data and DTO names, not its table. Append `V2` when the name is
@@ -63,14 +69,39 @@ Rules for a table row joining two entities with neither an entity type nor a fie
 - `filter` and `order_by` on relation connections and root queries are the relation type's Filter and OrderBy.
   They carry relation value conditions and end entity conditions (`checker: IdleCheckerFilter`), with
   `AND`/`OR`/`NOT`.
-- The cursor encodes the row's key: its surrogate key if it has one, its primary key columns otherwise.
-- A relation type has no data loader. Its end entity fields load through that entity's bulk data loader.
-- A mutation creating, removing or changing a relation takes the pair of end ids and returns the changed
-  relation type object.
+- The cursor encodes the end keys.
+- `node(id:)` and `nodes(ids:)` read a list of end keys at once. End entity fields load through that entity's
+  bulk data loader.
+- A mutation creating or changing a relation takes the end UUIDs. Its payload follows "Mutation payload" below.
 - A row declared as an entity type (`EntityShare`) is an entity, not a relation, and is a Node.
 - Keep an already published relation Node (`RoleAssignment`) deprecated and add no fields to it.
 - Do NOT change connections published before this rule that join two entities directly (`DomainV2.users`,
   `UserV2.projects`, ...).
+
+## Mutation payload
+
+Whether the target (entity, field row, relation) still exists when the response is sent decides the payload.
+Background: `KNOWLEDGE.md`.
+
+| Operation | Target at response time | Payload |
+|---|---|---|
+| create · update · soft delete · restore | exists | the target Node field |
+| purge finishing within the request | gone | `purgedId: ID!` + `entityId` for an entity, `fieldId` for a field row, the end UUIDs for a relation |
+| purge of an entity with `purge_status` | exists (`purgeStatus: PURGING`) | the target Node field, no `purgedId` |
+| force purge | gone | same as a purge finishing within the request |
+
+- `purgedId` is the removed target's global ID; Relay's `@deleteEdge` and `@deleteRecord` take it. The GQL
+  layer builds it from the DTO's UUID.
+- A purge mutation returns a payload type of its own, `Purge<X>Payload`. Do NOT share a payload type with a
+  delete (soft delete) mutation.
+- Do NOT put `purgedId` on a payload named `Delete*`. Leave a published `delete*` mutation that removes the row
+  as it is, add a `purge*` mutation returning `Purge<X>Payload`, and deprecate the old mutation.
+- Do NOT put a global ID in the payload's own `id`.
+- Do NOT return the removed target as a Node.
+- A purge of an entity with `purge_status` is complete when `node(id:)` answers null. A failure is
+  `purgeStatus: PURGE_ERROR` on the same Node.
+- Input arguments are UUIDs. Do not change the type of a published field or argument; add the new one and
+  deprecate the old.
 
 ## N+1 prevention
 
@@ -163,9 +194,9 @@ the name is identical to the single form, with no pluralisation —
 `myScopePermissions` / `myAtomicBulkScopePermissions`.
 
 **Where the existing surface stands**: 22 payloads carry a `failed` or an `errors` field
-and the names say nothing about which behaviour they have. 17 are genuinely partial.
-4 are atomic with a channel that is always empty — `BulkAddRolePermissionPresetsPayload`,
-`BulkAssignRolePayload`, `ReplaceRolePermissionsPayload`, `UpsertAppConfigFragmentsPayload`.
+and the names say nothing about which behaviour they have. 18 are genuinely partial.
+3 are atomic with a channel that is always empty — `BulkAddRolePermissionPresetsPayload`,
+`ReplaceRolePermissionsPayload`, `UpsertAppConfigFragmentsPayload`.
 The remaining one, `ScanProjectModelCardsV2Payload`, reports a scan summary in `errors`
 rather than a per-item channel. Renaming the 22 is breaking, so this states the policy
 and the migration is judged separately.

@@ -30,6 +30,9 @@ def _normalize_model_definition(conn: Connection, table: str, column: str) -> No
     ).fetchall()
 
     for row_id, model_definition in rows:
+        # IS NOT NULL excludes SQL NULL only; a JSON ``null`` decodes to None.
+        if not isinstance(model_definition, dict):
+            continue
         changed = False
         for model in model_definition.get("models") or []:
             try:

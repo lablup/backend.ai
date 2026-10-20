@@ -7,12 +7,16 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.dto.manager.v2.object_storage.request import (
     AdminSearchObjectStoragesInput,
     CreateObjectStorageInput,
     DeleteObjectStorageInput,
+    PartialBulkPurgeObjectStoragesInput,
+    PartialBulkUpdateObjectStoragesInput,
     UpdateObjectStorageInput,
 )
+from ai.backend.common.dto.manager.v2.object_storage.response import DeleteObjectStoragePayload
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import StorageIdPathParam
 
@@ -46,10 +50,35 @@ class V2ObjectStorageHandler:
 
     async def update(
         self,
+        path: PathParam[StorageIdPathParam],
         body: BodyParam[UpdateObjectStorageInput],
     ) -> APIResponse:
-        """Update an existing object storage."""
-        result = await self._adapter.update(body.parsed)
+        """Update an existing object storage. The path ID wins over the ID in the body."""
+        result = await self._adapter.update(ObjectStorageID(path.parsed.storage_id), body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def purge(
+        self,
+        path: PathParam[StorageIdPathParam],
+    ) -> APIResponse:
+        """Permanently remove an object storage."""
+        result = await self._adapter.purge(ObjectStorageID(path.parsed.storage_id))
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update(
+        self,
+        body: BodyParam[PartialBulkUpdateObjectStoragesInput],
+    ) -> APIResponse:
+        """Update several object storages, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge(
+        self,
+        body: BodyParam[PartialBulkPurgeObjectStoragesInput],
+    ) -> APIResponse:
+        """Permanently remove several object storages, answering for each one."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def search(
@@ -64,6 +93,9 @@ class V2ObjectStorageHandler:
         self,
         body: BodyParam[DeleteObjectStorageInput],
     ) -> APIResponse:
-        """Delete an object storage."""
-        result = await self._adapter.delete(body.parsed)
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+        """Deprecated. Use `DELETE /v2/object-storages/{storage_id}`."""
+        purged = await self._adapter.purge(ObjectStorageID(body.parsed.id))
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=DeleteObjectStoragePayload(id=purged.id, entity_id=purged.entity_id),
+        )

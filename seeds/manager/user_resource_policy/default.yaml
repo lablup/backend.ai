@@ -1,0 +1,8 @@
+kind: user_resource_policy
+version: 1
+items:
+- uuid: 9bf9e534-3886-4585-a881-b26b170330be
+  name: default
+  max_vfolder_count: 0
+  max_quota_scope_size: -1
+  max_session_count_per_model_session: 10

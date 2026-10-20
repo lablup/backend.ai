@@ -118,8 +118,6 @@ class TestCreateUser:
             rate_limit=60000,
             ssh_public_key=None,
             ssh_private_key=None,
-            dotfiles=b"",
-            bootstrap_script="",
         )
 
     @pytest.fixture
@@ -350,14 +348,15 @@ class TestDeleteUser:
         mock_user_repository: MagicMock,
     ) -> None:
         """Delete existing user should return success result."""
-        mock_user_repository.delete_user_by_uuid_validated = AsyncMock(return_value=None)
+        deleted_user = MagicMock(spec=UserData)
+        mock_user_repository.delete_user_by_uuid_validated = AsyncMock(return_value=deleted_user)
         user_id = UserID(uuid.uuid4())
 
         action = DeleteUserAction(user_id=user_id)
 
         result = await service.delete_user(action)
 
-        assert result is not None
+        assert result.user is deleted_user
         mock_user_repository.delete_user_by_uuid_validated.assert_called_once_with(
             user_uuid=user_id,
         )

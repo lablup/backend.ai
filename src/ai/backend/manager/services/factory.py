@@ -8,12 +8,13 @@ from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentE
 from ai.backend.common.data.entity.artifact import ArtifactEntityType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
-from ai.backend.common.data.entity.audit_log import AuditLogFieldType
+from ai.backend.common.data.entity.audit_log import AuditLogFieldType, AuditLogScopeFieldType
 from ai.backend.common.data.entity.client_ip_masking import ClientIPMaskingPolicyEntityType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.dotfile import DotfileFieldType
 from ai.backend.common.data.entity.entity_label import EntityLabelFieldType
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType
 from ai.backend.common.data.entity.fair_share import (
@@ -55,6 +56,7 @@ from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantP
 from ai.backend.common.data.entity.secret import SecretFieldType
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.session_group import SessionGroupEntityType
 from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
 from ai.backend.common.data.entity.types import GlobalEntityType
@@ -78,7 +80,8 @@ from ai.backend.manager.actions.registry.types import (
 from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
-from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
+from ai.backend.manager.data.dotfile.types import DotfileData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.data.fair_share.types import (
     DomainFairShareData,
@@ -93,6 +96,10 @@ from ai.backend.manager.data.resource_usage_history.types import (
     UserUsageBucketData,
 )
 from ai.backend.manager.data.secret.types import SecretFieldData
+from ai.backend.manager.models.audit_log.owner_candidates import (
+    AuditLogOwnerCandidates,
+    AuditLogScopeOwnerCandidates,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
@@ -115,10 +122,6 @@ from ai.backend.manager.services.artifact.revision.service import ArtifactRevisi
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
-from ai.backend.manager.services.audit_log.actions.lookup_owner import (
-    LookupAuditLogOwnerAction,
-    LookupBulkAuditLogOwnerAction,
-)
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
@@ -135,6 +138,11 @@ from ai.backend.manager.services.deployment_revision_preset.service import (
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.dotfile.actions.lookup_owner import (
+    LookupBulkDotfileOwnerAction,
+    LookupDotfileOwnerAction,
+)
+from ai.backend.manager.services.dotfile.processors import DotfileProcessors
 from ai.backend.manager.services.entity_label.actions.lookup_owner import (
     LookupBulkEntityLabelOwnerAction,
     LookupEntityLabelOwnerAction,
@@ -241,6 +249,7 @@ from ai.backend.manager.services.scheduling_history.service import SchedulingHis
 from ai.backend.manager.services.secret.processors import SecretProcessors
 from ai.backend.manager.services.secret.service import SecretService
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
+from ai.backend.manager.services.service_catalog.service import ServiceCatalogService
 from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
     LookupBulkKernelOwnerAction,
 )
@@ -255,6 +264,8 @@ from ai.backend.manager.services.session.resource_allocation.service import (
     ResourceAllocationService,
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.services.session_group.processors import SessionGroupProcessors
+from ai.backend.manager.services.session_group.service import SessionGroupService
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
 from ai.backend.manager.services.stream.processors import StreamProcessors
 from ai.backend.manager.services.stream.service import StreamService
@@ -362,6 +373,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             repositories.vfolder.repository,
             repositories.rbac.permission_check,
         ),
+        session_group=SessionGroupService(OpsRepository(repositories.v2_ops_provider)),
         session=SessionService(
             SessionServiceArgs(
                 agent_registry=args.agent_registry,
@@ -420,6 +432,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
         deployment_revision_preset=DeploymentPresetService(
             repositories.deployment_revision_preset.repository,
         ),
+        service_catalog=ServiceCatalogService(repositories.service_catalog.repository),
         model_card=ModelCardService(
             repositories.model_card.repository,
             args.storage_manager,
@@ -667,6 +680,10 @@ def create_processors(
         vfolder_mount_policy=VFolderMountPolicyProcessors(
             vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_mount_policy
         ),
+        session_group=SessionGroupProcessors(
+            session_groups.group(GroupMeta(SessionGroupEntityType())),
+            services.session_group,
+        ),
         session=SessionProcessors(
             session_groups.group(GroupMeta(SessionEntityType())),
             resource_group_groups.group(GroupMeta(ResourceGroupEntityType())),
@@ -831,12 +848,14 @@ def create_processors(
             artifact_groups.group(GroupMeta(StorageNamespaceEntityType()))
         ),
         audit_log=AuditLogProcessors(
-            visibility_groups.dangling_lookup_field_group(
-                FieldGroupMeta(AuditLogFieldType()),
-                AuditLogData,
-                LookupAuditLogOwnerAction,
-                LookupBulkAuditLogOwnerAction,
-            )
+            visibility_groups.dangling_owner_candidates_field_group(
+                FieldGroupMeta(AuditLogFieldType()), AuditLogData, AuditLogOwnerCandidates()
+            ),
+            visibility_groups.dangling_owner_candidates_field_group(
+                FieldGroupMeta(AuditLogScopeFieldType()),
+                AuditLogScopeData,
+                AuditLogScopeOwnerCandidates(),
+            ),
         ),
         entity_label=EntityLabelProcessors(
             registry.dangling_lookup_field_group(
@@ -844,6 +863,14 @@ def create_processors(
                 EntityLabelData,
                 LookupEntityLabelOwnerAction,
                 LookupBulkEntityLabelOwnerAction,
+            )
+        ),
+        dotfile=DotfileProcessors(
+            registry.dangling_lookup_field_group(
+                FieldGroupMeta(DotfileFieldType()),
+                DotfileData,
+                LookupDotfileOwnerAction,
+                LookupBulkDotfileOwnerAction,
             )
         ),
         idle_checker_assignment=IdleCheckerAssignmentProcessors(
@@ -857,7 +884,7 @@ def create_processors(
             services.scheduling_history,
         ),
         service_catalog=ServiceCatalogProcessors(
-            system_groups.group(GroupMeta(ServiceCatalogEntityType()))
+            system_groups.group(GroupMeta(ServiceCatalogEntityType())), services.service_catalog
         ),
         template=TemplateProcessors(
             session_groups.group(GroupMeta(SessionTemplateEntityType())), services.template

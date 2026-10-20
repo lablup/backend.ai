@@ -9,16 +9,19 @@ from uuid import UUID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchProjectsInput,
     AssignUsersToProjectInput,
     CreateProjectInput,
-    DeleteProjectInput,
+    PartialBulkDeleteProjectsInput,
+    PartialBulkRestoreProjectsInput,
+    PartialBulkUpdateProjectsInput,
     ProjectFilter,
     ProjectOrder,
     PurgeProjectInput,
-    RestoreProjectInput,
     ScopedSearchProjectsInput,
     UnassignUsersFromProjectInput,
     UpdateProjectInput,
@@ -50,15 +53,22 @@ from ai.backend.common.dto.manager.v2.group.types import (
 )
 from ai.backend.common.dto.manager.v2.user.response import UserNode
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
+from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.project.types import ProjectType as DataProjectType
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.deprecated_search import (
@@ -85,6 +95,15 @@ from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.project.actions.bulk_get import BulkGetProjectsAction
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.actions.delete_project import DeleteProjectAction
+from ai.backend.manager.services.project.actions.partial_bulk_delete_projects import (
+    PartialBulkDeleteProjectsAction,
+)
+from ai.backend.manager.services.project.actions.partial_bulk_restore_projects import (
+    PartialBulkRestoreProjectsAction,
+)
+from ai.backend.manager.services.project.actions.partial_bulk_update_projects import (
+    PartialBulkUpdateProjectsAction,
+)
 from ai.backend.manager.services.project.actions.purge_project import PurgeProjectAction
 from ai.backend.manager.services.project.actions.restore_project import RestoreProjectAction
 from ai.backend.manager.services.project.actions.scoped_search import (
@@ -140,6 +159,19 @@ class ProjectAdapter(BaseAdapter):
         return result.entity_id()
 
     # ------------------------------------------------------------------ batch load (DataLoader)
+
+    async def batch_load_image_commit_registries(
+        self, project_ids: Sequence[ProjectID]
+    ) -> Sequence[ImageCommitRegistry | Exception | None]:
+        if not project_ids:
+            return []
+        result = await self._project.bulk_get.run(BulkGetProjectsAction(ids=list(project_ids)))
+        return [
+            item.value.container_registry
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def batch_load_by_ids(
         self, group_ids: Sequence[ProjectID]
@@ -214,36 +246,129 @@ class ProjectAdapter(BaseAdapter):
         )
         return ProjectPayload(project=self._group_data_to_node(result.data))
 
-    async def admin_update(self, project_id: UUID, input: UpdateProjectInput) -> ProjectPayload:
-        """Update an existing project (superadmin only)."""
-        updater = ProjectUpdater(
-            project_id=ProjectID(project_id),
+    async def update(self, project_id: ProjectID, input: UpdateProjectInput) -> ProjectPayload:
+        """Update an existing project."""
+        result = await self._project.update_project.run(
+            UpdateProjectAction(updater=self._to_updater(project_id, input))
+        )
+        if result.data is None:
+            raise UnreachableError("modify_group must return data")
+        data = await self._apply_deprecated_is_active(result.data, input.is_active)
+        return ProjectPayload(project=self._group_data_to_node(data))
+
+    async def delete(self, project_id: ProjectID) -> DeleteProjectPayload:
+        """Soft-delete a project."""
+        result = await self._project.delete_project.run(
+            DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=project_id))
+        )
+        return DeleteProjectPayload(deleted=True, project=self._group_data_to_node(result.data))
+
+    async def restore(self, project_id: ProjectID) -> RestoreProjectPayload:
+        """Restore a soft-deleted project."""
+        result = await self._project.restore_project.run(
+            RestoreProjectAction(updater=ProjectRestoreUpdater(project_id=project_id))
+        )
+        return RestoreProjectPayload(restored=True, project=self._group_data_to_node(result.data))
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateProjectsInput
+    ) -> PartialBulkPayload[ProjectNode]:
+        """Update several projects, answering for each one."""
+        result = await self._project.partial_bulk_update.run(
+            PartialBulkUpdateProjectsAction(
+                updaters=[self._to_updater(ProjectID(item.id), item.input) for item in input.items]
+            )
+        )
+        requested = {ProjectID(item.id): item.input.is_active for item in input.items}
+        to_delete: list[ProjectID] = []
+        to_restore: list[ProjectID] = []
+        for item in result.items:
+            if item.value is None:
+                continue
+            project_id = item.value.entity_id()
+            match requested.get(project_id):
+                case False if item.value.is_active is not False:
+                    to_delete.append(project_id)
+                case True if item.value.is_active is not True:
+                    to_restore.append(project_id)
+        transitioned: dict[EntityIdentifier, PartialBulkEntityResult[ProjectData]] = {}
+        if to_delete:
+            deleted = await self._project.partial_bulk_delete.run(
+                PartialBulkDeleteProjectsAction(ids=to_delete)
+            )
+            transitioned.update({item.entity_id: item for item in deleted.items})
+        if to_restore:
+            restored = await self._project.partial_bulk_restore.run(
+                PartialBulkRestoreProjectsAction(ids=to_restore)
+            )
+            transitioned.update({item.entity_id: item for item in restored.items})
+        return self._to_partial_bulk_payload(
+            PartialBulkResult(
+                items=[transitioned.get(item.entity_id, item) for item in result.items]
+            )
+        )
+
+    async def partial_bulk_delete(
+        self, input: PartialBulkDeleteProjectsInput
+    ) -> PartialBulkPayload[ProjectNode]:
+        """Soft-delete several projects, answering for each one."""
+        result = await self._project.partial_bulk_delete.run(
+            PartialBulkDeleteProjectsAction(ids=[ProjectID(project_id) for project_id in input.ids])
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_restore(
+        self, input: PartialBulkRestoreProjectsInput
+    ) -> PartialBulkPayload[ProjectNode]:
+        """Restore several soft-deleted projects, answering for each one."""
+        result = await self._project.partial_bulk_restore.run(
+            PartialBulkRestoreProjectsAction(
+                ids=[ProjectID(project_id) for project_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def _apply_deprecated_is_active(
+        self, data: ProjectData, is_active: bool | None | Unset
+    ) -> ProjectData:
+        """Soft-delete (``False``) or restore (``True``) the project; nothing when it is
+        already there."""
+        if not isinstance(is_active, bool) or data.is_active is is_active:
+            return data
+        if is_active:
+            restored = await self._project.restore_project.run(
+                RestoreProjectAction(updater=ProjectRestoreUpdater(project_id=data.entity_id()))
+            )
+            return restored.data
+        deleted = await self._project.delete_project.run(
+            DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=data.entity_id()))
+        )
+        return deleted.data
+
+    def _to_updater(self, project_id: ProjectID, input: UpdateProjectInput) -> ProjectUpdater:
+        return ProjectUpdater(
+            project_id=project_id,
             name=OptionalState.from_unset(input.name),
             description=TriState.from_unset(input.description),
-            is_active=OptionalState.from_unset(input.is_active),
             integration_name=TriState.from_unset(input.integration_name),
             resource_policy=OptionalState.from_unset(input.resource_policy),
         )
-        result = await self._project.update_project.run(UpdateProjectAction(updater=updater))
-        if result.data is None:
-            raise UnreachableError("modify_group must return data")
-        return ProjectPayload(project=self._group_data_to_node(result.data))
 
-    async def admin_delete(self, input: DeleteProjectInput) -> DeleteProjectPayload:
-        """Soft-delete a project (superadmin only)."""
-        project_id = ProjectID(input.group_id)
-        await self._project.delete_project.run(
-            DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=project_id))
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[ProjectData]
+    ) -> PartialBulkPayload[ProjectNode]:
+        return PartialBulkPayload[ProjectNode](
+            successes=[
+                self._group_data_to_node(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
         )
-        return DeleteProjectPayload(deleted=True)
-
-    async def admin_restore(self, input: RestoreProjectInput) -> RestoreProjectPayload:
-        """Restore a soft-deleted project (superadmin only)."""
-        project_id = ProjectID(input.group_id)
-        await self._project.restore_project.run(
-            RestoreProjectAction(updater=ProjectRestoreUpdater(project_id=project_id))
-        )
-        return RestoreProjectPayload(restored=True)
 
     async def admin_purge(self, input: PurgeProjectInput) -> PurgeProjectPayload:
         """Permanently purge a project (superadmin only)."""
@@ -416,6 +541,7 @@ class ProjectAdapter(BaseAdapter):
         fields = ProjectSearchableFields.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
             *self.apply_string_filter(filter.name, fields.name.filter),
             *self.apply_string_filter(filter.domain_name, fields.domain_name.filter),
             *self.apply_string_filter(filter.description, fields.description.filter),
@@ -435,16 +561,17 @@ class ProjectAdapter(BaseAdapter):
         if filter.OR:
             or_sub_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_sub_conditions.extend(self._convert_group_filter(sub_filter))
+                sub_conditions = self._convert_group_filter(sub_filter)
+                if sub_conditions:
+                    or_sub_conditions.append(combine_conditions_and(sub_conditions))
             if or_sub_conditions:
                 conditions.append(combine_conditions_or(or_sub_conditions))
 
         if filter.NOT:
-            not_sub_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_sub_conditions.extend(self._convert_group_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
+                sub_conditions = self._convert_group_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 

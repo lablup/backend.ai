@@ -31,6 +31,7 @@ class Concern(enum.StrEnum):
     ARTIFACT_REGISTRY = "artifact_registry"
     CONTAINER_REGISTRY = "container_registry"
     DEPLOYMENT = "deployment"
+    DOTFILE = "dotfile"
     ENTITY_LABEL = "label"
     METRIC = "metric"
     NOTIFICATION_CENTER = "notification_center"
@@ -54,6 +55,8 @@ class Concern(enum.StrEnum):
                 return "the domain reading the images a session runs from"
             case Concern.DEPLOYMENT:
                 return "the domain creating and running the deployments that serve a model"
+            case Concern.DOTFILE:
+                return "the domain of the dotfiles an entity of any kind places in its sessions"
             case Concern.ENTITY_LABEL:
                 return "the domain of the labels an entity of any kind is tagged with"
             case Concern.METRIC:

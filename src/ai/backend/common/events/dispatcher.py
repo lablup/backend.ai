@@ -22,10 +22,10 @@ import attrs
 from aiomonitor.task import preserve_termination_log
 from aiotools.taskgroup import PersistentTaskGroup
 from aiotools.taskgroup.types import AsyncExceptionHandler
+from opentelemetry import trace
+from opentelemetry.trace import SpanKind, StatusCode
 
 from ai.backend.common.asyncio import IgnoreTaskExceptionHandler
-from ai.backend.common.contexts.request_id import current_request_id
-from ai.backend.common.contexts.user import current_user, triggered_user
 from ai.backend.common.message_queue.message import MessageId, MQMessage
 from ai.backend.common.message_queue.payload import (
     AnycastMessagePayload,
@@ -506,6 +506,7 @@ class EventDispatcher(EventDispatcherGroup):
                         )
                     if metadata:
                         stack.enter_context(metadata.apply_context())
+                        stack.enter_context(metadata.continue_trace(event_type, SpanKind.CONSUMER))
                     await self._handle_in_scope(evh, source, message, post_callbacks)
             except Exception:
                 # Nobody awaits this task, so a failure left here would vanish.
@@ -580,6 +581,10 @@ class EventDispatcher(EventDispatcherGroup):
                 exception=e,
             )
             log.exception("event handler failed", handler_type=evh_type)
+            # The handler span never sees this exception, so mark it here.
+            span = trace.get_current_span()
+            span.record_exception(e)
+            span.set_status(StatusCode.ERROR, str(e))
             return
         except BaseException as e:
             self._metric_observer.observe_event_failure(
@@ -704,15 +709,7 @@ class EventProducer:
         if source_override is not None:
             source = source_override
 
-        # Capture current request_id and other metadata
-        request_id = current_request_id()
-        user = current_user()
-        triggered = triggered_user()
-        metadata = MessageMetadata(
-            request_id=request_id,
-            user=user,
-            triggered_user=triggered,
-        )
+        metadata = MessageMetadata.from_current_context()
         message = event.to_message()
         payload = AnycastMessagePayload.from_event_body(
             name=message.name,
@@ -732,15 +729,7 @@ class EventProducer:
         source = self._source
         if source_override is not None:
             source = source_override
-        # Capture current request_id and other metadata
-        request_id = current_request_id()
-        user = current_user()
-        triggered = triggered_user()
-        metadata = MessageMetadata(
-            request_id=request_id,
-            user=user,
-            triggered_user=triggered,
-        )
+        metadata = MessageMetadata.from_current_context()
         message = event.to_message()
         payload = BroadcastMessagePayload.from_event_body(
             name=message.name,
@@ -759,15 +748,7 @@ class EventProducer:
         Broadcast a message to all subscribers with cache.
         The message will be delivered to all subscribers.
         """
-        # Capture current request_id and other metadata
-        request_id = current_request_id()
-        user = current_user()
-        triggered = triggered_user()
-        metadata = MessageMetadata(
-            request_id=request_id,
-            user=user,
-            triggered_user=triggered,
-        )
+        metadata = MessageMetadata.from_current_context()
         message = event.to_message()
         payload = BroadcastMessagePayload.from_event_body(
             name=message.name,
@@ -793,15 +774,7 @@ class EventProducer:
         if not events:
             return
 
-        # Capture current request_id and other metadata
-        request_id = current_request_id()
-        user = current_user()
-        triggered = triggered_user()
-        metadata = MessageMetadata(
-            request_id=request_id,
-            user=user,
-            triggered_user=triggered,
-        )
+        metadata = MessageMetadata.from_current_context()
 
         broadcast_payloads: list[CachedBroadcastMessagePayload] = []
         for event in events:

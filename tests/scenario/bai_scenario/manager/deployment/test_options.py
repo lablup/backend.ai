@@ -42,7 +42,7 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.deployment import ADeploymentAndACaller, ADeploymentInThatPlace
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 REGISTERED = CheckReplicaDeploymentHandler.name()
@@ -52,7 +52,7 @@ RETRIES = 3
 
 type Entry = tuple[str, int | None, int | None]
 type OptionsStep = Scenario[
-    SeedingSession, ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload
+    TestSeedingSession, ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload
 ]
 
 
@@ -134,7 +134,10 @@ class TheOptionsAreReplaced(Then[ADeploymentAndACaller, ReplaceDeploymentOptions
 @dataclass(frozen=True)
 class WhatIsGivenBecomesTheOptions(
     Scenario[
-        SeedingSession, ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload
+        TestSeedingSession,
+        ADeploymentAndACaller,
+        DeploymentAdapter,
+        ReplaceDeploymentOptionsPayload,
     ]
 ):
     @override
@@ -149,7 +152,7 @@ class WhatIsGivenBecomesTheOptions(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,))
 
     @override
@@ -166,7 +169,10 @@ class WhatIsGivenBecomesTheOptions(
 @dataclass(frozen=True)
 class WhatIsNotGivenDoesNotStay(
     Scenario[
-        SeedingSession, ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload
+        TestSeedingSession,
+        ADeploymentAndACaller,
+        DeploymentAdapter,
+        ReplaceDeploymentOptionsPayload,
     ]
 ):
     @override
@@ -181,7 +187,7 @@ class WhatIsNotGivenDoesNotStay(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,))
 
     @override
@@ -198,7 +204,10 @@ class WhatIsNotGivenDoesNotStay(
 @dataclass(frozen=True)
 class AnUnregisteredHandlerIsRefused(
     Scenario[
-        SeedingSession, ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload
+        TestSeedingSession,
+        ADeploymentAndACaller,
+        DeploymentAdapter,
+        ReplaceDeploymentOptionsPayload,
     ]
 ):
     @override
@@ -210,7 +219,7 @@ class AnUnregisteredHandlerIsRefused(
         return "등록되지 않은 처리기 이름을 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,))
 
     @override
@@ -227,7 +236,10 @@ class AnUnregisteredHandlerIsRefused(
 @dataclass(frozen=True)
 class AHandlerNamedTwiceIsRefused(
     Scenario[
-        SeedingSession, ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload
+        TestSeedingSession,
+        ADeploymentAndACaller,
+        DeploymentAdapter,
+        ReplaceDeploymentOptionsPayload,
     ]
 ):
     @override
@@ -239,7 +251,7 @@ class AHandlerNamedTwiceIsRefused(
         return "같은 처리기 이름을 두 번 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.UPDATE,))
 
     @override
@@ -256,7 +268,10 @@ class AHandlerNamedTwiceIsRefused(
 @dataclass(frozen=True)
 class ReadingIsNotEnoughToReplace(
     Scenario[
-        SeedingSession, ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload
+        TestSeedingSession,
+        ADeploymentAndACaller,
+        DeploymentAdapter,
+        ReplaceDeploymentOptionsPayload,
     ]
 ):
     @override
@@ -268,7 +283,7 @@ class ReadingIsNotEnoughToReplace(
         return "읽기 권한만 받은 사용자가 옵션을 갈아끼우면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADeploymentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
         return ADeploymentInThatPlace(granted=(Permission.READ,))
 
     @override

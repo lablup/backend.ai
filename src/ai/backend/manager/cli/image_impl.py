@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 from decimal import Decimal
 from pprint import pprint
@@ -7,7 +8,6 @@ from typing import Any
 
 import click
 import sqlalchemy as sa
-from sqlalchemy.orm import selectinload
 from tabulate import tabulate
 
 from ai.backend.common.arch import CURRENT_ARCH
@@ -17,7 +17,10 @@ from ai.backend.common.exception import UnknownImageReference
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.image.types import ImageData, ImageStatus
+from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.purgers import ImagePurger
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
@@ -134,14 +137,12 @@ async def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architectu
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with connect_database(bootstrap_config.db) as db:
         try:
-            image = await _first_image(
-                db, _reference_searcher(canonical_or_alias, architecture), canonical_or_alias
+            details = await ImageDBSource(db, V2DBOpsProvider(db)).search_image_details(
+                [], _reference_searcher(canonical_or_alias, architecture)
             )
-            async with db.begin_readonly_session() as session:
-                image_row = await session.get_one(
-                    ImageRow, image.id, options=[selectinload(ImageRow.aliases)]
-                )
-                pprint(await image_row.inspect())
+            if not details:
+                raise UnknownImageReference(canonical_or_alias)
+            pprint(dataclasses.asdict(details[0]))
         except UnknownImageReference:
             log.error("image not found", image_ref=canonical_or_alias)
         except Exception:
@@ -156,10 +157,8 @@ async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architectur
             image = await _first_image(
                 db, _reference_searcher(canonical_or_alias, architecture), canonical_or_alias
             )
-            async with db.begin_session() as session:
-                image_row = await session.get_one(ImageRow, image.id)
-                await image_row.mark_as_deleted(session)
-        except UnknownImageReference:
+            await ImageDBSource(db, V2DBOpsProvider(db)).mark_image_deleted_by_id(image.id)
+        except (UnknownImageReference, ImageNotFound):
             log.error("image not found", image_ref=canonical_or_alias)
         except Exception:
             log.exception("image command failed")
@@ -247,11 +246,13 @@ async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str)
     async with connect_database(bootstrap_config.db) as db:
         try:
             image = await _first_image(db, _canonical_searcher(target, architecture), target)
-            async with db.begin_session() as session:
-                image_row = await session.get_one(ImageRow, image.id)
-                await ImageAliasRow.create(session, alias, image_row)
+            await ImageDBSource(db, V2DBOpsProvider(db)).insert_image_alias_by_id(
+                image.id, ImageAliasCreator(alias=alias)
+            )
         except UnknownImageReference:
             log.error("image not found", image_ref=target)
+        except UniqueConstraintViolationError:
+            log.error("image alias already exists", image_alias=alias)
         except Exception:
             log.exception("image command failed")
 

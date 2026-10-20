@@ -46,7 +46,8 @@ from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
-from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
@@ -478,7 +479,7 @@ class TestModelCardDelete:
             DeleteModelCardOptions(delete_associated_vfolder=False),
         )
 
-        assert set(result.successes) == {valid_a.id, valid_b.id}
+        assert {card.id for card in result.successes} == {valid_a.id, valid_b.id}
         assert [failure.card_id for failure in result.failures] == [missing_id]
 
         async with db_with_cleanup.begin_readonly_session() as session:
@@ -515,7 +516,7 @@ class TestModelCardDelete:
             DeleteModelCardOptions(delete_associated_vfolder=True),
         )
 
-        assert set(result.successes) == {free_card.id}
+        assert {card.id for card in result.successes} == {free_card.id}
         assert [failure.card_id for failure in result.failures] == [mounted_card.id]
 
         async with db_with_cleanup.begin_readonly_session() as session:

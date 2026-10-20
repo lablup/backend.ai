@@ -23,6 +23,7 @@ from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment.types import (
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
@@ -63,6 +64,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     EnqueueSessionInput,
     ExcludeSessionIdleChecksInput,
     IncludeSessionIdleChecksInput,
+    PartialBulkTerminateSessionsInput,
     ScopedSearchSessionsInput,
     SessionFilter,
     SessionOrder,
@@ -86,6 +88,7 @@ from ai.backend.common.dto.manager.v2.session.response import (
     SessionNode,
     SessionResourceInfoGQLDTO,
     SessionRuntimeInfoGQLDTO,
+    SessionTerminationInfo,
     StartSessionServicePayload,
     TerminateSessionsPayload,
     UpdateSessionPayload,
@@ -95,6 +98,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
     OrderDirection,
     SessionOrderField,
     SessionScope,
+    SessionTerminationStatusEnum,
     SessionUsage,
 )
 from ai.backend.common.types import (
@@ -123,7 +127,11 @@ from ai.backend.manager.data.session.types import (
 )
 from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
@@ -805,6 +813,7 @@ class SessionAdapter(BaseAdapter):
         fields = SessionSearchableFields.own
         conditions = [
             *self.apply_uuid_filter(f.id, fields.id.filter),
+            *self.apply_uuid_filter(f.entity_id, fields.id.filter),
             *self.apply_string_filter(f.name, fields.name.filter),
             *self.apply_string_filter(f.domain_name, fields.domain_name.filter),
             *self.apply_uuid_filter(f.project_id, fields.group_id.filter),
@@ -834,6 +843,8 @@ class SessionAdapter(BaseAdapter):
             *self.apply_enum_filter(f.network_type, fields.network_type.filter),
             *self.apply_string_filter(f.network_id, fields.network_id.filter),
             *self.apply_uuid_filter(f.replica_id, fields.replica_id.filter),
+            *self.apply_uuid_filter(f.session_group_id, fields.session_group_id.filter),
+            *self.apply_datetime_filter(f.requested_starts_at, fields.requested_starts_at.filter),
         ]
         if f.AND:
             for sub in f.AND:
@@ -841,15 +852,16 @@ class SessionAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_session_filter(sub))
+                sub_conditions = self._convert_session_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_session_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_session_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_session_orders(self, orders: list[SessionOrder]) -> list[QueryOrder]:
@@ -907,6 +919,10 @@ class SessionAdapter(BaseAdapter):
                 return fields.network_id.order.apply(ascending)
             case SessionOrderField.REPLICA_ID:
                 return fields.replica_id.order.apply(ascending)
+            case SessionOrderField.SESSION_GROUP_ID:
+                return fields.session_group_id.order.apply(ascending)
+            case SessionOrderField.REQUESTED_STARTS_AT:
+                return fields.requested_starts_at.order.apply(ascending)
             case _:
                 assert_never(order.field)
 
@@ -1007,6 +1023,7 @@ class SessionAdapter(BaseAdapter):
         fields = KernelSearchableFields.own
         conditions: list[QueryCondition] = [
             *self.apply_uuid_filter(f.id, fields.id.filter),
+            *self.apply_uuid_filter(f.field_id, fields.id.filter),
             *self.apply_uuid_filter(f.session_id, fields.session_id.filter),
             *self._convert_kernel_status_filter(f.status),
         ]
@@ -1016,15 +1033,16 @@ class SessionAdapter(BaseAdapter):
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_kernel_filter(sub))
+                sub_conditions = self._convert_kernel_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_kernel_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_kernel_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_kernel_status_filter(self, f: KernelStatusFilter | None) -> list[QueryCondition]:
@@ -1068,6 +1086,32 @@ class SessionAdapter(BaseAdapter):
     # -------------------------------------------------------------------------
     # Terminate
     # -------------------------------------------------------------------------
+
+    async def partial_bulk_terminate(
+        self, input: PartialBulkTerminateSessionsInput
+    ) -> PartialBulkPayload[SessionTerminationInfo]:
+        """Terminate several sessions, answering for each one."""
+        result = await self._session.terminate_sessions.run(
+            TerminateSessionsAction(
+                session_ids=[SessionId(session_id) for session_id in input.ids],
+                forced=input.forced,
+            )
+        )
+        return PartialBulkPayload[SessionTerminationInfo](
+            successes=[
+                SessionTerminationInfo(
+                    id=SessionID(item.entity_id),
+                    status=SessionTerminationStatusEnum(item.value.value),
+                )
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
 
     async def terminate(self, input: TerminateSessionsInput) -> TerminateSessionsPayload:
         """Terminate one or more sessions.
@@ -1272,7 +1316,7 @@ class SessionAdapter(BaseAdapter):
             entity_id=data.entity_id(),
             image_ids=data.image_ids,
             domain_name=data.domain_name,
-            user_id=UserID(data.user_uuid),
+            user_id=data.user_uuid,
             project_id=data.group_id,
             metadata=SessionMetadataInfoGQLDTO(
                 creation_id=data.creation_id or "",
@@ -1290,6 +1334,8 @@ class SessionAdapter(BaseAdapter):
             resource=SessionResourceInfoGQLDTO(
                 allocation=allocation,
                 resource_group_name=data.resource_group_name,
+                session_group_id=data.session_group_id,
+                designated_agent_ids=data.designated_agent_ids,
             ),
             lifecycle=SessionLifecycleInfoGQLDTO(
                 status=_fold_session_status(data.status),
@@ -1297,6 +1343,7 @@ class SessionAdapter(BaseAdapter):
                 created_at=data.created_at,
                 terminated_at=data.terminated_at,
                 starts_at=data.starts_at,
+                requested_starts_at=data.requested_starts_at,
                 batch_timeout=data.batch_timeout,
             ),
             runtime=SessionRuntimeInfoGQLDTO(
@@ -1343,7 +1390,7 @@ class SessionAdapter(BaseAdapter):
                 session_type=info.session.session_type.value,
             ),
             user_info=KernelUserInfoGQLDTO(
-                user_id=UserID(info.user_permission.user_uuid),
+                user_id=info.user_permission.user_uuid,
                 access_key=info.user_permission.access_key,
                 domain_name=info.user_permission.domain_name,
                 group_id=info.user_permission.group_id,

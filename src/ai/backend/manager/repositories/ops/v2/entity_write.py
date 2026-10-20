@@ -53,7 +53,10 @@ from ai.backend.manager.models.specs.creator import (
     RoleManagedGlobalEntityCreator,
 )
 from ai.backend.manager.models.specs.purger import GuardedEntityPurger
-from ai.backend.manager.models.specs.types import BulkResultWithFailures
+from ai.backend.manager.models.specs.types import (
+    BulkResultWithFailures,
+    EntityInsertIfAbsentResult,
+)
 from ai.backend.manager.models.specs.upserter import EntityUpserter
 from ai.backend.manager.repositories.ops.v2.graph_write import V2GraphWriteOpsBase
 
@@ -272,6 +275,53 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             await self._created_in(upserter.created_in(row), entity)
         return [upserter.to_data(row) for upserter, row in zip(upserters, rows, strict=True)]
 
+    async def insert_entity_if_absent[TRow: Base, TData](
+        self, upserter: EntityUpserter[TRow, TData]
+    ) -> EntityInsertIfAbsentResult:
+        """Insert an entity row unless a row holds its conflict key, leaving that row as
+        it stands. The row is provisioned as :meth:`upsert_entity` provisions it,
+        inserted or not."""
+        [result] = await self.atomic_insert_entities_if_absent([upserter])
+        return result
+
+    async def atomic_insert_entities_if_absent[TRow: Base, TData](
+        self, upserters: Sequence[EntityUpserter[TRow, TData]]
+    ) -> list[EntityInsertIfAbsentResult]:
+        """:meth:`insert_entity_if_absent` for every upserter, all or nothing.
+
+        One statement per row: a row left out is read back by its own conflict key.
+        """
+        if not upserters:
+            return []
+        rows: list[tuple[TRow, bool]] = []
+        for upserter in upserters:
+            insert_values = upserter.build_insert_values()
+            inserted = await self._insert_row_if_absent(
+                upserter.row_class(),
+                upserter.index_elements(),
+                insert_values,
+                upserter.integrity_error_checks(),
+            )
+            if inserted is not None:
+                rows.append((inserted, True))
+            else:
+                rows.append((
+                    await self._row_holding_key(
+                        upserter.row_class(), upserter.index_elements(), insert_values
+                    ),
+                    False,
+                ))
+        entities = [
+            upserter.entity_id(row) for upserter, (row, _) in zip(upserters, rows, strict=True)
+        ]
+        await self._provision(entities)
+        for upserter, (row, _), entity in zip(upserters, rows, entities, strict=True):
+            await self._created_in(upserter.created_in(row), entity)
+        return [
+            EntityInsertIfAbsentResult(entity_id=entity, inserted=is_new)
+            for (_, is_new), entity in zip(rows, entities, strict=True)
+        ]
+
     async def grant_roles(
         self,
         user_id: UserID,
@@ -283,19 +333,19 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         answers False."""
         if not role_ids:
             return []
-        granted = set(
-            (
-                await self._sess.scalars(
-                    pg_insert(UserRoleRow)
-                    .values([
-                        {"user_id": user_id, "role_id": role_id, "granted_by": granted_by}
-                        for role_id in role_ids
-                    ])
-                    .on_conflict_do_nothing()
-                    .returning(UserRoleRow.role_id)
-                )
-            ).all()
+        stmt = (
+            pg_insert(UserRoleRow)
+            .values([
+                {"user_id": user_id, "role_id": role_id, "granted_by": granted_by}
+                for role_id in role_ids
+            ])
+            .on_conflict_do_nothing()
+            .returning(UserRoleRow.role_id)
         )
+        try:
+            granted = set((await self._sess.scalars(stmt)).all())
+        except sa.exc.IntegrityError as e:
+            raise self._parse_integrity_error(e) from e
         return [role_id in granted for role_id in role_ids]
 
     async def _grant_auto_assign_roles(
@@ -382,7 +432,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             await self._sess.scalars(
                 sa.select(RolePresetRow).where(
                     RolePresetRow.scope_type.in_({e.entity_type() for e in entities}),
-                    RolePresetRow.deleted.is_(False),
+                    RolePresetRow.deleted_at.is_(None),
                 )
             )
         ).all()

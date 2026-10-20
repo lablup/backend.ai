@@ -17,7 +17,6 @@ from ai.backend.common.dto.manager.v2.domain.types import (
     DomainFairShareScopeDTO,
     DomainUsageScopeDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -98,7 +97,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
     id: NodeID[str] = gql_field(description="Domain uuid. The name lives at basicInfo.name.")
     entity_id: uuid.UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the domain.",
         ),
     )
@@ -327,7 +326,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Resource groups this domain may schedule on.",
         )
     )  # type: ignore[misc]

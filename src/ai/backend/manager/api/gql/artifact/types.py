@@ -56,6 +56,15 @@ from ai.backend.common.dto.manager.v2.artifact.request import (
     ModelTargetInput as ModelTargetInputDTO,
 )
 from ai.backend.common.dto.manager.v2.artifact.request import (
+    PartialBulkDeleteArtifactsInput as PartialBulkDeleteArtifactsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    PartialBulkRestoreArtifactsInput as PartialBulkRestoreArtifactsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    PartialBulkUpdateArtifactsGQLInput as PartialBulkUpdateArtifactsGQLInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
     RejectArtifactInput as RejectArtifactInputDTO,
 )
 from ai.backend.common.dto.manager.v2.artifact.request import (
@@ -87,15 +96,18 @@ from ai.backend.common.dto.manager.v2.artifact.response import (
     CleanupArtifactRevisionsGQLPayload,
     DelegateImportArtifactsGQLPayload,
     DelegateScanArtifactsGQLPayload,
+    DeleteArtifactPayload,
     DeleteArtifactsGQLPayload,
     ImportArtifactsGQLPayload,
     RejectArtifactGQLPayload,
+    RestoreArtifactPayload,
     RestoreArtifactsGQLPayload,
     ScanArtifactModelsGQLPayload,
     ScanArtifactsGQLPayload,
     SourceInfoDTO,
     UpdateArtifactGQLPayload,
 )
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     ByteSize,
@@ -105,6 +117,7 @@ from ai.backend.manager.api.gql.base import (
     UUIDFilter,
     encode_cursor,
 )
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.data_loader.data_loaders import DataLoaders
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -252,6 +265,10 @@ class ArtifactFilter(PydanticInputMixin[ArtifactGQLFilterInputDTO]):
     registry: StringFilter | None = None
     source: StringFilter | None = None
     availability: list[ArtifactAvailability] | None = None
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by artifact ID."),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -259,7 +276,7 @@ class ArtifactFilter(PydanticInputMixin[ArtifactGQLFilterInputDTO]):
 
 
 _ARTIFACT_SIZE_ORDER_DEPRECATION = (
-    f"Deprecated since {NEXT_RELEASE_VERSION}. A size belongs to a revision rather than"
+    "Deprecated since 26.9.0. A size belongs to a revision rather than"
     " the artifact, so this value is not used for ordering. It is removed in the next"
     " release."
 )
@@ -336,6 +353,12 @@ class ArtifactRevisionFilter(PydanticInputMixin[ArtifactRevisionGQLFilterInputDT
     version: StringFilter | None = None
     artifact_id: UUIDFilter | None = gql_field(description="The artifact id field.", default=None)
     size: IntFilter | None = None
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by artifact revision ID."
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None
@@ -561,6 +584,43 @@ class RestoreArtifactsInput(PydanticInputMixin[RestoreArtifactsInputDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several artifacts, each answered for separately.",
+    ),
+    name="PartialBulkUpdateArtifactsInput",
+)
+class PartialBulkUpdateArtifactsInputGQL(PydanticInputMixin[PartialBulkUpdateArtifactsGQLInputDTO]):
+    items: list[UpdateArtifactInput] = gql_field(
+        description="The artifacts to update, each with its ID and fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for soft-deleting several artifacts, each answered for separately.",
+    ),
+    name="PartialBulkDeleteArtifactsInput",
+)
+class PartialBulkDeleteArtifactsInputGQL(PydanticInputMixin[PartialBulkDeleteArtifactsInputDTO]):
+    ids: list[uuid.UUID] = gql_field(description="IDs of the artifacts to soft-delete.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for restoring several soft-deleted artifacts, each answered for separately."
+        ),
+    ),
+    name="PartialBulkRestoreArtifactsInput",
+)
+class PartialBulkRestoreArtifactsInputGQL(PydanticInputMixin[PartialBulkRestoreArtifactsInputDTO]):
+    ids: list[uuid.UUID] = gql_field(description="IDs of the artifacts to restore.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
         description=dedent_strip("""
             Input for approving an artifact revision.
 
@@ -658,7 +718,7 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
     id: NodeID[str]
     entity_id: uuid.UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the artifact.",
         ),
     )
@@ -737,6 +797,20 @@ class Artifact(PydanticNodeMixin[ArtifactGQLNode]):
             page_info=page_info,
         )
 
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.artifact_loader.load_many([
+            ArtifactID(uuid.UUID(nid)) for nid in node_ids
+        ])
+        return cast(list[Self | None], results)
+
 
 @gql_node_type(
     BackendAIGQLMeta(
@@ -748,7 +822,7 @@ class ArtifactRevision(PydanticNodeMixin[ArtifactRevisionNode]):
     id: NodeID[str]
     field_id: uuid.UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the artifact revision.",
         ),
     )
@@ -1056,3 +1130,47 @@ class DeleteArtifactsPayload(PydanticOutputMixin[DeleteArtifactsGQLPayload]):
 )
 class RestoreArtifactsPayload(PydanticOutputMixin[RestoreArtifactsGQLPayload]):
     artifacts: list[Artifact]
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for artifact soft-delete. Returns the soft-deleted artifact.",
+    ),
+    model=DeleteArtifactPayload,
+    name="DeleteArtifactPayload",
+)
+class DeleteArtifactPayloadGQL(PydanticOutputMixin[DeleteArtifactPayload]):
+    artifact: Artifact = gql_field(description="The soft-deleted artifact.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for artifact restore. Returns the restored artifact.",
+    ),
+    model=RestoreArtifactPayload,
+    name="RestoreArtifactPayload",
+)
+class RestoreArtifactPayloadGQL(PydanticOutputMixin[RestoreArtifactPayload]):
+    artifact: Artifact = gql_field(description="The restored artifact.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk artifact operation: the artifacts processed and the ones "
+            "that failed."
+        ),
+    ),
+    model=PartialBulkPayload[ArtifactNode],
+    name="PartialBulkArtifactsPayload",
+)
+class PartialBulkArtifactsPayloadGQL(PydanticOutputMixin[PartialBulkPayload[ArtifactNode]]):
+    """Payload for partial bulk artifact mutations."""
+
+    successes: list[Artifact] = gql_field(description="The artifacts processed, as they now stand.")
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The artifacts not processed, each with the reason."
+    )

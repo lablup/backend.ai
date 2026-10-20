@@ -30,11 +30,11 @@ from bai_scenario.components.domain import (
     DomainLook,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Answers = list[DomainNode | Exception | None]
-type DomainStep = Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Answers]
+type DomainStep = Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, Answers]
 
 
 @dataclass(frozen=True)
@@ -100,7 +100,9 @@ class TheOnePlaceIsRefused(Then[ADomainAndACaller, Answers]):
 
 
 @dataclass(frozen=True)
-class TheSuperadminReadsById(Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Answers]):
+class TheSuperadminReadsById(
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, Answers]
+):
     started: datetime
 
     @override
@@ -112,7 +114,7 @@ class TheSuperadminReadsById(Scenario[SeedingSession, ADomainAndACaller, DomainA
         return "슈퍼관리자가 id로 도메인 여럿을 읽으면, 그 자리에 도메인이 온다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -126,7 +128,7 @@ class TheSuperadminReadsById(Scenario[SeedingSession, ADomainAndACaller, DomainA
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadById(
-    Scenario[SeedingSession, ADomainAndACaller, DomainAdapter, Answers]
+    Scenario[TestSeedingSession, ADomainAndACaller, DomainAdapter, Answers]
 ):
     @override
     def summary(self) -> str:
@@ -137,7 +139,7 @@ class AUserGrantedNothingMayNotReadById(
         return "아무 권한도 받지 않은 사용자가 id로 도메인 여럿을 읽으면, 그 자리가 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return ATargetAndSomeone()
 
     @override

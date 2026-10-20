@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.data.entity.session_template import SessionTemplateID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.models.user.row import UserRole
 
@@ -57,3 +59,7 @@ class CreateTaskTemplateActionResult(TemplateScopeActionResult):
     """Result of creating task templates."""
 
     created: list[CreatedTaskTemplateItem] = field(default_factory=list)
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(SessionTemplateID(uuid.UUID(item.id)) for item in self.created)

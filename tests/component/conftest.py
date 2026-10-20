@@ -118,6 +118,7 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.dotfile.row import DotfileRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel.row import kernels
@@ -129,10 +130,10 @@ from ai.backend.manager.models.project.row import (
     association_groups_users,
 )
 from ai.backend.manager.models.resource_group.row import (
-    ResourceGroupOpts,
     resource_groups,
     sgroups_for_domains,
 )
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
@@ -142,6 +143,11 @@ from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session_template.row import SessionTemplateRow
+
+# Nothing under src imports the storage rows yet; name them so the sandbox holds their
+# tables when `schema oneshot` builds the full schema.
+from ai.backend.manager.models.storage_backend.row import StorageBackendRow  # noqa: F401
+from ai.backend.manager.models.storage_volume.row import StorageVolumeRow  # noqa: F401
 from ai.backend.manager.models.user.row import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import vfolders
@@ -445,8 +451,10 @@ def database(
     and install the table schema using alembic.
     """
     db_url = (
-        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/{POSTGRES_MAINTENANCE_DB}")
-        .with_port(bootstrap_config.db.addr.port)
+        yarl.URL(
+            f"postgresql+asyncpg://{bootstrap_config.db.addrs[0].host}/{POSTGRES_MAINTENANCE_DB}"
+        )
+        .with_port(bootstrap_config.db.addrs[0].port)
         .with_user(bootstrap_config.db.user)
     )
     if bootstrap_config.db.password is not None:
@@ -573,8 +581,8 @@ async def db_engine(
 ) -> AsyncIterator[SAEngine]:
     """Provide a function-scoped SQLAlchemy async engine connected to the test database."""
     db_url = (
-        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/{test_db}")
-        .with_port(bootstrap_config.db.addr.port)
+        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addrs[0].host}/{test_db}")
+        .with_port(bootstrap_config.db.addrs[0].port)
         .with_user(bootstrap_config.db.user)
     )
     if bootstrap_config.db.password is not None:
@@ -1081,6 +1089,12 @@ async def admin_user_fixture(
     yield data
     async with db_engine.begin() as conn:
         # Clean side-effect tables that tests may populate via the running server
+        await conn.execute(
+            sa.delete(DotfileRow).where(
+                DotfileRow.entity_type == "user",
+                DotfileRow.entity_id == data.user_uuid,
+            )
+        )
         await conn.execute(vfolders.delete())
         await conn.execute(kernels.delete())
         await conn.execute(SessionRow.__table__.delete())
@@ -1175,6 +1189,12 @@ async def regular_user_fixture(
     yield data
     async with db_engine.begin() as conn:
         # Clean side-effect tables that tests may populate via the running server
+        await conn.execute(
+            sa.delete(DotfileRow).where(
+                DotfileRow.entity_type == "user",
+                DotfileRow.entity_id == data.user_uuid,
+            )
+        )
         await conn.execute(
             sa.delete(SessionTemplateRow).where(SessionTemplateRow.user_uuid == str(data.user_uuid))
         )
@@ -1406,14 +1426,8 @@ async def background_task_manager(
 def _make_async_etcd(bootstrap_config: BootstrapConfig) -> AsyncEtcd:
     """Create an AsyncEtcd instance from bootstrap config."""
     etcd_config = bootstrap_config.etcd
-    etcd_addr = etcd_config.addr
-    addrs: HostPortPair | list[HostPortPair]
-    if isinstance(etcd_addr, list):
-        addrs = [HostPortPair(host=a.host, port=a.port) for a in etcd_addr]
-    else:
-        addrs = HostPortPair(host=etcd_addr.host, port=etcd_addr.port)
     return AsyncEtcd(
-        addrs=addrs,
+        addrs=[HostPortPair(host=a.host, port=a.port) for a in etcd_config.addrs],
         namespace=etcd_config.namespace,
         scope_prefix_map={
             ConfigScopes.GLOBAL: "global",

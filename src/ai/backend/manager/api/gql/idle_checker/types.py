@@ -7,11 +7,13 @@ from enum import StrEnum
 from typing import Any, Self, cast, override
 from uuid import UUID
 
+import strawberry
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.data.idle_checker.types import SESSION_ID_LABEL
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
     CreateIdleCheckerInput as CreateIdleCheckerInputDTO,
 )
@@ -27,6 +29,9 @@ from ai.backend.common.dto.manager.v2.idle_checker.request import (
     SessionLifetimeSpecInputDTO,
     UtilizationSpecInputDTO,
     UtilizationThresholdInputDTO,
+)
+from ai.backend.common.dto.manager.v2.idle_checker.request import (
+    PartialBulkPurgeIdleCheckersInput as PartialBulkPurgeIdleCheckersInputDTO,
 )
 from ai.backend.common.dto.manager.v2.idle_checker.request import (
     PurgeIdleCheckerInput as PurgeIdleCheckerInputDTO,
@@ -56,7 +61,8 @@ from ai.backend.common.dto.manager.v2.idle_checker.types import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionTypes
-from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import DateTimeFilter, OrderDirection, StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -149,13 +155,13 @@ class UtilizationIdleCheckerThresholdGQL(PydanticOutputMixin[UtilizationThreshol
     threshold: Decimal = gql_field(description="Underutilization threshold.")
     filter_labels: list[MetricLabelEntryGQL] = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Label filters injected into the preset query.",
         )
     )
     group_labels: list[str] = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Group-by labels injected into the preset query.",
         )
     )
@@ -218,7 +224,7 @@ class IdleCheckerGQL(PydanticNodeMixin[IdleCheckerNode]):
     )
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the idle checker.",
         ),
     )
@@ -309,14 +315,14 @@ class UtilizationIdleCheckerThresholdInputGQL(PydanticInputMixin[UtilizationThre
     threshold: Decimal = gql_field(description="Underutilization threshold.")
     filter_labels: list[MetricLabelEntryInput] = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Label filters injected into the preset query.",
         ),
         default_factory=list,
     )
     group_labels: list[str] = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description=(
                 "Group-by labels injected into the preset query. "
                 "Per-session mapping requires 'session_id'; when included, the query is "
@@ -410,6 +416,12 @@ class IdleCheckerFilterGQL(PydanticInputMixin[IdleCheckerFilterDTO]):
     )
     updated_at: DateTimeFilter | None = gql_field(
         description="Update timestamp filter.",
+        default=None,
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by idle checker ID."
+        ),
         default=None,
     )
     AND: list[Self] | None = gql_field(description="Match all nested filters.", default=None)
@@ -512,6 +524,19 @@ class PurgeIdleCheckerInputGQL(PydanticInputMixin[PurgeIdleCheckerInputDTO]):
     id: UUID = gql_field(description="Idle checker ID to purge.")
 
 
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several idle checkers, each answered for separately.",
+    ),
+    name="PartialBulkPurgeIdleCheckersInput",
+)
+class PartialBulkPurgeIdleCheckersInputGQL(
+    PydanticInputMixin[PartialBulkPurgeIdleCheckersInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the idle checkers to purge.")
+
+
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version="26.8.0",
@@ -554,4 +579,40 @@ class UpdateIdleCheckerPayloadGQL(PydanticOutputMixin[UpdateIdleCheckerPayloadDT
     name="PurgeIdleCheckerPayload",
 )
 class PurgeIdleCheckerPayloadGQL(PydanticOutputMixin[PurgeIdleCheckerPayloadDTO]):
-    id: UUID = gql_field(description="Purged idle checker ID.")
+    id: UUID = gql_field(
+        description="Purged idle checker ID.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgedId` or `entityId`.",
+    )
+    purged_id: strawberry.ID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Global ID of the purged idle checker.",
+        ),
+    )
+    entity_id: UUID = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="UUID of the purged idle checker."
+        ),
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk idle checker operation: the idle checkers processed and "
+            "the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[IdleCheckerNode],
+    name="PartialBulkIdleCheckersPayload",
+)
+class PartialBulkIdleCheckersPayloadGQL(PydanticOutputMixin[PartialBulkPayload[IdleCheckerNode]]):
+    """Payload for partial bulk idle checker mutations."""
+
+    successes: list[IdleCheckerGQL] = gql_field(
+        description="The idle checkers processed, as they stood when processed."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The idle checkers not processed, each with the reason."
+    )

@@ -24,6 +24,7 @@ from ai.backend.manager.data.model_card.types import (
     VFolderScanData,
 )
 from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.errors.resource import (
     InvalidProjectTypeForModelCard,
     ModelCardNotFound,
@@ -46,7 +47,7 @@ from ai.backend.manager.models.session.searchers import LiveSessionsMountingVFol
 from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.vfolder.queriers import VFolderQuerier
-from ai.backend.manager.models.vfolder.row import DEAD_VFOLDER_STATUSES, VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.vfolder.searchers import VFolderScanTargetSearcher
 from ai.backend.manager.models.vfolder.updaters import VFolderSoftDeleteUpdater
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -140,7 +141,8 @@ class ModelCardDBSource:
         options: DeleteModelCardOptions,
     ) -> UUID:
         async with self._v2_ops.write_ops() as w:
-            return await self._delete_card(w, purger, options)
+            deleted = await self._delete_card(w, purger, options)
+            return deleted.id
 
     async def bulk_delete(
         self,
@@ -153,7 +155,7 @@ class ModelCardDBSource:
         card, mounted VFolder, ...) does not abort the rest of the batch. The
         outer transaction commits the union of every successful savepoint.
         """
-        successes: list[UUID] = []
+        successes: list[ModelCardData] = []
         failures: list[BulkModelCardDeleteFailure] = []
         if not purgers:
             return BulkModelCardDeleteResultData(successes=successes, failures=failures)
@@ -161,8 +163,8 @@ class ModelCardDBSource:
             for purger in purgers:
                 try:
                     async with w.savepoint() as sp:
-                        deleted_id = await self._delete_card(sp, purger, options)
-                    successes.append(deleted_id)
+                        deleted = await self._delete_card(sp, purger, options)
+                    successes.append(deleted)
                 except Exception as exc:
                     failures.append(BulkModelCardDeleteFailure(card_id=purger.card_id, error=exc))
         return BulkModelCardDeleteResultData(successes=successes, failures=failures)
@@ -172,7 +174,7 @@ class ModelCardDBSource:
         w: V2WriteOps,
         purger: ModelCardPurger,
         options: DeleteModelCardOptions,
-    ) -> UUID:
+    ) -> ModelCardData:
         deleted = await w.purge_entity(purger)
         if deleted is None:
             raise ModelCardNotFound()
@@ -199,7 +201,7 @@ class ModelCardDBSource:
                     sibling_count=len(siblings),
                 )
             await w.update_data(VFolderSoftDeleteUpdater(vfolder_id=vfolder_id))
-        return deleted.id
+        return deleted
 
     async def _reject_if_vfolder_mounted(self, w: V2WriteOps, vfolder_id: VFolderUUID) -> None:
         """Raise :class:`VFolderDeletionNotAllowed` if the VFolder is mounted on a live session.
@@ -238,7 +240,7 @@ class ModelCardDBSource:
                         lambda: sa.and_(
                             VFolderRow.group == project_id,
                             VFolderRow.usage_mode == VFolderUsageMode.MODEL,
-                            VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES),
+                            VFolderRow.status.not_in(VFolderOperationStatus.dead()),
                         )
                     ],
                     project_id=ProjectID(project_id),

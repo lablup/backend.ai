@@ -123,6 +123,7 @@ from ai.backend.common.cgroup import (
     get_cgroup_path_of_pid,
     get_container_main_pid,
 )
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.data.image.types import InstalledImageInfo
 from ai.backend.common.docker import (
     MAX_KERNELSPEC,
@@ -206,6 +207,9 @@ _SECCOMP_PROFILE_FILENAME: Final[str] = "seccomp.json"
 _SECCOMP_PATH_ENGINES: Final[frozenset[str]] = frozenset({"Podman Engine"})
 # Cached per container, so the capacity is the number of containers an agent may host.
 _CGROUP_PATH_CACHE_SIZE: Final[int] = 2048
+
+# Docker `HostConfig.NetworkMode` value for host networking.
+_HOST_NETWORK_MODE: Final[str] = "host"
 
 # Docker splits the configured total container-log size across this many files.
 _CONTAINER_LOG_FILE_COUNT: Final[int] = 5
@@ -1153,7 +1157,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             case ResourceGroupType.COMPUTE:
                 return ()
             case ResourceGroupType.STORAGE:
-                return ("ttyd",)
+                return ("ttyd", "etty")
 
     async def _apply_seccomp_profile(self, container_config: MutableMapping[str, Any]) -> None:
         default_seccomp_path = self.resolve_krunner_filepath("runner/default-seccomp.json")
@@ -1340,6 +1344,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
             },
         }
 
+        if (entrypoint_user := self.local_config.container.entrypoint_user) is not None:
+            container_config["User"] = entrypoint_user
+
         await self._apply_seccomp_profile(container_config)
 
         # merge all container configs generated during prior preparation steps
@@ -1517,6 +1524,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         port_map[sport["name"]][cport] for cport in sport["container_ports"]
                     )
                     sport["host_ports"] = created_host_ports
+                    if container_config["HostConfig"].get("NetworkMode") == _HOST_NETWORK_MODE:
+                        # The kernel runner binds services on `container_ports`.
+                        sport["container_ports"] = created_host_ports
             else:
                 kernel_host = advertised_kernel_host or container_bind_host
                 ctnr_host_port_map: MutableMapping[int, int] = {}
@@ -1596,6 +1606,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
         agent_class: AgentClass,
+        sentinel_monitors: SentinelMonitorSet,
     ) -> None:
         super().__init__(
             etcd,
@@ -1608,6 +1619,7 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             computers=computers,
             slots=slots,
             agent_class=agent_class,
+            sentinel_monitors=sentinel_monitors,
         )
         self.checked_invalid_images = set()
         self._seccomp_profile_as_path = False

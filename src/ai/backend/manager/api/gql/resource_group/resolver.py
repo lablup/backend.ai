@@ -9,15 +9,19 @@ import strawberry
 from strawberry import Info
 from strawberry.relay import PageInfo
 
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.dto.manager.v2.resource_group.request import (
     AdminSearchResourceGroupsInput,
     ReplaceResourceGroupDefaultDeploymentOptionsInput,
     ReplaceResourceGroupDefaultSessionOptionsInput,
     ScopedSearchResourceGroupsInput,
 )
-from ai.backend.common.dto.manager.v2.resource_group.response import DeleteResourceGroupPayload
+from ai.backend.common.dto.manager.v2.resource_group.response import (
+    DeleteResourceGroupPayload,
+    UpdateResourceGroupConfigPayloadNode,
+)
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -34,6 +38,10 @@ from .types import (
     CreateResourceGroupInputGQL,
     CreateResourceGroupPayloadGQL,
     DeleteResourceGroupPayloadGQL,
+    PartialBulkPurgeResourceGroupsInputGQL,
+    PartialBulkResourceGroupsPayloadGQL,
+    PartialBulkUpdateResourceGroupsInputGQL,
+    PurgeResourceGroupPayloadGQL,
     ReplaceResourceGroupDefaultDeploymentOptionsInputGQL,
     ReplaceResourceGroupDefaultDeploymentOptionsPayloadGQL,
     ReplaceResourceGroupDefaultSessionOptionsInputGQL,
@@ -51,6 +59,7 @@ from .types import (
     UpdateResourceGroupFairShareSpecPayload,
     UpdateResourceGroupInput,
     UpdateResourceGroupPayload,
+    UpdateResourceGroupV2InputGQL,
 )
 
 # Query fields
@@ -58,7 +67,7 @@ from .types import (
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Page through the resource groups the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."
@@ -72,7 +81,7 @@ async def scoped_resource_groups(
         ResourceGroupUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; resource groups the caller cannot "
                 "read are left out."
             )
@@ -124,7 +133,7 @@ async def admin_resource_groups(
         ResourceGroupUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; resource groups the caller cannot "
                 "read are left out."
             )
@@ -226,7 +235,10 @@ async def resource_groups(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Update fair share configuration for a resource group (admin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.",
-    )
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `updateResourceGroupFairShareSpec`."
+    ),
 )
 async def admin_update_resource_group_fair_share_spec(
     info: Info[StrawberryGQLContext],
@@ -244,11 +256,7 @@ async def admin_update_resource_group_fair_share_spec(
 @gql_mutation(
     BackendAIGQLMeta(
         added_version="26.2.0",
-        description="Update fair share configuration for a resource group (superadmin only). Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.",
-    ),
-    deprecation_reason=(
-        "Use admin_update_resource_group_fair_share_spec instead. "
-        "This API will be removed after v26.3.0. See BEP-1041 for migration guide."
+        description="Update fair share configuration for a resource group. Only provided fields are updated; others retain their existing values. Resource weights are validated against capacity - only resource types available in the scaling group's capacity can be specified.",
     ),
 )
 async def update_resource_group_fair_share_spec(
@@ -266,7 +274,8 @@ async def update_resource_group_fair_share_spec(
     BackendAIGQLMeta(
         added_version="26.2.0",
         description="Update resource group configuration (admin only). Only provided fields are updated; others retain their existing values. Supports all configuration fields except fair_share (use separate mutation).",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `updateResourceGroup`.",
 )
 async def admin_update_resource_group(
     info: Info[StrawberryGQLContext],
@@ -279,6 +288,53 @@ async def admin_update_resource_group(
     payload_dto = await info.context.adapters.resource_group.update_config(dto)
 
     return UpdateResourceGroupPayload.from_pydantic(payload_dto)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update a resource group. Only provided fields are updated.",
+    )
+)
+async def update_resource_group(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+    input: UpdateResourceGroupV2InputGQL,
+) -> UpdateResourceGroupPayload:
+    payload = await info.context.adapters.resource_group.update(
+        ResourceGroupID(id), input.to_pydantic()
+    )
+    return UpdateResourceGroupPayload.from_pydantic(
+        UpdateResourceGroupConfigPayloadNode(resource_group=payload.resource_group)
+    )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update several resource groups, answering for each one.",
+    )
+)
+async def partial_bulk_update_resource_groups(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkUpdateResourceGroupsInputGQL,
+) -> PartialBulkResourceGroupsPayloadGQL:
+    payload = await info.context.adapters.resource_group.partial_bulk_update(input.to_pydantic())
+    return PartialBulkResourceGroupsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Purge several resource groups, answering for each one.",
+    )
+)
+async def partial_bulk_purge_resource_groups(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeResourceGroupsInputGQL,
+) -> PartialBulkResourceGroupsPayloadGQL:
+    payload = await info.context.adapters.resource_group.partial_bulk_purge(input.to_pydantic())
+    return PartialBulkResourceGroupsPayloadGQL.from_pydantic(payload)
 
 
 @gql_mutation(
@@ -381,18 +437,34 @@ async def admin_create_resource_group_v2(
 
 
 @gql_mutation(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Purge a resource group.")
+)
+async def purge_resource_group_v2(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> PurgeResourceGroupPayloadGQL:
+    result = await info.context.adapters.resource_group.purge(ResourceGroupID(id))
+    return PurgeResourceGroupPayloadGQL.from_pydantic(
+        DeleteResourceGroupPayload(id=result.id, entity_id=result.entity_id),
+        extra={"purged_id": to_global_id(ResourceGroupGQL, result.id)},
+    )
+
+
+@gql_mutation(
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Delete a resource group (admin only).",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeResourceGroupV2`.",
 )
 async def admin_delete_resource_group_v2(
     info: Info[StrawberryGQLContext],
     name: str,
 ) -> DeleteResourceGroupPayloadGQL | None:
     check_admin_only()
-    result = await info.context.adapters.resource_group.purge(name)
-    payload = DeleteResourceGroupPayload(id=result.id)
+    adapter = info.context.adapters.resource_group
+    result = await adapter.purge(await adapter.lookup_name(name))
+    payload = DeleteResourceGroupPayload(id=result.id, entity_id=result.entity_id)
     return DeleteResourceGroupPayloadGQL.from_pydantic(payload)
 
 

@@ -1,344 +1,94 @@
 {
   "$schema": "./theme.schema.json",
-  "fontFamily": "'Ubuntu', Roboto, Pretendard, sans-serif",
-  "light": {
-    "token": {
-      "colorPrimary": "#FF7A00",
-      "colorLink": "#FF7A00",
-      "colorText": "#141414",
-      "colorInfo": "#028DF2",
-      "colorError": "#FF4D4F",
-      "colorSuccess": "#00BD9B",
-      "screenXLMax": 1919,
-      "screenXXLMin": 1920,
-      "screenXXL": 1920,
-      "screenXXLMax": 2559,
-      "screenXXXLMin": 2560,
-      "screenXXXL": 2560
-    },
-    "components": {
-      "Tag": {
-        "borderRadiusSM": 1
+  "schemaVersion": 2,
+  "theme": {
+    "fontFamily": "'Ubuntu', Roboto, Pretendard, sans-serif",
+    "families": {
+      "default": {
+        "seeds": {
+          "accent": ["#FF7A00", "#DC6B03"],
+          "link": ["#FF7A00", "#DC6B03"],
+          "info": ["#028DF2", "#009BDD"],
+          "error": ["#FF4D4F", "#DC4446"],
+          "success": ["#00BD9B", "#03A487"],
+          "warning": ["#FAAD14", "#FAAD14"]
+        },
+        "headerBg": ["#FF9729", "#E88A28"]
       },
-      "Layout": {
-        "lightSiderBg": "#FFF",
-        "siderBg": "#141414",
-        "headerBg": "#FF9729"
+      "stained": {
+        "seeds": {
+          "accent": ["#8B5CF6", "#A78BFA"],
+          "link": ["#8B5CF6", "#A78BFA"],
+          "info": ["#0066CC", "#009BDD"],
+          "error": ["#C82333", "#DC4446"],
+          "success": ["#007A63", "#03A487"],
+          "warning": ["#9A5D00", "#D89614"]
+        },
+        "headerBg": ["#8B5CF6", "#7C3AED"]
       },
-      "Divider": {
-        "colorSplit": "#D9D9D9"
+      "glass": {
+        "seeds": {
+          "accent": ["#007AFF", "#0A84FF"],
+          "link": ["#007AFF", "#0A84FF"],
+          "info": ["#005EB8", "#0A84FF"],
+          "error": ["#C22D26", "#FF453A"],
+          "success": ["#1D7D43", "#32D74B"],
+          "warning": ["#9A5700", "#FF9F0A"]
+        },
+        "headerBg": ["rgba(30, 32, 38, 0.15)", "rgba(255, 255, 255, 0.3)"]
       },
-      "Table": {
-        "headerBg": "#E3E3E3",
-        "headerSplitColor": "rgba(0,0,0,0.25)",
-        "rowExpandedBg": "#E3E3E3"
+      "reverie": {
+        "seeds": {
+          "accent": ["#F43F5E", "#FF97A8"],
+          "link": ["#F43F5E", "#FF97A8"],
+          "info": ["#0066CC", "#009BDD"],
+          "error": ["#C82333", "#DC4446"],
+          "success": ["#007A63", "#03A487"],
+          "warning": ["#9A5D00", "#D89614"]
+        },
+        "headerBg": "#FB7185"
+      },
+      "bliss": {
+        "seeds": {
+          "accent": ["#0054E3", "#0044CC"],
+          "link": ["#0054E3", "#0044CC"],
+          "info": ["#0054E3", "#0044CC"],
+          "error": ["#C00000", "#FF5C5C"],
+          "success": ["#2D7A1E", "#4CAF50"],
+          "warning": ["#9A5700", "#FFB74D"]
+        },
+        "headerBg": ["#245EDC", "#0044CC"]
       }
     }
   },
-  "dark": {
-    "token": {
-      "colorPrimary": "#DC6B03",
-      "colorLink": "#DC6B03",
-      "colorText": "#FFF",
-      "colorInfo": "#009BDD",
-      "colorError": "#DC4446",
-      "colorSuccess": "#03A487",
-      "colorFillSecondary": "#262626",
-      "screenXLMax": 1919,
-      "screenXXLMin": 1920,
-      "screenXXL": 1920,
-      "screenXXLMax": 2559,
-      "screenXXXLMin": 2560,
-      "screenXXXL": 2560
-    },
-    "components": {
-      "Tag": {
-        "borderRadiusSM": 1
-      },
-      "Layout": {
-        "lightSiderBg": "#FFF",
-        "siderBg": "#141414",
-        "headerBg": "#E88A28"
-      }
-    }
-  },
-  "families": {
-    "stained": {
-      "label": "Stained",
-      "light": {
-        "token": {
-          "colorPrimary": "#8B5CF6",
-          "colorLink": "#8B5CF6",
-          "colorText": "#141414",
-          "colorInfo": "#0066CC",
-          "colorError": "#C82333",
-          "colorSuccess": "#007A63",
-          "colorWarning": "#9A5D00",
-          "colorBorder": "#D9D9D9",
-          "colorBgContainer": "#FFFFFF",
-          "colorBgLayout": "#F5F5F5",
-          "screenXLMax": 1919,
-          "screenXXLMin": 1920,
-          "screenXXL": 1920,
-          "screenXXLMax": 2559,
-          "screenXXXLMin": 2560,
-          "screenXXXL": 2560
-        },
-        "components": {
-          "Tag": {
-            "borderRadiusSM": 1
-          },
-          "Layout": {
-            "lightSiderBg": "#FFF",
-            "siderBg": "#141414",
-            "headerBg": "#8B5CF6"
-          }
-        }
-      },
-      "dark": {
-        "token": {
-          "colorPrimary": "#A78BFA",
-          "colorLink": "#A78BFA",
-          "colorText": "#FFFFFF",
-          "colorInfo": "#009BDD",
-          "colorError": "#DC4446",
-          "colorSuccess": "#03A487",
-          "colorWarning": "#D89614",
-          "colorBorder": "#424242",
-          "colorBgContainer": "#1F1F1F",
-          "colorBgLayout": "#121212",
-          "screenXLMax": 1919,
-          "screenXXLMin": 1920,
-          "screenXXL": 1920,
-          "screenXXLMax": 2559,
-          "screenXXXLMin": 2560,
-          "screenXXXL": 2560
-        },
-        "components": {
-          "Tag": {
-            "borderRadiusSM": 1
-          },
-          "Layout": {
-            "lightSiderBg": "#FFF",
-            "siderBg": "#141414",
-            "headerBg": "#7C3AED"
-          }
-        }
-      }
-    },
-    "glass": {
-      "label": "Glass",
-      "light": {
-        "token": {
-          "colorPrimary": "#007AFF",
-          "colorLink": "#007AFF",
-          "colorText": "#1D1D1F",
-          "colorInfo": "#005EB8",
-          "colorError": "#C22D26",
-          "colorSuccess": "#1D7D43",
-          "colorWarning": "#9A5700",
-          "colorBorder": "#D9D9D9",
-          "colorBgContainer": "#FFFFFF",
-          "colorBgLayout": "#F2F2F7",
-          "screenXLMax": 1919,
-          "screenXXLMin": 1920,
-          "screenXXL": 1920,
-          "screenXXLMax": 2559,
-          "screenXXXLMin": 2560,
-          "screenXXXL": 2560
-        },
-        "components": {
-          "Tag": {
-            "borderRadiusSM": 1
-          },
-          "Layout": {
-            "lightSiderBg": "#FFF",
-            "siderBg": "#1C1C1E",
-            "headerBg": "rgba(30, 32, 38, 0.15)"
-          }
-        }
-      },
-      "dark": {
-        "token": {
-          "colorPrimary": "#0A84FF",
-          "colorLink": "#0A84FF",
-          "colorText": "#F5F5F7",
-          "colorInfo": "#0A84FF",
-          "colorError": "#FF453A",
-          "colorSuccess": "#32D74B",
-          "colorWarning": "#FF9F0A",
-          "colorBorder": "#424242",
-          "colorBgContainer": "#1F1F1F",
-          "colorBgLayout": "#000000",
-          "screenXLMax": 1919,
-          "screenXXLMin": 1920,
-          "screenXXL": 1920,
-          "screenXXLMax": 2559,
-          "screenXXXLMin": 2560,
-          "screenXXXL": 2560
-        },
-        "components": {
-          "Tag": {
-            "borderRadiusSM": 1
-          },
-          "Layout": {
-            "lightSiderBg": "#FFF",
-            "siderBg": "#1C1C1E",
-            "headerBg": "rgba(255, 255, 255, 0.3)"
-          }
-        }
-      }
-    },
-    "reverie": {
-      "label": "Reverie",
-      "light": {
-        "token": {
-          "colorPrimary": "#F43F5E",
-          "colorLink": "#F43F5E",
-          "colorText": "#141414",
-          "colorInfo": "#0066CC",
-          "colorError": "#C82333",
-          "colorSuccess": "#007A63",
-          "colorWarning": "#9A5D00",
-          "colorBorder": "#D9D9D9",
-          "colorBgContainer": "#FFFFFF",
-          "colorBgLayout": "#F5F5F5",
-          "screenXLMax": 1919,
-          "screenXXLMin": 1920,
-          "screenXXL": 1920,
-          "screenXXLMax": 2559,
-          "screenXXXLMin": 2560,
-          "screenXXXL": 2560
-        },
-        "components": {
-          "Tag": {
-            "borderRadiusSM": 1
-          },
-          "Layout": {
-            "lightSiderBg": "#FFF",
-            "siderBg": "#141414",
-            "headerBg": "#FB7185"
-          }
-        }
-      },
-      "dark": {
-        "token": {
-          "colorPrimary": "#FF97A8",
-          "colorLink": "#FF97A8",
-          "colorText": "#FFFFFF",
-          "colorInfo": "#009BDD",
-          "colorError": "#DC4446",
-          "colorSuccess": "#03A487",
-          "colorWarning": "#D89614",
-          "colorBorder": "#424242",
-          "colorBgContainer": "#1F1F1F",
-          "colorBgLayout": "#121212",
-          "screenXLMax": 1919,
-          "screenXXLMin": 1920,
-          "screenXXL": 1920,
-          "screenXXLMax": 2559,
-          "screenXXXLMin": 2560,
-          "screenXXXL": 2560
-        },
-        "components": {
-          "Tag": {
-            "borderRadiusSM": 1
-          },
-          "Layout": {
-            "lightSiderBg": "#FFF",
-            "siderBg": "#141414",
-            "headerBg": "#FB7185"
-          }
-        }
-      }
-    },
-    "bliss": {
-      "label": "Bliss",
-      "light": {
-        "token": {
-          "colorPrimary": "#0054E3",
-          "colorLink": "#0054E3",
-          "colorText": "#000000",
-          "colorInfo": "#0054E3",
-          "colorError": "#C00000",
-          "colorSuccess": "#2D7A1E",
-          "colorWarning": "#9A5700",
-          "colorBorder": "#ACA899",
-          "colorBgContainer": "#FFFFFF",
-          "colorBgLayout": "#ECE9D8",
-          "screenXLMax": 1919,
-          "screenXXLMin": 1920,
-          "screenXXL": 1920,
-          "screenXXLMax": 2559,
-          "screenXXXLMin": 2560,
-          "screenXXXL": 2560
-        },
-        "components": {
-          "Tag": {
-            "borderRadiusSM": 1
-          },
-          "Layout": {
-            "lightSiderBg": "#FFF",
-            "siderBg": "#1A3F8F",
-            "headerBg": "#245EDC"
-          }
-        }
-      },
-      "dark": {
-        "token": {
-          "colorPrimary": "#0044CC",
-          "colorLink": "#0044CC",
-          "colorText": "#E8E6E0",
-          "colorInfo": "#0044CC",
-          "colorError": "#FF5C5C",
-          "colorSuccess": "#4CAF50",
-          "colorWarning": "#FFB74D",
-          "colorBorder": "#3A3E48",
-          "colorBgContainer": "#22262E",
-          "colorBgLayout": "#1A1D24",
-          "screenXLMax": 1919,
-          "screenXXLMin": 1920,
-          "screenXXL": 1920,
-          "screenXXLMax": 2559,
-          "screenXXXLMin": 2560,
-          "screenXXXL": 2560
-        },
-        "components": {
-          "Tag": {
-            "borderRadiusSM": 1
-          },
-          "Layout": {
-            "lightSiderBg": "#FFF",
-            "siderBg": "#1C1C1E",
-            "headerBg": "#0044CC"
-          }
-        }
-      }
-    }
-  },
-  "logo": {
-    "src": "/manifest/backend.ai-webui-white.svg",
-    "srcCollapsed": "/manifest/backend.ai-brand-simple-white.svg",
-    "srcDark": "/manifest/backend.ai-webui-black.svg",
-    "srcCollapsedDark": "/manifest/backend.ai-brand-simple-black.svg",
-    "alt": "Backend.AI Logo",
-    "href": "/start",
-    "size": {
-      "width": 159,
-      "height": 24
-    },
-    "sizeCollapsed": {
-      "width": 34,
-      "height": 34
-    },
-    "aboutLogoSize": {
-      "width": 159,
-      "height": 24
-    }
-  },
-  "sider": {},
   "branding": {
+    "logo": {
+      "src": "/manifest/backend.ai-webui-white.svg",
+      "srcCollapsed": "/manifest/backend.ai-brand-simple-white.svg",
+      "srcDark": "/manifest/backend.ai-webui-black.svg",
+      "srcCollapsedDark": "/manifest/backend.ai-brand-simple-black.svg",
+      "alt": "Backend.AI Logo",
+      "href": "/start",
+      "size": {
+        "width": 159,
+        "height": 24
+      },
+      "sizeCollapsed": {
+        "width": 34,
+        "height": 34
+      },
+      "aboutLogoSize": {
+        "width": 159,
+        "height": 24
+      }
+    },
     "companyName": "Lablup Inc.",
-    "brandName": "Backend.AI"
+    "brandName": "Backend.AI",
+    "familyLabels": {
+      "stained": "Stained",
+      "glass": "Glass",
+      "reverie": "Reverie",
+      "bliss": "Bliss"
+    }
   }
 }

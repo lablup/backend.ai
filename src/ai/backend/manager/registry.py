@@ -49,7 +49,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
@@ -73,7 +73,7 @@ from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
-from ai.backend.common.exception import AliasResolutionFailed
+from ai.backend.common.exception import AliasResolutionFailed, UserNotFound
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AbuseReport,
@@ -124,7 +124,9 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.vfolder.types import verify_vfolder_name
 from ai.backend.manager.models.agent.row import AgentRow, agents
+from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
 from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.searchers import (
@@ -138,7 +140,6 @@ from ai.backend.manager.models.kernel.row import (
     KernelRow,
     kernels,
 )
-from ai.backend.manager.models.keypair.row import query_bootstrap_script
 from ai.backend.manager.models.network.row import NetworkRow, NetworkType
 from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
@@ -149,9 +150,6 @@ from ai.backend.manager.models.session.row import (
     handle_session_exception,
 )
 from ai.backend.manager.models.user.row import UserRow
-from ai.backend.manager.models.vfolder.row import (
-    verify_vfolder_name,
-)
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
@@ -174,7 +172,6 @@ from .errors.kernel import (
     TooManySessionsMatched,
 )
 from .errors.resource import (
-    DatabaseConnectionUnavailable,
     NoCurrentTaskContext,
     ResourceGroupNotFound,
     ResourceGroupSessionTypeNotAllowed,
@@ -274,15 +271,19 @@ class AgentRegistry:
         ``"1g"``) for memory-like slots; normalise them to plain decimal
         strings so downstream ``Decimal(quantity)`` calls in the scheduler
         and ``ResourceSlotEntry.to_resource_slot`` keep working unchanged.
+        Zero-quantity slots are dropped.
         """
         if not resources:
             return ()
-        return tuple(
-            ResourceSlotEntry(
-                resource_type=ResourceSlotName(str(k)), quantity=str(parse_quantity(v))
+        entries: list[ResourceSlotEntry] = []
+        for k, v in resources.items():
+            quantity = parse_quantity(v)
+            if quantity == 0:
+                continue
+            entries.append(
+                ResourceSlotEntry(resource_type=ResourceSlotName(str(k)), quantity=str(quantity))
             )
-            for k, v in resources.items()
-        )
+        return tuple(entries)
 
     def __init__(
         self,
@@ -611,24 +612,28 @@ class AgentRegistry:
         session_creation_id = secrets.token_urlsafe(16)
 
         async with self.db.begin_readonly_session() as db_session:
-            conn = await db_session.connection()
-            if conn is None:
-                raise DatabaseConnectionUnavailable("Database connection not available")
             # check if network exists
             if _network_id := config.get("attach_network"):
                 network = await NetworkRow.get(db_session, _network_id)
             else:
                 network = None
 
-            # Use keypair bootstrap_script if it is not delivered as a parameter
-            if not bootstrap_script:
-                script, _ = await query_bootstrap_script(conn, owner_access_key)
-                bootstrap_script = script
-
             user_row = await db_session.scalar(
                 sa.select(UserRow).where(UserRow.uuid == user_scope.user_uuid)
             )
-            user_row = cast(UserRow, user_row)
+            if not user_row:
+                raise UserNotFound(f"User with UUID {user_scope.user_uuid} not found.")
+            if not bootstrap_script:
+                bootstrap_script = (
+                    await db_session.scalar(
+                        sa.select(BootstrapScriptRow.script).where(
+                            BootstrapScriptRow.entity_type == UserEntityType(),
+                            BootstrapScriptRow.entity_id == user_scope.user_uuid,
+                            BootstrapScriptRow.is_default,
+                        )
+                    )
+                    or ""
+                )
 
         public_sgroup_only = session_type not in PRIVATE_SESSION_TYPES
         if dry_run:

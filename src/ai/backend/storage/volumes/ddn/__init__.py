@@ -1,50 +1,42 @@
-import asyncio
 import logging
 from collections.abc import Mapping
 from pathlib import Path
-from subprocess import CalledProcessError
-from typing import Any, Final, override
+from typing import Any, ClassVar, Final, override
 
 import aiofiles
 import aiofiles.os
 
 from ai.backend.common.asyncio import run_in_executor_with_context
+from ai.backend.common.clients.storage_backends.exascaler.client import EXAScalerClient
+from ai.backend.common.data.storage.types import StorageBackendCapability, StorageBackendType
 from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import QuotaScopeID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import (
-    DDNCommandFailedError,
     QuotaScopeAlreadyExists,
     QuotaScopeNotFoundError,
-    SubprocessStdoutNotAvailableError,
 )
-from ai.backend.storage.subproc import run
 from ai.backend.storage.types import QuotaConfig, QuotaUsage
-from ai.backend.storage.volumes.abc import CAP_QUOTA, CAP_VFOLDER, AbstractQuotaModel
+from ai.backend.storage.volumes.abc import AbstractQuotaModel
 from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
+from ai.backend.storage.watcher import WatcherClient
 
 FIRST_PROJECT_ID: Final = 100
 PROJECT_MAIN_ID_KEY: Final = "ddn/main-project-id"
 PROJECT_ID_FILE_NAME: Final = "project_id"
 
-
-def _byte_to_kilobyte(byte: int) -> int:
-    return byte // 1024
-
-
-def _kilobyte_to_byte(kilobyte: int) -> int:
-    return kilobyte * 1024
-
-
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class EXAScalerQuotaModel(BaseQuotaModel):
-    def __init__(self, mount_path: Path, local_config: Mapping[str, Any], etcd: AsyncEtcd) -> None:
-        self.local_config = local_config
-        self.etcd = etcd
+    _client: EXAScalerClient
+    etcd: AsyncEtcd
+
+    def __init__(self, mount_path: Path, client: EXAScalerClient, etcd: AsyncEtcd) -> None:
         super().__init__(mount_path)
-        return
+        self._client = client
+        self.etcd = etcd
 
     async def _read_project_id(self, pid_file_path: str | Path) -> int | None:
         def _read() -> int | None:
@@ -72,73 +64,11 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         await self.etcd.put(PROJECT_MAIN_ID_KEY, str(val + 1))
         return val
 
-    async def _set_quota_by_project(self, pid: int, path: Path, options: QuotaConfig) -> None:
-        # default unit for DDN quota is KB
-        quota_limit = _byte_to_kilobyte(options.limit_bytes)
-        try:
-            await run([
-                b"sudo",
-                b"lfs",
-                b"setquota",
-                b"-p",
-                str(pid),
-                f"-B{quota_limit}",
-                path,
-            ])
-        except CalledProcessError as e:
-            raise DDNCommandFailedError(
-                f"'lfs setquota -p {pid}' command failed: {e.stderr}"
-            ) from e
-
-    async def _unset_quota_by_project(self, pid: int, path: Path) -> None:
-        await self._set_quota_by_project(pid, path, QuotaConfig(0))
-
     async def _get_quota_by_project(self, pid: int, qspath: Path) -> QuotaUsage | None:
-        proc = await asyncio.create_subprocess_exec(
-            b"lfs",
-            b"quota",
-            b"-p",
-            str(pid),
-            str(qspath),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-        )
-        try:
-            if proc.stdout is None:
-                raise SubprocessStdoutNotAvailableError("lfs quota process stdout is not available")
-            next_line_is_quota = False
-            line = ""
-            while True:
-                try:
-                    raw = await proc.stdout.readline()
-                    if not raw:
-                        break
-                    line = raw.decode()
-                except asyncio.IncompleteReadError:
-                    break
-                words = line.split()
-                if next_line_is_quota:
-                    raw_used_bytes, hard_limit = words[0], int(words[2])
-                    # words[1] is soft_limit
-                    if hard_limit == 0:
-                        return None
-                    raw_used_bytes = raw_used_bytes.removesuffix("*")
-                    used_bytes = _kilobyte_to_byte(int(raw_used_bytes))
-                    limit_bytes = _kilobyte_to_byte(hard_limit)
-                    if used_bytes < 0 or limit_bytes < 0:
-                        log.warning(
-                            "negative quota usage reported",
-                            used_bytes=used_bytes,
-                            limit_bytes=limit_bytes,
-                            report_line=line,
-                        )
-                    return QuotaUsage(used_bytes=used_bytes, limit_bytes=limit_bytes)
-                if Path(words[0]) == qspath:
-                    next_line_is_quota = True
-                    continue
+        quota = await self._client.get_quota_by_project(pid, qspath)
+        if quota is None:
             return None
-        finally:
-            await proc.wait()
+        return QuotaUsage(used_bytes=quota.used_bytes, limit_bytes=quota.limit_bytes)
 
     @override
     async def create_quota_scope(
@@ -163,50 +93,19 @@ class EXAScalerQuotaModel(BaseQuotaModel):
             if quota_usage is not None:
                 raise QuotaScopeAlreadyExists
 
-        # Set projectID to the directory
-        try:
-            await run([
-                b"sudo",
-                b"lfs",
-                b"project",
-                b"-p",
-                str(project_id),
-                b"-r",
-                b"-s",
-                str(qspath),
-            ])
-        except CalledProcessError as e:
-            raise DDNCommandFailedError(
-                f"'lfs project -p {project_id}' command failed: {e.stderr}"
-            ) from e
+        await self._client.set_project_id(project_id, qspath)
 
         if options is not None:
-            await self._set_quota_by_project(project_id, qspath, options)
+            await self._client.set_quota_by_project(project_id, qspath, options.limit_bytes)
 
     @override
     async def describe_quota_scope(self, quota_scope_id: QuotaScopeID) -> QuotaUsage | None:
-        """
-        $ lfs quota -p <projectId> <fs_mount_point>
-
-        Disk quotas for prj <PID> (pid <PID>):
-        Filesystem  kbytes   quota   limit   grace   files   quota   limit   grace
-        /mnt/lufs01/vfroot/test
-                    1004       0       2048       -       2       0       0       -
-        pid <PID> is using default file quota setting
-
-        ---
-
-        `kbytes` is quota usage. `quota` is soft limit and `limit` is hard limit.
-        It will remove files after the `grace` if you exceed soft limit.
-        """
-
         qspath = self.mangle_qspath(quota_scope_id)
         if not qspath.exists():
             return None
         pid_path = qspath / PROJECT_ID_FILE_NAME
         if (pid := await self._read_project_id(pid_path)) is None:
             return None
-
         return await self._get_quota_by_project(pid, qspath)
 
     @override
@@ -220,7 +119,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         pid = await self._read_project_id(pid_path)
         if pid is None:
             raise QuotaScopeNotFoundError
-        await self._set_quota_by_project(pid, qspath, config)
+        await self._client.set_quota_by_project(pid, qspath, config.limit_bytes)
 
     @override
     async def unset_quota(self, quota_scope_id: QuotaScopeID) -> None:
@@ -229,7 +128,7 @@ class EXAScalerQuotaModel(BaseQuotaModel):
         pid = await self._read_project_id(pid_path)
         if pid is None:
             raise QuotaScopeNotFoundError
-        await self._unset_quota_by_project(pid, qspath)
+        await self._client.unset_quota_by_project(pid, qspath)
 
     @override
     async def delete_quota_scope(self, quota_scope_id: QuotaScopeID) -> None:
@@ -239,12 +138,35 @@ class EXAScalerQuotaModel(BaseQuotaModel):
 
 
 class EXAScalerFSVolume(BaseVolume):
-    name = "exascaler"
+    name: ClassVar[StorageBackendType] = StorageBackendType("exascaler")
+    _client: EXAScalerClient
+
+    def __init__(
+        self,
+        local_config: Mapping[str, Any],
+        mount_path: Path,
+        *,
+        etcd: AsyncEtcd,
+        event_dispatcher: EventDispatcher,
+        event_producer: EventProducer,
+        watcher: WatcherClient | None = None,
+        options: Mapping[str, Any] | None = None,
+    ) -> None:
+        super().__init__(
+            local_config,
+            mount_path,
+            etcd=etcd,
+            options=options,
+            event_dispatcher=event_dispatcher,
+            event_producer=event_producer,
+            watcher=watcher,
+        )
+        self._client = EXAScalerClient()
 
     @override
     async def create_quota_model(self) -> AbstractQuotaModel:
-        return EXAScalerQuotaModel(self.mount_path, self.local_config, self.etcd)
+        return EXAScalerQuotaModel(self.mount_path, self._client, self.etcd)
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
-        return frozenset([CAP_VFOLDER, CAP_QUOTA])
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
+        return frozenset([StorageBackendCapability.VFOLDER, StorageBackendCapability.QUOTA])

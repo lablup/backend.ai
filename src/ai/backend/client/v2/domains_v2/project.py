@@ -5,11 +5,15 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchProjectsInput,
     AssignUsersToProjectInput,
     CreateProjectInput,
     DeleteProjectInput,
+    PartialBulkDeleteProjectsInput,
+    PartialBulkRestoreProjectsInput,
+    PartialBulkUpdateProjectsInput,
     PurgeProjectInput,
     UnassignUsersFromProjectInput,
     UpdateProjectInput,
@@ -21,6 +25,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
     ProjectNode,
     ProjectPayload,
     PurgeProjectPayload,
+    RestoreProjectPayload,
     UnassignUsersFromProjectPayload,
 )
 
@@ -71,8 +76,66 @@ class V2ProjectClient(BaseDomainClient):
             response_model=ProjectPayload,
         )
 
+    async def update(self, project_id: UUID, request: UpdateProjectInput) -> ProjectPayload:
+        """Update a project."""
+        return await self._client.typed_request(
+            "PATCH",
+            f"{_PATH}/{project_id}",
+            request=request,
+            response_model=ProjectPayload,
+        )
+
+    async def delete(self, project_id: UUID) -> DeleteProjectPayload:
+        """Soft-delete a project."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{project_id}/delete",
+            response_model=DeleteProjectPayload,
+        )
+
+    async def restore(self, project_id: UUID) -> RestoreProjectPayload:
+        """Restore a soft-deleted project."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{project_id}/restore",
+            response_model=RestoreProjectPayload,
+        )
+
+    async def partial_bulk_update(
+        self, request: PartialBulkUpdateProjectsInput
+    ) -> PartialBulkPayload[ProjectNode]:
+        """Update several projects, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-update",
+            request=request,
+            response_model=PartialBulkPayload[ProjectNode],
+        )
+
+    async def partial_bulk_delete(
+        self, request: PartialBulkDeleteProjectsInput
+    ) -> PartialBulkPayload[ProjectNode]:
+        """Soft-delete several projects, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-delete",
+            request=request,
+            response_model=PartialBulkPayload[ProjectNode],
+        )
+
+    async def partial_bulk_restore(
+        self, request: PartialBulkRestoreProjectsInput
+    ) -> PartialBulkPayload[ProjectNode]:
+        """Restore several soft-deleted projects, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-restore",
+            request=request,
+            response_model=PartialBulkPayload[ProjectNode],
+        )
+
     async def admin_update(self, project_id: UUID, request: UpdateProjectInput) -> ProjectPayload:
-        """Update a project (superadmin only)."""
+        """Deprecated. Use :meth:`update`."""
         return await self._client.typed_request(
             "PATCH",
             f"{_PATH}/{project_id}",
@@ -81,7 +144,7 @@ class V2ProjectClient(BaseDomainClient):
         )
 
     async def admin_delete(self, request: DeleteProjectInput) -> DeleteProjectPayload:
-        """Soft-delete a project (superadmin only)."""
+        """Deprecated. Use :meth:`delete`."""
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/delete",

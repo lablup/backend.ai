@@ -12,6 +12,9 @@ import uuid
 from typing import TYPE_CHECKING
 
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.v2.model_card.request import (
     CreateModelCardInput,
@@ -43,9 +46,9 @@ class TestModelCardRoleAssign:
         # Assign role with project binding (admin SDK)
         await admin_v2_registry.rbac.assign_role(
             AssignRoleInput(
-                user_id=regular_user_fixture.user_uuid,
-                role_id=role_fixture,
-                project_id=project_id,
+                user_id=UserID(regular_user_fixture.user_uuid),
+                role_id=RoleID(role_fixture),
+                project_id=ProjectID(project_id),
             ),
         )
 

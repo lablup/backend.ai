@@ -104,10 +104,7 @@ unowned_dependency_behavior = "error"
 python-default = "python.lock"
 python-kernel = "python-kernel.lock"
 pants-plugins = "tools/pants-plugins.lock"
-black = "tools/black.lock"
-pytest = "tools/pytest.lock"
 coverage-py = "tools/coverage-py.lock"
-mypy = "tools/mypy.lock"
 towncrier = "tools/towncrier.lock"
 setuptools = "tools/setuptools.lock"
 
@@ -132,8 +129,8 @@ known_versions = [
 # $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.28.1/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
 # As of PEX v2.18, the GitHub release descriptions include the checksum and size for reference.
 
-[black]
-install_from_resolve = "black"
+[update-build-files]
+formatter = "ruff"
 
 [ruff]
 version = "0.14.0"
@@ -146,7 +143,17 @@ known_versions = [
 ]
 
 [pytest]
-install_from_resolve = "pytest"
+install_from_resolve = "python-default"
+requirements = [
+    "pytest",
+    "pytest-aiohttp",
+    "pytest-asyncio",
+    "pytest-cov",
+    "pytest-custom_exit_code",
+    "pytest-dependency",
+    "pytest-mock",
+    "pytest-timeout",
+]
 args = ["-v", "--suppress-no-test-exit-code"]
 execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
 
@@ -155,7 +162,8 @@ install_from_resolve = "coverage-py"
 report = ["xml", "console"]
 
 [mypy]
-install_from_resolve = "mypy"
+install_from_resolve = "python-default"
+requirements = ["mypy", "pydantic", "strawberry-graphql"]
 config = "pyproject.toml"
 
 [setuptools]

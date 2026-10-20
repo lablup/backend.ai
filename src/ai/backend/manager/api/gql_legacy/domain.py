@@ -32,7 +32,11 @@ from ai.backend.manager.data.permission.permission_defs import (
 )
 from ai.backend.manager.models.domain.creators import DomainCreator
 from ai.backend.manager.models.domain.row import DomainRow, domains, get_permission_ctx
-from ai.backend.manager.models.domain.updaters import DomainSoftDeleteUpdater, DomainUpdater
+from ai.backend.manager.models.domain.updaters import (
+    DomainRestoreUpdater,
+    DomainSoftDeleteUpdater,
+    DomainUpdater,
+)
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
@@ -47,6 +51,7 @@ from ai.backend.manager.services.domain.actions.create_domain import CreateDomai
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
+from ai.backend.manager.services.domain.actions.restore_domain import RestoreDomainAction
 from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
 from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
 from ai.backend.manager.types import OptionalState, TriState
@@ -363,6 +368,24 @@ async def _resolve_sgroup_ids(
     return resolved
 
 
+async def _apply_is_active(
+    graph_ctx: GraphQueryContext, data: DomainData, is_active: Any
+) -> DomainData:
+    """Soft-delete (``False``) or restore (``True``) the domain; nothing when it is
+    already there."""
+    if not isinstance(is_active, bool) or data.is_active == is_active:
+        return data
+    if is_active:
+        restored = await graph_ctx.processors.domain.restore.run(
+            RestoreDomainAction(updater=DomainRestoreUpdater(domain_id=data.id))
+        )
+        return restored.data
+    deleted = await graph_ctx.processors.domain.delete.run(
+        DeleteDomainAction(updater=DomainSoftDeleteUpdater(domain_id=data.id))
+    )
+    return deleted.data
+
+
 async def _ensure_sgroup_permission(
     graph_ctx: GraphQueryContext, sgroup_names: Iterable[str], *, db_session: AsyncSession
 ) -> None:
@@ -490,7 +513,6 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
             description=TriState[str].from_graphql(
                 self.description,
             ),
-            is_active=OptionalState[bool].from_graphql(self.is_active),
             total_resource_slots=TriState[ResourceSlot].from_graphql(
                 graphql.Undefined
                 if self.total_resource_slots is graphql.Undefined
@@ -556,11 +578,12 @@ class ModifyDomainNode(graphene.Mutation):  # type: ignore[misc]
 
         domain_id = target.entity_id()
         res = await graph_ctx.processors.domain.update.run(input.to_action(domain_id))
+        data = await _apply_is_active(graph_ctx, res.data, input.is_active)
         await _link_resource_groups_to_domain(graph_ctx, domain_id, list(sgroup_ids_to_add))
         await _unlink_resource_groups_from_domain(graph_ctx, domain_id, list(sgroup_ids_to_remove))
 
         return ModifyDomainNode(
-            item=DomainNode.from_dto(res.data),
+            item=DomainNode.from_dto(data),
             client_mutation_id=input.get("client_mutation_id"),
         )
 
@@ -710,9 +733,6 @@ class ModifyDomainInput(graphene.InputObjectType):  # type: ignore[misc]
             description=TriState[str].from_graphql(
                 self.description,
             ),
-            is_active=OptionalState[bool].from_graphql(
-                self.is_active,
-            ),
             total_resource_slots=TriState[ResourceSlot].from_graphql(
                 Undefined
                 if self.total_resource_slots is Undefined
@@ -785,10 +805,11 @@ class ModifyDomain(graphene.Mutation):  # type: ignore[misc]
         )
         action = props.to_action(name, target.entity_id())
         res = await ctx.processors.domain.update.run(action)
+        data = await _apply_is_active(ctx, res.data, props.is_active)
         return cls(
             ok=True,
             msg="domain modification succeed",
-            domain=Domain.from_data(res.data),
+            domain=Domain.from_data(data),
         )
 
 

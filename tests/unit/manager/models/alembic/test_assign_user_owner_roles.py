@@ -83,6 +83,13 @@ async def db(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(database_connection, _TABLES):
+        async with database_connection.begin() as conn:
+            await conn.execute(
+                sa.text(
+                    "ALTER TABLE role_presets "
+                    "ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT false"
+                )
+            )
         yield database_connection
 
 
@@ -150,7 +157,6 @@ async def users(db: ExtendedAsyncSAEngine) -> _Users:
                 name="user_owner",
                 scope_type=UserEntityType(),
                 auto_assign=False,
-                deleted=False,
             )
         )
         await session.flush()

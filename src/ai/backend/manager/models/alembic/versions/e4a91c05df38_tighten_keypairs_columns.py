@@ -24,7 +24,7 @@ log = logging.getLogger("alembic.runtime.migration")
 # revision identifiers, used by Alembic.
 revision = "e4a91c05df38"
 down_revision = "37d711158a8c"
-# Part of: NEXT_RELEASE_VERSION
+# Part of: 26.9.0
 branch_labels = None
 depends_on = None
 

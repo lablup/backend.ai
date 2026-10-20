@@ -9,7 +9,10 @@ from uuid import UUID
 from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import DeclaredEntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.query import (
     DateTimeFilter,
@@ -17,6 +20,8 @@ from ai.backend.common.dto.manager.query import (
     ToManyFilter,
     UUIDFilter,
 )
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
@@ -47,6 +52,11 @@ __all__ = (
     "EntityOrderBy",
     "MyAtomicBulkScopePermissionsInput",
     "MyScopePermissionsInput",
+    "PartialBulkDeleteRolesInput",
+    "PartialBulkPurgeRolesInput",
+    "PartialBulkRestoreRolesInput",
+    "PartialBulkUpdateRoleItemInput",
+    "PartialBulkUpdateRolesInput",
     "PermissionFilter",
     "PermissionNestedFilter",
     "PermissionOrderBy",
@@ -125,7 +135,13 @@ class UpdateRoleInput(BaseRequestModel):
         default=UNSET, description="Updated role description. Omit to leave unchanged; null clears."
     )
     status: RoleStatus | None | Unset = Field(
-        default=UNSET, description="Updated role status. Omit to leave unchanged."
+        default=UNSET,
+        description=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use the role delete and restore "
+            "operations. DELETED is handled as delete, ACTIVE on a deleted role as restore; "
+            "other values are ignored."
+        ),
+        deprecated=True,
     )
     auto_assign: bool | None | Unset = Field(
         default=UNSET,
@@ -157,6 +173,39 @@ class PurgeRoleInput(BaseRequestModel):
     """Input for purging a role."""
 
     id: UUID = Field(description="Role ID to purge")
+
+
+class PartialBulkUpdateRoleItemInput(BaseRequestModel):
+    """One role of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the role to update.")
+    input: UpdateRoleInput = Field(description="Fields to update on the role.")
+
+
+class PartialBulkUpdateRolesInput(BaseRequestModel):
+    """Input for updating several roles, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateRoleItemInput] = Field(
+        description="The roles to update, each with its fields."
+    )
+
+
+class PartialBulkDeleteRolesInput(BaseRequestModel):
+    """Input for soft-deleting several roles, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the roles to soft-delete.")
+
+
+class PartialBulkRestoreRolesInput(BaseRequestModel):
+    """Input for restoring several soft-deleted roles, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the roles to restore.")
+
+
+class PartialBulkPurgeRolesInput(BaseRequestModel):
+    """Input for permanently removing several roles, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the roles to purge.")
 
 
 class CreatePermissionInput(BaseRequestModel):
@@ -198,9 +247,9 @@ class DeletePermissionInput(BaseRequestModel):
 class AssignRoleInput(BaseRequestModel):
     """Input for assigning a role to a user."""
 
-    user_id: UUID = Field(description="User ID to assign the role to")
-    role_id: UUID = Field(description="Role ID to assign")
-    project_id: UUID | None = Field(
+    user_id: UserID = Field(description="User ID to assign the role to")
+    role_id: RoleID = Field(description="Role ID to assign")
+    project_id: ProjectID | None = Field(
         default=None,
         description="When provided, also add the user to this project",
     )
@@ -209,16 +258,16 @@ class AssignRoleInput(BaseRequestModel):
 class RevokeRoleInput(BaseRequestModel):
     """Input for revoking a role from a user."""
 
-    user_id: UUID = Field(description="User ID to revoke the role from")
-    role_id: UUID = Field(description="Role ID to revoke")
+    user_id: UserID = Field(description="User ID to revoke the role from")
+    role_id: RoleID = Field(description="Role ID to revoke")
 
 
 class BulkAssignRoleInput(BaseRequestModel):
     """Input for bulk assigning a role to multiple users."""
 
-    role_id: UUID = Field(description="Role ID to assign")
-    user_ids: list[UUID] = Field(description="List of user IDs to assign the role to")
-    project_id: UUID | None = Field(
+    role_id: RoleID = Field(description="Role ID to assign")
+    user_ids: list[UserID] = Field(description="List of user IDs to assign the role to")
+    project_id: ProjectID | None = Field(
         default=None,
         description="When provided, also add the users to this project",
     )
@@ -227,8 +276,8 @@ class BulkAssignRoleInput(BaseRequestModel):
 class BulkRevokeRoleInput(BaseRequestModel):
     """Input for bulk revoking a role from multiple users."""
 
-    role_id: UUID = Field(description="Role ID to revoke")
-    user_ids: list[UUID] = Field(description="List of user IDs to revoke the role from")
+    role_id: RoleID = Field(description="Role ID to revoke")
+    user_ids: list[UserID] = Field(description="List of user IDs to revoke the role from")
 
 
 class BulkAddRolePermissionsInput(BaseRequestModel):
@@ -312,6 +361,10 @@ class PermissionFilter(BaseRequestModel):
         default=None, description="Filter by the permission bit the entry grants."
     )
     created_at: DateTimeFilter | None = None
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by permission ID.",
+    )
     AND: list[PermissionFilter] | None = None
     OR: list[PermissionFilter] | None = None
     NOT: list[PermissionFilter] | None = None
@@ -345,6 +398,10 @@ class RoleFilter(BaseRequestModel):
     mapped_scope: MappedScopeNestedFilter | None = None
     permissions: RolePermissionNestedFilter | None = Field(
         default=None, description="Filter by conditions on the role's permission entries."
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by role ID.",
     )
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None

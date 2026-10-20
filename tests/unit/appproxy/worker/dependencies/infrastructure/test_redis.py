@@ -7,8 +7,10 @@ import pytest
 from ai.backend.appproxy.worker.config import ServerConfig
 from ai.backend.appproxy.worker.dependencies.infrastructure.redis import (
     RedisProvider,
+    RedisProviderInput,
     WorkerValkeyClients,
 )
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.config import redis_config_iv
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import HostPortPair
@@ -50,7 +52,9 @@ class TestRedisProvider:
         """Dependency should create and cleanup all Valkey clients."""
         dependency = RedisProvider()
 
-        async with dependency.provide(worker_config) as clients:
+        async with dependency.provide(
+            RedisProviderInput(config=worker_config, sentinel_monitors=SentinelMonitorSet([]))
+        ) as clients:
             assert isinstance(clients, WorkerValkeyClients)
             # Verify clients are functional
             assert clients.valkey_live is not None
@@ -68,7 +72,9 @@ class TestRedisProvider:
         dependency = RedisProvider()
 
         with pytest.raises(RuntimeError):
-            async with dependency.provide(worker_config) as clients:
+            async with dependency.provide(
+                RedisProviderInput(config=worker_config, sentinel_monitors=SentinelMonitorSet([]))
+            ) as clients:
                 assert isinstance(clients, WorkerValkeyClients)
                 raise RuntimeError("Test error")
 

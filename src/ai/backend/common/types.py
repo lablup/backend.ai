@@ -37,7 +37,6 @@ from uuid import UUID
 from warnings import deprecated
 
 import attrs
-import redis.asyncio.sentinel
 import trafaret as t
 import typeguard
 from aiohttp import Fingerprint
@@ -52,7 +51,6 @@ from pydantic import (
     field_validator,
 )
 from pydantic_core import ErrorDetails, core_schema
-from redis.asyncio import Redis
 
 # Deprecated re-export: new code should import ``ImageID`` from
 # ``ai.backend.common.data.entity.image``. This line lets existing
@@ -140,7 +138,6 @@ __all__ = (
     "QuotaScopeID",
     "QuotaScopeType",
     "ReadableCIDR",
-    "RedisConnectionInfo",
     "RedisHelperConfig",
     "RedisProfileTarget",
     "ResourceGroupID",
@@ -2165,6 +2162,10 @@ class ValkeyProfileTarget:
             return self._override_targets[role]
         return self._base_target
 
+    def targets(self) -> list[ValkeyTarget]:
+        """The base target and every override target."""
+        return [self._base_target, *(self._override_targets or {}).values()]
+
 
 # TODO: Remove this type
 @dataclass
@@ -2201,6 +2202,11 @@ class RedisProfileTarget:
         if self._override_targets and (role in self._override_targets):
             return self._override_targets[role]
         return self._base_target
+
+    def valkey_targets(self) -> list[ValkeyTarget]:
+        """The base target and every override target, converted to Valkey targets."""
+        targets = [self._base_target, *(self._override_targets or {}).values()]
+        return [target.to_valkey_target() for target in targets]
 
     @staticmethod
     def _parse_addr(addr_data: Any) -> HostPortPair:
@@ -2270,18 +2276,6 @@ class RedisHelperConfig(TypedDict, total=False):
     reconnect_poll_timeout: float
     max_connections: int
     connection_ready_timeout: float
-
-
-@attrs.define(auto_attribs=True)
-class RedisConnectionInfo:
-    client: Redis[Any]
-    name: str  # connection pool name
-    service_name: str | None
-    sentinel: redis.asyncio.sentinel.Sentinel | None
-    redis_helper_config: RedisHelperConfig
-
-    async def close(self, close_connection_pool: bool | None = None) -> None:
-        await self.client.close(close_connection_pool)
 
 
 class AcceleratorNumberFormat(TypedDict):

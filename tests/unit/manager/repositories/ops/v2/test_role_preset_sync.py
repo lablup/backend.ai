@@ -209,9 +209,7 @@ async def scene(db: ExtendedAsyncSAEngine) -> Scene:
             )
         )
         sess.add(VirtualEntityRow(entity_type="project", entity_id=project_id))
-        preset = RolePresetRow(
-            name="member", scope_type=ProjectEntityType(), auto_assign=False, deleted=False
-        )
+        preset = RolePresetRow(name="member", scope_type=ProjectEntityType(), auto_assign=False)
         sess.add(preset)
         await sess.flush()
         preset_id = preset.id

@@ -14,7 +14,7 @@ from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
 )
-from ai.backend.manager.models.vfolder.row import update_vfolder_status
+from ai.backend.manager.repositories.vfolder.deletion import update_vfolder_status
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 

@@ -7,7 +7,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from ai.backend.common import msgpack
-from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
+from ai.backend.common.data.entity.dotfile import DotfileID
+from ai.backend.common.data.entity.types import FieldData, RuntimeEntityID
+from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE, RESERVED_DOTFILES
 from ai.backend.manager.errors.storage import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
@@ -15,6 +17,10 @@ from ai.backend.manager.errors.storage import (
 )
 
 MAXIMUM_DOTFILE_COUNT = 100
+
+
+def verify_dotfile_name(dotfile: str) -> bool:
+    return dotfile not in RESERVED_DOTFILES
 
 
 class DotfileScope(enum.StrEnum):
@@ -41,6 +47,16 @@ class DotfileEntry:
 
 
 @dataclass(frozen=True)
+class DotfileData(FieldData):
+    id: DotfileID
+    entity: RuntimeEntityID
+    path: str
+    perm: str
+    data: str
+    is_default: bool
+
+
+@dataclass(frozen=True)
 class DotfileQueryResult:
     entries: list[DotfileEntry]
     leftover_space: int
@@ -48,12 +64,7 @@ class DotfileQueryResult:
 
 @dataclass(frozen=True)
 class DotfileEntries:
-    """The dotfile entries packed into one row's column.
-
-    Every edit is a read of the whole set followed by a write of the whole set, so
-    the limits the set has to hold — one entry per path, a count, a packed size —
-    are decided here rather than at each of the three tables that store one.
-    """
+    """Dotfiles with shared path, count and serialized-size constraints."""
 
     entries: tuple[DotfileEntry, ...] = ()
 

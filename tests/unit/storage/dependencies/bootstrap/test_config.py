@@ -59,9 +59,7 @@ path = "/tmp/backend.ai/vfroot/local"
         async with provider.provide(provider_input) as config:
             assert isinstance(config, StorageProxyUnifiedConfig)
             assert config.etcd.namespace == "local"
-            assert isinstance(config.etcd.addr, HostPortPair)
-            assert config.etcd.addr.host == "127.0.0.1"
-            assert config.etcd.addr.port == 2379
+            assert config.etcd.addrs == [HostPortPair(host="127.0.0.1", port=2379)]
 
     async def test_cleanup_on_exception(
         self,

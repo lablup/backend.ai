@@ -33,6 +33,7 @@ import aiohttp_cors
 import aiotools
 import click
 import jinja2
+import jwt
 import tomli
 import uvloop
 from aiohttp import web
@@ -41,12 +42,14 @@ from yarl import URL
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
+from ai.backend.client.request import Request
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.client.v2.auth import NoAuth
 from ai.backend.client.v2.config import ClientConfig as V2ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common import config
 from ai.backend.common.clients.http_client.client_pool import ClientPool
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, REDIS_STATISTICS_DB, RedisRole
@@ -83,7 +86,13 @@ from ai.backend.common.web.session import (
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
 from ai.backend.logging import Logger, LogLevel
-from ai.backend.logging.otel import LegacyOtelLogging, OpenTelemetrySpec, apply_otel_tracer
+from ai.backend.logging.otel import (
+    LegacyOtelLogging,
+    OpenTelemetrySpec,
+    apply_otel_tracer,
+    build_otel_server_middleware,
+    instrument_aiohttp_client,
+)
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.structured_otel import StructuredOtelLogging
 from ai.backend.web.clients.apollo_router_pool import (
@@ -100,7 +109,12 @@ from ai.backend.web.ratelimit import manager_proxy_rate_limited
 from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_policy_middleware
 
 from . import __version__, user_agent
-from .auth import build_forwarding_headers, fill_forwarding_hdrs_to_api_session, get_client_ip
+from .auth import (
+    build_forwarding_headers,
+    fill_forwarding_hdrs_to_api_session,
+    get_api_session,
+    get_client_ip,
+)
 from .errors import (
     AlreadyLoggedInError,
     InvalidAPIConfigurationError,
@@ -298,6 +312,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
             "title": e.data.get("title"),
             "details": e.data.get("msg"),
         }
+        return web.json_response(result, status=e.status)
     return web.json_response(result)
 
 
@@ -562,24 +577,24 @@ async def logout_handler(request: web.Request) -> web.Response:
     stats.active_logout_handlers.add(asyncio.current_task())
     session = await get_session(request)
     session_token = session.identity
-    session.invalidate()
 
-    # Invalidate login session in Manager DB
-    if session_token:
-        config = cast(WebServerUnifiedConfig, request.app["config"])
+    # The manager authenticates /auth/logout, so sign it with the session's keypair
+    # before invalidating the session drops that keypair.
+    if session_token and session.get("authenticated", False):
         manager_pool = cast(HealthyEndpointPool, request.app["manager_pool"])
         try:
             async with manager_pool.acquire() as acquired:
-                async with aiohttp.ClientSession() as http_session:
-                    await http_session.post(
-                        f"{acquired.endpoint}/auth/logout",
-                        json={"session_token": session_token},
-                        headers=build_forwarding_headers(request),
-                        ssl=config.api.ssl_verify,
-                    )
+                api_session = await get_api_session(request, acquired)
+                async with api_session:
+                    fill_forwarding_hdrs_to_api_session(request, api_session)
+                    rqst = Request("POST", "/auth/logout")
+                    rqst.set_json({"session_token": session_token})
+                    async with rqst.fetch():
+                        pass
         except Exception:
             log.warning("failed to invalidate the login session on the manager", exc_info=True)
 
+    session.invalidate()
     return web.Response()
 
 
@@ -656,6 +671,15 @@ async def webserver_healthcheck(request: web.Request) -> web.Response:
         "details": "Success",
     }
     return web.json_response(result)
+
+
+def _claimed_user_id(auth_token: str) -> uuid.UUID | None:
+    try:
+        # Skip signature verification only to read the claimed user ID for logging.
+        payload = jwt.decode(auth_token, options={"verify_signature": False})
+        return uuid.UUID(payload["user"])
+    except (jwt.PyJWTError, KeyError, ValueError, TypeError, AttributeError):
+        return None
 
 
 async def token_login_handler(request: web.Request) -> web.Response:
@@ -756,7 +780,9 @@ async def token_login_handler(request: web.Request) -> web.Response:
     except BackendClientError as e:
         raise ProxyTargetUnreachableError(str(e)) from e
     except BackendAPIError as e:
-        log.trace("token login failed: {}", e)
+        log.trace(
+            "token login failed", status=e.status, claimed_user_id=_claimed_user_id(auth_token)
+        )
         result["authenticated"] = False
         result["data"] = {
             "type": e.data.get("type"),
@@ -811,40 +837,47 @@ async def redis_ctx(
 
     valkey_profile_target = config.session.redis.to_valkey_profile_target()
     valkey_target = valkey_profile_target.profile_target(RedisRole.STATISTICS)
-
-    # Create ValkeySessionClient for session management
-    valkey_session_client = await ValkeySessionClient.create(
-        valkey_target=valkey_target,
-        db_id=REDIS_STATISTICS_DB,  # Use default database for session storage
-        human_readable_name="web.session",
-    )
-    # Keep app["redis"] key for compatibility
-    app["redis"] = valkey_session_client
-
-    valkey_rate_limit_client = await ValkeyRateLimitClient.create(
-        valkey_target=valkey_profile_target.profile_target(RedisRole.RATE_LIMIT),
-        db_id=REDIS_RATE_LIMIT_DB,
-        human_readable_name="web.ratelimit",
-    )
-    app["valkey_rate_limit"] = valkey_rate_limit_client
-
-    if pidx == 0 and config.session.flush_on_startup:
-        await valkey_session_client.flush_all_sessions()
-        log.info("session storage flushed")
-
-    if config.session.login_session_extension_sec is None:
-        config.session.login_session_extension_sec = config.session.max_age
-    redis_storage = RedisStorage(
-        valkey_session_client,
-        max_age=config.session.max_age,
-        secure=config.security.cookie_secure,
-    )
-    setup_session(app, redis_storage)
+    rate_limit_valkey_target = valkey_profile_target.profile_target(RedisRole.RATE_LIMIT)
+    sentinel_monitors = SentinelMonitorSet(valkey_profile_target.targets())
+    await sentinel_monitors.start()
     try:
-        yield
+        # Create ValkeySessionClient for session management
+        valkey_session_client = await ValkeySessionClient.create(
+            valkey_target=valkey_target,
+            db_id=REDIS_STATISTICS_DB,  # Use default database for session storage
+            human_readable_name="web.session",
+            sentinel_monitor=sentinel_monitors.monitor_for(valkey_target),
+        )
+        # Keep app["redis"] key for compatibility
+        app["redis"] = valkey_session_client
+
+        valkey_rate_limit_client = await ValkeyRateLimitClient.create(
+            valkey_target=rate_limit_valkey_target,
+            db_id=REDIS_RATE_LIMIT_DB,
+            human_readable_name="web.ratelimit",
+            sentinel_monitor=sentinel_monitors.monitor_for(rate_limit_valkey_target),
+        )
+        app["valkey_rate_limit"] = valkey_rate_limit_client
+
+        if pidx == 0 and config.session.flush_on_startup:
+            await valkey_session_client.flush_all_sessions()
+            log.info("session storage flushed")
+
+        if config.session.login_session_extension_sec is None:
+            config.session.login_session_extension_sec = config.session.max_age
+        redis_storage = RedisStorage(
+            valkey_session_client,
+            max_age=config.session.max_age,
+            secure=config.security.cookie_secure,
+        )
+        setup_session(app, redis_storage)
+        try:
+            yield
+        finally:
+            await valkey_rate_limit_client.close()
+            await valkey_session_client.close()
     finally:
-        await valkey_rate_limit_client.close()
-        await valkey_session_client.close()
+        await sentinel_monitors.close()
 
 
 @asynccontextmanager
@@ -1189,6 +1222,11 @@ async def server_main(
                 general_exception_middleware,
             ],
         )
+        if config.otel.enabled:
+            instrument_aiohttp_client()
+            app.middlewares.insert(
+                0, build_otel_server_middleware(untraced_handlers={console_handler, static_handler})
+            )
         app["config"] = config
         app["stats"] = WebStats()
         app["client_pool"] = await web_init_stack.enter_async_context(client_ctx(config, app))

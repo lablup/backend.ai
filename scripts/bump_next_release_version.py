@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """Advance NEXT_RELEASE_VERSION to the next sprint development version.
 
-After a sprint release is cut, the NEXT_RELEASE_VERSION placeholder in meta.py
-must move forward to the next development target. By default the sprint number is
-incremented and the patch reset to zero ({year}.{sprint+1}.0). A new version may
-be passed explicitly to handle year rollover or planned sprint skips.
+Once an X.Y.0rc1 cuts the X.Y version branch, the NEXT_RELEASE_VERSION placeholder
+in meta.py on main moves forward to the next development target. By default the
+sprint number is incremented and the patch reset to zero ({year}.{sprint+1}.0). A
+new version may be passed explicitly to handle year rollover or planned sprint skips.
 
 The new version string is printed to stdout so the caller can reuse it (e.g. in a
-commit message).
+commit message). With --current, the current value is printed and nothing is written.
 """
 
 from __future__ import annotations
@@ -51,8 +51,12 @@ def write_version(new_version: str) -> None:
 
 def main() -> None:
     if len(sys.argv) > 2:
-        print(f"Usage: {sys.argv[0]} [next_version]", file=sys.stderr)
+        print(f"Usage: {sys.argv[0]} [next_version | --current]", file=sys.stderr)
         sys.exit(1)
+
+    if sys.argv[1:] == ["--current"]:
+        print(read_current_version())
+        return
 
     if len(sys.argv) == 2:
         next_version = sys.argv[1]

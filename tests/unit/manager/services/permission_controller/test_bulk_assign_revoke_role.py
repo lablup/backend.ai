@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
@@ -11,12 +12,11 @@ import pytest
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.permission.role import (
+    AssignedUserData,
     BulkRoleAssignmentResultData,
     BulkRoleRevocationFailure,
     BulkRoleRevocationResultData,
     BulkUserRoleRevocationInput,
-    UserRoleAssignmentData,
-    UserRoleRevocationData,
 )
 from ai.backend.manager.services.rbac.actions.role.bulk_assign import (
     BulkAssignRoleAction,
@@ -51,20 +51,29 @@ class TestBulkAssignRole:
         role_id = uuid.uuid4()
         user_ids = [uuid.uuid4(), uuid.uuid4(), uuid.uuid4()]
         successes = [
-            UserRoleAssignmentData(id=uuid.uuid4(), user_id=uid, role_id=role_id, granted_by=None)
+            AssignedUserData(
+                id=uuid.uuid4(),
+                user_id=UserID(uid),
+                role_id=RoleID(role_id),
+                granted_by=None,
+                granted_at=datetime.now(tz=UTC),
+            )
             for uid in user_ids
         ]
         mock_repository.bulk_assign_role.return_value = BulkRoleAssignmentResultData(
             successes=successes, failures=[]
         )
 
+        granted_by = UserID(uuid.uuid4())
         action = BulkAssignRoleAction(
-            role_id=RoleID(role_id), user_ids=[UserID(uid) for uid in user_ids]
+            role_id=RoleID(role_id),
+            user_ids=[UserID(uid) for uid in user_ids],
+            granted_by=granted_by,
         )
         result = await service.bulk_assign_role(action)
 
         mock_repository.bulk_assign_role.assert_called_once_with(
-            RoleID(role_id), [UserID(uid) for uid in user_ids], None
+            RoleID(role_id), [UserID(uid) for uid in user_ids], granted_by
         )
         assert len(result.data.successes) == 3
         assert len(result.data.failures) == 0
@@ -78,7 +87,9 @@ class TestBulkAssignRole:
             successes=[], failures=[]
         )
 
-        action = BulkAssignRoleAction(role_id=RoleID(uuid.uuid4()), user_ids=[])
+        action = BulkAssignRoleAction(
+            role_id=RoleID(uuid.uuid4()), user_ids=[], granted_by=UserID(uuid.uuid4())
+        )
         result = await service.bulk_assign_role(action)
 
         assert len(result.data.successes) == 0
@@ -104,14 +115,22 @@ class TestBulkRevokeRole:
         role_id = uuid.uuid4()
         user_ids = [uuid.uuid4(), uuid.uuid4(), uuid.uuid4()]
         successes = [
-            UserRoleRevocationData(user_role_id=uuid.uuid4(), user_id=uid, role_id=role_id)
+            AssignedUserData(
+                id=uuid.uuid4(),
+                user_id=UserID(uid),
+                role_id=RoleID(role_id),
+                granted_by=None,
+                granted_at=datetime.now(tz=UTC),
+            )
             for uid in user_ids
         ]
         mock_repository.bulk_revoke_role.return_value = BulkRoleRevocationResultData(
             successes=successes, failures=[]
         )
 
-        input_data = BulkUserRoleRevocationInput(role_id=role_id, user_ids=user_ids)
+        input_data = BulkUserRoleRevocationInput(
+            role_id=RoleID(role_id), user_ids=[UserID(uid) for uid in user_ids]
+        )
         action = BulkRevokeRoleAction(input=input_data)
         result = await service.bulk_revoke_role(action)
 
@@ -128,16 +147,22 @@ class TestBulkRevokeRole:
         user_ids = [uuid.uuid4(), uuid.uuid4()]
         mock_repository.bulk_revoke_role.return_value = BulkRoleRevocationResultData(
             successes=[
-                UserRoleRevocationData(
-                    user_role_id=uuid.uuid4(),
-                    user_id=user_ids[0],
-                    role_id=role_id,
+                AssignedUserData(
+                    id=uuid.uuid4(),
+                    user_id=UserID(user_ids[0]),
+                    role_id=RoleID(role_id),
+                    granted_by=None,
+                    granted_at=datetime.now(tz=UTC),
                 )
             ],
-            failures=[BulkRoleRevocationFailure(user_id=user_ids[1], message="Role not assigned")],
+            failures=[
+                BulkRoleRevocationFailure(user_id=UserID(user_ids[1]), message="Role not assigned")
+            ],
         )
 
-        input_data = BulkUserRoleRevocationInput(role_id=role_id, user_ids=user_ids)
+        input_data = BulkUserRoleRevocationInput(
+            role_id=RoleID(role_id), user_ids=[UserID(uid) for uid in user_ids]
+        )
         action = BulkRevokeRoleAction(input=input_data)
         result = await service.bulk_revoke_role(action)
 
@@ -155,12 +180,14 @@ class TestBulkRevokeRole:
         mock_repository.bulk_revoke_role.return_value = BulkRoleRevocationResultData(
             successes=[],
             failures=[
-                BulkRoleRevocationFailure(user_id=uid, message="Role not assigned")
+                BulkRoleRevocationFailure(user_id=UserID(uid), message="Role not assigned")
                 for uid in user_ids
             ],
         )
 
-        input_data = BulkUserRoleRevocationInput(role_id=role_id, user_ids=user_ids)
+        input_data = BulkUserRoleRevocationInput(
+            role_id=RoleID(role_id), user_ids=[UserID(uid) for uid in user_ids]
+        )
         action = BulkRevokeRoleAction(input=input_data)
         result = await service.bulk_revoke_role(action)
 
@@ -177,7 +204,7 @@ class TestBulkRevokeRole:
             successes=[], failures=[]
         )
 
-        input_data = BulkUserRoleRevocationInput(role_id=role_id, user_ids=[])
+        input_data = BulkUserRoleRevocationInput(role_id=RoleID(role_id), user_ids=[])
         action = BulkRevokeRoleAction(input=input_data)
         result = await service.bulk_revoke_role(action)
 

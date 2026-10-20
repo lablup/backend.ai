@@ -37,12 +37,12 @@ from bai_scenario.components.app_config_allow_list import (
     TheNewEntryNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.app_config.allow_list import SCOPE_NAMES
 
 type CreatingStep = Scenario[
-    SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
 ]
 
 
@@ -80,7 +80,9 @@ class Opening(When[AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowL
 
 @dataclass(frozen=True)
 class LeavingTheRankOutTakesTheDefault(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     started: datetime
     scope_type: AppConfigScopeType
@@ -97,7 +99,7 @@ class LeavingTheRankOutTakesTheDefault(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=None, role=UserRole.SUPERADMIN)
 
     @override
@@ -113,7 +115,9 @@ class LeavingTheRankOutTakesTheDefault(
 
 @dataclass(frozen=True)
 class AGivenRankIsKept(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     started: datetime
 
@@ -126,7 +130,7 @@ class AGivenRankIsKept(
         return "슈퍼관리자가 순위를 지정해 allow_list를 생성하면, 지정한 값이 그대로 저장된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=None, role=UserRole.SUPERADMIN)
 
     @override
@@ -140,7 +144,9 @@ class AGivenRankIsKept(
 
 @dataclass(frozen=True)
 class AnUnregisteredNameIsRefused(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -151,7 +157,7 @@ class AnUnregisteredNameIsRefused(
         return "슈퍼관리자가 등록되지 않은 설정 이름으로 allow_list를 생성하면, 정의 없음 오류가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(defined=False, role=UserRole.SUPERADMIN)
 
     @override
@@ -165,7 +171,9 @@ class AnUnregisteredNameIsRefused(
 
 @dataclass(frozen=True)
 class OpeningTheSameKindTwiceIsRefused(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -179,7 +187,7 @@ class OpeningTheSameKindTwiceIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=AppConfigScopeType.PUBLIC, role=UserRole.SUPERADMIN)
 
     @override
@@ -193,7 +201,9 @@ class OpeningTheSameKindTwiceIsRefused(
 
 @dataclass(frozen=True)
 class APlainUserMayNotOpen(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode]
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ]
 ):
     @override
     def summary(self) -> str:
@@ -204,7 +214,7 @@ class APlainUserMayNotOpen(
         return "일반 사용자가 allow_list를 생성하면, 슈퍼관리자 권한이 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=None)
 
     @override
@@ -218,7 +228,9 @@ class APlainUserMayNotOpen(
 
 @dataclass(frozen=True)
 class EnforcementOffChangesNothing(
-    Scenario[SeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode],
+    Scenario[
+        TestSeedingSession, AnEntryAndACaller, AppConfigAllowListAdapter, AppConfigAllowListNode
+    ],
     Configured,
 ):
     @override
@@ -234,7 +246,7 @@ class EnforcementOffChangesNothing(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AnEntryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnEntryAndACaller]:
         return AnEntryAndSomeone(opened=None)
 
     @override
