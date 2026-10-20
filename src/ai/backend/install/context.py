@@ -2464,7 +2464,7 @@ class DockerContext(Context):
         self.log_header("Configuring manager...")
         await self.configure_manager()
 
-        # Manager schema must exist before fixtures and the app-proxy DB step
+        # Manager schema must exist before seeds and the app-proxy DB step
         # update scaling_groups (mirrors the PackageContext.configure() order).
         self.log_header("Initializing manager database schema...")
         await self.run_manager_cli(["mgr", "schema", "oneshot"])
@@ -2482,12 +2482,8 @@ class DockerContext(Context):
         await self.configure_appproxy()
         self.log_header("Generating client environ configs...")
         await self.configure_client()
-        self.log_header("Loading fixtures...")
-        await self.load_fixtures()
-        # load_fixtures() seeds the "default" scaling_group with placeholder
-        # wsproxy_addr/token from the example fixture, so this must run *after*
-        # it to overwrite them with the real coordinator address and secret.
-        await self.configure_appproxy_fixture()
+        self.log_header("Loading seeds...")
+        await self.load_seeds()
         self.log_header("Preparing vfolder volumes...")
         await self.prepare_local_vfolder_host()
 
