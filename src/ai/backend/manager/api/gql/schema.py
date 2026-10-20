@@ -649,9 +649,11 @@ from ai.backend.manager.api.gql.storage_volume.resolver import (
     delete_storage_volume,
     purge_storage_volume,
     restore_storage_volume,
-    scoped_storage_volumes,
     storage_volume,
     update_storage_volume,
+)
+from ai.backend.manager.api.gql.storage_volume_service_attachment.resolver import (
+    admin_storage_volume_service_attachments,
 )
 from ai.backend.manager.api.gql.user.resolver.mutation import (
     admin_bulk_create_users_v2,
@@ -855,7 +857,7 @@ class Query:
     admin_service_catalogs = admin_service_catalogs
     storage_volume = storage_volume
     admin_storage_volumes = admin_storage_volumes
-    scoped_storage_volumes = scoped_storage_volumes
+    admin_storage_volume_service_attachments = admin_storage_volume_service_attachments
     admin_session_scheduling_histories = admin_session_scheduling_histories
     admin_kernel_scheduling_histories = admin_kernel_scheduling_histories
     admin_deployments = admin_deployments

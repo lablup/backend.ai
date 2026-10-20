@@ -5,9 +5,10 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Any, Self, override
+from typing import TYPE_CHECKING, Annotated, Any, Self, override
 from uuid import UUID
 
+import strawberry
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
@@ -16,9 +17,6 @@ from ai.backend.common.dto.manager.v2.storage_volume.request import (
 )
 from ai.backend.common.dto.manager.v2.storage_volume.request import (
     StorageVolumeOrder as StorageVolumeOrderDTO,
-)
-from ai.backend.common.dto.manager.v2.storage_volume.request import (
-    StorageVolumeScope,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.request import (
     UpdateStorageVolumeInput as UpdateStorageVolumeInputDTO,
@@ -46,10 +44,10 @@ from ai.backend.common.dto.manager.v2.storage_volume.types import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
+    NullableDateTimeFilter,
     OrderDirection,
     StringFilter,
     UUIDFilter,
-    UUIDScopeGQL,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -67,6 +65,13 @@ from ai.backend.manager.api.gql.pydantic_compat import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
+if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.storage_volume_service_attachment.types import (
+        StorageVolumeServiceAttachmentConnectionGQL,
+        StorageVolumeServiceAttachmentFilterGQL,
+        StorageVolumeServiceAttachmentOrderByGQL,
+    )
+
 __all__ = (
     "DeleteStorageVolumePayloadGQL",
     "PurgeStorageVolumePayloadGQL",
@@ -76,7 +81,6 @@ __all__ = (
     "StorageVolumeFilterGQL",
     "StorageVolumeGQL",
     "StorageVolumeOrderByGQL",
-    "StorageVolumeScopeGQL",
     "StorageVolumeUsageFieldGQL",
     "UpdateStorageVolumeInputGQL",
     "UpdateStorageVolumePayloadGQL",
@@ -123,26 +127,59 @@ class StorageVolumeUsageExposureInputGQL(PydanticInputMixin[StorageVolumeUsageEx
     )
 
 
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Fields available for ordering storage volumes.",
+    ),
+    name="StorageVolumeOrderField",
+)
+class StorageVolumeOrderFieldGQL(StrEnum):
+    NAME = "name"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+    DELETED_AT = "deleted_at"
+
+
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "The scopes a storage volume read is answered for. Each list is OR'd internally"
-            " and across lists, and every scope named is authorized before the read runs."
-        ),
+        description="Specifies ordering for storage volume queries.",
     ),
-    name="StorageVolumeScope",
+    name="StorageVolumeOrderBy",
 )
-class StorageVolumeScopeGQL(PydanticInputMixin[StorageVolumeScope]):
-    domain: list[UUIDScopeGQL] | None = gql_field(
-        default=None, description="Domains whose storage volumes are being read."
+class StorageVolumeOrderByGQL(PydanticInputMixin[StorageVolumeOrderDTO]):
+    field: StorageVolumeOrderFieldGQL = gql_field(description="The field to order by.")
+    direction: OrderDirection = gql_field(description="Sort direction.", default=OrderDirection.ASC)
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Filter for storage volume queries.",
+    ),
+    name="StorageVolumeFilter",
+)
+class StorageVolumeFilterGQL(PydanticInputMixin[StorageVolumeFilterDTO]):
+    entity_id: UUIDFilter | None = gql_field(description="Filter by volume ID.", default=None)
+    name: StringFilter | None = gql_field(description="Filter by volume name.", default=None)
+    storage_backend_id: UUIDFilter | None = gql_field(
+        description="Filter by the backend the volume sits on.", default=None
     )
-    project: list[UUIDScopeGQL] | None = gql_field(
-        default=None, description="Projects whose storage volumes are being read."
+    deleted_at: NullableDateTimeFilter | None = gql_field(
+        description=(
+            "Filter by deletion time. Setting it on the top-level filter includes the volumes"
+            " marked deleted; inside AND, OR or NOT it does not."
+        ),
+        default=None,
     )
-    user: list[UUIDScopeGQL] | None = gql_field(
-        default=None, description="Users whose storage volumes are being read."
+    AND: list[Self] | None = gql_field(
+        description="Combine multiple filters with AND logic.", default=None
     )
+    OR: list[Self] | None = gql_field(
+        description="Combine multiple filters with OR logic.", default=None
+    )
+    NOT: list[Self] | None = gql_field(description="Negate the given filters.", default=None)
 
 
 @gql_node_type(
@@ -165,9 +202,46 @@ class StorageVolumeGQL(PydanticNodeMixin[StorageVolumeNode]):
     usage_exposure: StorageVolumeUsageExposureGQL = gql_field(
         description="Which usage figures the volume shows a user."
     )
-    enabled: bool = gql_field(description="Whether the volume is enabled.")
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime = gql_field(description="Last update timestamp.")
+    deleted_at: datetime | None = gql_field(
+        description="Deletion timestamp. Null while the volume is in use."
+    )
+
+    @gql_field(  # type: ignore[misc]
+        description="The services this volume is attached to, one attachment per service."
+    )
+    async def service_attachments(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: Annotated[
+            StorageVolumeServiceAttachmentFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.storage_volume_service_attachment.types"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                StorageVolumeServiceAttachmentOrderByGQL,
+                strawberry.lazy(
+                    "ai.backend.manager.api.gql.storage_volume_service_attachment.types"
+                ),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            StorageVolumeServiceAttachmentConnectionGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.storage_volume_service_attachment.types"),
+        ]
+        | None
+    ):
+        raise NotImplementedError
 
     @classmethod
     @override
@@ -212,54 +286,6 @@ class StorageVolumeConnectionGQL(Connection[StorageVolumeGQL]):
         self.count = count
 
 
-@gql_enum(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Fields available for ordering storage volumes.",
-    ),
-    name="StorageVolumeOrderField",
-)
-class StorageVolumeOrderFieldGQL(StrEnum):
-    NAME = "name"
-    CREATED_AT = "created_at"
-    UPDATED_AT = "updated_at"
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Specifies ordering for storage volume queries.",
-    ),
-    name="StorageVolumeOrderBy",
-)
-class StorageVolumeOrderByGQL(PydanticInputMixin[StorageVolumeOrderDTO]):
-    field: StorageVolumeOrderFieldGQL = gql_field(description="The field to order by.")
-    direction: OrderDirection = gql_field(description="Sort direction.", default=OrderDirection.ASC)
-
-
-@gql_pydantic_input(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Filter for storage volume queries.",
-    ),
-    name="StorageVolumeFilter",
-)
-class StorageVolumeFilterGQL(PydanticInputMixin[StorageVolumeFilterDTO]):
-    entity_id: UUIDFilter | None = gql_field(description="Filter by volume ID.", default=None)
-    name: StringFilter | None = gql_field(description="Filter by volume name.", default=None)
-    storage_backend_id: UUIDFilter | None = gql_field(
-        description="Filter by the backend the volume sits on.", default=None
-    )
-    enabled: bool | None = gql_field(description="Filter by the enabled flag.", default=None)
-    AND: list[Self] | None = gql_field(
-        description="Combine multiple filters with AND logic.", default=None
-    )
-    OR: list[Self] | None = gql_field(
-        description="Combine multiple filters with OR logic.", default=None
-    )
-    NOT: list[Self] | None = gql_field(description="Negate the given filters.", default=None)
-
-
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
@@ -286,7 +312,8 @@ class UpdateStorageVolumeInputGQL(PydanticInputMixin[UpdateStorageVolumeInputDTO
     name="PurgeStorageVolumePayload",
 )
 class PurgeStorageVolumePayloadGQL(PydanticOutputMixin[PurgeStorageVolumePayloadDTO]):
-    id: UUID = gql_field(description="ID of the purged storage volume.")
+    purged_id: strawberry.ID = gql_field(description="Global ID of the purged storage volume.")
+    entity_id: UUID = gql_field(description="UUID of the purged storage volume.")
 
 
 @gql_pydantic_type(
@@ -304,19 +331,19 @@ class UpdateStorageVolumePayloadGQL(PydanticOutputMixin[UpdateStorageVolumePaylo
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Payload returned after withdrawing a storage volume from new use.",
+        description="Payload returned after soft-deleting a storage volume.",
     ),
     model=DeleteStorageVolumePayloadDTO,
     name="DeleteStorageVolumePayload",
 )
 class DeleteStorageVolumePayloadGQL(PydanticOutputMixin[DeleteStorageVolumePayloadDTO]):
-    item: StorageVolumeGQL = gql_field(description="The withdrawn storage volume.")
+    item: StorageVolumeGQL = gql_field(description="The soft-deleted storage volume.")
 
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Payload returned after restoring a withdrawn storage volume.",
+        description="Payload returned after restoring a soft-deleted storage volume.",
     ),
     model=RestoreStorageVolumePayloadDTO,
     name="RestoreStorageVolumePayload",

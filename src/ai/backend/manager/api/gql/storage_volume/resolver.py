@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from strawberry import ID, Info
+from uuid import UUID
+
+from strawberry import Info
 
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
@@ -18,7 +20,6 @@ from ai.backend.manager.api.gql.storage_volume.types import (
     StorageVolumeFilterGQL,
     StorageVolumeGQL,
     StorageVolumeOrderByGQL,
-    StorageVolumeScopeGQL,
     UpdateStorageVolumeInputGQL,
     UpdateStorageVolumePayloadGQL,
 )
@@ -29,7 +30,6 @@ __all__ = (
     "delete_storage_volume",
     "purge_storage_volume",
     "restore_storage_volume",
-    "scoped_storage_volumes",
     "storage_volume",
     "update_storage_volume",
 )
@@ -43,7 +43,7 @@ __all__ = (
 )  # type: ignore[misc]
 async def storage_volume(
     info: Info[StrawberryGQLContext],
-    id: ID,
+    id: UUID,
 ) -> StorageVolumeGQL | None:
     raise NotImplementedError
 
@@ -68,30 +68,6 @@ async def admin_storage_volumes(
     raise NotImplementedError
 
 
-@gql_root_field(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "Page through the storage volumes the named scopes reach, combined with OR."
-            " Every scope is authorized before the read runs."
-        ),
-    )
-)  # type: ignore[misc]
-async def scoped_storage_volumes(
-    info: Info[StrawberryGQLContext],
-    scope: StorageVolumeScopeGQL,
-    filter: StorageVolumeFilterGQL | None = None,
-    order_by: list[StorageVolumeOrderByGQL] | None = None,
-    before: str | None = None,
-    after: str | None = None,
-    first: int | None = None,
-    last: int | None = None,
-    limit: int | None = None,
-    offset: int | None = None,
-) -> StorageVolumeConnectionGQL | None:
-    raise NotImplementedError
-
-
 @gql_mutation(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
@@ -102,7 +78,7 @@ async def scoped_storage_volumes(
 )
 async def update_storage_volume(
     info: Info[StrawberryGQLContext],
-    id: ID,
+    id: UUID,
     input: UpdateStorageVolumeInputGQL,
 ) -> UpdateStorageVolumePayloadGQL | None:
     raise NotImplementedError
@@ -118,7 +94,7 @@ async def update_storage_volume(
 )
 async def purge_storage_volume(
     info: Info[StrawberryGQLContext],
-    id: ID,
+    id: UUID,
 ) -> PurgeStorageVolumePayloadGQL | None:
     raise NotImplementedError
 
@@ -127,14 +103,15 @@ async def purge_storage_volume(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Withhold one storage volume from new use. The folders already on it keep"
-            " working and the volume still answers get and search."
+            "Soft-delete one storage volume, withholding it from new use. The folders already"
+            " on it keep working. A get still answers it; a search lists it only when the"
+            " filter gives deletedAt."
         ),
     )
 )
 async def delete_storage_volume(
     info: Info[StrawberryGQLContext],
-    id: ID,
+    id: UUID,
 ) -> DeleteStorageVolumePayloadGQL | None:
     raise NotImplementedError
 
@@ -142,11 +119,11 @@ async def delete_storage_volume(
 @gql_mutation(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Take one withdrawn storage volume back into use.",
+        description="Restore one soft-deleted storage volume back into use.",
     )
 )
 async def restore_storage_volume(
     info: Info[StrawberryGQLContext],
-    id: ID,
+    id: UUID,
 ) -> RestoreStorageVolumePayloadGQL | None:
     raise NotImplementedError

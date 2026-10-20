@@ -17,8 +17,10 @@ __all__ = (
     "GetStorageVolumePayload",
     "PurgeStorageVolumePayload",
     "RestoreStorageVolumePayload",
+    "SearchStorageVolumeServiceAttachmentsPayload",
     "SearchStorageVolumesPayload",
     "StorageVolumeNode",
+    "StorageVolumeServiceAttachmentNode",
     "UpdateStorageVolumePayload",
 )
 
@@ -36,7 +38,21 @@ class StorageVolumeNode(BaseResponseModel):
     usage_exposure: StorageVolumeUsageExposureInfo = Field(
         description="Which usage figures the volume shows a user"
     )
-    enabled: bool = Field(description="Whether the volume is enabled")
+    created_at: datetime = Field(description="Creation timestamp")
+    updated_at: datetime = Field(description="Last update timestamp")
+    deleted_at: datetime | None = Field(
+        default=None, description="Deletion timestamp. Null while the volume is in use"
+    )
+
+
+class StorageVolumeServiceAttachmentNode(BaseResponseModel):
+    """Node model representing a storage volume as one service has it attached."""
+
+    service_catalog_id: UUID = Field(description="ID of the service the volume is attached to")
+    storage_volume_id: UUID = Field(description="ID of the attached volume")
+    status_checked_at: datetime | None = Field(
+        description="When the service last checked the volume. Null until the first check"
+    )
     created_at: datetime = Field(description="Creation timestamp")
     updated_at: datetime = Field(description="Last update timestamp")
 
@@ -48,10 +64,23 @@ class GetStorageVolumePayload(BaseResponseModel):
 
 
 class SearchStorageVolumesPayload(BaseResponseModel):
-    """Payload for a storage volume search, whether an administrator's or a scoped one."""
+    """Payload for an administrator's storage volume search."""
 
     items: list[StorageVolumeNode] = Field(description="List of matching storage volumes.")
     total_count: int = Field(description="Total number of matching volumes.")
+    has_next_page: bool = Field(description="Whether there are more items after this page.")
+    has_previous_page: bool = Field(description="Whether there are more items before this page.")
+
+
+class SearchStorageVolumeServiceAttachmentsPayload(BaseResponseModel):
+    """Payload for a search over the storage volume service attachments."""
+
+    items: list[StorageVolumeServiceAttachmentNode] = Field(
+        description="List of matching storage volume service attachments."
+    )
+    total_count: int = Field(
+        description="Total number of matching storage volume service attachments."
+    )
     has_next_page: bool = Field(description="Whether there are more items after this page.")
     has_previous_page: bool = Field(description="Whether there are more items before this page.")
 
@@ -65,7 +94,7 @@ class UpdateStorageVolumePayload(BaseResponseModel):
 class PurgeStorageVolumePayload(BaseResponseModel):
     """Payload for a storage volume purge."""
 
-    id: UUID = Field(description="ID of the purged storage volume")
+    entity_id: UUID = Field(description="ID of the purged storage volume")
 
 
 class DeleteStorageVolumePayload(BaseResponseModel):

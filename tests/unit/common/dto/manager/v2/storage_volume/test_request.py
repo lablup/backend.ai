@@ -9,13 +9,13 @@ from pydantic import ValidationError
 
 from ai.backend.common.data.storage.types import StorageVolumeUsageField
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
-from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.dto.manager.v2.service_catalog.request import ServiceCatalogFilter
 from ai.backend.common.dto.manager.v2.storage_volume.request import (
+    AdminSearchStorageVolumeServiceAttachmentsInput,
     AdminSearchStorageVolumesInput,
-    ScopedSearchStorageVolumesInput,
     StorageVolumeFilter,
     StorageVolumeOrder,
-    StorageVolumeScope,
+    StorageVolumeServiceAttachmentFilter,
     UpdateStorageVolumeInput,
 )
 from ai.backend.common.dto.manager.v2.storage_volume.types import (
@@ -25,10 +25,6 @@ from ai.backend.common.dto.manager.v2.storage_volume.types import (
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.tristate.unset import UNSET
-
-
-def _a_scope() -> StorageVolumeScope:
-    return StorageVolumeScope(domain=[UUIDScope(value=uuid.uuid4())])
 
 
 class TestUpdateStorageVolumeInput:
@@ -83,7 +79,7 @@ class TestStorageVolumeFilter:
         assert filter.entity_id is None
         assert filter.name is None
         assert filter.storage_backend_id is None
-        assert filter.enabled is None
+        assert filter.deleted_at is None
 
     def test_nested_filters_hold_their_own_conditions(self) -> None:
         volume_id = uuid.uuid4()
@@ -95,22 +91,6 @@ class TestStorageVolumeFilter:
         nested = filter.OR[0]
         assert nested.entity_id is not None
         assert nested.entity_id.equals == volume_id
-
-
-class TestStorageVolumeScope:
-    def test_an_empty_scope_is_refused(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            StorageVolumeScope()
-
-    @pytest.mark.parametrize("field", ["domain", "project", "user"])
-    def test_one_dimension_is_enough(self, field: str) -> None:
-        scope = StorageVolumeScope.model_validate({field: [{"value": str(uuid.uuid4())}]})
-        assert getattr(scope, field) is not None
-
-    def test_the_other_dimensions_stay_none(self) -> None:
-        scope = _a_scope()
-        assert scope.project is None
-        assert scope.user is None
 
 
 class TestAdminSearchStorageVolumesInput:
@@ -139,15 +119,44 @@ class TestAdminSearchStorageVolumesInput:
             AdminSearchStorageVolumesInput.model_validate({field: value})
 
 
-class TestScopedSearchStorageVolumesInput:
-    def test_the_scope_is_required(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            ScopedSearchStorageVolumesInput.model_validate({})
-
-    def test_the_scope_is_carried(self) -> None:
-        project_id = uuid.uuid4()
-        input = ScopedSearchStorageVolumesInput(
-            scope=StorageVolumeScope(project=[UUIDScope(value=project_id)])
+class TestStorageVolumeServiceAttachmentFilter:
+    def test_it_carries_both_end_conditions(self) -> None:
+        service_id = uuid.uuid4()
+        filter = StorageVolumeServiceAttachmentFilter(
+            storage_volume=StorageVolumeFilter(name=StringFilter(contains="local")),
+            service_catalog=ServiceCatalogFilter(entity_id=UUIDFilter(equals=service_id)),
         )
-        assert input.scope.project is not None
-        assert input.scope.project[0].value == project_id
+        assert filter.storage_volume is not None
+        assert filter.storage_volume.name is not None
+        assert filter.service_catalog is not None
+        assert filter.service_catalog.entity_id is not None
+        assert filter.service_catalog.entity_id.equals == service_id
+
+    def test_nested_filters_hold_their_own_conditions(self) -> None:
+        volume_id = uuid.uuid4()
+        filter = StorageVolumeServiceAttachmentFilter(
+            NOT=[
+                StorageVolumeServiceAttachmentFilter(
+                    storage_volume=StorageVolumeFilter(entity_id=UUIDFilter(equals=volume_id))
+                )
+            ]
+        )
+        assert filter.NOT is not None
+        nested = filter.NOT[0]
+        assert nested.storage_volume is not None
+        assert nested.storage_volume.entity_id is not None
+        assert nested.storage_volume.entity_id.equals == volume_id
+
+
+class TestAdminSearchStorageVolumeServiceAttachmentsInput:
+    def test_it_takes_no_scope(self) -> None:
+        """The administrator's search reads every attachment, so it names no scope."""
+        assert "scope" not in AdminSearchStorageVolumeServiceAttachmentsInput.model_fields
+
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [("first", 0), ("last", 0), ("limit", 0), ("offset", -1)],
+    )
+    def test_out_of_range_pagination_is_refused(self, field: str, value: int) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            AdminSearchStorageVolumeServiceAttachmentsInput.model_validate({field: value})

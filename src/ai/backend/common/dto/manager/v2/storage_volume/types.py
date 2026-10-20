@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 __all__ = (
     "OrderDirection",
     "StorageVolumeOrderField",
+    "StorageVolumeServiceAttachmentOrderField",
     "StorageVolumeUsageExposureInfo",
     "StorageVolumeUsageExposureInput",
     "StorageVolumeUsageField",
@@ -25,6 +26,15 @@ class StorageVolumeOrderField(StrEnum):
     """Fields available for ordering storage volumes."""
 
     NAME = "name"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
+    DELETED_AT = "deleted_at"
+
+
+class StorageVolumeServiceAttachmentOrderField(StrEnum):
+    """Fields available for ordering the storage volume service attachments."""
+
+    STATUS_CHECKED_AT = "status_checked_at"
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
 
