@@ -24,7 +24,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerOptions,
     DeploymentOptions,
 )
-from ai.backend.manager.data.session.options import HandlerOptions
+from ai.backend.manager.data.session.options import AgentSelectionPolicy, HandlerOptions
 
 __all__ = (
     "deployment_options_to_info",
@@ -107,3 +107,12 @@ def deployment_options_from_input(
     return DeploymentOptions(
         handler_options=_handler_options_from_input(options.handler_options, valid_handler_names),
     )
+
+
+def agent_selection_policy_from_input(
+    options: DeploymentOptionsInput,
+) -> AgentSelectionPolicy | None:
+    """The policy the payload replaces with; ``None`` keeps the stored one."""
+    if options.agent_selection_policy is None:
+        return None
+    return AgentSelectionPolicy(options.agent_selection_policy.value)

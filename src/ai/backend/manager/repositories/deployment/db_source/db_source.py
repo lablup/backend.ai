@@ -98,6 +98,7 @@ from ai.backend.manager.data.session.creation import (
     ResolvedPresetValues,
     UserContext,
 )
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderLocation
 from ai.backend.manager.errors.deployment import (
@@ -2747,23 +2748,36 @@ class DeploymentDBSource:
         self,
         deployment_id: DeploymentID,
         options: DeploymentOptions,
+        agent_selection_policy: AgentSelectionPolicy | None,
     ) -> DeploymentOptions:
         """Replace the ``endpoints.options`` JSONB column for a deployment
-        and return the stored value in a single round-trip (``UPDATE ...
-        RETURNING``).
+        and return the stored value (``UPDATE ... RETURNING``).
 
         The column is typed as :class:`PydanticColumn` so the domain model
-        is persisted verbatim. This is a full-replace — callers are
-        expected to pass the complete new value.
+        is persisted verbatim. This is a full-replace except the agent
+        selection policy, which a ``None`` keeps as stored.
 
         Raises:
             EndpointNotFound: If the endpoint does not exist.
         """
         async with self._begin_session_read_committed() as db_sess:
+            if agent_selection_policy is None:
+                stored_options = await db_sess.scalar(
+                    sa.select(EndpointRow.options)
+                    .where(EndpointRow.id == deployment_id)
+                    .with_for_update()
+                )
+                if stored_options is None:
+                    raise EndpointNotFound(f"Endpoint {deployment_id} not found")
+                agent_selection_policy = stored_options.agent_selection_policy
             stmt = (
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == deployment_id)
-                .values(options=options)
+                .values(
+                    options=options.model_copy(
+                        update={"agent_selection_policy": agent_selection_policy}
+                    )
+                )
                 .returning(EndpointRow.options)
             )
             result = await db_sess.execute(stmt)

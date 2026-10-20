@@ -87,6 +87,7 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry, RoutingData
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.session.creation import DeploymentContext
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.service import EndpointNotFound
@@ -403,8 +404,11 @@ class DeploymentRepository:
         self,
         deployment_id: DeploymentID,
         options: DeploymentOptions,
+        agent_selection_policy: AgentSelectionPolicy | None,
     ) -> DeploymentOptions:
         """Fully replace a deployment's ``options`` surface.
+
+        ``agent_selection_policy`` replaces the policy; ``None`` keeps the stored one.
 
         Returns the persisted :class:`DeploymentOptions` value in a
         single ``UPDATE ... RETURNING`` round-trip. Callers that need
@@ -413,7 +417,9 @@ class DeploymentRepository:
         Raises:
             EndpointNotFound: If the deployment does not exist.
         """
-        return await self._db_source.replace_deployment_options(deployment_id, options)
+        return await self._db_source.replace_deployment_options(
+            deployment_id, options, agent_selection_policy
+        )
 
     @deployment_repository_resilience.apply()
     async def replace_designated_agents(

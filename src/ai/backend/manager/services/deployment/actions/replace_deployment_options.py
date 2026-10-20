@@ -3,6 +3,7 @@ from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.deployment.types import DeploymentOptions
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.services.deployment.actions.base import (
     DeploymentSingleEntityAction,
 )
@@ -17,6 +18,8 @@ class ReplaceDeploymentOptionsAction(DeploymentSingleEntityAction):
     """
 
     options: DeploymentOptions
+    # ``None`` keeps the stored policy; ``options.agent_selection_policy`` is not read.
+    agent_selection_policy: AgentSelectionPolicy | None
 
     @override
     @classmethod

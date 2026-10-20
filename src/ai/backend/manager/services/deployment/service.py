@@ -411,7 +411,7 @@ class DeploymentService:
         """
         log.trace("deployment options replace requested", deployment_id=action.deployment_id)
         options = await self._deployment_repository.replace_deployment_options(
-            action.deployment_id, action.options
+            action.deployment_id, action.options, action.agent_selection_policy
         )
         return ReplaceDeploymentOptionsActionResult(options=options)
 
