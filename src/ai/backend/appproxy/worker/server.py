@@ -46,7 +46,7 @@ from ai.backend.appproxy.common.defs import (
     MEDIA_TYPE_HTML,
     MEDIA_TYPE_JSON,
     WORKER_AUTHORITY_LABEL,
-    WORKER_INGRESS_DELIVERY_LABEL,
+    WORKER_INGRESS_DELIVERY_MODE_LABEL,
     WORKER_SERVICE_GROUP,
 )
 from ai.backend.appproxy.common.errors import (
@@ -611,7 +611,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             ),
             labels={
                 WORKER_AUTHORITY_LABEL: root_ctx.local_config.proxy_worker.authority,
-                WORKER_INGRESS_DELIVERY_LABEL: root_ctx.local_config.proxy_worker.ingress.delivery,
+                WORKER_INGRESS_DELIVERY_MODE_LABEL: root_ctx.local_config.proxy_worker.ingress.delivery_mode,
             },
         ),
     )

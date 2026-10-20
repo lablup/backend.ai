@@ -330,9 +330,9 @@
     # How ingresses are delivered to the worker, announced through service
     # discovery. api takes what the coordinator sends to the API port, redis
     # reads what the manager writes to Redis. Circuit events are written in
-    # either delivery.
+    # either delivery mode.
     # Added in 26.10.0
-    delivery = "api"
+    delivery_mode = "api"
     # Where the worker reads ingresses, in lookup order. in-memory, when
     # present, comes first.
     # Added in 26.10.0

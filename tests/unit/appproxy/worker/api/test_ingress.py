@@ -107,7 +107,7 @@ def reader() -> AsyncMock:
 def api_delivery_root_ctx(reader: AsyncMock, writer: AsyncMock) -> Mock:
     root_ctx = Mock(spec=RootContext, ingress_state=IngressState(reader=reader, writer=writer))
     root_ctx.local_config.proxy_worker.ingress = IngressConfig.model_validate({
-        "delivery": IngressDeliveryMode.API,
+        "delivery_mode": IngressDeliveryMode.API,
         "layers": ["in-memory"],
     })
     return root_ctx
@@ -117,7 +117,7 @@ def api_delivery_root_ctx(reader: AsyncMock, writer: AsyncMock) -> Mock:
 def redis_delivery_root_ctx(reader: AsyncMock, writer: AsyncMock) -> Mock:
     root_ctx = Mock(spec=RootContext, ingress_state=IngressState(reader=reader, writer=writer))
     root_ctx.local_config.proxy_worker.ingress = IngressConfig.model_validate({
-        "delivery": IngressDeliveryMode.REDIS,
+        "delivery_mode": IngressDeliveryMode.REDIS,
     })
     return root_ctx
 

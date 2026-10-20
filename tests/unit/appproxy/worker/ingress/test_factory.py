@@ -18,8 +18,8 @@ def valkey_client() -> ValkeyLiveClient:
     return Mock(spec=ValkeyLiveClient)
 
 
-def _create(delivery: str, layers: list[str], valkey_client: ValkeyLiveClient) -> IngressState:
-    config = IngressConfig.model_validate({"delivery": delivery, "layers": layers})
+def _create(delivery_mode: str, layers: list[str], valkey_client: ValkeyLiveClient) -> IngressState:
+    config = IngressConfig.model_validate({"delivery_mode": delivery_mode, "layers": layers})
     return IngressStateFactory(config, IngressAuthority("worker-1"), valkey_client).create()
 
 
