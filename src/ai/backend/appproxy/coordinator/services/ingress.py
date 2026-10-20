@@ -14,6 +14,7 @@ from ai.backend.appproxy.common.defs import (
 from ai.backend.appproxy.common.types import IngressDeliveryMode
 from ai.backend.appproxy.coordinator.clients.worker.client import AppProxyWorkerClient
 from ai.backend.appproxy.coordinator.errors.ingress import ApiDeliveryWorkerPushFailedError
+from ai.backend.appproxy.coordinator.ingress.traefik import TraefikIngressWriter
 from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientPool
 from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressAuthority, IngressKey
 from ai.backend.common.exception import BackendAIError
@@ -21,23 +22,39 @@ from ai.backend.common.service_discovery.service_discovery import ServiceDiscove
 
 
 class IngressService:
-    """Pushes ingresses to every api-delivery worker node of their authority, keeping none."""
+    """Writes ingresses to Traefik etcd when Traefik is enabled, and otherwise pushes them to
+    every api-delivery worker node of their authority. The coordinator keeps none of them."""
 
     _service_discovery: ServiceDiscovery
     _client_pool: ClientPool
     _secrets: SecretConfig
+    _traefik_writer: TraefikIngressWriter | None
 
     def __init__(
         self,
         service_discovery: ServiceDiscovery,
         client_pool: ClientPool,
         secrets: SecretConfig,
+        traefik_writer: TraefikIngressWriter | None,
     ) -> None:
         self._service_discovery = service_discovery
         self._client_pool = client_pool
         self._secrets = secrets
+        self._traefik_writer = traefik_writer
 
     async def upsert(self, ingresses: Sequence[Ingress]) -> None:
+        if self._traefik_writer is not None:
+            await asyncio.gather(*(self._traefik_writer.upsert(ingress) for ingress in ingresses))
+        else:
+            await self._push_upsert(ingresses)
+
+    async def remove(self, keys: Sequence[IngressKey]) -> None:
+        if self._traefik_writer is not None:
+            await asyncio.gather(*(self._traefik_writer.remove(key) for key in keys))
+        else:
+            await self._push_remove(keys)
+
+    async def _push_upsert(self, ingresses: Sequence[Ingress]) -> None:
         by_authority: defaultdict[IngressAuthority, list[Ingress]] = defaultdict(list)
         for ingress in ingresses:
             by_authority[ingress.authority].append(ingress)
@@ -48,7 +65,7 @@ class IngressService:
             for addr in addrs
         ])
 
-    async def remove(self, keys: Sequence[IngressKey]) -> None:
+    async def _push_remove(self, keys: Sequence[IngressKey]) -> None:
         by_authority: defaultdict[IngressAuthority, list[IngressKey]] = defaultdict(list)
         for key in keys:
             by_authority[key.authority].append(key)

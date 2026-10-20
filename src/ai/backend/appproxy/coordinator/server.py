@@ -82,7 +82,9 @@ from ai.backend.appproxy.common.utils import (
     ensure_json_serializable,
     mime_match,
 )
+from ai.backend.appproxy.coordinator.ingress.traefik import TraefikIngressWriter
 from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
+from ai.backend.appproxy.coordinator.repositories.worker import WorkerRepository
 from ai.backend.appproxy.coordinator.services.ingress import IngressService
 from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
@@ -927,10 +929,25 @@ async def worker_client_pool_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 @asynccontextmanager
 async def ingress_service_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    traefik_writer: TraefikIngressWriter | None
+    if root_ctx.traefik_etcd is None:
+        traefik_writer = None
+    else:
+        traefik_config = root_ctx.local_config.proxy_coordinator.traefik
+        if traefik_config is None:
+            raise MissingTraefikConfigError("Traefik configuration is required")
+        traefik_writer = TraefikIngressWriter(
+            root_ctx.traefik_etcd,
+            WorkerRepository(root_ctx.db),
+            traefik_config,
+            jwt_secret=root_ctx.local_config.secrets.jwt_secret,
+            permit_hash_secret=root_ctx.local_config.permit_hash.secret.decode(),
+        )
     root_ctx.ingress_service = IngressService(
         root_ctx.worker_service_discovery,
         root_ctx.worker_client_pool,
         root_ctx.local_config.secrets,
+        traefik_writer,
     )
     yield
 

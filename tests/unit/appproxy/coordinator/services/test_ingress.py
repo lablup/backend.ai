@@ -224,7 +224,7 @@ def client_pool(worker_sessions: dict[str, MagicMock]) -> Mock:
 def service(
     service_discovery: AsyncMock, client_pool: Mock, secrets: SecretConfig
 ) -> IngressService:
-    return IngressService(service_discovery, client_pool, secrets)
+    return IngressService(service_discovery, client_pool, secrets, traefik_writer=None)
 
 
 class TestIngressService:
@@ -304,7 +304,7 @@ class TestIngressService:
         worker_sessions: dict[str, MagicMock],
         worker_1_ingress: Ingress,
     ) -> None:
-        service = IngressService(empty_service_discovery, client_pool, secrets)
+        service = IngressService(empty_service_discovery, client_pool, secrets, traefik_writer=None)
         await service.upsert([worker_1_ingress])
         for session in worker_sessions.values():
             session.post.assert_not_called()
