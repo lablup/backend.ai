@@ -11,9 +11,10 @@ from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.rbac_models.role_preset.row import (
     RolePresetRow,
 )
-from ai.backend.manager.models.rbac_models.role_preset.updaters import (
-    RolePresetSoftDeleteUpdater,
+from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
+    RolePresetSearchableFields,
 )
+from ai.backend.manager.models.specs.soft_delete import SoftDeleteUpdater
 
 
 @dataclass
@@ -32,9 +33,17 @@ class PartialBulkDeleteRolePresetsAction(DeletePartialBulkOpsAction[RolePresetRo
         return tuple(self.ids)
 
     @override
-    def to_updaters(self) -> Mapping[EntityIdentifier, RolePresetSoftDeleteUpdater]:
+    def to_updaters(
+        self,
+    ) -> Mapping[EntityIdentifier, SoftDeleteUpdater[RolePresetRow, RolePresetData]]:
         return {
-            preset_id: RolePresetSoftDeleteUpdater(preset_id=preset_id) for preset_id in self.ids
+            preset_id: SoftDeleteUpdater(
+                target_row=RolePresetRow,
+                target_column=RolePresetRow.id,
+                target_id=preset_id,
+                converter=RolePresetSearchableFields.own,
+            )
+            for preset_id in self.ids
         }
 
     @override

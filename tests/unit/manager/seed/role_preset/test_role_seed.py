@@ -196,7 +196,7 @@ class TestFixture:
 
     def test_no_preset_is_deleted(self, seeds: list[RolePresetSeed]) -> None:
         presets = RoleFixture(seeds).render_presets()["role_presets"]
-        assert not any(preset["deleted"] for preset in presets)
+        assert all(preset["deleted_at"] is None for preset in presets)
 
     def test_every_row_fits_its_table(self, seeds: list[RolePresetSeed]) -> None:
         """A generated row names the columns its table has, and misses none it needs."""

@@ -10,6 +10,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "BulkDeleteRolePresetsPayload",
@@ -46,9 +47,14 @@ class RolePresetNode(BaseResponseModel):
         ),
     )
     deleted: bool = Field(
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deleted_at`.",
+        deprecated=True,
+    )
+    deleted_at: datetime | None = Field(
+        default=None,
         description=(
-            "Soft-delete flag. Set by the Delete mutation and cleared by the Restore "
-            "mutation; archived rows are excluded from default searches."
+            f"Added in {NEXT_RELEASE_VERSION}. Soft-delete time. Set by the Delete mutation and "
+            "cleared by the Restore mutation; null while the preset is in use."
         ),
     )
     created_at: datetime = Field(description="Creation timestamp.")

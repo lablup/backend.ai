@@ -381,7 +381,6 @@ async def user_role_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:
                 name="preset-user",
                 scope_type=UserEntityType(),
                 auto_assign=True,
-                deleted=False,
             )
         )
         await session.flush()
@@ -537,7 +536,6 @@ async def declared_user_owner_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:
                 name=seed.name,
                 scope_type=seed.scope_type,
                 auto_assign=seed.auto_assign,
-                deleted=False,
             )
         )
         await session.commit()

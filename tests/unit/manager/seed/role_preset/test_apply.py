@@ -40,11 +40,16 @@ async def _presets(db: ExtendedAsyncSAEngine) -> dict[str, tuple[str, str, bool,
                 RolePresetRow.name,
                 RolePresetRow.scope_type,
                 RolePresetRow.auto_assign,
-                RolePresetRow.deleted,
+                RolePresetRow.deleted_at,
             )
         )
         return {
-            str(row.id): (row.name, str(row.scope_type), row.auto_assign, row.deleted)
+            str(row.id): (
+                row.name,
+                str(row.scope_type),
+                row.auto_assign,
+                row.deleted_at is not None,
+            )
             for row in rows
         }
 
@@ -178,7 +183,7 @@ class TestApply:
         assert (await _presets(db))[domain_admin_id][0] == "renamed"
         assert await _permissions(db) == permissions
 
-    async def test_overwrite_restores_the_seed_values(
+    async def test_overwrite_restores_the_seed_values_and_keeps_a_soft_delete(
         self,
         db: ExtendedAsyncSAEngine,
         repository: SeedRepository,
@@ -192,7 +197,7 @@ class TestApply:
             await sess.execute(
                 sa.update(RolePresetRow)
                 .where(RolePresetRow.id == domain_admin_id)
-                .values(name="renamed", auto_assign=True, deleted=True)
+                .values(name="renamed", auto_assign=True, deleted_at=sa.func.now())
             )
             await sess.execute(
                 sa.delete(RolePermissionPresetRow).where(
@@ -202,8 +207,12 @@ class TestApply:
 
         results = await SeedApplier(repository).apply(plan, overwrite=True)
 
+        name, scope_type, auto_assign, _ = presets[domain_admin_id]
         assert len(results[SeedKind.ROLE_PRESET].succeeded) == len(plan.batches[0].items())
-        assert await _presets(db) == presets
+        assert await _presets(db) == {
+            **presets,
+            domain_admin_id: (name, scope_type, auto_assign, True),
+        }
         assert await _permissions(db) == permissions
 
     async def test_overwrite_rewrites_a_stated_entity_type_to_its_grant(

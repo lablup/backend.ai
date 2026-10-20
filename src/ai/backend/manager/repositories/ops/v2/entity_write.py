@@ -432,7 +432,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             await self._sess.scalars(
                 sa.select(RolePresetRow).where(
                     RolePresetRow.scope_type.in_({e.entity_type() for e in entities}),
-                    RolePresetRow.deleted.is_(False),
+                    RolePresetRow.deleted_at.is_(None),
                 )
             )
         ).all()

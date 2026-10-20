@@ -36,7 +36,7 @@ log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 class V2RolePresetHandler:
     """REST v2 handler for role preset operations.
 
-    Delete is a soft-delete (toggles ``deleted = true``); Restore inverts it;
+    Delete is a soft-delete (sets ``deleted_at``); Restore clears it;
     Purge performs the hard delete and cascades to permission entries.
     """
 
@@ -72,7 +72,7 @@ class V2RolePresetHandler:
         path: PathParam[RolePresetIdPathParam],
         body: BodyParam[UpdateRolePresetBody],
     ) -> APIResponse:
-        """Update a role preset's metadata. The ``deleted`` flag cannot be mutated here."""
+        """Update a role preset's metadata. ``deleted_at`` cannot be mutated here."""
         result = await self._adapter.update(path.parsed.role_preset_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

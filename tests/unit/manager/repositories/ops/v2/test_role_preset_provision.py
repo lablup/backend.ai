@@ -7,6 +7,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncGenerator, Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 
 import pytest
 import sqlalchemy as sa
@@ -189,7 +190,10 @@ async def scene(db: ExtendedAsyncSAEngine) -> Scene:
             sess.add(nodes[entity_id])
         rows = {
             name: RolePresetRow(
-                name=name, scope_type=scope_type, auto_assign=auto_assign, deleted=deleted
+                name=name,
+                scope_type=scope_type,
+                auto_assign=auto_assign,
+                deleted_at=datetime.now(UTC) if deleted else None,
             )
             for name, scope_type, auto_assign, deleted in _PRESETS
         }

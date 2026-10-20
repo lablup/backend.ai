@@ -122,7 +122,13 @@ class TestMigrationMatchesFixture:
             False,
         ))
         seeded = {
-            (row["id"], row["name"], row["scope_type"], row["auto_assign"], row["deleted"])
+            (
+                row["id"],
+                row["name"],
+                row["scope_type"],
+                row["auto_assign"],
+                row["deleted_at"] is not None,
+            )
             for row in fixture["role_presets"]
         }
         assert written == seeded

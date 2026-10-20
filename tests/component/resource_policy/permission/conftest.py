@@ -251,7 +251,6 @@ async def declared_presets(db_engine: SAEngine) -> AsyncIterator[list[RolePreset
                     "name": seed.name,
                     "scope_type": str(seed.scope_type),
                     "auto_assign": seed.auto_assign,
-                    "deleted": False,
                 }
                 for seed in seeds
             ])

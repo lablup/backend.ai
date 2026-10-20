@@ -154,7 +154,7 @@ def search(
     order_by: tuple[str, ...],
 ) -> None:
     """Search role presets across the system."""
-    from ai.backend.common.dto.manager.query import StringFilter
+    from ai.backend.common.dto.manager.query import NullableDateTimeFilter, StringFilter
     from ai.backend.common.dto.manager.v2.role_preset.request import (
         RolePresetFilter,
         RolePresetOrder,
@@ -168,7 +168,7 @@ def search(
             name=StringFilter(contains=name_contains) if name_contains is not None else None,
             scope_type=StringFilter(equals=scope_type) if scope_type is not None else None,
             auto_assign=auto_assign,
-            deleted=deleted,
+            deleted_at=NullableDateTimeFilter(is_null=not deleted) if deleted is not None else None,
         )
 
     orders = (
@@ -227,7 +227,7 @@ def update(
 @role_preset.command()
 @click.argument("role_preset_ids", type=click.UUID, nargs=-1, required=True)
 def delete(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
-    """Soft-delete one or more role presets (sets ``deleted = true``)."""
+    """Soft-delete one or more role presets (sets ``deleted_at``)."""
     from ai.backend.common.dto.manager.v2.role_preset.request import (
         PartialBulkDeleteRolePresetsInput,
     )
@@ -248,7 +248,7 @@ def delete(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
 @role_preset.command()
 @click.argument("role_preset_ids", type=click.UUID, nargs=-1, required=True)
 def restore(role_preset_ids: tuple[uuid.UUID, ...]) -> None:
-    """Restore one or more soft-deleted role presets (sets ``deleted = false``)."""
+    """Restore one or more soft-deleted role presets (clears ``deleted_at``)."""
     from ai.backend.common.dto.manager.v2.role_preset.request import (
         PartialBulkRestoreRolePresetsInput,
     )

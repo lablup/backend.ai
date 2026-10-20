@@ -96,9 +96,7 @@ def _node_of(entity_type: str, entity_id: uuid.UUID) -> sa.ScalarSelect[VirtualE
 
 async def _add_preset(db: ExtendedAsyncSAEngine, scope_type: EntityType) -> uuid.UUID:
     async with db.begin_session() as session:
-        preset = RolePresetRow(
-            name="member", scope_type=scope_type, auto_assign=False, deleted=False
-        )
+        preset = RolePresetRow(name="member", scope_type=scope_type, auto_assign=False)
         session.add(preset)
         await session.flush()
         return preset.id

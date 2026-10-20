@@ -118,7 +118,6 @@ async def declared_user_owner_preset(db_engine: SAEngine) -> AsyncIterator[uuid.
                 name=seed.name,
                 scope_type=str(seed.scope_type),
                 auto_assign=seed.auto_assign,
-                deleted=False,
             )
         )
         await conn.execute(

@@ -58,7 +58,7 @@ class RoleFixture:
                 "role_name_template": None,
                 "scope_type": str(seed.scope_type),
                 "auto_assign": seed.auto_assign,
-                "deleted": False,
+                "deleted_at": None,
                 "created_at": _TIMESTAMP,
                 "updated_at": _TIMESTAMP,
             }

@@ -10,6 +10,7 @@ import contextlib
 import uuid
 from collections.abc import AsyncGenerator, Mapping, Sequence
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from typing import Any, Self, override
 
 import pytest
@@ -77,7 +78,7 @@ async def _seed_preset(db: ExtendedAsyncSAEngine) -> RolePresetID:
                 id=preset_id,
                 name=f"preset-{preset_id.hex[:8]}",
                 scope_type=ProjectEntityType(),
-                deleted=_SEEDED_DELETED,
+                deleted_at=datetime.now(UTC) if _SEEDED_DELETED else None,
             )
         )
         await sess.commit()
@@ -117,7 +118,10 @@ async def _untouched(db: ExtendedAsyncSAEngine, preset_ids: list[RolePresetID]) 
     async with db.begin_readonly_session() as sess:
         rows = await sess.scalars(
             sa.select(RolePresetRow.id).where(
-                RolePresetRow.id.in_(preset_ids), RolePresetRow.deleted == _SEEDED_DELETED
+                RolePresetRow.id.in_(preset_ids),
+                RolePresetRow.deleted_at.is_not(None)
+                if _SEEDED_DELETED
+                else RolePresetRow.deleted_at.is_(None),
             )
         )
         return set(rows.all())
@@ -479,7 +483,7 @@ class TestResult:
 
         (item,) = result.items
         assert item.value.id == presets[0]
-        assert item.value.deleted is not _SEEDED_DELETED
+        assert (item.value.deleted_at is not None) is not _SEEDED_DELETED
 
 
 @dataclass

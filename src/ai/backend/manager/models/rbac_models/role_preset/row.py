@@ -14,16 +14,17 @@ from ai.backend.manager.models.base import (
     GUID,
     Base,
 )
+from ai.backend.manager.models.mixins.soft_delete import SoftDeleteMixin
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 
-class RolePresetRow(LifecycleTimestampsMixin, Base):
+class RolePresetRow(SoftDeleteMixin, LifecycleTimestampsMixin, Base):
     __tablename__ = "role_presets"
     __table_args__ = (
         sa.Index(
-            "ix_role_presets_scope_type_deleted",
+            "ix_role_presets_scope_type_deleted_at",
             "scope_type",
-            "deleted",
+            "deleted_at",
         ),
     )
 
@@ -43,9 +44,4 @@ class RolePresetRow(LifecycleTimestampsMixin, Base):
     # Default for the ``auto_assign`` flag copied onto roles instantiated from this preset.
     auto_assign: Mapped[bool] = mapped_column(
         "auto_assign", sa.Boolean, nullable=False, server_default=sa.false()
-    )
-    # Soft-delete flag. Toggled by the Delete / Restore service operations;
-    # the Update API never mutates this column directly.
-    deleted: Mapped[bool] = mapped_column(
-        "deleted", sa.Boolean, nullable=False, server_default=sa.false()
     )

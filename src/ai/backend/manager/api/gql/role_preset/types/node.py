@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     SearchRolePermissionPresetsInput,
 )
 from ai.backend.common.dto.manager.v2.role_preset.response import RolePresetNode
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -67,7 +68,17 @@ class RolePresetGQL(PydanticNodeMixin[RolePresetNode]):
         description=(
             "Soft-delete flag. Set by the delete mutation and cleared by the restore "
             "mutation; archived rows are excluded from default searches."
-        )
+        ),
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deletedAt`.",
+    )
+    deleted_at: datetime | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Soft-delete time. Set by the delete mutation and cleared by the restore "
+                "mutation; null while the preset is in use."
+            ),
+        ),
     )
     created_at: datetime = gql_field(description="Creation timestamp.")
     updated_at: datetime = gql_field(description="Last modification timestamp.")
