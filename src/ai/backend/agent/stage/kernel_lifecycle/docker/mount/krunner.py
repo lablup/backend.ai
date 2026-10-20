@@ -8,7 +8,7 @@ from typing import Final, override
 
 from cachetools import LRUCache, cached
 
-from ai.backend.agent.kernel import match_distro_data
+from ai.backend.agent.kernel import match_distro_data, read_krunner_python_version
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec, Mount
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.stage.types import (
@@ -252,23 +252,9 @@ class KernelRunnerMountProvisioner(Provisioner[KernelRunnerMountSpec, KernelRunn
         matched_libc_style = LibcStyle.GLIBC
         if distro.startswith("alpine"):
             matched_libc_style = LibcStyle.MUSL
-        krunner_pyver = FALLBACK_KERNEL_PYTHON_VERSION
-        if m := re.search(r"^([a-z-]+)(\d+(\.\d+)*)?$", matched_distro):
-            matched_distro_pkgname = m.group(1).replace("-", "_")
-            try:
-                krunner_pyver = (
-                    Path(
-                        str(
-                            files(f"ai.backend.krunner.{matched_distro_pkgname}").joinpath(
-                                f"krunner-python.{matched_distro}.txt"
-                            )
-                        )
-                    )
-                    .read_text()
-                    .strip()
-                )
-            except FileNotFoundError:
-                pass
+        krunner_pyver = (
+            read_krunner_python_version(matched_distro) or FALLBACK_KERNEL_PYTHON_VERSION
+        )
         arch = get_arch_name()
         return KernelRunnerInfo(
             distro=matched_distro,

@@ -264,6 +264,7 @@ from .kernel import (
     AbstractKernel,
     KernelRegistry,
     match_distro_data,
+    read_krunner_python_version,
 )
 from .kernel_registry.writer.types import KernelRegistrySaveMetadata
 from .observer.host_port import HostPortObserver
@@ -531,23 +532,7 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         matched_libc_style = "glibc"
         if distro.startswith("alpine"):
             matched_libc_style = "musl"
-        krunner_pyver = "3.6"  # fallback
-        if m := re.search(r"^([a-z-]+)(\d+(\.\d+)*)?$", matched_distro):
-            matched_distro_pkgname = m.group(1).replace("-", "_")
-            try:
-                krunner_pyver = (
-                    Path(
-                        str(
-                            files(f"ai.backend.krunner.{matched_distro_pkgname}").joinpath(
-                                f"krunner-python.{matched_distro}.txt"
-                            )
-                        )
-                    )
-                    .read_text()
-                    .strip()
-                )
-            except FileNotFoundError:
-                pass
+        krunner_pyver = read_krunner_python_version(matched_distro) or "3.6"  # fallback
         log.debug(
             "krunner selected",
             krunner_distro=matched_distro,
