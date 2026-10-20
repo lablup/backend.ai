@@ -10,7 +10,7 @@ from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 
 from ai.backend.appproxy.common.errors.http import AuthorizationFailed
-from ai.backend.appproxy.common.types import IngressUpdateMode
+from ai.backend.appproxy.common.types import IngressDeliveryMode
 from ai.backend.appproxy.worker.api.ingress import (
     TOKEN_HEADER,
     IngressHandler,
@@ -104,23 +104,26 @@ def reader() -> AsyncMock:
 
 
 @pytest.fixture
-def api_mode_state(reader: AsyncMock, writer: AsyncMock) -> IngressState:
-    config = IngressConfig.model_validate({"mode": IngressUpdateMode.API, "layers": ["in-memory"]})
+def api_delivery_state(reader: AsyncMock, writer: AsyncMock) -> IngressState:
+    config = IngressConfig.model_validate({
+        "delivery": IngressDeliveryMode.API,
+        "layers": ["in-memory"],
+    })
     return IngressState(reader=reader, writer=writer, config=config)
 
 
 @pytest.fixture
-def redis_mode_state(reader: AsyncMock, writer: AsyncMock) -> IngressState:
-    config = IngressConfig.model_validate({"mode": IngressUpdateMode.REDIS})
+def redis_delivery_state(reader: AsyncMock, writer: AsyncMock) -> IngressState:
+    config = IngressConfig.model_validate({"delivery": IngressDeliveryMode.REDIS})
     return IngressState(reader=reader, writer=writer, config=config)
 
 
 class TestIngressHandler:
     async def test_upsert_reports_the_applied_revisions(
-        self, api_mode_state: IngressState, writer: AsyncMock
+        self, api_delivery_state: IngressState, writer: AsyncMock
     ) -> None:
         response = await IngressHandler().upsert(
-            _request(api_mode_state, {"ingresses": [INGRESS_PAYLOAD]})
+            _request(api_delivery_state, {"ingresses": [INGRESS_PAYLOAD]})
         )
         assert isinstance(response, web.Response)
         assert response.status == HTTPStatus.OK
@@ -128,35 +131,35 @@ class TestIngressHandler:
         writer.apply.assert_awaited_once()
 
     async def test_remove_removes_through_the_writer(
-        self, api_mode_state: IngressState, writer: AsyncMock
+        self, api_delivery_state: IngressState, writer: AsyncMock
     ) -> None:
         body = {"keys": [{"authority": "worker-1", "frontend_key": "10205"}]}
-        response = await IngressHandler().remove(_request(api_mode_state, body))
+        response = await IngressHandler().remove(_request(api_delivery_state, body))
         assert response.status == HTTPStatus.NO_CONTENT
         writer.remove.assert_awaited_once()
 
     async def test_replace_reports_the_applied_revisions(
-        self, api_mode_state: IngressState, writer: AsyncMock
+        self, api_delivery_state: IngressState, writer: AsyncMock
     ) -> None:
         response = await IngressHandler().replace(
-            _request(api_mode_state, {"ingresses": [INGRESS_PAYLOAD]})
+            _request(api_delivery_state, {"ingresses": [INGRESS_PAYLOAD]})
         )
         assert isinstance(response, web.Response)
         assert response.status == HTTPStatus.OK
         assert json.loads(response.text or "") == {"revisions": {"10205": 3}}
         writer.replace_all.assert_awaited_once()
 
-    async def test_write_outside_the_api_mode_is_not_supported(
-        self, redis_mode_state: IngressState, writer: AsyncMock
+    async def test_write_outside_the_api_delivery_is_not_supported(
+        self, redis_delivery_state: IngressState, writer: AsyncMock
     ) -> None:
         with pytest.raises(IngressWriteNotSupportedError):
             await IngressHandler().upsert(
-                _request(redis_mode_state, {"ingresses": [INGRESS_PAYLOAD]})
+                _request(redis_delivery_state, {"ingresses": [INGRESS_PAYLOAD]})
             )
         writer.apply.assert_not_awaited()
 
-    async def test_revisions_map_frontend_keys(self, api_mode_state: IngressState) -> None:
-        response = await IngressHandler().revisions(_request(api_mode_state))
+    async def test_revisions_map_frontend_keys(self, api_delivery_state: IngressState) -> None:
+        response = await IngressHandler().revisions(_request(api_delivery_state))
         assert isinstance(response, web.Response)
         assert response.status == HTTPStatus.OK
         assert json.loads(response.text or "") == {"revisions": {"10205": 3}}

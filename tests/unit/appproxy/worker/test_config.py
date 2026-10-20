@@ -8,7 +8,7 @@ from uuid import uuid4
 import pytest
 from pydantic import TypeAdapter
 
-from ai.backend.appproxy.common.types import FrontendMode, IngressUpdateMode
+from ai.backend.appproxy.common.types import FrontendMode, IngressDeliveryMode
 from ai.backend.appproxy.worker.config import (
     IngressConfig,
     IngressLayerType,
@@ -20,8 +20,8 @@ from ai.backend.common.typed_validators import AutoDirectoryPath
 
 
 @dataclass(frozen=True)
-class _ModeLayersCase:
-    mode: IngressUpdateMode
+class _DeliveryLayersCase:
+    delivery: IngressDeliveryMode
     layers: list[str]
 
 
@@ -63,22 +63,22 @@ class TestTraefikConfig:
 class TestIngressConfig:
     def test_default_reads_redis_through_in_memory(self) -> None:
         config = IngressConfig.model_validate({})
-        assert config.mode == IngressUpdateMode.REDIS
+        assert config.delivery == IngressDeliveryMode.REDIS
         assert config.layers == [IngressLayerType.IN_MEMORY, IngressLayerType.REDIS]
         assert config.redis.key_prefix == "appproxy:ingress"
 
     @pytest.mark.parametrize(
         "case",
         [
-            _ModeLayersCase(mode=IngressUpdateMode.API, layers=["in-memory"]),
-            _ModeLayersCase(mode=IngressUpdateMode.API, layers=["in-memory", "redis"]),
-            _ModeLayersCase(mode=IngressUpdateMode.REDIS, layers=["in-memory", "redis"]),
-            _ModeLayersCase(mode=IngressUpdateMode.REDIS, layers=["redis"]),
+            _DeliveryLayersCase(delivery=IngressDeliveryMode.API, layers=["in-memory"]),
+            _DeliveryLayersCase(delivery=IngressDeliveryMode.API, layers=["in-memory", "redis"]),
+            _DeliveryLayersCase(delivery=IngressDeliveryMode.REDIS, layers=["in-memory", "redis"]),
+            _DeliveryLayersCase(delivery=IngressDeliveryMode.REDIS, layers=["redis"]),
         ],
-        ids=lambda case: f"{case.mode.value}-{'-'.join(case.layers)}",
+        ids=lambda case: f"{case.delivery.value}-{'-'.join(case.layers)}",
     )
-    def test_supported_layers_are_accepted(self, case: _ModeLayersCase) -> None:
-        config = IngressConfig.model_validate({"mode": case.mode, "layers": case.layers})
+    def test_supported_layers_are_accepted(self, case: _DeliveryLayersCase) -> None:
+        config = IngressConfig.model_validate({"delivery": case.delivery, "layers": case.layers})
         assert config.layers == case.layers
 
     def test_empty_layers_are_rejected(self) -> None:
@@ -118,7 +118,7 @@ class TestIngressConfig:
     def test_in_memory_ttl_without_later_layer_is_rejected(self, ttl_key: str) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
             IngressConfig.model_validate({
-                "mode": "api",
+                "delivery": "api",
                 "layers": ["in-memory"],
                 "in-memory": {ttl_key: 60.0},
             })

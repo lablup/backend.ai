@@ -30,7 +30,7 @@ from ai.backend.appproxy.common.types import (
     EventLoopType,
     FrontendMode,
     FrontendServerMode,
-    IngressUpdateMode,
+    IngressDeliveryMode,
     ProxyProtocol,
 )
 from ai.backend.common import config
@@ -426,14 +426,14 @@ class IngressRedisConfig(BaseSchema):
 
 
 class IngressConfig(BaseSchema):
-    mode: Annotated[
-        IngressUpdateMode,
-        Field(default=IngressUpdateMode.REDIS),
+    delivery: Annotated[
+        IngressDeliveryMode,
+        Field(default=IngressDeliveryMode.REDIS),
         BackendAIConfigMeta(
             description=(
-                "How the worker receives ingresses, announced through service discovery. "
+                "How ingresses are delivered to the worker, announced through service discovery. "
                 "api takes what the coordinator sends to the API port, redis reads what the "
-                "manager writes to Redis. Circuit events are written in either mode."
+                "manager writes to Redis. Circuit events are written in either delivery."
             ),
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="redis", prod="api"),
@@ -489,11 +489,14 @@ class IngressConfig(BaseSchema):
         return self
 
     @model_validator(mode="after")
-    def _check_mode(self) -> Self:
-        if self.mode == IngressUpdateMode.API and IngressLayerType.IN_MEMORY not in self.layers:
-            raise ValueError("the api ingress mode requires the in-memory layer")
-        if self.mode == IngressUpdateMode.REDIS and IngressLayerType.REDIS not in self.layers:
-            raise ValueError("the redis ingress mode requires the redis layer")
+    def _check_delivery(self) -> Self:
+        if (
+            self.delivery == IngressDeliveryMode.API
+            and IngressLayerType.IN_MEMORY not in self.layers
+        ):
+            raise ValueError("the api ingress delivery requires the in-memory layer")
+        if self.delivery == IngressDeliveryMode.REDIS and IngressLayerType.REDIS not in self.layers:
+            raise ValueError("the redis ingress delivery requires the redis layer")
         return self
 
 

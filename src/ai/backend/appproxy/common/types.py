@@ -35,7 +35,7 @@ class FrontendServerMode(enum.StrEnum):
     TRAEFIK = "traefik"
 
 
-class IngressUpdateMode(enum.StrEnum):
+class IngressDeliveryMode(enum.StrEnum):
     API = "api"
     REDIS = "redis"
 

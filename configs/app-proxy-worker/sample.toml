@@ -327,11 +327,12 @@
   # Where the worker reads the ingresses it serves.
   # Added in 26.10.0
   [proxy_worker.ingress]
-    # How the worker receives ingresses, announced through service discovery.
-    # api takes what the coordinator sends to the API port, redis reads what the
-    # manager writes to Redis. Circuit events are written in either mode.
+    # How ingresses are delivered to the worker, announced through service
+    # discovery. api takes what the coordinator sends to the API port, redis
+    # reads what the manager writes to Redis. Circuit events are written in
+    # either delivery.
     # Added in 26.10.0
-    mode = "api"
+    delivery = "api"
     # Where the worker reads ingresses, in lookup order. in-memory, when
     # present, comes first.
     # Added in 26.10.0
