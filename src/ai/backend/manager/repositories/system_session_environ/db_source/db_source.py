@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Collection
+from collections.abc import Sequence
 
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.system_session_environ.conditions import (
-    SystemSessionEnvironConditions,
+from ai.backend.manager.models.system_session_environ.scopes import (
+    SessionSystemSessionEnvironScope,
 )
 from ai.backend.manager.models.system_session_environ.searchers import (
     SystemSessionEnvironSearcher,
@@ -25,15 +23,9 @@ class SystemSessionEnvironDBSource:
 
     async def search_at_scopes(
         self,
-        domain_ids: Collection[DomainID],
-        project_ids: Collection[ProjectID],
+        scopes: Sequence[SessionSystemSessionEnvironScope],
     ) -> list[SystemSessionEnvironData]:
-        searcher = SystemSessionEnvironSearcher(
-            pagination=NoPagination(),
-            conditions=[
-                SystemSessionEnvironConditions.at_global_or_scopes(domain_ids, project_ids)
-            ],
-        )
+        searcher = SystemSessionEnvironSearcher(pagination=NoPagination(), conditions=[])
         async with self._v2_ops.read_ops() as r:
-            result = await r.search_in_global(searcher)
+            result = await r.search_with_scopes(scopes, searcher)
         return result.items

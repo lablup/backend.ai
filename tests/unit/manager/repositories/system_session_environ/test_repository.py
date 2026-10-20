@@ -17,6 +17,9 @@ from ai.backend.common.data.system_session_environ.types import (
     SystemSessionEnvironValueSource,
 )
 from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
+from ai.backend.manager.models.system_session_environ.scopes import (
+    SessionSystemSessionEnvironScope,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.system_session_environ.repository import (
@@ -100,7 +103,9 @@ class TestSearchAtScopes:
         repository: SystemSessionEnvironRepository,
         seeded_rows: _SeededRows,
     ) -> None:
-        rows = await repository.search_at_scopes(domain_ids={_DOMAIN_ID}, project_ids={_PROJECT_ID})
+        rows = await repository.search_at_scopes([
+            SessionSystemSessionEnvironScope(domain_id=_DOMAIN_ID, project_id=_PROJECT_ID)
+        ])
 
         assert {row.id for row in rows} == {
             seeded_rows.global_row,
@@ -108,12 +113,16 @@ class TestSearchAtScopes:
             seeded_rows.project_row,
         }
 
-    async def test_returns_only_the_global_rows_without_scopes(
+    async def test_returns_only_the_global_rows_at_a_scope_with_no_rows(
         self,
         repository: SystemSessionEnvironRepository,
         seeded_rows: _SeededRows,
     ) -> None:
-        rows = await repository.search_at_scopes(domain_ids=set(), project_ids=set())
+        rows = await repository.search_at_scopes([
+            SessionSystemSessionEnvironScope(
+                domain_id=DomainID(uuid.uuid4()), project_id=ProjectID(uuid.uuid4())
+            )
+        ])
 
         assert {row.id for row in rows} == {seeded_rows.global_row}
 
@@ -122,7 +131,9 @@ class TestSearchAtScopes:
         repository: SystemSessionEnvironRepository,
         seeded_rows: _SeededRows,
     ) -> None:
-        rows = await repository.search_at_scopes(domain_ids={_DOMAIN_ID}, project_ids={_PROJECT_ID})
+        rows = await repository.search_at_scopes([
+            SessionSystemSessionEnvironScope(domain_id=_DOMAIN_ID, project_id=_PROJECT_ID)
+        ])
 
         assert {row.id: row.scope_id for row in rows} == {
             seeded_rows.global_row: None,

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Collection
-
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
@@ -15,21 +13,28 @@ __all__ = ("SystemSessionEnvironConditions",)
 
 class SystemSessionEnvironConditions:
     @staticmethod
-    def at_global_or_scopes(
-        domain_ids: Collection[DomainID],
-        project_ids: Collection[ProjectID],
-    ) -> QueryCondition:
+    def by_global_scope() -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                SystemSessionEnvironRow.scope_type == SystemSessionEnvironScopeType.GLOBAL,
-                sa.and_(
-                    SystemSessionEnvironRow.scope_type == SystemSessionEnvironScopeType.DOMAIN,
-                    SystemSessionEnvironRow.scope_id.in_(domain_ids),
-                ),
-                sa.and_(
-                    SystemSessionEnvironRow.scope_type == SystemSessionEnvironScopeType.PROJECT,
-                    SystemSessionEnvironRow.scope_id.in_(project_ids),
-                ),
+            return SystemSessionEnvironRow.scope_type == SystemSessionEnvironScopeType.GLOBAL
+
+        return inner
+
+    @staticmethod
+    def by_domain_scope(domain_id: DomainID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(
+                SystemSessionEnvironRow.scope_type == SystemSessionEnvironScopeType.DOMAIN,
+                SystemSessionEnvironRow.scope_id == domain_id,
+            )
+
+        return inner
+
+    @staticmethod
+    def by_project_scope(project_id: ProjectID) -> QueryCondition:
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(
+                SystemSessionEnvironRow.scope_type == SystemSessionEnvironScopeType.PROJECT,
+                SystemSessionEnvironRow.scope_id == project_id,
             )
 
         return inner

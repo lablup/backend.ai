@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Collection
+from collections.abc import Sequence
 
-from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
+from ai.backend.manager.models.system_session_environ.scopes import (
+    SessionSystemSessionEnvironScope,
+)
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.system_session_environ.db_source.db_source import (
     SystemSessionEnvironDBSource,
@@ -21,8 +22,7 @@ class SystemSessionEnvironRepository:
 
     async def search_at_scopes(
         self,
-        domain_ids: Collection[DomainID],
-        project_ids: Collection[ProjectID],
+        scopes: Sequence[SessionSystemSessionEnvironScope],
     ) -> list[SystemSessionEnvironData]:
-        """The rows at the global scope and at any of the given domains and projects."""
-        return await self._db_source.search_at_scopes(domain_ids, project_ids)
+        """The rows any of the given sessions receives."""
+        return await self._db_source.search_at_scopes(scopes)
