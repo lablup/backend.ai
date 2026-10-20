@@ -186,6 +186,12 @@ class KernelTaskExited(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent/kernel-task-exited"
     error_title = "The kernel task exited before the kernel became ready."
 
+    exit_status: int | None
+
+    def __init__(self, extra_msg: str | None = None, *, exit_status: int | None = None) -> None:
+        super().__init__(extra_msg)
+        self.exit_status = exit_status
+
     @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(

@@ -150,7 +150,8 @@ class ContainerdKernel(AbstractKernel):
             raise KernelTaskExited(f"the kernel task is gone (container {container_id})")
         if task.state is TaskState.STOPPED:
             raise KernelTaskExited(
-                f"the kernel task exited with status {task.exit_status} (container {container_id})"
+                f"the kernel task exited with status {task.exit_status} (container {container_id})",
+                exit_status=task.exit_status,
             )
 
     async def _check_tls_status(self, readiness: TlsConnectReadiness) -> dict[str, Any]:

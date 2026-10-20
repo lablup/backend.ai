@@ -68,6 +68,7 @@ from ai.backend.agent.errors import (
     InvalidChunkSizeError,
     KernelNotFoundError,
 )
+from ai.backend.agent.errors.containerd import KernelTaskExited
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.health.heartbeat import HeartbeatTask
 from ai.backend.agent.legacy_inference_env import LegacyInferenceEnvTranslator
@@ -1468,6 +1469,7 @@ class AbstractAgent[
                             ev.container_id,
                             LifecycleEvent.CLEAN,
                             ev.reason,
+                            exit_code=ev.exit_code,
                             suppress_events=ev.suppress_events,
                             done_future=ev.done_future,
                         ),
@@ -1522,17 +1524,20 @@ class AbstractAgent[
                         restart_tracker.destroy_event.set()
                     else:
                         await self.reconstruct_resource_usage()
+                        exit_code = -1 if ev.exit_code is None else ev.exit_code
                         if not ev.suppress_events:
                             await self.anycast_and_broadcast_event(
                                 KernelTerminatedAnycastEvent(
                                     kernel_id=ev.kernel_id,
                                     session_id=ev.session_id,
                                     reason=ev.reason,
+                                    exit_code=exit_code,
                                 ),
                                 KernelTerminatedBroadcastEvent(
                                     kernel_id=ev.kernel_id,
                                     session_id=ev.session_id,
                                     reason=ev.reason,
+                                    exit_code=exit_code,
                                 ),
                             )
                     # Notify cleanup waiters after all state updates.
@@ -3096,6 +3101,16 @@ class AbstractAgent[
                             f"(k:{ctx.kernel_id!s}, container:{container_data['container_id']})"
                         )
                         raise ContainerStartupFailedError(err_msg) from e
+                    except KernelTaskExited as e:
+                        await self.inject_container_lifecycle_event(
+                            kernel_id,
+                            session_id,
+                            LifecycleEvent.DESTROY,
+                            KernelLifecycleEventReason.FAILED_TO_START,
+                            container_id=ContainerId(container_data["container_id"]),
+                            exit_code=e.exit_status,
+                        )
+                        raise
                     except BaseException:
                         await self.inject_container_lifecycle_event(
                             kernel_id,

@@ -462,6 +462,7 @@ class TestCheckStatusTlsTaskExit:
 
         assert not isinstance(exc_info.value, TryAgain)
         assert refused.calls == 1
+        assert exc_info.value.exit_status == 137
 
     async def test_task_exiting_between_calls_ends_the_wait(
         self,
