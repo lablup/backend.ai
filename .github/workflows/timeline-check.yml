@@ -34,8 +34,10 @@ jobs:
         python -m pip install -U -r tools/towncrier-requirements.txt
     - name: Check existence of news fragment
       run: |
-        BASE_COMMIT=$(git rev-list --first-parent --max-parents=0 --max-count=1 HEAD)
-        BASE_TIMESTAMP=$(git log --format=%ct "${BASE_COMMIT}")
+        # The oldest commit in the shallow checkout, not the first-parent root: in a
+        # stacked PR the merge ref's first-parent chain is GitHub-generated merges
+        # stamped "now", newer than every commit on the base branch.
+        BASE_TIMESTAMP=$(git log --format=%ct HEAD | sort -n | head -n 1)
         git fetch --no-tags --shallow-since "${BASE_TIMESTAMP}" origin "${BASE_REF}"
         python -m towncrier.check --compare-with=origin/${BASE_REF}
       env:
