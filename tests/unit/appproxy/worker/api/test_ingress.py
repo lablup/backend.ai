@@ -83,9 +83,9 @@ INGRESS_PAYLOAD: dict[str, Any] = {
 }
 
 
-def _request(state: IngressState, body: dict[str, Any] | None = None) -> Mock:
+def _request(root_ctx: Mock, body: dict[str, Any] | None = None) -> Mock:
     request = Mock(spec=web.Request)
-    request.app = {"_root.context": Mock(spec=RootContext, ingress_state=state)}
+    request.app = {"_root.context": root_ctx}
     request.can_read_body = body is not None
     request.json = AsyncMock(return_value=body)
     return request
@@ -104,26 +104,30 @@ def reader() -> AsyncMock:
 
 
 @pytest.fixture
-def api_delivery_state(reader: AsyncMock, writer: AsyncMock) -> IngressState:
-    config = IngressConfig.model_validate({
+def api_delivery_root_ctx(reader: AsyncMock, writer: AsyncMock) -> Mock:
+    root_ctx = Mock(spec=RootContext, ingress_state=IngressState(reader=reader, writer=writer))
+    root_ctx.local_config.proxy_worker.ingress = IngressConfig.model_validate({
         "delivery": IngressDeliveryMode.API,
         "layers": ["in-memory"],
     })
-    return IngressState(reader=reader, writer=writer, config=config)
+    return root_ctx
 
 
 @pytest.fixture
-def redis_delivery_state(reader: AsyncMock, writer: AsyncMock) -> IngressState:
-    config = IngressConfig.model_validate({"delivery": IngressDeliveryMode.REDIS})
-    return IngressState(reader=reader, writer=writer, config=config)
+def redis_delivery_root_ctx(reader: AsyncMock, writer: AsyncMock) -> Mock:
+    root_ctx = Mock(spec=RootContext, ingress_state=IngressState(reader=reader, writer=writer))
+    root_ctx.local_config.proxy_worker.ingress = IngressConfig.model_validate({
+        "delivery": IngressDeliveryMode.REDIS,
+    })
+    return root_ctx
 
 
 class TestIngressHandler:
     async def test_upsert_reports_the_applied_revisions(
-        self, api_delivery_state: IngressState, writer: AsyncMock
+        self, api_delivery_root_ctx: Mock, writer: AsyncMock
     ) -> None:
         response = await IngressHandler().upsert(
-            _request(api_delivery_state, {"ingresses": [INGRESS_PAYLOAD]})
+            _request(api_delivery_root_ctx, {"ingresses": [INGRESS_PAYLOAD]})
         )
         assert isinstance(response, web.Response)
         assert response.status == HTTPStatus.OK
@@ -131,18 +135,18 @@ class TestIngressHandler:
         writer.apply.assert_awaited_once()
 
     async def test_remove_removes_through_the_writer(
-        self, api_delivery_state: IngressState, writer: AsyncMock
+        self, api_delivery_root_ctx: Mock, writer: AsyncMock
     ) -> None:
         body = {"keys": [{"authority": "worker-1", "frontend_key": "10205"}]}
-        response = await IngressHandler().remove(_request(api_delivery_state, body))
+        response = await IngressHandler().remove(_request(api_delivery_root_ctx, body))
         assert response.status == HTTPStatus.NO_CONTENT
         writer.remove.assert_awaited_once()
 
     async def test_replace_reports_the_applied_revisions(
-        self, api_delivery_state: IngressState, writer: AsyncMock
+        self, api_delivery_root_ctx: Mock, writer: AsyncMock
     ) -> None:
         response = await IngressHandler().replace(
-            _request(api_delivery_state, {"ingresses": [INGRESS_PAYLOAD]})
+            _request(api_delivery_root_ctx, {"ingresses": [INGRESS_PAYLOAD]})
         )
         assert isinstance(response, web.Response)
         assert response.status == HTTPStatus.OK
@@ -150,16 +154,16 @@ class TestIngressHandler:
         writer.replace_all.assert_awaited_once()
 
     async def test_write_outside_the_api_delivery_is_not_supported(
-        self, redis_delivery_state: IngressState, writer: AsyncMock
+        self, redis_delivery_root_ctx: Mock, writer: AsyncMock
     ) -> None:
         with pytest.raises(IngressWriteNotSupportedError):
             await IngressHandler().upsert(
-                _request(redis_delivery_state, {"ingresses": [INGRESS_PAYLOAD]})
+                _request(redis_delivery_root_ctx, {"ingresses": [INGRESS_PAYLOAD]})
             )
         writer.apply.assert_not_awaited()
 
-    async def test_revisions_map_frontend_keys(self, api_delivery_state: IngressState) -> None:
-        response = await IngressHandler().revisions(_request(api_delivery_state))
+    async def test_revisions_map_frontend_keys(self, api_delivery_root_ctx: Mock) -> None:
+        response = await IngressHandler().revisions(_request(api_delivery_root_ctx))
         assert isinstance(response, web.Response)
         assert response.status == HTTPStatus.OK
         assert json.loads(response.text or "") == {"revisions": {"10205": 3}}

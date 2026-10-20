@@ -13,7 +13,8 @@ from ai.backend.appproxy.common.types import (
     WebMiddleware,
     WebRequestHandler,
 )
-from ai.backend.appproxy.worker.dto.context import IngressStateCtx
+from ai.backend.appproxy.worker.config import IngressConfig
+from ai.backend.appproxy.worker.dto.context import IngressConfigCtx, IngressStateCtx
 from ai.backend.appproxy.worker.errors.ingress import IngressWriteNotSupportedError
 from ai.backend.appproxy.worker.ingress.factory import IngressState
 from ai.backend.appproxy.worker.ingress.validating import ValidatingIngressWriter
@@ -43,9 +44,13 @@ async def coordinator_auth_middleware(
 class IngressHandler:
     @api_handler
     async def upsert(
-        self, ctx: IngressStateCtx, body: BodyParam[IngressUpsertRequest]
+        self,
+        state_ctx: IngressStateCtx,
+        config_ctx: IngressConfigCtx,
+        body: BodyParam[IngressUpsertRequest],
     ) -> APIResponse:
-        await self._writer(ctx.ingress_state).apply(body.parsed.ingresses)
+        writer = self._writer(state_ctx.ingress_state, config_ctx.ingress_config)
+        await writer.apply(body.parsed.ingresses)
         # The writer applies every ingress or raises, so each sent revision is the one held.
         response = IngressRevisionsResponse(
             revisions={
@@ -56,16 +61,24 @@ class IngressHandler:
 
     @api_handler
     async def remove(
-        self, ctx: IngressStateCtx, body: BodyParam[IngressRemoveRequest]
+        self,
+        state_ctx: IngressStateCtx,
+        config_ctx: IngressConfigCtx,
+        body: BodyParam[IngressRemoveRequest],
     ) -> APIResponse:
-        await self._writer(ctx.ingress_state).remove(body.parsed.keys)
+        writer = self._writer(state_ctx.ingress_state, config_ctx.ingress_config)
+        await writer.remove(body.parsed.keys)
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
     @api_handler
     async def replace(
-        self, ctx: IngressStateCtx, body: BodyParam[IngressReplaceRequest]
+        self,
+        state_ctx: IngressStateCtx,
+        config_ctx: IngressConfigCtx,
+        body: BodyParam[IngressReplaceRequest],
     ) -> APIResponse:
-        await self._writer(ctx.ingress_state).replace_all(body.parsed.ingresses)
+        writer = self._writer(state_ctx.ingress_state, config_ctx.ingress_config)
+        await writer.replace_all(body.parsed.ingresses)
         response = IngressRevisionsResponse(
             revisions={
                 ingress.frontend.key(): ingress.revision for ingress in body.parsed.ingresses
@@ -74,15 +87,15 @@ class IngressHandler:
         return APIResponse.build(HTTPStatus.OK, response)
 
     @api_handler
-    async def revisions(self, ctx: IngressStateCtx) -> APIResponse:
-        ingresses = await ctx.ingress_state.reader.get_all()
+    async def revisions(self, state_ctx: IngressStateCtx) -> APIResponse:
+        ingresses = await state_ctx.ingress_state.reader.get_all()
         response = IngressRevisionsResponse(
             revisions={ingress.frontend.key(): ingress.revision for ingress in ingresses}
         )
         return APIResponse.build(HTTPStatus.OK, response)
 
-    def _writer(self, state: IngressState) -> ValidatingIngressWriter:
-        if state.config.delivery != IngressDeliveryMode.API or state.writer is None:
+    def _writer(self, state: IngressState, config: IngressConfig) -> ValidatingIngressWriter:
+        if config.delivery != IngressDeliveryMode.API or state.writer is None:
             raise IngressWriteNotSupportedError
         return state.writer
 

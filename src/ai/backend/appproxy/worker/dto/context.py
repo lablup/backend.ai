@@ -5,6 +5,7 @@ from typing import Self, override
 from aiohttp import web
 from pydantic import ConfigDict
 
+from ai.backend.appproxy.worker.config import IngressConfig
 from ai.backend.appproxy.worker.ingress.factory import IngressState
 from ai.backend.common.api_handlers import MiddlewareParam
 
@@ -18,3 +19,12 @@ class IngressStateCtx(MiddlewareParam):
     @classmethod
     async def from_request(cls, request: web.Request) -> Self:
         return cls(ingress_state=request.app["_root.context"].ingress_state)
+
+
+class IngressConfigCtx(MiddlewareParam):
+    ingress_config: IngressConfig
+
+    @override
+    @classmethod
+    async def from_request(cls, request: web.Request) -> Self:
+        return cls(ingress_config=request.app["_root.context"].local_config.proxy_worker.ingress)

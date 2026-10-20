@@ -18,7 +18,6 @@ class IngressState:
     reader: LayeredIngressState
     writer: ValidatingIngressWriter | None
     """None when the worker holds no in-memory layer."""
-    config: IngressConfig
 
 
 class IngressStateFactory:
@@ -47,11 +46,7 @@ class IngressStateFactory:
                     readers.append(self._redis())
         if not readers:
             raise InvalidConfigError("No ingress layer is configured")
-        return IngressState(
-            reader=LayeredIngressState(readers, in_memory=in_memory),
-            writer=writer,
-            config=self._config,
-        )
+        return IngressState(reader=LayeredIngressState(readers, in_memory=in_memory), writer=writer)
 
     def _in_memory(self) -> InMemoryIngressState:
         return InMemoryIngressState(
