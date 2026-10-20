@@ -11,9 +11,9 @@ from ai.backend.common.exception import (
     BackendAIError,
     ErrorCode,
 )
-from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging.utils import BraceStyleAdapter
 
-log = StructuredLogger(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 SYSTEM_METRIC_UPDATE_INTERVAL: Final = 10.0
 
