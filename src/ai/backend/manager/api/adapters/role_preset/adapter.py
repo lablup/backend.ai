@@ -96,12 +96,11 @@ from ai.backend.manager.models.rbac_models.role_preset.searchers import (
     RolePresetSearcher,
 )
 from ai.backend.manager.models.rbac_models.role_preset.updaters import (
-    RolePresetRestoreUpdater,
-    RolePresetSoftDeleteUpdater,
     RolePresetUpdater,
 )
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.models.specs.soft_delete import RestoreUpdater, SoftDeleteUpdater
 from ai.backend.manager.services.role_preset.actions.atomic_bulk_add_permissions import (
     AtomicBulkAddRolePresetPermissionsAction,
 )
@@ -230,10 +229,12 @@ class RolePresetAdapter(BaseAdapter):
         conditions = self._convert_filter(input.filter) if input.filter else []
         orders = self._convert_orders(input.order) if input.order else []
         # Soft-deleted rows are excluded unless the caller explicitly sets the
-        # top-level ``deleted`` filter.
+        # top-level ``deleted_at`` or ``deleted`` filter.
         base_conditions: list[QueryCondition] = []
-        if input.filter is None or input.filter.deleted is None:
-            base_conditions.append(RolePresetSearchableFields.own.deleted.filter.equals(False))
+        if input.filter is None or (
+            input.filter.deleted_at is None and input.filter.deleted is None
+        ):
+            base_conditions.append(RolePresetSearchableFields.own.deleted_at.filter.is_null())
         searcher = self._build_searcher(
             RolePresetSearcher,
             conditions=[*base_conditions, *conditions],
@@ -270,14 +271,28 @@ class RolePresetAdapter(BaseAdapter):
     async def delete(self, role_preset_id: RolePresetID) -> DeleteRolePresetPayload:
         """Soft-delete a role preset."""
         result = await self._role_preset.delete.run(
-            DeleteRolePresetAction(updater=RolePresetSoftDeleteUpdater(preset_id=role_preset_id))
+            DeleteRolePresetAction(
+                updater=SoftDeleteUpdater(
+                    target_row=RolePresetRow,
+                    target_column=RolePresetRow.id,
+                    target_id=role_preset_id,
+                    converter=RolePresetSearchableFields.own,
+                )
+            )
         )
         return DeleteRolePresetPayload(role_preset=self._data_to_node(result.data))
 
     async def restore(self, role_preset_id: RolePresetID) -> RestoreRolePresetPayload:
         """Restore a soft-deleted role preset."""
         result = await self._role_preset.restore.run(
-            RestoreRolePresetAction(updater=RolePresetRestoreUpdater(preset_id=role_preset_id))
+            RestoreRolePresetAction(
+                updater=RestoreUpdater(
+                    target_row=RolePresetRow,
+                    target_column=RolePresetRow.id,
+                    target_id=role_preset_id,
+                    converter=RolePresetSearchableFields.own,
+                )
+            )
         )
         return RestoreRolePresetPayload(role_preset=self._data_to_node(result.data))
 
@@ -509,7 +524,8 @@ class RolePresetAdapter(BaseAdapter):
             *self.apply_string_filter(filter_.name, fields.name.filter),
             *self.apply_string_filter(filter_.scope_type, fields.scope_type.filter),
             *self.apply_bool_filter(filter_.auto_assign, fields.auto_assign.filter),
-            *self.apply_bool_filter(filter_.deleted, fields.deleted.filter),
+            *self._deleted_conditions(filter_.deleted),
+            *self.apply_nullable_datetime_filter(filter_.deleted_at, fields.deleted_at.filter),
             *self.apply_to_many_filter(
                 filter_.permissions,
                 RolePresetSearchableFields.nested.permissions.correlation,
@@ -533,6 +549,12 @@ class RolePresetAdapter(BaseAdapter):
                 if sub_conditions:
                     conditions.append(negate_conditions(sub_conditions))
         return conditions
+
+    def _deleted_conditions(self, deleted: bool | None) -> list[QueryCondition]:
+        if deleted is None:
+            return []
+        conditions = RolePresetSearchableFields.own.deleted_at.filter
+        return [conditions.is_not_null() if deleted else conditions.is_null()]
 
     def _convert_orders(self, orders: list[RolePresetOrder]) -> list[QueryOrder]:
         fields = RolePresetSearchableFields.own
@@ -622,7 +644,8 @@ class RolePresetAdapter(BaseAdapter):
             name=data.name,
             scope_type=data.scope_type,
             auto_assign=data.auto_assign,
-            deleted=data.deleted,
+            deleted=data.deleted_at is not None,
+            deleted_at=data.deleted_at,
             created_at=data.created_at,
             updated_at=data.updated_at,
         )

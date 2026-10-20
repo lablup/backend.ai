@@ -160,6 +160,7 @@ class TestRemovedRolePermissionPresetOrder:
             scope_type="project",
             auto_assign=False,
             deleted=False,
+            deleted_at=None,
             created_at=now,
             updated_at=now,
         )

@@ -40,11 +40,16 @@ async def _presets(db: ExtendedAsyncSAEngine) -> dict[str, tuple[str, str, bool,
                 RolePresetRow.name,
                 RolePresetRow.scope_type,
                 RolePresetRow.auto_assign,
-                RolePresetRow.deleted,
+                RolePresetRow.deleted_at,
             )
         )
         return {
-            str(row.id): (row.name, str(row.scope_type), row.auto_assign, row.deleted)
+            str(row.id): (
+                row.name,
+                str(row.scope_type),
+                row.auto_assign,
+                row.deleted_at is not None,
+            )
             for row in rows
         }
 
@@ -192,7 +197,7 @@ class TestApply:
             await sess.execute(
                 sa.update(RolePresetRow)
                 .where(RolePresetRow.id == domain_admin_id)
-                .values(name="renamed", auto_assign=True, deleted=True)
+                .values(name="renamed", auto_assign=True, deleted_at=sa.func.now())
             )
             await sess.execute(
                 sa.delete(RolePermissionPresetRow).where(

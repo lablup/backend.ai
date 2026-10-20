@@ -72,6 +72,13 @@ async def db(
     global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(global_entity_ids, _TABLES):
+        async with global_entity_ids.begin() as conn:
+            await conn.execute(
+                sa.text(
+                    "ALTER TABLE role_presets "
+                    "ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT false"
+                )
+            )
         yield global_entity_ids
 
 
@@ -114,7 +121,6 @@ async def seeded(db: ExtendedAsyncSAEngine) -> _Fixture:
                 name="domain_member",
                 scope_type=DomainEntityType(),
                 auto_assign=True,
-                deleted=False,
             )
         )
         await session.flush()

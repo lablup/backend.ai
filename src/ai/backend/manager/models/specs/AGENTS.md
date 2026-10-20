@@ -204,8 +204,9 @@ is created in no scope.
 
 ## Soft delete belongs to its own updaters
 
-Target layout from BEP-1069. Until the soft delete mixin lands, rows keep the column they
-delete by today.
+Target layout from BEP-1069. The mixin is `SoftDeleteMixin` in `models/mixins/soft_delete.py`;
+the shared updaters are `SoftDeleteUpdater` / `RestoreUpdater` in `models/specs/soft_delete.py`.
+Rows not yet on the mixin keep the column they delete by today.
 
 - Whether a row is soft-deleted is the soft delete mixin's `deleted_at` (nullable
   timestamp) alone; NULL means alive. Do NOT add a `deleted` boolean beside it.

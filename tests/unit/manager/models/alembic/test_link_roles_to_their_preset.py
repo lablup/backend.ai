@@ -81,6 +81,13 @@ async def db(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(database_connection, _TABLES):
+        async with database_connection.begin() as conn:
+            await conn.execute(
+                sa.text(
+                    "ALTER TABLE role_presets "
+                    "ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT false"
+                )
+            )
         yield database_connection
 
 
@@ -126,10 +133,13 @@ async def _add_preset(
             name=name,
             role_name_template=template,
             scope_type=scope_type or ProjectEntityType(),
-            deleted=deleted,
         )
         session.add(preset)
         await session.flush()
+        await session.execute(
+            sa.text("UPDATE role_presets SET deleted = :deleted WHERE id = :id"),
+            {"deleted": deleted, "id": preset.id},
+        )
         return preset.id
 
 

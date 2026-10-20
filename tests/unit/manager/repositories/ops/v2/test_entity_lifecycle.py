@@ -388,7 +388,6 @@ async def _add_presets(database: ExtendedAsyncSAEngine) -> None:
             name=_PRESET_NAME,
             scope_type=ProjectEntityType(),
             auto_assign=True,
-            deleted=False,
         )
         sess.add(preset_row)
         await sess.flush()
@@ -405,7 +404,6 @@ async def _add_presets(database: ExtendedAsyncSAEngine) -> None:
                 role_name_template="{{ scope.name }}-member",
                 scope_type=ProjectEntityType(),
                 auto_assign=False,
-                deleted=False,
             )
         )
 

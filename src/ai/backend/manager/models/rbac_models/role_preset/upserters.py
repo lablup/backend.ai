@@ -65,7 +65,8 @@ class RolePresetUpserter(
             "name": self.name,
             "scope_type": self.scope_type,
             "auto_assign": self.auto_assign,
-            "deleted": False,
+            # ``sa.null()``: a seed overwrite leaves a ``None`` value as it stands.
+            "deleted_at": sa.null(),
         }
 
     @override

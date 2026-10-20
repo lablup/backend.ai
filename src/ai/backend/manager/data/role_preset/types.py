@@ -36,7 +36,7 @@ class RolePresetData(EntityData):
     role_name_template: str | None
     scope_type: EntityType
     auto_assign: bool
-    deleted: bool
+    deleted_at: datetime | None
     created_at: datetime
     updated_at: datetime
 

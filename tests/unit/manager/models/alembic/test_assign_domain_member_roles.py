@@ -80,6 +80,13 @@ async def db(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(database_connection, _TABLES):
+        async with database_connection.begin() as conn:
+            await conn.execute(
+                sa.text(
+                    "ALTER TABLE role_presets "
+                    "ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT false"
+                )
+            )
         yield database_connection
 
 
@@ -239,6 +246,9 @@ class TestAssignDomainMemberRoles:
 
         async with db.begin_readonly_session() as session:
             preset = await session.get(RolePresetRow, _PRESET_UUID)
+            deleted = await session.scalar(
+                sa.text("SELECT deleted FROM role_presets WHERE id = :id"), {"id": _PRESET_UUID}
+            )
             grants = set(
                 (
                     await session.execute(
@@ -253,7 +263,7 @@ class TestAssignDomainMemberRoles:
         assert preset.name == "domain_member"
         assert preset.scope_type == _DOMAIN_ENTITY_TYPE
         assert preset.auto_assign is True
-        assert preset.deleted is False
+        assert deleted is False
         assert {(str(entity_type), permission) for entity_type, permission in grants} == _GRANTS
 
     async def test_a_domain_gets_the_role_and_its_users_hold_it(

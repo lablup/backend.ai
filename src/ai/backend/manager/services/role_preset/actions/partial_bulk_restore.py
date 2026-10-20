@@ -11,9 +11,10 @@ from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.rbac_models.role_preset.row import (
     RolePresetRow,
 )
-from ai.backend.manager.models.rbac_models.role_preset.updaters import (
-    RolePresetRestoreUpdater,
+from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
+    RolePresetSearchableFields,
 )
+from ai.backend.manager.models.specs.soft_delete import RestoreUpdater
 
 
 @dataclass
@@ -34,8 +35,18 @@ class PartialBulkRestoreRolePresetsAction(
         return tuple(self.ids)
 
     @override
-    def to_updaters(self) -> Mapping[EntityIdentifier, RolePresetRestoreUpdater]:
-        return {preset_id: RolePresetRestoreUpdater(preset_id=preset_id) for preset_id in self.ids}
+    def to_updaters(
+        self,
+    ) -> Mapping[EntityIdentifier, RestoreUpdater[RolePresetRow, RolePresetData]]:
+        return {
+            preset_id: RestoreUpdater(
+                target_row=RolePresetRow,
+                target_column=RolePresetRow.id,
+                target_id=preset_id,
+                converter=RolePresetSearchableFields.own,
+            )
+            for preset_id in self.ids
+        }
 
     @override
     def narrowed_to(self, entity_ids: Sequence[EntityIdentifier]) -> Self:

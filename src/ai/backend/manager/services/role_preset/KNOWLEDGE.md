@@ -3,7 +3,7 @@ name: role-preset-service-shapes
 type: decision-table
 description: role preset knowledge: why a preset is global state that owns field rows, why creation is one action, why delete and purge both exist, why the two template-settling writes have a service
 scope: src/ai/backend/manager/services/role_preset
-keywords: [CreateRolePresetAction, PartialBulkDeleteRolePresetsAction, PartialBulkRestoreRolePresetsAction, RolePresetCreator, RolePermissionPresetCreator, RolePresetService, role_name_template, field_atomic_create_ops, partial_bulk_delete_ops, deleted]
+keywords: [CreateRolePresetAction, PartialBulkDeleteRolePresetsAction, PartialBulkRestoreRolePresetsAction, RolePresetCreator, RolePermissionPresetCreator, RolePresetService, role_name_template, field_atomic_create_ops, partial_bulk_delete_ops, deleted_at]
 sources:
   - src/ai/backend/manager/services/role_preset
   - src/ai/backend/manager/models/rbac_models/role_preset
@@ -65,9 +65,10 @@ that group hands out. The entity recorded is always the preset.
 
 ## Delete and purge are different operations, not duplicates
 
-- `role_presets.deleted` is the lifecycle column, so `delete` and `partial_bulk_delete`
-  are an UPDATE at the DB recorded as `DELETE`, and `restore` and `partial_bulk_restore`
-  are the same update reversed.
+- The lifecycle column is the soft delete mixin's `role_presets.deleted_at`, so `delete`
+  and `partial_bulk_delete` are an UPDATE at the DB recorded as `DELETE`, and `restore`
+  and `partial_bulk_restore` are the same update reversed. Both use the shared updaters
+  (`models/specs/soft_delete.py`).
 - `purge` and `partial_bulk_purge` remove the row, taking the permission rows with it by
   FK cascade.
 - The lifecycle column is not exposed on the general updater, so an ordinary edit

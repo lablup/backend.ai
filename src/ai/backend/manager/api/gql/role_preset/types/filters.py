@@ -15,7 +15,12 @@ from ai.backend.common.dto.manager.v2.role_preset.request import (
     RolePresetPermissionNestedFilter as RolePresetPermissionNestedFilterDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.base import (
+    NullableDateTimeFilter,
+    OrderDirection,
+    StringFilter,
+    UUIDFilter,
+)
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -89,6 +94,17 @@ class RolePresetFilterGQL(PydanticInputMixin[RolePresetFilterDTO]):
         description=(
             "Filter by soft-delete flag. Searches exclude soft-deleted rows by default; "
             "set this explicitly to `true` to inspect archived presets."
+        ),
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deletedAt`.",
+    )
+    deleted_at: NullableDateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Filter by soft-delete time. Setting it on the top-level filter includes "
+                "soft-deleted presets; inside AND, OR or NOT it does not."
+            ),
         ),
         default=None,
     )

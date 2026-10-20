@@ -23756,7 +23756,12 @@ type RolePreset implements Node
   """
   Soft-delete flag. Set by the delete mutation and cleared by the restore mutation; archived rows are excluded from default searches.
   """
-  deleted: Boolean!
+  deleted: Boolean! @deprecated(reason: "Deprecated since 26.10.0. Use `deletedAt`.")
+
+  """
+  Added in 26.10.0. Soft-delete time. Set by the delete mutation and cleared by the restore mutation; null while the preset is in use.
+  """
+  deletedAt: DateTime
 
   """Creation timestamp."""
   createdAt: DateTime!
@@ -23815,7 +23820,12 @@ input RolePresetFilter
   """
   Filter by soft-delete flag. Searches exclude soft-deleted rows by default; set this explicitly to `true` to inspect archived presets.
   """
-  deleted: Boolean = null
+  deleted: Boolean = null @deprecated(reason: "Deprecated since 26.10.0. Use `deletedAt`.")
+
+  """
+  Added in 26.10.0. Filter by soft-delete time. Setting it on the top-level filter includes soft-deleted presets; inside AND, OR or NOT it does not.
+  """
+  deletedAt: NullableDateTimeFilter = null
 
   """
   Added in 26.9.0. Filter by conditions on the permission entries the preset carries.

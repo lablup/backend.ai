@@ -9,7 +9,12 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import DeclaredEntityType
-from ai.backend.common.dto.manager.query import StringFilter, ToManyFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import (
+    NullableDateTimeFilter,
+    StringFilter,
+    ToManyFilter,
+    UUIDFilter,
+)
 from ai.backend.common.dto.manager.v2.common import NonEmptyList, OrderDirection
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     RolePermissionPresetFilter,
@@ -66,8 +71,8 @@ class UpdateRolePresetBody(BaseRequestModel):
     Used directly as the REST request body, where the preset ID is supplied as a
     URL path segment instead of a body field. ``UpdateRolePresetInput`` extends
     this with the ID for the GQL/adapter call path. Permission entries are
-    managed via the dedicated Add/Remove endpoints, and the ``deleted`` flag
-    through the dedicated Delete/Restore endpoints.
+    managed via the dedicated Add/Remove endpoints, and ``deleted_at`` through the
+    dedicated Delete/Restore endpoints.
     """
 
     name: str | None = Field(default=None, min_length=1, max_length=64, description="Updated name.")
@@ -88,7 +93,7 @@ class UpdateRolePresetInput(UpdateRolePresetBody):
 
 
 class BulkDeleteRolePresetsInput(BaseRequestModel):
-    """Input for bulk-soft-deleting role presets (sets ``deleted = true``)."""
+    """Input for bulk-soft-deleting role presets (sets ``deleted_at``)."""
 
     role_preset_ids: list[RolePresetID] = Field(
         description="Role preset UUIDs to soft-delete.",
@@ -96,7 +101,7 @@ class BulkDeleteRolePresetsInput(BaseRequestModel):
 
 
 class BulkRestoreRolePresetsInput(BaseRequestModel):
-    """Input for bulk-restoring soft-deleted role presets (sets ``deleted = false``)."""
+    """Input for bulk-restoring soft-deleted role presets (clears ``deleted_at``)."""
 
     role_preset_ids: list[RolePresetID] = Field(
         description="Role preset UUIDs to restore.",
@@ -153,7 +158,11 @@ class RolePresetPermissionNestedFilter(ToManyFilter[RolePermissionPresetFilter])
 
 
 class RolePresetFilter(BaseRequestModel):
-    """Filter criteria for searching role presets."""
+    """Filter criteria for searching role presets.
+
+    Soft-deleted presets are left out unless the top-level filter gives ``deleted_at`` or
+    ``deleted``. Either inside ``AND``/``OR``/``NOT`` does not lift that default.
+    """
 
     id: UUIDFilter | None = Field(
         default=None,
@@ -169,9 +178,14 @@ class RolePresetFilter(BaseRequestModel):
     auto_assign: bool | None = Field(default=None, description="Filter by auto-assign flag.")
     deleted: bool | None = Field(
         default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deleted_at`.",
+        deprecated=True,
+    )
+    deleted_at: NullableDateTimeFilter | None = Field(
+        default=None,
         description=(
-            "Filter by soft-delete flag. Searches exclude soft-deleted rows by default; "
-            "set this explicitly to ``true`` to inspect archived presets."
+            f"Added in {NEXT_RELEASE_VERSION}. Filter by soft-delete time. Setting it on the "
+            "top-level filter includes soft-deleted presets; inside AND, OR or NOT it does not."
         ),
     )
     permissions: RolePresetPermissionNestedFilter | None = Field(
