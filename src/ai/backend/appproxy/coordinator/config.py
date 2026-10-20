@@ -409,6 +409,15 @@ class ProxyCoordinatorConfig(BaseSchema):
             example=ConfigExample(local="0.0.0.0:10200", prod="0.0.0.0:10200"),
         ),
     ]
+    max_header_field_size: Annotated[
+        int,
+        Field(default=8190, gt=0),
+        BackendAIConfigMeta(
+            description="Maximum bytes of a single request header. Larger ones get 400.",
+            added_version="26.10.0",
+            example=ConfigExample(local="8190", prod="65536"),
+        ),
+    ]
     advertised_addr: Annotated[
         HostPortPair | None,
         Field(default=None),
