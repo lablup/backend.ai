@@ -17,5 +17,6 @@ class SoftDeleteMixin:
         "deleted_at",
         sa.DateTime(timezone=True),
         nullable=True,
+        server_default=sa.null(),
         sort_order=10000,
     )

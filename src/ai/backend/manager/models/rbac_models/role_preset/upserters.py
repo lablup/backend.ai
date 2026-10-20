@@ -24,7 +24,7 @@ __all__ = ("RolePresetUpserter",)
 class RolePresetUpserter(
     CreatedInGlobal[RolePresetRow], EntityUpserter[RolePresetRow, RolePresetData]
 ):
-    """Write a role preset under its stated id, restoring a deleted one.
+    """Write a role preset under its stated id.
 
     Conflict key: id. ``role_name_template`` and ``scope_id`` are left as they are.
     """
@@ -65,8 +65,6 @@ class RolePresetUpserter(
             "name": self.name,
             "scope_type": self.scope_type,
             "auto_assign": self.auto_assign,
-            # ``sa.null()``: a seed overwrite leaves a ``None`` value as it stands.
-            "deleted_at": sa.null(),
         }
 
     @override

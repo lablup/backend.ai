@@ -13,7 +13,12 @@ depends_on = None
 def upgrade() -> None:
     op.add_column(
         "role_presets",
-        sa.Column("deleted_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column(
+            "deleted_at",
+            sa.DateTime(timezone=True),
+            nullable=True,
+            server_default=sa.null(),
+        ),
     )
     op.execute(sa.text("UPDATE role_presets SET deleted_at = now() WHERE deleted"))
     op.drop_index("ix_role_presets_scope_type_deleted", table_name="role_presets")
