@@ -240,7 +240,7 @@ async def rescan_images(
             for error in result.errors:
                 log.error("failed to scan registries", scan_error=str(error))
                 click.echo(f"failed to scan registries: {error}", err=True)
-            if result.errors:
+            if result.errors and not result.images:
                 sys.exit(ExitCode.FAILURE)
         except Exception as e:
             log.exception("image command failed")
