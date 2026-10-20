@@ -659,8 +659,8 @@ class SessionDBSource:
 
     async def bulk_get_designated_agents_by_session(
         self,
-        session_ids: Sequence[SessionId],
-    ) -> dict[SessionId, list[AgentId]]:
+        session_ids: Sequence[SessionID],
+    ) -> dict[SessionID, list[AgentId]]:
         """Read the agents each session designates, by agent id; one with none is absent."""
         if not session_ids:
             return {}
@@ -670,10 +670,10 @@ class SessionDBSource:
             .where(SessionDesignatedAgentRow.session_id.in_(session_ids))
             .order_by(AgentRow.id)
         )
-        designated: dict[SessionId, list[AgentId]] = {}
+        designated: dict[SessionID, list[AgentId]] = {}
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             for session_id, agent_id in await db_sess.execute(stmt):
-                designated.setdefault(SessionId(session_id), []).append(AgentId(agent_id))
+                designated.setdefault(SessionID(session_id), []).append(AgentId(agent_id))
         return designated
 
     async def batch_get_resource_allocation_by_session(

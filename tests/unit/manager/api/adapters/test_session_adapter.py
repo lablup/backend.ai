@@ -248,8 +248,7 @@ async def _no_designations(
     """The read answers for every session named, each designating no agent."""
     return PartialBulkResult(
         items=[
-            PartialBulkEntityResult[list[AgentId]].succeeded(SessionID(sid), [])
-            for sid in action.session_ids
+            PartialBulkEntityResult[list[AgentId]].succeeded(sid, []) for sid in action.session_ids
         ]
     )
 
