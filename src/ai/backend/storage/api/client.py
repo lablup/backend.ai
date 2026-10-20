@@ -11,7 +11,7 @@ import urllib.parse
 import uuid
 from collections.abc import AsyncGenerator, Iterator, Mapping, MutableMapping
 from contextlib import AbstractAsyncContextManager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from email.utils import format_datetime
 from http import HTTPStatus
 from pathlib import Path
@@ -76,6 +76,7 @@ from ai.backend.common.clients.valkey_client.valkey_tus import (
     TusSessionId,
     TusSessionNotFoundError,
 )
+from ai.backend.common.clients.valkey_client.valkey_tus.client import TusUploadState
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -466,12 +467,13 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                 await watcher_task
             except asyncio.CancelledError:
                 pass
-        new_offset = await ctx.valkey_tus_client.advance_offset(
+        upload_state = await ctx.valkey_tus_client.advance_offset(
             session_id, holder_token, bytes_written
         )
 
-        headers["Upload-Offset"] = str(new_offset)
-        if new_offset >= int(token_data["size"]):
+        headers["Upload-Offset"] = str(upload_state.offset)
+        headers["Upload-Expires"] = _format_upload_expires(token_data, upload_state)
+        if upload_state.offset >= int(token_data["size"]):
             parent_dir = vfpath
             if (dst_dir := params["dst_dir"]) is not None:
                 parent_dir = vfpath / dst_dir
@@ -533,17 +535,24 @@ async def prepare_tus_session_headers(
     headers["Cache-Control"] = "no-store"
     headers["Tus-Resumable"] = "1.0.0"
     ctx: RootContext = request.app["ctx"]
-    redis_offset = await ctx.valkey_tus_client.get_offset(TusSessionId(token_data["session"]))
-    if redis_offset is None:
+    upload_state = await ctx.valkey_tus_client.get_upload_state(TusSessionId(token_data["session"]))
+    if upload_state is None:
         raise TusSessionNotFoundError(
             f"Upload session {token_data['session']} is not registered or has expired"
         )
-    headers["Upload-Offset"] = str(redis_offset)
+    headers["Upload-Offset"] = str(upload_state.offset)
     headers["Upload-Length"] = str(token_data["size"])
-    headers["Upload-Expires"] = format_datetime(
-        datetime.fromtimestamp(token_data["exp"], UTC), usegmt=True
-    )
+    headers["Upload-Expires"] = _format_upload_expires(token_data, upload_state)
     return headers
+
+
+def _format_upload_expires(token_data: Mapping[str, Any], upload_state: TusUploadState) -> str:
+    """The upload token stops being accepted at its ``exp``, which no PATCH extends."""
+    expires_at = min(
+        datetime.fromtimestamp(token_data["exp"], UTC),
+        datetime.now(UTC) + timedelta(seconds=upload_state.ttl_seconds),
+    )
+    return format_datetime(expires_at, usegmt=True)
 
 
 class DownloadHandler:
