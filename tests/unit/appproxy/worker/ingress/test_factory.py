@@ -18,8 +18,8 @@ def valkey_client() -> ValkeyLiveClient:
     return Mock(spec=ValkeyLiveClient)
 
 
-def _create(layers: list[str], valkey_client: ValkeyLiveClient) -> IngressState:
-    config = IngressConfig.model_validate({"layers": layers})
+def _create(mode: str, layers: list[str], valkey_client: ValkeyLiveClient) -> IngressState:
+    config = IngressConfig.model_validate({"mode": mode, "layers": layers})
     return IngressStateFactory(config, IngressAuthority("worker-1"), valkey_client).create()
 
 
@@ -27,19 +27,19 @@ class TestIngressStateFactory:
     def test_in_memory_only_writes_through_validation(
         self, valkey_client: ValkeyLiveClient
     ) -> None:
-        state = _create(["in-memory"], valkey_client)
+        state = _create("api", ["in-memory"], valkey_client)
         [in_memory] = state.reader.layers
         assert isinstance(in_memory, InMemoryIngressState)
         assert isinstance(state.writer, ValidatingIngressWriter)
 
     def test_in_memory_and_redis_read_in_order(self, valkey_client: ValkeyLiveClient) -> None:
-        state = _create(["in-memory", "redis"], valkey_client)
+        state = _create("redis", ["in-memory", "redis"], valkey_client)
         in_memory, redis = state.reader.layers
         assert isinstance(in_memory, InMemoryIngressState)
         assert isinstance(redis, RedisIngressState)
         assert isinstance(state.writer, ValidatingIngressWriter)
 
     def test_redis_only_has_no_writer(self, valkey_client: ValkeyLiveClient) -> None:
-        state = _create(["redis"], valkey_client)
+        state = _create("redis", ["redis"], valkey_client)
         assert [type(layer) for layer in state.reader.layers] == [RedisIngressState]
         assert state.writer is None

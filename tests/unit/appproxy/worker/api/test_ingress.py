@@ -108,8 +108,8 @@ def api_mode_state(reader: AsyncMock, writer: AsyncMock) -> IngressState:
 
 
 @pytest.fixture
-def circuit_mode_state(reader: AsyncMock, writer: AsyncMock) -> IngressState:
-    return IngressState(reader=reader, writer=writer, mode=IngressUpdateMode.CIRCUIT)
+def redis_mode_state(reader: AsyncMock, writer: AsyncMock) -> IngressState:
+    return IngressState(reader=reader, writer=writer, mode=IngressUpdateMode.REDIS)
 
 
 class TestIngressHandler:
@@ -144,11 +144,11 @@ class TestIngressHandler:
         writer.replace_all.assert_awaited_once()
 
     async def test_write_outside_the_api_mode_is_not_supported(
-        self, circuit_mode_state: IngressState, writer: AsyncMock
+        self, redis_mode_state: IngressState, writer: AsyncMock
     ) -> None:
         with pytest.raises(IngressWriteNotSupportedError):
             await IngressHandler().upsert(
-                _request(circuit_mode_state, {"ingresses": [INGRESS_PAYLOAD]})
+                _request(redis_mode_state, {"ingresses": [INGRESS_PAYLOAD]})
             )
         writer.apply.assert_not_awaited()
 

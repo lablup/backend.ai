@@ -36,7 +36,6 @@ class FrontendServerMode(enum.StrEnum):
 
 
 class IngressUpdateMode(enum.StrEnum):
-    CIRCUIT = "circuit"
     API = "api"
     REDIS = "redis"
 

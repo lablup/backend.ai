@@ -428,20 +428,23 @@ class IngressRedisConfig(BaseSchema):
 class IngressConfig(BaseSchema):
     mode: Annotated[
         IngressUpdateMode,
-        Field(default=IngressUpdateMode.CIRCUIT),
+        Field(default=IngressUpdateMode.REDIS),
         BackendAIConfigMeta(
             description=(
                 "How the worker receives ingresses, announced through service discovery. "
-                "circuit writes the coordinator's circuit events, api takes what the coordinator "
-                "sends to the API port, redis reads what the manager writes to Redis."
+                "api takes what the coordinator sends to the API port, redis reads what the "
+                "manager writes to Redis. Circuit events are written in either mode."
             ),
             added_version=NEXT_RELEASE_VERSION,
-            example=ConfigExample(local="circuit", prod="api"),
+            example=ConfigExample(local="redis", prod="api"),
         ),
     ]
     layers: Annotated[
         list[IngressLayerType],
-        Field(default_factory=lambda: [IngressLayerType.IN_MEMORY], min_length=1),
+        Field(
+            default_factory=lambda: [IngressLayerType.IN_MEMORY, IngressLayerType.REDIS],
+            min_length=1,
+        ),
         BackendAIConfigMeta(
             description=(
                 "Where the worker reads ingresses, in lookup order. "

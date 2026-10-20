@@ -68,7 +68,6 @@ from ai.backend.appproxy.common.types import (
     EventLoopType,
     FrontendMode,
     FrontendServerMode,
-    IngressUpdateMode,
     ProxyProtocol,
     WebMiddleware,
     WebRequestHandler,
@@ -533,11 +532,7 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     for circuit in circuits:
         await root_ctx.proxy_frontend.register_circuit(circuit, circuit.route_info)
     # Applied rather than replaced, so circuits from events handled meanwhile are kept.
-    ingress_writer = (
-        root_ctx.ingress_state.writer
-        if root_ctx.ingress_state.mode == IngressUpdateMode.CIRCUIT
-        else None
-    )
+    ingress_writer = root_ctx.ingress_state.writer
     if ingress_writer is not None:
         ingress_authority = IngressAuthority(root_ctx.local_config.proxy_worker.authority)
         await ingress_writer.apply([circuit.to_ingress(ingress_authority) for circuit in circuits])
@@ -744,11 +739,7 @@ async def handle_proxy_route_event(
     if event.target_worker_authority != context.local_config.proxy_worker.authority:
         return
 
-    ingress_writer = (
-        context.ingress_state.writer
-        if context.ingress_state.mode == IngressUpdateMode.CIRCUIT
-        else None
-    )
+    ingress_writer = context.ingress_state.writer
     ingress_authority = IngressAuthority(context.local_config.proxy_worker.authority)
     match event:
         case AppProxyCircuitCreatedEvent():
