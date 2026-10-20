@@ -28,6 +28,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
 )
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentPresetRepository,
 )
@@ -147,3 +148,18 @@ class TestDeploymentFromPreset:
         assert spec.metadata.revision_history_limit == preset_data.revision_history_limit
         assert policy_config is not None
         assert policy_config.strategy == preset_data.deployment_strategy
+
+    async def test_the_resource_group_default_policy_is_copied(
+        self,
+        deployment_controller: DeploymentController,
+        mock_deployment_repository: MagicMock,
+        preset_only_creator: NewDeploymentCreator,
+    ) -> None:
+        mock_deployment_repository.get_resource_group_default_deployment_options = AsyncMock(
+            return_value=DeploymentOptions(agent_selection_policy=AgentSelectionPolicy.STRICT)
+        )
+
+        await deployment_controller.create_deployment(preset_only_creator)
+
+        spec, _ = mock_deployment_repository.create_endpoint.await_args.args
+        assert spec.options.agent_selection_policy == AgentSelectionPolicy.STRICT
