@@ -63,6 +63,7 @@ from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchResult,
     DeploymentConfig,
     DeploymentHandlerCategory,
+    DeploymentHandlerOptions,
     DeploymentInfo,
     DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
@@ -404,7 +405,7 @@ class DeploymentRepository:
     async def replace_deployment_options(
         self,
         deployment_id: DeploymentID,
-        options: DeploymentOptions,
+        handler_options: DeploymentHandlerOptions,
         agent_selection_policy: AgentSelectionPolicy | None,
     ) -> DeploymentOptions:
         """Fully replace a deployment's ``options`` surface.
@@ -419,7 +420,7 @@ class DeploymentRepository:
             EndpointNotFound: If the deployment does not exist.
         """
         return await self._db_source.replace_deployment_options(
-            deployment_id, options, agent_selection_policy
+            deployment_id, handler_options, agent_selection_policy
         )
 
     @deployment_repository_resilience.apply()

@@ -28,7 +28,7 @@ from ai.backend.manager.data.session.options import AgentSelectionPolicy, Handle
 
 __all__ = (
     "deployment_options_to_info",
-    "deployment_options_from_input",
+    "deployment_handler_options_from_input",
 )
 
 
@@ -91,22 +91,20 @@ def _handler_options_from_input(
     )
 
 
-def deployment_options_from_input(
+def deployment_handler_options_from_input(
     options: DeploymentOptionsInput,
     *,
     valid_handler_names: frozenset[str],
-) -> DeploymentOptions:
-    """Validate and project an incoming API payload into the domain
-    model.
+) -> DeploymentHandlerOptions:
+    """Validate and project the handler options of an incoming API payload
+    into the domain model.
 
     ``valid_handler_names`` is the runtime set of handlers registered on
     the deployment coordinator; any ``by_handler`` key outside this set
     is rejected as :class:`InvalidAPIParameters`. Duplicate keys are
     likewise rejected.
     """
-    return DeploymentOptions(
-        handler_options=_handler_options_from_input(options.handler_options, valid_handler_names),
-    )
+    return _handler_options_from_input(options.handler_options, valid_handler_names)
 
 
 def agent_selection_policy_from_input(
