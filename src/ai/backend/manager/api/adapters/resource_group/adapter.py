@@ -77,7 +77,7 @@ from ai.backend.common.types import PreemptionMode, PreemptionOrder, SlotQuantit
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.deployment.options import (
     agent_selection_policy_from_input,
-    deployment_options_from_input,
+    deployment_handler_options_from_input,
     deployment_options_to_info,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
@@ -1118,7 +1118,7 @@ class ResourceGroupAdapter(BaseAdapter):
         path uses ``UPDATE ... RETURNING`` and does not re-read the
         surrounding scaling group node).
         """
-        options = deployment_options_from_input(
+        handler_options = deployment_handler_options_from_input(
             input.options,
             valid_handler_names=frozenset(
                 h.name() for h in self._deployment_coordinator.registered_handlers()
@@ -1128,7 +1128,7 @@ class ResourceGroupAdapter(BaseAdapter):
             ReplaceDefaultDeploymentOptionsAction(
                 resource_group_id=await self.lookup_name(name),
                 resource_group=name,
-                options=options,
+                handler_options=handler_options,
                 agent_selection_policy=agent_selection_policy_from_input(input.options),
             )
         )

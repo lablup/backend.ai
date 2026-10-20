@@ -16,7 +16,7 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
-from ai.backend.manager.data.deployment.types import DeploymentOptions
+from ai.backend.manager.data.deployment.types import DeploymentHandlerOptions, DeploymentOptions
 from ai.backend.manager.data.resource_group.types import (
     ResourceGroupData,
     ResourceInfo,
@@ -152,7 +152,7 @@ class ResourceGroupRepository:
     async def replace_default_deployment_options(
         self,
         name: ResourceGroupName,
-        options: DeploymentOptions,
+        handler_options: DeploymentHandlerOptions,
         agent_selection_policy: AgentSelectionPolicy | None,
     ) -> DeploymentOptions:
         """Fully replace a resource group's ``default_deployment_options``.
@@ -167,7 +167,7 @@ class ResourceGroupRepository:
             ScalingGroupNotFound: If the resource group does not exist.
         """
         return await self._db_source.replace_default_deployment_options(
-            name, options, agent_selection_policy
+            name, handler_options, agent_selection_policy
         )
 
     @resource_group_repository_resilience.apply()

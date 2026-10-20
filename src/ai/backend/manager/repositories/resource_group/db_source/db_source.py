@@ -15,7 +15,7 @@ from ai.backend.common.data.entity.resource_group import (
 )
 from ai.backend.common.types import SlotQuantity
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.data.deployment.types import DeploymentOptions
+from ai.backend.manager.data.deployment.types import DeploymentHandlerOptions, DeploymentOptions
 from ai.backend.manager.data.resource_group.types import (
     ResourceGroupData,
     ResourceGroupListResult,
@@ -108,7 +108,7 @@ class ResourceGroupDBSource:
     async def replace_default_deployment_options(
         self,
         name: ResourceGroupName,
-        options: DeploymentOptions,
+        handler_options: DeploymentHandlerOptions,
         agent_selection_policy: AgentSelectionPolicy | None,
     ) -> DeploymentOptions:
         """Fully replace the ``default_deployment_options`` JSONB column
@@ -135,8 +135,9 @@ class ResourceGroupDBSource:
                 sa.update(ResourceGroupRow)
                 .where(ResourceGroupRow.name == name)
                 .values(
-                    default_deployment_options=options.model_copy(
-                        update={"agent_selection_policy": agent_selection_policy}
+                    default_deployment_options=DeploymentOptions(
+                        handler_options=handler_options,
+                        agent_selection_policy=agent_selection_policy,
                     )
                 )
                 .returning(ResourceGroupRow.default_deployment_options)

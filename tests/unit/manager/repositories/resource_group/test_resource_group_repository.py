@@ -17,7 +17,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.deployment.types import DeploymentOptions
+from ai.backend.manager.data.deployment.types import DeploymentHandlerOptions
 from ai.backend.manager.data.resource_group.types import PreemptionConfig as DataPreemptionConfig
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.user.types import UserStatus
@@ -558,11 +558,11 @@ class TestScalingGroupRepositoryDB:
     ) -> None:
         name = ResourceGroupName(sample_scaling_group_for_update)
         await resource_group_repository.replace_default_deployment_options(
-            name, DeploymentOptions(), AgentSelectionPolicy.STRICT
+            name, DeploymentHandlerOptions(), AgentSelectionPolicy.STRICT
         )
 
         stored = await resource_group_repository.replace_default_deployment_options(
-            name, DeploymentOptions(), None
+            name, DeploymentHandlerOptions(), None
         )
 
         assert stored.agent_selection_policy == AgentSelectionPolicy.STRICT

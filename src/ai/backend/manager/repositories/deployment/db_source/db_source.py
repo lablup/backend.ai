@@ -62,6 +62,7 @@ from ai.backend.manager.data.deployment.scale_modifier import (
 from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchResult,
     DeploymentHandlerCategory,
+    DeploymentHandlerOptions,
     DeploymentInfo,
     DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
@@ -2747,7 +2748,7 @@ class DeploymentDBSource:
     async def replace_deployment_options(
         self,
         deployment_id: DeploymentID,
-        options: DeploymentOptions,
+        handler_options: DeploymentHandlerOptions,
         agent_selection_policy: AgentSelectionPolicy | None,
     ) -> DeploymentOptions:
         """Replace the ``endpoints.options`` JSONB column for a deployment
@@ -2774,8 +2775,9 @@ class DeploymentDBSource:
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == deployment_id)
                 .values(
-                    options=options.model_copy(
-                        update={"agent_selection_policy": agent_selection_policy}
+                    options=DeploymentOptions(
+                        handler_options=handler_options,
+                        agent_selection_policy=agent_selection_policy,
                     )
                 )
                 .returning(EndpointRow.options)

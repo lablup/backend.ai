@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.deployment.types import DeploymentOptions
+from ai.backend.manager.data.deployment.types import DeploymentHandlerOptions, DeploymentOptions
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.services.deployment.actions.base import (
     DeploymentSingleEntityAction,
@@ -17,8 +17,8 @@ class ReplaceDeploymentOptionsAction(DeploymentSingleEntityAction):
     user can replace options on their own deployment.
     """
 
-    options: DeploymentOptions
-    # ``None`` keeps the stored policy; ``options.agent_selection_policy`` is not read.
+    handler_options: DeploymentHandlerOptions
+    # ``None`` keeps the stored policy.
     agent_selection_policy: AgentSelectionPolicy | None
 
     @override
