@@ -10,6 +10,7 @@ from tabulate import tabulate
 from ai.backend.cli.interaction import ask_yn
 from ai.backend.cli.types import ExitCode
 from ai.backend.client.cli.pretty import print_done, print_error, print_fail, print_info, print_wait
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from . import admin
 
@@ -101,7 +102,9 @@ def unfreeze() -> None:
         sys.exit(ExitCode.FAILURE)
 
 
-@admin.group()
+@admin.group(
+    deprecated=f"Since {NEXT_RELEASE_VERSION}, WebUI keeps the announcement in the domain app config."
+)
 def announcement() -> None:
     """Global announcement related commands"""
 

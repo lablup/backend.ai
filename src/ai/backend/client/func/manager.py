@@ -70,6 +70,9 @@ class Manager(BaseFunction):
     async def get_announcement(cls) -> dict[str, Any]:
         """
         Get current announcement.
+
+        .. deprecated:: {NEXT_RELEASE_VERSION}
+            WebUI keeps the announcement in the domain app config.
         """
         rqst = Request("GET", "/manager/announcement")
         async with rqst.fetch() as resp:
@@ -88,6 +91,9 @@ class Manager(BaseFunction):
         :param message: Announcement message. Required if ``enabled`` is True.
             If omitted, the stored message is kept as-is; pass an empty string to
             clear it.
+
+        .. deprecated:: {NEXT_RELEASE_VERSION}
+            WebUI keeps the announcement in the domain app config.
         """
         rqst = Request("POST", "/manager/announcement")
         rqst.set_json({

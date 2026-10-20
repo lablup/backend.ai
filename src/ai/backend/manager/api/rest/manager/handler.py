@@ -217,6 +217,7 @@ class ManagerHandler:
     # ------------------------------------------------------------------
 
     async def get_announcement(self) -> APIResponse:
+        """Deprecated since {NEXT_RELEASE_VERSION}: WebUI keeps the announcement in the domain app config."""
         action = GetAnnouncementAction()
         result = await self._manager_admin.get_announcement.run(action)
         resp = AnnouncementResponse(enabled=result.enabled, message=result.message)
@@ -231,6 +232,7 @@ class ManagerHandler:
         body: BodyParam[UpdateAnnouncementRequest],
         ctx: UserContext,
     ) -> APIResponse:
+        """Deprecated since {NEXT_RELEASE_VERSION}: WebUI keeps the announcement in the domain app config."""
         params = body.parsed
         action = UpdateAnnouncementAction(
             enabled=params.enabled,
