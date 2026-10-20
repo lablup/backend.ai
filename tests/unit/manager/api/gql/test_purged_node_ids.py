@@ -1,4 +1,4 @@
-"""Tests for the purged Node ids on delete and purge payloads."""
+"""Tests for the Node ids on delete, restore and purge payloads."""
 
 from __future__ import annotations
 
@@ -19,6 +19,9 @@ from ai.backend.common.dto.manager.v2.domain.response import (
     DomainLifecycleInfo,
     DomainNode,
     DomainRegistryInfo,
+)
+from ai.backend.common.dto.manager.v2.domain.response import (
+    RestoreDomainPayload as RestoreDomainPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.entity_label.response import (
     EntityLabelNode,
@@ -123,3 +126,35 @@ class TestDeleteDomainV2:
         assert result.domain.id == str(domain.id)
         assert result.domain.entity_id == domain.entity_id
         assert result.deleted is True
+
+
+class TestRestoreDomainV2:
+    @pytest.fixture
+    def domain(self) -> DomainNode:
+        domain_id = DomainID(uuid.uuid4())
+        now = datetime.now(tz=UTC)
+        return DomainNode(
+            id=domain_id,
+            entity_id=domain_id,
+            basic_info=DomainBasicInfo(name="to-restore", description=None, integration_name=None),
+            registry=DomainRegistryInfo(allowed_docker_registries=[]),
+            lifecycle=DomainLifecycleInfo(
+                is_active=True, is_default=False, created_at=now, modified_at=now
+            ),
+        )
+
+    @pytest.fixture
+    def info(self, domain: DomainNode) -> MagicMock:
+        info = MagicMock()
+        info.context.adapters.domain.restore = AsyncMock(
+            return_value=RestoreDomainPayloadDTO(restored=True, domain=domain)
+        )
+        return info
+
+    async def test_returns_restored_domain_node(self, info: MagicMock, domain: DomainNode) -> None:
+        resolver_fn = cast(Any, domain_resolver.restore_domain_v2).base_resolver
+        result = await resolver_fn(info, domain.id)
+
+        assert result.domain.id == str(domain.id)
+        assert result.domain.entity_id == domain.entity_id
+        assert result.restored is True

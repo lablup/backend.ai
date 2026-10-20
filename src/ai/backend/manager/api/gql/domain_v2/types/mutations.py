@@ -205,7 +205,13 @@ class DeleteDomainPayloadGQL(PydanticOutputMixin[DeleteDomainPayloadDTO]):
 class RestoreDomainPayloadGQL(PydanticOutputMixin[RestoreDomainPayloadDTO]):
     """Payload for domain restore."""
 
-    restored: bool = gql_field(description="Whether the restore was successful.")
+    restored: bool = gql_field(
+        description="Whether the restore was successful.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `domain`.",
+    )
+    domain: DomainV2GQL = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="The restored domain."),
+    )
 
 
 @gql_pydantic_type(

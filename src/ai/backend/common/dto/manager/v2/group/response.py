@@ -168,6 +168,7 @@ class RestoreProjectPayload(BaseResponseModel):
     restored: bool = Field(
         description="Whether the restore was successful.",
     )
+    project: ProjectNode = Field(description="The restored project. Added in 26.10.0.")
 
 
 class PurgeProjectPayload(BaseResponseModel):

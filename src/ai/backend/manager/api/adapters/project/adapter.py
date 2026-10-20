@@ -265,10 +265,10 @@ class ProjectAdapter(BaseAdapter):
 
     async def restore(self, project_id: ProjectID) -> RestoreProjectPayload:
         """Restore a soft-deleted project."""
-        await self._project.restore_project.run(
+        result = await self._project.restore_project.run(
             RestoreProjectAction(updater=ProjectRestoreUpdater(project_id=project_id))
         )
-        return RestoreProjectPayload(restored=True)
+        return RestoreProjectPayload(restored=True, project=self._group_data_to_node(result.data))
 
     async def partial_bulk_update(
         self, input: PartialBulkUpdateProjectsInput

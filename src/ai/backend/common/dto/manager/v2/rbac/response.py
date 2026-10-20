@@ -111,6 +111,7 @@ class RestoreRolePayload(BaseResponseModel):
     """Payload for role restore mutation result."""
 
     id: UUID = Field(description="ID of the restored role")
+    role: RoleNode = Field(description="The restored role. Added in 26.10.0.")
 
 
 class PurgeRolePayload(BaseResponseModel):

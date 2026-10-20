@@ -17357,7 +17357,10 @@ type RestoreArtifactsPayload {
 """Added in 26.9.0. Payload for domain restore mutation."""
 type RestoreDomainPayload {
   """Whether the restore was successful."""
-  restored: Boolean!
+  restored: Boolean! @deprecated(reason: "Deprecated since 26.10.0. Use `domain`.")
+
+  """Added in 26.10.0. The restored domain."""
+  domain: DomainV2!
 }
 
 """Added in 26.10.0. Restored image."""
@@ -17369,13 +17372,19 @@ type RestoreImagePayload {
 """Added in 26.9.0. Payload for project restore mutation."""
 type RestoreProjectPayload {
   """Whether the restore was successful."""
-  restored: Boolean!
+  restored: Boolean! @deprecated(reason: "Deprecated since 26.10.0. Use `project`.")
+
+  """Added in 26.10.0. The restored project."""
+  project: ProjectV2!
 }
 
 """Added in 26.10.0. Payload for restore role mutation."""
 type RestoreRolePayload {
   """ID of the restored role."""
-  id: UUID!
+  id: UUID! @deprecated(reason: "Deprecated since 26.10.0. Use `role`.")
+
+  """Added in 26.10.0. The restored role."""
+  role: Role!
 }
 
 """Added in 26.10.0. Payload returned after restoring a role preset."""

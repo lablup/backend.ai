@@ -1103,7 +1103,13 @@ class PurgeRolePayload(PydanticOutputMixin[PurgeRolePayloadDTO]):
     name="RestoreRolePayload",
 )
 class RestoreRolePayload(PydanticOutputMixin[RestoreRolePayloadDTO]):
-    id: UUID = gql_field(description="ID of the restored role.")
+    id: UUID = gql_field(
+        description="ID of the restored role.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `role`.",
+    )
+    role: RoleGQL = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="The restored role."),
+    )
 
 
 @gql_pydantic_type(

@@ -892,7 +892,7 @@ class RBACAdapter(BaseAdapter):
         result = await self._permission_controller.restore_role.run(
             RestoreRoleAction(updater=RoleRestoreUpdater(role_id=RoleID(role_id)))
         )
-        return RestoreRolePayload(id=result.data.id)
+        return RestoreRolePayload(id=result.data.id, role=self._role_data_to_node(result.data))
 
     # ------------------------------------------------------------------ purge
 

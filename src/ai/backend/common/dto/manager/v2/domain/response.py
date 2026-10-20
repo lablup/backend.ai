@@ -142,6 +142,7 @@ class RestoreDomainPayload(BaseResponseModel):
     restored: bool = Field(
         description="Whether the restore was successful.",
     )
+    domain: DomainNode = Field(description="The restored domain. Added in 26.10.0.")
 
 
 class PurgeDomainPayload(BaseResponseModel):

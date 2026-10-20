@@ -215,7 +215,13 @@ class DeleteProjectPayloadGQL(PydanticOutputMixin[DeleteProjectPayloadDTO]):
 class RestoreProjectPayloadGQL(PydanticOutputMixin[RestoreProjectPayloadDTO]):
     """Payload for project restore."""
 
-    restored: bool = gql_field(description="Whether the restore was successful.")
+    restored: bool = gql_field(
+        description="Whether the restore was successful.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `project`.",
+    )
+    project: ProjectV2GQL = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="The restored project."),
+    )
 
 
 @gql_pydantic_type(
