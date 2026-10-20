@@ -23,8 +23,6 @@ class AssociationResourceGroupsUsersRow(Base):
     resource_group_id: Mapped[ResourceGroupID] = mapped_column(
         "resource_group_id",
         GUID(ResourceGroupID),
-        # Named explicitly: the naming convention would generate a 69-character name,
-        # over PostgreSQL's 63-character limit.
         sa.ForeignKey(
             "scaling_groups.id",
             onupdate="CASCADE",
