@@ -8,14 +8,14 @@ import aiohttp
 import pytest
 
 from ai.backend.appproxy.common.config import SecretConfig
+from ai.backend.appproxy.coordinator.clients.worker.client import (
+    AppProxyWorkerClient,
+    AppProxyWorkerClientPool,
+)
 from ai.backend.appproxy.coordinator.errors.ingress import (
     ApiDeliveryWorkerRejectedError,
     ApiDeliveryWorkerServerError,
     ApiDeliveryWorkerUnreachableError,
-)
-from ai.backend.appproxy.coordinator.ingress.client import (
-    ApiDeliveryWorkerClient,
-    ApiDeliveryWorkerClientPool,
 )
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
     Ingress,
@@ -91,11 +91,11 @@ def unreachable_session() -> MagicMock:
     return session
 
 
-class TestApiDeliveryWorkerClient:
+class TestAppProxyWorkerClient:
     async def test_push_carries_the_api_secret(
         self, applying_session: MagicMock, secrets: SecretConfig, ingress: Ingress
     ) -> None:
-        client = ApiDeliveryWorkerClient(applying_session, WORKER_ADDR, secrets)
+        client = AppProxyWorkerClient(applying_session, WORKER_ADDR, secrets)
         await client.upsert([ingress])
         assert applying_session.post.call_args.kwargs["headers"] == {
             "X-BackendAI-Token": API_SECRET
@@ -127,7 +127,7 @@ class TestApiDeliveryWorkerClient:
         self, case: _ErrorAnswerCase, secrets: SecretConfig, ingress: Ingress
     ) -> None:
         session = _answering_session(case.status, b"rejected")
-        client = ApiDeliveryWorkerClient(session, WORKER_ADDR, secrets)
+        client = AppProxyWorkerClient(session, WORKER_ADDR, secrets)
         with pytest.raises(case.expected_error) as exc_info:
             await client.upsert([ingress])
         assert exc_info.value.extra_data == {
@@ -139,14 +139,14 @@ class TestApiDeliveryWorkerClient:
     async def test_unreachable_worker_raises(
         self, unreachable_session: MagicMock, secrets: SecretConfig, ingress: Ingress
     ) -> None:
-        client = ApiDeliveryWorkerClient(unreachable_session, WORKER_ADDR, secrets)
+        client = AppProxyWorkerClient(unreachable_session, WORKER_ADDR, secrets)
         with pytest.raises(ApiDeliveryWorkerUnreachableError):
             await client.upsert([ingress])
 
 
-class TestApiDeliveryWorkerClientPool:
+class TestAppProxyWorkerClientPool:
     async def test_client_of_an_address_is_reused(self, secrets: SecretConfig) -> None:
-        pool = ApiDeliveryWorkerClientPool(secrets)
+        pool = AppProxyWorkerClientPool(secrets)
         try:
             assert pool.load_client(WORKER_ADDR) is pool.load_client(WORKER_ADDR)
         finally:

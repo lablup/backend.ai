@@ -20,24 +20,24 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressKey
 _TOKEN_HEADER = "X-BackendAI-Token"
 
 
-class ApiDeliveryWorkerClientPool:
-    """Holds one ApiDeliveryWorkerClient per api-delivery worker address."""
+class AppProxyWorkerClientPool:
+    """Holds one AppProxyWorkerClient per worker address."""
 
     _secrets: SecretConfig
-    _clients: dict[str, ApiDeliveryWorkerClient]
+    _clients: dict[str, AppProxyWorkerClient]
 
     def __init__(self, secrets: SecretConfig) -> None:
         self._secrets = secrets
         self._clients = {}
 
-    def load_client(self, addr: str) -> ApiDeliveryWorkerClient:
+    def load_client(self, addr: str) -> AppProxyWorkerClient:
         client = self._clients.get(addr)
         if client is None:
             session = aiohttp.ClientSession(
                 base_url=f"http://{addr}",
                 timeout=aiohttp.ClientTimeout(total=30.0, connect=10.0),
             )
-            client = ApiDeliveryWorkerClient(session, addr, self._secrets)
+            client = AppProxyWorkerClient(session, addr, self._secrets)
             self._clients[addr] = client
         return client
 
@@ -47,8 +47,8 @@ class ApiDeliveryWorkerClientPool:
         self._clients.clear()
 
 
-class ApiDeliveryWorkerClient:
-    """Sends ingress pushes to the API port of one api-delivery worker node."""
+class AppProxyWorkerClient:
+    """Sends ingress pushes to the API port of one worker node."""
 
     _session: aiohttp.ClientSession
     _addr: str
