@@ -29,6 +29,7 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 class TCPFrontend(BaseFrontend[TCPBackend, int]):
     servers: list[asyncio.Server]
     server_tasks: list[asyncio.Task[Any]]
+    _conn_tasks: set[asyncio.Task[Any]]
 
     root_context: RootContext
 
@@ -37,6 +38,7 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
 
         self.servers = []
         self.server_tasks = []
+        self._conn_tasks = set()
 
     @override
     async def start(self) -> None:
@@ -76,11 +78,17 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
 
     @override
     async def stop(self) -> None:
-        for task in self.server_tasks:
-            task.cancel()
-            await task
         for server in self.servers:
             server.close()
+        # asyncio's wait_closed() waits for open connections; end them first.
+        conn_tasks = list(self._conn_tasks)
+        for conn_task in conn_tasks:
+            conn_task.cancel()
+        await asyncio.gather(*conn_tasks, return_exceptions=True)
+        for task in self.server_tasks:
+            task.cancel()
+        await asyncio.gather(*self.server_tasks, return_exceptions=True)
+        for server in self.servers:
             await server.wait_closed()
 
     def ensure_credential(self, request: web.Request, circuit: Circuit) -> None:
@@ -130,6 +138,20 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
         await writer.wait_closed()
 
     async def pipe(
+        self, circuit_key: int, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
+        # After the client half-closes, nothing in the loop holds this task;
+        # keep a strong reference until it is done.
+        task = asyncio.current_task()
+        if task is not None:
+            self._conn_tasks.add(task)
+        try:
+            await self._pipe(circuit_key, reader, writer)
+        finally:
+            if task is not None:
+                self._conn_tasks.discard(task)
+
+    async def _pipe(
         self, circuit_key: int, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
         metrics = self.root_context.metrics

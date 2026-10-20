@@ -61,10 +61,20 @@ class TCPBackend(BaseBackend):
                         break
                     total_bytes += len(data)
                     metrics.proxy.observe_upstream_tcp_traffic_chunk(len(data))
-                    writer.write(data)
-                    await writer.drain()
-            except ConnectionResetError:
-                log.trace("{}: connection reset", tag)
+                    try:
+                        writer.write(data)
+                        await writer.drain()
+                    except RuntimeError as e:  # uvloop: the handle is already closed
+                        log.trace("{}: write to closed transport: {!r}", tag, e)
+                        break
+                # Propagate the half-close so the peer does not wait on keep-alive.
+                try:
+                    if writer.can_write_eof():
+                        writer.write_eof()
+                except RuntimeError:
+                    pass
+            except OSError as e:
+                log.trace("{}: connection ended: {!r}", tag, e)
             finally:
                 stop_event.set()
 
