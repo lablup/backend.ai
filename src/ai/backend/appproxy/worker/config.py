@@ -612,6 +612,15 @@ class ProxyWorkerConfig(BaseSchema):
             example=ConfigExample(local="", prod="worker.example.com:10201"),
         ),
     ]
+    max_header_field_size: Annotated[
+        int,
+        Field(default=8190, gt=0),
+        BackendAIConfigMeta(
+            description="Maximum bytes of a single request header. Larger ones get 400.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="8190", prod="8190"),
+        ),
+    ]
 
     coordinator_endpoint: Annotated[
         AnyUrl,

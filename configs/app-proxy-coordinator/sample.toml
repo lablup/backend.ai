@@ -173,6 +173,9 @@
   # specify a specific IP to restrict access. Port 10200 is the default.
   # Added in 25.9.0
   bind_addr = { host = "0.0.0.0", port = 10200 }
+  # Maximum bytes of a single request header. Larger ones get 400.
+  # Added in 26.10.0
+  max_header_field_size = 8190
   # The external address that workers and clients should use to connect to this
   # coordinator. Required when the coordinator is behind a load balancer or NAT,
   # where the bind address differs from the externally accessible address.

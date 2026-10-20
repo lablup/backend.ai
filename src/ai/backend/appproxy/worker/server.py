@@ -981,7 +981,10 @@ async def server_main(
             )
 
         runner = web.AppRunner(
-            root_app, keepalive_timeout=30.0, access_log_class=BackendAIAccessLogger
+            root_app,
+            keepalive_timeout=30.0,
+            access_log_class=BackendAIAccessLogger,
+            max_field_size=local_config.proxy_worker.max_header_field_size,
         )
         await runner.setup()
         service_addr = local_config.proxy_worker.api_bind_addr

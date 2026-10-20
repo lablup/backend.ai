@@ -113,7 +113,11 @@ class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
         app.router.add_head("/{key}/mark-last-used-time", self.mark_last_used_time)
         app.router.add_head("/{key}/mark-active", self.mark_active)
         app.router.add_head("/{key}/mark-inactive", self.mark_inactive)
-        self.runner = web.AppRunner(app, access_log=None)
+        self.runner = web.AppRunner(
+            app,
+            access_log=None,
+            max_field_size=root_context.local_config.proxy_worker.max_header_field_size,
+        )
 
     @override
     async def start(self) -> None:
