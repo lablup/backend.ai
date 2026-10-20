@@ -44,19 +44,15 @@ from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.actions.bulk_get_keypairs import BulkGetKeypairsAction
 from ai.backend.manager.services.user.actions.bulk_lookup import BulkLookupUsersAction
 from ai.backend.manager.services.user.actions.bulk_lookup_keypairs import BulkLookupKeypairsAction
-from ai.backend.manager.services.user.actions.create_keypair_dotfile import (
-    CreateKeypairDotfileAction,
-    CreateKeypairDotfileActionResult,
+from ai.backend.manager.services.user.actions.create_dotfile import (
+    CreateDotfileAction,
+    CreateDotfileActionResult,
 )
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     BulkCreateUserActionResult,
     CreateUserAction,
     CreateUserActionResult,
-)
-from ai.backend.manager.services.user.actions.delete_keypair_dotfile import (
-    DeleteKeypairDotfileAction,
-    DeleteKeypairDotfileActionResult,
 )
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
@@ -112,10 +108,6 @@ from ai.backend.manager.services.user.actions.scoped_search import (
     ScopedSearchUsersAction,
 )
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
-from ai.backend.manager.services.user.actions.update_keypair_dotfile import (
-    UpdateKeypairDotfileAction,
-    UpdateKeypairDotfileActionResult,
-)
 from ai.backend.manager.services.user.actions.update_user import (
     BulkUpdateUserAction,
     BulkUpdateUserActionResult,
@@ -189,15 +181,7 @@ class UserProcessors:
     admin_get_ssh_keypair: SingleEntityActionProcessor[
         AdminGetSSHKeypairAction, AdminGetSSHKeypairActionResult
     ]
-    create_dotfile: SingleEntityActionProcessor[
-        CreateKeypairDotfileAction, CreateKeypairDotfileActionResult
-    ]
-    update_dotfile: SingleEntityActionProcessor[
-        UpdateKeypairDotfileAction, UpdateKeypairDotfileActionResult
-    ]
-    delete_dotfile: SingleEntityActionProcessor[
-        DeleteKeypairDotfileAction, DeleteKeypairDotfileActionResult
-    ]
+    create_dotfile: SingleEntityActionProcessor[CreateDotfileAction, CreateDotfileActionResult]
     get_default_bootstrap_script: SingleEntityActionProcessor[
         GetDefaultBootstrapScriptAction, GetDefaultBootstrapScriptActionResult
     ]
@@ -255,15 +239,7 @@ class UserProcessors:
         self.admin_get_ssh_keypair = group.single_entity(
             AdminGetSSHKeypairAction, user_service.admin_get_ssh_keypair
         )
-        self.create_dotfile = group.single_entity(
-            CreateKeypairDotfileAction, user_service.create_dotfile
-        )
-        self.update_dotfile = group.single_entity(
-            UpdateKeypairDotfileAction, user_service.update_dotfile
-        )
-        self.delete_dotfile = group.single_entity(
-            DeleteKeypairDotfileAction, user_service.delete_dotfile
-        )
+        self.create_dotfile = group.single_entity(CreateDotfileAction, user_service.create_dotfile)
         self.get_default_bootstrap_script = group.single_entity(
             GetDefaultBootstrapScriptAction, user_service.get_default_bootstrap_script
         )

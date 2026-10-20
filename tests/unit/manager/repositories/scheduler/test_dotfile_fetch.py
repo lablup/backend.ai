@@ -1,4 +1,4 @@
-"""Tests for the domain and project dotfiles ScheduleDBSource reads into a session's dotfile bundle."""
+"""User, project and domain dotfiles share one bundle for all creation paths."""
 
 from __future__ import annotations
 
@@ -7,244 +7,180 @@ import uuid
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.types import AccessKey
-from ai.backend.manager.data.dotfile.types import DotfileBundle, DotfileEntries, DotfileEntry
+from ai.backend.common.data.entity.domain import DomainName
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.types import AccessKey, SecretKey
+from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry
+from ai.backend.manager.data.session.draft import (
+    SessionIdentityDraft,
+    SessionResourceSpecDraft,
+    SessionScopeDraft,
+    SessionSpecDraft,
+)
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.dotfile.row import DotfileRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.types import UserScope
 from ai.backend.testutils.fixtures import DomainFixtureData
 
-_DOMAIN_ENTRY = DotfileEntry(path=".bashrc", perm="644", data="domain")
-_KEYPAIR_ENTRY = DotfileEntry(path=".bashrc", perm="600", data="keypair")
-_PROJECT_ENTRY = DotfileEntry(path=".bashrc", perm="644", data="project")
-_OTHER_KEYPAIR_ENTRY = DotfileEntry(path=".profile", perm="600", data="keypair")
+_USER = DotfileEntry(path=".bashrc", perm="600", data="user")
+_PROJECT = DotfileEntry(path=".profile", perm="644", data="project")
+_DOMAIN = DotfileEntry(path=".vimrc", perm="644", data="domain")
+_STALE = DotfileEntry(path=".bashrc", perm="644", data="stale keypair")
 
 
-class TestFetchDomainDotfiles:
-    @pytest.fixture
-    def db_source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ScheduleDBSource:
-        return ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
-
-    @pytest.fixture
-    async def domain_with_dotfile(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, test_domain: DomainFixtureData
-    ) -> DomainFixtureData:
-        async with db_with_cleanup.begin_session() as db_sess:
-            await db_sess.execute(
-                sa.update(DomainRow)
-                .where(DomainRow.name == test_domain.domain_name)
-                .values(dotfiles=DotfileEntries(entries=(_DOMAIN_ENTRY,)).pack())
+@pytest.fixture
+async def dotfile_scope(
+    db_with_cleanup: ExtendedAsyncSAEngine,
+    test_user_uuid: uuid.UUID,
+    test_group_id: uuid.UUID,
+    test_domain: DomainFixtureData,
+    test_access_key: AccessKey,
+) -> UserScope:
+    async with db_with_cleanup.begin_session() as session:
+        await session.execute(
+            sa.insert(VirtualEntityRow).values(
+                entity_type=UserEntityType(), entity_id=test_user_uuid
             )
-        return test_domain
-
-    @pytest.fixture
-    async def keypair_with_same_path(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, test_access_key: AccessKey
-    ) -> AccessKey:
-        async with db_with_cleanup.begin_session() as db_sess:
-            await db_sess.execute(
-                sa.update(KeyPairRow)
-                .where(KeyPairRow.access_key == test_access_key)
-                .values(dotfiles=DotfileEntries(entries=(_KEYPAIR_ENTRY,)).pack())
-            )
-        return test_access_key
-
-    async def _fetch(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        db_source: ScheduleDBSource,
-        domain_name: str,
-        access_key: AccessKey,
-    ) -> DotfileBundle:
-        scope = UserScope(
-            domain_name=domain_name,
-            group_id=uuid.UUID(int=0),
-            user_uuid=uuid.uuid4(),
-            user_role="user",
         )
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            return await db_source._fetch_dotfile_data(db_sess, scope, access_key)
+        await session.execute(
+            sa.insert(DotfileRow).values(
+                entity_type=UserEntityType(),
+                entity_id=test_user_uuid,
+                path=_USER.path,
+                perm=_USER.perm,
+                data=_USER.data,
+                is_default=True,
+            )
+        )
+        await session.execute(
+            sa.insert(DotfileRow).values(
+                entity_type=UserEntityType(),
+                entity_id=test_user_uuid,
+                path=".ignored",
+                perm="600",
+                data="non-default",
+                is_default=False,
+            )
+        )
+        await session.execute(
+            sa.update(ProjectRow)
+            .where(ProjectRow.id == test_group_id)
+            .values(dotfiles=DotfileEntries((_STALE, _PROJECT)).pack())
+        )
+        await session.execute(
+            sa.update(DomainRow)
+            .where(DomainRow.name == test_domain.domain_name)
+            .values(
+                dotfiles=DotfileEntries((
+                    _STALE,
+                    DotfileEntry(_PROJECT.path, "644", "domain"),
+                    _DOMAIN,
+                )).pack()
+            )
+        )
+        await session.execute(
+            sa.update(KeyPairRow)
+            .where(KeyPairRow.access_key == test_access_key)
+            .values(
+                is_default=True,
+                ssh_public_key="public",
+                ssh_private_key="private",
+            )
+        )
+    return UserScope(
+        domain_name=test_domain.domain_name,
+        group_id=test_group_id,
+        user_uuid=test_user_uuid,
+        user_role="user",
+    )
 
-    async def test_domain_dotfiles_are_included(
+
+@pytest.fixture
+async def second_access_key(
+    db_with_cleanup: ExtendedAsyncSAEngine,
+    dotfile_scope: UserScope,
+    test_keypair_resource_policy_name: str,
+) -> AccessKey:
+    key = AccessKey(f"AKIA{uuid.uuid4().hex[:16].upper()}")
+    async with db_with_cleanup.begin_session() as session:
+        session.add(
+            KeyPairRow(
+                access_key=key,
+                secret_key=SecretValue(SecretKey("secret")),
+                user=dotfile_scope.user_uuid,
+                is_active=True,
+                is_admin=False,
+                resource_policy=test_keypair_resource_policy_name,
+            )
+        )
+    return key
+
+
+class TestFetchDotfiles:
+    @pytest.mark.parametrize("has_default", [True, False])
+    @pytest.mark.parametrize("key_kind", ["default", "non_default", "none"])
+    async def test_enqueue_dotfiles_for_selected_key(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        db_source: ScheduleDBSource,
-        domain_with_dotfile: DomainFixtureData,
+        dotfile_scope: UserScope,
+        test_access_key: AccessKey,
+        second_access_key: AccessKey,
+        key_kind: str,
+        has_default: bool,
+    ) -> None:
+        if not has_default:
+            async with db_with_cleanup.begin() as conn:
+                await conn.execute(sa.update(DotfileRow).values(is_default=False))
+        keys = {"default": test_access_key, "non_default": second_access_key, "none": None}
+        draft = SessionSpecDraft(
+            resource_spec=SessionResourceSpecDraft(
+                identity=SessionIdentityDraft(
+                    user_uuid=dotfile_scope.user_uuid, access_key=keys[key_kind]
+                ),
+            ),
+            scope=SessionScopeDraft(
+                domain_name=DomainName(dotfile_scope.domain_name),
+                project_id=ProjectID(dotfile_scope.group_id),
+            ),
+        )
+        source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        async with db_with_cleanup.begin_readonly_session() as session:
+            result = await source._fetch_user_enqueue_fetch(session, draft)
+        expected_dotfiles = (
+            () if key_kind == "none" else (_DOMAIN, _PROJECT, _USER if has_default else _STALE)
+        )
+        assert result.dotfiles.dotfiles == expected_dotfiles
+        if key_kind == "default":
+            assert result.dotfiles.ssh_keypair is not None
+            assert result.dotfiles.ssh_keypair.public_key == "public"
+            assert result.dotfiles.ssh_keypair.private_key == "private"
+        else:
+            assert result.dotfiles.ssh_keypair is None
+
+    async def test_delegated_key_uses_its_owners_dotfiles(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        dotfile_scope: UserScope,
         test_access_key: AccessKey,
     ) -> None:
-        bundle = await self._fetch(
-            db_with_cleanup, db_source, domain_with_dotfile.domain_name, test_access_key
-        )
-
-        assert bundle.dotfiles == (_DOMAIN_ENTRY,)
-
-    async def test_keypair_dotfile_wins_over_domain_dotfile_on_the_same_path(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        db_source: ScheduleDBSource,
-        domain_with_dotfile: DomainFixtureData,
-        keypair_with_same_path: AccessKey,
-    ) -> None:
-        bundle = await self._fetch(
-            db_with_cleanup, db_source, domain_with_dotfile.domain_name, keypair_with_same_path
-        )
-
-        assert bundle.dotfiles == (_KEYPAIR_ENTRY,)
-
-    async def test_missing_domain_yields_no_domain_dotfiles(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        db_source: ScheduleDBSource,
-        keypair_with_same_path: AccessKey,
-    ) -> None:
-        bundle = await self._fetch(
-            db_with_cleanup, db_source, f"missing-{uuid.uuid4().hex[:8]}", keypair_with_same_path
-        )
-
-        assert bundle.dotfiles == (_KEYPAIR_ENTRY,)
-
-
-class TestFetchProjectDotfiles:
-    @pytest.fixture
-    def db_source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ScheduleDBSource:
-        return ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
-
-    @pytest.fixture
-    async def project_with_dotfile(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, test_group_id: uuid.UUID
-    ) -> uuid.UUID:
-        async with db_with_cleanup.begin_session() as db_sess:
-            await db_sess.execute(
-                sa.update(ProjectRow)
-                .where(ProjectRow.id == test_group_id)
-                .values(dotfiles=DotfileEntries(entries=(_PROJECT_ENTRY,)).pack())
-            )
-        return test_group_id
-
-    @pytest.fixture
-    async def project_without_dotfile(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, test_group_id: uuid.UUID
-    ) -> uuid.UUID:
-        async with db_with_cleanup.begin_session() as db_sess:
-            await db_sess.execute(
-                sa.update(ProjectRow)
-                .where(ProjectRow.id == test_group_id)
-                .values(dotfiles=DotfileEntries().pack())
-            )
-        return test_group_id
-
-    @pytest.fixture
-    async def keypair_with_same_path(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, test_access_key: AccessKey
-    ) -> AccessKey:
-        async with db_with_cleanup.begin_session() as db_sess:
-            await db_sess.execute(
-                sa.update(KeyPairRow)
-                .where(KeyPairRow.access_key == test_access_key)
-                .values(dotfiles=DotfileEntries(entries=(_KEYPAIR_ENTRY,)).pack())
-            )
-        return test_access_key
-
-    @pytest.fixture
-    async def keypair_with_other_path(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, test_access_key: AccessKey
-    ) -> AccessKey:
-        async with db_with_cleanup.begin_session() as db_sess:
-            await db_sess.execute(
-                sa.update(KeyPairRow)
-                .where(KeyPairRow.access_key == test_access_key)
-                .values(dotfiles=DotfileEntries(entries=(_OTHER_KEYPAIR_ENTRY,)).pack())
-            )
-        return test_access_key
-
-    async def _fetch(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        db_source: ScheduleDBSource,
-        domain_name: str,
-        group_id: uuid.UUID,
-        access_key: AccessKey,
-    ) -> DotfileBundle:
-        scope = UserScope(
-            domain_name=domain_name,
-            group_id=group_id,
+        requester_scope = UserScope(
+            domain_name=dotfile_scope.domain_name,
+            group_id=dotfile_scope.group_id,
             user_uuid=uuid.uuid4(),
             user_role="user",
         )
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            return await db_source._fetch_dotfile_data(db_sess, scope, access_key)
-
-    async def test_project_dotfiles_join_the_bundle_before_keypair_dotfiles(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        db_source: ScheduleDBSource,
-        test_domain: DomainFixtureData,
-        project_with_dotfile: uuid.UUID,
-        keypair_with_other_path: AccessKey,
-    ) -> None:
-        bundle = await self._fetch(
-            db_with_cleanup,
-            db_source,
-            test_domain.domain_name,
-            project_with_dotfile,
-            keypair_with_other_path,
-        )
-
-        assert bundle.dotfiles == (_PROJECT_ENTRY, _OTHER_KEYPAIR_ENTRY)
-
-    async def test_keypair_dotfile_wins_over_project_dotfile_on_the_same_path(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        db_source: ScheduleDBSource,
-        test_domain: DomainFixtureData,
-        project_with_dotfile: uuid.UUID,
-        keypair_with_same_path: AccessKey,
-    ) -> None:
-        bundle = await self._fetch(
-            db_with_cleanup,
-            db_source,
-            test_domain.domain_name,
-            project_with_dotfile,
-            keypair_with_same_path,
-        )
-
-        assert bundle.dotfiles == (_KEYPAIR_ENTRY,)
-
-    async def test_project_without_dotfiles_adds_nothing(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        db_source: ScheduleDBSource,
-        test_domain: DomainFixtureData,
-        project_without_dotfile: uuid.UUID,
-        keypair_with_same_path: AccessKey,
-    ) -> None:
-        bundle = await self._fetch(
-            db_with_cleanup,
-            db_source,
-            test_domain.domain_name,
-            project_without_dotfile,
-            keypair_with_same_path,
-        )
-
-        assert bundle.dotfiles == (_KEYPAIR_ENTRY,)
-
-    async def test_missing_project_yields_no_project_dotfiles(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        db_source: ScheduleDBSource,
-        test_domain: DomainFixtureData,
-        keypair_with_same_path: AccessKey,
-    ) -> None:
-        bundle = await self._fetch(
-            db_with_cleanup,
-            db_source,
-            test_domain.domain_name,
-            uuid.uuid4(),
-            keypair_with_same_path,
-        )
-
-        assert bundle.dotfiles == (_KEYPAIR_ENTRY,)
+        source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        async with db_with_cleanup.begin_readonly_session() as session:
+            result = await source._fetch_dotfile_data(session, requester_scope, test_access_key)
+        assert result.dotfiles == (_DOMAIN, _PROJECT, _USER)
+        assert result.ssh_keypair is not None
+        assert result.ssh_keypair.public_key == "public"
+        assert result.ssh_keypair.private_key == "private"

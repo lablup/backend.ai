@@ -27,6 +27,7 @@ from ai.backend.common.data.entity.container_registry import ContainerRegistryEn
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.dotfile import DotfileFieldType
 from ai.backend.common.data.entity.entity_label import EntityLabelFieldType
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
@@ -80,6 +81,7 @@ from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAct
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
+from ai.backend.manager.data.dotfile.types import DotfileData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.data.image.types import ImageAliasData
 from ai.backend.manager.data.kernel.types import KernelInfo
@@ -226,6 +228,12 @@ from ai.backend.manager.services.domain.actions.create_domain import CreateDomai
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.actions.scoped_search import ScopedSearchDomainsAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
+from ai.backend.manager.services.dotfile.actions.lookup_owner import (
+    LookupBulkDotfileOwnerAction,
+    LookupDotfileOwnerAction,
+)
+from ai.backend.manager.services.dotfile.actions.search import SearchDotfilesAction
+from ai.backend.manager.services.dotfile.processors import DotfileProcessors
 from ai.backend.manager.services.entity_label.actions.lookup_owner import (
     LookupBulkEntityLabelOwnerAction,
     LookupEntityLabelOwnerAction,
@@ -785,6 +793,14 @@ def test_entity_data_loader_reads_are_checked_per_entity() -> None:
     ResourceGroupProcessors(registry.group(GroupMeta(ResourceGroupEntityType())), MagicMock())
     DomainProcessors(registry.group(GroupMeta(DomainEntityType())), MagicMock())
     UserProcessors(registry.group(GroupMeta(UserEntityType())), MagicMock())
+    DotfileProcessors(
+        registry.dangling_lookup_field_group(
+            FieldGroupMeta(DotfileFieldType()),
+            DotfileData,
+            LookupDotfileOwnerAction,
+            LookupBulkDotfileOwnerAction,
+        )
+    )
     ProjectProcessors(registry.group(GroupMeta(ProjectEntityType())), MagicMock())
     SessionGroupProcessors(registry.group(GroupMeta(SessionGroupEntityType())), MagicMock())
     NotificationProcessors(
@@ -825,6 +841,11 @@ def test_entity_data_loader_reads_are_checked_per_entity() -> None:
         record.action_cls: (record.entity_type, record.kind, record.gate)
         for record in registry.wired_processors()
     }
+    assert recorded[SearchDotfilesAction] == (
+        GlobalEntityType(),
+        ActionKind.SCOPE,
+        ActionGate.PERMISSION,
+    )
     assert recorded[BulkGetDeploymentsAction] == (
         DeploymentEntityType(),
         ActionKind.BULK,

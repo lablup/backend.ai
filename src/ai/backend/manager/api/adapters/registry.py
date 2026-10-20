@@ -73,6 +73,7 @@ from ai.backend.manager.api.adapters.session_group.adapter import SessionGroupAd
 from ai.backend.manager.api.adapters.storage_host.adapter import StorageHostAdapter
 from ai.backend.manager.api.adapters.storage_namespace.adapter import StorageNamespaceAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
+from ai.backend.manager.api.adapters.user.config import UserConfigAdapter
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.api.adapters.vfs_storage.adapter import VFSStorageAdapter
 from ai.backend.manager.secret.pool import KeyProviderPool
@@ -146,6 +147,7 @@ class Adapters:
         storage_host: StorageHostAdapter,
         storage_namespace: StorageNamespaceAdapter,
         user: UserAdapter,
+        user_config: UserConfigAdapter,
         vfolder: VFolderAdapter,
         vfs_storage: VFSStorageAdapter,
     ) -> None:
@@ -200,6 +202,7 @@ class Adapters:
         self.storage_host = storage_host
         self.storage_namespace = storage_namespace
         self.user = user
+        self.user_config = user_config
         self.vfolder = vfolder
         self.vfs_storage = vfs_storage
 
@@ -312,6 +315,7 @@ class Adapters:
             storage_host=StorageHostAdapter(processors.vfolder),
             storage_namespace=StorageNamespaceAdapter(processors.storage_namespace),
             user=UserAdapter(processors.user, processors.domain, auth_config, key_provider_pool),
+            user_config=UserConfigAdapter(processors.user, processors.dotfile),
             vfolder=VFolderAdapter(
                 processors.vfolder,
                 processors.vfolder_file,

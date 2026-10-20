@@ -6,6 +6,8 @@ from collections.abc import AsyncIterator, Callable, Coroutine
 from typing import Any
 
 import pytest
+import sqlalchemy as sa
+from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.config import (
@@ -17,6 +19,7 @@ from ai.backend.common.dto.manager.config import (
     DeleteGroupDotfileRequest,
     DeleteUserDotfileRequest,
 )
+from ai.backend.manager.models.dotfile.row import DotfileRow
 
 UserDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
 GroupDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
@@ -26,8 +29,9 @@ DomainDotfileFactory = Callable[..., Coroutine[Any, Any, CreateDotfileResponse]]
 @pytest.fixture()
 async def user_dotfile_factory(
     admin_registry: BackendAIClientRegistry,
+    db_engine: SAEngine,
 ) -> AsyncIterator[UserDotfileFactory]:
-    """Factory fixture that creates user dotfiles via SDK and deletes on teardown."""
+    """Create through the SDK, mark the new file default, and delete on teardown."""
     created_paths: list[str] = []
 
     async def _create(**overrides: Any) -> CreateDotfileResponse:
@@ -39,6 +43,13 @@ async def user_dotfile_factory(
         }
         params.update(overrides)
         result = await admin_registry.config.create_user_dotfile(CreateUserDotfileRequest(**params))
+        # Creation adds a non-default variant; the default-file API reads defaults only.
+        async with db_engine.begin() as conn:
+            await conn.execute(
+                sa.update(DotfileRow)
+                .where(DotfileRow.path == params["path"])
+                .values(is_default=True)
+            )
         created_paths.append(params["path"])
         return result
 

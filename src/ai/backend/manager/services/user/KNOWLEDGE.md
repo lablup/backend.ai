@@ -7,7 +7,7 @@ keywords:
   - UserProcessors
   - keypair_group
   - LookupKeypairOwnerByAccessKeyAction
-  - KeypairDotfilesUpdater
+  - DotfileRow
   - bootstrap_script
 sources:
   - src/ai/backend/manager/services/user/processors.py
@@ -37,7 +37,16 @@ row is a change to that user.
 
 - `bootstrap_scripts` holds scripts per `(entity_type, entity_id)`; at most one per entity is `is_default`.
 - The API and session creation use the user's default script. Reading one that is missing answers an empty script; updating it answers not found.
-- Dotfiles stay on `keypairs.dotfiles`.
+- `dotfiles` stores one file per row with `entity_type`, `entity_id`, `path`, `perm`, `data`, and `is_default`. Each entity has at most one default row per path; user APIs and sessions use these rows.
+- `(entity_type, entity_id)` references `virtual_entities` with `ON DELETE CASCADE`. Creating for an entity with no node fails, and a row created while its owner is purged goes with the node.
+- Project and domain dotfiles remain in their existing columns.
+- Creation stores a non-default file. Its ActionResult retains `entries`: the existing default files followed by the new file. No runtime operation currently selects a default; migrated default files remain available.
+- Requests limit each file's `data` to `MAXIMUM_DOTFILE_SIZE` characters, the limit the row's CHECK enforces.
+- The adapter creates `DotfileEntryCreator`. `CreateDotfileAction` passes it to `UserRepository`, which calls write ops in one transaction. `DotfileEntryCreator` names the owner, and `CreateDotfileAction` takes its user from there.
+- Migration unpacks keypair bytes, deduplicates `(path, perm, data)` per user, and preserves whether any source was the default keypair. It reads rows in batches and writes up to 1,000 file rows per insert before dropping `keypairs.dotfiles`.
+- Downgrade packs each user’s default files into msgpack and restores them to all of that user’s keypairs.
+- Reads are `SearchDotfilesAction` on `DotfileProcessors`, scope-shaped with the user as the scope, from a dangling field group because the owner's kind is a value on the row. The legacy single-file read is that search with a path condition. `UpdateDotfileAction` and `PurgeDotfileAction` name one row by id and are answered for by the owner its lookup reads; the legacy update and delete find the default row's id by path first.
+- An access key selects its owning user for the existing dotfile API. Purging a user deletes its dotfile rows.
 
 ## The operations that keep a service
 

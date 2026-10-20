@@ -47,7 +47,6 @@ class KeyPairData(FieldData):
     rate_limit: int
     ssh_public_key: str | None
     ssh_private_key: str | None
-    dotfiles: bytes
 
     last_used: datetime | None = None
     num_queries: int = 0
