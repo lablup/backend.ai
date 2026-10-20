@@ -211,6 +211,7 @@
       "rank": 1400
     },
     {
+      "uuid": "7b0a5640-f097-4786-ba0d-a4ffa8e9cc14",
       "slot_name": "cuda.unified",
       "slot_type": "unified",
       "required": false,
