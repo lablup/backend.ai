@@ -1715,13 +1715,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             socket_dir = ipc_base_path / "container"
             relay_config = self.local_config.agent.socket_relay
             relay_user: str | None
-            if not relay_config.run_as_non_root:
-                relay_user = None
-            elif os.geteuid() == 0:
-                os.chown(socket_dir, _SOCKET_RELAY_UID, _SOCKET_RELAY_GID)
-                relay_user = f"{_SOCKET_RELAY_UID}:{_SOCKET_RELAY_GID}"
+            if relay_config.run_as_non_root:
+                if os.geteuid() == 0:
+                    os.chown(socket_dir, _SOCKET_RELAY_UID, _SOCKET_RELAY_GID)
+                    relay_user = f"{_SOCKET_RELAY_UID}:{_SOCKET_RELAY_GID}"
+                else:
+                    relay_user = f"{os.geteuid()}:{os.getegid()}"
             else:
-                relay_user = f"{os.geteuid()}:{os.getegid()}"
+                relay_user = None
             listen_address = (
                 f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777"
             )
