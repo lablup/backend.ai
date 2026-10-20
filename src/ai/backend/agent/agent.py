@@ -244,6 +244,7 @@ from ai.backend.logging.structured import StructuredLogger, with_log_context
 from . import __version__ as VERSION
 from .affinity_map import AffinityMap
 from .config.unified import AgentUnifiedConfig, ContainerSandboxType
+from .defs import FALLBACK_KERNEL_PYTHON_VERSION
 from .errors import (
     ContainerCreationError,
     ContainerCreationFailedError,
@@ -532,7 +533,9 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         matched_libc_style = "glibc"
         if distro.startswith("alpine"):
             matched_libc_style = "musl"
-        krunner_pyver = read_krunner_python_version(matched_distro) or "3.6"  # fallback
+        krunner_pyver = (
+            read_krunner_python_version(matched_distro) or FALLBACK_KERNEL_PYTHON_VERSION
+        )
         log.debug(
             "krunner selected",
             krunner_distro=matched_distro,

@@ -4,10 +4,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
-from typing import Final, override
+from typing import override
 
 from cachetools import LRUCache, cached
 
+from ai.backend.agent.defs import FALLBACK_KERNEL_PYTHON_VERSION
 from ai.backend.agent.kernel import match_distro_data, read_krunner_python_version
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec, Mount
 from ai.backend.agent.utils import get_arch_name
@@ -29,9 +30,6 @@ ARTIFACT_PATH = Path(str(files("ai.backend.agent").joinpath("../runner")))
 class LibcStyle(enum.StrEnum):
     GLIBC = "glibc"
     MUSL = "musl"
-
-
-FALLBACK_KERNEL_PYTHON_VERSION: Final[str] = "3.6"  # Need to update?
 
 
 @dataclass
