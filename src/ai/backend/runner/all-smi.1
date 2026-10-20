@@ -1,4 +1,4 @@
-.TH ALL-SMI 1 "October 17, 2026" "all-smi 0.28.0" "User Commands"
+.TH ALL-SMI 1 "October 20, 2026" "all-smi 0.28.1" "User Commands"
 .SH NAME
 all-smi \- Command-line utility for monitoring GPU hardware
 .SH SYNOPSIS
@@ -510,7 +510,7 @@ Support for Wormhole and Blackhole architectures with multiple temperature senso
 Support for Trainium and Inferentia devices: one row per NeuronCore, device HBM and PCI topology from neuron-ls, per-core memory from the neuron driver sysfs tree, and best-effort per-core utilization from neuron-monitor while a Neuron runtime is attached
 .TP
 .B Rebellions NPUs
-Support for ATOM, ATOM+, and ATOM Max variants with PCIe Gen5 x16 interfaces. An ATOM Max card has four dies that share one power reading; it is counted once, on the lowest\-numbered die of the card, and the other dies show the card value in parentheses and export no power series
+Support for the ATOM line (ATOM, ATOM+, ATOM Max) and its successor REBEL line (REBEL100) with PCIe Gen5 x16 interfaces. An ATOM Max card has four dies that share one power reading; it is counted once, on the lowest\-numbered die of the card, and the other dies show the card value in parentheses and export no power series
 .TP
 .B Furiosa NPUs
 Support for RNGD architecture with 8-core NPUs and PE utilization tracking
