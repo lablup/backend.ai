@@ -27,10 +27,14 @@ class TCPBackend(BaseBackend):
     """
 
     _pool: RoutePool
+    _live_writers: set[asyncio.StreamWriter]
+    _closed: bool
 
     def __init__(self, routes: list[RouteInfo], *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         self._pool = RoutePool(initial_routes=routes)
+        self._live_writers = set()
+        self._closed = False
 
     @override
     async def update_routes(self, routes: list[RouteInfo]) -> None:
@@ -38,6 +42,10 @@ class TCPBackend(BaseBackend):
 
     @override
     async def close(self) -> None:
+        # Closing both ends ends the pipes of connections already bound to this circuit.
+        self._closed = True
+        for writer in list(self._live_writers):
+            writer.close()
         await self._pool.close()
 
     async def bind(
@@ -96,9 +104,18 @@ class TCPBackend(BaseBackend):
 
             up_reader, up_writer = await asyncio.open_connection(sock=sock)
             self._pool.record_success(route)
-            async with asyncio.TaskGroup() as group:
-                group.create_task(_pipe(up_reader, down_writer, tag="up->down"))
-                group.create_task(_pipe(down_reader, up_writer, tag="down->up"))
+            self._live_writers.update((down_writer, up_writer))
+            if self._closed:
+                down_writer.close()
+                up_writer.close()
+            try:
+                async with asyncio.TaskGroup() as group:
+                    group.create_task(_pipe(up_reader, down_writer, tag="up->down"))
+                    group.create_task(_pipe(down_reader, up_writer, tag="down->up"))
+            finally:
+                self._live_writers.discard(down_writer)
+                self._live_writers.discard(up_writer)
+                up_writer.close()
         finally:
             metrics.proxy.observe_upstream_tcp_traffic_chunk(total_bytes)
             await marker_cron.stop()
