@@ -3,11 +3,12 @@ from __future__ import annotations
 import asyncio
 import time
 import uuid
-from collections.abc import AsyncGenerator, AsyncIterator, Mapping
+from collections.abc import AsyncGenerator, AsyncIterator, Iterator, Mapping
 from dataclasses import dataclass
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import aiodocker
 import pytest
 
 from ai.backend.common.auth import PublicKey, SecretKey
@@ -144,6 +145,55 @@ async def registry_ctx() -> AsyncGenerator[
         )
     finally:
         await registry.shutdown()
+
+
+class TestAgentRegistryInit:
+    @pytest.fixture
+    def docker_unavailable(self) -> Iterator[MagicMock]:
+        with patch.object(
+            aiodocker, "Docker", side_effect=RuntimeError("no docker host")
+        ) as mock_docker:
+            yield mock_docker
+
+    @pytest.fixture
+    async def registry_ctx(
+        self,
+        docker_unavailable: MagicMock,
+        registry_ctx: tuple[
+            AgentRegistry,
+            MagicMock,
+            MagicMock,
+            MagicMock,
+            ManagerConfigProvider,
+            MagicMock,
+            MagicMock,
+        ],
+    ) -> tuple[
+        AgentRegistry,
+        MagicMock,
+        MagicMock,
+        MagicMock,
+        ManagerConfigProvider,
+        MagicMock,
+        MagicMock,
+    ]:
+        # Depend on the patch so the registry is always built while Docker is unavailable.
+        return registry_ctx
+
+    async def test_init_does_not_create_docker_client(
+        self,
+        docker_unavailable: MagicMock,
+        registry_ctx: tuple[
+            AgentRegistry,
+            MagicMock,
+            MagicMock,
+            MagicMock,
+            ManagerConfigProvider,
+            MagicMock,
+            MagicMock,
+        ],
+    ) -> None:
+        docker_unavailable.assert_not_called()
 
 
 @dataclass
