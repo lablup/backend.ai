@@ -281,6 +281,7 @@ from .stats import StatContext, StatModes
 from .types import (
     Container,
     ContainerLifecycleEvent,
+    CreationAttempt,
     KernelLifecycleStatus,
     KernelOwnershipData,
     LifecycleEvent,
@@ -876,7 +877,7 @@ class AbstractAgent[
     # Kernels registered by an ongoing `create_kernel`, which reports their failures itself.
     failure_reporting_kernels: set[KernelId]
     # The latest creation attempt of each kernel, so a stale failure report can be told apart.
-    create_attempts: dict[KernelId, object]
+    create_attempts: dict[KernelId, CreationAttempt]
 
     @contextmanager
     def track_pull(self, image: str) -> Generator[bool, None, None]:
@@ -1531,7 +1532,6 @@ class AbstractAgent[
                 else:
                     # Forget as we are done with this kernel.
                     kernel_obj = self.kernel_registry.pop(ev.kernel_id, None)
-                    self.create_attempts.pop(ev.kernel_id, None)
                 try:
                     if kernel_obj is not None:
                         host_ports = kernel_obj.get("host_ports")
@@ -1688,7 +1688,7 @@ class AbstractAgent[
         exit_code: int | None = None,
         done_future: asyncio.Future[Any] | None = None,
         suppress_events: bool = False,
-        create_attempt: object | None = None,
+        create_attempt: CreationAttempt | None = None,
     ) -> None:
         cid: ContainerId | None = None
         try:
@@ -2588,7 +2588,7 @@ class AbstractAgent[
         *,
         restarting: bool = False,
         throttle_sema: asyncio.Semaphore | None = None,
-        attempt: object | None = None,
+        creation_attempt: CreationAttempt | None = None,
     ) -> KernelCreationResult:
         """
         Create a new kernel.
@@ -2601,8 +2601,8 @@ class AbstractAgent[
             if not should_proceed:
                 log.debug("kernel creation already in progress")
                 raise KernelCreationInProgressError("Kernel creation already in progress")
-            if attempt is not None:
-                self.create_attempts[kernel_id] = attempt
+            if creation_attempt is not None:
+                self.create_attempts[kernel_id] = creation_attempt
 
             if throttle_sema is None:
                 # make a local semaphore

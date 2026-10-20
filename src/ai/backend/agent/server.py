@@ -166,6 +166,7 @@ from .config.unified import (
     KernelLifecyclesConfig,
 )
 from .types import (
+    CreationAttempt,
     KernelLifecycleStatus,
     KernelOwnershipData,
     LifecycleEvent,
@@ -836,7 +837,7 @@ class AgentRPCServer(aobject):
                 log.debug("kernel creating", image_name=kernel_image.canonical)
                 released = False
                 reported = False
-                attempt = object()
+                attempt = CreationAttempt()
                 try:
                     return await agent.create_kernel(
                         ownership_data,
@@ -844,7 +845,7 @@ class AgentRPCServer(aobject):
                         kernel_config,
                         cluster_info,
                         throttle_sema=throttle_sema,
-                        attempt=attempt,
+                        creation_attempt=attempt,
                     )
                 except KernelCreationInProgressError:
                     # The ongoing creation owns the entry.
@@ -865,7 +866,6 @@ class AgentRPCServer(aobject):
                     agent.failure_reporting_kernels.discard(ownership_data.kernel_id)
                     released = True
                     if unreported:
-                        reported = True
                         # No container exists to report the failure for it, so tell the manager
                         # the kernel is gone instead of leaving the session to its create timeout.
                         await agent.inject_container_lifecycle_event(
@@ -875,6 +875,7 @@ class AgentRPCServer(aobject):
                             KernelLifecycleEventReason.FAILED_TO_CREATE,
                             create_attempt=attempt,
                         )
+                        reported = True
                     raise
                 finally:
                     if not released:
@@ -882,7 +883,6 @@ class AgentRPCServer(aobject):
                     if (
                         not reported
                         and agent.create_attempts.get(ownership_data.kernel_id) is attempt
-                        and ownership_data.kernel_id not in agent.kernel_registry
                     ):
                         del agent.create_attempts[ownership_data.kernel_id]
 

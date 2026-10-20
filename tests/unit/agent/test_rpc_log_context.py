@@ -382,21 +382,37 @@ class TestCreateKernels:
             agent.inject_container_lifecycle_event.assert_not_awaited()
         assert kernel_id not in agent.failure_reporting_kernels
 
-    async def test_report_carries_the_attempt_of_the_failed_creation(self) -> None:
+    @pytest.mark.parametrize(
+        ("registered", "error", "entry_kept"),
+        [
+            (False, RuntimeError("rejected"), True),
+            (True, RuntimeError("rejected"), False),
+            (False, TimeoutError(), False),
+        ],
+        ids=["reported", "registered", "unreported"],
+    )
+    async def test_attempt_entry_lives_until_the_queued_report_is_handled(
+        self, registered: bool, error: Exception, entry_kept: bool
+    ) -> None:
         session_id = uuid.uuid4()
         kernel_id = KernelId(uuid.uuid4())
         agent = MagicMock()
         agent.id = PRIMARY_AGENT_ID
         agent.local_config.agent.kernel_creation_concurrency = 1
-        agent.kernel_registry = {}
+        agent.kernel_registry = {kernel_id: MagicMock()} if registered else {}
         agent.failure_reporting_kernels = set()
         agent.create_attempts = {}
-        agent.create_kernel = AsyncMock(side_effect=RuntimeError("rejected"))
+
+        async def fail_after_admission(*_args: object, **kwargs: Any) -> None:
+            agent.create_attempts[kernel_id] = kwargs["creation_attempt"]
+            raise error
+
+        agent.create_kernel = AsyncMock(side_effect=fail_after_admission)
         agent.inject_container_lifecycle_event = AsyncMock()
         image_ref = MagicMock()
         image_ref.canonical = "cr.backend.ai/stable/python:latest"
 
-        with pytest.raises(RuntimeError):
+        with pytest.raises(type(error)):
             await AgentRPCServer.create_kernels(
                 _server(agent),
                 _request(
@@ -405,36 +421,10 @@ class TestCreateKernels:
                 ),
             )
 
-        attempt = agent.create_kernel.await_args.kwargs["attempt"]
-        assert agent.inject_container_lifecycle_event.await_args.kwargs["create_attempt"] is attempt
-
-    async def test_unreported_failure_releases_its_attempt(self) -> None:
-        session_id = uuid.uuid4()
-        kernel_id = KernelId(uuid.uuid4())
-        agent = MagicMock()
-        agent.id = PRIMARY_AGENT_ID
-        agent.local_config.agent.kernel_creation_concurrency = 1
-        agent.kernel_registry = {}
-        agent.create_attempts = {}
-
-        async def fail_after_registering_the_attempt(*_args: object, **kwargs: Any) -> None:
-            agent.create_attempts[kernel_id] = kwargs["attempt"]
-            raise TimeoutError
-
-        agent.create_kernel = AsyncMock(side_effect=fail_after_registering_the_attempt)
-        image_ref = MagicMock()
-        image_ref.canonical = "cr.backend.ai/stable/python:latest"
-
-        with pytest.raises(TimeoutError):
-            await AgentRPCServer.create_kernels(
-                _server(agent),
-                _request(
-                    "create_kernels",
-                    (str(session_id), [str(kernel_id)], [{}], {}, {kernel_id: image_ref}),
-                ),
-            )
-
-        assert kernel_id not in agent.create_attempts
+        assert (kernel_id in agent.create_attempts) is entry_kept
+        if entry_kept:
+            report = agent.inject_container_lifecycle_event.await_args.kwargs
+            assert report["create_attempt"] is agent.create_attempts[kernel_id]
 
     async def test_retried_creation_entry_survives_the_stale_report(self) -> None:
         session_id = uuid.uuid4()
