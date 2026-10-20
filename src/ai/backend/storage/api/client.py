@@ -500,8 +500,8 @@ async def tus_options(request: web.Request) -> web.Response:
         "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
     )
     headers["Access-Control-Expose-Headers"] = (
-        "Tus-Resumable, Tus-Extension, Upload-Length, Upload-Metadata, Upload-Offset, "
-        "Upload-Expires, Content-Type"
+        "Tus-Resumable, Tus-Version, Tus-Extension, Tus-Max-Size, Upload-Length, "
+        "Upload-Metadata, Upload-Offset, Upload-Expires, Content-Type"
     )
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Tus-Resumable"] = "1.0.0"

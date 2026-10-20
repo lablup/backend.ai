@@ -447,8 +447,10 @@ class TestTusUploadExpiration:
         response = await tus_options(options_request)
 
         assert response.headers["Tus-Extension"] == "expiration"
-        assert "Tus-Extension" in response.headers["Access-Control-Expose-Headers"]
-        assert "Upload-Expires" in response.headers["Access-Control-Expose-Headers"]
+        exposed = {
+            name.strip() for name in response.headers["Access-Control-Expose-Headers"].split(",")
+        }
+        assert {"Tus-Version", "Tus-Extension", "Tus-Max-Size", "Upload-Expires"} <= exposed
 
     @pytest.mark.parametrize(
         "case",
