@@ -76,7 +76,6 @@ from ai.backend.common.clients.valkey_client.valkey_tus import (
     TusSessionId,
     TusSessionNotFoundError,
 )
-from ai.backend.common.clients.valkey_client.valkey_tus.client import TusUploadState
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -150,6 +149,7 @@ class UploadTokenData(TypedDict):
     relpath: str
     session: str
     size: int
+    exp: int
 
 
 upload_token_data_iv = t.Dict(
@@ -160,6 +160,7 @@ upload_token_data_iv = t.Dict(
         t.Key("relpath"): t.String,
         t.Key("session"): t.String,
         t.Key("size"): t.Int,
+        t.Key("exp"): t.Int,
     },
 ).allow_extra(
     "*",
@@ -472,7 +473,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
         )
 
         headers["Upload-Offset"] = str(upload_state.offset)
-        headers["Upload-Expires"] = _format_upload_expires(token_data, upload_state)
+        headers["Upload-Expires"] = _upload_expires_at(token_data["exp"], upload_state.ttl_seconds)
         if upload_state.offset >= int(token_data["size"]):
             parent_dir = vfpath
             if (dst_dir := params["dst_dir"]) is not None:
@@ -542,15 +543,15 @@ async def prepare_tus_session_headers(
         )
     headers["Upload-Offset"] = str(upload_state.offset)
     headers["Upload-Length"] = str(token_data["size"])
-    headers["Upload-Expires"] = _format_upload_expires(token_data, upload_state)
+    headers["Upload-Expires"] = _upload_expires_at(token_data["exp"], upload_state.ttl_seconds)
     return headers
 
 
-def _format_upload_expires(token_data: Mapping[str, Any], upload_state: TusUploadState) -> str:
+def _upload_expires_at(token_exp: int, ttl_seconds: int) -> str:
     """The upload token stops being accepted at its ``exp``, which no PATCH extends."""
     expires_at = min(
-        datetime.fromtimestamp(token_data["exp"], UTC),
-        datetime.now(UTC) + timedelta(seconds=upload_state.ttl_seconds),
+        datetime.fromtimestamp(token_exp, UTC),
+        datetime.now(UTC) + timedelta(seconds=ttl_seconds),
     )
     return format_datetime(expires_at, usegmt=True)
 
