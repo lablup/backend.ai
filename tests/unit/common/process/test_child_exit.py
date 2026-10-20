@@ -44,8 +44,14 @@ class TestChildExitMonitorRaiseSystemExit:
         ChildExitMonitor(()).raise_system_exit()
 
     def test_fails_when_a_spawned_child_reports_an_init_failure(self) -> None:
-        status = ChildStatus()
-        child = mp.get_context("spawn").Process(target=_fail_init, args=(status,))
+        # The shared objects must come from the context that starts the child.
+        ctx = mp.get_context("spawn")
+        status = ChildStatus(
+            pid=ctx.Value("i", 0),
+            clean_shutdown=ctx.Event(),
+            init_failed=ctx.Event(),
+        )
+        child = ctx.Process(target=_fail_init, args=(status,))
         child.start()
         child.join(timeout=30)
         assert child.exitcode == 0
