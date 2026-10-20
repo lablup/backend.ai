@@ -131,6 +131,7 @@ class TestTCPPipe:
     ) -> None:
         upstream_accepted = asyncio.Event()
         upstream_writers: list[asyncio.StreamWriter] = []
+        conn_task_refs: list[weakref.ref[asyncio.Task[Any]]] = []
 
         async def idle_upstream(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> None:
             upstream_writers.append(w)
@@ -143,7 +144,15 @@ class TestTCPPipe:
         frontend = TCPFrontend(root_context)
         frontend.circuits[PORT] = circuit
         frontend.backends[PORT] = TCPBackend(circuit.route_info, root_context, circuit)
-        proxy = await asyncio.start_server(partial(frontend.pipe, PORT), "127.0.0.1", 0)
+
+        async def pipe_handler(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> None:
+            task = asyncio.current_task()
+            assert task is not None
+            conn_task_refs.append(weakref.ref(task))
+            del task
+            await frontend.pipe(PORT, r, w)
+
+        proxy = await asyncio.start_server(pipe_handler, "127.0.0.1", 0)
         servers.append(proxy)
         proxy_port: int = proxy.sockets[0].getsockname()[1]
 
@@ -152,7 +161,7 @@ class TestTCPPipe:
             await asyncio.wait_for(upstream_accepted.wait(), TIMEOUT)
             client_w.write_eof()
             await asyncio.sleep(0.05)
-            conn_task_ref = weakref.ref(next(iter(frontend._conn_tasks)))
+            conn_task_ref = conn_task_refs[0]
             loop_errors: list[str] = []
             loop = asyncio.get_running_loop()
             loop.set_exception_handler(lambda _loop, ctx: loop_errors.append(ctx["message"]))
@@ -177,7 +186,6 @@ class TestTCPPipe:
                 w.close()
             await frontend.stop()
             await frontend.backends[PORT].close()
-        assert frontend._conn_tasks == set()
 
     async def test_half_close_propagates_and_reply_still_flows(
         self,

@@ -140,8 +140,8 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
     async def pipe(
         self, circuit_key: int, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
-        # After the client half-closes, nothing in the loop holds this task;
-        # keep a strong reference until it is done.
+        # The loop does not reference this task after the client half-closes,
+        # so the GC can finalize it mid-suspension. Hold it until it is done.
         task = asyncio.current_task()
         if task is not None:
             self._conn_tasks.add(task)
