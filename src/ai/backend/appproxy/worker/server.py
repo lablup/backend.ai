@@ -45,6 +45,9 @@ from ai.backend.appproxy.common.defs import (
     ERROR_TEMPLATE_NAME,
     MEDIA_TYPE_HTML,
     MEDIA_TYPE_JSON,
+    WORKER_AUTHORITY_LABEL,
+    WORKER_INGRESS_DELIVERY_MODE_LABEL,
+    WORKER_SERVICE_GROUP,
 )
 from ai.backend.appproxy.common.errors import (
     CoordinatorConnectionError,
@@ -597,7 +600,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         service_discovery,
         ServiceMetadata.for_endpoint(
             display_name=f"appproxy-worker-{root_ctx.local_config.proxy_worker.authority}",
-            service_group="appproxy-worker",
+            service_group=WORKER_SERVICE_GROUP,
             version=__version__,
             endpoint=ServiceEndpoint(
                 address=announce_addr.host,
@@ -606,6 +609,10 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 # It can be separated into an internal-purpose port later.
                 prometheus_address=str(announce_addr),
             ),
+            labels={
+                WORKER_AUTHORITY_LABEL: root_ctx.local_config.proxy_worker.authority,
+                WORKER_INGRESS_DELIVERY_MODE_LABEL: root_ctx.local_config.proxy_worker.ingress.delivery_mode,
+            },
         ),
     )
 
