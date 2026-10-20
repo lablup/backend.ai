@@ -26,7 +26,6 @@ from sqlalchemy.sql.expression import SQLColumnExpression, false, true
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.deployment.types import DeploymentOptions
 from ai.backend.manager.data.permission.permission_defs import ResourceGroupPermission
 from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
@@ -157,27 +156,6 @@ class ResourceGroupForKeypairsRow(Base):
 # For compatibility. In src, only gql_legacy (scaling_group.py) uses it.
 # Delete it with the gql_legacy cleanup.
 sgroups_for_keypairs = ResourceGroupForKeypairsRow.__table__
-
-
-class ResourceGroupForUserRow(Base):
-    __tablename__ = "resource_groups_for_users"
-    id: Mapped[uuid.UUID] = mapped_column(
-        "id", GUID, primary_key=True, server_default=sa.text("uuid_generate_v7()")
-    )
-    resource_group_id: Mapped[ResourceGroupID] = mapped_column(
-        "resource_group_id",
-        sa.ForeignKey("scaling_groups.id", onupdate="CASCADE", ondelete="CASCADE"),
-        index=True,
-        nullable=False,
-    )
-    user_id: Mapped[UserID] = mapped_column(
-        "user_id",
-        GUID(UserID),
-        sa.ForeignKey("users.uuid", onupdate="CASCADE", ondelete="CASCADE"),
-        index=True,
-        nullable=False,
-    )
-    __table_args__ = (sa.UniqueConstraint("resource_group_id", "user_id"),)
 
 
 class ResourceGroupRow(CreatedAtMixin, Base):
