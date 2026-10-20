@@ -743,7 +743,7 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     try:
         yield
     finally:
-        root_ctx.core_event_dispatcher.unconsume(session_terminated_handler)
+        root_ctx.core_event_dispatcher.unsubscribe(session_terminated_handler)
         root_ctx.event_dispatcher.unconsume(worker_lost_handler)
         root_ctx.event_dispatcher.unconsume(reconcile_traefik_routes_handler)
 
@@ -924,7 +924,7 @@ async def circuit_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     if root_ctx.local_config.proxy_coordinator.enable_traefik:
         async with root_ctx.db.begin_readonly_session() as session:
             circuits = await Circuit.list_circuits(session, load_worker=True, load_endpoint=True)
-            log.info("injecting traefik configuration", circuit_circuit_count=len(circuits))
+            log.info("injecting traefik configuration", circuit_count=len(circuits))
             await root_ctx.circuit_manager.initialize_traefik_circuits(circuits)
 
     yield
