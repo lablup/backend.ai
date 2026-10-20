@@ -36,6 +36,7 @@ from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.testutils.scenario_steps import (
@@ -212,6 +213,7 @@ async def lay_a_deployment(
     replica_count: int = 1,
     tag: str | None = None,
     open_to_public: bool = False,
+    agent_selection_policy: AgentSelectionPolicy = AgentSelectionPolicy.PREFERRED,
 ) -> Laid[DeploymentInfo]:
     """그 자리에 배포 하나를 심는다. 소유는 그 자리의 사용자에게 있다."""
     laid: Laid[DeploymentInfo] = await seeding.creating_from_three(
@@ -220,6 +222,7 @@ async def lay_a_deployment(
             replica_count=replica_count,
             tag=tag,
             open_to_public=open_to_public,
+            agent_selection_policy=agent_selection_policy,
         ),
         place.project,
         place.resource_group,
@@ -294,6 +297,7 @@ class ADeploymentInThatPlace(Given[Any, ADeploymentAndACaller]):
     replica_count: int = 1
     tag: str | None = None
     open_to_public: bool = False
+    agent_selection_policy: AgentSelectionPolicy = AgentSelectionPolicy.PREFERRED
 
     @override
     def describe(self) -> str:
@@ -310,6 +314,7 @@ class ADeploymentInThatPlace(Given[Any, ADeploymentAndACaller]):
             replica_count=self.replica_count,
             tag=self.tag,
             open_to_public=self.open_to_public,
+            agent_selection_policy=self.agent_selection_policy,
         )
         return ADeploymentAndACaller(place=place.made(seeding), deployment=seeding.made(laid))
 

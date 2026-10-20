@@ -47,7 +47,7 @@
   - partial_bulk_update_rules — 성공 있음 2 · 실패 없음 (partial_bulk_field) — SCENARIO-GAP
   - purge_access_token — 성공 없음 · 실패 없음 (single_field) — SCENARIO-GAP
   - purge_rule — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - replace_options — 성공 있음 2 · 실패 있음 3 (single_entity)
+  - replace_options — 성공 있음 4 · 실패 있음 3 (single_entity)
   - search_revision_resource_slots — 성공 있음 1 · 실패 있음 1 (single_field)
   - sync_replicas — 성공 있음 1 · 실패 있음 1 (single_entity)
   - update — 성공 있음 5 · 실패 있음 2 (single_entity)
@@ -185,7 +185,9 @@
 | 시나리오 | 판정 |
 |---|---|
 | [수정 권한을 받은 사용자가 기본값과 처리기별 설정을 담아 옵션을 갈아끼우면, 준 것이 통째로 새 옵션이 되고 답은 그 옵션만 싣는다](#options-a-user-granted-update-replaces-the-options-whole) | 성공 |
+| [선택 정책을 STRICT로 담아 옵션을 갈아끼우면, 새 옵션의 선택 정책이 STRICT다](#options-replacing-with-a-strict-policy-keeps-it-strict) | 성공 |
 | [물려받은 처리기별 설정이 있는 배포에 기본값만 담아 옵션을 갈아끼우면, 물려받은 설정이 하나도 남지 않는다](#options-replacing-with-no-handler-entry-drops-the-inherited-ones) | 성공 |
+| [선택 정책이 STRICT인 배포에 선택 정책을 빼고 옵션을 갈아끼우면, 선택 정책은 STRICT로 남는다](#options-replacing-without-a-policy-keeps-the-stored-one) | 성공 |
 | [읽기 권한만 받은 사용자가 옵션을 갈아끼우면, 권한 부족으로 거부된다](#options-a-user-granted-only-read-may-not-replace-the-options) | 거부 |
 | [같은 처리기 이름을 두 번 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다](#options-naming-a-handler-twice-is-refused) | 거부 |
 | [등록되지 않은 처리기 이름을 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다](#options-naming-an-unregistered-handler-is-refused) | 거부 |
@@ -2413,6 +2415,43 @@ Then
   - options.handler_options.default.timeout_sec = 600
   - options.handler_options.default.max_retry_count = 3
   - options.handler_options.by_handler = [('check-replica-deployments', None, 1)]
+  - options.agent_selection_policy = <AgentSelectionPolicyEnum.PREFERRED: 'preferred'>
+
+<a id="options-replacing-with-a-strict-policy-keeps-it-strict"></a>
+
+#### [replacing-with-a-strict-policy-keeps-it-strict](/tests/scenario/bai_scenario/manager/deployment/test_options.py) — pass
+
+선택 정책을 STRICT로 담아 옵션을 갈아끼우면, 새 옵션의 선택 정책이 STRICT다
+
+Given
+
+- 이미 있는 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 UPDATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+
+When
+
+- DeploymentAdapter.replace_options — user-1이 deployment-1의 옵션을 선택 정책 strict와 기본값만 담아 갈아끼움
+
+Then
+
+- 갈아끼운 옵션만 온다
+  - deployment_id: 심은 배포와 같다
+  - options.handler_options.default.timeout_sec = 600
+  - options.handler_options.default.max_retry_count = 3
+  - options.handler_options.by_handler = []
+  - options.agent_selection_policy = <AgentSelectionPolicyEnum.STRICT: 'strict'>
 
 <a id="options-replacing-with-no-handler-entry-drops-the-inherited-ones"></a>
 
@@ -2448,6 +2487,43 @@ Then
   - options.handler_options.default.timeout_sec = 600
   - options.handler_options.default.max_retry_count = 3
   - options.handler_options.by_handler = []
+  - options.agent_selection_policy = <AgentSelectionPolicyEnum.PREFERRED: 'preferred'>
+
+<a id="options-replacing-without-a-policy-keeps-the-stored-one"></a>
+
+#### [replacing-without-a-policy-keeps-the-stored-one](/tests/scenario/bai_scenario/manager/deployment/test_options.py) — pass
+
+선택 정책이 STRICT인 배포에 선택 정책을 빼고 옵션을 갈아끼우면, 선택 정책은 STRICT로 남는다
+
+Given
+
+- 이미 있는 배포 하나와, 배포에 UPDATE 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 배포에 UPDATE 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 deployment-user-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 deployment-user-1: deployment 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 deployment-user-1 보유
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다, 선택 정책이 strict다
+
+When
+
+- DeploymentAdapter.replace_options — user-1이 deployment-1의 옵션을 기본값만 담아 갈아끼움
+
+Then
+
+- 갈아끼운 옵션만 온다
+  - deployment_id: 심은 배포와 같다
+  - options.handler_options.default.timeout_sec = 600
+  - options.handler_options.default.max_retry_count = 3
+  - options.handler_options.by_handler = []
+  - options.agent_selection_policy = <AgentSelectionPolicyEnum.STRICT: 'strict'>
 
 <a id="options-a-user-granted-only-read-may-not-replace-the-options"></a>
 

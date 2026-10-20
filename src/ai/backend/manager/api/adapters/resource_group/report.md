@@ -1534,7 +1534,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_deployment_options — user-1이 resource-group-1의 기본 배포 옵션을 처리기 check-replica-deployments의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_deployment_options — user-1이 resource-group-1의 기본 배포 옵션을 선택 정책 STRICT와 처리기 check-replica-deployments의 설정을 담아 갈아끼움
 
 Then
 
@@ -1543,6 +1543,7 @@ Then
   - default_deployment_options.handler_options.default.timeout_sec = 600
   - default_deployment_options.handler_options.default.max_retry_count = 3
   - default_deployment_options.handler_options.by_handler = [('check-replica-deployments', 60, None)]
+  - default_deployment_options.agent_selection_policy = <AgentSelectionPolicyEnum.STRICT: 'strict'>
 
 <a id="options-the-superadmin-replaces-the-default-deployment-options-whole"></a>
 
@@ -1563,7 +1564,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_deployment_options — user-1이 resource-group-1의 기본 배포 옵션을 처리기 check-replica-deployments의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_deployment_options — user-1이 resource-group-1의 기본 배포 옵션을 선택 정책 STRICT와 처리기 check-replica-deployments의 설정을 담아 갈아끼움
 
 Then
 
@@ -1572,6 +1573,7 @@ Then
   - default_deployment_options.handler_options.default.timeout_sec = 600
   - default_deployment_options.handler_options.default.max_retry_count = 3
   - default_deployment_options.handler_options.by_handler = [('check-replica-deployments', 60, None)]
+  - default_deployment_options.agent_selection_policy = <AgentSelectionPolicyEnum.STRICT: 'strict'>
 
 <a id="options-a-user-granted-nothing-may-not-replace-the-default-deployment-options"></a>
 
@@ -1592,7 +1594,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_deployment_options — user-1이 resource-group-1의 기본 배포 옵션을 처리기 check-replica-deployments의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_deployment_options — user-1이 resource-group-1의 기본 배포 옵션을 선택 정책 STRICT와 처리기 check-replica-deployments의 설정을 담아 갈아끼움
 
 Then
 
@@ -1618,7 +1620,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_deployment_options — user-1이 resource-group-1의 기본 배포 옵션을 처리기 no-such-handler의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_deployment_options — user-1이 resource-group-1의 기본 배포 옵션을 선택 정책 STRICT와 처리기 no-such-handler의 설정을 담아 갈아끼움
 
 Then
 

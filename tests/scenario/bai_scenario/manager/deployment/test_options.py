@@ -20,9 +20,11 @@ from ai.backend.common.dto.manager.v2.session_options.request import (
     HandlerOptionsEntryInput,
     HandlerOptionsInput,
 )
+from ai.backend.common.dto.manager.v2.session_options.types import AgentSelectionPolicyEnum
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -58,9 +60,10 @@ type OptionsStep = Scenario[
 
 @dataclass(frozen=True)
 class Replacing(When[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]):
-    """배포의 옵션을 준 것으로 갈아끼운다."""
+    """배포의 옵션을 준 것으로 갈아끼운다. ``policy``가 없으면 선택 정책을 주지 않는다."""
 
     entries: tuple[Entry, ...] = ()
+    policy: AgentSelectionPolicyEnum | None = None
 
     @override
     def operation(self) -> str:
@@ -72,6 +75,8 @@ class Replacing(When[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeployment
             given = "기본값만 담아"
         else:
             given = f"처리기별 설정 {', '.join(name for name, _, _ in self.entries)}을 담아"
+        if self.policy is not None:
+            given = f"선택 정책 {self.policy.value}와 {given}"
         return f"{laid.caller.username}이 {laid.deployment.metadata.name}의 옵션을 {given} 갈아끼움"
 
     @override
@@ -88,7 +93,8 @@ class Replacing(When[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeployment
                         )
                         for name, waits, retries in self.entries
                     ],
-                )
+                ),
+                agent_selection_policy=self.policy,
             )
         )
         with ActingAs(laid.caller):
@@ -100,6 +106,7 @@ class TheOptionsAreReplaced(Then[ADeploymentAndACaller, ReplaceDeploymentOptions
     """준 옵션이 통째로 온다. 배포 전체가 아니라 옵션만 싣는다."""
 
     entries: tuple[Entry, ...] = field(default_factory=tuple)
+    policy: AgentSelectionPolicyEnum = AgentSelectionPolicyEnum.PREFERRED
 
     @override
     def says(self) -> str:
@@ -127,6 +134,11 @@ class TheOptionsAreReplaced(Then[ADeploymentAndACaller, ReplaceDeploymentOptions
                 "options.handler_options.by_handler",
                 [(e.handler_name, e.timeout_sec, e.max_retry_count) for e in handler.by_handler],
                 sorted(self.entries),
+            ),
+            Same(
+                "options.agent_selection_policy",
+                payload.options.agent_selection_policy,
+                self.policy,
             ),
         ]
 
@@ -199,6 +211,75 @@ class WhatIsNotGivenDoesNotStay(
     @override
     def then(self) -> Then[ADeploymentAndACaller, ReplaceDeploymentOptionsPayload]:
         return TheOptionsAreReplaced()
+
+
+@dataclass(frozen=True)
+class TheGivenPolicyBecomesThePolicy(
+    Scenario[
+        TestSeedingSession,
+        ADeploymentAndACaller,
+        DeploymentAdapter,
+        ReplaceDeploymentOptionsPayload,
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "replacing-with-a-strict-policy-keeps-it-strict"
+
+    @override
+    def describe(self) -> str:
+        return "선택 정책을 STRICT로 담아 옵션을 갈아끼우면, 새 옵션의 선택 정책이 STRICT다"
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
+        return ADeploymentInThatPlace(granted=(Permission.UPDATE,))
+
+    @override
+    def when(
+        self,
+    ) -> When[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]:
+        return Replacing(policy=AgentSelectionPolicyEnum.STRICT)
+
+    @override
+    def then(self) -> Then[ADeploymentAndACaller, ReplaceDeploymentOptionsPayload]:
+        return TheOptionsAreReplaced(policy=AgentSelectionPolicyEnum.STRICT)
+
+
+@dataclass(frozen=True)
+class AnOmittedPolicyStays(
+    Scenario[
+        TestSeedingSession,
+        ADeploymentAndACaller,
+        DeploymentAdapter,
+        ReplaceDeploymentOptionsPayload,
+    ]
+):
+    @override
+    def summary(self) -> str:
+        return "replacing-without-a-policy-keeps-the-stored-one"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "선택 정책이 STRICT인 배포에 선택 정책을 빼고 옵션을 갈아끼우면, "
+            "선택 정책은 STRICT로 남는다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ADeploymentAndACaller]:
+        return ADeploymentInThatPlace(
+            granted=(Permission.UPDATE,), agent_selection_policy=AgentSelectionPolicy.STRICT
+        )
+
+    @override
+    def when(
+        self,
+    ) -> When[ADeploymentAndACaller, DeploymentAdapter, ReplaceDeploymentOptionsPayload]:
+        return Replacing()
+
+    @override
+    def then(self) -> Then[ADeploymentAndACaller, ReplaceDeploymentOptionsPayload]:
+        return TheOptionsAreReplaced(policy=AgentSelectionPolicyEnum.STRICT)
 
 
 @dataclass(frozen=True)
@@ -300,6 +381,8 @@ class ReadingIsNotEnoughToReplace(
 SCENARIOS: list[OptionsStep] = [
     WhatIsGivenBecomesTheOptions(),
     WhatIsNotGivenDoesNotStay(),
+    TheGivenPolicyBecomesThePolicy(),
+    AnOmittedPolicyStays(),
     AnUnregisteredHandlerIsRefused(),
     AHandlerNamedTwiceIsRefused(),
     ReadingIsNotEnoughToReplace(),
