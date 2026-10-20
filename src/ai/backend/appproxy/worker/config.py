@@ -617,7 +617,7 @@ class ProxyWorkerConfig(BaseSchema):
         Field(default=8190, gt=0),
         BackendAIConfigMeta(
             description="Maximum bytes of a single request header. Larger ones get 400.",
-            added_version="26.10.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="8190", prod="65536"),
         ),
     ]

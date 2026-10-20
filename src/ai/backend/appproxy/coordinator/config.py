@@ -31,6 +31,7 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -414,7 +415,7 @@ class ProxyCoordinatorConfig(BaseSchema):
         Field(default=8190, gt=0),
         BackendAIConfigMeta(
             description="Maximum bytes of a single request header. Larger ones get 400.",
-            added_version="26.10.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="8190", prod="65536"),
         ),
     ]
