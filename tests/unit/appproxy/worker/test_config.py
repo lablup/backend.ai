@@ -88,6 +88,21 @@ class TestIngressConfig:
         })
         assert config.layers == case.layers
 
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _DeliveryLayersCase(delivery_mode=IngressDeliveryMode.API, layers=["redis"]),
+            _DeliveryLayersCase(delivery_mode=IngressDeliveryMode.REDIS, layers=["in-memory"]),
+        ],
+        ids=lambda case: f"{case.delivery_mode.value}-{'-'.join(case.layers)}",
+    )
+    def test_delivery_mode_without_its_layer_is_rejected(self, case: _DeliveryLayersCase) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed):
+            IngressConfig.model_validate({
+                "delivery_mode": case.delivery_mode,
+                "layers": case.layers,
+            })
+
     def test_empty_layers_are_rejected(self) -> None:
         with pytest.raises(BackendAISchemaValidationFailed):
             IngressConfig.model_validate({"layers": []})
