@@ -30,27 +30,27 @@ class ProbeCheckRunner[TID: Hashable]:
 
     _checks: Sequence[AbstractProbeCheck[TID]]
     _initial_delay: float
-    _loops: list[asyncio.Task[None]]
+    _tasks: list[asyncio.Task[None]]
 
     def __init__(self, args: ProbeCheckRunnerArgs[TID]) -> None:
         self._checks = args.checks
         self._initial_delay = args.initial_delay
-        self._loops = []
+        self._tasks = []
 
     async def start(self) -> None:
-        if self._loops:
+        if self._tasks:
             log.warning("probe check runner already running")
             return
         for check in self._checks:
-            loop = asyncio.create_task(self._run_check(check))
-            loop.set_name(f"probe-check-{check.id()}")
-            self._loops.append(loop)
-        log.debug("probe check runner started", check_count=len(self._loops))
+            task = asyncio.create_task(self._run_check(check))
+            task.set_name(f"probe-check-{check.id()}")
+            self._tasks.append(task)
+        log.debug("probe check runner started", check_count=len(self._tasks))
 
     async def stop(self) -> None:
-        for loop in self._loops:
-            await cancel_and_wait(loop)
-        self._loops.clear()
+        for task in self._tasks:
+            await cancel_and_wait(task)
+        self._tasks.clear()
         log.debug("probe check runner stopped")
 
     async def _run_check(self, check: AbstractProbeCheck[TID]) -> None:
