@@ -328,6 +328,46 @@ async def test_atomic_replace_prefixes_multiple_subtrees(etcd: AsyncEtcd) -> Non
     }
 
 
+async def test_compare_and_replace_prefixes_replaces_while_the_guard_holds(
+    etcd: AsyncEtcd,
+) -> None:
+    await etcd.put_prefix("cfg/routers/bai_router_f", {"rule": "old-rule"})
+    await etcd.put("cfg/revision_f", "1")
+
+    replaced = await etcd.compare_and_replace_prefixes(
+        {"cfg/routers/bai_router_f": {"service": "bai_service_f"}},
+        guards={"cfg/revision_f": "1"},
+    )
+
+    assert replaced
+    assert await etcd.get_prefix("cfg/routers/bai_router_f") == {"service": "bai_service_f"}
+
+
+async def test_compare_and_replace_prefixes_leaves_the_subtree_when_the_guard_moved(
+    etcd: AsyncEtcd,
+) -> None:
+    await etcd.put_prefix("cfg/routers/bai_router_g", {"rule": "kept-rule"})
+    await etcd.put("cfg/revision_g", "2")
+
+    replaced = await etcd.compare_and_replace_prefixes(
+        {"cfg/routers/bai_router_g": {"rule": "lost-rule"}},
+        guards={"cfg/revision_g": "1"},
+    )
+
+    assert not replaced
+    assert await etcd.get_prefix("cfg/routers/bai_router_g") == {"rule": "kept-rule"}
+
+
+async def test_compare_and_replace_prefixes_guards_an_absent_key(etcd: AsyncEtcd) -> None:
+    replaced = await etcd.compare_and_replace_prefixes(
+        {"cfg/routers/bai_router_h": {"rule": "first-rule"}},
+        guards={"cfg/revision_h": None},
+    )
+
+    assert replaced
+    assert await etcd.get_prefix("cfg/routers/bai_router_h") == {"rule": "first-rule"}
+
+
 async def test_watch(etcd: AsyncEtcd) -> None:
     records = []
     records_prefix = []
