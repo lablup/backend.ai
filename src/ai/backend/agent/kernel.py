@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import codecs
+import functools
 import io
 import json
 import logging
@@ -19,6 +20,7 @@ from collections.abc import (
     Sequence,
 )
 from dataclasses import dataclass
+from importlib.resources import files
 from typing import (
     Any,
     Literal,
@@ -59,7 +61,9 @@ from ai.backend.common.types import (
     aobject,
 )
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.plugin.entrypoint import scan_entrypoints
 
+from .defs import KRUNNER_ENTRYPOINT_GROUP
 from .errors import (
     InvalidArgumentError,
     InvalidSocket,
@@ -1352,13 +1356,14 @@ def match_distro_data(data: Mapping[str, Any], distro: str) -> tuple[str, Any]:
         distro_ver = tuple(map(int, m.group(1).split(".")))
 
     # Check if there are static-build krunners first.
+    # krunner-alpine 5.x names its volume with the wheel platform tag (e.g., "musllinux_1_2").
     if distro_prefix == "alpine":
-        libc_flavor = "musl"
+        static_keys: tuple[str, ...] = ("static-musl", "musllinux_")
     else:
-        libc_flavor = "gnu"
-    distro_key = f"static-{libc_flavor}"
-    if volume := data.get(distro_key):
-        return distro_key, volume
+        static_keys = ("static-gnu",)
+    for key, volume in data.items():
+        if key.startswith(static_keys):
+            return key, volume
 
     # Search through the per-distro versions
     match_list = [
@@ -1376,3 +1381,18 @@ def match_distro_data(data: Mapping[str, Any], distro: str) -> tuple[str, Any]:
                 return (distro_key, value)
         return match_list[-1][:-1]  # fallback to the latest of its kind
     raise UnsupportedBaseDistroError(distro)
+
+
+@functools.cache
+def read_krunner_python_version(matched_distro: str) -> str | None:
+    """
+    Read the Python version of the krunner volume selected by `match_distro_data()`.
+    The key does not always name its package (krunner-alpine 5.x uses "musllinux_1_2").
+    """
+    for entrypoint in scan_entrypoints(KRUNNER_ENTRYPOINT_GROUP):
+        path = files(f"ai.backend.krunner.{entrypoint.name}").joinpath(
+            f"krunner-python.{matched_distro}.txt"
+        )
+        if path.is_file():
+            return path.read_text().strip()
+    return None

@@ -150,3 +150,13 @@ def test_match_distro_data_with_libc_based_krunners_mixed() -> None:
     ret = match_distro_data(krunner_volumes, "xyz")
     assert ret[0] == "static-gnu"
     assert ret[1] == "x1"
+
+
+def test_match_distro_data_with_musllinux_krunner() -> None:
+    krunner_volumes = {
+        "static-gnu": "x1",
+        "musllinux_1_2": "m1",
+    }
+
+    assert match_distro_data(krunner_volumes, "alpine3.24") == ("musllinux_1_2", "m1")
+    assert match_distro_data(krunner_volumes, "ubuntu22.04") == ("static-gnu", "x1")
