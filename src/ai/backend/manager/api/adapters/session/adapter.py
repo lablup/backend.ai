@@ -603,9 +603,7 @@ class SessionAdapter(BaseAdapter):
         designated = (
             (
                 await self._session.bulk_get_session_designated_agents.run(
-                    BulkGetSessionDesignatedAgentsAction(
-                        session_ids=[SessionId(sid) for sid in session_ids]
-                    )
+                    BulkGetSessionDesignatedAgentsAction(session_ids=session_ids)
                 )
             ).items
             if session_ids

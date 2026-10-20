@@ -292,8 +292,8 @@ class SessionRepository:
     @session_repository_resilience.apply()
     async def bulk_get_designated_agents_by_session(
         self,
-        session_ids: Sequence[SessionId],
-    ) -> dict[SessionId, list[AgentId]]:
+        session_ids: Sequence[SessionID],
+    ) -> dict[SessionID, list[AgentId]]:
         """Read the agents each session designates, by agent id; one with none is absent."""
         return await self._db_source.bulk_get_designated_agents_by_session(session_ids)
 

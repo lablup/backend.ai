@@ -1449,7 +1449,7 @@ class SessionService:
         return PartialBulkResult(
             items=[
                 PartialBulkEntityResult[list[AgentId]].succeeded(
-                    SessionID(sid), data.get(sid, []), description="read"
+                    sid, data.get(sid, []), description="read"
                 )
                 for sid in action.session_ids
             ]
