@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -29,6 +29,7 @@ from ai.backend.manager.models.resource_group.row import resource_groups
 from .conftest import SessionSeedData
 
 _WSPROXY_ADDR = "http://127.0.0.1:5050"
+_WSPROXY_API_TOKEN = "coordinator-api-secret"
 _SERVICE_PORTS_TTYD = [
     {
         "name": "ttyd",
@@ -39,21 +40,6 @@ _SERVICE_PORTS_TTYD = [
         "is_inference": False,
     }
 ]
-
-
-def _make_wsproxy_mock(token: str = "test-token-xyz") -> AsyncMock:
-    """Create a mock for aiohttp.ClientSession returning a wsproxy token."""
-    mock_resp = AsyncMock()
-    mock_resp.json.return_value = {"token": token}
-    mock_session_ctx = AsyncMock()
-    mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
-    mock_session_ctx.__aexit__ = AsyncMock(return_value=False)
-    mock_session_obj = MagicMock()
-    mock_session_obj.post.return_value = mock_session_ctx
-    mock_session_cls = AsyncMock()
-    mock_session_cls.__aenter__ = AsyncMock(return_value=mock_session_obj)
-    mock_session_cls.__aexit__ = AsyncMock(return_value=False)
-    return mock_session_cls
 
 
 # ---------------------------------------------------------------------------
@@ -339,12 +325,12 @@ class TestSessionStartService:
         agent_registry: AsyncMock,
         appproxy_client_pool: AsyncMock,
     ) -> None:
-        """S-1: Start service 'ttyd' → StartServiceResponse with token and wsproxy_addr."""
+        """S-1: Start service 'ttyd' → token from /v2/conf, called with the coordinator API token."""
         async with db_engine.begin() as conn:
             await conn.execute(
                 sa.update(resource_groups)
                 .where(resource_groups.c.name == resource_group_name)
-                .values(wsproxy_addr=_WSPROXY_ADDR)
+                .values(wsproxy_addr=_WSPROXY_ADDR, wsproxy_api_token=_WSPROXY_API_TOKEN)
             )
         async with db_engine.begin() as conn:
             await conn.execute(
@@ -365,20 +351,20 @@ class TestSessionStartService:
 
         agent_registry.start_service.return_value = {"status": "started"}
 
-        mock_session_cls = _make_wsproxy_mock(token="test-token-xyz")
-
-        with patch(
-            "ai.backend.manager.services.session.service.aiohttp.ClientSession",
-            return_value=mock_session_cls,
-        ):
-            result = await admin_registry.session.start_service(
-                session_seed.session_id,
-                StartServiceRequest(app="ttyd"),
-            )
+        mock_client.create_session_app_token.return_value = "test-token-xyz"
+        result = await admin_registry.session.start_service(
+            session_seed.session_id,
+            StartServiceRequest(app="ttyd"),
+        )
 
         assert isinstance(result, StartServiceResponse)
         assert result.token == "test-token-xyz"
         assert result.wsproxy_addr == _WSPROXY_ADDR
+        appproxy_client_pool.load_client.assert_called_once_with(_WSPROXY_ADDR, _WSPROXY_API_TOKEN)
+        body = mock_client.create_session_app_token.call_args[0][0]
+        assert body.kernel_host == "127.0.0.1"
+        assert body.kernel_port == 30080
+        assert body.session.id == session_seed.session_id
 
     async def test_start_service_with_specific_port(
         self,
@@ -425,15 +411,11 @@ class TestSessionStartService:
 
         agent_registry.start_service.return_value = {"status": "started"}
 
-        mock_session_cls = _make_wsproxy_mock(token="port-test-token")
-        with patch(
-            "ai.backend.manager.services.session.service.aiohttp.ClientSession",
-            return_value=mock_session_cls,
-        ):
-            result = await admin_registry.session.start_service(
-                session_seed.session_id,
-                StartServiceRequest(app="ttyd", port=8888),
-            )
+        mock_client.create_session_app_token.return_value = "port-test-token"
+        result = await admin_registry.session.start_service(
+            session_seed.session_id,
+            StartServiceRequest(app="ttyd", port=8888),
+        )
 
         assert isinstance(result, StartServiceResponse)
         assert result.token == "port-test-token"
@@ -473,19 +455,15 @@ class TestSessionStartService:
 
         agent_registry.start_service.return_value = {"status": "started"}
 
-        mock_session_cls = _make_wsproxy_mock(token="args-test-token")
-        with patch(
-            "ai.backend.manager.services.session.service.aiohttp.ClientSession",
-            return_value=mock_session_cls,
-        ):
-            result = await admin_registry.session.start_service(
-                session_seed.session_id,
-                StartServiceRequest(
-                    app="ttyd",
-                    arguments=json.dumps(["--port", "8080"]),
-                    envs=json.dumps({"DEBUG": "true"}),
-                ),
-            )
+        mock_client.create_session_app_token.return_value = "args-test-token"
+        result = await admin_registry.session.start_service(
+            session_seed.session_id,
+            StartServiceRequest(
+                app="ttyd",
+                arguments=json.dumps(["--port", "8080"]),
+                envs=json.dumps({"DEBUG": "true"}),
+            ),
+        )
 
         assert isinstance(result, StartServiceResponse)
         call_args = agent_registry.start_service.call_args
@@ -529,30 +507,16 @@ class TestSessionStartService:
 
         agent_registry.start_service.return_value = {"status": "started"}
 
-        mock_resp = AsyncMock()
-        mock_resp.json.return_value = {"token": "host-test-token"}
-        mock_session_ctx = AsyncMock()
-        mock_session_ctx.__aenter__ = AsyncMock(return_value=mock_resp)
-        mock_session_ctx.__aexit__ = AsyncMock(return_value=False)
-        mock_session_obj = MagicMock()
-        mock_session_obj.post.return_value = mock_session_ctx
-        mock_session_cls = AsyncMock()
-        mock_session_cls.__aenter__ = AsyncMock(return_value=mock_session_obj)
-        mock_session_cls.__aexit__ = AsyncMock(return_value=False)
-
-        with patch(
-            "ai.backend.manager.services.session.service.aiohttp.ClientSession",
-            return_value=mock_session_cls,
-        ):
-            result = await admin_registry.session.start_service(
-                session_seed.session_id,
-                StartServiceRequest(app="ttyd"),
-            )
+        mock_client.create_session_app_token.return_value = "host-test-token"
+        result = await admin_registry.session.start_service(
+            session_seed.session_id,
+            StartServiceRequest(app="ttyd"),
+        )
 
         assert isinstance(result, StartServiceResponse)
         # Verify kernel_host was extracted from agent_addr
-        post_call_kwargs = mock_session_obj.post.call_args[1]
-        assert post_call_kwargs["json"]["kernel_host"] == "192.168.1.100"
+        body = mock_client.create_session_app_token.call_args[0][0]
+        assert body.kernel_host == "192.168.1.100"
 
     async def test_start_service_wsproxy_advertise_address_fallback(
         self,
@@ -589,15 +553,11 @@ class TestSessionStartService:
 
         agent_registry.start_service.return_value = {"status": "started"}
 
-        mock_session_cls = _make_wsproxy_mock(token="fallback-test-token")
-        with patch(
-            "ai.backend.manager.services.session.service.aiohttp.ClientSession",
-            return_value=mock_session_cls,
-        ):
-            result = await admin_registry.session.start_service(
-                session_seed.session_id,
-                StartServiceRequest(app="ttyd"),
-            )
+        mock_client.create_session_app_token.return_value = "fallback-test-token"
+        result = await admin_registry.session.start_service(
+            session_seed.session_id,
+            StartServiceRequest(app="ttyd"),
+        )
 
         assert isinstance(result, StartServiceResponse)
         # wsproxy_addr should fall back to the original (not advertise_address)
