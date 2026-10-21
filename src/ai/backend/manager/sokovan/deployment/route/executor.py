@@ -1183,7 +1183,7 @@ class RouteExecutor:
                     route_id=route.route_id,
                     target_revision=target_revision,
                     session_group_id=session_group_map.get(route.route_id),
-                    designated_agents=designated_agent_map.get(route.deployment_id, []),
+                    designated_agents=designated_agent_map[route.deployment_id],
                 )
                 return await self._scheduling_controller.enqueue_session_from_draft(draft)
 
