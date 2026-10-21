@@ -14,6 +14,7 @@ import pytest_mock
 from aiohttp import web
 from aiohttp.test_utils import make_mocked_request
 
+from ai.backend.appproxy.common.errors import ContainerConnectionRefused
 from ai.backend.appproxy.common.types import (
     AppMode,
     FrontendMode,
@@ -151,11 +152,8 @@ class TestHTTPProxyLogging:
         )
 
         with caplog.at_level(TRACE_LEVEL, logger=WORKER_LOGGER_NAME):
-            response = await http_frontend.ensure_slot_middleware(
-                self._request(), http_frontend.proxy
-            )
-
-        assert response.status == 502
+            with pytest.raises(ContainerConnectionRefused):
+                await http_frontend.ensure_slot_middleware(self._request(), http_frontend.proxy)
 
         assert _worker_records(caplog, logging.INFO) == []
         traces = [

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import html
 import logging
 import time
 from collections.abc import AsyncIterator
@@ -14,6 +13,7 @@ from aiohttp import ClientConnectorError, web
 from multidict import CIMultiDict
 from yarl import URL
 
+from ai.backend.appproxy.common.errors import ContainerConnectionRefused, WorkerNotAvailable
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
@@ -131,18 +131,10 @@ class HTTPBackend(BaseBackend):
         async with client_session.ws_connect(request.rel_url, protocols=protocols) as ws:
             yield ws
 
-    def _unreachable_response(self, route: RouteInfo) -> web.Response:
-        app = html.escape(self.circuit.app)
-        return web.Response(
-            status=502,
-            content_type="text/html",
-            text=(
-                "<!DOCTYPE html><html><head><title>App not reachable</title></head><body>"
-                f"<h1>The app &quot;{app}&quot; is not reachable</h1>"
-                "<p>State: unreachable</p>"
-                f"<p>Session: {route.session_id}</p>"
-                "</body></html>"
-            ),
+    def _unreachable_error(self) -> ContainerConnectionRefused:
+        sessions = ", ".join(str(session_id) for session_id in self.circuit.session_ids)
+        return ContainerConnectionRefused(
+            extra_msg=f'The app "{self.circuit.app}" of session {sessions} is not reachable.'
         )
 
     async def proxy_http(self, frontend_request: web.Request) -> web.StreamResponse:
@@ -195,7 +187,10 @@ class HTTPBackend(BaseBackend):
             backend_rqst_hdrs,
             backend_rqst_body,
         )
-        route = await self._pool.select()
+        try:
+            route = await self._pool.select()
+        except WorkerNotAvailable as e:
+            raise self._unreachable_error() from e
         await self.mark_last_used_time(route)
         await self.increase_request_counter()
         log.trace(
@@ -206,6 +201,7 @@ class HTTPBackend(BaseBackend):
             route.kernel_port,
             route_id=route.route_id,
         )
+        frontend_response: web.StreamResponse | None = None
         try:
             async with self.request_http(route, backend_request) as backend_response:
                 # Use a multidict and add() so that repeated response headers
@@ -258,7 +254,9 @@ class HTTPBackend(BaseBackend):
         except (aiohttp.ClientOSError, TimeoutError) as e:
             self._pool.record_failure(route)
             log.trace("app is unreachable: {!r}", e, route_id=route.route_id)
-            return self._unreachable_response(route)
+            if frontend_response is not None and frontend_response.prepared:
+                raise
+            raise self._unreachable_error() from e
         except Exception:
             log.exception("failed to proxy an HTTP request", route_id=route.route_id)
             raise

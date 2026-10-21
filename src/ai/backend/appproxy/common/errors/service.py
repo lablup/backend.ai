@@ -84,10 +84,10 @@ class DatabaseError(BackendAIError, web.HTTPInternalServerError):
 
 
 class ContainerConnectionRefused(BackendAIError, web.HTTPBadGateway):
-    """Raised when connection to Backend.AI kernel is refused."""
+    """Raised when the session's app refuses the connection or times out."""
 
     error_type = "https://api.backend.ai/probs/appproxy/container-connection-refused"
-    error_title = "Cannot connect to Backend.AI kernel."
+    error_title = "The session's app is not reachable."
 
     @override
     def error_code(self) -> ErrorCode:
