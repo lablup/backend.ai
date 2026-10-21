@@ -27,6 +27,7 @@ class SystemSessionEnvironSeed(SeedItem):
     value_source: SystemSessionEnvironValueSource
     environ_key: str = Field(alias="key", max_length=256, pattern=ENVIRON_KEY_PATTERN)
     scope_type: SystemSessionEnvironScopeType
+    # TODO(BA-8661): Make this required once the global entity ids are fixed by the seed.
     scope_id: SystemSessionEnvironScopeID | None = None
     enabled: bool
 
