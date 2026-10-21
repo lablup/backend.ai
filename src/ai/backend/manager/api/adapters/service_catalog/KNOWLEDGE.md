@@ -1,12 +1,15 @@
 ---
 name: service-catalog-adapter-scenarios
 type: reference
-description: what the service catalog adapter guarantees, as scenarios; a single search behind the superadmin role that the monitor role also passes, a status filter checked over one service of every status, endpoints carried whole
+description: what the service catalog adapter guarantees, as scenarios; a single search behind the superadmin role that the monitor role also passes, a status filter checked over one service of every status, a service with endpoints counted once
 scope: src/ai/backend/manager/api/adapters/service_catalog
 keywords: [service catalog, scenario, adapter, superadmin, monitor, search, endpoints]
 generated:
   by: claude-code/opus-5
   at: 2026-09-17
+updated:
+  by: claude-code/opus-5.5
+  at: 2026-10-07
 status: draft
 ---
 # service_catalog 어댑터 — 시나리오
@@ -27,7 +30,7 @@ src에서 행을 만드는 write spec은 등록 처리기가 쓰는 upsert spec 
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 슈퍼관리자가 검색한다 | 서비스 둘, 그중 하나에 엔드포인트 하나, 전역 역할 있음 | 전체 조회 | 둘 다 반환되고, 엔드포인트도 함께 반환된다 |
+| 슈퍼관리자가 검색한다 | 서비스 둘, 그중 하나에 엔드포인트 하나, 전역 역할 있음 | 전체 조회 | 둘 다 한 번씩 반환된다 |
 | `service_group` 필터로 검색한다 | `service_group` 값이 다른 서비스 둘, 전역 역할 있음 | `service_group` 필터로 조회 | `service_group` 값이 일치하는 서비스만 반환된다 |
 | 상태가 같은 것을 고른다 | 정상·비정상·등록 해제 서비스 하나씩, 전역 역할 있음 | `equals` 조건에 비정상을 지정해 조회 | 비정상 서비스만 반환된다 |
 | 상태가 다른 것을 고른다 | 정상·비정상·등록 해제 서비스 하나씩, 전역 역할 있음 | `not_equals` 조건에 비정상을 지정해 조회 | 정상과 등록 해제 서비스만 반환된다 |
