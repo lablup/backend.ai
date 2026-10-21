@@ -191,11 +191,20 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 SESSION_NAME_LEN_LIMIT = 10
 DEFAULT_WAIT_TIMEOUT_SECONDS = 60
+SESSION_TERMINATED_REASON_LIMIT = 512
 
 
 def _session_terminated_error(status_data: Mapping[str, Any] | None) -> SessionNotFound:
     """Build the error for a session that terminated before it ran, naming the stored reason."""
+    # `update_session_error_info` stores the error one level deeper than `mark_session_cancelled`.
     error = (status_data or {}).get("error") or {}
+    error = error.get("error") or error
+    extra = ""
+    if collection := error.get("collection"):
+        error, extra = (
+            collection[0],
+            f" (+{len(collection) - 1} more)" if len(collection) > 1 else "",
+        )
     name, detail = error.get("name"), error.get("repr")
     reason = (
         detail
@@ -204,6 +213,9 @@ def _session_terminated_error(status_data: Mapping[str, Any] | None) -> SessionN
     )
     message = "Session terminated during scheduling"
     if reason:
+        reason = " ".join(f"{reason}{extra}".split())
+        if len(reason) > SESSION_TERMINATED_REASON_LIMIT:
+            reason = reason[: SESSION_TERMINATED_REASON_LIMIT - 1] + "\u2026"
         message += f": {reason}"
     return SessionNotFound(message)
 

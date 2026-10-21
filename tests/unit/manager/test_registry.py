@@ -396,7 +396,7 @@ class TestWaitForSessionRunning:
         mock_propagator.receive = _yield_terminated
         mock_db_session = AsyncMock()
         mock_db_session.scalar = AsyncMock(
-            return_value={"error": {"name": "ContainerCreationError", "repr": "boom"}}
+            return_value={"error": {"error": {"name": "ContainerCreationError", "repr": "boom"}}}
         )
         mock_db_ctx = MagicMock()
         mock_db_ctx.__aenter__ = AsyncMock(return_value=mock_db_session)
@@ -430,7 +430,9 @@ class TestWaitForSessionRunning:
         mock_result = MagicMock()
         mock_row = MagicMock()
         mock_row.status = SessionStatus.TERMINATED
-        mock_row.status_data = {"error": {"name": "ContainerCreationError", "repr": "boom"}}
+        mock_row.status_data = {
+            "error": {"error": {"name": "ContainerCreationError", "repr": "boom"}}
+        }
         mock_result.first.return_value = mock_row
         mock_db_session.execute = AsyncMock(return_value=mock_result)
         mock_db_ctx = MagicMock()
@@ -467,10 +469,46 @@ class TestSessionTerminatedError:
                 {"error": {"name": "ContainerCreationError"}},
                 "Session terminated during scheduling: ContainerCreationError",
             ),
+            (
+                {
+                    "error": {
+                        "error": {"src": "agent", "name": "ContainerCreationError", "repr": "boom"}
+                    }
+                },
+                "Session terminated during scheduling: ContainerCreationError: boom",
+            ),
+            (
+                {
+                    "error": {
+                        "error": {
+                            "name": "MultiAgentError",
+                            "repr": "MultiAgentError(2)",
+                            "collection": [
+                                {"name": "ImageNotAvailable", "repr": "ImageNotAvailable('x')"},
+                                {"name": "ResourceError", "repr": "ResourceError()"},
+                            ],
+                        }
+                    }
+                },
+                "Session terminated during scheduling: ImageNotAvailable('x') (+1 more)",
+            ),
+            (
+                {"error": {"name": "ContainerCreationError", "repr": "line1\nline2\n  line3"}},
+                "Session terminated during scheduling: ContainerCreationError: line1 line2 line3",
+            ),
             ({}, "Session terminated during scheduling"),
             (None, "Session terminated during scheduling"),
         ],
-        ids=["name-and-repr", "repr-starts-with-name", "name-only", "no-error", "no-status-data"],
+        ids=[
+            "name-and-repr",
+            "repr-starts-with-name",
+            "name-only",
+            "nested",
+            "multi-agent",
+            "newlines-collapsed",
+            "no-error",
+            "no-status-data",
+        ],
     )
     def test_message_names_stored_error(
         self, status_data: dict[str, Any] | None, expected: str
@@ -478,3 +516,18 @@ class TestSessionTerminatedError:
         err = _session_terminated_error(status_data)
         assert isinstance(err, SessionNotFound)
         assert err.extra_msg == expected
+
+    def test_long_reason_is_truncated(self) -> None:
+        err = _session_terminated_error({"error": {"name": "E", "repr": "x" * 2000}})
+        assert err.extra_msg is not None
+        reason = err.extra_msg.removeprefix("Session terminated during scheduling: ")
+        assert len(reason) == 512
+        assert reason.endswith("\u2026")
+
+    def test_traceback_is_never_included(self) -> None:
+        err = _session_terminated_error({
+            "error": {"name": "E", "repr": "boom", "traceback": "secret-tb", "agent_id": "i-a"}
+        })
+        assert err.extra_msg is not None
+        assert "secret-tb" not in err.extra_msg
+        assert "i-a" not in err.extra_msg
