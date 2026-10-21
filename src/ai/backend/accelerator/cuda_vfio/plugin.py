@@ -3,7 +3,7 @@ from collections.abc import Collection, Mapping, Sequence
 from decimal import Decimal
 from pathlib import Path
 from pprint import pformat
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import aiodocker
 
@@ -249,7 +249,19 @@ class CUDAVFIOPlugin(AbstractComputePlugin):
     ) -> None:
         if not self.enabled:
             return
-        resource_spec = await get_resource_spec_from_container(container.backend_obj)
+        backend_obj = container.backend_obj
+        if not isinstance(backend_obj, (aiodocker.containers.DockerContainer, Mapping)):
+            # A containerd record (containerd backend) has no inspect form; its allocation is not restored here.
+            log.warning(
+                "cannot restore the cuda.device allocation of a non-docker container",
+                container_id=container.id,
+                backend_type=type(backend_obj).__name__,
+            )
+            return
+        # A DockerContainer is subscriptable like the inspect Mapping the helper reads.
+        resource_spec = await get_resource_spec_from_container(
+            cast("Mapping[str, Any]", backend_obj)
+        )
         if resource_spec is None:
             return
         alloc_map.apply_allocation({

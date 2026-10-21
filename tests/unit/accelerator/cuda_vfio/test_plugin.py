@@ -9,6 +9,7 @@ from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from aiodocker.containers import DockerContainer
 from pytest_mock import MockerFixture
 
 from ai.backend.accelerator.cuda_vfio.plugin import CUDAVFIOPlugin
@@ -17,8 +18,17 @@ from ai.backend.agent.affinity_map import AffinityHint, AffinityMap, AffinityPol
 from ai.backend.agent.errors import InsufficientResource
 from ai.backend.agent.errors.resources import InvalidResourceArgument
 from ai.backend.agent.resources import DiscretePropertyAllocMap, KernelResourceSpec
+from ai.backend.agent.types import Container
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
-from ai.backend.common.types import DeviceId, DeviceName, ResourceSlot, SlotName, SlotTypes
+from ai.backend.common.types import (
+    ContainerId,
+    ContainerStatus,
+    DeviceId,
+    DeviceName,
+    ResourceSlot,
+    SlotName,
+    SlotTypes,
+)
 from ai.backend.plugin.entrypoint import scan_entrypoints
 
 NVIDIA = "0x10de"
@@ -376,10 +386,78 @@ class TestAllocation:
         )
         alloc_map = await plugin.create_alloc_map()
         assert isinstance(alloc_map, DiscretePropertyAllocMap)
-        await plugin.restore_from_container(MagicMock(), alloc_map)
+        await plugin.restore_from_container(self._container({}), alloc_map)
         allocations = alloc_map.allocations[SlotName("cuda.device")]
         assert allocations[DeviceId(GPU_ID)] == Decimal(1)
         assert allocations[DeviceId(GPU2_ID)] == Decimal(0)
+
+    @staticmethod
+    def _container(backend_obj: object) -> Container:
+        return Container(
+            id=ContainerId("c1"),
+            status=ContainerStatus.RUNNING,
+            image="img",
+            labels={},
+            ports=[],
+            backend_obj=backend_obj,
+        )
+
+    @staticmethod
+    def _write_resource_txt(config_dir: Path, device_id: DeviceId) -> None:
+        config_dir.mkdir()
+        spec = KernelResourceSpec(
+            ResourceSlot.from_json({"cuda.device": "1"}),
+            allocations={
+                DeviceName("cuda"): {SlotName("cuda.device"): {device_id: Decimal(1)}},
+            },
+            scratch_disk_size=0,
+            mounts=[],
+        )
+        (config_dir / "resource.txt").write_text(spec.write_to_string())
+
+    async def test_restore_reads_resource_txt_of_a_docker_container(
+        self, plugin: CUDAVFIOPlugin, tmp_path: Path
+    ) -> None:
+        """The docker agent passes an aiodocker DockerContainer, which is not a Mapping."""
+        config_dir = tmp_path / "config"
+        self._write_resource_txt(config_dir, DeviceId(GPU2_ID))
+        backend_obj = DockerContainer(
+            MagicMock(),
+            Id="c1",
+            Mounts=[{"Target": "/home/config", "Source": str(config_dir)}],
+        )
+        alloc_map = await plugin.create_alloc_map()
+
+        await plugin.restore_from_container(self._container(backend_obj), alloc_map)
+
+        assert alloc_map.allocations[SlotName("cuda.device")][DeviceId(GPU2_ID)] == Decimal(1)
+
+    async def test_restore_reads_resource_txt_of_an_inspect_mapping(
+        self, plugin: CUDAVFIOPlugin, tmp_path: Path
+    ) -> None:
+        config_dir = tmp_path / "config"
+        self._write_resource_txt(config_dir, DeviceId(GPU2_ID))
+        backend_obj = {"Mounts": [{"Target": "/home/config", "Source": str(config_dir)}]}
+        alloc_map = await plugin.create_alloc_map()
+
+        await plugin.restore_from_container(self._container(backend_obj), alloc_map)
+
+        assert alloc_map.allocations[SlotName("cuda.device")][DeviceId(GPU2_ID)] == Decimal(1)
+
+    async def test_restore_of_a_non_docker_container_leaves_the_map_untouched(
+        self, plugin: CUDAVFIOPlugin
+    ) -> None:
+        """A containerd record is neither a DockerContainer nor a Mapping; restore must not raise."""
+        alloc_map = await plugin.create_alloc_map()
+        slot = SlotName("cuda.device")
+        picked = alloc_map.allocate({slot: Decimal(1)})
+        containerd_record = object()
+
+        await plugin.restore_from_container(self._container(containerd_record), alloc_map)
+
+        (device_id,) = picked[slot]
+        assert alloc_map.allocations[slot][device_id] == Decimal(1)
+        assert sum(alloc_map.allocations[slot].values()) == Decimal(1)
 
     async def test_generate_docker_args_skips_unallocated_devices(
         self, plugin: CUDAVFIOPlugin
