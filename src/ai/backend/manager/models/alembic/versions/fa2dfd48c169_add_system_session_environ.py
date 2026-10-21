@@ -44,8 +44,8 @@ OPTIONAL_BINDINGS: Final[dict[str, str]] = {
 }
 
 _ADD_GLOBAL_BINDING: Final = sa.text("""
-    INSERT INTO system_session_environ (value_source, key, scope_type, scope_id, disabled)
-    VALUES (:value_source, :key, 'global', NULL, :disabled)
+    INSERT INTO system_session_environ (value_source, key, scope_type, scope_id, enabled)
+    VALUES (:value_source, :key, 'global', NULL, :enabled)
     ON CONFLICT (key, scope_type, scope_id) DO NOTHING
 """)
 
@@ -58,7 +58,7 @@ def upgrade() -> None:
         sa.Column("key", sa.String(length=256), nullable=False),
         sa.Column("scope_type", sa.String(length=64), nullable=False),
         sa.Column("scope_id", GUID, nullable=True),
-        sa.Column("disabled", sa.Boolean, server_default=sa.false(), nullable=False),
+        sa.Column("enabled", sa.Boolean, server_default=sa.true(), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -96,11 +96,11 @@ def upgrade() -> None:
     conn = op.get_bind()
     for value_source, key in REQUIRED_BINDINGS.items():
         conn.execute(
-            _ADD_GLOBAL_BINDING, {"value_source": value_source, "key": key, "disabled": False}
+            _ADD_GLOBAL_BINDING, {"value_source": value_source, "key": key, "enabled": True}
         )
     for value_source, key in OPTIONAL_BINDINGS.items():
         conn.execute(
-            _ADD_GLOBAL_BINDING, {"value_source": value_source, "key": key, "disabled": True}
+            _ADD_GLOBAL_BINDING, {"value_source": value_source, "key": key, "enabled": False}
         )
 
 

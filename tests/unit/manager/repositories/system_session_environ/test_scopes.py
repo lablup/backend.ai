@@ -78,7 +78,7 @@ async def seeded_rows(database: ExtendedAsyncSAEngine) -> _SeededRows:
         key="BACKENDAI_USER_NAME",
         scope_type=SystemSessionEnvironScopeType.PROJECT,
         scope_id=SystemSessionEnvironScopeID(_PROJECT_ID),
-        disabled=True,
+        enabled=False,
     )
     async with database.begin_session() as db_sess:
         db_sess.add_all([
@@ -169,8 +169,8 @@ class TestSessionSystemSessionEnvironScope:
             searcher,
         )
 
-        assert {row.id: row.disabled for row in result.items} == {
-            seeded_rows.global_row: False,
-            seeded_rows.domain_row: False,
-            seeded_rows.project_row: True,
+        assert {row.id: row.enabled for row in result.items} == {
+            seeded_rows.global_row: True,
+            seeded_rows.domain_row: True,
+            seeded_rows.project_row: False,
         }

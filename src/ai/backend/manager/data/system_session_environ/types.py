@@ -16,6 +16,6 @@ class SystemSessionEnvironData:
     value_source: SystemSessionEnvironValueSource
     key: str
     scope_id: EntityIdentifier | None
-    disabled: bool
+    enabled: bool
     created_at: datetime
     updated_at: datetime
