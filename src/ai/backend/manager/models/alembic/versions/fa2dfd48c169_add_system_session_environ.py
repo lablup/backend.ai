@@ -1,7 +1,7 @@
 """Add system_session_environ
 
 Create the table deciding which values the manager injects into a session's
-environment, and bind every value source at the global scope under the name the
+environment, and bind every value source at the public scope under the name the
 launcher has always used.
 
 Revision ID: fa2dfd48c169
@@ -43,10 +43,10 @@ OPTIONAL_BINDINGS: Final[dict[str, str]] = {
     "access_key": "BACKENDAI_ACCESS_KEY",
 }
 
-_ADD_GLOBAL_BINDING: Final = sa.text("""
+_ADD_PUBLIC_BINDING: Final = sa.text("""
     INSERT INTO system_session_environ (value_source, key, scope_type, scope_id, enabled)
-    SELECT :value_source, :key, 'global', id, :enabled
-    FROM global_entities WHERE name = 'global'
+    SELECT :value_source, :key, 'public', id, :enabled
+    FROM global_entities WHERE name = 'public'
     ON CONFLICT (key, scope_type, scope_id) DO NOTHING
 """)
 
@@ -92,11 +92,11 @@ def upgrade() -> None:
     conn = op.get_bind()
     for value_source, key in REQUIRED_BINDINGS.items():
         conn.execute(
-            _ADD_GLOBAL_BINDING, {"value_source": value_source, "key": key, "enabled": True}
+            _ADD_PUBLIC_BINDING, {"value_source": value_source, "key": key, "enabled": True}
         )
     for value_source, key in OPTIONAL_BINDINGS.items():
         conn.execute(
-            _ADD_GLOBAL_BINDING, {"value_source": value_source, "key": key, "enabled": True}
+            _ADD_PUBLIC_BINDING, {"value_source": value_source, "key": key, "enabled": True}
         )
 
 

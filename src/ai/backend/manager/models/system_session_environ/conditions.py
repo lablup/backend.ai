@@ -15,11 +15,11 @@ __all__ = ("SystemSessionEnvironConditions",)
 
 class SystemSessionEnvironConditions:
     @staticmethod
-    def by_global_scope() -> QueryCondition:
+    def by_public_scope() -> QueryCondition:
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
-                SystemSessionEnvironRow.scope_type == SystemSessionEnvironScopeType.GLOBAL,
-                SystemSessionEnvironRow.scope_id == global_entity_id(GlobalEntityName.GLOBAL),
+                SystemSessionEnvironRow.scope_type == SystemSessionEnvironScopeType.PUBLIC,
+                SystemSessionEnvironRow.scope_id == global_entity_id(GlobalEntityName.PUBLIC),
             )
 
         return inner

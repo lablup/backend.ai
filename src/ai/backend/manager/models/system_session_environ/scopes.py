@@ -19,7 +19,7 @@ __all__ = ("SessionSystemSessionEnvironScope",)
 
 @dataclass(frozen=True)
 class SessionSystemSessionEnvironScope(OperationScope):
-    """The rows one session receives: ``global``, its domain's and its project's.
+    """The rows one session receives: ``public``, its domain's and its project's.
 
     Not a :class:`ScopeTarget`: the launcher reads these rows with no caller to authorize.
     """
@@ -30,7 +30,7 @@ class SessionSystemSessionEnvironScope(OperationScope):
     @override
     def to_condition(self) -> QueryCondition:
         conditions = [
-            SystemSessionEnvironConditions.by_global_scope(),
+            SystemSessionEnvironConditions.by_public_scope(),
             SystemSessionEnvironConditions.by_domain_scope(self.domain_id),
             SystemSessionEnvironConditions.by_project_scope(self.project_id),
         ]

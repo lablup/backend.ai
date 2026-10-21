@@ -38,7 +38,7 @@ _PROJECT_ID = ProjectID(uuid.UUID("7a2d3b1f-0000-4000-8000-000000000002"))
 
 @dataclass(frozen=True)
 class _SeededRows:
-    global_row: SystemSessionEnvironID
+    public_row: SystemSessionEnvironID
     domain_row: SystemSessionEnvironID
     project_row: SystemSessionEnvironID
 
@@ -63,11 +63,11 @@ def searcher() -> SystemSessionEnvironSearcher:
 
 @pytest.fixture
 async def seeded_rows(database: ExtendedAsyncSAEngine) -> _SeededRows:
-    global_row = SystemSessionEnvironRow(
+    public_row = SystemSessionEnvironRow(
         value_source=SystemSessionEnvironValueSource.SESSION_ID,
         key="BACKENDAI_SESSION_ID",
-        scope_type=SystemSessionEnvironScopeType.GLOBAL,
-        scope_id=SystemSessionEnvironScopeID(global_entity_id(GlobalEntityName.GLOBAL)),
+        scope_type=SystemSessionEnvironScopeType.PUBLIC,
+        scope_id=SystemSessionEnvironScopeID(global_entity_id(GlobalEntityName.PUBLIC)),
     )
     domain_row = SystemSessionEnvironRow(
         value_source=SystemSessionEnvironValueSource.USER_EMAIL,
@@ -84,7 +84,7 @@ async def seeded_rows(database: ExtendedAsyncSAEngine) -> _SeededRows:
     )
     async with database.begin_session() as db_sess:
         db_sess.add_all([
-            global_row,
+            public_row,
             domain_row,
             project_row,
             SystemSessionEnvironRow(
@@ -102,14 +102,14 @@ async def seeded_rows(database: ExtendedAsyncSAEngine) -> _SeededRows:
         ])
         await db_sess.flush()
         return _SeededRows(
-            global_row=global_row.id,
+            public_row=public_row.id,
             domain_row=domain_row.id,
             project_row=project_row.id,
         )
 
 
 class TestSessionSystemSessionEnvironScope:
-    async def test_returns_the_global_rows_and_the_rows_at_the_given_scopes(
+    async def test_returns_the_public_rows_and_the_rows_at_the_given_scopes(
         self,
         repository: OpsRepository[SystemSessionEnvironData],
         searcher: SystemSessionEnvironSearcher,
@@ -121,12 +121,12 @@ class TestSessionSystemSessionEnvironScope:
         )
 
         assert {row.id for row in result.items} == {
-            seeded_rows.global_row,
+            seeded_rows.public_row,
             seeded_rows.domain_row,
             seeded_rows.project_row,
         }
 
-    async def test_returns_only_the_global_rows_at_a_scope_with_no_rows(
+    async def test_returns_only_the_public_rows_at_a_scope_with_no_rows(
         self,
         repository: OpsRepository[SystemSessionEnvironData],
         searcher: SystemSessionEnvironSearcher,
@@ -141,7 +141,7 @@ class TestSessionSystemSessionEnvironScope:
             searcher,
         )
 
-        assert {row.id for row in result.items} == {seeded_rows.global_row}
+        assert {row.id for row in result.items} == {seeded_rows.public_row}
 
     async def test_names_the_scope_by_its_entity(
         self,
@@ -155,7 +155,7 @@ class TestSessionSystemSessionEnvironScope:
         )
 
         assert {row.id: row.scope_id for row in result.items} == {
-            seeded_rows.global_row: global_entity_id(GlobalEntityName.GLOBAL),
+            seeded_rows.public_row: global_entity_id(GlobalEntityName.PUBLIC),
             seeded_rows.domain_row: _DOMAIN_ID,
             seeded_rows.project_row: _PROJECT_ID,
         }
@@ -172,7 +172,7 @@ class TestSessionSystemSessionEnvironScope:
         )
 
         assert {row.id: row.enabled for row in result.items} == {
-            seeded_rows.global_row: True,
+            seeded_rows.public_row: True,
             seeded_rows.domain_row: True,
             seeded_rows.project_row: False,
         }

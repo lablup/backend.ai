@@ -17,7 +17,7 @@ __all__ = (
 
 
 class SystemSessionEnvironScopeType(enum.StrEnum):
-    GLOBAL = "global"
+    PUBLIC = "public"
     DOMAIN = "domain"
     PROJECT = "project"
 
@@ -25,7 +25,7 @@ class SystemSessionEnvironScopeType(enum.StrEnum):
     def of_owner(cls, owner: EntityIdentifier) -> SystemSessionEnvironScopeType:
         match owner:
             case _ if owner.entity_type() == GlobalEntityType():
-                return cls.GLOBAL
+                return cls.PUBLIC
             case _ if owner.entity_type() == DomainEntityType():
                 return cls.DOMAIN
             case _ if owner.entity_type() == ProjectEntityType():
@@ -37,7 +37,7 @@ class SystemSessionEnvironScopeType(enum.StrEnum):
 
     def to_owner(self, scope_id: SystemSessionEnvironScopeID) -> EntityIdentifier:
         match self:
-            case SystemSessionEnvironScopeType.GLOBAL:
+            case SystemSessionEnvironScopeType.PUBLIC:
                 return GlobalEntityID(scope_id)
             case SystemSessionEnvironScopeType.DOMAIN:
                 return DomainID(scope_id)
