@@ -1,0 +1,43 @@
+kind: system_session_environ
+version: 1
+items:
+- value_source: session_id
+  key: BACKENDAI_SESSION_ID
+  scope_type: public
+  enabled: true
+- value_source: session_name
+  key: BACKENDAI_SESSION_NAME
+  scope_type: public
+  enabled: true
+- value_source: cluster_size
+  key: BACKENDAI_CLUSTER_SIZE
+  scope_type: public
+  enabled: true
+- value_source: cluster_replicas
+  key: BACKENDAI_CLUSTER_REPLICAS
+  scope_type: public
+  enabled: true
+- value_source: cluster_hosts
+  key: BACKENDAI_CLUSTER_HOSTS
+  scope_type: public
+  enabled: true
+- value_source: preopen_ports
+  key: BACKENDAI_PREOPEN_PORTS
+  scope_type: public
+  enabled: true
+- value_source: user_uuid
+  key: BACKENDAI_USER_UUID
+  scope_type: public
+  enabled: true
+- value_source: user_email
+  key: BACKENDAI_USER_EMAIL
+  scope_type: public
+  enabled: true
+- value_source: user_name
+  key: BACKENDAI_USER_NAME
+  scope_type: public
+  enabled: true
+- value_source: access_key
+  key: BACKENDAI_ACCESS_KEY
+  scope_type: public
+  enabled: true
