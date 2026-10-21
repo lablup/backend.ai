@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from collections.abc import Mapping
 from typing import Any, Final
 
@@ -20,6 +21,8 @@ _PRIMITIVES = (str, int, float, bool, type(None))
 def _is_bounded(value: Any, *, nested: bool) -> bool:
     if isinstance(value, str):
         return len(value) <= MAX_ATTESTATION_STRING_LEN
+    if isinstance(value, float):
+        return math.isfinite(value)
     if isinstance(value, _PRIMITIVES):
         return True
     if nested and isinstance(value, Mapping):
@@ -51,7 +54,12 @@ def build_attestation_status(summary: Mapping[str, Any] | None) -> dict[str, Any
         log.warning("attestation summary dropped: unsupported shape")
         return None
     status = {**body, "source": ATTESTATION_SOURCE}
-    if len(json.dumps(status).encode()) > MAX_ATTESTATION_BYTES:
+    try:
+        encoded = json.dumps(status, allow_nan=False).encode()
+    except (ValueError, TypeError):
+        log.warning("attestation summary dropped: not serializable")
+        return None
+    if len(encoded) > MAX_ATTESTATION_BYTES:
         log.warning("attestation summary dropped: too large", limit_bytes=MAX_ATTESTATION_BYTES)
         return None
     return status

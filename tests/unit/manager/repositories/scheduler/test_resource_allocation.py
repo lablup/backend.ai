@@ -935,6 +935,35 @@ class TestUpdateKernelStatusRunningResourceAllocation:
                 "attestation": {"attested": True, "source": "host-reported"},
             }
 
+    async def _seed_status_data(
+        self,
+        db: ExtendedAsyncSAEngine,
+        kernel_id: uuid.UUID,
+        session_id: uuid.UUID,
+    ) -> None:
+        async with db.begin_session() as db_sess:
+            for row_type, row_id in ((KernelRow, kernel_id), (SessionRow, session_id)):
+                await db_sess.execute(
+                    sa.update(row_type)
+                    .where(row_type.id == row_id)
+                    .values(status_data={"scheduler": {"retries": 1}})
+                )
+
+    async def _read_status_data(
+        self,
+        db: ExtendedAsyncSAEngine,
+        kernel_id: uuid.UUID,
+        session_id: uuid.UUID,
+    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+        async with db.begin_readonly_session() as db_sess:
+            kernel = (
+                await db_sess.execute(sa.select(KernelRow).where(KernelRow.id == kernel_id))
+            ).scalar_one()
+            session = (
+                await db_sess.execute(sa.select(SessionRow).where(SessionRow.id == session_id))
+            ).scalar_one()
+        return kernel.status_data, session.status_data
+
     async def test_without_attestation_status_data_is_untouched(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
@@ -949,7 +978,7 @@ class TestUpdateKernelStatusRunningResourceAllocation:
         resource_slot_types: None,
     ) -> None:
         await self._seed_agent_resources(db_with_cleanup, test_agent_id)
-        _, kernel_id = await self._create_kernel_with_pending_allocations(
+        session_id, kernel_id = await self._create_kernel_with_pending_allocations(
             db_with_cleanup,
             domain_id=test_domain_id,
             domain_name=test_domain.domain_name,
@@ -960,14 +989,65 @@ class TestUpdateKernelStatusRunningResourceAllocation:
             access_key=test_access_key,
             agent_id=test_agent_id,
         )
+        await self._seed_status_data(db_with_cleanup, kernel_id, session_id)
 
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         await db_source.update_kernel_status_running(
             kernel_id, "test-started", _make_creation_info()
         )
 
-        async with db_with_cleanup.begin_readonly_session() as db_sess:
-            kernel = (
-                await db_sess.execute(sa.select(KernelRow).where(KernelRow.id == kernel_id))
-            ).scalar_one()
-        assert "attestation" not in (kernel.status_data or {})
+        kernel_data, session_data = await self._read_status_data(
+            db_with_cleanup, kernel_id, session_id
+        )
+        for status_data in (kernel_data, session_data):
+            assert status_data is not None
+            assert status_data["scheduler"] == {"retries": 1}
+            assert "attestation" not in status_data
+
+    async def test_non_main_kernel_leaves_session_status_data_alone(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain_id: DomainID,
+        test_domain: DomainFixtureData,
+        test_scaling_group_id: ResourceGroupID,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_agent_id: str,
+        resource_slot_types: None,
+    ) -> None:
+        await self._seed_agent_resources(db_with_cleanup, test_agent_id)
+        session_id, kernel_id = await self._create_kernel_with_pending_allocations(
+            db_with_cleanup,
+            domain_id=test_domain_id,
+            domain_name=test_domain.domain_name,
+            resource_group_id=test_scaling_group_id,
+            resource_group_name=test_scaling_group_name,
+            group_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+            agent_id=test_agent_id,
+        )
+        await self._seed_status_data(db_with_cleanup, kernel_id, session_id)
+        async with db_with_cleanup.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.update(KernelRow).where(KernelRow.id == kernel_id).values(cluster_role="sub")
+            )
+
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        result = await db_source.update_kernel_status_running(
+            kernel_id,
+            "test-started",
+            _make_creation_info(attestation={"attested": True}),
+        )
+        assert result is True
+
+        kernel_data, session_data = await self._read_status_data(
+            db_with_cleanup, kernel_id, session_id
+        )
+        assert kernel_data == {
+            "scheduler": {"retries": 1},
+            "attestation": {"attested": True, "source": "host-reported"},
+        }
+        assert session_data == {"scheduler": {"retries": 1}}

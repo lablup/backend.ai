@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import uuid
 from decimal import Decimal
 
@@ -117,8 +118,23 @@ class TestKernelCreationEventPayload:
 
         assert restored.creation_info.attestation == creation_info.attestation
 
-    def test_attestation_defaults_to_none(self, creation_info: KernelCreationInfo) -> None:
-        assert creation_info.attestation is None
+    def test_attestation_defaults_to_none(
+        self,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        creation_info: KernelCreationInfo,
+    ) -> None:
+        message = KernelStartedAnycastEvent(
+            kernel_id=kernel_id, session_id=session_id, creation_info=creation_info
+        ).to_message()
+        body = json.loads(message.payload)
+        body["creation_info"].pop("attestation")
+        older = message.model_copy(update={"payload": json.dumps(body).encode()})
+
+        restored = KernelStartedAnycastEvent.from_message(older)
+
+        assert "attestation" not in json.loads(older.payload)["creation_info"]
+        assert restored.creation_info.attestation is None
 
     def test_earlier_creation_events_carry_no_creation_info(
         self, kernel_id: KernelId, session_id: SessionId
