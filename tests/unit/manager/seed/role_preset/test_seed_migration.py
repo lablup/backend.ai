@@ -24,7 +24,9 @@ _PUBLIC_MEMBER_REVISION = "c3e8a1f05b27_add_preset_scope_and_public_member_role"
 _MEMBER_READS_REVISION = "a1f6b7c4d902_grant_image_and_project_reads_to_members"
 _OWN_POLICY_READS_REVISION = "b8e0c1f4a276_grant_seed_roles_read_on_their_own_policy"
 _USER_OWNER_APP_CONFIG_REVISION = "d6e297fca9ae_grant_user_owners_read_on_app_configs"
-_SYSTEM_SESSION_ENVIRON_READ_REVISION = "bf07cae92d86_grant_members_read_on_system_session_environ"
+_SYSTEM_SESSION_ENVIRON_GRANTS_REVISION = (
+    "bf07cae92d86_grant_role_presets_on_system_session_environ"
+)
 _REPOSITORY = Path(__file__).resolve().parents[5]
 _VERSIONS = _REPOSITORY / "src/ai/backend/manager/models/alembic/versions"
 
@@ -81,8 +83,8 @@ def user_owner_app_config_migration() -> Any:
 
 
 @pytest.fixture(scope="module")
-def system_session_environ_read_migration() -> Any:
-    return load_python_file(str(_VERSIONS), f"{_SYSTEM_SESSION_ENVIRON_READ_REVISION}.py")
+def system_session_environ_grants_migration() -> Any:
+    return load_python_file(str(_VERSIONS), f"{_SYSTEM_SESSION_ENVIRON_GRANTS_REVISION}.py")
 
 
 @pytest.fixture(scope="module")
@@ -150,7 +152,7 @@ class TestMigrationMatchesFixture:
         member_reads_migration: Any,
         own_policy_reads_migration: Any,
         user_owner_app_config_migration: Any,
-        system_session_environ_read_migration: Any,
+        system_session_environ_grants_migration: Any,
         fixture: dict[str, Any],
     ) -> None:
         written = {
@@ -268,17 +270,14 @@ class TestMigrationMatchesFixture:
         }
         written |= {
             (
-                system_session_environ_read_migration._identify(
-                    "role_permission_preset",
-                    preset_id,
-                    entity_type,
-                    str(system_session_environ_read_migration._READ),
+                system_session_environ_grants_migration._identify(
+                    "role_permission_preset", preset_id, entity_type, str(bit)
                 ),
                 preset_id,
                 entity_type,
-                system_session_environ_read_migration._READ,
+                bit,
             )
-            for preset_id, entity_type in system_session_environ_read_migration._GRANTS
+            for preset_id, entity_type, bit in system_session_environ_grants_migration._GRANTS
         }
         seeded = {
             (row["id"], row["role_preset_id"], row["entity_type"], row["permission"])

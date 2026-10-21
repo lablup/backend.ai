@@ -1,8 +1,8 @@
-"""Grant public, domain and project members and admins READ on system session environ
+"""Grant the role presets their permissions on system session environ
 
-Every user reads the bindings at public, and a domain's or a project's members and admins
-read the ones at their domain or project. Write the grant to the presets and to every role
-made from them.
+Every user reads the bindings at public, a domain's or a project's members read the ones at
+their domain or project, and its admins manage them. Write the grants to the presets and to
+every role made from them.
 
 Revision ID: bf07cae92d86
 Revises: fa2dfd48c169
@@ -31,15 +31,18 @@ _DOMAIN_MEMBER_PRESET_ID: Final[str] = "76616aa7-6597-5b11-8629-adff5d5640c2"
 _DOMAIN_ADMIN_PRESET_ID: Final[str] = "9ebf4f57-9e67-5631-997a-d2d79cc3815f"
 _PROJECT_MEMBER_PRESET_ID: Final[str] = "06057849-3534-546f-b74c-b79d5d3ecf5e"
 _PROJECT_ADMIN_PRESET_ID: Final[str] = "22c4db03-24aa-5ff8-b5a9-64b2a2182413"
+_ENTITY_TYPE: Final[str] = "system_session_environ"
 _READ: Final[int] = 1
+# read, update, create, soft_delete, hard_delete
+_EVERY_OPERATION: Final[tuple[int, ...]] = (1, 2, 4, 8, 16)
 
-# (preset id, entity type) each grant is written for.
-_GRANTS: Final[tuple[tuple[str, str], ...]] = (
-    (_PUBLIC_MEMBER_PRESET_ID, "system_session_environ"),
-    (_DOMAIN_MEMBER_PRESET_ID, "system_session_environ"),
-    (_DOMAIN_ADMIN_PRESET_ID, "system_session_environ"),
-    (_PROJECT_MEMBER_PRESET_ID, "system_session_environ"),
-    (_PROJECT_ADMIN_PRESET_ID, "system_session_environ"),
+# (preset id, entity type, permission bit) each grant is written for.
+_GRANTS: Final[tuple[tuple[str, str, int], ...]] = (
+    (_PUBLIC_MEMBER_PRESET_ID, _ENTITY_TYPE, _READ),
+    (_DOMAIN_MEMBER_PRESET_ID, _ENTITY_TYPE, _READ),
+    (_PROJECT_MEMBER_PRESET_ID, _ENTITY_TYPE, _READ),
+    *((_DOMAIN_ADMIN_PRESET_ID, _ENTITY_TYPE, bit) for bit in _EVERY_OPERATION),
+    *((_PROJECT_ADMIN_PRESET_ID, _ENTITY_TYPE, bit) for bit in _EVERY_OPERATION),
 )
 
 # The seed derives an id as a uuid7 whose timestamp is fixed and whose remaining bits
@@ -58,7 +61,7 @@ def _identify(*parts: str) -> str:
     return str(uuid.UUID(int=value))
 
 
-def grant(conn: sa.engine.Connection, preset_id: str, entity_type: str) -> None:
+def grant(conn: sa.engine.Connection, preset_id: str, entity_type: str, permission: int) -> None:
     conn.execute(
         sa.text("""
             INSERT INTO role_permission_presets (id, role_preset_id, entity_type, permission)
@@ -67,10 +70,10 @@ def grant(conn: sa.engine.Connection, preset_id: str, entity_type: str) -> None:
             WHERE p.id = CAST(:preset_id AS uuid)
             ON CONFLICT DO NOTHING
         """).bindparams(
-            id=_identify("role_permission_preset", preset_id, entity_type, str(_READ)),
+            id=_identify("role_permission_preset", preset_id, entity_type, str(permission)),
             preset_id=preset_id,
             entity_type=entity_type,
-            permission=_READ,
+            permission=permission,
         )
     )
     conn.execute(
@@ -80,18 +83,18 @@ def grant(conn: sa.engine.Connection, preset_id: str, entity_type: str) -> None:
             FROM roles r
             WHERE r.role_preset_id = CAST(:preset_id AS uuid)
             ON CONFLICT (role_id, entity_type, permission) DO NOTHING
-        """).bindparams(preset_id=preset_id, entity_type=entity_type, permission=_READ)
+        """).bindparams(preset_id=preset_id, entity_type=entity_type, permission=permission)
     )
 
 
-def revoke(conn: sa.engine.Connection, preset_id: str, entity_type: str) -> None:
+def revoke(conn: sa.engine.Connection, preset_id: str, entity_type: str, permission: int) -> None:
     conn.execute(
         sa.text("""
             DELETE FROM permissions
             WHERE entity_type = :entity_type
               AND permission = :permission
               AND role_id IN (SELECT id FROM roles WHERE role_preset_id = CAST(:preset_id AS uuid))
-        """).bindparams(preset_id=preset_id, entity_type=entity_type, permission=_READ)
+        """).bindparams(preset_id=preset_id, entity_type=entity_type, permission=permission)
     )
     conn.execute(
         sa.text("""
@@ -99,17 +102,17 @@ def revoke(conn: sa.engine.Connection, preset_id: str, entity_type: str) -> None
             WHERE role_preset_id = CAST(:preset_id AS uuid)
               AND entity_type = :entity_type
               AND permission = :permission
-        """).bindparams(preset_id=preset_id, entity_type=entity_type, permission=_READ)
+        """).bindparams(preset_id=preset_id, entity_type=entity_type, permission=permission)
     )
 
 
 def upgrade() -> None:
     conn = op.get_bind()
-    for preset_id, entity_type in _GRANTS:
-        grant(conn, preset_id, entity_type)
+    for preset_id, entity_type, permission in _GRANTS:
+        grant(conn, preset_id, entity_type, permission)
 
 
 def downgrade() -> None:
     conn = op.get_bind()
-    for preset_id, entity_type in _GRANTS:
-        revoke(conn, preset_id, entity_type)
+    for preset_id, entity_type, permission in _GRANTS:
+        revoke(conn, preset_id, entity_type, permission)
