@@ -2806,15 +2806,20 @@ class DeploymentDBSource:
         self,
         deployment_ids: set[DeploymentID],
     ) -> Mapping[DeploymentID, list[AgentUUID]]:
-        """Fetch the designated agents of each deployment; one with none maps to ``[]``."""
+        """Fetch the designated agents of each deployment in agent UUID order; one with none
+        maps to ``[]``."""
         if not deployment_ids:
             return {}
 
         async with self._begin_readonly_session_read_committed() as db_sess:
-            query = sa.select(
-                DeploymentDesignatedAgentRow.endpoint_id,
-                DeploymentDesignatedAgentRow.agent_uuid,
-            ).where(DeploymentDesignatedAgentRow.endpoint_id.in_(deployment_ids))
+            query = (
+                sa.select(
+                    DeploymentDesignatedAgentRow.endpoint_id,
+                    DeploymentDesignatedAgentRow.agent_uuid,
+                )
+                .where(DeploymentDesignatedAgentRow.endpoint_id.in_(deployment_ids))
+                .order_by(DeploymentDesignatedAgentRow.agent_uuid)
+            )
             result = await db_sess.execute(query)
             agents_by_deployment: dict[DeploymentID, list[AgentUUID]] = {
                 deployment_id: [] for deployment_id in deployment_ids
