@@ -12,12 +12,15 @@ Create Date: 2026-10-21
 
 from __future__ import annotations
 
-import hashlib
-import uuid
 from typing import Final
 
 import sqlalchemy as sa
 from alembic import op
+
+from ai.backend.common.data.permission.types import Permission
+from ai.backend.manager.models.rbac_models.role_permission_preset.ids import (
+    role_permission_preset_id,
+)
 
 # revision identifiers, used by Alembic.
 revision = "bf07cae92d86"  # Part of: NEXT_RELEASE_VERSION
@@ -32,9 +35,8 @@ _DOMAIN_ADMIN_PRESET_ID: Final[str] = "9ebf4f57-9e67-5631-997a-d2d79cc3815f"
 _PROJECT_MEMBER_PRESET_ID: Final[str] = "06057849-3534-546f-b74c-b79d5d3ecf5e"
 _PROJECT_ADMIN_PRESET_ID: Final[str] = "22c4db03-24aa-5ff8-b5a9-64b2a2182413"
 _ENTITY_TYPE: Final[str] = "system_session_environ"
-_READ: Final[int] = 1
-# read, update, create, soft_delete, hard_delete
-_EVERY_OPERATION: Final[tuple[int, ...]] = (1, 2, 4, 8, 16)
+_READ: Final[int] = int(Permission.READ)
+_EVERY_OPERATION: Final[tuple[int, ...]] = tuple(int(bit) for bit in Permission.full())
 
 # (preset id, entity type, permission bit) each grant is written for.
 _GRANTS: Final[tuple[tuple[str, str, int], ...]] = (
@@ -44,21 +46,6 @@ _GRANTS: Final[tuple[tuple[str, str, int], ...]] = (
     *((_DOMAIN_ADMIN_PRESET_ID, _ENTITY_TYPE, bit) for bit in _EVERY_OPERATION),
     *((_PROJECT_ADMIN_PRESET_ID, _ENTITY_TYPE, bit) for bit in _EVERY_OPERATION),
 )
-
-# The seed derives an id as a uuid7 whose timestamp is fixed and whose remaining bits
-# come from what it identifies, so a database migrated here and one seeded from the
-# fixture hold the same rows.
-_EPOCH_MS: Final[int] = 1757670718265
-
-
-def _identify(*parts: str) -> str:
-    digest = hashlib.blake2b("|".join(parts).encode("utf-8"), digest_size=10).digest()
-    value = (_EPOCH_MS & 0xFFFFFFFFFFFF) << 80 | int.from_bytes(digest, "big")
-    value &= ~(0xF << 76)
-    value |= 0x7 << 76
-    value &= ~(0x3 << 62)
-    value |= 0x2 << 62
-    return str(uuid.UUID(int=value))
 
 
 def grant(conn: sa.engine.Connection, preset_id: str, entity_type: str, permission: int) -> None:
@@ -70,7 +57,7 @@ def grant(conn: sa.engine.Connection, preset_id: str, entity_type: str, permissi
             WHERE p.id = CAST(:preset_id AS uuid)
             ON CONFLICT DO NOTHING
         """).bindparams(
-            id=_identify("role_permission_preset", preset_id, entity_type, str(permission)),
+            id=role_permission_preset_id(preset_id, entity_type, permission),
             preset_id=preset_id,
             entity_type=entity_type,
             permission=permission,

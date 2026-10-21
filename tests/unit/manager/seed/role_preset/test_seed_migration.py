@@ -14,6 +14,10 @@ from typing import Any
 import pytest
 from alembic.util.pyfiles import load_python_file
 
+from ai.backend.manager.models.rbac_models.role_permission_preset.ids import (
+    role_permission_preset_id,
+)
+
 _REVISION = "f4a1c9d20b73_sync_seed_roles_with_their_declaration"
 _USER_OWNER_REVISION = "dc61fa027fc1_assign_every_user_their_user_owner_role"
 _DOMAIN_MEMBER_REVISION = "e7d2a9c41b60_assign_every_user_their_domain_member_role"
@@ -270,9 +274,7 @@ class TestMigrationMatchesFixture:
         }
         written |= {
             (
-                system_session_environ_grants_migration._identify(
-                    "role_permission_preset", preset_id, entity_type, str(bit)
-                ),
+                role_permission_preset_id(preset_id, entity_type, bit),
                 preset_id,
                 entity_type,
                 bit,

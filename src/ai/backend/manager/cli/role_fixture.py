@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-import hashlib
-import uuid
 from collections.abc import Mapping, Sequence
 from typing import Any, Final
 
 from ai.backend.common.data.permission.types import Permission
+from ai.backend.manager.models.rbac_models.role_permission_preset.ids import (
+    role_permission_preset_id,
+)
 from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
 
-# A derived id is a uuid7 whose timestamp is fixed and whose remaining bits come from
-# what it identifies, so the same declaration writes the same file. The timestamp is
-# the moment the seed was first generated.
-_EPOCH_MS: Final[int] = 1757670718265
 _TIMESTAMP: Final[str] = "2025-09-12 09:51:58.265582+00"
 # The bits a grant is written out as, one row per bit.
 _BITS: Final[tuple[Permission, ...]] = (
@@ -21,17 +18,6 @@ _BITS: Final[tuple[Permission, ...]] = (
     Permission.SOFT_DELETE,
     Permission.HARD_DELETE,
 )
-
-
-def _identify(*parts: str) -> str:
-    """The uuid7 identifying these parts, the same on every run."""
-    digest = hashlib.blake2b("|".join(parts).encode("utf-8"), digest_size=10).digest()
-    value = (_EPOCH_MS & 0xFFFFFFFFFFFF) << 80 | int.from_bytes(digest, "big")
-    value &= ~(0xF << 76)
-    value |= 0x7 << 76
-    value &= ~(0x3 << 62)
-    value |= 0x2 << 62
-    return str(uuid.UUID(int=value))
 
 
 class RoleFixture:
@@ -75,9 +61,7 @@ class RoleFixture:
                     if not granted[entity_type] & bit:
                         continue
                     rows.append({
-                        "id": _identify(
-                            "role_permission_preset", preset_id, entity_type, str(int(bit))
-                        ),
+                        "id": role_permission_preset_id(preset_id, entity_type, int(bit)),
                         "role_preset_id": preset_id,
                         "entity_type": entity_type,
                         "permission": int(bit),
