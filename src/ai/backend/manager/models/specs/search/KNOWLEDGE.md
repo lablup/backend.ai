@@ -424,7 +424,6 @@ Nothing is left. `resource_group.get_wsproxy_version` became a scope action taki
 | `resource_group` | `lookup`, `bulk_lookup` | A name in `scaling_groups` to its id | Not moved | Same |
 | `session` | `lookup` | A (user, name, non-terminal status) in `sessions` to its id | Not moved | Same. The handler decides the user |
 | `etcd_config` | `get_resource_slots`, `get_resource_metadata`, `get_vfolder_types` | etcd settings, device metadata in valkey | Not moved | Not an entity |
-| `manager_admin` | `get_announcement` | The announcement in etcd | Not moved | Not an entity |
 | `metric` | `metadata_public_search` | Container metric names in Prometheus | Not moved | Not an entity |
 | `export` | `public_get_report` | Report definitions registered in code. The export query is authorized separately | Not moved | Not an entity |
 | `permission_contoller` | `public_get_scope_types`, `public_get_entity_types`, `public_get_permission_matrix` | Code constants and the list of wired actions | Not moved | Not an entity |

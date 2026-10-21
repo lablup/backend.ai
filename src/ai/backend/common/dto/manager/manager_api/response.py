@@ -13,10 +13,3 @@ class ManagerStatusResponse(BaseResponseModel):
     nodes: list[Any] = Field(description="List of manager node info")
     status: str = Field(description="Current manager status")
     active_sessions: int | None = Field(description="Number of active sessions")
-
-
-class AnnouncementResponse(BaseResponseModel):
-    """Response containing announcement info."""
-
-    enabled: bool = Field(description="Whether announcement is enabled")
-    message: str = Field(description="Announcement message")

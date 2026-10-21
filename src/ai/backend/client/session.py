@@ -19,7 +19,7 @@ import aiohttp
 from multidict import CIMultiDict
 
 from .config import MIN_API_VERSION, APIConfig, get_config, parse_api_version
-from .exceptions import APIVersionWarning, BackendAPIError, BackendClientError
+from .exceptions import APIVersionWarning
 from .types import Sentinel, sentinel
 
 __all__: tuple[str, ...] = (
@@ -484,14 +484,6 @@ class Session(BaseSession):
         if self.closed:
             raise RuntimeError("Cannot reuse closed session")
         self.open()
-        if self.config.announcement_handler:
-            try:
-                payload = self.Manager.get_announcement()
-                if payload["enabled"]:
-                    self.config.announcement_handler(payload["message"])
-            except (BackendClientError, BackendAPIError):
-                # The server may be an old one without announcement API.
-                pass
         return self
 
     @override
@@ -562,14 +554,6 @@ class AsyncSession(BaseSession):
         if self.closed:
             raise RuntimeError("Cannot reuse closed session")
         await self.open()
-        if self.config.announcement_handler:
-            try:
-                payload = await self.Manager.get_announcement()
-                if payload["enabled"]:
-                    self.config.announcement_handler(payload["message"])
-            except (BackendClientError, BackendAPIError):
-                # The server may be an old one without announcement API.
-                pass
         return self
 
     @override

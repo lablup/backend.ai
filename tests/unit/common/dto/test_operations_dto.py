@@ -12,7 +12,6 @@ from ai.backend.common.dto.manager.operations.request import (
     PerformSchedulerOpsRequest,
     PushBackgroundTaskEventsRequest,
     PushSessionEventsRequest,
-    UpdateAnnouncementRequest,
     UpdateManagerStatusRequest,
 )
 from ai.backend.common.dto.manager.operations.response import (
@@ -20,7 +19,6 @@ from ai.backend.common.dto.manager.operations.response import (
     ClearErrorLogResponse,
     ErrorLogItem,
     FetchManagerStatusResponse,
-    GetAnnouncementResponse,
     ListErrorLogsResponse,
     ManagerNodeInfo,
 )
@@ -200,22 +198,6 @@ class TestUpdateManagerStatusRequest:
     def test_force_kill(self) -> None:
         req = UpdateManagerStatusRequest(status=ManagerStatus.RUNNING, force_kill=True)
         assert req.force_kill is True
-
-
-class TestUpdateAnnouncementRequest:
-    def test_defaults(self) -> None:
-        req = UpdateAnnouncementRequest()
-        assert req.enabled is False
-        assert req.message is None
-
-    def test_enabled_with_message(self) -> None:
-        req = UpdateAnnouncementRequest(enabled=True, message="System maintenance at 2am")
-        assert req.enabled is True
-        assert req.message == "System maintenance at 2am"
-
-    def test_disabled(self) -> None:
-        req = UpdateAnnouncementRequest(enabled=False)
-        assert req.enabled is False
 
 
 class TestPerformSchedulerOpsRequest:
@@ -438,15 +420,3 @@ class TestFetchManagerStatusResponse:
         data = resp.model_dump()
         assert data["nodes"][0]["id"] == "mgr-1"
         assert data["status"] == "frozen"
-
-
-class TestGetAnnouncementResponse:
-    def test_enabled(self) -> None:
-        resp = GetAnnouncementResponse(enabled=True, message="Maintenance tonight")
-        assert resp.enabled is True
-        assert resp.message == "Maintenance tonight"
-
-    def test_disabled(self) -> None:
-        resp = GetAnnouncementResponse(enabled=False, message="")
-        assert resp.enabled is False
-        assert resp.message == ""

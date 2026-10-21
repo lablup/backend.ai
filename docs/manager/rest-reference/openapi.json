@@ -46623,32 +46623,6 @@
         "title": "UpdateManagerStatusRequest",
         "type": "object"
       },
-      "UpdateAnnouncementRequest": {
-        "description": "Request body for updating announcement.",
-        "properties": {
-          "enabled": {
-            "default": false,
-            "description": "Whether announcement is enabled",
-            "title": "Enabled",
-            "type": "boolean"
-          },
-          "message": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "Announcement message text",
-            "title": "Message"
-          }
-        },
-        "title": "UpdateAnnouncementRequest",
-        "type": "object"
-      },
       "SchedulerOpsRequest": {
         "description": "Request body for scheduler operations.",
         "properties": {
@@ -73841,53 +73815,6 @@
           }
         ],
         "description": "\n**Preconditions:**\n* User privilege required.\n* Manager status required: one of FROZEN, RUNNING\n"
-      }
-    },
-    "/manager/announcement": {
-      "get": {
-        "operationId": "manager.get_announcement",
-        "tags": [
-          "manager"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "parameters": [],
-        "description": "\n**Preconditions:**\n* User privilege required.\n"
-      },
-      "post": {
-        "operationId": "manager.update_announcement",
-        "tags": [
-          "manager"
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful response"
-          }
-        },
-        "security": [
-          {
-            "TokenAuth": []
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateAnnouncementRequest"
-              }
-            }
-          }
-        },
-        "parameters": [],
-        "description": "\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/manager/status": {
