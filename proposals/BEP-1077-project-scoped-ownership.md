@@ -415,12 +415,12 @@ Today "visible to everyone" is expressed in four ways. The superadmin-only gates
 |---|---|
 | Table | `global_entities(id, name, created_at)`, `name` unique |
 | Source of names | A code enum (`GLOBAL`, `PUBLIC`) |
-| Row creation | The migration inserts by name; the DB generates the id |
+| Row creation | On an existing database the migration inserts by name and the DB generates the id. A fresh install gets them from the `global_entity` seed kind, under the ids `seeds/manager/global_entity/defaults.yaml` states |
 | id lookup | Queried once at manager startup into a name-to-id cache. Requests read the cache |
-| Code references | By name only. No UUID constants, no seed files |
+| Code references | By name only. No UUID constants in code; a seed file may state the ids a fresh install gets |
 
-- Reading an id before the cache is loaded raises an error. CLI commands that use the DB load the cache first.
-- Ids differ per installation, so tests and fixtures reference names only.
+- Reading an id before the cache is loaded raises an error. CLI commands that use the DB load the cache first; `mgr seed apply` loads it after writing the `global_entity` kind.
+- Ids differ per installation, so code and tests reference names only.
 
 **Existence guarantee**
 

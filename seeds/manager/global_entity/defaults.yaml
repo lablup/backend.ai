@@ -1,0 +1,7 @@
+kind: global_entity
+version: 1
+items:
+- id: 785a0db6-868b-40d2-bda9-ac6679d85b7e
+  name: global
+- id: 0258d56a-4a34-4927-8eb8-615cb892618d
+  name: public

@@ -1,8 +1,8 @@
 """
-The singleton rows and their graph nodes.
+The singleton rows and their graph nodes, under ids the database generates.
 
-Executed by the migration and by `mgr schema oneshot`, which builds a fresh database
-without running migrations. One statement per string.
+Executed by the migration on an existing database and by the test setups. A fresh install
+gets them from the `global_entity` seed kind instead. One statement per string.
 """
 
 SEED_GLOBAL_ENTITIES_SQL: tuple[str, ...] = (

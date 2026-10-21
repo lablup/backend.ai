@@ -12,6 +12,7 @@ from ai.backend.manager.seed.container_registry_project.seed import (
 )
 from ai.backend.manager.seed.deployment_preset.seed import DeploymentPresetSeed
 from ai.backend.manager.seed.domain.seed import DomainSeed
+from ai.backend.manager.seed.global_entity.seed import GlobalEntitySeed
 from ai.backend.manager.seed.idle_checker.seed import IdleCheckerSeed
 from ai.backend.manager.seed.idle_checker_assignment.seed import IdleCheckerAssignmentSeed
 from ai.backend.manager.seed.login_client_type.seed import LoginClientTypeSeed
@@ -54,6 +55,7 @@ from ai.backend.manager.seed.vfs_storage.seed import VFSStorageSeed
 def create_seed_kind_registry() -> SeedKindRegistry:
     """Every kind, in the order it is applied."""
     return SeedKindRegistry({
+        SeedKind.GLOBAL_ENTITY: (1, GlobalEntitySeed),
         SeedKind.RESOURCE_SLOT_TYPE: (1, ResourceSlotTypeSeed),
         SeedKind.LOGIN_CLIENT_TYPE: (1, LoginClientTypeSeed),
         SeedKind.RETENTION_POLICY: (1, RetentionPolicySeed),

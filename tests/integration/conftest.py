@@ -55,6 +55,7 @@ from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.composer import DependencyInput, ManagerDependencyComposer
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain.row import DomainRow, domains
+from ai.backend.manager.models.global_entity.seed import SEED_GLOBAL_ENTITIES_SQL
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel.row import kernels
@@ -445,6 +446,16 @@ def database(
             obj=cli_ctx,
         )
         cli_schema_oneshot.invoke(click_ctx)
+
+    # Installs get the global entities from their seed file; the manager reads them at startup.
+    async def seed_global_entities() -> None:
+        engine = create_async_engine(str(test_db_url), connect_args=pgsql_connect_opts)
+        async with engine.begin() as conn:
+            for statement in SEED_GLOBAL_ENTITIES_SQL:
+                await conn.exec_driver_sql(statement)
+        await engine.dispose()
+
+    asyncio.run(seed_global_entities())
 
 
 # ---------------------------------------------------------------------------
