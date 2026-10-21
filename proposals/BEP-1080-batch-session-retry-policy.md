@@ -11,15 +11,15 @@ Implemented-Version:
 
 ## Related Issues
 
-- Epic: #15935, this BEP: #15934
+- Epic: #15935; this BEP: #15934
 - First consumer: lablup/backend.ai-fasttrack#6454, which moves FastTrack's task auto-retry into the manager
-- Prior art: #9806 (auto-restart of inference session containers, closed as not planned)
+- Prior art: #9806, auto-restart of inference session containers (closed, not planned)
 
 ## 1. Goal
 
-A batch session that fails is never run again. This BEP adds a per-session **retry policy**: after a retriable failure the manager re-queues **the same session** with a backoff delay and records each attempt.
+A batch session that fails is never run again. This BEP adds a per-session **retry policy**: after a retriable failure, the manager re-queues **the same session** with a backoff delay and records each attempt.
 
-Callers that retry today enqueue a new session per attempt. They cannot see why the session ended, and the session id changes on every attempt.
+Callers that retry today enqueue a new session for every attempt. They cannot see why the session ended, and the session id changes on every attempt.
 
 ## 2. Current State & Scope, by Area
 
@@ -27,10 +27,12 @@ Callers that retry today enqueue a new session per attempt. They cannot see why 
 
 | | Item |
 |---|---|
-| ✅ | Batch sessions accept `batch_timeout` and `starts_at` (stored as `requested_starts_at`) at enqueue: REST v1 `/session/_/create*`, REST v2 `/v2/sessions/enqueue` and GraphQL v2 `enqueueSession` (`BatchConfigInput`) |
+| ✅ | Batch sessions accept `batch_timeout` and `starts_at` (stored as `requested_starts_at`) at enqueue:<br>- REST v1 `/session/_/create*`: top-level fields<br>- REST v2 `/v2/sessions/enqueue`: `BatchConfigInput`<br>- GraphQL v2 `enqueueSession`: `SessionBatchConfigInput` |
 | ✅ | `PATCH /session/{name}` (restart) returns 501 |
-| ➕ | `retry_policy` in `BatchConfigInput`, next to `batch_timeout`, on every enqueue route, plus the Python SDK and the CLI. The enqueue response echoes the accepted policy |
-| ➕ | `retry_policy`, `retry_attempt`, `retry_next_attempt_at` and `attempts` on `SessionV2` and on the REST session info |
+| ✅ | REST v1 and v2 ignore unknown request fields. GraphQL v2 rejects them |
+| ➕ | `retry_policy` next to `batch_timeout` on every enqueue route, plus the Python SDK and the CLI. The session returned by enqueue carries the accepted policy |
+| ➕ | `retry_policy`, `retry_attempt`, `retry_next_attempt_at` and `attempts` on `SessionV2`, on the legacy `ComputeSessionNode`, and in the REST session info |
+| ➕ | Manager config `session.retry-policy.enabled` (default `false`). While it is off, a request carrying `retry_policy` is rejected with 400 |
 
 ### 2.2 DB
 
@@ -38,29 +40,29 @@ Callers that retry today enqueue a new session per attempt. They cannot see why 
 |---|---|
 | ✅ | `sessions.options` holds `SessionStoredOptions`, frozen at enqueue |
 | ✅ | `sessions.status_info` holds the reason passed to `mark_sessions_for_termination`, and the promotion to TERMINATED keeps it |
-| ✅ | Kernel `status_data.exit_code`; `SessionRow.set_session_result` drops the exit code (`# TODO: store exit code?`) |
+| ✅ | Only `SessionSuccess/FailureAnycastEvent` carries the batch exit code (−2 means batch timeout), and `handle_batch_result` drops it. A kernel's `status_data.exit_code` is always −1, because no `KernelTerminatedAnycastEvent` passes one |
 | ✅ | `status_history` is a map keyed by status, so a repeated status overwrites its timestamp |
-| ➕ | `SessionStoredOptions.retry_policy` (immutable after enqueue) |
+| ➕ | `SessionStoredOptions.retry_policy`, immutable after enqueue |
 | ➕ | `sessions.retry_attempt` (int, default 0): the 0-based index of the run in progress |
-| ➕ | `sessions.retry_next_attempt_at` (timestamptz, nullable): the earliest time the next attempt may be scheduled. `requested_starts_at` stays untouched |
+| ➕ | `sessions.retry_next_attempt_at` (timestamptz, nullable): the earliest time the next attempt may be scheduled. `requested_starts_at` is left untouched |
+| ➕ | `sessions.terminate_requested_at` (timestamptz, nullable): set by a user terminate (§3.3) |
 | ➕ | A `session_attempts` table (§3.5) |
 
 ### 2.3 Sokovan
 
 | | Item |
 |---|---|
-| ✅ | `promote-to-terminated` (`CHECK_TERMINATING_PROGRESS`) moves a TERMINATING session to TERMINATED once all kernels are terminal, and runs `TerminatedTransitionHook` (network teardown) |
+| ✅ | `promote-to-terminated` (`CHECK_TERMINATING_PROGRESS`) moves a TERMINATING session to TERMINATED once all of its kernels are terminal, and runs `TerminatedTransitionHook`, which tears down the network |
 | ✅ | `RescheduleSessionsLifecycleHandler` returns a RESCHEDULING session to PENDING with the same id and config. Today only BEP-1055 preemption in reschedule mode writes RESCHEDULING |
-| ✅ | Per-phase retry budgets (`HandlerOptions.max_retry_count`, default 5) for scheduling and startup only |
-| ➕ | A retry branch in the promotion (§3.2) |
-| ➕ | The prerequisites in §3.4. Three of them fix bugs that already affect preemption reschedule mode and reserved batch sessions |
+| ✅ | Per-phase retry budgets exist (`HandlerOptions.max_retry_count`, default 5), but only for scheduling and startup |
+| ➕ | A retry branch at the promotion (§3.2), and the prerequisites in §3.4 |
 
 ### 2.4 Callbacks
 
 | | Item |
 |---|---|
-| ✅ | `callback_url` receives `session_success` / `session_failure` only, sent by `handle_batch_result` when the agent reports the batch result. No other session status change reaches it |
-| ➕ | For sessions with a policy, one callback per finished attempt, sent from the retry decision (§3.6) |
+| ✅ | `callback_url` receives `success` or `failure` (the event name with its `session_` prefix stripped). Only `handle_batch_result` sends them, when the agent reports the batch result. No other status change reaches `callback_url` |
+| ➕ | For sessions with a policy: one callback per finished attempt, plus one when the session ends (§3.6) |
 
 ## 3. Implementation Design
 
@@ -69,10 +71,10 @@ Callers that retry today enqueue a new session per attempt. They cannot see why 
 ```yaml
 retry_policy:
   max_retries: 3          # the session runs at most 1 + max_retries times
-  delay: 10              # seconds
+  delay: 10
   backoff: fixed          # fixed | exponential
-  max_delay: 300         # seconds
-  retry_on: [task-failed, task-timeout, abnormal-termination]
+  max_delay: 300
+  when: [task-failed, task-timeout, abnormal-termination]
 ```
 
 | Field | Type | Default | Bounds |
@@ -80,141 +82,150 @@ retry_policy:
 | `max_retries` | int | 3 | 1..999 |
 | `delay` | int, seconds | 10 | ≥ 1 |
 | `backoff` | enum | `fixed` | `fixed`, `exponential` |
-| `max_delay` | int, seconds | 300 | ≥ `delay`; read only for `exponential` |
-| `retry_on` | list of `KernelLifecycleEventReason` | `[task-failed, task-timeout, abnormal-termination]` | non-empty, unique, and a subset of the retriable reasons below |
+| `max_delay` | int, seconds | 300 | ≥ `delay` when `backoff` is `exponential`; ignored otherwise |
+| `when` | list of `KernelLifecycleEventReason` | `[task-failed, task-timeout, abnormal-termination]` | Non-empty, unique, and drawn from the retriable reasons below |
 
 - **Validation:** an invalid policy, or a policy on a non-BATCH session, is rejected with 400.
-- **Delay before retry `n`:** `fixed` waits `delay`. `exponential` waits `min(delay * 2**n, max_delay)` and then adds up to 25% jitter, so the jittered delay can exceed `max_delay`.
-- **Naming:** no unit suffix, matching `batch_timeout` in the same `BatchConfigInput`.
+- **Delay before retry `n`:**
+  - `fixed`: `delay`.
+  - `exponential`: `min(delay * 2**n, max_delay)`, plus up to 25% jitter. The jittered delay can exceed `max_delay`.
 
-| Retriable reasons (allowed in `retry_on`) | Never retried |
+| Retriable reasons (allowed in `when`) | Never retried |
 |---|---|
-| `task-failed`, `task-timeout`, `abnormal-termination`, `exceeded-max-retries` (startup give-up, §3.4), `preempted-by-scheduler` (preemption in terminate mode; does not use up the budget) | `user-requested`, any forced termination, `idle-*`, `pending-timeout`, any other reason, and a NULL reason |
+| `task-failed`, `task-timeout`, `abnormal-termination` (the container died, including an out-of-memory kill of the container and an external `docker kill`), `exceeded-max-retries` (startup gave up), `preempted-by-scheduler` (preemption in terminate mode) | `user-requested`, `pending-timeout`, `idle-*`, any forced termination, any other reason, a NULL reason |
 
-`abnormal-termination` covers a dead container, including an out-of-memory kill of the container itself, an external `docker kill` and agent loss.
+Each retriable reason uses up one attempt of `max_retries`.
 
 ### 3.2 Retry decision
 
-The decision runs in `promote-to-terminated`. At that point every kernel is terminal, so the attempt's exit codes and timestamps are final when the attempt record is written.
+The decision runs at the promotion to TERMINATED. By then every kernel is terminal and the batch result for the attempt has arrived, so the attempt record is complete when it is written.
 
 ```
-RUNNING ─(batch fails / kernel dies / startup gives up)─▶ TERMINATING (status_info = reason)
+RUNNING ─(batch fails / container dies / startup gives up)─▶ TERMINATING (status_info = reason)
 TERMINATING ─all kernels terminal─▶ retriable?
-    yes ─▶ RESCHEDULING  (attempt recorded, callback, retry_attempt += 1, retry_next_attempt_at set)
+    yes ─▶ RESCHEDULING  (attempt row, callback will_retry=true, retry_attempt += 1, retry_next_attempt_at set)
             └─ RescheduleSessionsLifecycleHandler ─▶ PENDING ─▶ held until retry_next_attempt_at ─▶ …
-    no  ─▶ TERMINATED    (attempt recorded, callback)
+    no  ─▶ TERMINATED    (attempt row, callback will_retry=false)
 ```
 
-A session is retriable when all of these hold:
+A session is retriable only when all of these hold:
 
-- its type is BATCH;
-- it has a `retry_policy`;
-- its `status_info` is in `retry_on`;
+- it is BATCH and has a `retry_policy`;
+- its `status_info` is in `when`;
 - `retry_attempt < max_retries`;
-- no user terminate is recorded (§3.3).
+- `terminate_requested_at` is NULL.
 
 | Contract | |
 |---|---|
-| **Promotion becomes a lifecycle handler** | The branch cannot be a `PromotionSpec` because a spec has a single `success_status`. A lifecycle handler with its own `LockID` owns the TERMINATING → TERMINATED / RESCHEDULING move. Sessions without a policy go to TERMINATED exactly as before |
-| **One transaction, compare-and-set** | The status move, the attempt record, `retry_attempt += 1`, the `result` reset to UNDEFINED and `retry_next_attempt_at` are written in one transaction guarded by `status = TERMINATING AND retry_attempt = N`. A second manager replica that loses the race changes nothing |
-| **The TERMINATED hook is skipped** | Its per-attempt work moves into the reschedule path (§3.4) |
-| **Dependents** | `DependenciesValidator` requires TERMINATED + SUCCESS, so dependents wait for the final attempt and see only its outcome |
-| **Priority** | Each attempt keeps the session's current priority, including any DEPRIORITIZING decrements |
-| **`batch_timeout`** | Applies per attempt; the agent arms it on every start |
-| **Cluster sessions** | A retry re-runs every kernel. `KernelGroup.failure_policy` is not enforced yet, so it has no effect on the retry decision |
+| **One handler, one lock** | A lifecycle handler replaces the `promote-to-terminated` promotion, because a `PromotionSpec` has only one `success_status`. It shares `LOCKID_SOKOVAN_TARGET_TERMINATING` with `TerminateSessionsLifecycleHandler`. Sessions without a policy go to TERMINATED and run the TERMINATED hook as before |
+| **One transaction, compare-and-set** | One transaction writes the status move, the attempt row, `retry_attempt += 1`, the reset of `result` to UNDEFINED, and `retry_next_attempt_at`. It is guarded by `status = TERMINATING AND retry_attempt = N AND terminate_requested_at IS NULL`. A replica that loses the race, or a terminate that lands first, leaves it nothing to do |
+| **Every final path finishes the attempt** | The decision handler, the forced termination path and the pending-session cancel all use one shared step. It writes the final attempt row when that attempt ran, and sends the final callback |
+| **Re-queue is guarded** | `RescheduleSessionsLifecycleHandler` moves a session to PENDING only while it is RESCHEDULING, so a terminate that lands first is kept. This also fixes the same race in preemption reschedule mode |
+| **Dependents** | `DependenciesValidator` requires TERMINATED + SUCCESS, so dependents wait for the final attempt |
+| **Per-attempt clocks** | `batch_timeout` and the session-lifetime idle checker restart with each attempt. Priority carries over, including any DEPRIORITIZING decrements |
+| **Cluster sessions** | A retry re-runs every kernel. `KernelGroup.failure_policy` is not enforced yet and has no effect on the decision |
 
 ### 3.3 User terminate wins
 
-A non-forced terminate on a TERMINATING session is skipped today: TERMINATING is not in `terminatable_statuses()`.
-
-For a session with a policy, the terminate request on a TERMINATING session overwrites `status_info` with `user-requested`, so the decision sees a never-retried reason. In the other statuses:
+A user-initiated terminate on a session with a policy sets `terminate_requested_at`; `status_info` keeps the attempt's reason. Non-user callers of `mark_sessions_for_termination` (the batch result, idle checks, preemption) do not set it.
 
 | Status when the user terminates | Outcome |
 |---|---|
-| RUNNING | TERMINATING with `user-requested`, then TERMINATED |
-| TERMINATING | `status_info` becomes `user-requested`, then TERMINATED |
-| RESCHEDULING | TERMINATING (RESCHEDULING is terminatable), then TERMINATED |
-| PENDING, waiting for `retry_next_attempt_at` | CANCELLED (the existing pending cancel) |
+| RUNNING | TERMINATING, then TERMINATED. The attempt row is written; the callback has `will_retry: false` |
+| TERMINATING | Same as RUNNING: the compare-and-set rejects the retry |
+| RESCHEDULING | TERMINATING, then TERMINATED. No attempt row, because the attempt never ran. The callback is `cancelled` |
+| PENDING, waiting for `retry_next_attempt_at` | CANCELLED. No attempt row; the callback is `cancelled` |
+| Any status, forced | TERMINATED. The attempt row is written if the attempt ran; the callback has `will_retry: false` |
 
 ### 3.4 Prerequisites
 
 | # | Change | Why |
 |---|---|---|
-| P1 | `detect-termination` writes `abnormal-termination` to the session's `status_info`. Startup give-up and expired transitions to TERMINATING write `exceeded-max-retries`. The stamping is scoped to these transitions, because a generic reason in `_apply_transition` would let the promotion overwrite the TERMINATING reason | Today `_apply_transition` writes no reason, and RUNNING clears `status_info`, so a dead container reaches the promotion with NULL |
-| P2 | A held session is reported to the scheduler as **skipped**, not as a failure. This covers `requested_starts_at`, `retry_next_attempt_at` and unmet dependencies | A `SchedulingValidationError` is recorded as a failure, so a reserved batch session is moved to DEPRIORITIZING after `max_retry_count` passes and loses 10 priority each budget cycle. This was reproduced with the real provisioner and handler |
-| P3 | `pending_timeout` is measured from the session's latest entry into PENDING, not from `created_at` | Otherwise a re-queued session that ran longer than `pending_timeout` is cancelled as `pending-timeout` straight away. Preemption reschedule mode has the same bug |
-| P4 | The reschedule path destroys the volatile network and records the failed agents (as `_apply_kernel_pending_resets` does), so the next attempt avoids the failed node | Network names derive from the session id, so a re-queued session collides with or leaks its previous network. Preemption reschedule mode has the same bug |
-| P5 | `handle_batch_result` accepts a result only for a session that is RUNNING | A late result from attempt N must not mark attempt N+1 as finished |
+| P1 | Every transition to TERMINATING records the reason of the failure that caused it:<br>- `detect-termination` writes `abnormal-termination`<br>- `start-sessions` and `check-precondition` give-up write `exceeded-max-retries`<br>- `sweep-sessions` keeps `pending-timeout`<br>The move to RUNNING applies only to a session that is still starting | The coordinator's transitions write no reason today, and the move to RUNNING clears `status_info`. A fast batch result can mark the session TERMINATING before the late RUNNING write lands and overwrites it |
+| P2 | A session that is waiting for `requested_starts_at`, `retry_next_attempt_at` or an unmet dependency is reported to the scheduler as skipped, not as failed | A validation failure counts toward `max_retry_count`. A waiting session is therefore moved to DEPRIORITIZING and loses 10 priority every budget cycle. This already affects reserved batch sessions |
+| P3 | `pending_timeout` is measured from the latest entry into PENDING | It is measured from `created_at`, so a re-queued session would be reported as `pending-timeout` on its first sweep |
+| P4 | The re-queue tears down the volatile network and records the failed agents, so the next attempt ranks those agents last | Network names derive from the session id, so a re-queued session would collide with or leak its previous network. This already affects preemption reschedule mode |
+| P5 | The agent echoes `retry_attempt` in the batch result. The manager accepts a result only for the current attempt and only in a non-terminal status. That result sets `status_info` even when the session is already TERMINATING with `abnormal-termination`. The agent sends −1 in place of a missing exit code | Kernel rows are reused across attempts, so a late result from an earlier attempt could end the next one. The batch result also races container-death detection to mark TERMINATING, and the batch reason should win. A missing exit code fails event validation, so no result is sent and the session stays RUNNING |
 
-Image-pull failures that cancel every kernel move the session straight to CANCELLED, so they never reach the promotion and are not retried.
+These failures never reach the decision, and none of them is retried:
+
+- an image-pull failure that cancels every kernel ends CANCELLED;
+- a lost agent leaves its sessions RUNNING;
+- a session expired to TERMINATING before any kernel got an agent never reaches the promotion.
 
 ### 3.5 Attempt record
 
-`session_attempts` holds one row per finished attempt:
+`session_attempts` holds one row per attempt that ran:
 
 | Column | |
 |---|---|
-| `session_id`, `attempt` | Primary key |
-| `status_info` | The reason the attempt ended |
-| `result` | UNDEFINED, SUCCESS or FAILURE |
-| `exit_code` | Per kernel, from the kernel's `status_data` (−1 unknown, −2 batch timeout) |
-| `started_at`, `terminated_at` | The attempt's own timestamps; `status_history` cannot hold them |
-| `agent_ids` | Per kernel |
+| `session_id`, `attempt` | Primary key. `attempt` is the value of `retry_attempt` during the run |
+| `status_info`, `result`, `status_data` | The attempt's reason, result and error payload |
+| `exit_code` | Taken from the batch result event. −1 means unknown, −2 means batch timeout, NULL means no result arrived |
+| `started_at`, `terminated_at` | The attempt's own timestamps, which `status_history` cannot keep |
+| `agent_ids` | One per kernel |
 
-`retry_attempt` is the 0-based index of the run in progress. With `max_retries: 3`, the runs are attempts 0 to 3.
+With `max_retries: 3`, the runs are attempts 0 to 3. A non-NULL `retry_next_attempt_at` tells a retry re-queue apart from a preemption reschedule.
 
 ### 3.6 Callback contract
 
-For a session with a policy, `handle_batch_result` no longer sends the callback. Instead, the retry decision sends exactly one callback per finished attempt, after its transaction commits:
+For a session with a policy, the callbacks are sent by the shared final step (§3.2) after its transaction commits; `handle_batch_result` no longer sends them. The existing payload fields are unchanged, and three are added:
 
 | Field | |
 |---|---|
-| `event` | `session_success` or `session_failure`, unchanged |
-| `attempt` | The finished attempt's index |
+| `attempt` | The index of the finished attempt |
 | `will_retry` | `true` when the session went to RESCHEDULING |
-| `status_info`, `exit_code` | From the attempt record |
+| `exit_code` | From the attempt row |
 
-The last callback has `will_retry: false`. A session cancelled while waiting for `retry_next_attempt_at` sends `session_failure` with `will_retry: false` and `status_info: user-requested`. Sessions without a policy send callbacks exactly as today.
+- **`event` values:**
+  - `success`: the attempt's result is SUCCESS.
+  - `failure`: any other finished attempt, including one whose result is UNDEFINED.
+  - `cancelled`: the session ended between attempts. `attempt` is the last attempt that ran.
+- **Final callback:** each session with a policy gets exactly one final callback, either `will_retry: false` or `cancelled`.
+- **Sessions without a policy:** callbacks are unchanged.
 
 ## 4. Migration / Compatibility
 
-- **Additive.** Sessions without `retry_policy` behave as before, apart from P2–P5, which fix existing bugs.
-- **Status sequence:** a session with a policy can go TERMINATING → RESCHEDULING → PENDING → … on the same id. Consumers must treat {TERMINATED, CANCELLED} as final and read `will_retry`.
-- **Rolling upgrade:** an older replica that wins the promotion terminates the session, which is the current behaviour. The enqueue response echoes `retry_policy`. An older manager ignores unknown fields, so it accepts the request but omits the policy from its response; that is how a client detects the manager does not support it.
-- **Downgrade:** the new columns and table are ignored, and sessions in RESCHEDULING continue as a plain reschedule.
-- **Out of scope; callers keep these:**
+- **Additive.** Sessions without `retry_policy` behave as before, except for the bug fixes in P1–P5.
+- **Status sequence:** a session with a policy can go TERMINATING → RESCHEDULING → PENDING → … with the same id. Consumers treat {TERMINATED, CANCELLED} as final, and read `will_retry` and `cancelled`.
+- **Narrower than caller retry:** callers that retry every non-SUCCESS result today lose retries for `pending-timeout`, `idle-*`, user terminations and image-pull failures.
+- **Rolling upgrade:**
+  - Operators turn on `session.retry-policy.enabled` after every manager replica runs this version. Until then no session carries a policy, so an older replica never acts on a policy or sends an old-format callback for one.
+  - Clients detect support from the policy echoed by enqueue (REST), or from the schema (GraphQL).
+- **Downgrade:** turn the flag off first. Sessions already in RESCHEDULING continue as a plain reschedule.
+- **Out of scope:** callers keep handling these themselves:
   - failures before a session exists (enqueue rejected, mount resolution);
-  - a fresh scratch folder per attempt;
-  - re-reading the configuration at retry time.
-
-  Mounts, environment and image are fixed at enqueue.
+  - a fresh scratch folder for each attempt;
+  - re-reading the configuration at retry time. Mounts, environment and image are fixed at enqueue.
 
 ## 5. Implementation Plan
 
-1. **Prerequisites P1–P5.** Each is independently mergeable; P2–P4 fix bugs that exist today.
-2. **API:** `retry_policy` in `BatchConfigInput` on every enqueue route, the SDK and the CLI; storage only.
-3. **Sokovan:** the promotion lifecycle handler with the retry branch, the new columns, `session_attempts`, and the user-terminate rule.
-4. **Exposure:** the read fields on `SessionV2` and the REST session info, and the callback contract.
+1. **Prerequisites P1–P5**, each mergeable on its own.
+2. **API:** `retry_policy` on every enqueue route, the SDK and the CLI, behind the config flag. Storage only.
+3. **Sokovan:** the decision handler, the new columns, `session_attempts`, the shared final step and the user-terminate rule.
+4. **Exposure:** the read fields and the callback contract.
 
 ## 6. Decision Summary
 
 | Decision | Alternative rejected | Rationale |
 |---|---|---|
-| Re-queue the same session | A new session per attempt with lineage | A stable id for callbacks, dependencies and watchers; the name index needs no change |
-| Decide in the promotion to TERMINATED | Decide in each place that marks TERMINATING | Every kernel is terminal, so the attempt record is complete and teardown is done before the decision. A single decision site |
-| `retry_on` takes `KernelLifecycleEventReason` values | New failure classes | The same strings users see in `status_info`; no mapping table |
-| BATCH sessions only | Every session type | Only batch sessions have a result; inference replicas are replaced by deployment scaling (#9806) |
-| New columns for the attempt index and the next attempt time | Reusing `requested_starts_at`, or counting attempt rows | `requested_starts_at` is never overwritten after enqueue; a counter guarded by compare-and-set avoids lost updates |
-| No resource-group default policy | `DefaultSessionOptions.retry_policy` | Can be added later next to `handler_options` |
+| Re-queue the same session | A new session per attempt, with lineage | A stable id for callbacks, dependencies and watchers; the name index needs no change |
+| Decide at the promotion to TERMINATED | Decide wherever TERMINATING is marked | Every kernel is terminal and the batch result has arrived, so the attempt record is complete. There is one decision site |
+| `when` takes `KernelLifecycleEventReason` values | New failure classes; the names `on`, `trigger` or `retry_on` | They are the same strings users see in `status_info`. `when` matches GitLab CI's `retry.when`, and YAML 1.1 parses a bare `on` key as `true` |
+| BATCH sessions only | Every session type | Only batch sessions have a result. Inference replicas are replaced by deployment scaling (#9806) |
+| A separate `terminate_requested_at` | Overwriting `status_info` | The compare-and-set can check it, and the attempt keeps its real reason |
+| New columns for the attempt index and the next attempt time | Reusing `requested_starts_at`, or counting attempt rows | `requested_starts_at` is never overwritten after enqueue. A counter guarded by compare-and-set avoids lost updates |
+| Attempt fields also on `ComputeSessionNode` | `SessionV2` only | FastTrack polls `compute_session_list`, and the WebUI session pages read `ComputeSessionNode`. Polling is the only way to recover from a lost callback |
+| A config flag | Accepting the field as soon as one replica supports it | During a rolling upgrade, an older replica would otherwise terminate a session that has a policy, or send it an old-format callback |
+| No resource-group default policy | `DefaultSessionOptions.retry_policy` | Can be added later, next to `handler_options` |
 
 ## 7. Open Questions
 
-- Does a session waiting for `retry_next_attempt_at` count toward pending-session limits? The pending limit is checked only at enqueue, and a re-queue does not pass through enqueue.
-- Should the legacy `ComputeSessionNode` also expose `retry_attempt` and `attempts`? FastTrack polls `compute_session_list`, and the WebUI session pages read `ComputeSessionNode`.
-- Should image-pull failures be retried? That would need the all-kernels-cancelled path to go through TERMINATING.
+- Does a session waiting for `retry_next_attempt_at` count toward pending-session limits? The limit is checked only at enqueue, and a re-queue does not pass through enqueue.
+- Should image-pull failures be retried? That would require the all-kernels-cancelled path to go through TERMINATING.
 
 ## 8. References
 
-- [BEP-1030](BEP-1030-sokovan-scheduler-status-transition.md): need_retry / expired / give_up and promotions
-- [BEP-1055](BEP-1055-preemption-scheduler-mechanics.md): preemption reschedule mode. It states there is no separate RESCHEDULING state, but the code now has one (`RescheduleSessionsLifecycleHandler`)
+- [BEP-1030](BEP-1030-sokovan-scheduler-status-transition.md): need_retry, expired, give_up and promotions
+- [BEP-1055](BEP-1055-preemption-scheduler-mechanics.md): preemption reschedule mode. That BEP states there is no separate RESCHEDULING state, but the code has one (`RescheduleSessionsLifecycleHandler`)
 - [BEP-1014](BEP-1014-preemption-of-low-priority-sessions.md): preemption of low-priority sessions
