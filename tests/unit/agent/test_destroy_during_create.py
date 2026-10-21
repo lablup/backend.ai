@@ -16,6 +16,7 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.agent.agent import AbstractAgent, CreateTaskInfo
+from ai.backend.agent.errors import ContainerCreationError
 from ai.backend.agent.types import (
     CREATION_DESTROYED_MESSAGE,
     ContainerLifecycleEvent,
@@ -40,10 +41,11 @@ def _make_agent() -> Any:
     agent.anycast_and_broadcast_event = AsyncMock()
     agent.produce_error_event = AsyncMock()
 
-    async def cancel_ongoing_create(kernel_id: KernelId) -> bool:
+    async def cancel_ongoing_create(kernel_id: KernelId) -> tuple[bool, bool]:
         return await AbstractAgent._cancel_ongoing_create(agent, kernel_id)
 
     agent._cancel_ongoing_create = cancel_ongoing_create
+    agent._record_started_container = AbstractAgent._record_started_container
     return agent
 
 
@@ -116,7 +118,7 @@ class TestDestroyDuringCreate:
         )
         agent._pending_creation_tasks[kernel_id].add(create_task)
 
-        assert await AbstractAgent._cancel_ongoing_create(agent, kernel_id) is False
+        assert await AbstractAgent._cancel_ongoing_create(agent, kernel_id) == (False, False)
         assert not create_task.cancelled()
         create_task.cancel()
 
@@ -133,14 +135,14 @@ class TestDestroyDuringCreate:
             kernel_id=kernel_id, session_id=SessionId(uuid4()), task=create_task
         )
 
-        assert await AbstractAgent._cancel_ongoing_create(agent, kernel_id) is True
+        assert await AbstractAgent._cancel_ongoing_create(agent, kernel_id) == (True, True)
 
         with pytest.raises(asyncio.CancelledError) as exc_info:
             create_task.result()
         assert exc_info.value.args == (CREATION_DESTROYED_MESSAGE,)
 
     async def test_only_the_first_destroy_cancels_the_creation(self) -> None:
-        """A second destroy waits for the unwinding but does not clean or report again."""
+        """A second destroy waits for the unwinding but does not cancel, clean or report again."""
         kernel_id = KernelId(uuid4())
         agent = _make_agent()
         create_task = asyncio.create_task(asyncio.sleep(3600))
@@ -153,7 +155,7 @@ class TestDestroyDuringCreate:
             AbstractAgent._cancel_ongoing_create(agent, kernel_id),
         )
 
-        assert (first, second) == (True, False)
+        assert (first, second) == ((True, True), (True, False))
 
     async def test_destroy_stops_the_container_recorded_by_the_cancelled_creation(self) -> None:
         """A container that came up before the creation unwound is destroyed by its id."""
@@ -185,6 +187,29 @@ class TestDestroyDuringCreate:
         assert clean_event.event == LifecycleEvent.CLEAN
         assert clean_event.container_id == ContainerId("c1")
 
+    async def test_second_destroy_also_stops_the_recorded_container(self) -> None:
+        """A destroy that only waited for the unwinding still takes the container id."""
+        kernel_id = KernelId(uuid4())
+        session_id = SessionId(uuid4())
+        agent = _make_agent()
+        agent.destroy_kernel = AsyncMock()
+        agent.container_lifecycle_queue = asyncio.Queue()
+        kernel_obj = MagicMock()
+        kernel_obj.container_id = ContainerId("c1")
+        kernel_obj.runner = None
+        agent.kernel_registry[kernel_id] = kernel_obj
+        create_task = asyncio.create_task(asyncio.sleep(0.01))  # unwinding after the first cancel
+        agent._active_creates[kernel_id] = CreateTaskInfo(
+            kernel_id=kernel_id,
+            session_id=session_id,
+            task=create_task,
+            cancelled_by_destroy=True,
+        )
+
+        await AbstractAgent._handle_destroy_event(agent, _destroy_event(kernel_id, session_id))
+
+        agent.destroy_kernel.assert_awaited_once_with(kernel_id, ContainerId("c1"))
+
     @pytest.mark.parametrize(
         "reason",
         [KernelLifecycleEventReason.FAILED_TO_CREATE, KernelLifecycleEventReason.FAILED_TO_START],
@@ -206,7 +231,7 @@ class TestDestroyDuringCreate:
             agent, kernel_id, session_id, LifecycleEvent.DESTROY, reason
         )
 
-        assert await AbstractAgent._cancel_ongoing_create(agent, kernel_id) is False
+        assert await AbstractAgent._cancel_ongoing_create(agent, kernel_id) == (False, False)
         assert not create_task.cancelled()
         create_task.cancel()
 
@@ -220,5 +245,79 @@ class TestDestroyDuringCreate:
             kernel_id=kernel_id, session_id=SessionId(uuid4()), task=create_task
         )
 
-        assert await AbstractAgent._cancel_ongoing_create(agent, kernel_id) is False
+        assert await AbstractAgent._cancel_ongoing_create(agent, kernel_id) == (False, False)
         create_task.cancel()
+
+
+class TestSettleCancelledStart:
+    async def test_container_is_recorded_after_repeated_cancellations(self) -> None:
+        """A start whose creation is cancelled twice still ends with its container recorded."""
+        kernel_id = KernelId(uuid4())
+        session_id = SessionId(uuid4())
+        agent = _make_agent()
+        agent.inject_container_lifecycle_event = AsyncMock()
+        agent._active_creates[kernel_id] = CreateTaskInfo(
+            kernel_id=kernel_id, session_id=session_id, cancelled_by_destroy=True
+        )
+        kernel_obj = MagicMock()
+        kernel_obj.data = {}
+        started = asyncio.get_running_loop().create_future()
+        settling = asyncio.create_task(
+            AbstractAgent._settle_cancelled_start(agent, kernel_obj, started, kernel_id, session_id)
+        )
+        await asyncio.sleep(0)
+
+        settling.cancel()
+        await asyncio.sleep(0)
+        settling.cancel()
+        await asyncio.sleep(0)
+        assert not settling.done()
+        started.set_result({"container_id": "c1", "host_ports": [30000]})
+        await settling
+
+        kernel_obj.set_container_id.assert_called_once_with("c1")
+        assert kernel_obj.data == {"container_id": "c1", "host_ports": [30000]}
+        agent.inject_container_lifecycle_event.assert_not_awaited()
+
+    async def test_cancellation_not_from_a_destroy_injects_a_destroy_for_the_container(
+        self,
+    ) -> None:
+        """Nobody else stops the container when the RPC was cancelled instead of destroyed."""
+        kernel_id = KernelId(uuid4())
+        session_id = SessionId(uuid4())
+        agent = _make_agent()
+        agent.inject_container_lifecycle_event = AsyncMock()
+        agent._active_creates[kernel_id] = CreateTaskInfo(
+            kernel_id=kernel_id, session_id=session_id
+        )
+        kernel_obj = MagicMock()
+        kernel_obj.data = {}
+        started = asyncio.get_running_loop().create_future()
+        started.set_result({"container_id": "c1"})
+
+        await AbstractAgent._settle_cancelled_start(
+            agent, kernel_obj, started, kernel_id, session_id
+        )
+
+        agent.inject_container_lifecycle_event.assert_awaited_once()
+        assert (
+            agent.inject_container_lifecycle_event.await_args.args[3]
+            == KernelLifecycleEventReason.FAILED_TO_CREATE
+        )
+
+    async def test_failed_start_with_a_created_container_records_its_id(self) -> None:
+        """The container a failing start created is still stopped by its id."""
+        kernel_id = KernelId(uuid4())
+        session_id = SessionId(uuid4())
+        agent = _make_agent()
+        agent.inject_container_lifecycle_event = AsyncMock()
+        kernel_obj = MagicMock()
+        kernel_obj.data = {}
+        started = asyncio.get_running_loop().create_future()
+        started.set_exception(ContainerCreationError("c1"))
+
+        await AbstractAgent._settle_cancelled_start(
+            agent, kernel_obj, started, kernel_id, session_id
+        )
+
+        kernel_obj.set_container_id.assert_called_once_with("c1")
