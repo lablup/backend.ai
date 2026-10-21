@@ -710,7 +710,10 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     )  # type: ignore[misc]
     async def designated_agents(
         self, info: Info[StrawberryGQLContext]
-    ) -> Annotated[AgentV2Connection, strawberry.lazy("ai.backend.manager.api.gql.agent.types")]:
+    ) -> (
+        Annotated[AgentV2Connection, strawberry.lazy("ai.backend.manager.api.gql.agent.types")]
+        | None
+    ):
         from ai.backend.manager.api.gql.agent.types import (
             AgentV2Connection,
             AgentV2Edge,
