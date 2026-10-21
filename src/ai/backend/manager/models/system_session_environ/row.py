@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Final
-
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -9,6 +7,7 @@ from ai.backend.common.data.entity.system_session_environ import (
     SystemSessionEnvironID,
     SystemSessionEnvironScopeID,
 )
+from ai.backend.common.data.environ.types import ENVIRON_KEY_PATTERN
 from ai.backend.common.data.system_session_environ.types import (
     SystemSessionEnvironScopeType,
     SystemSessionEnvironValueSource,
@@ -16,12 +15,7 @@ from ai.backend.common.data.system_session_environ.types import (
 from ai.backend.manager.models.base import GUID, Base, StrEnumType
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
-__all__ = (
-    "ENVIRON_KEY_PATTERN",
-    "SystemSessionEnvironRow",
-)
-
-ENVIRON_KEY_PATTERN: Final = r"^[A-Za-z_][A-Za-z0-9_]*$"
+__all__ = ("SystemSessionEnvironRow",)
 
 
 class SystemSessionEnvironRow(LifecycleTimestampsMixin, Base):
