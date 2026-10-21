@@ -380,7 +380,7 @@ class UserRepository:
         """Make one of the user's dotfiles the default of its path."""
         scopes = [UserDotfileTarget(user_id)]
         async with self._v2_ops.write_ops() as ops:
-            # Cleared first; the partial unique index allows one default per path.
+            # The clear locks the path's rows, so a concurrent switch waits for this one.
             await ops.batch_update_in_scopes(
                 scopes, DotfileDefaultClearUpdater(user_id=user_id, dotfile_id=dotfile_id)
             )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import AsyncGenerator
 
@@ -125,3 +126,30 @@ class TestSwitchDefaultDotfile:
         with pytest.raises(DotfileNotFound):
             await repository.switch_default_dotfile(user_id, theirs)
         assert await self._defaults(db, other_user_id) == {theirs: False}
+
+    async def test_another_users_default_on_the_same_path_stays(
+        self,
+        db: ExtendedAsyncSAEngine,
+        repository: UserRepository,
+        user_id: UserID,
+        other_user_id: UserID,
+    ) -> None:
+        theirs = await self._add(db, other_user_id, ".bashrc", is_default=True)
+        mine = await self._add(db, user_id, ".bashrc", is_default=False)
+
+        await repository.switch_default_dotfile(user_id, mine)
+
+        assert await self._defaults(db, other_user_id) == {theirs: True}
+
+    async def test_concurrent_switches_leave_one_default(
+        self, db: ExtendedAsyncSAEngine, repository: UserRepository, user_id: UserID
+    ) -> None:
+        switches = []
+        for _ in range(8):
+            variant = await self._add(db, user_id, ".bashrc", is_default=False)
+            switches.append(repository.switch_default_dotfile(user_id, variant))
+
+        await asyncio.gather(*switches)
+
+        defaults = await self._defaults(db, user_id)
+        assert list(defaults.values()).count(True) == 1

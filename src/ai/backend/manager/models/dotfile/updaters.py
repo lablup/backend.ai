@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import Any, override
 
 import sqlalchemy as sa
-from sqlalchemy.orm import InstrumentedAttribute
+from sqlalchemy.orm import InstrumentedAttribute, aliased
 
 from ai.backend.common.data.entity.dotfile import DotfileID
 from ai.backend.common.data.entity.user import UserID
@@ -52,7 +52,8 @@ class DotfileUpdater(DataUpdater[DotfileRow, DotfileData]):
 
 @dataclass
 class DotfileDefaultClearUpdater(DataBatchUpdater[DotfileRow, DotfileData]):
-    """Clear the default among the user's other dotfiles sharing the named one's path."""
+    """Clear the default across the user's dotfiles on the named one's path, the named one
+    included. The rows are locked in id order first, so a concurrent switch waits."""
 
     user_id: UserID
     dotfile_id: DotfileID
@@ -67,16 +68,24 @@ class DotfileDefaultClearUpdater(DataBatchUpdater[DotfileRow, DotfileData]):
         user_id, dotfile_id = self.user_id, self.dotfile_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            target_path = sa.select(DotfileRow.path).where(
-                DotfileRow.entity_type == user_id.entity_type(),
-                DotfileRow.entity_id == user_id,
-                DotfileRow.id == dotfile_id,
+            target = aliased(DotfileRow)
+            variant = aliased(DotfileRow)
+            target_path = sa.select(target.path).where(
+                target.entity_type == user_id.entity_type(),
+                target.entity_id == user_id,
+                target.id == dotfile_id,
             )
-            return sa.and_(
-                DotfileRow.path == target_path.scalar_subquery(),
-                DotfileRow.id != dotfile_id,
-                DotfileRow.is_default,
+            locked = (
+                sa.select(variant.id)
+                .where(
+                    variant.entity_type == user_id.entity_type(),
+                    variant.entity_id == user_id,
+                    variant.path == target_path.scalar_subquery(),
+                )
+                .order_by(variant.id)
+                .with_for_update()
             )
+            return DotfileRow.id.in_(locked)
 
         return [inner]
 
