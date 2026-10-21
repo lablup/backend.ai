@@ -40,7 +40,7 @@ type ReadingStep = Scenario[TestSeedingSession, Laid, SessionGroupAdapter, Sessi
 
 @dataclass(frozen=True)
 class ReadingTheUsersGroup(When[Laid, SessionGroupAdapter, SessionGroupNode]):
-    """사용자가 만든 그룹을 id로 읽는다."""
+    """사용자가 만든 세션 그룹을 id로 읽는다."""
 
     @override
     def operation(self) -> str:
@@ -48,7 +48,7 @@ class ReadingTheUsersGroup(When[Laid, SessionGroupAdapter, SessionGroupNode]):
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.caller.username}이 사용자가 만든 그룹을 id로 조회"
+        return f"{laid.caller.username}이 사용자가 만든 세션 그룹을 id로 조회"
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> SessionGroupNode:
@@ -58,7 +58,7 @@ class ReadingTheUsersGroup(When[Laid, SessionGroupAdapter, SessionGroupNode]):
 
 @dataclass(frozen=True)
 class ReadingTheDeploymentGroup(When[Laid, SessionGroupAdapter, SessionGroupNode]):
-    """배포의 그룹을 id로 읽는다."""
+    """배포의 replica group이 가진 세션 그룹을 id로 읽는다."""
 
     @override
     def operation(self) -> str:
@@ -66,7 +66,7 @@ class ReadingTheDeploymentGroup(When[Laid, SessionGroupAdapter, SessionGroupNode
 
     @override
     def describe(self, laid: Laid) -> str:
-        return f"{laid.caller.username}이 배포의 그룹을 id로 조회"
+        return f"{laid.caller.username}이 배포의 replica group이 가진 세션 그룹을 id로 조회"
 
     @override
     async def call(self, adapter: SessionGroupAdapter, laid: Laid) -> SessionGroupNode:
@@ -76,13 +76,13 @@ class ReadingTheDeploymentGroup(When[Laid, SessionGroupAdapter, SessionGroupNode
 
 @dataclass(frozen=True)
 class TheUsersGroupNode(Then[Laid, SessionGroupNode]):
-    """사용자가 만든 그룹의 노드가 통째로 온다."""
+    """사용자가 만든 세션 그룹의 노드가 통째로 온다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "사용자가 만든 그룹 전체가 온다"
+        return "사용자가 만든 세션 그룹 전체가 온다"
 
     @override
     def look(self, laid: Laid, answered: Answered[SessionGroupNode]) -> list[Verdict]:
@@ -105,8 +105,8 @@ class AGrantedUserReadsTheUsersGroup(
     @override
     def describe(self) -> str:
         return (
-            "그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 그룹을 "
-            "id로 조회하면, 그 그룹이 온다"
+            "그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹을 "
+            "id로 조회하면, 그 세션 그룹이 온다"
         )
 
     @override
@@ -133,7 +133,7 @@ class AUserGrantedNothingMayNotRead(
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 받지 않은 사용자가 사용자가 만든 그룹을 id로 조회하면, "
+            "아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 조회하면, "
             "권한 부족으로 거부된다"
         )
 
@@ -161,7 +161,7 @@ class ADeploymentsGroupIsNotFound(
     @override
     def describe(self) -> str:
         return (
-            "그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 배포의 그룹을 id로 조회하면, "
+            "그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 id로 조회하면, "
             "권한이 아니라 대상이 없다는 것으로 거부된다"
         )
 

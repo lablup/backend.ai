@@ -23,5 +23,6 @@ def register_v2_session_group_routes(
     registry.add("GET", "/{session_group_id}", handler.get, middlewares=[auth_required])
     registry.add("POST", "/search", handler.admin_search, middlewares=[superadmin_required])
     registry.add("POST", "/scoped/search", handler.scoped_search, middlewares=[auth_required])
+    registry.add("POST", "/{session_group_id}/purge", handler.purge, middlewares=[auth_required])
 
     return registry

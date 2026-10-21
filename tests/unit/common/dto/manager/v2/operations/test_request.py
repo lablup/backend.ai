@@ -19,7 +19,6 @@ from ai.backend.common.dto.manager.v2.operations.request import (
     PerformSchedulerOpsInput,
     SubscribeBackgroundTaskInput,
     SubscribeSessionEventsInput,
-    UpdateAnnouncementInput,
     UpdateManagerStatusInput,
 )
 from ai.backend.common.exception import BackendAISchemaValidationFailed
@@ -260,34 +259,6 @@ class TestUpdateManagerStatusInput:
     def test_missing_status_raises_validation_error(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateManagerStatusInput.model_validate({})
-
-
-class TestUpdateAnnouncementInput:
-    """Tests for UpdateAnnouncementInput model creation and validation."""
-
-    def test_default_values(self) -> None:
-        req = UpdateAnnouncementInput()
-        assert req.enabled is False
-        assert req.message is None
-
-    def test_enabled_true_with_message(self) -> None:
-        req = UpdateAnnouncementInput(enabled=True, message="System maintenance tonight")
-        assert req.enabled is True
-        assert req.message == "System maintenance tonight"
-
-    def test_enabled_false_with_no_message(self) -> None:
-        req = UpdateAnnouncementInput(enabled=False)
-        assert req.enabled is False
-        assert req.message is None
-
-    def test_enabled_false_with_message(self) -> None:
-        req = UpdateAnnouncementInput(enabled=False, message="Some message")
-        assert req.enabled is False
-        assert req.message == "Some message"
-
-    def test_explicit_none_message(self) -> None:
-        req = UpdateAnnouncementInput(enabled=True, message=None)
-        assert req.message is None
 
 
 class TestPerformSchedulerOpsInput:

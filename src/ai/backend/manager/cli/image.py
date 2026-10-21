@@ -8,6 +8,7 @@ import click
 
 from ai.backend.common.cli import MinMaxRange
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.models.base import ensure_all_tables_registered
 
 from .context import CLIContext
 from .image_impl import alias as alias_impl
@@ -26,7 +27,8 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 @click.group()
 def cli() -> None:
-    pass
+    # String relationships across models resolve only after every model module is imported.
+    ensure_all_tables_registered()
 
 
 @cli.command(name="list")

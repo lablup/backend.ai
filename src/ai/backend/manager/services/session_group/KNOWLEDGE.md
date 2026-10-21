@@ -1,9 +1,9 @@
 ---
 name: session-group-service-shapes
 type: decision-table
-description: session_group knowledge - why the reads by id keep a service while the two searches run against ops, how a deployment's group is left out of every user read, why the bulk read is partial
+description: session_group knowledge - why the reads by id keep a service while the two searches and the purge run against ops, how a deployment's group is left out of every user read and refused by the purge, why the bulk read is partial
 scope: src/ai/backend/manager/services/session_group
-keywords: [GetSessionGroupAction, BulkGetSessionGroupsAction, GlobalSearchSessionGroupsAction, ScopedSearchSessionGroupsAction, SessionGroupService, OpsRepository, SessionGroupTarget, replica_groups, partial_bulk, single_entity]
+keywords: [GetSessionGroupAction, BulkGetSessionGroupsAction, GlobalSearchSessionGroupsAction, ScopedSearchSessionGroupsAction, PurgeSessionGroupAction, SessionGroupPurger, SessionGroupService, OpsRepository, SessionGroupTarget, replica_groups, partial_bulk, single_entity]
 sources:
   - src/ai/backend/manager/services/session_group
   - src/ai/backend/manager/repositories/ops/repository.py
@@ -11,6 +11,9 @@ sources:
 generated:
   by: claude-code/opus-5.5
   at: 2026-10-15
+updated:
+  by: claude-code/opus-5.5
+  at: 2026-10-19
 status: draft
 ---
 
@@ -35,11 +38,14 @@ shape, operation, gate and backing.
 | `bulk_get_ids` | The same searcher for many ids; a held group answers empty |
 | `scoped_search` | Every `SessionGroupTarget` adds the same condition to its scope condition |
 | `global_search` | Not left out: the superadmin sees every group |
+| `purge` | The purger's guard rides on the DELETE; a held group is refused as in use (409) |
 
 - The condition is `SessionGroupSearchableFields.linked.replica_groups.not_exists()`, one
   declaration every path reads.
-- A held group answers not found, not a denial: the caller may hold READ on it through
-  the project, so the permission is not what keeps it out.
+- A read answers a held group as not found, not a denial: the caller may hold READ on it
+  through the project, so the permission is not what keeps it out.
+- The purge refuses a held group as in use: only a caller holding PURGE on the group
+  reaches the guard, and the group cannot go while a replica group references it.
 
 ## The reads by id keep a service
 
@@ -61,3 +67,13 @@ shape, operation, gate and backing.
 - Groups marked deleted are left out unless the top-level filter names `deleted_at`; one
   inside `AND`/`OR`/`NOT` does not lift it. That default is the adapter's, as
   `role_preset` does it.
+
+## The purge runs against ops
+
+- `purge` is wired through `entity_purge_ops` with no service method: the purger's guard
+  carries the held-group condition, so nothing is left to branch on.
+- The row and its virtual entity go together. Member sessions stay; the FK
+  (`ON DELETE SET NULL`) clears their `session_group_id`.
+- A replica group a concurrent transaction attaches is past the guard's snapshot, so the
+  DELETE fails the FK (`replica_groups.session_group_id`, NO ACTION). Ops raises that as
+  `ForeignKeyViolationError` (409).
