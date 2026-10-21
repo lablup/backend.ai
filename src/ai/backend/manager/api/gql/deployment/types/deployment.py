@@ -979,6 +979,16 @@ class ModelDeploymentMetadataInput(PydanticInputMixin[ModelDeploymentMetadataInp
     resource_group_name: str
     name: str | None = None
     tags: list[str] | None = None
+    designated_agent_ids: list[UUID] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "UUIDs of the agents the route sessions are placed on. Each must belong to"
+                " the resource group."
+            ),
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_input(
@@ -1031,6 +1041,16 @@ class UpdateDeploymentInput(PydanticInputMixin[UpdateDeploymentInputDTO]):
     replica_count: int | None = UNSET
     name: str | None = UNSET
     preferred_domain_name: str | None = UNSET
+    designated_agent_ids: list[UUID] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Replaces the designated agent UUIDs; an empty list clears them. Each must"
+                " belong to the deployment's resource group. Omit to leave unchanged."
+            ),
+        ),
+        default=UNSET,
+    )
 
 
 @gql_pydantic_input(
