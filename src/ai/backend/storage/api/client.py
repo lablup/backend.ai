@@ -11,7 +11,8 @@ import urllib.parse
 import uuid
 from collections.abc import AsyncGenerator, Iterator, Mapping, MutableMapping
 from contextlib import AbstractAsyncContextManager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
 from http import HTTPStatus
 from pathlib import Path
 from typing import (
@@ -148,6 +149,7 @@ class UploadTokenData(TypedDict):
     relpath: str
     session: str
     size: int
+    exp: int
 
 
 upload_token_data_iv = t.Dict(
@@ -158,6 +160,7 @@ upload_token_data_iv = t.Dict(
         t.Key("relpath"): t.String,
         t.Key("session"): t.String,
         t.Key("size"): t.Int,
+        t.Key("exp"): t.Int,
     },
 ).allow_extra(
     "*",
@@ -465,12 +468,13 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                 await watcher_task
             except asyncio.CancelledError:
                 pass
-        new_offset = await ctx.valkey_tus_client.advance_offset(
+        upload_state = await ctx.valkey_tus_client.advance_offset(
             session_id, holder_token, bytes_written
         )
 
-        headers["Upload-Offset"] = str(new_offset)
-        if new_offset >= int(token_data["size"]):
+        headers["Upload-Offset"] = str(upload_state.offset)
+        headers["Upload-Expires"] = _upload_expires_at(token_data["exp"], upload_state.ttl_seconds)
+        if upload_state.offset >= int(token_data["size"]):
             parent_dir = vfpath
             if (dst_dir := params["dst_dir"]) is not None:
                 parent_dir = vfpath / dst_dir
@@ -496,11 +500,13 @@ async def tus_options(request: web.Request) -> web.Response:
         "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
     )
     headers["Access-Control-Expose-Headers"] = (
-        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+        "Tus-Resumable, Tus-Version, Tus-Extension, Tus-Max-Size, Upload-Length, "
+        "Upload-Metadata, Upload-Offset, Upload-Expires, Content-Type"
     )
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Tus-Resumable"] = "1.0.0"
     headers["Tus-Version"] = "1.0.0"
+    headers["Tus-Extension"] = "expiration"
     headers["Tus-Max-Size"] = str(
         int(BinarySize.from_str(ctx.local_config.storage_proxy.max_upload_size)),
     )
@@ -525,20 +531,30 @@ async def prepare_tus_session_headers(
         "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
     )
     headers["Access-Control-Expose-Headers"] = (
-        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Upload-Expires, Content-Type"
     )
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Cache-Control"] = "no-store"
     headers["Tus-Resumable"] = "1.0.0"
     ctx: RootContext = request.app["ctx"]
-    redis_offset = await ctx.valkey_tus_client.get_offset(TusSessionId(token_data["session"]))
-    if redis_offset is None:
+    upload_state = await ctx.valkey_tus_client.get_upload_state(TusSessionId(token_data["session"]))
+    if upload_state is None:
         raise TusSessionNotFoundError(
             f"Upload session {token_data['session']} is not registered or has expired"
         )
-    headers["Upload-Offset"] = str(redis_offset)
+    headers["Upload-Offset"] = str(upload_state.offset)
     headers["Upload-Length"] = str(token_data["size"])
+    headers["Upload-Expires"] = _upload_expires_at(token_data["exp"], upload_state.ttl_seconds)
     return headers
+
+
+def _upload_expires_at(token_exp: int, ttl_seconds: int) -> str:
+    """The upload token stops being accepted at its ``exp``, which no PATCH extends."""
+    expires_at = min(
+        datetime.fromtimestamp(token_exp, UTC),
+        datetime.now(UTC) + timedelta(seconds=ttl_seconds),
+    )
+    return format_datetime(expires_at, usegmt=True)
 
 
 class DownloadHandler:
