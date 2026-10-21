@@ -14,6 +14,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.image import ImageID
@@ -41,6 +42,9 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.services.deployment.actions.bulk_get_deployment_designated_agents import (
+    BulkGetDeploymentDesignatedAgentsAction,
+)
 from ai.backend.manager.services.deployment.actions.create_legacy_deployment import (
     CreateLegacyDeploymentAction,
 )
@@ -364,3 +368,26 @@ class TestSyncReplica(DeploymentCRUDBaseFixtures):
         mock_deployment_controller.mark_lifecycle_needed.assert_called_once_with(
             DeploymentLifecycleType.CHECK_REPLICA
         )
+
+
+class TestBulkGetDeploymentDesignatedAgents(DeploymentCRUDBaseFixtures):
+    async def test_each_deployment_answers_its_agents_in_order(
+        self,
+        deployment_service: DeploymentService,
+        mock_deployment_repository: MagicMock,
+    ) -> None:
+        designating = DeploymentID(uuid.uuid4())
+        plain = DeploymentID(uuid.uuid4())
+        agent = AgentUUID(uuid.uuid4())
+        mock_deployment_repository.fetch_designated_agents_by_deployment_ids = AsyncMock(
+            return_value={designating: [agent], plain: []}
+        )
+
+        result = await deployment_service.bulk_get_deployment_designated_agents(
+            BulkGetDeploymentDesignatedAgentsAction(deployment_ids=[designating, plain])
+        )
+
+        assert [(item.entity_id, item.value) for item in result.items] == [
+            (designating, [agent]),
+            (plain, []),
+        ]
