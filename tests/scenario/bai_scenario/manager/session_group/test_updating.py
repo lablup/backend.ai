@@ -16,20 +16,18 @@ from ai.backend.common.dto.manager.v2.session_group.types import (
 )
 from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.manager.api.adapters.session_group.adapter import SessionGroupAdapter
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.session_group import SessionGroupInUseForUpdate
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
-    Refused,
     Scenario,
     Then,
     Verdict,
     When,
 )
-from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.answers import MissingResponse, TheCallIsRefused
 from bai_scenario.components.session_group import (
     GrantedIn,
     Granting,
@@ -124,7 +122,7 @@ class TheUpdatedGroupNode(Then[Laid, SessionGroupNode]):
     def look(self, laid: Laid, answered: Answered[SessionGroupNode]) -> list[Verdict]:
         node = answered.response
         if node is None:
-            return [Refused(EntityNotFoundError, answered.raised)]
+            return [MissingResponse(answered.raised)]
         return UsersGroupLook(
             self.started, direction=_SPREAD, enforcement=self.enforcement
         ).verdicts("", node, laid)
