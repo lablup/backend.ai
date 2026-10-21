@@ -112,6 +112,7 @@ from ai.backend.common.middlewares.exception import client_closed_response, is_c
 from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
+from ai.backend.common.process.child_exit import ChildExitMonitor, ChildStatus
 from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
 from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
     RedisServiceDiscovery,
@@ -1021,6 +1022,8 @@ async def server_main(
         log.info("started the app-proxy worker service")
     except Exception:
         log.exception("server initialization failed; triggering shutdown")
+        child_status: ChildStatus = _args[2][pidx]
+        child_status.mark_init_failed()
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
     try:
         yield
@@ -1038,6 +1041,8 @@ async def server_main_logwrapper(
     setproctitle(f"backend.ai: proxy-worker worker-{pidx}")
     local_config: ServerConfig = _args[0]
     log_endpoint: str = _args[1]
+    child_status: ChildStatus = _args[2][pidx]
+    child_status.publish_pid()
     logger = Logger(
         local_config.logging,
         is_master=False,
@@ -1051,6 +1056,7 @@ async def server_main_logwrapper(
         with logger:
             async with server_main(loop, pidx, _args):
                 yield
+            child_status.mark_clean_shutdown()
     except Exception:
         traceback.print_exc(file=sys.stderr)
 
@@ -1133,17 +1139,20 @@ def main(ctx: click.Context, config_path: Path, debug: bool, log_level: LogLevel
                         log.info("using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
+                num_workers = 1
+                child_statuses = tuple(ChildStatus() for _ in range(num_workers))
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
-                        num_workers=1,
-                        args=(server_config, log_endpoint),
+                        num_workers=num_workers,
+                        args=(server_config, log_endpoint, child_statuses),
                         wait_timeout=5.0,
                         runner=runner,
                     )
                 finally:
                     cleanup_prometheus_multiprocess_dir()
                     log.info("terminated")
+                ChildExitMonitor(child_statuses).raise_system_exit()
         finally:
             if server_config.proxy_worker.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!
