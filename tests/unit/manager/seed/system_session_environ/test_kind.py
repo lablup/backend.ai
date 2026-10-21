@@ -14,14 +14,14 @@ _DOMAIN_ID = "0198a5a0-0000-7000-8000-00000000d001"
 
 
 @dataclass(frozen=True)
-class _KeyCase:
+class _SeedKeyCase:
     name: str
     item: dict[str, Any]
     expected: str
 
 
 @dataclass(frozen=True)
-class _InvalidItemCase:
+class _InvalidSeedItemCase:
     name: str
     item: dict[str, Any]
 
@@ -30,7 +30,7 @@ class TestSystemSessionEnvironSeed:
     @pytest.mark.parametrize(
         "case",
         [
-            _KeyCase(
+            _SeedKeyCase(
                 name="public",
                 item={
                     "value_source": "session_id",
@@ -40,7 +40,7 @@ class TestSystemSessionEnvironSeed:
                 },
                 expected="BACKENDAI_SESSION_ID:public",
             ),
-            _KeyCase(
+            _SeedKeyCase(
                 name="domain",
                 item={
                     "value_source": "session_id",
@@ -51,7 +51,7 @@ class TestSystemSessionEnvironSeed:
                 },
                 expected=f"BACKENDAI_SESSION_ID:domain:{_DOMAIN_ID}",
             ),
-            _KeyCase(
+            _SeedKeyCase(
                 name="project",
                 item={
                     "value_source": "session_id",
@@ -65,25 +65,25 @@ class TestSystemSessionEnvironSeed:
         ],
         ids=lambda case: case.name,
     )
-    def test_the_key_names_the_variable_and_its_scope(self, case: _KeyCase) -> None:
+    def test_the_key_names_the_variable_and_its_scope(self, case: _SeedKeyCase) -> None:
         assert SystemSessionEnvironSeed.model_validate(case.item).key() == case.expected
 
     @pytest.mark.parametrize(
         "case",
         [
-            _InvalidItemCase(
+            _InvalidSeedItemCase(
                 name="missing-value-source",
                 item={"key": "K", "scope_type": "public", "enabled": True},
             ),
-            _InvalidItemCase(
+            _InvalidSeedItemCase(
                 name="missing-key",
                 item={"value_source": "session_id", "scope_type": "public", "enabled": True},
             ),
-            _InvalidItemCase(
+            _InvalidSeedItemCase(
                 name="missing-enabled",
                 item={"value_source": "session_id", "key": "K", "scope_type": "public"},
             ),
-            _InvalidItemCase(
+            _InvalidSeedItemCase(
                 name="unknown-value-source",
                 item={
                     "value_source": "hostname",
@@ -92,7 +92,7 @@ class TestSystemSessionEnvironSeed:
                     "enabled": True,
                 },
             ),
-            _InvalidItemCase(
+            _InvalidSeedItemCase(
                 name="key-not-an-environ-name",
                 item={
                     "value_source": "session_id",
@@ -101,7 +101,7 @@ class TestSystemSessionEnvironSeed:
                     "enabled": True,
                 },
             ),
-            _InvalidItemCase(
+            _InvalidSeedItemCase(
                 name="too-long-key",
                 item={
                     "value_source": "session_id",
@@ -110,7 +110,7 @@ class TestSystemSessionEnvironSeed:
                     "enabled": True,
                 },
             ),
-            _InvalidItemCase(
+            _InvalidSeedItemCase(
                 name="unknown-scope-type",
                 item={
                     "value_source": "session_id",
@@ -119,7 +119,7 @@ class TestSystemSessionEnvironSeed:
                     "enabled": True,
                 },
             ),
-            _InvalidItemCase(
+            _InvalidSeedItemCase(
                 name="public-with-scope-id",
                 item={
                     "value_source": "session_id",
@@ -129,7 +129,7 @@ class TestSystemSessionEnvironSeed:
                     "enabled": True,
                 },
             ),
-            _InvalidItemCase(
+            _InvalidSeedItemCase(
                 name="domain-without-scope-id",
                 item={
                     "value_source": "session_id",
@@ -138,7 +138,7 @@ class TestSystemSessionEnvironSeed:
                     "enabled": True,
                 },
             ),
-            _InvalidItemCase(
+            _InvalidSeedItemCase(
                 name="project-without-scope-id",
                 item={
                     "value_source": "session_id",
@@ -147,7 +147,7 @@ class TestSystemSessionEnvironSeed:
                     "enabled": True,
                 },
             ),
-            _InvalidItemCase(
+            _InvalidSeedItemCase(
                 name="unknown-field",
                 item={
                     "value_source": "session_id",
@@ -160,6 +160,6 @@ class TestSystemSessionEnvironSeed:
         ],
         ids=lambda case: case.name,
     )
-    def test_an_invalid_item_is_refused(self, case: _InvalidItemCase) -> None:
+    def test_an_invalid_item_is_refused(self, case: _InvalidSeedItemCase) -> None:
         with pytest.raises(InvalidSeedDocument):
             SystemSessionEnvironSeed.model_validate(case.item)

@@ -31,17 +31,17 @@ from ai.backend.manager.seed.runner import SeedApplier, SeedPlan, SeedPlanner
 from ai.backend.manager.seed.types import SeedKind
 
 _DOMAIN_ID = "0198a5a0-0000-7000-8000-00000000d001"
-_PUBLIC_KEY = "BACKENDAI_SESSION_ID:public"
-_DOMAIN_KEY = f"BACKENDAI_USER_EMAIL:domain:{_DOMAIN_ID}"
+_PUBLIC_SESSION_ID_SEED_KEY = "BACKENDAI_SESSION_ID:public"
+_DOMAIN_USER_EMAIL_SEED_KEY = f"BACKENDAI_USER_EMAIL:domain:{_DOMAIN_ID}"
 
 
 @dataclass(frozen=True)
-class _Binding:
+class _ValueSourceAndEnabled:
     value_source: SystemSessionEnvironValueSource
     enabled: bool
 
 
-async def _bindings(db: ExtendedAsyncSAEngine) -> dict[str, _Binding]:
+async def _rows_by_seed_key(db: ExtendedAsyncSAEngine) -> dict[str, _ValueSourceAndEnabled]:
     """Each binding by the key its seed item answers, with the public scope named."""
     public_id = global_entity_id(GlobalEntityName.PUBLIC)
     async with db.begin_readonly() as conn:
@@ -51,12 +51,14 @@ async def _bindings(db: ExtendedAsyncSAEngine) -> dict[str, _Binding]:
                 f"{row.key}:{row.scope_type}"
                 if row.scope_id == public_id
                 else f"{row.key}:{row.scope_type}:{row.scope_id}"
-            ): _Binding(value_source=row.value_source, enabled=row.enabled)
+            ): _ValueSourceAndEnabled(value_source=row.value_source, enabled=row.enabled)
             for row in rows
         }
 
 
-async def _members(db: ExtendedAsyncSAEngine, entity_type: str, entity_id: str) -> set[str]:
+async def _environ_ids_in_scope(
+    db: ExtendedAsyncSAEngine, entity_type: str, entity_id: str
+) -> set[str]:
     """The bindings the node of ``entity_type`` and ``entity_id`` holds as members."""
     scope_node = (
         sa.select(VirtualEntityRow.id)
@@ -78,7 +80,7 @@ async def _members(db: ExtendedAsyncSAEngine, entity_type: str, entity_id: str) 
         return {str(row.entity_id) for row in rows}
 
 
-async def _id_of(db: ExtendedAsyncSAEngine, key: str) -> str:
+async def _environ_id_of_key(db: ExtendedAsyncSAEngine, key: str) -> str:
     async with db.begin_readonly() as conn:
         return str(
             await conn.scalar(
@@ -88,17 +90,21 @@ async def _id_of(db: ExtendedAsyncSAEngine, key: str) -> str:
 
 
 @pytest.fixture
-def plan(system_session_environ_seed_dir: Path) -> SeedPlan:
+def system_session_environ_plan(system_session_environ_seed_dir: Path) -> SeedPlan:
     return SeedPlanner(create_seed_kind_registry()).plan([system_session_environ_seed_dir])
 
 
 @pytest.fixture
-async def applied(repository: SeedRepository, plan: SeedPlan) -> None:
-    await SeedApplier(repository).apply(plan, overwrite=False)
+async def seeds_applied_once(
+    repository: SeedRepository, system_session_environ_plan: SeedPlan
+) -> None:
+    await SeedApplier(repository).apply(system_session_environ_plan, overwrite=False)
 
 
 @pytest.fixture
-async def switched_off_after_apply(applied: None, db: ExtendedAsyncSAEngine) -> None:
+async def public_session_id_disabled_after_apply(
+    seeds_applied_once: None, db: ExtendedAsyncSAEngine
+) -> None:
     """The public binding switched off after the seed wrote it."""
     async with db.begin_session() as sess:
         await sess.execute(
@@ -109,7 +115,9 @@ async def switched_off_after_apply(applied: None, db: ExtendedAsyncSAEngine) -> 
 
 
 @pytest.fixture
-def changed_plan(applied: None, system_session_environ_seed_dir: Path) -> SeedPlan:
+def plan_rebinding_public_session_id(
+    seeds_applied_once: None, system_session_environ_seed_dir: Path
+) -> SeedPlan:
     """The seeds with the public binding stating another source, switched off."""
     (system_session_environ_seed_dir / "system_session_environ" / "bindings.yaml").write_text(
         yaml.safe_dump({
@@ -129,7 +137,7 @@ def changed_plan(applied: None, system_session_environ_seed_dir: Path) -> SeedPl
 
 
 @pytest.fixture
-async def migrated_public_binding(db: ExtendedAsyncSAEngine) -> SystemSessionEnvironID:
+async def public_session_id_row_from_migration(db: ExtendedAsyncSAEngine) -> SystemSessionEnvironID:
     """The public binding written as the migration writes it: the row alone, in no scope."""
     async with db.begin_session() as sess:
         row = SystemSessionEnvironRow(
@@ -146,16 +154,22 @@ async def migrated_public_binding(db: ExtendedAsyncSAEngine) -> SystemSessionEnv
 
 class TestApply:
     async def test_an_empty_database_gets_every_binding(
-        self, db: ExtendedAsyncSAEngine, repository: SeedRepository, plan: SeedPlan
+        self,
+        db: ExtendedAsyncSAEngine,
+        repository: SeedRepository,
+        system_session_environ_plan: SeedPlan,
     ) -> None:
-        results = await SeedApplier(repository).apply(plan, overwrite=False)
+        results = await SeedApplier(repository).apply(system_session_environ_plan, overwrite=False)
 
-        assert results[SeedKind.SYSTEM_SESSION_ENVIRON].succeeded == [_PUBLIC_KEY, _DOMAIN_KEY]
-        assert await _bindings(db) == {
-            _PUBLIC_KEY: _Binding(
+        assert results[SeedKind.SYSTEM_SESSION_ENVIRON].succeeded == [
+            _PUBLIC_SESSION_ID_SEED_KEY,
+            _DOMAIN_USER_EMAIL_SEED_KEY,
+        ]
+        assert await _rows_by_seed_key(db) == {
+            _PUBLIC_SESSION_ID_SEED_KEY: _ValueSourceAndEnabled(
                 value_source=SystemSessionEnvironValueSource.SESSION_ID, enabled=True
             ),
-            _DOMAIN_KEY: _Binding(
+            _DOMAIN_USER_EMAIL_SEED_KEY: _ValueSourceAndEnabled(
                 value_source=SystemSessionEnvironValueSource.USER_EMAIL, enabled=False
             ),
         }
@@ -164,41 +178,46 @@ class TestApply:
         "scope", [GlobalEntityName.GLOBAL, GlobalEntityName.PUBLIC], ids=lambda name: name.value
     )
     async def test_a_public_binding_is_created_in_global_and_public(
-        self, db: ExtendedAsyncSAEngine, applied: None, scope: GlobalEntityName
+        self, db: ExtendedAsyncSAEngine, seeds_applied_once: None, scope: GlobalEntityName
     ) -> None:
-        members = await _members(db, str(GlobalEntityType()), str(global_entity_id(scope)))
+        members = await _environ_ids_in_scope(
+            db, str(GlobalEntityType()), str(global_entity_id(scope))
+        )
 
-        assert members == {await _id_of(db, "BACKENDAI_SESSION_ID")}
+        assert members == {await _environ_id_of_key(db, "BACKENDAI_SESSION_ID")}
 
     async def test_a_domain_binding_is_created_in_its_domain(
-        self, db: ExtendedAsyncSAEngine, applied: None
+        self, db: ExtendedAsyncSAEngine, seeds_applied_once: None
     ) -> None:
-        members = await _members(db, str(DomainEntityType()), _DOMAIN_ID)
+        members = await _environ_ids_in_scope(db, str(DomainEntityType()), _DOMAIN_ID)
 
-        assert members == {await _id_of(db, "BACKENDAI_USER_EMAIL")}
+        assert members == {await _environ_id_of_key(db, "BACKENDAI_USER_EMAIL")}
 
     async def test_an_existing_binding_is_skipped_and_kept(
         self,
         db: ExtendedAsyncSAEngine,
         repository: SeedRepository,
-        plan: SeedPlan,
-        switched_off_after_apply: None,
+        system_session_environ_plan: SeedPlan,
+        public_session_id_disabled_after_apply: None,
     ) -> None:
-        results = await SeedApplier(repository).apply(plan, overwrite=False)
+        results = await SeedApplier(repository).apply(system_session_environ_plan, overwrite=False)
 
         assert results[SeedKind.SYSTEM_SESSION_ENVIRON].succeeded == []
         assert [skip.reason for skip in results[SeedKind.SYSTEM_SESSION_ENVIRON].skipped] == [
             "exists",
             "exists",
         ]
-        assert (await _bindings(db))[_PUBLIC_KEY].enabled is False
+        assert (await _rows_by_seed_key(db))[_PUBLIC_SESSION_ID_SEED_KEY].enabled is False
 
     async def test_an_overwrite_replaces_the_source_and_the_switch(
-        self, db: ExtendedAsyncSAEngine, repository: SeedRepository, changed_plan: SeedPlan
+        self,
+        db: ExtendedAsyncSAEngine,
+        repository: SeedRepository,
+        plan_rebinding_public_session_id: SeedPlan,
     ) -> None:
-        await SeedApplier(repository).apply(changed_plan, overwrite=True)
+        await SeedApplier(repository).apply(plan_rebinding_public_session_id, overwrite=True)
 
-        assert (await _bindings(db))[_PUBLIC_KEY] == _Binding(
+        assert (await _rows_by_seed_key(db))[_PUBLIC_SESSION_ID_SEED_KEY] == _ValueSourceAndEnabled(
             value_source=SystemSessionEnvironValueSource.SESSION_NAME, enabled=False
         )
 
@@ -206,15 +225,15 @@ class TestApply:
         self,
         db: ExtendedAsyncSAEngine,
         repository: SeedRepository,
-        plan: SeedPlan,
-        migrated_public_binding: SystemSessionEnvironID,
+        system_session_environ_plan: SeedPlan,
+        public_session_id_row_from_migration: SystemSessionEnvironID,
     ) -> None:
-        results = await SeedApplier(repository).apply(plan, overwrite=False)
+        results = await SeedApplier(repository).apply(system_session_environ_plan, overwrite=False)
 
         assert [skip.reason for skip in results[SeedKind.SYSTEM_SESSION_ENVIRON].skipped] == [
             "exists"
         ]
-        members = await _members(
+        members = await _environ_ids_in_scope(
             db, str(GlobalEntityType()), str(global_entity_id(GlobalEntityName.PUBLIC))
         )
-        assert members == {str(migrated_public_binding)}
+        assert members == {str(public_session_id_row_from_migration)}
