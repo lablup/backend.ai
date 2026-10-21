@@ -170,7 +170,7 @@ class UserProcessors:
     get_default_keypairs: BulkActionProcessor[
         GetDefaultKeypairsAction, OwnedFieldsOpsResult[UserID, KeyPairData]
     ]
-    search_ssh_keypairs: ScopeActionProcessor[
+    search_ssh_keypairs: BulkActionProcessor[
         SearchSSHKeypairsAction, ScopedFieldsOpsResult[SSHKeypairData]
     ]
     update_keypair: SingleFieldActionProcessor[UpdateKeypairAction, UpdateKeypairActionResult]
@@ -275,7 +275,9 @@ class UserProcessors:
             LookupSSHKeypairOwnerAction,
             LookupBulkSSHKeypairOwnerAction,
         )
-        self.search_ssh_keypairs = self.ssh_keypair_group.search_ops(SearchSSHKeypairsAction)
+        self.search_ssh_keypairs = self.ssh_keypair_group.atomic_bulk_scoped_search_ops(
+            SearchSSHKeypairsAction
+        )
         self.lookup_keypair = group.key_field_lookup_ops(LookupKeypairByAccessKeyAction)
         self.bulk_lookup_keypairs = group.public_bulk_key_field_lookup_ops(BulkLookupKeypairsAction)
         self.bulk_get_keypairs = self.keypair_group.partial_bulk_get_ops(BulkGetKeypairsAction)
