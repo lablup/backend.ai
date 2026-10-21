@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 import sqlalchemy as sa
@@ -12,10 +13,11 @@ import yaml
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.system_session_environ import (
+    SystemSessionEnvironEntityType,
     SystemSessionEnvironID,
     SystemSessionEnvironScopeID,
 )
-from ai.backend.common.data.entity.types import GlobalEntityType
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
 from ai.backend.common.data.system_session_environ.types import (
     SystemSessionEnvironScopeType,
     SystemSessionEnvironValueSource,
@@ -23,8 +25,7 @@ from ai.backend.common.data.system_session_environ.types import (
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
-from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 from ai.backend.manager.repositories.seed.repository import SeedRepository
 from ai.backend.manager.seed.factory import create_seed_kind_registry
 from ai.backend.manager.seed.runner import SeedApplier, SeedPlan, SeedPlanner
@@ -56,28 +57,22 @@ async def _rows_by_seed_key(db: ExtendedAsyncSAEngine) -> dict[str, _ValueSource
         }
 
 
-async def _environ_ids_in_scope(
-    db: ExtendedAsyncSAEngine, entity_type: str, entity_id: str
+async def _environ_ids_reached_from(
+    db: ExtendedAsyncSAEngine, scope_type: EntityType, scope_id: UUID
 ) -> set[str]:
-    """The bindings the node of ``entity_type`` and ``entity_id`` holds as members."""
-    scope_node = (
-        sa.select(VirtualEntityRow.id)
-        .where(
-            VirtualEntityRow.entity_type == entity_type,
-            VirtualEntityRow.entity_id == entity_id,
-        )
-        .scalar_subquery()
-    )
+    """The bindings a role at the scope reaches, as a permission check walks the graph."""
     async with db.begin_readonly() as conn:
-        rows = await conn.execute(
-            sa.select(VirtualEntityRow.entity_id)
-            .join(EntityMembershipRow, EntityMembershipRow.member_entity_id == VirtualEntityRow.id)
-            .where(
-                EntityMembershipRow.virtual_entity_id == scope_node,
-                VirtualEntityRow.entity_type == "system_session_environ",
+        environ_ids = await conn.scalars(
+            sa.select(SystemSessionEnvironRow.id).where(
+                scope_membership_exists(
+                    scope_type,
+                    scope_id,
+                    SystemSessionEnvironEntityType(),
+                    SystemSessionEnvironRow.id,
+                )
             )
         )
-        return {str(row.entity_id) for row in rows}
+        return {str(environ_id) for environ_id in environ_ids}
 
 
 async def _environ_id_of_key(db: ExtendedAsyncSAEngine, key: str) -> str:
@@ -174,24 +169,33 @@ class TestApply:
             ),
         }
 
-    @pytest.mark.parametrize(
-        "scope", [GlobalEntityName.GLOBAL, GlobalEntityName.PUBLIC], ids=lambda name: name.value
-    )
-    async def test_a_public_binding_is_created_in_global_and_public(
-        self, db: ExtendedAsyncSAEngine, seeds_applied_once: None, scope: GlobalEntityName
-    ) -> None:
-        members = await _environ_ids_in_scope(
-            db, str(GlobalEntityType()), str(global_entity_id(scope))
-        )
-
-        assert members == {await _environ_id_of_key(db, "BACKENDAI_SESSION_ID")}
-
-    async def test_a_domain_binding_is_created_in_its_domain(
+    async def test_global_reaches_every_binding(
         self, db: ExtendedAsyncSAEngine, seeds_applied_once: None
     ) -> None:
-        members = await _environ_ids_in_scope(db, str(DomainEntityType()), _DOMAIN_ID)
+        reached = await _environ_ids_reached_from(
+            db, GlobalEntityType(), global_entity_id(GlobalEntityName.GLOBAL)
+        )
 
-        assert members == {await _environ_id_of_key(db, "BACKENDAI_USER_EMAIL")}
+        assert reached == {
+            await _environ_id_of_key(db, "BACKENDAI_SESSION_ID"),
+            await _environ_id_of_key(db, "BACKENDAI_USER_EMAIL"),
+        }
+
+    async def test_public_reaches_only_the_public_binding(
+        self, db: ExtendedAsyncSAEngine, seeds_applied_once: None
+    ) -> None:
+        reached = await _environ_ids_reached_from(
+            db, GlobalEntityType(), global_entity_id(GlobalEntityName.PUBLIC)
+        )
+
+        assert reached == {await _environ_id_of_key(db, "BACKENDAI_SESSION_ID")}
+
+    async def test_a_domain_reaches_only_its_binding(
+        self, db: ExtendedAsyncSAEngine, seeds_applied_once: None
+    ) -> None:
+        reached = await _environ_ids_reached_from(db, DomainEntityType(), UUID(_DOMAIN_ID))
+
+        assert reached == {await _environ_id_of_key(db, "BACKENDAI_USER_EMAIL")}
 
     async def test_an_existing_binding_is_skipped_and_kept(
         self,
@@ -233,7 +237,7 @@ class TestApply:
         assert [skip.reason for skip in results[SeedKind.SYSTEM_SESSION_ENVIRON].skipped] == [
             "exists"
         ]
-        members = await _environ_ids_in_scope(
-            db, str(GlobalEntityType()), str(global_entity_id(GlobalEntityName.PUBLIC))
+        reached = await _environ_ids_reached_from(
+            db, GlobalEntityType(), global_entity_id(GlobalEntityName.PUBLIC)
         )
-        assert members == {str(public_session_id_row_from_migration)}
+        assert reached == {str(public_session_id_row_from_migration)}
