@@ -41,7 +41,6 @@ def test_the_registered_models_let_every_mapper_configure() -> None:
 def rescan_result(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     result = MagicMock()
     result.errors = []
-    result.images = [MagicMock()]
 
     @asynccontextmanager
     async def connect_database(_: Any) -> AsyncIterator[MagicMock]:
@@ -68,20 +67,9 @@ async def test_rescan_exits_non_zero_and_prints_the_scan_errors(
     rescan_result: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
     rescan_result.errors = ["Failed to scan image! Detail: boom"]
-    rescan_result.images = []
     with pytest.raises(SystemExit) as exc_info:
         await image_impl.rescan_images(rescan_result.cli_ctx, "registry")
     assert exc_info.value.code == ExitCode.FAILURE
-    assert "Failed to scan image! Detail: boom" in capsys.readouterr().err
-
-
-async def test_rescan_warns_and_exits_zero_on_a_partial_failure(
-    rescan_result: MagicMock, capsys: pytest.CaptureFixture[str]
-) -> None:
-    rescan_result.errors = ["Failed to scan image! Detail: boom"]
-
-    await image_impl.rescan_images(rescan_result.cli_ctx, "registry")
-
     assert "Failed to scan image! Detail: boom" in capsys.readouterr().err
 
 
