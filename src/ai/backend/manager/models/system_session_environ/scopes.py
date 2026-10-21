@@ -36,7 +36,7 @@ class SessionSystemSessionEnvironScope(OperationScope):
     def to_condition(self) -> QueryCondition:
         fields = SystemSessionEnvironSearchableFields.own
 
-        def at(
+        def bound_to_scope(
             scope_type: SystemSessionEnvironScopeType, scope_id: UUID
         ) -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
@@ -46,9 +46,11 @@ class SessionSystemSessionEnvironScope(OperationScope):
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.or_(
-                at(SystemSessionEnvironScopeType.PUBLIC, global_entity_id(GlobalEntityName.PUBLIC)),
-                at(SystemSessionEnvironScopeType.DOMAIN, self.domain_id),
-                at(SystemSessionEnvironScopeType.PROJECT, self.project_id),
+                bound_to_scope(
+                    SystemSessionEnvironScopeType.PUBLIC, global_entity_id(GlobalEntityName.PUBLIC)
+                ),
+                bound_to_scope(SystemSessionEnvironScopeType.DOMAIN, self.domain_id),
+                bound_to_scope(SystemSessionEnvironScopeType.PROJECT, self.project_id),
             )
 
         return inner
