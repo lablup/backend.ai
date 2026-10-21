@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+import sys
 from decimal import Decimal
 from pprint import pprint
 from typing import Any
@@ -10,6 +11,7 @@ import click
 import sqlalchemy as sa
 from tabulate import tabulate
 
+from ai.backend.cli.types import ExitCode
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import validate_image_labels
@@ -45,8 +47,9 @@ def _register_image_cli_orm_cluster() -> None:
     """Register ORM rows reachable only via string relationships so the CLI can configure mappers (kept minimal, not all models)."""
     from ai.backend.manager.models.agent.row import AgentRow
     from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
+    from ai.backend.manager.models.session.row import SessionRow
 
-    _ = (AgentRow, ResourceGroupForProjectRow)
+    _ = (AgentRow, ResourceGroupForProjectRow, SessionRow)
 
 
 def _canonical_searcher(canonical: str, architecture: str) -> ImageSearcher:
@@ -236,8 +239,13 @@ async def rescan_images(
             )
             for error in result.errors:
                 log.error("failed to scan registries", scan_error=str(error))
-        except Exception:
+                click.echo(f"failed to scan registries: {error}", err=True)
+            if result.errors and not result.images:
+                sys.exit(ExitCode.FAILURE)
+        except Exception as e:
             log.exception("image command failed")
+            click.echo(f"image command failed: {e}", err=True)
+            sys.exit(ExitCode.FAILURE)
 
 
 async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str) -> None:
