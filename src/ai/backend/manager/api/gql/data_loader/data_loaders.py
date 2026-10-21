@@ -1133,6 +1133,17 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
+    def deployment_designated_agents_loader(
+        self,
+    ) -> DataLoader[DeploymentID, list[AgentUUID]]:
+        adapter = self._adapters.deployment
+
+        async def load_fn(ids: list[DeploymentID]) -> list[list[AgentUUID] | Exception]:
+            return await adapter.batch_load_designated_agents(ids)
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
     def session_history_loader(
         self,
     ) -> DataLoader[SessionSchedulingHistoryID, SessionSchedulingHistory | None]:
