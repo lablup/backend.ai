@@ -2598,7 +2598,7 @@ class AbstractAgent[
 
             if not restarting and kernel_id in self.kernel_registry:
                 log.debug("kernel already registered")
-                raise KernelAlreadyExistsError
+                raise KernelAlreadyExistsError(f"Kernel {kernel_id} is already registered.")
 
             if throttle_sema is None:
                 # make a local semaphore

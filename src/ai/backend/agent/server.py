@@ -57,6 +57,7 @@ from ai.backend.agent.errors import (
 from ai.backend.agent.errors.agent import (
     ImagePullFailedError,
     ImagePullTimeoutError,
+    KernelAlreadyExistsError,
     KernelNotFoundError,
 )
 from ai.backend.agent.health.docker import DockerHealthChecker
@@ -238,6 +239,9 @@ class _RPCRegistryBase:
                     raise
                 except KernelNotFoundError:
                     log.trace("rpc target kernel not found")
+                    raise
+                except KernelAlreadyExistsError:
+                    log.trace("rpc target kernel already exists")
                     raise
                 except Exception:
                     if log_failure or not scoped:
@@ -852,6 +856,9 @@ class AgentRPCServer(aobject):
                         throttle_sema=throttle_sema,
                     )
                 except (TimeoutError, asyncio.CancelledError, ResourceError):
+                    raise
+                except KernelAlreadyExistsError:
+                    log.trace("kernel creation rejected: kernel already registered")
                     raise
                 except (ImagePullTimeoutError, ImagePullFailedError) as e:
                     log.trace("kernel image pull failed", error_repr=repr(e))
