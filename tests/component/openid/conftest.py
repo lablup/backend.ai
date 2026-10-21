@@ -54,8 +54,8 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.base import pgsql_connect_opts
-from ai.backend.manager.models.global_entity.seed import SEED_GLOBAL_ENTITIES_SQL
 from ai.backend.manager.models.domain.row import DomainRow, domains
+from ai.backend.manager.models.global_entity.seed import SEED_GLOBAL_ENTITIES_SQL
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.project.row import ProjectRow, association_groups_users, groups
