@@ -50,7 +50,7 @@ items:
       session_template:                 []
       storage_namespace:                []
       storage_volume:                   []
-      system_session_environ:           []
+      system_session_environ:           [read]
       user:                             []
       user_resource_policy:             []
       vfolder:                          []
