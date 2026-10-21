@@ -19,7 +19,6 @@ class SessionLifecycleHandlerNode(BaseResponseModel):
         description="Handler key accepted in the session options' handler_options.by_handler."
     )
     description: str | None = Field(
-        default=None,
         description=(
             "First line of the handler's docstring, if any. "
             "Null when the backing class has no docstring."
