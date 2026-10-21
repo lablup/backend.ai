@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.config.bootstrap import BootstrapConfig
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.config.unified import ManagerUnifiedConfig
-    from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
     from .types import RedisConnectionSet
 
@@ -172,18 +171,6 @@ async def config_provider_ctx(cli_ctx: CLIContext) -> AsyncIterator[ManagerConfi
             yield config_provider
         finally:
             await config_provider.terminate()
-
-
-@contextlib.asynccontextmanager
-async def db_ctx(cli_ctx: CLIContext) -> AsyncIterator[ExtendedAsyncSAEngine]:
-    """Connect to the manager DB and load the global entity ids, as the server DI does."""
-    from ai.backend.manager.repositories.db.engine import connect_database
-    from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
-
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
-    async with connect_database(bootstrap_config.db) as db:
-        await GlobalEntityIDLoader(db).load()
-        yield db
 
 
 @contextlib.asynccontextmanager
