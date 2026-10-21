@@ -66,6 +66,9 @@ class SystemSessionEnvironRow(LifecycleTimestampsMixin, Base):
         GUID(SystemSessionEnvironScopeID),
         nullable=True,
     )
+    disabled: Mapped[bool] = mapped_column(
+        "disabled", sa.Boolean, nullable=False, server_default=sa.false()
+    )
 
     def to_data(self) -> SystemSessionEnvironData:
         return SystemSessionEnvironData(
@@ -73,6 +76,7 @@ class SystemSessionEnvironRow(LifecycleTimestampsMixin, Base):
             value_source=self.value_source,
             key=self.key,
             scope_id=self.scope_type.to_owner(self.scope_id),
+            disabled=self.disabled,
             created_at=self.created_at,
             updated_at=self.updated_at,
         )

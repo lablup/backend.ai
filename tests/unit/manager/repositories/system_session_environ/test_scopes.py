@@ -78,6 +78,7 @@ async def seeded_rows(database: ExtendedAsyncSAEngine) -> _SeededRows:
         key="BACKENDAI_USER_NAME",
         scope_type=SystemSessionEnvironScopeType.PROJECT,
         scope_id=SystemSessionEnvironScopeID(_PROJECT_ID),
+        disabled=True,
     )
     async with database.begin_session() as db_sess:
         db_sess.add_all([
@@ -155,4 +156,21 @@ class TestSessionSystemSessionEnvironScope:
             seeded_rows.global_row: None,
             seeded_rows.domain_row: _DOMAIN_ID,
             seeded_rows.project_row: _PROJECT_ID,
+        }
+
+    async def test_returns_the_disabled_rows_with_their_flag(
+        self,
+        repository: OpsRepository[SystemSessionEnvironData],
+        searcher: SystemSessionEnvironSearcher,
+        seeded_rows: _SeededRows,
+    ) -> None:
+        result = await repository.search_in_scopes(
+            [SessionSystemSessionEnvironScope(domain_id=_DOMAIN_ID, project_id=_PROJECT_ID)],
+            searcher,
+        )
+
+        assert {row.id: row.disabled for row in result.items} == {
+            seeded_rows.global_row: False,
+            seeded_rows.domain_row: False,
+            seeded_rows.project_row: True,
         }

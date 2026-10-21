@@ -1,8 +1,8 @@
 """Add system_session_environ
 
 Create the table deciding which values the manager injects into a session's
-environment, and bind every required value source at the global scope under the
-name the launcher has always used. The session owner's values are left unbound.
+environment, and bind every value source at the global scope under the name the
+launcher has always used. The session owner's values are bound disabled.
 
 Revision ID: fa2dfd48c169
 Revises: e234d84a162f
@@ -25,7 +25,7 @@ down_revision = "e234d84a162f"
 branch_labels = None
 depends_on = None
 
-# value_source to key.
+# value_source to key, bound enabled.
 REQUIRED_BINDINGS: Final[dict[str, str]] = {
     "session_id": "BACKENDAI_SESSION_ID",
     "session_name": "BACKENDAI_SESSION_NAME",
@@ -35,9 +35,17 @@ REQUIRED_BINDINGS: Final[dict[str, str]] = {
     "preopen_ports": "BACKENDAI_PREOPEN_PORTS",
 }
 
+# value_source to key, bound disabled.
+OPTIONAL_BINDINGS: Final[dict[str, str]] = {
+    "user_uuid": "BACKENDAI_USER_UUID",
+    "user_email": "BACKENDAI_USER_EMAIL",
+    "user_name": "BACKENDAI_USER_NAME",
+    "access_key": "BACKENDAI_ACCESS_KEY",
+}
+
 _ADD_GLOBAL_BINDING: Final = sa.text("""
-    INSERT INTO system_session_environ (value_source, key, scope_type, scope_id)
-    VALUES (:value_source, :key, 'global', NULL)
+    INSERT INTO system_session_environ (value_source, key, scope_type, scope_id, disabled)
+    VALUES (:value_source, :key, 'global', NULL, :disabled)
     ON CONFLICT (key, scope_type, scope_id) DO NOTHING
 """)
 
@@ -50,6 +58,7 @@ def upgrade() -> None:
         sa.Column("key", sa.String(length=256), nullable=False),
         sa.Column("scope_type", sa.String(length=64), nullable=False),
         sa.Column("scope_id", GUID, nullable=True),
+        sa.Column("disabled", sa.Boolean, server_default=sa.false(), nullable=False),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -86,7 +95,13 @@ def upgrade() -> None:
     )
     conn = op.get_bind()
     for value_source, key in REQUIRED_BINDINGS.items():
-        conn.execute(_ADD_GLOBAL_BINDING, {"value_source": value_source, "key": key})
+        conn.execute(
+            _ADD_GLOBAL_BINDING, {"value_source": value_source, "key": key, "disabled": False}
+        )
+    for value_source, key in OPTIONAL_BINDINGS.items():
+        conn.execute(
+            _ADD_GLOBAL_BINDING, {"value_source": value_source, "key": key, "disabled": True}
+        )
 
 
 def downgrade() -> None:
