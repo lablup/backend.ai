@@ -5,14 +5,15 @@ from typing import Self, override
 
 from pydantic import Field, model_validator
 
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironScopeID
 from ai.backend.common.data.system_session_environ.types import (
     SystemSessionEnvironScopeType,
     SystemSessionEnvironValueSource,
 )
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.models.system_session_environ.row import ENVIRON_KEY_PATTERN
 from ai.backend.manager.models.system_session_environ.upserters import (
-    PublicSystemSessionEnvironUpserter,
     SystemSessionEnvironUpserter,
 )
 from ai.backend.manager.repositories.ops.v2.seed.types import SeedWrite
@@ -44,17 +45,14 @@ class SystemSessionEnvironSeed(SeedItem):
 
     @override
     def write(self) -> SeedWrite:
-        if self.scope_id is None:
-            return SeedWrite(
-                upserter=PublicSystemSessionEnvironUpserter(
-                    value_source=self.value_source, key=self.environ_key, enabled=self.enabled
-                ),
-                field_upserters=[],
-                field_purgers=[],
-            )
+        owner = (
+            global_entity_id(GlobalEntityName.PUBLIC)
+            if self.scope_id is None
+            else self.scope_type.to_owner(self.scope_id)
+        )
         return SeedWrite(
             upserter=SystemSessionEnvironUpserter(
-                owner=self.scope_type.to_owner(self.scope_id),
+                owner=owner,
                 value_source=self.value_source,
                 key=self.environ_key,
                 enabled=self.enabled,
