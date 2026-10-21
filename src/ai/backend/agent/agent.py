@@ -87,6 +87,7 @@ from ai.backend.agent.tasks import (
     SyncContainerLifecyclesTask,
 )
 from ai.backend.common.asyncio import cancel_tasks, current_loop, run_in_executor_with_context
+from ai.backend.common.attestation import build_attestation_status
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.cgroup import CgroupController
 from ai.backend.common.clients.valkey_client.valkey_bgtask.client import ValkeyBgtaskClient
@@ -301,6 +302,7 @@ DEAD_STATUS_SET = ContainerStatus.dead_set()
 COMMIT_STATUS_EXPIRE: Final[int] = 13
 EVENT_DISPATCHER_CONSUMER_GROUP: Final = "agent"
 STAT_COLLECTION_TIMEOUT: Final[float] = 10 * 60  # 10 minutes
+_ATTESTATION_SUMMARY_TIMEOUT_SEC: Final = 10.0
 
 P = ParamSpec("P")
 KernelIdContainerPair = tuple[KernelId, Container]
@@ -3026,6 +3028,7 @@ class AbstractAgent[
                         "kernel service initialization waiting",
                         container_id=container_data.get("container_id"),
                     )
+                    attestation: dict[str, Any] | None = None
                     try:
                         async for attempt in AsyncRetrying(
                             wait=wait_fixed(0.3),
@@ -3068,6 +3071,19 @@ class AbstractAgent[
                             container_id=container_data.get("container_id"),
                             service_ports=str(service_ports),
                         )
+                        try:
+                            async with asyncio.timeout(_ATTESTATION_SUMMARY_TIMEOUT_SEC):
+                                attestation = build_attestation_status(
+                                    await kernel_obj.summarize_attestation(
+                                        _ATTESTATION_SUMMARY_TIMEOUT_SEC
+                                    )
+                                )
+                        except Exception as e:
+                            log.warning(
+                                "attestation summary unavailable",
+                                kernel_id=kernel_id,
+                                error=repr(e),
+                            )
                     except TimeoutError as e:
                         await self.inject_container_lifecycle_event(
                             kernel_id,
@@ -3200,6 +3216,7 @@ class AbstractAgent[
                         used_devices=UsedDevices.from_allocations(
                             resource_spec.allocations, attached_devices
                         ),
+                        attestation=attestation,
                     )
                     await self.anycast_and_broadcast_event(
                         KernelStartedAnycastEvent(

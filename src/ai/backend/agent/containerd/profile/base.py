@@ -117,6 +117,16 @@ class RuntimeProfile(Protocol):
         """
         return None
 
+    async def summarize_attestation(
+        self, host: str, port: int, timeout_s: float
+    ) -> Mapping[str, Any] | None:
+        """
+        After readiness, describe the kernel's launch evidence as a small flat mapping, or None.
+        host and port are the kernel's published readiness endpoint. Core stores the mapping
+        as informational, host-reported data; it is not verified.
+        """
+        return None
+
     # Provisional name. True: the image carries its own krunner, so core skips the host krunner
     # mounts and env (and the runner and libbaihook resolution they need) but keeps the
     # accelerator setup. The image distro is still resolved before the creation context.
@@ -152,3 +162,18 @@ def describe_profile_failure(
         log.exception("runtime profile describe_failure failed", profile=profile.name)
         return None
     return reason
+
+
+async def summarize_profile_attestation(
+    profile: RuntimeProfile, host: str, port: int, timeout_s: float
+) -> Mapping[str, Any] | None:
+    """Call profile.summarize_attestation(); a missing or failing hook summarizes nothing."""
+    summarize = getattr(profile, "summarize_attestation", None)
+    if summarize is None:
+        return None
+    try:
+        summary: Mapping[str, Any] | None = await summarize(host, port, timeout_s)
+    except Exception:
+        log.exception("runtime profile summarize_attestation failed", profile=profile.name)
+        return None
+    return summary

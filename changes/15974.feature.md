@@ -1,0 +1,1 @@
+Report an informational attestation summary in the session record: a containerd runtime profile can describe its kernel after readiness through the optional `summarize_attestation()`, and the manager merges the bounded summary into the kernel and session `status_data.attestation` with a fixed `host-reported` source label.
