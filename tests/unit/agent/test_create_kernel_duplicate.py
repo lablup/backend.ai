@@ -141,6 +141,7 @@ class TestCreateKernelsDuplicate:
 
         assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
         duplicate_rpc.server.error_monitor.capture_exception.assert_not_awaited()
+        duplicate_rpc.agent.produce_error_event.assert_awaited_once()
 
     async def test_rejection_does_not_inject_a_lifecycle_event(
         self, duplicate_rpc: _DuplicateRPC
