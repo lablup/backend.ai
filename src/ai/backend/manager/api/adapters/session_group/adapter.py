@@ -99,9 +99,11 @@ class SessionGroupAdapter(BaseAdapter):
             for item in result.items
         ]
 
-    async def get(self, group_id: SessionGroupID) -> SessionGroupNode:
+    async def get(self, session_group_id: SessionGroupID) -> SessionGroupNode:
         """Retrieve a single session group by id."""
-        result = await self._session_group.get.run(GetSessionGroupAction(group_id=group_id))
+        result = await self._session_group.get.run(
+            GetSessionGroupAction(session_group_id=session_group_id)
+        )
         return self._data_to_node(result.data)
 
     async def global_search(
@@ -168,14 +170,16 @@ class SessionGroupAdapter(BaseAdapter):
     async def purge(self, input: PurgeSessionGroupInput) -> PurgeSessionGroupPayload:
         """Remove a session group; its member sessions stay with their group cleared."""
         result = await self._session_group.purge.run(
-            PurgeSessionGroupAction(purger=SessionGroupPurger(group_id=SessionGroupID(input.id)))
+            PurgeSessionGroupAction(
+                purger=SessionGroupPurger(session_group_id=SessionGroupID(input.id))
+            )
         )
         return PurgeSessionGroupPayload(entity_id=result.data.id)
 
     async def update(self, input: UpdateSessionGroupInput) -> UpdateSessionGroupPayload:
         """Change a session group's placement direction and enforcement."""
         updater = SessionGroupUpdater(
-            group_id=SessionGroupID(input.id),
+            session_group_id=SessionGroupID(input.id),
             placement_direction=OptionalState.from_unset(input.placement_direction).map(
                 SessionGroupPlacementDirection
             ),

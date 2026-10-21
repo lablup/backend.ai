@@ -31,7 +31,7 @@ class SessionGroupUpdater(GuardedDataUpdater[SessionGroupRow, SessionGroupData])
     A group a replica group holds is refused as in use, as the purge does.
     """
 
-    group_id: SessionGroupID
+    session_group_id: SessionGroupID
     placement_direction: OptionalState[SessionGroupPlacementDirection] = field(
         default_factory=OptionalState[SessionGroupPlacementDirection].nop
     )
@@ -50,7 +50,7 @@ class SessionGroupUpdater(GuardedDataUpdater[SessionGroupRow, SessionGroupData])
 
     @override
     def target_id_value(self) -> SessionGroupID:
-        return self.group_id
+        return self.session_group_id
 
     @override
     def guard_checks(self) -> Sequence[GuardCheck]:
@@ -58,7 +58,7 @@ class SessionGroupUpdater(GuardedDataUpdater[SessionGroupRow, SessionGroupData])
             GuardCheck(
                 condition=SessionGroupSearchableFields.linked.replica_groups.not_exists(),
                 error=SessionGroupInUseForUpdate(
-                    f"Session group {self.group_id} cannot be updated while a replica group uses it"
+                    f"Session group {self.session_group_id} cannot be updated while a replica group uses it"
                 ),
             ),
         )

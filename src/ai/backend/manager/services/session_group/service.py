@@ -26,7 +26,7 @@ class SessionGroupService:
         found = (await self._repository.search_in_global(action.to_searcher())).items
         if not found:
             raise EntityNotFoundError(
-                f"Session group {action.group_id} not found",
+                f"Session group {action.session_group_id} not found",
                 entity_type=SessionGroupEntityType(),
                 operation=ActionOperationType.GET,
             )
@@ -40,9 +40,11 @@ class SessionGroupService:
         found = {data.id: data for data in result.items}
         return PartialBulkResult(
             items=[
-                PartialBulkEntityResult[SessionGroupData].succeeded(group_id, found[group_id])
-                if group_id in found
-                else PartialBulkEntityResult[SessionGroupData].nothing(group_id)
-                for group_id in action.ids
+                PartialBulkEntityResult[SessionGroupData].succeeded(
+                    session_group_id, found[session_group_id]
+                )
+                if session_group_id in found
+                else PartialBulkEntityResult[SessionGroupData].nothing(session_group_id)
+                for session_group_id in action.ids
             ]
         )

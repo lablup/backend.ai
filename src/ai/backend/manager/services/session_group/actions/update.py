@@ -25,7 +25,7 @@ class UpdateSessionGroupAction(UpdateSingleEntityOpsAction[SessionGroupRow, Sess
 
     @override
     def entity_id(self) -> EntityIdentifier:
-        return self.updater.group_id
+        return self.updater.session_group_id
 
     @override
     def to_updater(self) -> SessionGroupUpdater:
