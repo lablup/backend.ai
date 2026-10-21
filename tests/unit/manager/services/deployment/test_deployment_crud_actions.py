@@ -391,3 +391,12 @@ class TestBulkGetDeploymentDesignatedAgents(DeploymentCRUDBaseFixtures):
             (designating, [agent]),
             (plain, []),
         ]
+
+    def test_narrowing_keeps_only_the_permitted_deployments_in_order(self) -> None:
+        first, denied, last = (DeploymentID(uuid.uuid4()) for _ in range(3))
+        action = BulkGetDeploymentDesignatedAgentsAction(deployment_ids=[first, denied, last])
+
+        narrowed = action.narrowed_to([last, first])
+
+        assert list(action.entity_ids()) == [first, denied, last]
+        assert narrowed.deployment_ids == [first, last]
