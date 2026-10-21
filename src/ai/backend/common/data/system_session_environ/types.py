@@ -66,20 +66,11 @@ class SystemSessionEnvironValueSource(enum.StrEnum):
     ACCESS_KEY = "access_key"
 
     def kind(self) -> SystemSessionEnvironSourceKind:
-        match self:
-            case (
-                SystemSessionEnvironValueSource.SESSION_ID
-                | SystemSessionEnvironValueSource.SESSION_NAME
-                | SystemSessionEnvironValueSource.CLUSTER_SIZE
-                | SystemSessionEnvironValueSource.CLUSTER_REPLICAS
-                | SystemSessionEnvironValueSource.CLUSTER_HOSTS
-                | SystemSessionEnvironValueSource.PREOPEN_PORTS
-            ):
-                return SystemSessionEnvironSourceKind.REQUIRED
-            case (
-                SystemSessionEnvironValueSource.USER_UUID
-                | SystemSessionEnvironValueSource.USER_EMAIL
-                | SystemSessionEnvironValueSource.USER_NAME
-                | SystemSessionEnvironValueSource.ACCESS_KEY
-            ):
-                return SystemSessionEnvironSourceKind.OPTIONAL
+        if self in [
+            SystemSessionEnvironValueSource.USER_UUID,
+            SystemSessionEnvironValueSource.USER_EMAIL,
+            SystemSessionEnvironValueSource.USER_NAME,
+            SystemSessionEnvironValueSource.ACCESS_KEY,
+        ]:
+            return SystemSessionEnvironSourceKind.OPTIONAL
+        return SystemSessionEnvironSourceKind.REQUIRED
