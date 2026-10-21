@@ -22,42 +22,42 @@ depends_on = None
 
 def upgrade() -> None:
     op.create_table(
-        "association_resource_groups_users",
+        "user_resource_group_relations",
         sa.Column("id", GUID(), server_default=sa.text("uuid_generate_v7()"), nullable=False),
         sa.Column("resource_group_id", GUID(), nullable=False),
         sa.Column("user_id", GUID(), nullable=False),
         sa.ForeignKeyConstraint(
             ["resource_group_id"],
             ["scaling_groups.id"],
-            name="fk_association_resource_groups_users_resource_group_id",
+            name="fk_user_resource_group_relations_resource_group_id",
             onupdate="CASCADE",
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
             ["user_id"],
             ["users.uuid"],
-            name="fk_association_resource_groups_users_user_id",
+            name="fk_user_resource_group_relations_user_id",
             onupdate="CASCADE",
             ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_association_resource_groups_users")),
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_user_resource_group_relations")),
         sa.UniqueConstraint(
             "resource_group_id",
             "user_id",
-            name=op.f("uq_association_resource_groups_users_resource_group_id"),
+            name=op.f("uq_user_resource_group_relations_resource_group_id"),
         ),
     )
     op.create_index(
-        op.f("ix_association_resource_groups_users_resource_group_id"),
-        "association_resource_groups_users",
+        op.f("ix_user_resource_group_relations_resource_group_id"),
+        "user_resource_group_relations",
         ["resource_group_id"],
     )
     op.create_index(
-        op.f("ix_association_resource_groups_users_user_id"),
-        "association_resource_groups_users",
+        op.f("ix_user_resource_group_relations_user_id"),
+        "user_resource_group_relations",
         ["user_id"],
     )
 
 
 def downgrade() -> None:
-    op.drop_table("association_resource_groups_users")
+    op.drop_table("user_resource_group_relations")

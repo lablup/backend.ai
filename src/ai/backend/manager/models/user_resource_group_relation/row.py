@@ -10,11 +10,11 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.models.base import GUID, Base
 
-__all__: Sequence[str] = ("AssociationResourceGroupsUsersRow",)
+__all__: Sequence[str] = ("UserResourceGroupRelationRow",)
 
 
-class AssociationResourceGroupsUsersRow(Base):
-    __tablename__ = "association_resource_groups_users"
+class UserResourceGroupRelationRow(Base):
+    __tablename__ = "user_resource_group_relations"
     __table_args__ = (sa.UniqueConstraint("resource_group_id", "user_id"),)
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -27,7 +27,7 @@ class AssociationResourceGroupsUsersRow(Base):
             "scaling_groups.id",
             onupdate="CASCADE",
             ondelete="CASCADE",
-            name="fk_association_resource_groups_users_resource_group_id",
+            name="fk_user_resource_group_relations_resource_group_id",
         ),
         index=True,
         nullable=False,
@@ -39,7 +39,7 @@ class AssociationResourceGroupsUsersRow(Base):
             "users.uuid",
             onupdate="CASCADE",
             ondelete="CASCADE",
-            name="fk_association_resource_groups_users_user_id",
+            name="fk_user_resource_group_relations_user_id",
         ),
         index=True,
         nullable=False,
