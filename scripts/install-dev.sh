@@ -1341,7 +1341,7 @@ configure_backendai() {
 
   # Scan the container image registry
   show_info "Scanning the image registry..."
-  ./backend.ai mgr image rescan cr.backend.ai
+  ./backend.ai mgr image rescan --allow-partial-failure cr.backend.ai
   if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
     ./backend.ai mgr image alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
   else

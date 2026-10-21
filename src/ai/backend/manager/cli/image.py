@@ -98,16 +98,29 @@ def set_resource_limit(
 @click.option(
     "-p", "--project", default=None, help="The name of the project to which the images belong."
 )
+@click.option(
+    "--allow-partial-failure",
+    is_flag=True,
+    default=False,
+    help="Print the scan errors but exit 0 when the scan itself did not raise.",
+)
 @click.pass_obj
-def rescan(cli_ctx: CLIContext, registry_or_image: str, project: str | None = None) -> None:
+def rescan(
+    cli_ctx: CLIContext,
+    registry_or_image: str,
+    project: str | None = None,
+    allow_partial_failure: bool = False,
+) -> None:
     """
     Update the kernel image metadata from the configured registries.
 
     Pass the name (usually hostname or "lablup") of the Docker registry configured as REGISTRY.
 
     To rescan only the images belonging to a specific project, use the --project option.
+
+    Exits non-zero when any registry fails to scan, unless --allow-partial-failure is given.
     """
-    asyncio.run(rescan_images_impl(cli_ctx, registry_or_image, project))
+    asyncio.run(rescan_images_impl(cli_ctx, registry_or_image, project, allow_partial_failure))
 
 
 @cli.command()

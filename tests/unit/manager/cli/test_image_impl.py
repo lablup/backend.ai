@@ -73,6 +73,16 @@ async def test_rescan_exits_non_zero_and_prints_the_scan_errors(
     assert "Failed to scan image! Detail: boom" in capsys.readouterr().err
 
 
+async def test_rescan_prints_the_scan_errors_and_exits_zero_when_partial_failure_is_allowed(
+    rescan_result: MagicMock, capsys: pytest.CaptureFixture[str]
+) -> None:
+    rescan_result.errors = ["Failed to scan image! Detail: boom"]
+
+    await image_impl.rescan_images(rescan_result.cli_ctx, "registry", allow_partial_failure=True)
+
+    assert "Failed to scan image! Detail: boom" in capsys.readouterr().err
+
+
 async def test_rescan_exits_non_zero_when_the_scan_raises(
     rescan_result: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -81,3 +91,14 @@ async def test_rescan_exits_non_zero_when_the_scan_raises(
         await image_impl.rescan_images(rescan_result.cli_ctx, "registry")
     assert exc_info.value.code == ExitCode.FAILURE
     assert "down" in capsys.readouterr().err
+
+
+async def test_rescan_exits_non_zero_when_the_scan_raises_even_if_partial_failure_is_allowed(
+    rescan_result: MagicMock,
+) -> None:
+    rescan_result.db_source.return_value.rescan_images.side_effect = RuntimeError("down")
+    with pytest.raises(SystemExit) as exc_info:
+        await image_impl.rescan_images(
+            rescan_result.cli_ctx, "registry", allow_partial_failure=True
+        )
+    assert exc_info.value.code == ExitCode.FAILURE

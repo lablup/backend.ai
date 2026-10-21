@@ -1960,7 +1960,13 @@ class Context(metaclass=ABCMeta):
                     }
                     await self.etcd_put_json("config", data)
 
-                    await self.run_manager_cli(["mgr", "image", "rescan", "cr.backend.ai"])
+                    await self.run_manager_cli([
+                        "mgr",
+                        "image",
+                        "rescan",
+                        "--allow-partial-failure",
+                        "cr.backend.ai",
+                    ])
                     if self.os_info.platform in (Platform.LINUX_ARM64, Platform.MACOS_ARM64):
                         await self.alias_image(
                             "python",
@@ -2001,7 +2007,13 @@ class Context(metaclass=ABCMeta):
                     await self.etcd_put_json("config", data)
 
                     for ref in self.dist_info.image_refs:
-                        await self.run_manager_cli(["mgr", "image", "rescan", ref])
+                        await self.run_manager_cli([
+                            "mgr",
+                            "image",
+                            "rescan",
+                            "--allow-partial-failure",
+                            ref,
+                        ])
                         await self.run_exec([*self.docker_sudo, "docker", "pull", ref])
                 case ImageSource.LOCAL_DIR:
                     self.log_header("Populating local container images...")

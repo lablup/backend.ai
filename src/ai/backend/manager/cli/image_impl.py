@@ -224,7 +224,10 @@ async def set_image_resource_limit(
 
 
 async def rescan_images(
-    cli_ctx: CLIContext, registry_or_image: str, project: str | None = None
+    cli_ctx: CLIContext,
+    registry_or_image: str,
+    project: str | None = None,
+    allow_partial_failure: bool = False,
 ) -> None:
     if not registry_or_image:
         raise click.BadArgumentUsage("Please specify a valid registry or full image name.")
@@ -240,7 +243,7 @@ async def rescan_images(
             for error in result.errors:
                 log.error("failed to scan registries", scan_error=str(error))
                 click.echo(f"failed to scan registries: {error}", err=True)
-            if result.errors:
+            if result.errors and not allow_partial_failure:
                 sys.exit(ExitCode.FAILURE)
         except Exception as e:
             log.exception("image command failed")
