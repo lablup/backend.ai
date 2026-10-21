@@ -16,6 +16,7 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.appproxy.common.errors import WorkerNotAvailable
 from ai.backend.appproxy.common.types import (
     AppMode,
     FrontendMode,
@@ -324,6 +325,46 @@ class TestTCPPipe:
         writer.close.assert_called_once()
         writer.wait_closed.assert_awaited_once()
         assert [r for r in caplog.records if r.levelno >= logging.ERROR] == []
+
+    @pytest.mark.parametrize("failing_step", ["select", "cron_start", "request_counter"])
+    async def test_client_writer_is_closed_when_bind_fails_before_its_cleanup(
+        self,
+        failing_step: str,
+        root_context: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        circuit = _create_circuit(1)
+        frontend = TCPFrontend(root_context)
+        frontend.circuits[PORT] = circuit
+        backend = TCPBackend(circuit.route_info, root_context, circuit)
+        frontend.backends[PORT] = backend
+
+        cron = MagicMock()
+        cron.start = AsyncMock()
+        cron.stop = AsyncMock()
+        monkeypatch.setattr(
+            "ai.backend.appproxy.worker.proxy.backend.tcp.LocalCron", MagicMock(return_value=cron)
+        )
+        select = AsyncMock(return_value=MagicMock())
+        request_counter = AsyncMock()
+        monkeypatch.setattr(backend._pool, "select", select)
+        monkeypatch.setattr(backend, "increase_request_counter", request_counter)
+        match failing_step:
+            case "select":
+                select.side_effect = WorkerNotAvailable
+            case "cron_start":
+                cron.start.side_effect = RuntimeError("cron failed")
+            case "request_counter":
+                request_counter.side_effect = RuntimeError("counter failed")
+
+        writer = MagicMock()
+        writer.get_extra_info.return_value = ("10.0.0.1", 12345)
+        writer.wait_closed = AsyncMock()
+
+        await asyncio.wait_for(frontend.pipe(PORT, asyncio.StreamReader(), writer), TIMEOUT)
+
+        writer.close.assert_called_once()
+        writer.wait_closed.assert_awaited_once()
 
     async def test_stop_returns_with_open_half_closed_connection(
         self,

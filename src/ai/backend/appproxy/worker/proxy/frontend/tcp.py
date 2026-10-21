@@ -138,7 +138,7 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
         try:
             await writer.wait_closed()
         except OSError as e:  # the client is already gone: ENOTCONN / ECONNRESET
-            log.trace("rejected connection already closed by the client: {!r}", e)
+            log.trace("client connection already closed: {!r}", e)
 
     async def pipe(
         self, circuit_key: int, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
@@ -175,8 +175,11 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
                 await backend.bind(reader, writer)
             except WorkerNotAvailable:
                 log.trace("no healthy route for the TCP connection")
+                await self._close_writer(writer)
             except Exception:
                 log.exception("failed to proxy a TCP connection")
+                # bind may have failed before its own cleanup; closing twice is harmless.
+                await self._close_writer(writer)
             finally:
                 end = time.monotonic()
                 metrics.proxy.observe_downstream_tcp_end(duration=int(end - start))
