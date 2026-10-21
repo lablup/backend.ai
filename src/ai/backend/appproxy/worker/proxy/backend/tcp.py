@@ -4,7 +4,6 @@ import socket
 from typing import Any, Final, override
 
 from ai.backend.appproxy.common.types import RouteInfo
-from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cron import LocalCron
 from ai.backend.logging.structured import StructuredLogger
 
@@ -92,13 +91,18 @@ class TCPBackend(BaseBackend):
 
         try:
             sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
+            sock.setblocking(False)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
-            # unlike .frontend.tcp this has a chance of being a blocking call since kernel host can be a domain
+            connect_timeout = self.root_context.local_config.proxy_worker.tcp_connect_timeout
             try:
-                await run_in_executor_with_context(
-                    None, sock.connect, (route.current_kernel_host, route.kernel_port)
+                # the kernel host can be a domain, which sock_connect resolves
+                await asyncio.wait_for(
+                    asyncio.get_running_loop().sock_connect(
+                        sock, (route.current_kernel_host, route.kernel_port)
+                    ),
+                    timeout=connect_timeout,
                 )
-            except OSError as e:
+            except (OSError, TimeoutError) as e:
                 self._pool.record_failure(route)
                 log.warning(
                     "failed to connect to the TCP upstream",

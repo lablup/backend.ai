@@ -90,6 +90,7 @@ def root_context() -> MagicMock:
     root_ctx = MagicMock()
     root_ctx.last_used_time_marker_redis_queue = asyncio.Queue()
     root_ctx.request_counter_redis_queue = asyncio.Queue()
+    root_ctx.local_config.proxy_worker.tcp_connect_timeout = 10.0
     return root_ctx
 
 

@@ -106,6 +106,7 @@ def root_context() -> MagicMock:
     root_ctx = MagicMock()
     root_ctx.last_used_time_marker_redis_queue = asyncio.Queue()
     root_ctx.request_counter_redis_queue = asyncio.Queue()
+    root_ctx.local_config.proxy_worker.tcp_connect_timeout = 10.0
     return root_ctx
 
 
@@ -381,9 +382,7 @@ class TestTCPPipe:
         async def refuse(*_args: Any) -> None:
             raise refused
 
-        monkeypatch.setattr(
-            "ai.backend.appproxy.worker.proxy.backend.tcp.run_in_executor_with_context", refuse
-        )
+        monkeypatch.setattr(asyncio.get_running_loop(), "sock_connect", refuse)
         down_writer = MagicMock()
         down_writer.wait_closed = AsyncMock()
 
@@ -401,6 +400,42 @@ class TestTCPPipe:
         assert fields["log_tag_circuit_id"] == str(circuit.id)
         assert fields["log_tag_route_id"] == str(circuit.route_info[0].route_id)
         assert fields["log_tag_error"] == repr(refused)
+        record_failure.assert_called_once()
+        down_writer.close.assert_called_once()
+        down_writer.wait_closed.assert_awaited_once()
+
+    async def test_upstream_connect_timeout_is_treated_like_a_refused_connect(
+        self,
+        root_context: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        root_context.local_config.proxy_worker.tcp_connect_timeout = 0.05
+        circuit = _create_circuit(1)
+        backend = TCPBackend(circuit.route_info, root_context, circuit)
+        record_failure = MagicMock()
+        monkeypatch.setattr(backend._pool, "record_failure", record_failure)
+
+        async def hang(*_args: Any) -> None:
+            await asyncio.Event().wait()
+
+        monkeypatch.setattr(asyncio.get_running_loop(), "sock_connect", hang)
+        down_writer = MagicMock()
+        down_writer.wait_closed = AsyncMock()
+
+        try:
+            with caplog.at_level(logging.DEBUG):
+                await asyncio.wait_for(backend.bind(asyncio.StreamReader(), down_writer), TIMEOUT)
+        finally:
+            await backend.close()
+
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1
+        fields = vars(warnings[0])
+        assert warnings[0].getMessage() == "failed to connect to the TCP upstream"
+        assert fields["log_tag_circuit_id"] == str(circuit.id)
+        assert fields["log_tag_route_id"] == str(circuit.route_info[0].route_id)
+        assert fields["log_tag_error"] == repr(TimeoutError())
         record_failure.assert_called_once()
         down_writer.close.assert_called_once()
         down_writer.wait_closed.assert_awaited_once()
