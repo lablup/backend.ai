@@ -10,6 +10,7 @@ Test Scenarios:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID
@@ -308,11 +309,12 @@ class TestSessionLauncherKernelCreation:
 
         session_ids = [session_for_start_single_kernel.session_id]
         with RecorderContext.scope("test", entity_ids=session_ids):
-            await launcher.start_sessions_for_handler(
+            timed_out = await launcher.start_sessions_for_handler(
                 [session_for_start_single_kernel],
                 image_config_default,
             )
 
+        assert timed_out == []
         (record,) = [r for r in caplog.records if r.levelno >= logging.ERROR]
         assert record.__dict__["log_tag_agent_id"] == "agent-1"
         assert record.__dict__["log_tag_session_id"] == str(
@@ -321,6 +323,82 @@ class TestSessionLauncherKernelCreation:
         assert record.exc_info is not None
         assert record.exc_info[1] is error
         mock_valkey_schedule.record_session_failed_agents.assert_awaited_once()
+
+    async def test_kernel_creation_honors_configured_start_timeout(
+        self,
+        launcher: SessionLauncher,
+        mock_config_provider: MagicMock,
+        mock_agent_client_pool: MagicMock,
+        mock_repository: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """Kernel creation exceeding session.start_timeout fails the session.
+
+        Given: session.start_timeout configured shorter than the agent call
+        When: Start session
+        Then: The start is cancelled, error info naming the timeout is recorded,
+            the session is returned as timed out and a warning is logged
+        """
+        mock_config_provider.config.session.start_timeout = 0.05
+
+        async def slow_create_kernels(*args: object, **kwargs: object) -> None:
+            await asyncio.sleep(5)
+
+        mock_agent_client_pool._mock_client.create_kernels.side_effect = slow_create_kernels
+
+        session_ids = [session_for_start_single_kernel.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            timed_out = await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel],
+                image_config_default,
+            )
+
+        assert timed_out == [session_for_start_single_kernel.session_id]
+        (record,) = [r for r in caplog.records if "session start timed out" in r.message]
+        assert record.exc_info is not None
+        assert isinstance(record.exc_info[1], asyncio.TimeoutError)
+
+        session_id = session_for_start_single_kernel.session_id
+        mock_repository.update_session_error_info.assert_awaited_once()
+        recorded_id, error_info = mock_repository.update_session_error_info.await_args.args
+        assert recorded_id == session_id
+        assert error_info["error"]["name"] == "TimeoutError"
+        assert "0.05" in error_info["error"]["repr"]
+
+    async def test_start_timeout_recording_failure_is_logged(
+        self,
+        launcher: SessionLauncher,
+        mock_config_provider: MagicMock,
+        mock_agent_client_pool: MagicMock,
+        mock_repository: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A failure while recording the start timeout is logged, not raised.
+
+        Given: Start timeout fires and the repository fails to record it
+        When: Start session
+        Then: The failure is logged and start_sessions_for_handler does not raise
+        """
+        mock_config_provider.config.session.start_timeout = 0.05
+
+        async def slow_create_kernels(*args: object, **kwargs: object) -> None:
+            await asyncio.sleep(5)
+
+        mock_agent_client_pool._mock_client.create_kernels.side_effect = slow_create_kernels
+        mock_repository.update_session_error_info.side_effect = RuntimeError("db down")
+
+        session_ids = [session_for_start_single_kernel.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel],
+                image_config_default,
+            )
+
+        assert any("failed to record session start timeout" in r.message for r in caplog.records)
 
 
 # =============================================================================

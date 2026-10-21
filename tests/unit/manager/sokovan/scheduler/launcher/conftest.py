@@ -115,6 +115,7 @@ def mock_config_provider() -> MagicMock:
     provider.config.docker.image.auto_pull.value = AutoPullBehavior.DIGEST.value
     provider.config.network.inter_container.default_driver = "overlay"
     provider.config.debug.enabled = False
+    provider.config.session.start_timeout = 1800.0
     return provider
 
 

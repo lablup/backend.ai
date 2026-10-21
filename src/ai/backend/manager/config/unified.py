@@ -234,7 +234,10 @@ from ai.backend.manager.data.secret.types import (
     SecretKeyId,
     SecretKeyMaterial,
 )
-from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
+from ai.backend.manager.defs import (
+    DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW,
+    DEFAULT_START_SESSION_TIMEOUT_SEC,
+)
 from ai.backend.manager.pglock import PgAdvisoryLock
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -2289,6 +2292,24 @@ class HangToleranceConfig(BaseConfigSchema):
 
 
 class SessionConfig(BaseConfigSchema):
+    start_timeout: Annotated[
+        float,
+        Field(
+            default=DEFAULT_START_SESSION_TIMEOUT_SEC,
+            gt=0,
+            validation_alias=AliasChoices("start_timeout", "start-timeout"),
+            serialization_alias="start-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum time in seconds the manager waits for the kernel creation of a "
+                "single session to complete after it leaves the PREPARED state. "
+                "Increase for large images or slow agents; the default is 30 minutes."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="1800", prod="1800"),
+        ),
+    ]
     hang_tolerance: Annotated[
         HangToleranceConfig,
         Field(

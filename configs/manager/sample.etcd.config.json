@@ -37,6 +37,7 @@
     "token": "some-random-long-string"
   },
   "session": {
+    "start-timeout": 1800,
     "hang-tolerance": {
       "threshold": {
         "PREPARING": "1h",
