@@ -41,14 +41,6 @@ from .context import CLIContext, redis_ctx
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-def _register_image_cli_orm_cluster() -> None:
-    """Register ORM rows reachable only via string relationships so the CLI can configure mappers (kept minimal, not all models)."""
-    from ai.backend.manager.models.agent.row import AgentRow
-    from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
-
-    _ = (AgentRow, ResourceGroupForProjectRow)
-
-
 def _canonical_searcher(canonical: str, architecture: str) -> ImageSearcher:
     return CanonicalImageSearcher(canonical, architecture, [ImageStatus.ALIVE])
 
@@ -72,7 +64,6 @@ def _describe(image: ImageData) -> str:
 
 
 async def list_images(cli_ctx: CLIContext, short: bool, installed_only: bool) -> None:
-    _register_image_cli_orm_cluster()
     # Connect to postgreSQL DB
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
@@ -133,7 +124,6 @@ async def list_images(cli_ctx: CLIContext, short: bool, installed_only: bool) ->
 
 
 async def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
-    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with connect_database(bootstrap_config.db) as db:
         try:
@@ -150,7 +140,6 @@ async def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architectu
 
 
 async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
-    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with connect_database(bootstrap_config.db) as db:
         try:
@@ -167,7 +156,6 @@ async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architectur
 async def purge_image(
     cli_ctx: CLIContext, canonical_or_alias: str, architecture: str, remove_from_registry: bool
 ) -> None:
-    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -204,7 +192,6 @@ async def set_image_resource_limit(
     range_value: tuple[Decimal | None, Decimal | None],
     architecture: str,
 ) -> None:
-    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with connect_database(bootstrap_config.db) as db:
         try:
@@ -225,7 +212,6 @@ async def rescan_images(
 ) -> None:
     if not registry_or_image:
         raise click.BadArgumentUsage("Please specify a valid registry or full image name.")
-    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -241,7 +227,6 @@ async def rescan_images(
 
 
 async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str) -> None:
-    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with connect_database(bootstrap_config.db) as db:
         try:
@@ -258,7 +243,6 @@ async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str)
 
 
 async def dealias(cli_ctx: CLIContext, alias: str) -> None:
-    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
@@ -274,7 +258,6 @@ async def dealias(cli_ctx: CLIContext, alias: str) -> None:
 
 
 async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
-    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with connect_database(bootstrap_config.db) as db:
         try:
@@ -304,7 +287,6 @@ def _resolve_architecture(current: bool, architecture: str | None) -> str:
 async def validate_image_canonical(
     cli_ctx: CLIContext, canonical: str, current: bool, architecture: str | None = None
 ) -> None:
-    _register_image_cli_orm_cluster()
     bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
         connect_database(bootstrap_config.db) as db,
