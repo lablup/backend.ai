@@ -188,7 +188,15 @@ class KernelTaskExited(BackendAIError, web.HTTPInternalServerError):
 
     exit_status: int | None
 
-    def __init__(self, extra_msg: str | None = None, *, exit_status: int | None = None) -> None:
+    def __init__(
+        self,
+        extra_msg: str | None = None,
+        *,
+        exit_status: int | None = None,
+        failure_reason: str | None = None,
+    ) -> None:
+        if failure_reason is not None:
+            extra_msg = f"{extra_msg}: {failure_reason}" if extra_msg else failure_reason
         super().__init__(extra_msg)
         self.exit_status = exit_status
 

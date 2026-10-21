@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
@@ -8,6 +9,9 @@ from pathlib import Path
 from typing import Any, Literal, Protocol, runtime_checkable
 
 from ai.backend.common.types import KernelCreationConfig, KernelId, SessionId, SlotName
+from ai.backend.logging.structured import StructuredLogger
+
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class GeneratedMountKind(enum.StrEnum):
@@ -105,6 +109,14 @@ class RuntimeProfile(Protocol):
         """
         return config
 
+    def describe_failure(self, exit_status: int | None, error_text: str) -> str | None:
+        """
+        Name why a kernel failed; the text is added to the session error message, None keeps it.
+        error_text is the text core has: str() of the runtime error on a create failure, core's
+        own message on a task exit. exit_status is None when no task ran.
+        """
+        return None
+
     # Provisional name. True: the image carries its own krunner, so core skips the host krunner
     # mounts and env (and the runner and libbaihook resolution they need) but keeps the
     # accelerator setup. The image distro is still resolved before the creation context.
@@ -125,3 +137,18 @@ async def prepare_kernel_config(
         return config
     prepared: KernelCreationConfig = await prepare(config)
     return prepared
+
+
+def describe_profile_failure(
+    profile: RuntimeProfile, exit_status: int | None, error_text: str
+) -> str | None:
+    """Call profile.describe_failure(); a missing or failing hook describes nothing."""
+    describe = getattr(profile, "describe_failure", None)
+    if describe is None:
+        return None
+    try:
+        reason: str | None = describe(exit_status, error_text)
+    except Exception:
+        log.exception("runtime profile describe_failure failed", profile=profile.name)
+        return None
+    return reason

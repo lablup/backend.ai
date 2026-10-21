@@ -24,6 +24,7 @@ from ai.backend.agent.containerd import kernel as kernel_module
 from ai.backend.agent.containerd.client import TaskInfo, TaskState
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.profile.base import LaunchPlan, TlsConnectReadiness
+from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.errors.containerd import (
     ContainerdOperationFailed,
     KernelTaskExited,
@@ -51,6 +52,7 @@ def kernel(
         environ={},
         data={},
         launch_plan=launch_plan,
+        profile=RuncProfile(1.0),
         client=fake,
     )
 

@@ -11,7 +11,12 @@ from typing import Any, Final, override
 from tenacity import TryAgain
 
 from ai.backend.agent.containerd.client import ContainerdAPI, TaskState
-from ai.backend.agent.containerd.profile.base import LaunchPlan, TlsConnectReadiness
+from ai.backend.agent.containerd.profile.base import (
+    LaunchPlan,
+    RuntimeProfile,
+    TlsConnectReadiness,
+    describe_profile_failure,
+)
 from ai.backend.agent.errors.containerd import (
     ContainerdOperationFailed,
     KernelTaskExited,
@@ -42,6 +47,7 @@ _TLS_RETRY_INTERVAL_SEC: Final = 1.0
 
 class ContainerdKernel(AbstractKernel):
     launch_plan: LaunchPlan
+    _profile: RuntimeProfile
     _client: ContainerdAPI
     _readiness_deadline: float | None
 
@@ -58,6 +64,7 @@ class ContainerdKernel(AbstractKernel):
         environ: Mapping[str, Any],
         data: dict[str, Any],
         launch_plan: LaunchPlan,
+        profile: RuntimeProfile,
         client: ContainerdAPI,
     ) -> None:
         super().__init__(
@@ -72,6 +79,7 @@ class ContainerdKernel(AbstractKernel):
             environ=environ,
         )
         self.launch_plan = launch_plan
+        self._profile = profile
         # Process-local handle; never pickled because the containerd agent does not persist its kernel registry.
         self._client = client
         self._readiness_deadline = None
@@ -147,11 +155,18 @@ class ContainerdKernel(AbstractKernel):
             )
             return
         if task is None:
-            raise KernelTaskExited(f"the kernel task is gone (container {container_id})")
-        if task.state is TaskState.STOPPED:
+            message = f"the kernel task is gone (container {container_id})"
             raise KernelTaskExited(
-                f"the kernel task exited with status {task.exit_status} (container {container_id})",
+                message, failure_reason=describe_profile_failure(self._profile, None, message)
+            )
+        if task.state is TaskState.STOPPED:
+            message = (
+                f"the kernel task exited with status {task.exit_status} (container {container_id})"
+            )
+            raise KernelTaskExited(
+                message,
                 exit_status=task.exit_status,
+                failure_reason=describe_profile_failure(self._profile, task.exit_status, message),
             )
 
     async def _check_tls_status(self, readiness: TlsConnectReadiness) -> dict[str, Any]:

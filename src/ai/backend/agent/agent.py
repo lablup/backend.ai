@@ -2992,6 +2992,8 @@ class AbstractAgent[
                             LifecycleEvent.DESTROY,
                             KernelLifecycleEventReason.FAILED_TO_CREATE,
                         )
+                        if isinstance(e, ContainerCreationFailedError):
+                            raise
                         raise ContainerCreationFailedError(
                             f"Kernel failed to create container (k:{kernel_id!s}, detail: {e!s})"
                         ) from e
