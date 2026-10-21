@@ -18,6 +18,7 @@ from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.manager.api.adapters.session_group.adapter import SessionGroupAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
+from ai.backend.manager.errors.session_group import SessionGroupInUseForUpdate
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -223,18 +224,18 @@ class AnOwnerGrantedOnlyReadMayNotUpdate(
 
 
 @dataclass(frozen=True)
-class ADeploymentsGroupIsNotFoundToItsOwner(
+class ADeploymentsGroupIsRefusedAsInUse(
     Scenario[TestSeedingSession, SessionGroupsAndACaller, SessionGroupAdapter, SessionGroupNode]
 ):
     @override
     def summary(self) -> str:
-        return "a-deployments-session-group-is-not-found-even-to-its-owner"
+        return "a-deployments-session-group-is-refused-as-in-use"
 
     @override
     def describe(self) -> str:
         return (
             "자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기 배포의 그룹 정책을 "
-            "바꾸면, 권한이 아니라 대상이 없다는 것으로 거부된다"
+            "바꾸면, 권한이 아니라 사용 중이라는 것으로 거부된다"
         )
 
     @override
@@ -247,14 +248,14 @@ class ADeploymentsGroupIsNotFoundToItsOwner(
 
     @override
     def then(self) -> Then[Laid, SessionGroupNode]:
-        return TheCallIsRefused(EntityNotFoundError)
+        return TheCallIsRefused(SessionGroupInUseForUpdate)
 
 
 SCENARIOS: list[UpdatingStep] = [
     AnOwnerChangesBothItems(started=datetime.now(UTC)),
     AnOwnerChangesOnlyTheDirection(started=datetime.now(UTC)),
     AnOwnerGrantedOnlyReadMayNotUpdate(),
-    ADeploymentsGroupIsNotFoundToItsOwner(),
+    ADeploymentsGroupIsRefusedAsInUse(),
 ]
 
 

@@ -8,14 +8,13 @@ from typing import Any, override
 
 from sqlalchemy.orm import InstrumentedAttribute
 
-from ai.backend.common.data.entity.session_group import SessionGroupEntityType, SessionGroupID
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.manager.data.session_group.types import (
     SessionGroupData,
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.session_group import SessionGroupInUseForUpdate
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
@@ -29,7 +28,7 @@ __all__ = ("SessionGroupUpdater",)
 class SessionGroupUpdater(GuardedDataUpdater[SessionGroupRow, SessionGroupData]):
     """Changes a session group's placement policy.
 
-    A group a replica group holds answers not found, as the reads do.
+    A group a replica group holds is refused as in use, as the purge does.
     """
 
     group_id: SessionGroupID
@@ -58,10 +57,8 @@ class SessionGroupUpdater(GuardedDataUpdater[SessionGroupRow, SessionGroupData])
         return (
             GuardCheck(
                 condition=SessionGroupSearchableFields.linked.replica_groups.not_exists(),
-                error=EntityNotFoundError(
-                    f"Session group {self.group_id} not found",
-                    entity_type=SessionGroupEntityType(),
-                    operation=ActionOperationType.UPDATE,
+                error=SessionGroupInUseForUpdate(
+                    f"Session group {self.group_id} cannot be updated while a replica group uses it"
                 ),
             ),
         )

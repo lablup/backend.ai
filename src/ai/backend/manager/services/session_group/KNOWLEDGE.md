@@ -1,7 +1,7 @@
 ---
 name: session-group-service-shapes
 type: decision-table
-description: session_group knowledge - why the reads by id keep a service while the two searches, the update and the purge run against ops, how a deployment's group is left out of every user read and the update and refused by the purge, why the bulk read is partial
+description: session_group knowledge - why the reads by id keep a service while the two searches, the update and the purge run against ops, how a deployment's group is left out of every user read and refused by the update and the purge, why the bulk read is partial
 scope: src/ai/backend/manager/services/session_group
 keywords: [GetSessionGroupAction, BulkGetSessionGroupsAction, GlobalSearchSessionGroupsAction, ScopedSearchSessionGroupsAction, UpdateSessionGroupAction, SessionGroupUpdater, GuardCheck, PurgeSessionGroupAction, SessionGroupPurger, SessionGroupService, OpsRepository, SessionGroupTarget, replica_groups, partial_bulk, single_entity]
 sources:
@@ -13,7 +13,7 @@ generated:
   at: 2026-10-15
 updated:
   by: claude-code/opus-5.5
-  at: 2026-10-19
+  at: 2026-10-21
 status: draft
 ---
 
@@ -30,7 +30,7 @@ managed with its deployment, not by the user.
 `backend.ai mgr ops list` prints the wired list. Its output answers the entity type,
 shape, operation, gate and backing.
 
-## A deployment's group is left out of every user read and write
+## A deployment's group is left out of every user read
 
 | Operation | Where the group is left out |
 |---|---|
@@ -38,15 +38,15 @@ shape, operation, gate and backing.
 | `bulk_get_ids` | The same searcher for many ids; a held group answers empty |
 | `scoped_search` | Every `SessionGroupTarget` adds the same condition to its scope condition |
 | `global_search` | Not left out: the superadmin sees every group |
-| `update` | `SessionGroupUpdater` carries the condition as a `GuardCheck` whose error is not found |
+| `update` | `SessionGroupUpdater` carries the condition as a `GuardCheck`; a held group is refused as in use (409) |
 | `purge` | The purger's guard rides on the DELETE; a held group is refused as in use (409) |
 
 - The condition is `SessionGroupSearchableFields.linked.replica_groups.not_exists()`, one
   declaration every path reads.
 - A read answers a held group as not found, not a denial: the caller may hold READ on it
   through the project, so the permission is not what keeps it out.
-- The purge refuses a held group as in use: only a caller holding PURGE on the group
-  reaches the guard, and the group cannot go while a replica group references it.
+- The update and the purge refuse a held group as in use: only a caller holding UPDATE or
+  PURGE on the group reaches the guard, and the deployment manages the group it references.
 
 ## The reads by id keep a service
 

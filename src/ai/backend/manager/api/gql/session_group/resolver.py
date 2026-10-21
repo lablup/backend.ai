@@ -135,7 +135,7 @@ async def scoped_session_groups(
         description=(
             "Change a session group's placement direction and enforcement. Members placed "
             "afterwards follow the new policy; a group a deployment's replica group holds "
-            "is not found."
+            "is refused as in use."
         ),
     )
 )
