@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 
+from ai.backend.agent.containerd import lifecycle
 from ai.backend.agent.containerd.client import ContainerRecord
 from ai.backend.agent.containerd.lifecycle import (
     clean_container,
@@ -183,17 +184,46 @@ class TestClean:
 
         assert ("remove_snapshot", "absent") in fake.calls
 
-    async def test_failing_task_deletion_still_removes_container_and_snapshot(
+    async def test_failing_task_deletion_keeps_the_container_record_and_snapshot(
         self, fake: FakeContainerd
     ) -> None:
-        """A task that cannot be deleted must not leave its container record and snapshot."""
+        """The record is the way to the task: a task that is not confirmed gone keeps it."""
         await _launch(fake)
         fake.failing.add("delete_task")
 
         with pytest.raises(ContainerdOperationFailed, match="delete_task"):
             await clean_container(fake, CID)
 
-        assert fake.containers == {}
+        assert CID in fake.containers
+        assert CID in fake.snapshots
+
+    async def test_task_surviving_sigkill_keeps_the_container_record_and_snapshot(
+        self, fake: FakeContainerd, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        await _launch(fake)
+        monkeypatch.setattr(lifecycle, "KILL_WAIT_SEC", 0.2)
+
+        async def ignored(*args: Any, **kwargs: Any) -> None:
+            return None
+
+        monkeypatch.setattr(fake, "kill_task", ignored)
+
+        with pytest.raises(ContainerdOperationFailed, match="did not exit"):
+            await clean_container(fake, CID)
+
+        assert CID in fake.containers
+        assert CID in fake.snapshots
+
+    async def test_failing_container_deletion_still_removes_the_snapshot(
+        self, fake: FakeContainerd
+    ) -> None:
+        await _launch(fake)
+        fake.failing.add("delete_container")
+
+        with pytest.raises(ContainerdOperationFailed, match="delete_container"):
+            await clean_container(fake, CID)
+
+        assert fake.tasks == {}
         assert fake.snapshots == {}
 
     async def test_is_idempotent(self, fake: FakeContainerd) -> None:

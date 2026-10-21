@@ -99,10 +99,22 @@ async def clean_container(
     """Remove the task, the container record and the rootfs snapshot; missing pieces are skipped.
 
     The snapshot key is the container record's; `snapshot_key` covers a record not created yet.
-    A failing step is logged and the next one still runs; the first failure is raised at the end.
+    The record stays while the task may still exist: containerd reaches the task through it.
+    Once the task is gone, a failing step is logged and the next one still runs; the first
+    failure is raised at the end.
     """
     record = await client.get_container(container_id)
     task = await client.get_task(container_id)
+    if task is not None:
+        if not is_gone(task):
+            await client.kill_task(container_id, signal.SIGKILL, all_processes=True)
+            if not await _wait_gone(client, container_id, KILL_WAIT_SEC):
+                raise ContainerdOperationFailed(
+                    f"the task of {container_id} did not exit after SIGKILL"
+                )
+        await client.delete_task(container_id)
+        if await client.get_task(container_id) is not None:
+            raise ContainerdOperationFailed(f"the task of {container_id} is still there")
     failures: list[BackendAIError] = []
 
     async def attempt(step: Awaitable[Any]) -> None:
@@ -112,11 +124,6 @@ async def clean_container(
             log.exception("container cleanup step failed", container_id=container_id)
             failures.append(e)
 
-    if task is not None:
-        if not is_gone(task):
-            await attempt(client.kill_task(container_id, signal.SIGKILL, all_processes=True))
-            await _wait_gone(client, container_id, KILL_WAIT_SEC)
-        await attempt(client.delete_task(container_id))
     await attempt(client.delete_container(container_id))
     key = record.snapshot_key if record is not None else snapshot_key or container_id
     await attempt(client.remove_snapshot(key))

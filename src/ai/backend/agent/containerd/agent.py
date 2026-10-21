@@ -115,16 +115,12 @@ from ai.backend.logging.structured import StructuredLogger
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-async def _run_scratch_work[**P, T](
-    func: Callable[P, T], *args: P.args, **kwargs: P.kwargs
-) -> T:
+async def _run_scratch_work[**P, T](func: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
     """Run blocking scratch work in the executor; a cancel waits until the thread has finished.
 
     Otherwise the thread could recreate the scratch dir after its removal.
     """
-    work = asyncio.ensure_future(
-        run_in_executor_with_context(None, partial(func, *args, **kwargs))
-    )
+    work = asyncio.ensure_future(run_in_executor_with_context(None, partial(func, *args, **kwargs)))
     try:
         return await asyncio.shield(work)
     except asyncio.CancelledError:
@@ -134,6 +130,7 @@ async def _run_scratch_work[**P, T](
             except asyncio.CancelledError:
                 pass
         raise
+
 
 HOST_PORTS_LABEL: Final = "ai.backend.containerd.host-ports"
 KERNEL_IP_LABEL: Final = "ai.backend.containerd.kernel-ip"
