@@ -4,7 +4,15 @@ import asyncio
 import logging
 import signal
 import uuid
-from collections.abc import AsyncGenerator, Callable, Iterable, Mapping, MutableMapping, Sequence
+from collections.abc import (
+    AsyncGenerator,
+    Awaitable,
+    Callable,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
@@ -248,6 +256,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _network: KernelNetwork
     _address: IPv4Address | None
     _resource_lock: asyncio.Lock
+    _hold_stuck: Callable[[KernelId, str], Awaitable[None]]
     _dirs: ScratchDirs
     _generated_mounts: list[GeneratedMount]
     _base_spec: dict[str, Any]
@@ -270,6 +279,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         port_pool: PortPool,
         network: KernelNetwork,
         resource_lock: asyncio.Lock,
+        hold_stuck: Callable[[KernelId, str], Awaitable[None]],
     ) -> None:
         super().__init__(
             ownership_data,
@@ -288,6 +298,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self._network = network
         self._address = None
         self._resource_lock = resource_lock
+        self._hold_stuck = hold_stuck
         self._dirs = ScratchDirs.for_kernel(
             local_config.container.scratch_root, str(ownership_data.kernel_id)
         )
@@ -651,6 +662,12 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 stdio=stdio,
                 runtime_options=launch_plan.runtime_options,
             )
+        except ContainerTaskStuck as stuck:
+            # The task survived the cleanup and still holds the devices, ports and network.
+            await self._hold_stuck(self.kernel_id, container_id)
+            if stuck.__cause__ is None:
+                raise
+            raise stuck.__cause__ from None
         except BaseException:
             await self._teardown_network()
             self._port_pool.release_many(host_ports)
@@ -1046,7 +1063,11 @@ class ContainerdAgent(
             port_pool=self.port_pool,
             network=self._network,
             resource_lock=self.resource_lock,
+            hold_stuck=self._hold_stuck,
         )
+
+    def _is_stuck(self, kernel_id: KernelId) -> bool:
+        return any(entry.kernel_id == kernel_id for entry in self._stuck_kernels.values())
 
     def _refuse_while_stuck(self, kernel_id: KernelId) -> None:
         for entry in self._stuck_kernels.values():
@@ -1108,6 +1129,8 @@ class ContainerdAgent(
         container_id: ContainerId | None,
         restarting: bool,
     ) -> None:
+        if container_id is None and self._is_stuck(kernel_id):
+            return  # a launch whose task survived its cleanup; the retry loop finishes it
         dirs = ScratchDirs.for_kernel(self.local_config.container.scratch_root, str(kernel_id))
         if container_id is not None:
             await self._collect_task_log(kernel_id, container_id, dirs)

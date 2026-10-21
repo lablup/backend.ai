@@ -782,6 +782,22 @@ class TestStuckKernel:
         assert (scratch_root / str(kid)).exists()
         assert agent.port_pool.used_ports() == {30000, 30001}
 
+    async def test_clean_of_a_stuck_launch_keeps_the_network_and_scratch(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+    ) -> None:
+        """A failed launch's clean event has no container id; the held task still needs both."""
+        kid = await self._stick(agent, scratch_root)
+
+        await agent.clean_kernel(kid, None, False)
+
+        assert agent._stuck_kernels["c1"].kernel_id == kid
+        assert (scratch_root / str(kid)).exists()
+        assert agent.port_pool.used_ports() == {30000, 30001}
+
     async def test_the_clean_event_does_not_release_the_ports_of_a_stuck_kernel(
         self,
         agent: ContainerdAgent,

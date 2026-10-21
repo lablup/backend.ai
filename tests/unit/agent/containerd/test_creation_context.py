@@ -81,6 +81,7 @@ def _make_context(
     computers: dict[DeviceName, ComputerContext] | None = None,
     runner: FakeCommandRunner | None = None,
     network: KernelNetwork | None = None,
+    hold_stuck: AsyncMock | None = None,
 ) -> ContainerdKernelCreationContext:
     return ContainerdKernelCreationContext(
         ownership_data,
@@ -103,6 +104,7 @@ def _make_context(
             run=runner or FakeCommandRunner(),
         ),
         resource_lock=asyncio.Lock(),
+        hold_stuck=hold_stuck or AsyncMock(),
     )
 
 
@@ -722,6 +724,7 @@ class TestStartContainer:
         port_pool: PortPool,
         runner: FakeCommandRunner | None = None,
         service_ports: list[ServicePort] | None = None,
+        hold_stuck: AsyncMock | None = None,
     ) -> tuple[ContainerdKernelCreationContext, ContainerdKernel]:
         profile = FakeProfile("runc", accepts=True, plan_result=launch_plan)
         ctx = _make_context(
@@ -733,6 +736,7 @@ class TestStartContainer:
             port_pool=port_pool,
             computers=computers,
             runner=runner,
+            hold_stuck=hold_stuck,
         )
         await ctx.prepare_scratch()
         resource_spec.mounts.extend(await ctx.get_intrinsic_mounts())
@@ -1177,3 +1181,52 @@ class TestStartContainer:
         assert fake.snapshots == {}
         assert runner.matching("ip", "link", "show")  # the network teardown ran
         cast(MagicMock, computers[DeviceName("cpu")].alloc_map).free.assert_called_once()
+
+    async def test_launch_whose_cleanup_is_stuck_keeps_what_the_task_holds(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+        fake: FakeContainerd,
+    ) -> None:
+        """The task of a failed launch survives its cleanup: nothing it holds is released."""
+        pool = PortPool(PORT_RANGE, cooldown_sec=0)
+        runner = FakeCommandRunner()
+        hold_stuck = AsyncMock()
+        sports: list[ServicePort] = [
+            {
+                "name": "app",
+                "protocol": ServicePortProtocols.HTTP,
+                "container_ports": (8080,),
+                "host_ports": (None,),
+                "is_inference": False,
+            }
+        ]
+        ctx, kernel = await self._prepared(
+            tmp_path,
+            ownership_data,
+            launch_kernel_config,
+            launch_plan,
+            resource_spec,
+            computers,
+            fake,
+            pool,
+            runner,
+            service_ports=sports,
+            hold_stuck=hold_stuck,
+        )
+        fake.failing.update({"start_task", "delete_task"})
+
+        with pytest.raises(ContainerdOperationFailed):
+            await ctx.start_container(kernel, [], None, [], MagicMock())
+
+        assert hold_stuck.await_args is not None
+        kernel_id, container_id = hold_stuck.await_args.args
+        assert kernel_id == ownership_data.kernel_id
+        assert container_id in fake.containers
+        assert len(pool) == 9
+        assert not runner.matching("ip", "link", "show")  # no network teardown
+        cast(MagicMock, computers[DeviceName("cpu")].alloc_map).free.assert_not_called()

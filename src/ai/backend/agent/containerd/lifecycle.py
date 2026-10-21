@@ -56,15 +56,19 @@ async def launch_container(
     """Prepare the snapshot, create the container and start its task; returns the PID.
 
     A failed step removes what was created. FIXME(containerd-mvp): no lease holds the snapshot.
+    If the task survives that cleanup, ContainerTaskStuck is raised from the original error.
     """
     try:
         rootfs: Sequence[MountSpec] = await client.prepare_snapshot(record.snapshot_key, chain_id)
         await client.create_container(record, runtime, spec, runtime_options)
         pid = await client.create_task(record.id, rootfs, stdio, stdio)
         await client.start_task(record.id)
-    except BaseException:
+    except BaseException as e:
         try:
             await clean_container(client, record.id, snapshot_key=record.snapshot_key)
+        except ContainerTaskStuck as stuck:
+            log.exception("cleanup after a failed launch failed", container_id=record.id)
+            raise stuck from e
         except BackendAIError:
             log.exception("cleanup after a failed launch failed", container_id=record.id)
         raise

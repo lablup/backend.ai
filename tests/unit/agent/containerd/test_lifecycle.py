@@ -93,6 +93,19 @@ class TestLaunch:
         with pytest.raises(ContainerdOperationFailed, match="create_task"):
             await _launch(fake)
 
+    async def test_stuck_cleanup_raises_stuck_from_the_launch_error(
+        self, fake: FakeContainerd
+    ) -> None:
+        """The caller learns that the task survived, and still gets the launch error."""
+        fake.failing.update({"start_task", "delete_task"})
+
+        with pytest.raises(ContainerTaskStuck) as excinfo:
+            await _launch(fake)
+
+        assert isinstance(excinfo.value.__cause__, ContainerdOperationFailed)
+        assert "start_task" in str(excinfo.value.__cause__)
+        assert CID in fake.containers
+
     @pytest.mark.parametrize(
         "cancelled_op", ["prepare_snapshot", "create_container", "create_task"]
     )
