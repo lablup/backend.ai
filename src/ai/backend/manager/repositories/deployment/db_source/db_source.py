@@ -41,6 +41,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import (
     AccessKey,
+    AgentId,
     KernelId,
     SessionId,
     SlotName,
@@ -2838,6 +2839,32 @@ class DeploymentDBSource:
             for endpoint_id, agent_uuid in result:
                 agents_by_deployment[endpoint_id].append(agent_uuid)
             return agents_by_deployment
+
+    async def fetch_designated_agent_ids_by_deployment_ids(
+        self,
+        deployment_ids: set[DeploymentID],
+    ) -> Mapping[DeploymentID, list[AgentId]]:
+        """Fetch the agent ids each deployment designates, ordered by agent id.
+
+        A deployment with none maps to ``[]``.
+        """
+        if not deployment_ids:
+            return {}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = (
+                sa.select(DeploymentDesignatedAgentRow.endpoint_id, AgentRow.id)
+                .join(AgentRow, AgentRow.uuid == DeploymentDesignatedAgentRow.agent_uuid)
+                .where(DeploymentDesignatedAgentRow.endpoint_id.in_(deployment_ids))
+                .order_by(AgentRow.id)
+            )
+            result = await db_sess.execute(query)
+            agent_ids_by_deployment: dict[DeploymentID, list[AgentId]] = {
+                deployment_id: [] for deployment_id in deployment_ids
+            }
+            for endpoint_id, agent_id in result:
+                agent_ids_by_deployment[endpoint_id].append(agent_id)
+            return agent_ids_by_deployment
 
     async def activate_revision(
         self,
