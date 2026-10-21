@@ -47,9 +47,9 @@ class SystemSessionEnvironScopeType(enum.StrEnum):
 
 
 class SystemSessionEnvironSourceKind(enum.StrEnum):
-    """``system`` values win over the session's own environ; ``optional`` ones lose to it."""
+    """``required`` values win over the session's own environ; ``optional`` ones lose to it."""
 
-    SYSTEM = "system"
+    REQUIRED = "required"
     OPTIONAL = "optional"
 
 
@@ -75,7 +75,7 @@ class SystemSessionEnvironValueSource(enum.StrEnum):
                 | SystemSessionEnvironValueSource.CLUSTER_HOSTS
                 | SystemSessionEnvironValueSource.PREOPEN_PORTS
             ):
-                return SystemSessionEnvironSourceKind.SYSTEM
+                return SystemSessionEnvironSourceKind.REQUIRED
             case (
                 SystemSessionEnvironValueSource.USER_UUID
                 | SystemSessionEnvironValueSource.USER_EMAIL

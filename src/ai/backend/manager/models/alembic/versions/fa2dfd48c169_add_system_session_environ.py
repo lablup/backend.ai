@@ -1,7 +1,7 @@
 """Add system_session_environ
 
 Create the table deciding which values the manager injects into a session's
-environment, and bind every system value source at the global scope under the
+environment, and bind every required value source at the global scope under the
 name the launcher has always used. The session owner's values are left unbound.
 
 Revision ID: fa2dfd48c169
@@ -26,7 +26,7 @@ branch_labels = None
 depends_on = None
 
 # value_source to key.
-SYSTEM_BINDINGS: Final[dict[str, str]] = {
+REQUIRED_BINDINGS: Final[dict[str, str]] = {
     "session_id": "BACKENDAI_SESSION_ID",
     "session_name": "BACKENDAI_SESSION_NAME",
     "cluster_size": "BACKENDAI_CLUSTER_SIZE",
@@ -85,7 +85,7 @@ def upgrade() -> None:
         ["scope_type", "scope_id"],
     )
     conn = op.get_bind()
-    for value_source, key in SYSTEM_BINDINGS.items():
+    for value_source, key in REQUIRED_BINDINGS.items():
         conn.execute(_ADD_GLOBAL_BINDING, {"value_source": value_source, "key": key})
 
 
