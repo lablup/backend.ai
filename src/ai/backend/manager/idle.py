@@ -818,13 +818,13 @@ class UtilizationConfig(BaseConfigModel):
 
 
 @dataclass
-class _UtilizationSamples:
+class _UtilizationSeriesV2:
     observed_since: float
     collected_at: list[float]
     series: dict[str, list[float | None]]
 
     @classmethod
-    def unpack(cls, raw: bytes) -> _UtilizationSamples:
+    def unpack(cls, raw: bytes) -> Self:
         data = msgpack.unpackb(raw, use_list=True)
         return cls(
             observed_since=data["observed_since"],
@@ -1022,9 +1022,9 @@ class UtilizationIdleChecker(BaseIdleChecker):
         window_start = util_now - time_window.total_seconds()
         raw_util_series_v2 = await self._redis_live.get_live_data(util_series_v2_key)
         if raw_util_series_v2 is not None:
-            samples = _UtilizationSamples.unpack(raw_util_series_v2)
+            samples = _UtilizationSeriesV2.unpack(raw_util_series_v2)
         else:
-            samples = _UtilizationSamples(observed_since=util_now, collected_at=[], series={})
+            samples = _UtilizationSeriesV2(observed_since=util_now, collected_at=[], series={})
         samples.drop_before(window_start)
         if not samples.collected_at:
             # Nothing was collected within the window, so it must be observed again from now.
