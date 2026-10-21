@@ -1,8 +1,8 @@
-"""Grant public and project members READ on system session environ
+"""Grant public members and project members and admins READ on system session environ
 
-Every user reads the bindings at public, and a project's members read the ones at their
-project, as they read app config fragments. Write the grant to the presets and to every
-role made from them.
+Every user reads the bindings at public, and a project's members and admins read the ones
+at their project, as they read app config fragments. Write the grant to the presets and to
+every role made from them.
 
 Revision ID: bf07cae92d86
 Revises: fa2dfd48c169
@@ -28,12 +28,14 @@ depends_on = None
 
 _PUBLIC_MEMBER_PRESET_ID: Final[str] = "01993d56-bb39-7d13-a84b-b6a84fc8b7fd"
 _PROJECT_MEMBER_PRESET_ID: Final[str] = "06057849-3534-546f-b74c-b79d5d3ecf5e"
+_PROJECT_ADMIN_PRESET_ID: Final[str] = "22c4db03-24aa-5ff8-b5a9-64b2a2182413"
 _READ: Final[int] = 1
 
 # (preset id, entity type) each grant is written for.
 _GRANTS: Final[tuple[tuple[str, str], ...]] = (
     (_PUBLIC_MEMBER_PRESET_ID, "system_session_environ"),
     (_PROJECT_MEMBER_PRESET_ID, "system_session_environ"),
+    (_PROJECT_ADMIN_PRESET_ID, "system_session_environ"),
 )
 
 # The seed derives an id as a uuid7 whose timestamp is fixed and whose remaining bits
