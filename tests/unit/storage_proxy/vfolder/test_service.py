@@ -72,10 +72,10 @@ async def test_get_volumes(
     mock_log: AsyncMock, mock_service: VolumeService, mock_volume_pool: MagicMock
 ) -> None:
     mock_volumes = {
-        str(UUID1): MagicMock(backend="backend1", path="/path1", fsprefix="fsprefix1"),
-        str(UUID2): MagicMock(backend="backend2", path="/path2", fsprefix="fsprefix2"),
+        VOLUME_ID1: MagicMock(backend="backend1", path="/path1", fsprefix="fsprefix1"),
+        VOLUME_ID2: MagicMock(backend="backend2", path="/path2", fsprefix="fsprefix2"),
     }
-    mock_volume_pool.list_volumes.return_value = mock_volumes
+    mock_volume_pool.list_volumes_by_id.return_value = mock_volumes
 
     assert isinstance(mock_service._get_capabilities, AsyncMock)
     mock_service._get_capabilities.side_effect = [
@@ -86,7 +86,7 @@ async def test_get_volumes(
     result = await mock_service.get_volumes()
 
     mock_log.assert_called_once_with(service_log, "get_volumes", params=None)
-    mock_volume_pool.list_volumes.assert_called_once()
+    mock_volume_pool.list_volumes_by_id.assert_called_once()
 
     assert len(result) == 2
     assert result[0].volume_id == UUID1

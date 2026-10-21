@@ -39,6 +39,7 @@ from ai.backend.common.api_handlers import (
     stream_api_handler,
 )
 from ai.backend.common.asyncio import run_in_executor_with_context
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.dto.storage.request import (
     ArchiveDownloadQueryParams,
     ArchiveDownloadTokenData,
@@ -217,7 +218,7 @@ async def download(request: web.Request) -> web.StreamResponse:
             read_from=CheckParamSource.QUERY,
         ),
     ) as params:
-        volume = ctx.volume_pool.get_volume_by_name(params["token"]["volume"])
+        volume = ctx.volume_pool.get_volume_by_name(StorageVolumeName(params["token"]["volume"]))
         token_data = params["token"]
         if token_data["unmanaged_path"] is not None:
             vfpath = Path(token_data["unmanaged_path"]).resolve()
@@ -386,7 +387,7 @@ async def tus_check_session(request: web.Request) -> web.Response:
         ),
     ) as params:
         token_data = params["token"]
-        volume = ctx.volume_pool.get_volume_by_name(token_data["volume"])
+        volume = ctx.volume_pool.get_volume_by_name(StorageVolumeName(token_data["volume"]))
         headers = await prepare_tus_session_headers(request, token_data, volume)
     return web.Response(headers=headers)
 
@@ -419,7 +420,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
         ),
     ) as params:
         token_data = params["token"]
-        volume = ctx.volume_pool.get_volume_by_name(token_data["volume"])
+        volume = ctx.volume_pool.get_volume_by_name(StorageVolumeName(token_data["volume"]))
         headers = await prepare_tus_session_headers(request, token_data, volume)
         vfpath = volume.mangle_vfpath(token_data["vfid"])
         upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
@@ -578,7 +579,7 @@ class DownloadHandler:
         """Stream multiple files/directories as a ZIP archive."""
         token_data = self._jwt_validator.validate(query.parsed.token, ArchiveDownloadTokenData)
 
-        volume = ctx.root_ctx.volume_pool.get_volume_by_name(token_data.volume)
+        volume = ctx.root_ctx.volume_pool.get_volume_by_name(StorageVolumeName(token_data.volume))
         vfolder_root = volume.sanitize_vfpath(token_data.virtual_folder_id)
         sanitized: list[Path] = [(vfolder_root / relpath).resolve() for relpath in token_data.files]
         for file_path, relpath in zip(sanitized, token_data.files, strict=True):
