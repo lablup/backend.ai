@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Iterator
-from dataclasses import dataclass
 from pathlib import Path
 from uuid import UUID
 
@@ -13,11 +12,13 @@ import yaml
 from sqlalchemy import text
 
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache, global_entity_id
 from ai.backend.manager.models.global_entity.row import GlobalEntityRow
 from ai.backend.manager.models.global_entity.seed import SEED_GLOBAL_ENTITIES_SQL
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.queries import scope_membership_exists
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
@@ -32,47 +33,24 @@ _GLOBAL_ID = UUID("785a0db6-868b-40d2-bda9-ac6679d85b7e")
 _PUBLIC_ID = UUID("0258d56a-4a34-4927-8eb8-615cb892618d")
 
 
-@dataclass(frozen=True)
-class _SingletonNode:
-    holds_itself: bool
-    governs_itself: bool
-
-
 async def _global_entity_ids_by_name(db: ExtendedAsyncSAEngine) -> dict[str, UUID]:
     async with db.begin_readonly() as conn:
         rows = await conn.execute(sa.select(GlobalEntityRow.name, GlobalEntityRow.id))
         return {str(row.name): row.id for row in rows}
 
 
-async def _singleton_nodes_by_entity_id(db: ExtendedAsyncSAEngine) -> dict[UUID, _SingletonNode]:
-    """Each global node by the entity it stands for, and whether it holds and governs itself."""
+async def _global_entity_ids_reaching_themselves(db: ExtendedAsyncSAEngine) -> set[UUID]:
+    """The singletons a role at themselves reaches, through the node every scope holds and
+    governs itself by."""
     async with db.begin_readonly() as conn:
-        nodes = await conn.execute(
-            sa.select(VirtualEntityRow.id, VirtualEntityRow.entity_id).where(
-                VirtualEntityRow.entity_type == "global"
-            )
-        )
-        memberships = {
-            (row.virtual_entity_id, row.member_entity_id)
-            for row in await conn.execute(
-                sa.select(
-                    EntityMembershipRow.virtual_entity_id, EntityMembershipRow.member_entity_id
+        global_entity_ids = await conn.scalars(
+            sa.select(GlobalEntityRow.id).where(
+                scope_membership_exists(
+                    GlobalEntityType(), GlobalEntityRow.id, GlobalEntityType(), GlobalEntityRow.id
                 )
             )
-        }
-        bindings = {
-            (row.virtual_entity_id, row.scope_entity_id)
-            for row in await conn.execute(
-                sa.select(ScopeBindingRow.virtual_entity_id, ScopeBindingRow.scope_entity_id)
-            )
-        }
-        return {
-            node.entity_id: _SingletonNode(
-                holds_itself=(node.id, node.id) in memberships,
-                governs_itself=(node.id, node.id) in bindings,
-            )
-            for node in nodes
-        }
+        )
+        return set(global_entity_ids)
 
 
 @pytest.fixture
@@ -157,12 +135,12 @@ class TestApplyToAFreshDatabase:
             "public": _PUBLIC_ID,
         }
 
-    async def test_each_singleton_gets_a_node_holding_and_governing_itself(
+    async def test_each_singleton_reaches_itself(
         self, db_without_global_entities: ExtendedAsyncSAEngine, global_entities_applied_once: None
     ) -> None:
-        assert await _singleton_nodes_by_entity_id(db_without_global_entities) == {
-            _GLOBAL_ID: _SingletonNode(holds_itself=True, governs_itself=True),
-            _PUBLIC_ID: _SingletonNode(holds_itself=True, governs_itself=True),
+        assert await _global_entity_ids_reaching_themselves(db_without_global_entities) == {
+            _GLOBAL_ID,
+            _PUBLIC_ID,
         }
 
     async def test_the_id_cache_loads_the_stated_ids_afterwards(
