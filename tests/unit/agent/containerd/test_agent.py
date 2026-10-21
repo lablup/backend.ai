@@ -798,6 +798,19 @@ class TestStuckKernel:
         assert (scratch_root / str(kid)).exists()
         assert agent.port_pool.used_ports() == {30000, 30001}
 
+    async def test_hold_of_a_launch_keeps_its_ports_when_the_record_is_unreadable(
+        self,
+        agent: ContainerdAgent,
+        clock: list[float],
+    ) -> None:
+        """A launch that failed early has no ports on the kernel yet and may have no record."""
+        kid = KernelId(uuid.uuid4())
+        agent.port_pool.discard(30004)
+
+        await agent._hold_stuck(kid, "c-missing", [30004])
+
+        assert agent._stuck_kernels["c-missing"].host_ports == [30004]
+
     async def test_the_clean_event_does_not_release_the_ports_of_a_stuck_kernel(
         self,
         agent: ContainerdAgent,

@@ -1220,13 +1220,15 @@ class TestStartContainer:
         )
         fake.failing.update({"start_task", "delete_task"})
 
-        with pytest.raises(ContainerdOperationFailed):
+        with pytest.raises(ContainerdOperationFailed, match="start_task"):
             await ctx.start_container(kernel, [], None, [], MagicMock())
 
         assert hold_stuck.await_args is not None
-        kernel_id, container_id = hold_stuck.await_args.args
+        kernel_id, container_id, held_ports = hold_stuck.await_args.args
         assert kernel_id == ownership_data.kernel_id
         assert container_id in fake.containers
         assert len(pool) == 9
+        assert len(held_ports) == 1
+        assert held_ports[0] in pool.used_ports()
         assert not runner.matching("ip", "link", "show")  # no network teardown
         cast(MagicMock, computers[DeviceName("cpu")].alloc_map).free.assert_not_called()

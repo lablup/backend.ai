@@ -256,7 +256,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _network: KernelNetwork
     _address: IPv4Address | None
     _resource_lock: asyncio.Lock
-    _hold_stuck: Callable[[KernelId, str], Awaitable[None]]
+    _hold_stuck: Callable[[KernelId, str, Sequence[int]], Awaitable[None]]
     _dirs: ScratchDirs
     _generated_mounts: list[GeneratedMount]
     _base_spec: dict[str, Any]
@@ -279,7 +279,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         port_pool: PortPool,
         network: KernelNetwork,
         resource_lock: asyncio.Lock,
-        hold_stuck: Callable[[KernelId, str], Awaitable[None]],
+        hold_stuck: Callable[[KernelId, str, Sequence[int]], Awaitable[None]],
     ) -> None:
         super().__init__(
             ownership_data,
@@ -664,10 +664,11 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             )
         except ContainerTaskStuck as stuck:
             # The task survived the cleanup and still holds the devices, ports and network.
-            await self._hold_stuck(self.kernel_id, container_id)
-            if stuck.__cause__ is None:
+            await self._hold_stuck(self.kernel_id, container_id, host_ports)
+            launch_error = stuck.__cause__
+            if launch_error is None:
                 raise
-            raise stuck.__cause__ from None
+            raise launch_error from launch_error.__cause__
         except BaseException:
             await self._teardown_network()
             self._port_pool.release_many(host_ports)
@@ -1158,11 +1159,16 @@ class ContainerdAgent(
                 None, remove_scratch, self.local_config.container.scratch_root, str(kernel_id)
             )
 
-    async def _hold_stuck(self, kernel_id: KernelId, container_id: str) -> None:
-        """Keep the allocations, ports, network and scratch of a kernel whose task survives."""
+    async def _hold_stuck(
+        self, kernel_id: KernelId, container_id: str, launch_ports: Sequence[int] = ()
+    ) -> None:
+        """Keep the allocations, ports, network and scratch of a kernel whose task survives.
+
+        `launch_ports` are the pool ports of a launch that failed before the kernel recorded them.
+        """
         entry = self._stuck_kernels.get(container_id)
         if entry is None:
-            host_ports: set[int] = set(self._orphan_ports.pop(kernel_id, []))
+            host_ports: set[int] = {*launch_ports, *self._orphan_ports.pop(kernel_id, [])}
             if (kernel_obj := self.kernel_registry.get(kernel_id)) is not None:
                 host_ports.update(kernel_obj.get("host_ports") or [])
                 kernel_obj["host_ports"] = []  # the base must not release them again
