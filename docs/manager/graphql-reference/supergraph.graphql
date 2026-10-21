@@ -6613,6 +6613,16 @@ type DeleteScalingGroup
 }
 
 """
+Added in 26.10.0. Payload returned after soft-deleting a storage volume.
+"""
+type DeleteStorageVolumePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The soft-deleted storage volume."""
+  item: StorageVolumeV2!
+}
+
+"""
 Instead of really deleting user, just mark the account as deleted status.
 
 All related keypairs will also be inactivated.
@@ -14944,6 +14954,26 @@ type Mutation
   """
   partialBulkPurgePrometheusQueryPresets(input: PartialBulkPurgeQueryDefinitionsInput!): PartialBulkQueryDefinitionsPayload! @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 26.10.0. Retune one storage volume: its name, its usage exposure and its stale threshold.
+  """
+  updateStorageVolume(id: UUID!, input: UpdateStorageVolumeInput!): UpdateStorageVolumePayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Remove one storage volume from the catalog. Refused while a folder sits on it.
+  """
+  purgeStorageVolume(id: UUID!): PurgeStorageVolumePayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Soft-delete one storage volume, withholding it from new use. The folders already on it keep working. A get still answers it; a search lists it only when the filter gives deletedAt.
+  """
+  deleteStorageVolume(id: UUID!): DeleteStorageVolumePayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Restore one soft-deleted storage volume back into use.
+  """
+  restoreStorageVolume(id: UUID!): RestoreStorageVolumePayload @join__field(graph: STRAWBERRY)
+
   """Added in 26.3.0. Create a new query preset category (admin only)."""
   adminCreatePrometheusQueryPresetCategory(input: CreateCategoryInput!): CreateCategoryPayload @join__field(graph: STRAWBERRY)
 
@@ -19830,6 +19860,17 @@ type PurgeSessionGroupPayload
   entityId: UUID!
 }
 
+"""Added in 26.10.0. Payload returned after purging a storage volume."""
+type PurgeStorageVolumePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Global ID of the purged storage volume."""
+  purgedId: ID!
+
+  """UUID of the purged storage volume."""
+  entityId: UUID!
+}
+
 """
 Delete user as well as all user-related DB informations such as keypairs, kernels, etc.
 
@@ -20562,6 +20603,19 @@ type Query
 
   """Added in 26.3.0. Query service catalog entries. Admin only."""
   adminServiceCatalogs(filter: ServiceCatalogFilter = null, orderBy: [ServiceCatalogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): [ServiceCatalog!] @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Read one storage volume."""
+  storageVolume(id: UUID!): StorageVolumeV2 @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Page through every declared storage volume. Admin only.
+  """
+  adminStorageVolumes(filter: StorageVolumeFilter = null, orderBy: [StorageVolumeOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): StorageVolumeV2Connection @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Page through every storage volume service attachment. Admin only.
+  """
+  adminStorageVolumeServiceAttachments(filter: StorageVolumeServiceAttachmentFilter = null, orderBy: [StorageVolumeServiceAttachmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): StorageVolumeServiceAttachmentConnection @join__field(graph: STRAWBERRY)
 
   """Added in 26.4.2. List session scheduling history (admin only)"""
   adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection @join__field(graph: STRAWBERRY)
@@ -23235,6 +23289,16 @@ type RestoreRolePresetPayload
   rolePreset: RolePreset!
 }
 
+"""
+Added in 26.10.0. Payload returned after restoring a soft-deleted storage volume.
+"""
+type RestoreStorageVolumePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The restored storage volume."""
+  item: StorageVolumeV2!
+}
+
 """Added in 26.9.0. Payload for single user restore mutation."""
 type RestoreUserV2Payload
   @join__type(graph: STRAWBERRY)
@@ -25564,6 +25628,11 @@ type ServiceCatalog implements Node
 
   """Endpoints exposed by this service instance."""
   endpoints: [ServiceCatalogEndpoint!]!
+
+  """
+  Added in 26.10.0. The storage volumes attached to this service, one attachment per volume.
+  """
+  storageVolumeAttachments(filter: StorageVolumeServiceAttachmentFilter = null, orderBy: [StorageVolumeServiceAttachmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): StorageVolumeServiceAttachmentConnection
 }
 
 """Added in 26.3.0. An endpoint exposed by a service instance."""
@@ -26924,12 +26993,257 @@ type StorageVolume implements Item
   name: String
 }
 
+"""Added in 26.10.0. Filter for storage volume queries."""
+input StorageVolumeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by volume ID."""
+  entityId: UUIDFilter = null
+
+  """Filter by volume name."""
+  name: StringFilter = null
+
+  """Filter by the backend the volume sits on."""
+  storageBackendId: UUIDFilter = null
+
+  """
+  Filter by deletion time. Setting it on the top-level filter includes the volumes marked deleted; inside AND, OR or NOT it does not.
+  """
+  deletedAt: NullableDateTimeFilter = null
+
+  """Combine multiple filters with AND logic."""
+  AND: [StorageVolumeFilter!] = null
+
+  """Combine multiple filters with OR logic."""
+  OR: [StorageVolumeFilter!] = null
+
+  """Negate the given filters."""
+  NOT: [StorageVolumeFilter!] = null
+}
+
 type StorageVolumeList implements PaginatedList
   @join__implements(graph: GRAPHENE, interface: "PaginatedList")
   @join__type(graph: GRAPHENE)
 {
   items: [StorageVolume]!
   total_count: Int!
+}
+
+"""Added in 26.10.0. Specifies ordering for storage volume queries."""
+input StorageVolumeOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """The field to order by."""
+  field: StorageVolumeOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.10.0. Fields available for ordering storage volumes."""
+enum StorageVolumeOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  NAME @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+  DELETED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.10.0. A storage volume as one service has it attached."""
+type StorageVolumeServiceAttachment implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """ID of the service the volume is attached to."""
+  serviceCatalogId: UUID!
+
+  """ID of the attached volume."""
+  storageVolumeId: UUID!
+
+  """When the service last checked the volume. Null until the first check."""
+  statusCheckedAt: DateTime
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime!
+
+  """The attached volume."""
+  storageVolume: StorageVolumeV2!
+
+  """The service the volume is attached to."""
+  serviceCatalog: ServiceCatalog!
+}
+
+"""
+Added in 26.10.0. Paginated connection for storage volume service attachments.
+"""
+type StorageVolumeServiceAttachmentConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [StorageVolumeServiceAttachmentEdge!]!
+
+  """Total number of storage volume service attachments matching the query."""
+  count: Int!
+}
+
+"""
+Added in 26.10.0. One storage volume service attachment within a connection.
+"""
+type StorageVolumeServiceAttachmentEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: StorageVolumeServiceAttachment!
+}
+
+"""Added in 26.10.0. Filter for the storage volume service attachments."""
+input StorageVolumeServiceAttachmentFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by when the service last checked the volume."""
+  statusCheckedAt: NullableDateTimeFilter = null
+
+  """Filter by conditions on the attached volume."""
+  storageVolume: StorageVolumeFilter = null
+
+  """Filter by conditions on the service the volume is attached to."""
+  serviceCatalog: ServiceCatalogFilter = null
+
+  """Combine multiple filters with AND logic."""
+  AND: [StorageVolumeServiceAttachmentFilter!] = null
+
+  """Combine multiple filters with OR logic."""
+  OR: [StorageVolumeServiceAttachmentFilter!] = null
+
+  """Negate the given filters."""
+  NOT: [StorageVolumeServiceAttachmentFilter!] = null
+}
+
+"""
+Added in 26.10.0. Specifies ordering for the storage volume service attachments.
+"""
+input StorageVolumeServiceAttachmentOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """The field to order by."""
+  field: StorageVolumeServiceAttachmentOrderField!
+
+  """Sort direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.10.0. Fields available for ordering the storage volume service attachments.
+"""
+enum StorageVolumeServiceAttachmentOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  STATUS_CHECKED_AT @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""Added in 26.10.0. Which usage figures a volume shows a user."""
+type StorageVolumeUsageExposure
+  @join__type(graph: STRAWBERRY)
+{
+  """The usage figures the volume shows."""
+  exposed: [StorageVolumeUsageField!]!
+}
+
+"""Added in 26.10.0. Input for which usage figures a volume shows a user."""
+input StorageVolumeUsageExposureInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The usage figures the volume shows. Replaces the whole set."""
+  exposed: [StorageVolumeUsageField!]!
+}
+
+"""Added in 26.10.0. A usage figure a volume may show a user."""
+enum StorageVolumeUsageField
+  @join__type(graph: STRAWBERRY)
+{
+  PERCENTAGE @join__enumValue(graph: STRAWBERRY)
+  USED_BYTES @join__enumValue(graph: STRAWBERRY)
+  CAPACITY_BYTES @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.10.0. A volume on a storage backend, identified by the name every service declares it under.
+"""
+type StorageVolumeV2 implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """UUID of the storage volume."""
+  entityId: UUID!
+
+  """Volume name, as every service declares it."""
+  name: String!
+
+  """ID of the backend the volume sits on."""
+  storageBackendId: UUID!
+
+  """
+  How long the volume may go without a fresh check before it counts as stale.
+  """
+  statusStaleAfterSeconds: Int!
+
+  """Which usage figures the volume shows a user."""
+  usageExposure: StorageVolumeUsageExposure!
+
+  """Creation timestamp."""
+  createdAt: DateTime!
+
+  """Last update timestamp."""
+  updatedAt: DateTime!
+
+  """Deletion timestamp. Null while the volume is in use."""
+  deletedAt: DateTime
+
+  """The services this volume is attached to, one attachment per service."""
+  serviceAttachments(filter: StorageVolumeServiceAttachmentFilter = null, orderBy: [StorageVolumeServiceAttachmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): StorageVolumeServiceAttachmentConnection
+}
+
+"""Added in 26.10.0. Paginated connection for storage volumes."""
+type StorageVolumeV2Connection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [StorageVolumeV2Edge!]!
+
+  """Total number of storage volumes matching the query."""
+  count: Int!
+}
+
+"""Added in 26.10.0. One storage volume within a connection."""
+type StorageVolumeV2Edge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: StorageVolumeV2!
 }
 
 """
@@ -28673,6 +28987,30 @@ type UpdateRuntimeVariantPresetPayload
 {
   """The updated preset."""
   preset: RuntimeVariantPreset!
+}
+
+"""
+Added in 26.10.0. Input for updating the metadata an administrator owns on a volume.
+"""
+input UpdateStorageVolumeInput
+  @join__type(graph: STRAWBERRY)
+{
+  """Updated volume name."""
+  name: String
+
+  """Updated stale threshold, in seconds."""
+  statusStaleAfterSeconds: Int
+
+  """Updated usage exposure."""
+  usageExposure: StorageVolumeUsageExposureInput
+}
+
+"""Added in 26.10.0. Payload returned after updating a storage volume."""
+type UpdateStorageVolumePayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated storage volume."""
+  item: StorageVolumeV2!
 }
 
 """

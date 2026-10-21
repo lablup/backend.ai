@@ -42,6 +42,11 @@ from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticNodeMixin,
     PydanticOutputMixin,
 )
+from ai.backend.manager.api.gql.storage_volume_service_attachment.types import (
+    StorageVolumeServiceAttachmentConnectionGQL,
+    StorageVolumeServiceAttachmentFilterGQL,
+    StorageVolumeServiceAttachmentOrderByGQL,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
@@ -114,6 +119,26 @@ class ServiceCatalogGQL(PydanticNodeMixin[ServiceCatalogNode]):
     endpoints: list[ServiceCatalogEndpointGQL] = gql_field(
         description="Endpoints exposed by this service instance."
     )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The storage volumes attached to this service, one attachment per volume.",
+        )
+    )  # type: ignore[misc]
+    async def storage_volume_attachments(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: StorageVolumeServiceAttachmentFilterGQL | None = None,
+        order_by: list[StorageVolumeServiceAttachmentOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> StorageVolumeServiceAttachmentConnectionGQL | None:
+        raise NotImplementedError
 
     @classmethod
     @override
