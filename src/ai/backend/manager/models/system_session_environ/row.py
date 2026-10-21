@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Final
+
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,6 +18,8 @@ from ai.backend.manager.models.base import GUID, Base, StrEnumType
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 __all__ = ("SystemSessionEnvironRow",)
+
+_ENVIRON_KEY_PATTERN: Final = r"^[A-Za-z_][A-Za-z0-9_]*$"
 
 
 class SystemSessionEnvironRow(LifecycleTimestampsMixin, Base):
@@ -34,7 +38,7 @@ class SystemSessionEnvironRow(LifecycleTimestampsMixin, Base):
             name="scope_id_matches_scope_type",
         ),
         sa.CheckConstraint(
-            "key ~ '^[A-Za-z_][A-Za-z0-9_]*$'",
+            f"key ~ '{_ENVIRON_KEY_PATTERN}'",
             name="key_is_environ_name",
         ),
         sa.Index("ix_system_session_environ_scope", "scope_type", "scope_id"),
