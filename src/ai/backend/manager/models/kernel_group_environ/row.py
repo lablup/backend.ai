@@ -6,6 +6,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.kernel_group import KernelGroupID
+from ai.backend.manager.data.environ.types import ENVIRON_KEY_PATTERN
 from ai.backend.manager.models.base import GUID, Base
 
 __all__ = ("KernelGroupEnvironRow",)
@@ -14,14 +15,13 @@ __all__ = ("KernelGroupEnvironRow",)
 class KernelGroupEnvironRow(Base):
     """Per-group environment variable.
 
-    Composite primary key: (kernel_group_id, key). The key format matches
-    ``system_session_environ.key``.
+    Composite primary key: (kernel_group_id, key).
     """
 
     __tablename__ = "kernel_group_environ"
     __table_args__ = (
         sa.CheckConstraint(
-            "key ~ '^[A-Za-z_][A-Za-z0-9_]*$'",
+            f"key ~ '{ENVIRON_KEY_PATTERN}'",
             name="key_is_environ_name",
         ),
     )
