@@ -1,4 +1,4 @@
-"""세션 그룹 배치 정책 바꾸기 — 누가 어느 그룹의 정책을 바꿀 수 있는가."""
+"""세션 그룹 배치 정책 바꾸기 — 누가 어느 세션 그룹의 정책을 바꿀 수 있는가."""
 
 from __future__ import annotations
 
@@ -50,7 +50,7 @@ _PREFERRED = SessionGroupPlacementEnforcementEnum.PREFERRED
 
 @dataclass(frozen=True)
 class UpdatingTheUsersGroup(When[Laid, SessionGroupAdapter, SessionGroupNode]):
-    """사용자가 만든 그룹의 배치 정책을 바꾼다. 빠진 항목은 그대로 둔다."""
+    """사용자가 만든 세션 그룹의 배치 정책을 바꾼다. 빠진 항목은 그대로 둔다."""
 
     enforcement: SessionGroupPlacementEnforcementEnum | Unset = _PREFERRED
 
@@ -61,9 +61,9 @@ class UpdatingTheUsersGroup(When[Laid, SessionGroupAdapter, SessionGroupNode]):
     @override
     def describe(self, laid: Laid) -> str:
         if isinstance(self.enforcement, Unset):
-            return f"{laid.caller.username}이 사용자가 만든 그룹의 방향만 퍼뜨리기로 바꾼다"
+            return f"{laid.caller.username}이 사용자가 만든 세션 그룹의 방향만 퍼뜨리기로 바꾼다"
         return (
-            f"{laid.caller.username}이 사용자가 만든 그룹의 방향을 퍼뜨리기로, "
+            f"{laid.caller.username}이 사용자가 만든 세션 그룹의 방향을 퍼뜨리기로, "
             "강제 수준을 선호로 바꾼다"
         )
 
@@ -82,7 +82,7 @@ class UpdatingTheUsersGroup(When[Laid, SessionGroupAdapter, SessionGroupNode]):
 
 @dataclass(frozen=True)
 class UpdatingTheDeploymentGroup(When[Laid, SessionGroupAdapter, SessionGroupNode]):
-    """배포의 그룹의 배치 정책을 바꾼다."""
+    """배포의 replica group이 가진 세션 그룹의 배치 정책을 바꾼다."""
 
     @override
     def operation(self) -> str:
@@ -91,7 +91,8 @@ class UpdatingTheDeploymentGroup(When[Laid, SessionGroupAdapter, SessionGroupNod
     @override
     def describe(self, laid: Laid) -> str:
         return (
-            f"{laid.caller.username}이 배포의 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다"
+            f"{laid.caller.username}이 배포의 replica group이 가진 세션 그룹의 방향을 퍼뜨리기로, "
+            "강제 수준을 선호로 바꾼다"
         )
 
     @override
@@ -109,7 +110,7 @@ class UpdatingTheDeploymentGroup(When[Laid, SessionGroupAdapter, SessionGroupNod
 
 @dataclass(frozen=True)
 class TheUpdatedGroupNode(Then[Laid, SessionGroupNode]):
-    """정책이 바뀐 사용자 그룹의 노드가 통째로 온다."""
+    """정책이 바뀐, 사용자가 만든 세션 그룹의 노드가 통째로 온다."""
 
     started: datetime
     enforcement: SessionGroupPlacementEnforcementEnum
@@ -142,8 +143,8 @@ class AnOwnerChangesBothItems(
     @override
     def describe(self) -> str:
         return (
-            "자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 그룹의 방향과 "
-            "강제 수준을 바꾸면, 두 항목이 바뀐 그 그룹이 온다"
+            "자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향과 "
+            "강제 수준을 바꾸면, 두 항목이 바뀐 그 세션 그룹이 온다"
         )
 
     @override
@@ -157,7 +158,9 @@ class AnOwnerChangesBothItems(
     @override
     def then(self) -> Then[Laid, SessionGroupNode]:
         return TheUpdatedGroupNode(
-            started=self.started, enforcement=_PREFERRED, said="두 항목이 바뀐 그룹 전체가 온다"
+            started=self.started,
+            enforcement=_PREFERRED,
+            said="두 항목이 바뀐 세션 그룹 전체가 온다",
         )
 
 
@@ -174,8 +177,8 @@ class AnOwnerChangesOnlyTheDirection(
     @override
     def describe(self) -> str:
         return (
-            "자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 그룹의 방향만 "
-            "바꾸면, 강제 수준은 그대로인 그 그룹이 온다"
+            "자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향만 "
+            "바꾸면, 강제 수준은 그대로인 그 세션 그룹이 온다"
         )
 
     @override
@@ -191,7 +194,7 @@ class AnOwnerChangesOnlyTheDirection(
         return TheUpdatedGroupNode(
             started=self.started,
             enforcement=SessionGroupPlacementEnforcementEnum.STRICT,
-            said="방향만 바뀌고 강제 수준은 그대로인 그룹 전체가 온다",
+            said="방향만 바뀌고 강제 수준은 그대로인 세션 그룹 전체가 온다",
         )
 
 
@@ -206,7 +209,7 @@ class AnOwnerGrantedOnlyReadMayNotUpdate(
     @override
     def describe(self) -> str:
         return (
-            "자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 그룹의 정책을 "
+            "자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹의 정책을 "
             "바꾸면, 권한 부족으로 거부된다"
         )
 
@@ -234,7 +237,7 @@ class ADeploymentsGroupIsRefusedAsInUse(
     @override
     def describe(self) -> str:
         return (
-            "자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기 배포의 그룹 정책을 "
+            "자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기 배포의 replica group이 가진 세션 그룹 정책을 "
             "바꾸면, 권한이 아니라 사용 중이라는 것으로 거부된다"
         )
 

@@ -43,10 +43,10 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 그룹의 방향만 바꾸면, 강제 수준은 그대로인 그 그룹이 온다](#updating-an-owner-changes-only-the-direction) | 성공 |
-| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 그룹의 방향과 강제 수준을 바꾸면, 두 항목이 바뀐 그 그룹이 온다](#updating-an-owner-changes-the-direction-and-the-enforcement) | 성공 |
-| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기 배포의 그룹 정책을 바꾸면, 권한이 아니라 사용 중이라는 것으로 거부된다](#updating-a-deployments-session-group-is-refused-as-in-use) | 거부 |
-| [자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 그룹의 정책을 바꾸면, 권한 부족으로 거부된다](#updating-an-owner-granted-only-read-may-not-update) | 거부 |
+| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향만 바꾸면, 강제 수준은 그대로인 그 세션 그룹이 온다](#updating-an-owner-changes-only-the-direction) | 성공 |
+| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향과 강제 수준을 바꾸면, 두 항목이 바뀐 그 세션 그룹이 온다](#updating-an-owner-changes-the-direction-and-the-enforcement) | 성공 |
+| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기 배포의 replica group이 가진 세션 그룹 정책을 바꾸면, 권한이 아니라 사용 중이라는 것으로 거부된다](#updating-a-deployments-session-group-is-refused-as-in-use) | 거부 |
+| [자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹의 정책을 바꾸면, 권한 부족으로 거부된다](#updating-an-owner-granted-only-read-may-not-update) | 거부 |
 
 **bulk_get_ids**
 
@@ -547,7 +547,7 @@ Then
 
 #### [an-owner-changes-only-the-direction](/tests/scenario/bai_scenario/manager/session_group/test_updating.py) — pass
 
-자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 그룹의 방향만 바꾸면, 강제 수준은 그대로인 그 그룹이 온다
+자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향만 바꾸면, 강제 수준은 그대로인 그 세션 그룹이 온다
 
 Given
 
@@ -578,11 +578,11 @@ Given
 
 When
 
-- SessionGroupAdapter.update — user-1이 사용자가 만든 그룹의 방향만 퍼뜨리기로 바꾼다
+- SessionGroupAdapter.update — user-1이 사용자가 만든 세션 그룹의 방향만 퍼뜨리기로 바꾼다
 
 Then
 
-- 방향만 바뀌고 강제 수준은 그대로인 그룹 전체가 온다
+- 방향만 바뀌고 강제 수준은 그대로인 세션 그룹 전체가 온다
   - id: 무시함 — 데이터베이스가 만든다
   - entity_id: 사용자가 만든 세션 그룹의 id와 같다
   - domain_id: 그 도메인의 id와 같다
@@ -597,7 +597,7 @@ Then
 
 #### [an-owner-changes-the-direction-and-the-enforcement](/tests/scenario/bai_scenario/manager/session_group/test_updating.py) — pass
 
-자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 그룹의 방향과 강제 수준을 바꾸면, 두 항목이 바뀐 그 그룹이 온다
+자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향과 강제 수준을 바꾸면, 두 항목이 바뀐 그 세션 그룹이 온다
 
 Given
 
@@ -628,11 +628,11 @@ Given
 
 When
 
-- SessionGroupAdapter.update — user-1이 사용자가 만든 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
+- SessionGroupAdapter.update — user-1이 사용자가 만든 세션 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
 
 Then
 
-- 두 항목이 바뀐 그룹 전체가 온다
+- 두 항목이 바뀐 세션 그룹 전체가 온다
   - id: 무시함 — 데이터베이스가 만든다
   - entity_id: 사용자가 만든 세션 그룹의 id와 같다
   - domain_id: 그 도메인의 id와 같다
@@ -647,7 +647,7 @@ Then
 
 #### [a-deployments-session-group-is-refused-as-in-use](/tests/scenario/bai_scenario/manager/session_group/test_updating.py) — pass
 
-자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기 배포의 그룹 정책을 바꾸면, 권한이 아니라 사용 중이라는 것으로 거부된다
+자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기 배포의 replica group이 가진 세션 그룹 정책을 바꾸면, 권한이 아니라 사용 중이라는 것으로 거부된다
 
 Given
 
@@ -678,7 +678,7 @@ Given
 
 When
 
-- SessionGroupAdapter.update — user-1이 배포의 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
+- SessionGroupAdapter.update — user-1이 배포의 replica group이 가진 세션 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
 
 Then
 
@@ -689,7 +689,7 @@ Then
 
 #### [an-owner-granted-only-read-may-not-update](/tests/scenario/bai_scenario/manager/session_group/test_updating.py) — pass
 
-자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 그룹의 정책을 바꾸면, 권한 부족으로 거부된다
+자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹의 정책을 바꾸면, 권한 부족으로 거부된다
 
 Given
 
@@ -720,7 +720,7 @@ Given
 
 When
 
-- SessionGroupAdapter.update — user-1이 사용자가 만든 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
+- SessionGroupAdapter.update — user-1이 사용자가 만든 세션 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
 
 Then
 
