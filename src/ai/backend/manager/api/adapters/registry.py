@@ -227,9 +227,9 @@ class Adapters:
         ``deployment_coordinator`` / ``schedule_coordinator`` are
         threaded through to adapters that validate or enumerate live
         handler names (``DeploymentAdapter``, ``ResourceGroupAdapter``,
-        ``SchedulingHandlerAdapter``, ``SessionLifecycleHandlerAdapter``)
-        so that DTO-side validation and catalog endpoints always agree
-        with the coordinators' live registrations.
+        ``SchedulingHandlerAdapter``) so that DTO-side validation and
+        catalog endpoints always agree with the coordinators' live
+        registrations.
         """
         entity_types = WiredEntityTypes(action_registry)
         # The model card adapter reads presets through this one, so it is built first.
@@ -317,7 +317,7 @@ class Adapters:
             service_catalog=ServiceCatalogAdapter(processors.service_catalog),
             session=SessionAdapter(processors.session, processors.idle_checker),
             session_group=SessionGroupAdapter(processors.session_group),
-            session_lifecycle_handler=SessionLifecycleHandlerAdapter(schedule_coordinator),
+            session_lifecycle_handler=SessionLifecycleHandlerAdapter(),
             storage_host=StorageHostAdapter(processors.vfolder),
             storage_namespace=StorageNamespaceAdapter(processors.storage_namespace),
             user=UserAdapter(processors.user, processors.domain, auth_config, key_provider_pool),

@@ -1,4 +1,4 @@
-"""세션 처리기 목록 조회 — 코디네이터에 등록된 처리기를 그대로 돌려준다."""
+"""세션 처리기 목록 조회 — 스케줄러가 시작할 때 만드는 처리기를 전부 돌려준다."""
 
 from __future__ import annotations
 
@@ -15,9 +15,7 @@ from ai.backend.manager.api.adapters.session_lifecycle_handler.adapter import (
     SessionLifecycleHandlerAdapter,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.terminate_sessions import (
-    TerminateSessionsLifecycleHandler,
-)
+from ai.backend.manager.sokovan.scheduler.factory import SESSION_LIFECYCLE_HANDLER_TYPES
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
@@ -37,25 +35,12 @@ type ListingStep = Scenario[
 
 
 @dataclass(frozen=True)
-class TheTerminatorIsRegistered(Given[TestSeedingSession, None]):
-    """코디네이터 대역은 conftest가 세션 종료 처리기 하나로 만든다. 심을 행은 없다."""
+class TheSchedulerHandlersAreFixed(Given[TestSeedingSession, None]):
+    """처리기 목록은 코드에 정해져 있어 심을 행이 없다."""
 
     @override
     def describe(self) -> str:
-        return "코디네이터에 세션 종료 처리기가 등록되어 있다"
-
-    @override
-    async def lay(self, seeding: TestSeedingSession) -> None:
-        return None
-
-
-@dataclass(frozen=True)
-class NothingIsRegistered(Given[TestSeedingSession, None]):
-    """코디네이터 대역은 conftest가 빈 채로 만든다. 심을 행은 없다."""
-
-    @override
-    def describe(self) -> str:
-        return "코디네이터에 등록된 처리기가 없다"
+        return "스케줄러가 시작할 때 만드는 세션 처리기가 정해져 있다"
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> None:
@@ -81,10 +66,10 @@ class Listing(When[None, SessionLifecycleHandlerAdapter, list[SessionLifecycleHa
 
 
 @dataclass(frozen=True)
-class TheTerminatorIsListed(Then[None, list[SessionLifecycleHandlerNode]]):
+class EveryHandlerIsListed(Then[None, list[SessionLifecycleHandlerNode]]):
     @override
     def says(self) -> str:
-        return "세션 종료 처리기 하나가 그 이름과 클래스 설명의 첫 줄로 반환된다"
+        return "처리기 전부가 각자의 이름과 클래스 설명의 첫 줄로 반환된다"
 
     @override
     def look(
@@ -98,48 +83,32 @@ class TheTerminatorIsListed(Then[None, list[SessionLifecycleHandlerNode]]):
                 answered.response,
                 [
                     SessionLifecycleHandlerNode(
-                        name=TerminateSessionsLifecycleHandler.name(),
-                        description=inspect.cleandoc(
-                            TerminateSessionsLifecycleHandler.__doc__ or ""
-                        ).partition("\n")[0],
+                        name=handler_type.name(),
+                        description=inspect.cleandoc(handler_type.__doc__ or "").partition("\n")[0],
                     )
+                    for handler_type in SESSION_LIFECYCLE_HANDLER_TYPES
                 ],
             )
         ]
 
 
 @dataclass(frozen=True)
-class NothingIsListed(Then[None, list[SessionLifecycleHandlerNode]]):
-    @override
-    def says(self) -> str:
-        return "빈 목록이 반환된다"
-
-    @override
-    def look(
-        self, laid: None, answered: Answered[list[SessionLifecycleHandlerNode]]
-    ) -> list[Verdict]:
-        if answered.response is None:
-            return [MissingResponse(answered.raised)]
-        return [Same("items", answered.response, [])]
-
-
-@dataclass(frozen=True)
-class TheRegisteredHandlerIsListed(
+class EverySchedulerHandlerIsListed(
     Scenario[
         TestSeedingSession, None, SessionLifecycleHandlerAdapter, list[SessionLifecycleHandlerNode]
     ]
 ):
     @override
     def summary(self) -> str:
-        return "the-registered-handler-is-listed"
+        return "every-scheduler-handler-is-listed"
 
     @override
     def describe(self) -> str:
-        return "코디네이터에 등록된 처리기가 그 이름과 클래스 설명의 첫 줄로 반환된다"
+        return "스케줄러가 만드는 세션 처리기 전부가 각자의 이름과 클래스 설명의 첫 줄로 반환된다"
 
     @override
     def given(self) -> Given[TestSeedingSession, None]:
-        return TheTerminatorIsRegistered()
+        return TheSchedulerHandlersAreFixed()
 
     @override
     def when(
@@ -149,41 +118,12 @@ class TheRegisteredHandlerIsListed(
 
     @override
     def then(self) -> Then[None, list[SessionLifecycleHandlerNode]]:
-        return TheTerminatorIsListed()
-
-
-@dataclass(frozen=True)
-class NoRegisteredHandlerListsNothing(
-    Scenario[
-        TestSeedingSession, None, SessionLifecycleHandlerAdapter, list[SessionLifecycleHandlerNode]
-    ]
-):
-    @override
-    def summary(self) -> str:
-        return "no-registered-handler-lists-nothing"
-
-    @override
-    def describe(self) -> str:
-        return "코디네이터에 등록된 처리기가 없으면 빈 목록이 반환된다"
-
-    @override
-    def given(self) -> Given[TestSeedingSession, None]:
-        return NothingIsRegistered()
-
-    @override
-    def when(
-        self,
-    ) -> When[None, SessionLifecycleHandlerAdapter, list[SessionLifecycleHandlerNode]]:
-        return Listing()
-
-    @override
-    def then(self) -> Then[None, list[SessionLifecycleHandlerNode]]:
-        return NothingIsListed()
+        return EveryHandlerIsListed()
 
 
 @pytest.mark.parametrize(
     "scenario",
-    [TheRegisteredHandlerIsListed()],
+    [EverySchedulerHandlerIsListed()],
     ids=lambda scenario: scenario.summary(),
 )
 async def test_listing(
@@ -192,16 +132,3 @@ async def test_listing(
     engine: ExtendedAsyncSAEngine,
 ) -> None:
     await run_scenario(scenario, adapter, engine)
-
-
-@pytest.mark.parametrize(
-    "scenario",
-    [NoRegisteredHandlerListsNothing()],
-    ids=lambda scenario: scenario.summary(),
-)
-async def test_listing_with_no_handler_registered(
-    scenario: ListingStep,
-    adapter_with_no_handler_registered: SessionLifecycleHandlerAdapter,
-    engine: ExtendedAsyncSAEngine,
-) -> None:
-    await run_scenario(scenario, adapter_with_no_handler_registered, engine)
