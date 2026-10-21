@@ -26107,11 +26107,6 @@ type SessionLifecycleHandlerNode
   Handler key accepted in the session options' handler_options.by_handler.
   """
   name: String!
-
-  """
-  First line of the handler's docstring, if any. Null when the backing class has no docstring.
-  """
-  description: String
 }
 
 """
