@@ -6,11 +6,9 @@ from ai.backend.common.dto.manager.operations import (
     AppendErrorLogResponse,
     ClearErrorLogResponse,
     FetchManagerStatusResponse,
-    GetAnnouncementResponse,
     ListErrorLogsRequest,
     ListErrorLogsResponse,
     PerformSchedulerOpsRequest,
-    UpdateAnnouncementRequest,
     UpdateManagerStatusRequest,
 )
 
@@ -76,25 +74,6 @@ class OperationsClient(BaseDomainClient):
         await self._client.typed_request_no_content(
             "PUT",
             "/manager/status",
-            request=request,
-        )
-
-    async def get_announcement(self) -> GetAnnouncementResponse:
-        """Deprecated since {NEXT_RELEASE_VERSION}: WebUI keeps the announcement in the domain app config."""
-        return await self._client.typed_request(
-            "GET",
-            "/manager/announcement",
-            response_model=GetAnnouncementResponse,
-        )
-
-    async def update_announcement(
-        self,
-        request: UpdateAnnouncementRequest,
-    ) -> None:
-        """Deprecated since {NEXT_RELEASE_VERSION}: WebUI keeps the announcement in the domain app config."""
-        await self._client.typed_request_no_content(
-            "POST",
-            "/manager/announcement",
             request=request,
         )
 

@@ -23,13 +23,9 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam
 from ai.backend.common.dto.manager.manager_api.request import (
     SchedulerOps,
     SchedulerOpsRequest,
-    UpdateAnnouncementRequest,
     UpdateManagerStatusRequest,
 )
-from ai.backend.common.dto.manager.manager_api.response import (
-    AnnouncementResponse,
-    ManagerStatusResponse,
-)
+from ai.backend.common.dto.manager.manager_api.response import ManagerStatusResponse
 from ai.backend.common.types import PromMetric, PromMetricGroup, PromMetricPrimitive
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager import __version__
@@ -37,13 +33,9 @@ from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericBadRequest
 from ai.backend.manager.services.manager_admin.actions.fetch_status import FetchManagerStatusAction
-from ai.backend.manager.services.manager_admin.actions.get_announcement import GetAnnouncementAction
 from ai.backend.manager.services.manager_admin.actions.get_db_cxn_status import GetDbCxnStatusAction
 from ai.backend.manager.services.manager_admin.actions.perform_scheduler_ops import (
     PerformSchedulerOpsAction,
-)
-from ai.backend.manager.services.manager_admin.actions.update_announcement import (
-    UpdateAnnouncementAction,
 )
 from ai.backend.manager.services.manager_admin.actions.update_status import (
     UpdateManagerStatusAction,
@@ -210,35 +202,6 @@ class ManagerHandler:
             force_kill=params.force_kill,
         )
         await self._manager_admin.update_status.run(action)
-        return APIResponse.no_content(HTTPStatus.NO_CONTENT)
-
-    # ------------------------------------------------------------------
-    # get_announcement (GET /manager/announcement)
-    # ------------------------------------------------------------------
-
-    async def get_announcement(self) -> APIResponse:
-        """Deprecated since {NEXT_RELEASE_VERSION}: WebUI keeps the announcement in the domain app config."""
-        action = GetAnnouncementAction()
-        result = await self._manager_admin.get_announcement.run(action)
-        resp = AnnouncementResponse(enabled=result.enabled, message=result.message)
-        return APIResponse.build(HTTPStatus.OK, resp)
-
-    # ------------------------------------------------------------------
-    # update_announcement (POST /manager/announcement)
-    # ------------------------------------------------------------------
-
-    async def update_announcement(
-        self,
-        body: BodyParam[UpdateAnnouncementRequest],
-        ctx: UserContext,
-    ) -> APIResponse:
-        """Deprecated since {NEXT_RELEASE_VERSION}: WebUI keeps the announcement in the domain app config."""
-        params = body.parsed
-        action = UpdateAnnouncementAction(
-            enabled=params.enabled,
-            message=params.message,
-        )
-        await self._manager_admin.update_announcement.run(action)
         return APIResponse.no_content(HTTPStatus.NO_CONTENT)
 
     # ------------------------------------------------------------------

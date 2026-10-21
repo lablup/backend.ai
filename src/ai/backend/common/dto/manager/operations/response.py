@@ -16,7 +16,6 @@ __all__ = (
     "ClearErrorLogResponse",
     "ErrorLogItem",
     "FetchManagerStatusResponse",
-    "GetAnnouncementResponse",
     "ListErrorLogsResponse",
     "ManagerNodeInfo",
 )
@@ -143,15 +142,4 @@ class FetchManagerStatusResponse(BaseResponseModel):
     )
     active_sessions: int = Field(
         description="Total number of active sessions across all nodes",
-    )
-
-
-class GetAnnouncementResponse(BaseResponseModel):
-    """Response containing the current system announcement."""
-
-    enabled: bool = Field(
-        description="Whether the announcement is currently enabled",
-    )
-    message: str = Field(
-        description="Announcement message text; empty string if disabled",
     )

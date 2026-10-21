@@ -393,7 +393,6 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
         manager_admin=ManagerAdminService(
             repository=repositories.manager_admin.repository,
             config_provider=args.config_provider,
-            etcd=args.etcd,
             db=args.db,
             valkey_stat=args.valkey_stat_client,
         ),

@@ -12,14 +12,9 @@ from ai.backend.client.output import get_output_handler
 
 
 def set_client_config(info: Mapping[str, Any]) -> CLIContext:
-    from .announcement import announce
-
     skip_sslcert_validation = info.get("skip_sslcert_validation", False)
     output = info.get("output", "console")
-    config = APIConfig(
-        skip_sslcert_validation=skip_sslcert_validation,
-        announcement_handler=announce,
-    )
+    config = APIConfig(skip_sslcert_validation=skip_sslcert_validation)
     set_config(config)
 
     output_mode = OutputMode(output)
