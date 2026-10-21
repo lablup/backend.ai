@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import threading
 import uuid
 from collections.abc import Mapping
 from decimal import Decimal
@@ -17,7 +18,12 @@ from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.alloc_map import DiscretePropertyAllocMap
 from ai.backend.agent.config.unified import ContainerdConfig
 from ai.backend.agent.containerd import agent as agent_module
-from ai.backend.agent.containerd.agent import HOST_PORTS_LABEL, ContainerdAgent, _kernel_slots
+from ai.backend.agent.containerd.agent import (
+    HOST_PORTS_LABEL,
+    ContainerdAgent,
+    _kernel_slots,
+    _run_scratch_work,
+)
 from ai.backend.agent.containerd.client import ContainerRecord, TaskInfo, TaskState
 from ai.backend.agent.containerd.network import KernelNetwork
 from ai.backend.agent.containerd.profile.base import KernelLaunch, LaunchPlan, RuntimeProfile
@@ -879,3 +885,28 @@ class TestBaseRestoreContainerResources:
         )
 
         cast(AsyncMock, second.instance.restore_from_container).assert_awaited_once()
+
+
+class TestRunScratchWork:
+    async def test_cancellation_waits_for_the_thread_to_finish(self) -> None:
+        """The scratch work is done before the cancel propagates, so a removal after it holds."""
+        started = threading.Event()
+        release = threading.Event()
+        finished: list[bool] = []
+
+        def work() -> None:
+            started.set()
+            release.wait(5)
+            finished.append(True)
+
+        task = asyncio.create_task(_run_scratch_work(work))
+        await asyncio.get_running_loop().run_in_executor(None, started.wait, 5)
+
+        task.cancel()
+        await asyncio.sleep(0.05)
+        assert not task.done()
+        release.set()
+
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert finished == [True]

@@ -4,7 +4,7 @@ import asyncio
 import logging
 import signal
 import uuid
-from collections.abc import AsyncGenerator, Mapping, MutableMapping, Sequence
+from collections.abc import AsyncGenerator, Callable, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from functools import partial
 from importlib.resources import files
@@ -113,6 +113,27 @@ from ai.backend.common.types import (
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
+
+
+async def _run_scratch_work[**P, T](
+    func: Callable[P, T], *args: P.args, **kwargs: P.kwargs
+) -> T:
+    """Run blocking scratch work in the executor; a cancel waits until the thread has finished.
+
+    Otherwise the thread could recreate the scratch dir after its removal.
+    """
+    work = asyncio.ensure_future(
+        run_in_executor_with_context(None, partial(func, *args, **kwargs))
+    )
+    try:
+        return await asyncio.shield(work)
+    except asyncio.CancelledError:
+        while not work.done():
+            try:
+                await asyncio.wait({work})
+            except asyncio.CancelledError:
+                pass
+        raise
 
 HOST_PORTS_LABEL: Final = "ai.backend.containerd.host-ports"
 KERNEL_IP_LABEL: Final = "ai.backend.containerd.kernel-ip"
@@ -296,14 +317,11 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     # says (memory and hostfile are not implemented)
     @override
     async def prepare_scratch(self) -> None:
-        await run_in_executor_with_context(
-            None,
-            partial(
-                create_scratch,
-                self._dirs,
-                self._owner(),
-                clone_dotfiles=not self.restarting,
-            ),
+        await _run_scratch_work(
+            create_scratch,
+            self._dirs,
+            self._owner(),
+            clone_dotfiles=not self.restarting,
         )
 
     # Not mirrored from the Docker agent: the agent socket, domain-socket proxies, extra
@@ -492,7 +510,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         )
 
     async def _add_spec_jws(self, signature: str) -> None:
-        await run_in_executor_with_context(None, write_spec_jws, self._dirs.spec_jws, signature)
+        await _run_scratch_work(write_spec_jws, self._dirs.spec_jws, signature)
         # Appended to the base spec, not a GeneratedMount: a profile's spec_patch["mounts"] keeps
         # the base mounts (coco-tdx replaces the list with base mounts + resolver binds).
         self._base_spec["mounts"].append(spec_jws_mount(self._dirs.spec_jws))
@@ -520,7 +538,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             write_hosts_file(self._dirs, self.kernel_config["cluster_hostname"])
             write_resolv_conf(self._dirs)
 
-        await run_in_executor_with_context(None, _write)
+        await _run_scratch_work(_write)
 
     def _acquire_host_ports(self, count: int) -> list[int]:
         acquired: list[int] = []

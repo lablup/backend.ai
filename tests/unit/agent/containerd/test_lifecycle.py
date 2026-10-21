@@ -183,6 +183,19 @@ class TestClean:
 
         assert ("remove_snapshot", "absent") in fake.calls
 
+    async def test_failing_task_deletion_still_removes_container_and_snapshot(
+        self, fake: FakeContainerd
+    ) -> None:
+        """A task that cannot be deleted must not leave its container record and snapshot."""
+        await _launch(fake)
+        fake.failing.add("delete_task")
+
+        with pytest.raises(ContainerdOperationFailed, match="delete_task"):
+            await clean_container(fake, CID)
+
+        assert fake.containers == {}
+        assert fake.snapshots == {}
+
     async def test_is_idempotent(self, fake: FakeContainerd) -> None:
         await _launch(fake)
 
