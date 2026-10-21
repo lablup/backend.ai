@@ -105,6 +105,19 @@ class TestDescribeProfileFailure:
         assert describe_profile_failure(_RaisingProfile(), 3, "boom") is None
 
 
+class TestReasonComesFirst:
+    @pytest.mark.parametrize("error_type", [KernelTaskExited, ContainerCreationFailedError])
+    def test_reason_leads_a_long_message(
+        self, error_type: type[KernelTaskExited | ContainerCreationFailedError]
+    ) -> None:
+        error = error_type("x" * 700, failure_reason="SomeReason: the runtime refused")
+
+        assert error.extra_msg is not None
+        assert error.extra_msg.startswith("SomeReason: the runtime refused: x")
+        assert str(error).index("SomeReason") < 100
+        assert repr(error).index("SomeReason") < 100
+
+
 class TestKernelTaskExitedReason:
     async def test_raising_profile_keeps_the_message(
         self, ownership_data: KernelOwnershipData, launch_plan: LaunchPlan, fake: FakeContainerd
@@ -128,7 +141,9 @@ class TestKernelTaskExitedReason:
         with pytest.raises(KernelTaskExited) as exc_info:
             await kernel._raise_if_task_exited()
 
-        assert "status 3 (container c1): SomeReason: the runtime refused" in str(exc_info.value)
+        assert exc_info.value.extra_msg == (
+            "SomeReason: the runtime refused: the kernel task exited with status 3 (container c1)"
+        )
         assert exc_info.value.exit_status == 3
         assert profile.calls[0][0] == 3
 
@@ -211,7 +226,8 @@ class TestContainerCreationFailedReason:
             await self._start(context, kernel)
 
         assert CREATE_ERROR in str(exc_info.value)
-        assert str(exc_info.value).endswith("SomeReason: the runtime refused)")
+        assert exc_info.value.extra_msg is not None
+        assert exc_info.value.extra_msg.startswith("SomeReason: the runtime refused: Kernel failed")
         assert profile.calls == [(None, CREATE_ERROR)]
 
     @pytest.mark.parametrize(

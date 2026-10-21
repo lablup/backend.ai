@@ -70,7 +70,7 @@ class ContainerCreationFailedError(BackendAIError, web.HTTPInternalServerError):
 
     def __init__(self, extra_msg: str | None = None, *, failure_reason: str | None = None) -> None:
         if failure_reason is not None:
-            extra_msg = f"{extra_msg}: {failure_reason}" if extra_msg else failure_reason
+            extra_msg = f"{failure_reason}: {extra_msg}" if extra_msg else failure_reason
         super().__init__(extra_msg)
 
     @override
