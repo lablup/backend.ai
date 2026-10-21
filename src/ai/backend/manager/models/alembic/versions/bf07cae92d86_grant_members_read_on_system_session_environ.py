@@ -1,8 +1,8 @@
-"""Grant public members and project members and admins READ on system session environ
+"""Grant public, domain and project members and admins READ on system session environ
 
-Every user reads the bindings at public, and a project's members and admins read the ones
-at their project, as they read app config fragments. Write the grant to the presets and to
-every role made from them.
+Every user reads the bindings at public, and a domain's or a project's members and admins
+read the ones at their domain or project. Write the grant to the presets and to every role
+made from them.
 
 Revision ID: bf07cae92d86
 Revises: fa2dfd48c169
@@ -27,6 +27,8 @@ depends_on = None
 
 
 _PUBLIC_MEMBER_PRESET_ID: Final[str] = "01993d56-bb39-7d13-a84b-b6a84fc8b7fd"
+_DOMAIN_MEMBER_PRESET_ID: Final[str] = "76616aa7-6597-5b11-8629-adff5d5640c2"
+_DOMAIN_ADMIN_PRESET_ID: Final[str] = "9ebf4f57-9e67-5631-997a-d2d79cc3815f"
 _PROJECT_MEMBER_PRESET_ID: Final[str] = "06057849-3534-546f-b74c-b79d5d3ecf5e"
 _PROJECT_ADMIN_PRESET_ID: Final[str] = "22c4db03-24aa-5ff8-b5a9-64b2a2182413"
 _READ: Final[int] = 1
@@ -34,6 +36,8 @@ _READ: Final[int] = 1
 # (preset id, entity type) each grant is written for.
 _GRANTS: Final[tuple[tuple[str, str], ...]] = (
     (_PUBLIC_MEMBER_PRESET_ID, "system_session_environ"),
+    (_DOMAIN_MEMBER_PRESET_ID, "system_session_environ"),
+    (_DOMAIN_ADMIN_PRESET_ID, "system_session_environ"),
     (_PROJECT_MEMBER_PRESET_ID, "system_session_environ"),
     (_PROJECT_ADMIN_PRESET_ID, "system_session_environ"),
 )

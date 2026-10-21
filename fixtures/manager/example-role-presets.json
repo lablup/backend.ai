@@ -659,6 +659,13 @@
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
         {
+            "id": "01993d56-bb39-7044-8158-3fb9721a5e6f",
+            "role_preset_id": "9ebf4f57-9e67-5631-997a-d2d79cc3815f",
+            "entity_type": "system_session_environ",
+            "permission": 1,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
             "id": "01993d56-bb39-7555-b4a9-af765f925e93",
             "role_preset_id": "9ebf4f57-9e67-5631-997a-d2d79cc3815f",
             "entity_type": "user",
@@ -788,6 +795,13 @@
             "id": "01993d56-bb39-78b1-89b4-7d32b8fdcf49",
             "role_preset_id": "76616aa7-6597-5b11-8629-adff5d5640c2",
             "entity_type": "resource_preset",
+            "permission": 1,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-770f-9701-e312457d52ad",
+            "role_preset_id": "76616aa7-6597-5b11-8629-adff5d5640c2",
+            "entity_type": "system_session_environ",
             "permission": 1,
             "created_at": "2025-09-12 09:51:58.265582+00"
         },
