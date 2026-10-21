@@ -32,11 +32,10 @@ from ai.backend.manager.models.image.searchers import (
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.db.engine import connect_database
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
-from .context import CLIContext, redis_ctx
+from .context import CLIContext, db_ctx, redis_ctx
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
@@ -65,9 +64,8 @@ def _describe(image: ImageData) -> str:
 
 async def list_images(cli_ctx: CLIContext, short: bool, installed_only: bool) -> None:
     # Connect to postgreSQL DB
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(bootstrap_config.db) as db,
+        db_ctx(cli_ctx) as db,
         redis_ctx(cli_ctx) as redis_conn_set,
     ):
         displayed_items: list[tuple[Any, ...]] = []
@@ -124,8 +122,7 @@ async def list_images(cli_ctx: CLIContext, short: bool, installed_only: bool) ->
 
 
 async def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
-    async with connect_database(bootstrap_config.db) as db:
+    async with db_ctx(cli_ctx) as db:
         try:
             details = await ImageDBSource(db, V2DBOpsProvider(db)).search_image_details(
                 [], _reference_searcher(canonical_or_alias, architecture)
@@ -140,8 +137,7 @@ async def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architectu
 
 
 async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
-    async with connect_database(bootstrap_config.db) as db:
+    async with db_ctx(cli_ctx) as db:
         try:
             image = await _first_image(
                 db, _reference_searcher(canonical_or_alias, architecture), canonical_or_alias
@@ -156,9 +152,8 @@ async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architectur
 async def purge_image(
     cli_ctx: CLIContext, canonical_or_alias: str, architecture: str, remove_from_registry: bool
 ) -> None:
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(bootstrap_config.db) as db,
+        db_ctx(cli_ctx) as db,
         db.begin_session() as session,
     ):
         try:
@@ -192,8 +187,7 @@ async def set_image_resource_limit(
     range_value: tuple[Decimal | None, Decimal | None],
     architecture: str,
 ) -> None:
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
-    async with connect_database(bootstrap_config.db) as db:
+    async with db_ctx(cli_ctx) as db:
         try:
             image = await _first_image(
                 db, _reference_searcher(canonical_or_alias, architecture), canonical_or_alias
@@ -212,9 +206,8 @@ async def rescan_images(
 ) -> None:
     if not registry_or_image:
         raise click.BadArgumentUsage("Please specify a valid registry or full image name.")
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(bootstrap_config.db) as db,
+        db_ctx(cli_ctx) as db,
     ):
         try:
             result = await ImageDBSource(db, V2DBOpsProvider(db)).rescan_images(
@@ -227,8 +220,7 @@ async def rescan_images(
 
 
 async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str) -> None:
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
-    async with connect_database(bootstrap_config.db) as db:
+    async with db_ctx(cli_ctx) as db:
         try:
             image = await _first_image(db, _canonical_searcher(target, architecture), target)
             await ImageDBSource(db, V2DBOpsProvider(db)).insert_image_alias_by_id(
@@ -243,9 +235,8 @@ async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str)
 
 
 async def dealias(cli_ctx: CLIContext, alias: str) -> None:
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(bootstrap_config.db) as db,
+        db_ctx(cli_ctx) as db,
         db.begin_session() as session,
     ):
         alias_row = await session.scalar(
@@ -258,8 +249,7 @@ async def dealias(cli_ctx: CLIContext, alias: str) -> None:
 
 
 async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
-    async with connect_database(bootstrap_config.db) as db:
+    async with db_ctx(cli_ctx) as db:
         try:
             image = await _first_image(
                 db,
@@ -287,9 +277,8 @@ def _resolve_architecture(current: bool, architecture: str | None) -> str:
 async def validate_image_canonical(
     cli_ctx: CLIContext, canonical: str, current: bool, architecture: str | None = None
 ) -> None:
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(bootstrap_config.db) as db,
+        db_ctx(cli_ctx) as db,
         db.begin_readonly_session() as session,
     ):
         try:
