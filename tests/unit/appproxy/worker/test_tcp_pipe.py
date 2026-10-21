@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import errno
 import gc
+import logging
 import sys
 import weakref
 from collections.abc import AsyncIterator, Callable
@@ -250,6 +252,47 @@ class TestTCPPipe:
             await backend.close()
 
         down_writer.write.assert_called_once_with(b"data")
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            OSError(errno.ENOTCONN, "Transport endpoint is not connected"),
+            ConnectionResetError(errno.ECONNRESET, "Connection reset by peer"),
+        ],
+    )
+    async def test_client_gone_before_close_is_a_normal_end(
+        self,
+        error: OSError,
+        root_context: MagicMock,
+        servers: list[asyncio.Server],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        async def idle_upstream(r: asyncio.StreamReader, w: asyncio.StreamWriter) -> None:
+            await r.read()
+            w.close()
+
+        upstream = await _start_upstream(idle_upstream)
+        servers.append(upstream._server)
+        circuit = _create_circuit(upstream.port)
+        frontend = TCPFrontend(root_context)
+        frontend.circuits[PORT] = circuit
+        frontend.backends[PORT] = TCPBackend(circuit.route_info, root_context, circuit)
+
+        down_writer = MagicMock()
+        down_writer.can_write_eof.return_value = True
+        down_writer.drain = AsyncMock()
+        down_writer.wait_closed = AsyncMock(side_effect=error)
+        down_reader = asyncio.StreamReader()
+        down_reader.feed_eof()
+
+        try:
+            with caplog.at_level(logging.DEBUG):
+                await asyncio.wait_for(frontend.pipe(PORT, down_reader, down_writer), TIMEOUT)
+        finally:
+            await frontend.backends[PORT].close()
+
+        down_writer.wait_closed.assert_awaited_once()
+        assert [r for r in caplog.records if r.levelno >= logging.ERROR] == []
 
     async def test_stop_returns_with_open_half_closed_connection(
         self,

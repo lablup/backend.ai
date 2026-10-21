@@ -113,5 +113,8 @@ class TCPBackend(BaseBackend):
             metrics.proxy.observe_upstream_tcp_traffic_chunk(total_bytes)
             await marker_cron.stop()
             down_writer.close()
-            await down_writer.wait_closed()
+            try:
+                await down_writer.wait_closed()
+            except OSError as e:  # the client is already gone: ENOTCONN / ECONNRESET
+                log.trace("downstream already closed: {!r}", e)
         log.trace("TCP connection closed")
