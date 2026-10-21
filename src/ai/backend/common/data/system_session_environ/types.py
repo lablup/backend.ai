@@ -3,9 +3,10 @@ from __future__ import annotations
 import enum
 
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.global_entity import GlobalEntityID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironScopeID
-from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.types import EntityIdentifier, GlobalEntityType
 from ai.backend.common.exception import UnreachableError
 
 __all__ = (
@@ -21,9 +22,9 @@ class SystemSessionEnvironScopeType(enum.StrEnum):
     PROJECT = "project"
 
     @classmethod
-    def of_owner(cls, owner: EntityIdentifier | None) -> SystemSessionEnvironScopeType:
+    def of_owner(cls, owner: EntityIdentifier) -> SystemSessionEnvironScopeType:
         match owner:
-            case None:
+            case _ if owner.entity_type() == GlobalEntityType():
                 return cls.GLOBAL
             case _ if owner.entity_type() == DomainEntityType():
                 return cls.DOMAIN
@@ -34,12 +35,10 @@ class SystemSessionEnvironScopeType(enum.StrEnum):
                     f"No system session environ scope is owned by a {owner.entity_type()}"
                 )
 
-    def to_owner(self, scope_id: SystemSessionEnvironScopeID | None) -> EntityIdentifier | None:
-        if scope_id is None:
-            return None
+    def to_owner(self, scope_id: SystemSessionEnvironScopeID) -> EntityIdentifier:
         match self:
             case SystemSessionEnvironScopeType.GLOBAL:
-                return None
+                return GlobalEntityID(scope_id)
             case SystemSessionEnvironScopeType.DOMAIN:
                 return DomainID(scope_id)
             case SystemSessionEnvironScopeType.PROJECT:

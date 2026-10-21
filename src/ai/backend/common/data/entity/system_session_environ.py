@@ -9,6 +9,6 @@ __all__ = (
 
 SystemSessionEnvironID = NewType("SystemSessionEnvironID", UUID)
 
-# A domain or a project id, discriminated by the accompanying ``SystemSessionEnvironScopeType``;
-# ``global`` names none, so its absence is spelled ``| None`` at each use.
+# The global entity, a domain or a project id, discriminated by the accompanying
+# ``SystemSessionEnvironScopeType``.
 SystemSessionEnvironScopeID = NewType("SystemSessionEnvironScopeID", UUID)

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.system_session_environ import (
     SystemSessionEnvironID,
@@ -16,6 +17,7 @@ from ai.backend.common.data.system_session_environ.types import (
     SystemSessionEnvironScopeType,
     SystemSessionEnvironValueSource,
 )
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
@@ -43,10 +45,10 @@ class _SeededRows:
 
 @pytest.fixture
 async def database(
-    database_connection: ExtendedAsyncSAEngine,
+    global_entity_ids: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-    async with with_tables(database_connection, [SystemSessionEnvironRow]):
-        yield database_connection
+    async with with_tables(global_entity_ids, [SystemSessionEnvironRow]):
+        yield global_entity_ids
 
 
 @pytest.fixture
@@ -65,7 +67,7 @@ async def seeded_rows(database: ExtendedAsyncSAEngine) -> _SeededRows:
         value_source=SystemSessionEnvironValueSource.SESSION_ID,
         key="BACKENDAI_SESSION_ID",
         scope_type=SystemSessionEnvironScopeType.GLOBAL,
-        scope_id=None,
+        scope_id=SystemSessionEnvironScopeID(global_entity_id(GlobalEntityName.GLOBAL)),
     )
     domain_row = SystemSessionEnvironRow(
         value_source=SystemSessionEnvironValueSource.USER_EMAIL,
@@ -153,7 +155,7 @@ class TestSessionSystemSessionEnvironScope:
         )
 
         assert {row.id: row.scope_id for row in result.items} == {
-            seeded_rows.global_row: None,
+            seeded_rows.global_row: global_entity_id(GlobalEntityName.GLOBAL),
             seeded_rows.domain_row: _DOMAIN_ID,
             seeded_rows.project_row: _PROJECT_ID,
         }

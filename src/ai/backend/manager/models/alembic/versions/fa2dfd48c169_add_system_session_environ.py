@@ -45,7 +45,8 @@ OPTIONAL_BINDINGS: Final[dict[str, str]] = {
 
 _ADD_GLOBAL_BINDING: Final = sa.text("""
     INSERT INTO system_session_environ (value_source, key, scope_type, scope_id, enabled)
-    VALUES (:value_source, :key, 'global', NULL, :enabled)
+    SELECT :value_source, :key, 'global', id, :enabled
+    FROM global_entities WHERE name = 'global'
     ON CONFLICT (key, scope_type, scope_id) DO NOTHING
 """)
 
@@ -57,7 +58,7 @@ def upgrade() -> None:
         sa.Column("value_source", sa.String(length=64), nullable=False),
         sa.Column("key", sa.String(length=256), nullable=False),
         sa.Column("scope_type", sa.String(length=64), nullable=False),
-        sa.Column("scope_id", GUID, nullable=True),
+        sa.Column("scope_id", GUID, nullable=False),
         sa.Column("enabled", sa.Boolean, server_default=sa.true(), nullable=False),
         sa.Column(
             "created_at",
@@ -77,11 +78,6 @@ def upgrade() -> None:
             "scope_type",
             "scope_id",
             name=op.f("uq_system_session_environ_key"),
-            postgresql_nulls_not_distinct=True,
-        ),
-        sa.CheckConstraint(
-            "(scope_type = 'global') = (scope_id IS NULL)",
-            name=op.f("ck_system_session_environ_scope_id_matches_scope_type"),
         ),
         sa.CheckConstraint(
             "key ~ '^[A-Za-z_][A-Za-z0-9_]*$'",

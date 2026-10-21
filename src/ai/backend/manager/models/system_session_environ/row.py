@@ -31,11 +31,6 @@ class SystemSessionEnvironRow(LifecycleTimestampsMixin, Base):
             "key",
             "scope_type",
             "scope_id",
-            postgresql_nulls_not_distinct=True,
-        ),
-        sa.CheckConstraint(
-            "(scope_type = 'global') = (scope_id IS NULL)",
-            name="scope_id_matches_scope_type",
         ),
         sa.CheckConstraint(
             f"key ~ '{_ENVIRON_KEY_PATTERN}'",
@@ -61,10 +56,10 @@ class SystemSessionEnvironRow(LifecycleTimestampsMixin, Base):
         StrEnumType(SystemSessionEnvironScopeType),
         nullable=False,
     )
-    scope_id: Mapped[SystemSessionEnvironScopeID | None] = mapped_column(
+    scope_id: Mapped[SystemSessionEnvironScopeID] = mapped_column(
         "scope_id",
         GUID(SystemSessionEnvironScopeID),
-        nullable=True,
+        nullable=False,
     )
     enabled: Mapped[bool] = mapped_column(
         "enabled", sa.Boolean, nullable=False, server_default=sa.true()
