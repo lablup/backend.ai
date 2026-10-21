@@ -288,19 +288,16 @@ class TestMigrationMatchesFixture:
 
 
 class TestEntityTypeSweep:
-    def test_the_seed_names_only_kept_types(
-        self,
-        migration: Any,
-        system_session_environ_read_migration: Any,
-        fixture: dict[str, Any],
-    ) -> None:
-        """What the sweep keeps covers what the presets grant, or it deletes the grants. A type
-        first granted by a migration after the sweep has no row there for it to delete."""
-        granted_after_sweep = {
-            entity_type for _, entity_type in system_session_environ_read_migration._GRANTS
+    def test_the_presets_it_writes_name_only_kept_types(self, migration: Any) -> None:
+        """What the sweep keeps covers what the revision's own presets grant. A later revision
+        grants after the sweep has run, so the current fixture is not what it answers for."""
+        granted = {
+            entity_type
+            for preset in migration._PRESETS
+            for entity_type, bits in preset.grants
+            if bits
         }
-        named = {row["entity_type"] for row in fixture["role_permission_presets"]}
-        assert named - granted_after_sweep <= migration._ENTITY_TYPES
+        assert granted <= migration._ENTITY_TYPES
 
     def test_the_retired_names_are_not_kept(self, migration: Any) -> None:
         for name, replacement in migration._RETIRED.items():
