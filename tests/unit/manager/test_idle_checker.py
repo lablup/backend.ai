@@ -923,8 +923,12 @@ class TestUtilizationIdleChecker:
             if key.endswith(".util_series_v2"):
                 return msgpack.packb({
                     "observed_since": window_start,
-                    "collected_at": [window_start],
-                    "series": {"mem": [grace_test_config.previous_mem_util]},
+                    "samples": [
+                        {
+                            "collected_at": window_start,
+                            "utilizations": {"mem": grace_test_config.previous_mem_util},
+                        },
+                    ],
                 })
             return None
 
@@ -1276,8 +1280,12 @@ class TestUtilizationIdleChecker:
             if ".util_series_v2" in key:
                 return msgpack.packb({
                     "observed_since": window_start,
-                    "collected_at": [window_start],
-                    "series": {"mem": [insufficient_test_config.previous_mem_util]},
+                    "samples": [
+                        {
+                            "collected_at": window_start,
+                            "utilizations": {"mem": insufficient_test_config.previous_mem_util},
+                        },
+                    ],
                 })
             if ".utilization_extra" in key:
                 return msgpack.packb({"resources": {}})
@@ -1346,8 +1354,12 @@ class TestUtilizationIdleChecker:
             if ".util_series_v2" in key:
                 return msgpack.packb({
                     "observed_since": window_start,
-                    "collected_at": [window_start],
-                    "series": {"cpu_util": [None], "mem": [60.0]},
+                    "samples": [
+                        {
+                            "collected_at": window_start,
+                            "utilizations": {"cpu_util": None, "mem": 60.0},
+                        },
+                    ],
                 })
             if ".utilization_extra" in key:
                 return msgpack.packb({"resources": {}})

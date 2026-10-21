@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import bisect
 import enum
 import logging
 import math
@@ -817,46 +816,54 @@ class UtilizationConfig(BaseConfigModel):
     ]
 
 
+@dataclass(frozen=True)
+class _UtilizationSample:
+    collected_at: float
+    utilizations: dict[str, float | None]
+
+
 @dataclass
 class _UtilizationSeriesV2:
     observed_since: float
-    collected_at: list[float]
-    series: dict[str, list[float | None]]
+    samples: list[_UtilizationSample]
 
     @classmethod
     def unpack(cls, raw: bytes) -> Self:
         data = msgpack.unpackb(raw, use_list=True)
         return cls(
             observed_since=data["observed_since"],
-            collected_at=data["collected_at"],
-            series=data["series"],
+            samples=[
+                _UtilizationSample(
+                    collected_at=sample["collected_at"],
+                    utilizations=sample["utilizations"],
+                )
+                for sample in data["samples"]
+            ],
         )
 
     def pack(self) -> bytes:
         return msgpack.packb({
             "observed_since": self.observed_since,
-            "collected_at": self.collected_at,
-            "series": self.series,
+            "samples": [
+                {"collected_at": sample.collected_at, "utilizations": sample.utilizations}
+                for sample in self.samples
+            ],
         })
 
     def drop_before(self, cutoff: float) -> None:
-        start = bisect.bisect_left(self.collected_at, cutoff)
-        self.collected_at = self.collected_at[start:]
-        self.series = {metric_key: values[start:] for metric_key, values in self.series.items()}
-
-    def append(self, collected_at: float, utilizations: Mapping[str, float | None]) -> None:
-        for metric_key in utilizations.keys() - self.series.keys():
-            self.series[metric_key] = [None] * len(self.collected_at)
-        for metric_key, values in self.series.items():
-            values.append(utilizations.get(metric_key))
-        self.collected_at.append(collected_at)
+        self.samples = [sample for sample in self.samples if sample.collected_at >= cutoff]
 
     def averages(self) -> dict[str, float | None]:
-        result: dict[str, float | None] = {}
-        for metric_key, values in self.series.items():
-            filtered = [v for v in values if v is not None]
-            result[metric_key] = sum(filtered) / len(filtered) if filtered else None
-        return result
+        values_by_metric: dict[str, list[float]] = {}
+        for sample in self.samples:
+            for metric_key, value in sample.utilizations.items():
+                metric_values = values_by_metric.setdefault(metric_key, [])
+                if value is not None:
+                    metric_values.append(value)
+        return {
+            metric_key: sum(values) / len(values) if values else None
+            for metric_key, values in values_by_metric.items()
+        }
 
 
 class UtilizationIdleChecker(BaseIdleChecker):
@@ -1022,19 +1029,21 @@ class UtilizationIdleChecker(BaseIdleChecker):
         window_start = util_now - time_window.total_seconds()
         raw_util_series_v2 = await self._redis_live.get_live_data(util_series_v2_key)
         if raw_util_series_v2 is not None:
-            samples = _UtilizationSeriesV2.unpack(raw_util_series_v2)
+            util_series_v2 = _UtilizationSeriesV2.unpack(raw_util_series_v2)
         else:
-            samples = _UtilizationSeriesV2(observed_since=util_now, collected_at=[], series={})
-        samples.drop_before(window_start)
-        if not samples.collected_at:
+            util_series_v2 = _UtilizationSeriesV2(observed_since=util_now, samples=[])
+        util_series_v2.drop_before(window_start)
+        if not util_series_v2.samples:
             # Nothing was collected within the window, so it must be observed again from now.
-            samples.observed_since = util_now
-        samples.append(util_now, current_utilizations)
-        do_idle_check = samples.observed_since <= window_start
+            util_series_v2.observed_since = util_now
+        util_series_v2.samples.append(
+            _UtilizationSample(collected_at=util_now, utilizations=dict(current_utilizations))
+        )
+        do_idle_check = util_series_v2.observed_since <= window_start
 
         await self._redis_live.store_live_data(
             util_series_v2_key,
-            samples.pack(),
+            util_series_v2.pack(),
             ex=max(86400, int(self.time_window.total_seconds() * 2)),
         )
         await self._redis_live.store_live_data(
@@ -1043,7 +1052,7 @@ class UtilizationIdleChecker(BaseIdleChecker):
             ex=max(86400, int(self.time_window.total_seconds() * 2)),
         )
 
-        avg_utils: Mapping[str, float | None] = samples.averages()
+        avg_utils: Mapping[str, float | None] = util_series_v2.averages()
 
         util_avg_thresholds = UtilizationResourceReport.from_avg_threshold(
             avg_utils, self.resource_thresholds, excluded_resources
