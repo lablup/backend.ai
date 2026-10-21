@@ -11,6 +11,7 @@ import msgpack
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.dotfile import DotfileID
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
@@ -33,7 +34,7 @@ from ai.backend.manager.data.user.types import (
     UserSearchResult,
 )
 from ai.backend.manager.errors.bootstrap_script import DefaultBootstrapScriptNotFound
-from ai.backend.manager.errors.storage import DotfileCreationFailed
+from ai.backend.manager.errors.storage import DotfileCreationFailed, DotfileNotFound
 from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.bootstrap_script.queriers import BootstrapScriptQuerier
 from ai.backend.manager.models.bootstrap_script.updaters import DefaultBootstrapScriptUpdater
@@ -41,6 +42,10 @@ from ai.backend.manager.models.dotfile.creators import DotfileEntryCreator
 from ai.backend.manager.models.dotfile.scopes import UserDotfileTarget
 from ai.backend.manager.models.dotfile.searchable_fields import DotfileSearchableFields
 from ai.backend.manager.models.dotfile.searchers import DotfileSearcher
+from ai.backend.manager.models.dotfile.updaters import (
+    DotfileDefaultClearUpdater,
+    DotfileDefaultSetUpdater,
+)
 from ai.backend.manager.models.keypair.creators import KeypairCreator
 from ai.backend.manager.models.keypair.purgers import NonDefaultKeypairPurger
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
@@ -369,6 +374,22 @@ class UserRepository:
             if owned.total_count >= max_count:
                 raise DotfileCreationFailed("Dotfile creation limit reached")
             return await ops.create_field(creator.owner, creator)
+
+    @user_repository_resilience.apply()
+    async def switch_default_dotfile(self, user_id: UserID, dotfile_id: DotfileID) -> DotfileData:
+        """Make one of the user's dotfiles the default of its path."""
+        scopes = [UserDotfileTarget(user_id)]
+        async with self._v2_ops.write_ops() as ops:
+            # Cleared first; the partial unique index allows one default per path.
+            await ops.batch_update_in_scopes(
+                scopes, DotfileDefaultClearUpdater(user_id=user_id, dotfile_id=dotfile_id)
+            )
+            switched = await ops.batch_update_in_scopes(
+                scopes, DotfileDefaultSetUpdater(dotfile_id=dotfile_id)
+            )
+            if not switched:
+                raise DotfileNotFound
+            return switched[0]
 
     async def _default_dotfiles(self, ops: V2ReadOps, user_id: UserID) -> DotfileEntries:
         result = await ops.search_with_scopes(
