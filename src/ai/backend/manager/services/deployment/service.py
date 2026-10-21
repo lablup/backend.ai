@@ -21,6 +21,7 @@ from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
 )
 from ai.backend.common.exception import BackendAIError
 from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
@@ -340,7 +341,7 @@ class DeploymentService:
         log.trace("deployment creation requested", deployment_name=action.creator.metadata.name)
         designated_agents = action.creator.designated_agents
         await self._ensure_agents_in_resource_group(
-            action.creator.metadata.resource_group, designated_agents
+            action.creator.metadata.resource_group, designated_agents, ActionOperationType.CREATE
         )
         deployment_info = await self._deployment_controller.create_deployment(action.creator)
         if designated_agents:
@@ -409,7 +410,7 @@ class DeploymentService:
         if designated_agents is not None:
             current = await self._deployment_repository.get_endpoint_info(action.deployment_id)
             await self._ensure_agents_in_resource_group(
-                current.metadata.resource_group, designated_agents
+                current.metadata.resource_group, designated_agents, ActionOperationType.UPDATE
             )
         deployment_info = await self._deployment_controller.update_deployment(
             action.updater.deployment_id, action.updater
@@ -421,7 +422,10 @@ class DeploymentService:
         return UpdateDeploymentActionResult(data=_convert_deployment_info_to_data(deployment_info))
 
     async def _ensure_agents_in_resource_group(
-        self, resource_group: str, agent_uuids: frozenset[AgentUUID]
+        self,
+        resource_group: str,
+        agent_uuids: frozenset[AgentUUID],
+        operation: ActionOperationType,
     ) -> None:
         """Refuse agents that do not belong to the deployment's resource group."""
         found = await self._deployment_repository.fetch_agents_in_resource_group(
@@ -429,7 +433,8 @@ class DeploymentService:
         )
         if outside := agent_uuids - found:
             raise DesignatedAgentOutsideResourceGroup(
-                f"Agents {sorted(str(u) for u in outside)} are not in resource group {resource_group}"
+                f"Agents {sorted(str(u) for u in outside)} are not in resource group {resource_group}",
+                operation=operation,
             )
 
     async def replace_deployment_options(

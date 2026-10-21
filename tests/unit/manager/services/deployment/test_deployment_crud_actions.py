@@ -24,6 +24,7 @@ from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import ClusterMode, MountPermission, ResourceSlot
+from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.data.deployment.creator import NewDeploymentCreator
 from ai.backend.manager.data.deployment.types import (
@@ -434,8 +435,10 @@ class TestDesignatedAgentsOnCreate(DeploymentCRUDBaseFixtures):
     ) -> None:
         mock_deployment_repository.fetch_agents_in_resource_group = AsyncMock(return_value=set())
 
-        with pytest.raises(DesignatedAgentOutsideResourceGroup):
+        with pytest.raises(DesignatedAgentOutsideResourceGroup) as raised:
             await deployment_service.create_deployment(creating)
+
+        assert raised.value.entity_error_code().operation == ActionOperationType.CREATE
 
         mock_deployment_controller.create_deployment.assert_not_awaited()
         mock_deployment_repository.replace_designated_agents.assert_not_awaited()
@@ -509,10 +512,12 @@ class TestDesignatedAgentsOnUpdate(DeploymentCRUDBaseFixtures):
         agent_uuid: AgentUUID,
         wired: None,
     ) -> None:
-        with pytest.raises(DesignatedAgentOutsideResourceGroup):
+        with pytest.raises(DesignatedAgentOutsideResourceGroup) as raised:
             await deployment_service.update_deployment(
                 self._updating(endpoint_info, frozenset({agent_uuid}))
             )
+
+        assert raised.value.entity_error_code().operation == ActionOperationType.UPDATE
 
         mock_deployment_controller.update_deployment.assert_not_awaited()
         mock_deployment_repository.replace_designated_agents.assert_not_awaited()
