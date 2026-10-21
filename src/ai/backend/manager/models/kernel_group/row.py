@@ -54,7 +54,6 @@ class KernelGroupRow(CreatedAtMixin, Base):
     # runtime default. Not a slot: the agent sets it as ShmSize and allocates nothing.
     shmem: Mapped[int | None] = mapped_column("shmem", sa.BigInteger, nullable=True)
     startup_command: Mapped[str | None] = mapped_column("startup_command", sa.Text, nullable=True)
-    bootstrap_script: Mapped[str | None] = mapped_column("bootstrap_script", sa.Text, nullable=True)
     preopen_ports: Mapped[list[int]] = mapped_column(
         "preopen_ports",
         sa.ARRAY(sa.Integer),

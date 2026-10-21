@@ -5,7 +5,7 @@ A kernel group is one role of a session. Existing rows are not backfilled here:
 write sets it on new rows.
 
 Revision ID: c9e1b7a4d2f0
-Revises: e234d84a162f
+Revises: fa2dfd48c169
 Create Date: 2026-10-20
 
 """
@@ -17,7 +17,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "c9e1b7a4d2f0"
-down_revision = "e234d84a162f"
+down_revision = "fa2dfd48c169"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
@@ -34,7 +34,6 @@ def upgrade() -> None:
         sa.Column("image_id", sa.Uuid(), nullable=True),
         sa.Column("shmem", sa.BigInteger(), nullable=True),
         sa.Column("startup_command", sa.Text(), nullable=True),
-        sa.Column("bootstrap_script", sa.Text(), nullable=True),
         sa.Column(
             "preopen_ports",
             sa.ARRAY(sa.Integer()),

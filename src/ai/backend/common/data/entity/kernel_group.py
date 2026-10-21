@@ -52,4 +52,4 @@ class KernelGroupRole(NaturalKey):
     @override
     @classmethod
     def key_name(cls) -> str:
-        return "role"
+        return "kernel_group_role"
