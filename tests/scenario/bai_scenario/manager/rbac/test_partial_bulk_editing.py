@@ -18,7 +18,6 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     UpdateRoleInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import RoleNode
-from ai.backend.common.dto.manager.v2.rbac.types import RoleStatusDTO
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -123,7 +122,7 @@ class EveryRoleIsRestored(Then[RolesAndACaller, Edited]):
         payload = answered.response
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        look = RoleLook(self.started, status=RoleStatusDTO.ACTIVE)
+        look = RoleLook(self.started)
         verdicts: list[Verdict] = [
             Same("successes count", len(payload.successes), len(laid.roles)),
             Same("failed", payload.failed, []),

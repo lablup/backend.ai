@@ -518,14 +518,14 @@ class TestTerminalStateFilter:
                     scope_type=ProjectEntityType(),
                     scope_id=uuid.uuid4(),
                     name="deleted-old",
-                    status=RoleStatus.DELETED,
+                    status=RoleStatus.INACTIVE,
                     deleted_at=_OLD,
                 ),
                 RoleRow(
                     scope_type=ProjectEntityType(),
                     scope_id=uuid.uuid4(),
                     name="deleted-new",
-                    status=RoleStatus.DELETED,
+                    status=RoleStatus.INACTIVE,
                     deleted_at=_NEW,
                 ),
                 # Active role: never deleted, deleted_at is NULL -> preserved.
@@ -541,7 +541,6 @@ class TestTerminalStateFilter:
             RoleRow,
             RoleRow.deleted_at,
             _THRESHOLD,
-            conditions=(RoleRow.status == RoleStatus.DELETED,),
         )
 
         async with RetentionOpsProvider(db).write_ops() as w:
@@ -557,7 +556,7 @@ class TestTerminalStateFilter:
             scope_type=ProjectEntityType(),
             scope_id=uuid.uuid4(),
             name="drained",
-            status=RoleStatus.DELETED,
+            status=RoleStatus.INACTIVE,
             deleted_at=_OLD,
         )
         kept = RoleRow(
@@ -565,7 +564,7 @@ class TestTerminalStateFilter:
             scope_type=ProjectEntityType(),
             scope_id=uuid.uuid4(),
             name="kept",
-            status=RoleStatus.DELETED,
+            status=RoleStatus.INACTIVE,
             deleted_at=_NEW,
         )
         await self._insert_roles(db, [drained, kept])
@@ -576,7 +575,6 @@ class TestTerminalStateFilter:
             RoleRow,
             RoleRow.deleted_at,
             _THRESHOLD,
-            conditions=(RoleRow.status == RoleStatus.DELETED,),
             entity=RoleEntityType(),
         )
 

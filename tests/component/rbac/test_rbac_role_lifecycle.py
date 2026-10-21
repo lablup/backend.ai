@@ -159,7 +159,7 @@ class TestRBACRoleLifecycle:
         )
         assert any(r.id == role_id for r in before.roles)
 
-        # Soft delete (sets status to DELETED)
+        # Soft delete (sets deleted_at)
         await admin_registry.rbac.delete_role(DeleteRoleRequest(role_id=role_id))
 
         # Confirm it no longer appears when filtering for ACTIVE roles
@@ -173,16 +173,10 @@ class TestRBACRoleLifecycle:
         )
         assert not any(r.id == role_id for r in after.roles)
 
-        # Confirm it does appear when filtering for DELETED roles
-        deleted_search = await admin_registry.rbac.search_roles(
-            SearchRolesRequest(
-                filter=RoleFilter(
-                    name=StringFilter(contains=marker),
-                    statuses=[RoleStatus.DELETED],
-                ),
-            )
-        )
-        assert any(r.id == role_id for r in deleted_search.roles)
+        # The role keeps its status; soft deletion shows in deleted_at
+        fetched = await admin_registry.rbac.get_role(role_id)
+        assert fetched.role.status == RoleStatus.ACTIVE
+        assert fetched.role.deleted_at is not None
 
 
 class TestRoleAssignmentAudit:

@@ -200,7 +200,6 @@ from ai.backend.manager.models.rbac_models.role.searchable_fields import (
 )
 from ai.backend.manager.models.rbac_models.role.searchers import RoleSearcher
 from ai.backend.manager.models.rbac_models.role.updaters import (
-    RoleRestoreUpdater,
     RoleSoftDeleteUpdater,
     RoleUpdater,
 )
@@ -222,6 +221,7 @@ from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
+from ai.backend.manager.models.specs.soft_delete import RestoreUpdater
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.services.permission_contoller.actions.add_role_permission import (
     AddRolePermissionAction,
@@ -682,7 +682,7 @@ class RBACAdapter(BaseAdapter):
         input: SearchRolesInput,
     ) -> SearchResult[RoleNode]:
         """Search roles with cursor/offset pagination."""
-        conditions = self._convert_role_filter_gql(input.filter) if input.filter else []
+        conditions = self._role_search_conditions(input.filter)
         orders = self._convert_role_orders_gql(input.order) if input.order else []
         searcher = self._build_searcher(
             RoleSearcher,
@@ -721,7 +721,7 @@ class RBACAdapter(BaseAdapter):
         input: SearchRolesInput,
     ) -> SearchResult[RoleNode]:
         """Search the roles the named scopes reach."""
-        conditions = self._convert_role_filter_gql(input.filter) if input.filter else []
+        conditions = self._role_search_conditions(input.filter)
         orders = self._convert_role_orders_gql(input.order) if input.order else []
         searcher = self._build_searcher(
             RoleSearcher,
@@ -871,7 +871,7 @@ class RBACAdapter(BaseAdapter):
             data = deleted.data
         elif self._requests_restore(input, data):
             restored = await self._permission_controller.restore_role.run(
-                RestoreRoleAction(updater=RoleRestoreUpdater(role_id=data.id))
+                RestoreRoleAction(updater=self._restore_updater(data.id))
             )
             data = restored.data
         return UpdateRolePayload(role=self._role_data_to_node(data))
@@ -879,7 +879,7 @@ class RBACAdapter(BaseAdapter):
     # ------------------------------------------------------------------ delete
 
     async def delete(self, role_id: UUID) -> DeleteRolePayload:
-        """Soft-delete a role (marks status as DELETED)."""
+        """Soft-delete a role (sets ``deleted_at``)."""
         result = await self._permission_controller.delete_role.run(
             DeleteRoleAction(updater=RoleSoftDeleteUpdater(role_id=RoleID(role_id)))
         )
@@ -888,9 +888,9 @@ class RBACAdapter(BaseAdapter):
     # ------------------------------------------------------------------ restore
 
     async def restore(self, role_id: UUID) -> RestoreRolePayload:
-        """Restore a soft-deleted role (marks status as ACTIVE)."""
+        """Restore a soft-deleted role (clears ``deleted_at``; ``status`` stays)."""
         result = await self._permission_controller.restore_role.run(
-            RestoreRoleAction(updater=RoleRestoreUpdater(role_id=RoleID(role_id)))
+            RestoreRoleAction(updater=self._restore_updater(RoleID(role_id)))
         )
         return RestoreRolePayload(id=result.data.id, role=self._role_data_to_node(result.data))
 
@@ -1260,13 +1260,21 @@ class RBACAdapter(BaseAdapter):
                 result.append(fields.created_at.order.apply(ascending))
         return result
 
+    def _role_search_conditions(self, f: RoleFilterDTO | None) -> list[QueryCondition]:
+        """Soft-deleted roles are left out unless the top-level filter gives ``deleted_at``."""
+        conditions = self._convert_role_filter_gql(f) if f is not None else []
+        if f is None or f.deleted_at is None:
+            conditions.append(RoleSearchableFields.own.deleted_at.filter.is_null())
+        return conditions
+
     def _convert_role_filter_gql(self, f: RoleFilterDTO) -> list[QueryCondition]:
         fields = RoleSearchableFields.own
         conditions = [
             *self.apply_uuid_filter(f.entity_id, fields.id.filter),
             *self.apply_string_filter(f.name, fields.name.filter),
             *self._convert_role_source_filter(f.source, fields.source.filter),
-            *self._convert_role_status_filter(f.status, fields.status.filter),
+            *self._convert_role_status_filter(f.status),
+            *self.apply_nullable_datetime_filter(f.deleted_at, fields.deleted_at.filter),
             *self._convert_assigned_user_nested_filter(f.assigned_user),
             *self._convert_mapped_scope_nested_filter(f.mapped_scope),
             *self.apply_to_many_filter(
@@ -1310,22 +1318,30 @@ class RBACAdapter(BaseAdapter):
             applied.append(conditions.not_in([InternalRoleSource(s) for s in f.not_in]))
         return applied
 
-    def _convert_role_status_filter(
-        self, f: RoleStatusFilterDTO | None, conditions: EnumConditions[InternalRoleStatus]
-    ) -> list[QueryCondition]:
-        """The request-side status names carry the same values as the stored ones."""
+    def _convert_role_status_filter(self, f: RoleStatusFilterDTO | None) -> list[QueryCondition]:
         if f is None:
             return []
         applied: list[QueryCondition] = []
         if f.equals is not None:
-            applied.append(conditions.equals(InternalRoleStatus(f.equals)))
+            applied.append(self._role_status_condition(f.equals))
         if f.in_:
-            applied.append(conditions.in_([InternalRoleStatus(s) for s in f.in_]))
+            applied.append(combine_conditions_or([self._role_status_condition(s) for s in f.in_]))
         if f.not_equals is not None:
-            applied.append(conditions.not_equals(InternalRoleStatus(f.not_equals)))
+            applied.append(negate_conditions([self._role_status_condition(f.not_equals)]))
         if f.not_in:
-            applied.append(conditions.not_in([InternalRoleStatus(s) for s in f.not_in]))
+            applied.append(
+                negate_conditions([
+                    combine_conditions_or([self._role_status_condition(s) for s in f.not_in])
+                ])
+            )
         return applied
+
+    def _role_status_condition(self, status: str) -> QueryCondition:
+        """The deprecated ``deleted`` is no stored status, so it matches no role."""
+        conditions = RoleSearchableFields.own.status.filter
+        if status == RoleStatusDTO.DELETED:
+            return conditions.in_(())
+        return conditions.equals(InternalRoleStatus(status))
 
     def _convert_assigned_user_nested_filter(
         self, f: UserNestedFilterDTO | None
@@ -1405,7 +1421,7 @@ class RBACAdapter(BaseAdapter):
         row_conditions = [
             *self.apply_string_filter(f.name, fields.name.filter),
             *self._convert_role_source_filter(f.source, fields.source.filter),
-            *self._convert_role_status_filter(f.status, fields.status.filter),
+            *self._convert_role_status_filter(f.status),
         ]
         conditions: list[QueryCondition] = []
         if row_conditions:
@@ -1517,21 +1533,23 @@ class RBACAdapter(BaseAdapter):
         return result
 
     def _requests_soft_delete(self, input: UpdateRoleInput, data: RoleData) -> bool:
-        return (
-            self._requested_status(input) == InternalRoleStatus.DELETED
-            and data.status != InternalRoleStatus.DELETED
-        )
+        return self._requested_status(input) == RoleStatusDTO.DELETED and data.deleted_at is None
 
     def _requests_restore(self, input: UpdateRoleInput, data: RoleData) -> bool:
-        return (
-            self._requested_status(input) == InternalRoleStatus.ACTIVE
-            and data.status == InternalRoleStatus.DELETED
-        )
+        return self._requested_status(input) == RoleStatusDTO.ACTIVE and data.deleted_at is not None
 
-    def _requested_status(self, input: UpdateRoleInput) -> InternalRoleStatus | None:
+    def _requested_status(self, input: UpdateRoleInput) -> RoleStatusDTO | None:
         if input.status is None or isinstance(input.status, Unset):
             return None
-        return InternalRoleStatus(input.status.value)
+        return RoleStatusDTO(input.status.value)
+
+    def _restore_updater(self, role_id: RoleID) -> RestoreUpdater[RoleRow, RoleData]:
+        return RestoreUpdater(
+            target_row=RoleRow,
+            target_column=RoleRow.id,
+            target_id=role_id,
+            converter=RoleSearchableFields.own,
+        )
 
     def _build_updater(self, role_id: UUID, input: UpdateRoleInput) -> RoleUpdater:
         return RoleUpdater(
@@ -1539,7 +1557,15 @@ class RBACAdapter(BaseAdapter):
             name=OptionalState.from_unset(input.name),
             description=TriState.from_unset(input.description),
             auto_assign=OptionalState.from_unset(input.auto_assign),
+            status=self._updater_status(input),
         )
+
+    def _updater_status(self, input: UpdateRoleInput) -> OptionalState[InternalRoleStatus]:
+        """The deprecated ``deleted`` goes to soft delete instead of the status column."""
+        status = self._requested_status(input)
+        if status is None or status == RoleStatusDTO.DELETED:
+            return OptionalState.nop()
+        return OptionalState.update(InternalRoleStatus(status.value))
 
     @staticmethod
     def _role_data_to_node(data: RoleData) -> RoleNode:

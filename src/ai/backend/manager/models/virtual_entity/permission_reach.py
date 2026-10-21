@@ -89,6 +89,7 @@ def user_permission_reaches(
             entity.c.entity_id == entity_id,
             user_roles.c.user_id == user_id,
             roles.c.status == RoleStatus.ACTIVE,
+            roles.c.deleted_at.is_(None),
             granted.op("&")(bits) == bits,
             # Own answers through every governor. A share answers with a cap row on
             # every field for the bit, and only through the ve's own govern.

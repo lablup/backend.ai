@@ -13,9 +13,10 @@ from sqlalchemy import Table
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.role import RoleEntityType
-from ai.backend.common.data.permission.types import Permission, RoleStatus
+from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.models.alembic.versions.e7d2a9c41b60_assign_every_user_their_domain_member_role import (
     _PRESET_ID,

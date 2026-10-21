@@ -5,18 +5,18 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import RestoreSingleEntityOpsAction
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
-from ai.backend.manager.models.rbac_models.role.updaters import RoleRestoreUpdater
+from ai.backend.manager.models.specs.soft_delete import RestoreUpdater
 
 
 @dataclass(frozen=True)
 class RestoreRoleAction(RestoreSingleEntityOpsAction[RoleRow, RoleData]):
     """Put one retired role back in service."""
 
-    updater: RoleRestoreUpdater
+    updater: RestoreUpdater[RoleRow, RoleData]
 
     @override
     def entity_id(self) -> EntityIdentifier:
-        return self.updater.role_id
+        return self.updater.target_id
 
     @override
     @classmethod
@@ -24,5 +24,5 @@ class RestoreRoleAction(RestoreSingleEntityOpsAction[RoleRow, RoleData]):
         return "restore_role"
 
     @override
-    def to_updater(self) -> RoleRestoreUpdater:
+    def to_updater(self) -> RestoreUpdater[RoleRow, RoleData]:
         return self.updater

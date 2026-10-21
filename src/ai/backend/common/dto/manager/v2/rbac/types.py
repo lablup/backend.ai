@@ -49,6 +49,7 @@ class RoleStatusDTO(StrEnum):
 
     ACTIVE = "active"
     INACTIVE = "inactive"
+    # Deprecated: no role is stored with it; soft deletion is ``deleted_at``.
     DELETED = "deleted"
 
 

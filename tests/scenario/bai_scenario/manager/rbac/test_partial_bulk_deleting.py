@@ -17,7 +17,6 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     PartialBulkRestoreRolesInput,
 )
 from ai.backend.common.dto.manager.v2.rbac.response import RoleNode
-from ai.backend.common.dto.manager.v2.rbac.types import RoleStatusDTO
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -122,12 +121,12 @@ class EveryRoleComesBack(Then[RolesAndACaller, Deleted]):
     """역할이 모두 처리된 목록에 온다. `missing`이 있으면 그 id 만 실패 목록에 온다."""
 
     started: datetime
-    status: RoleStatusDTO
+    deleted: bool
     missing: UUID | None = None
 
     @override
     def says(self) -> str:
-        state = "삭제 상태" if self.status == RoleStatusDTO.DELETED else "활성"
+        state = "soft delete 된 상태" if self.deleted else "활성"
         if self.missing is None:
             return f"역할이 모두 {state}로 오고, 실패한 것은 없다"
         return f"역할이 모두 {state}로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
@@ -137,7 +136,7 @@ class EveryRoleComesBack(Then[RolesAndACaller, Deleted]):
         payload = answered.response
         if payload is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        look = RoleLook(self.started, status=self.status)
+        look = RoleLook(self.started, deleted=self.deleted)
         verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.roles))]
         for i, (node, role) in enumerate(zip(payload.successes, laid.roles, strict=False)):
             verdicts += look.verdicts(f"successes[{i}].", node, role, laid.domain)
@@ -166,7 +165,7 @@ class SoftDeletingAnswersForTheMissingOne(
     @override
     def describe(self) -> str:
         return (
-            "활성 역할 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 삭제 상태로 오고 "
+            "활성 역할 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 soft delete 된 채로 오고 "
             "없는 id 는 대상이 없다는 이유로 실패 목록에 온다"
         )
 
@@ -180,9 +179,7 @@ class SoftDeletingAnswersForTheMissingOne(
 
     @override
     def then(self) -> Then[RolesAndACaller, Deleted]:
-        return EveryRoleComesBack(
-            started=self.started, status=RoleStatusDTO.DELETED, missing=self.missing
-        )
+        return EveryRoleComesBack(started=self.started, deleted=True, missing=self.missing)
 
 
 @dataclass(frozen=True)
@@ -237,7 +234,7 @@ class RestoringBringsSeveralBack(
 
     @override
     def then(self) -> Then[RolesAndACaller, Deleted]:
-        return EveryRoleComesBack(started=self.started, status=RoleStatusDTO.ACTIVE)
+        return EveryRoleComesBack(started=self.started, deleted=False)
 
 
 @dataclass(frozen=True)
@@ -266,7 +263,7 @@ class TheSuperadminPurgesSeveralRoles(
 
     @override
     def then(self) -> Then[RolesAndACaller, Deleted]:
-        return EveryRoleComesBack(started=self.started, status=RoleStatusDTO.ACTIVE)
+        return EveryRoleComesBack(started=self.started, deleted=False)
 
 
 @dataclass(frozen=True)

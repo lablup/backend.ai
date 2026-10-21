@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -12,11 +13,12 @@ from pydantic import ValidationError
 from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.scope_admin import ScopeAdminEntityType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.data.user.types import UserData, UserRole
-from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import NullableDateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.rbac.request import (
     MAX_SCOPE_PERMISSION_TARGETS,
     MappedScopeNestedFilter,
@@ -29,9 +31,19 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     RoleFilter,
     RoleNestedFilter,
     RolePermissionNestedFilter,
+    UpdateRoleInput,
 )
-from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO, PermissionBitFilter
+from ai.backend.common.dto.manager.v2.rbac.types import (
+    PermissionBitDTO,
+    PermissionBitFilter,
+    RoleStatusDTO,
+    RoleStatusFilter,
+)
+from ai.backend.common.dto.manager.v2.rbac.types import RoleStatus as CommonRoleStatus
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
+from ai.backend.manager.data.permission.role import RoleData
+from ai.backend.manager.data.permission.status import RoleStatus
+from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.permission.virtual_entity import GovernCheckKey
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.services.permission_contoller.actions.get_held_permissions import (
@@ -249,3 +261,75 @@ class TestRoleListingFilters:
         assert "roles.id = user_roles.role_id" in compiled
         assert "roles.name" in compiled
         assert "permissions.role_id = user_roles.role_id" in compiled
+
+
+class TestRoleSoftDelete:
+    def test_a_search_without_a_filter_leaves_soft_deleted_roles_out(
+        self, adapter: RBACAdapter
+    ) -> None:
+        assert _compiled(adapter._role_search_conditions(None)) == "roles.deleted_at IS NULL"
+
+    def test_a_top_level_deleted_at_filter_includes_soft_deleted_roles(
+        self, adapter: RBACAdapter
+    ) -> None:
+        conditions = adapter._role_search_conditions(
+            RoleFilter(deleted_at=NullableDateTimeFilter(is_null=False))
+        )
+
+        assert _compiled(conditions) == "roles.deleted_at IS NOT NULL"
+
+    def test_a_deleted_at_filter_inside_and_keeps_the_default(self, adapter: RBACAdapter) -> None:
+        conditions = adapter._role_search_conditions(
+            RoleFilter(AND=[RoleFilter(deleted_at=NullableDateTimeFilter(is_null=False))])
+        )
+
+        assert _compiled(conditions) == "roles.deleted_at IS NOT NULL roles.deleted_at IS NULL"
+
+    def test_a_status_filter_keeps_the_default(self, adapter: RBACAdapter) -> None:
+        conditions = adapter._role_search_conditions(
+            RoleFilter(status=RoleStatusFilter(equals="inactive"))
+        )
+
+        assert _compiled(conditions) == "roles.status = :status_1 roles.deleted_at IS NULL"
+
+    def test_the_deprecated_deleted_status_matches_no_role(self, adapter: RBACAdapter) -> None:
+        conditions = adapter._convert_role_status_filter(RoleStatusFilter(equals="deleted"))
+
+        assert "roles.deleted_at" not in _compiled(conditions)
+        assert "IN" in _compiled(conditions)
+
+    def test_a_soft_deleted_role_answers_with_its_stored_status(self) -> None:
+        data = RoleData(
+            id=RoleID(uuid.uuid4()),
+            name="reader",
+            source=RoleSource.CUSTOM,
+            status=RoleStatus.INACTIVE,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+            deleted_at=datetime.now(UTC),
+            scope_type=ProjectEntityType(),
+            scope_id=uuid.uuid4(),
+        )
+
+        node = RBACAdapter._role_data_to_node(data)
+
+        assert node.status == RoleStatusDTO.INACTIVE
+        assert node.deleted_at == data.deleted_at
+
+
+class TestRoleUpdateStatus:
+    def test_active_and_inactive_set_the_status(self, adapter: RBACAdapter) -> None:
+        updater = adapter._build_updater(
+            uuid.uuid4(), UpdateRoleInput(status=CommonRoleStatus.ACTIVE)
+        )
+
+        assert updater.build_values() == {"status": RoleStatus.ACTIVE}
+
+    def test_the_deprecated_deleted_status_leaves_the_status_column(
+        self, adapter: RBACAdapter
+    ) -> None:
+        updater = adapter._build_updater(
+            uuid.uuid4(), UpdateRoleInput(status=CommonRoleStatus.DELETED)
+        )
+
+        assert updater.build_values() == {}

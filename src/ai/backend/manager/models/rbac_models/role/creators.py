@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from typing import override
 
 from ai.backend.common.data.entity.role import RoleID
@@ -30,6 +31,7 @@ class RoleCreator(EntityCreator[RoleRow, RoleData]):
     auto_assign: bool = False
     # The row defaults an omitted status to active.
     status: RoleStatus | None = None
+    deleted_at: datetime | None = None
 
     @override
     def entity_id(self, row: RoleRow) -> RoleID:
@@ -52,6 +54,7 @@ class RoleCreator(EntityCreator[RoleRow, RoleData]):
             auto_assign=self.auto_assign,
             scope_type=self.scope.entity_type(),
             scope_id=self.scope,
+            deleted_at=self.deleted_at,
         )
         if self.status is not None:
             row.status = self.status

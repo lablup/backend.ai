@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
 from uuid import UUID
 
 import sqlalchemy as sa
@@ -21,10 +20,11 @@ from ai.backend.manager.models.base import (
     Base,
     StrEnumType,
 )
+from ai.backend.manager.models.mixins.soft_delete import SoftDeleteMixin
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 
-class RoleRow(LifecycleTimestampsMixin, Base):
+class RoleRow(SoftDeleteMixin, LifecycleTimestampsMixin, Base):
     __tablename__ = "roles"
     __table_args__ = (
         sa.Index("ix_id_status", "id", "status"),
@@ -76,9 +76,6 @@ class RoleRow(LifecycleTimestampsMixin, Base):
         nullable=False,
         default=False,
         server_default=sa.false(),
-    )
-    deleted_at: Mapped[datetime | None] = mapped_column(
-        "deleted_at", sa.DateTime(timezone=True), nullable=True
     )
     # The one scope the role belongs to.
     scope_type: Mapped[EntityType] = mapped_column(

@@ -84,7 +84,7 @@ class RoleLook:
 
     started: datetime
     described: str | None = None
-    status: RoleStatusDTO = RoleStatusDTO.ACTIVE
+    deleted: bool = False
 
     def verdicts(
         self, prefix: str, node: RoleNode, laid: RoleData, domain: DomainData
@@ -92,14 +92,14 @@ class RoleLook:
         written = WrittenByThisRun(self.started)
         deleted_at: Verdict = (
             Held(f"{prefix}deleted_at", node.deleted_at, written)
-            if self.status == RoleStatusDTO.DELETED
+            if self.deleted
             else Same(f"{prefix}deleted_at", node.deleted_at, None)
         )
         return [
             Same(f"{prefix}name", node.name, laid.name),
             Same(f"{prefix}description", node.description, self.described),
             Same(f"{prefix}source", node.source, RoleSourceDTO.CUSTOM),
-            Same(f"{prefix}status", node.status, self.status),
+            Same(f"{prefix}status", node.status, RoleStatusDTO.ACTIVE),
             Same(f"{prefix}auto_assign", node.auto_assign, False),
             Same(f"{prefix}scope_type", node.scope_type, DomainEntityType()),
             Held[UUID](

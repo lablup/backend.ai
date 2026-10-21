@@ -124,7 +124,13 @@ from ai.backend.common.dto.manager.v2.rbac.types import (
     RoleStatusFilter as RoleStatusFilterDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, encode_cursor
+from ai.backend.manager.api.gql.base import (
+    NullableDateTimeFilter,
+    OrderDirection,
+    StringFilter,
+    UUIDFilter,
+    encode_cursor,
+)
 from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -176,6 +182,12 @@ RoleStatusGQL: type[RoleStatusDTO] = gql_enum(
     BackendAIGQLMeta(added_version="26.3.0", description="Role status"),
     RoleStatusDTO,
     name="RoleStatus",
+    deprecated_values={
+        "DELETED": (
+            f"Deprecated since {NEXT_RELEASE_VERSION}. No role is stored with it; read "
+            "`deletedAt` for soft deletion."
+        ),
+    },
 )
 
 
@@ -748,6 +760,16 @@ class RoleFilter(PydanticInputMixin[RoleFilterDTO], GQLFilter):
     name: StringFilter | None = None
     source: RoleSourceFilterGQL | None = None
     status: RoleStatusFilterGQL | None = None
+    deleted_at: NullableDateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "Filter by soft-delete time. Setting it on the top-level filter includes "
+                "soft-deleted roles; inside AND, OR or NOT it does not."
+            ),
+        ),
+        default=None,
+    )
     assigned_user: RoleUserNestedFilterGQL | None = gql_field(
         default=None,
         description="Filter roles by the users holding them.",
@@ -919,8 +941,8 @@ class UpdateRoleInput(PydanticInputMixin[UpdateRoleInputDTO]):
     description: str | None = UNSET
     status: RoleStatusGQL | None = gql_field(
         description=(
-            "DELETED is handled as `deleteRole`, ACTIVE on a deleted role as `restoreRole`; "
-            "other values are ignored."
+            "ACTIVE and INACTIVE set the status. DELETED is handled as `deleteRole`; ACTIVE on "
+            "a deleted role also runs `restoreRole`."
         ),
         default=UNSET,
         deprecation_reason=(

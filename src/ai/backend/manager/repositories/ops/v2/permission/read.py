@@ -276,6 +276,7 @@ class PermissionReadOps(V2ReadOps):
                 entity.c.entity_id.in_(entity_ids),
                 user_roles.c.user_id == group_key.user_id,
                 roles.c.status == RoleStatus.ACTIVE,
+                roles.c.deleted_at.is_(None),
                 # Own answers through every governor. A share answers only with a cap
                 # row on every field for the bit, only for the shared entity's own type,
                 # and only through the ve's own govern. Path-capped bits wait for the

@@ -6,6 +6,7 @@ Also provides data-to-DTO conversion functions.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from uuid import UUID
 
 from ai.backend.common.data.entity.role import RoleID
@@ -15,11 +16,14 @@ from ai.backend.common.dto.manager.rbac import (
     RoleFilter,
     RoleOrder,
     RoleOrderField,
+    RoleStatus,
     SearchRolesRequest,
     UpdateRoleRequest,
 )
 from ai.backend.manager.data.permission.role import RoleData, RoleDetailData
+from ai.backend.manager.data.permission.status import RoleStatus as InternalRoleStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import combine_conditions_or
 from ai.backend.manager.models.rbac_models.role.searchable_fields import (
     RoleSearchableFields,
 )
@@ -43,12 +47,26 @@ class RoleAdapter(BaseFilterAdapter):
             scope_type=data.scope_type,
             scope_id=data.scope_id,
             source=data.source,
-            status=data.status,
+            status=RoleStatus(data.status.value),
             created_at=data.created_at,
             updated_at=data.updated_at,
             deleted_at=data.deleted_at,
             description=data.description,
         )
+
+    def creator_status(self, status: RoleStatus | None) -> InternalRoleStatus | None:
+        """The deprecated ``deleted`` creates an inactive role; see :meth:`creator_deleted_at`."""
+        if status is None:
+            return None
+        if status == RoleStatus.DELETED:
+            return InternalRoleStatus.INACTIVE
+        return InternalRoleStatus(status.value)
+
+    def creator_deleted_at(self, status: RoleStatus | None) -> datetime | None:
+        """The deprecated ``deleted`` creates a soft-deleted role."""
+        if status == RoleStatus.DELETED:
+            return datetime.now(UTC)
+        return None
 
     def build_updater(self, request: UpdateRoleRequest, role_id: UUID) -> RoleUpdater:
         """Convert update request to updater."""
@@ -69,6 +87,8 @@ class RoleAdapter(BaseFilterAdapter):
             Querier object with converted conditions, orders, and pagination
         """
         conditions = self._convert_filter(request.filter) if request.filter else []
+        # Soft-deleted roles are left out; this API has no filter that includes them.
+        conditions.append(RoleSearchableFields.own.deleted_at.filter.is_null())
         orders: list[QueryOrder] = []
         if request.order is not None:
             for order in request.order:
@@ -84,8 +104,17 @@ class RoleAdapter(BaseFilterAdapter):
         if filter.sources:
             conditions.append(fields.source.filter.in_(filter.sources))
         if filter.statuses:
-            conditions.append(fields.status.filter.in_(filter.statuses))
+            conditions.append(
+                combine_conditions_or([self._status_condition(s) for s in filter.statuses])
+            )
         return conditions
+
+    def _status_condition(self, status: RoleStatus) -> QueryCondition:
+        """The deprecated ``deleted`` is no stored status, so it matches no role."""
+        conditions = RoleSearchableFields.own.status.filter
+        if status == RoleStatus.DELETED:
+            return conditions.in_(())
+        return conditions.equals(InternalRoleStatus(status.value))
 
     def _convert_order(self, order: RoleOrder) -> QueryOrder:
         """Convert role order specification to query order."""

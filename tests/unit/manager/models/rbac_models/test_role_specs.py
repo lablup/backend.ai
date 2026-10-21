@@ -12,7 +12,6 @@ from ai.backend.manager.models.rbac_models.role.purgers import RolePurger
 from ai.backend.manager.models.rbac_models.role.queriers import RoleQuerier
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role.updaters import (
-    RoleRestoreUpdater,
     RoleSoftDeleteUpdater,
     RoleUpdater,
 )
@@ -64,8 +63,15 @@ class TestRoleUpdater:
 
         assert updater.build_values() == {"description": None}
 
-    def test_the_general_edit_path_carries_no_status_field(self) -> None:
-        assert "status" not in {f for f in RoleUpdater.__dataclass_fields__}
+    def test_the_general_edit_path_carries_no_deleted_at_field(self) -> None:
+        assert "deleted_at" not in {f for f in RoleUpdater.__dataclass_fields__}
+
+    def test_status_is_written_by_the_general_edit_path(self) -> None:
+        updater = RoleUpdater(
+            role_id=RoleID(uuid.uuid4()), status=OptionalState.update(RoleStatus.ACTIVE)
+        )
+
+        assert updater.build_values() == {"status": RoleStatus.ACTIVE}
 
     def test_edit_and_soft_delete_guard_on_a_custom_source(self) -> None:
         role_id = RoleID(uuid.uuid4())
@@ -74,15 +80,11 @@ class TestRoleUpdater:
             assert str(guard.condition()) == str(RoleRow.source == RoleSource.CUSTOM)
             assert isinstance(guard.error, SystemRoleNotEditable)
 
-    def test_soft_delete_and_restore_write_constants(self) -> None:
-        role_id = RoleID(uuid.uuid4())
+    def test_soft_delete_writes_only_deleted_at(self) -> None:
+        deleted = RoleSoftDeleteUpdater(role_id=RoleID(uuid.uuid4())).build_values()
 
-        deleted = RoleSoftDeleteUpdater(role_id=role_id).build_values()
-        restored = RoleRestoreUpdater(role_id=role_id).build_values()
-
-        assert deleted["status"] == RoleStatus.DELETED
+        assert deleted.keys() == {"deleted_at"}
         assert isinstance(deleted["deleted_at"], sa.sql.functions.Function)
-        assert restored == {"status": RoleStatus.ACTIVE, "deleted_at": None}
 
 
 class TestRoleReadAndPurgeSpecs:

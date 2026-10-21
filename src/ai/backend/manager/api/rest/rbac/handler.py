@@ -106,7 +106,8 @@ class RBACHandler:
                 creator=RoleCreator(
                     name=body.parsed.name,
                     scope=RuntimeEntityID(body.parsed.scope_type, body.parsed.scope_id),
-                    status=body.parsed.status,
+                    status=self._role_adapter.creator_status(body.parsed.status),
+                    deleted_at=self._role_adapter.creator_deleted_at(body.parsed.status),
                     description=body.parsed.description,
                 )
             )
