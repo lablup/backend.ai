@@ -292,6 +292,9 @@ class ExtendedAsyncSAEngine(SAEngine):
         # which follows the lifetime of underlying DB connection.
         # As such, we should keep using one single connection for both lock and unlock ops.
         async with self.connect() as lock_conn:
+            # AUTOCOMMIT keeps the connection out of an idle transaction, which
+            # idle_in_transaction_session_timeout would otherwise kill, dropping the lock.
+            lock_conn = await lock_conn.execution_options(isolation_level="AUTOCOMMIT")
             try:
                 # It is usually a BAD practice to directly interpolate strings into SQL statements,
                 # but in this case:
