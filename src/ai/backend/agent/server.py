@@ -58,6 +58,7 @@ from ai.backend.agent.errors import (
 from ai.backend.agent.errors.agent import (
     ImagePullFailedError,
     ImagePullTimeoutError,
+    KernelCreationCancelledError,
     KernelNotFoundError,
 )
 from ai.backend.agent.health.docker import DockerHealthChecker
@@ -851,7 +852,7 @@ class AgentRPCServer(aobject):
                     # The ongoing creation owns the entry.
                     released = True
                     raise
-                except (TimeoutError, asyncio.CancelledError):
+                except (TimeoutError, asyncio.CancelledError, KernelCreationCancelledError):
                     raise
                 except (ImagePullTimeoutError, ImagePullFailedError) as e:
                     log.trace("kernel image pull failed", error_repr=repr(e))
