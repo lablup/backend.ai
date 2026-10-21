@@ -188,7 +188,7 @@ class TestTCPProxyLogging:
         writer.wait_closed = AsyncMock()
         return writer
 
-    async def test_refused_app_connection_logs_nothing_at_info_or_above(
+    async def test_refused_app_connection_logs_one_warning_with_circuit_id(
         self,
         mocker: pytest_mock.MockerFixture,
         tcp_frontend: TCPFrontend,
@@ -199,7 +199,10 @@ class TestTCPProxyLogging:
         with caplog.at_level(TRACE_LEVEL, logger=WORKER_LOGGER_NAME):
             await tcp_frontend.pipe(PORT, mocker.MagicMock(), writer)
 
-        assert _worker_records(caplog, logging.INFO) == []
+        records = _worker_records(caplog, logging.INFO)
+        assert len(records) == 1
+        assert records[0].levelno == logging.WARNING
+        assert records[0].__dict__["log_tag_circuit_id"] == str(CIRCUIT_ID)
         writer.close.assert_called_once()
 
     async def test_internal_exception_logs_one_error_with_circuit_id(
