@@ -3,7 +3,6 @@ from __future__ import annotations
 from .bgtask import BackgroundTaskManagerInput, BackgroundTaskManagerProvider
 from .composer import StorageComposer, StorageComposerInput, StorageResources
 from .manager_client_pool import ManagerClientPoolProvider
-from .status_probe import StatusProbeInput, StatusProbeProvider, StatusProbeResources
 from .storage_pool import StoragePoolInput, StoragePoolProvider
 from .volume_pool import VolumePoolInput, VolumePoolProvider
 from .volume_stats import VolumeStatsInput, VolumeStatsProvider, VolumeStatsResources
@@ -13,9 +12,6 @@ __all__ = [
     "BackgroundTaskManagerInput",
     "BackgroundTaskManagerProvider",
     "ManagerClientPoolProvider",
-    "StatusProbeInput",
-    "StatusProbeProvider",
-    "StatusProbeResources",
     "StorageComposer",
     "StorageComposerInput",
     "StoragePoolInput",

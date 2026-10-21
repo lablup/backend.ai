@@ -41,9 +41,6 @@ class VolumeStatusCheckRegistry:
             seen.add(volume_id)
         return cls(checks)
 
-    def checks(self) -> Sequence[VolumeStatusCheck]:
-        return self._checks
-
     def snapshot(self) -> Mapping[StorageVolumeID, StorageStatusResult | None]:
         """The last observation of every check, None where one has not run yet."""
         return {check.id(): check.latest() for check in self._checks}
