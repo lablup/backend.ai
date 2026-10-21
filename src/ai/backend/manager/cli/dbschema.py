@@ -226,6 +226,9 @@ def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
 
     from ai.backend.manager.models.base import ensure_all_tables_registered, metadata
     from ai.backend.manager.models.global_entity.seed import SEED_GLOBAL_ENTITIES_SQL
+    from ai.backend.manager.models.system_session_environ.seed import (
+        SEED_SYSTEM_SESSION_ENVIRON_SQL,
+    )
     from ai.backend.manager.repositories.db.engine import create_async_engine
 
     ensure_all_tables_registered()
@@ -238,6 +241,8 @@ def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
         alembic_cfg.attributes["connection"] = connection
         metadata.create_all(engine, checkfirst=False)
         for statement in SEED_GLOBAL_ENTITIES_SQL:
+            connection.exec_driver_sql(statement)
+        for statement in SEED_SYSTEM_SESSION_ENVIRON_SQL:
             connection.exec_driver_sql(statement)
         log.info("stamping the alembic version to head")
         script = ScriptDirectory.from_config(alembic_cfg)
