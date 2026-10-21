@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
@@ -177,19 +177,6 @@ def create_default_scheduler_components(
 # =============================================================================
 # Coordinator Handlers
 # =============================================================================
-
-# The classes `_create_lifecycle_handlers` builds, for readers that hold no coordinator.
-SESSION_LIFECYCLE_HANDLER_TYPES: Final[tuple[type[SessionLifecycleHandler], ...]] = (
-    ScheduleSessionsLifecycleHandler,
-    DeprioritizeSessionsLifecycleHandler,
-    CheckPreconditionLifecycleHandler,
-    StartSessionsLifecycleHandler,
-    TerminateSessionsLifecycleHandler,
-    ReleaseReservedSessionsLifecycleHandler,
-    PreemptSessionsLifecycleHandler,
-    RescheduleSessionsLifecycleHandler,
-    SweepSessionsLifecycleHandler,
-)
 
 
 @dataclass
