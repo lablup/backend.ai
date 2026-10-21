@@ -2,7 +2,7 @@
 
 Create the table deciding which values the manager injects into a session's
 environment, and bind every value source at the global scope under the name the
-launcher has always used. The session owner's values are bound disabled.
+launcher has always used.
 
 Revision ID: fa2dfd48c169
 Revises: e234d84a162f
@@ -25,7 +25,7 @@ down_revision = "e234d84a162f"
 branch_labels = None
 depends_on = None
 
-# value_source to key, bound enabled.
+# value_source to key of the required sources.
 REQUIRED_BINDINGS: Final[dict[str, str]] = {
     "session_id": "BACKENDAI_SESSION_ID",
     "session_name": "BACKENDAI_SESSION_NAME",
@@ -35,7 +35,7 @@ REQUIRED_BINDINGS: Final[dict[str, str]] = {
     "preopen_ports": "BACKENDAI_PREOPEN_PORTS",
 }
 
-# value_source to key, bound disabled.
+# value_source to key of the optional sources.
 OPTIONAL_BINDINGS: Final[dict[str, str]] = {
     "user_uuid": "BACKENDAI_USER_UUID",
     "user_email": "BACKENDAI_USER_EMAIL",
@@ -96,7 +96,7 @@ def upgrade() -> None:
         )
     for value_source, key in OPTIONAL_BINDINGS.items():
         conn.execute(
-            _ADD_GLOBAL_BINDING, {"value_source": value_source, "key": key, "enabled": False}
+            _ADD_GLOBAL_BINDING, {"value_source": value_source, "key": key, "enabled": True}
         )
 
 
