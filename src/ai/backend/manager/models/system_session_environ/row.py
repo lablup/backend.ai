@@ -13,7 +13,6 @@ from ai.backend.common.data.system_session_environ.types import (
     SystemSessionEnvironScopeType,
     SystemSessionEnvironValueSource,
 )
-from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
 from ai.backend.manager.models.base import GUID, Base, StrEnumType
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
@@ -64,14 +63,3 @@ class SystemSessionEnvironRow(LifecycleTimestampsMixin, Base):
     enabled: Mapped[bool] = mapped_column(
         "enabled", sa.Boolean, nullable=False, server_default=sa.true()
     )
-
-    def to_data(self) -> SystemSessionEnvironData:
-        return SystemSessionEnvironData(
-            id=self.id,
-            value_source=self.value_source,
-            key=self.key,
-            scope_id=self.scope_type.to_owner(self.scope_id),
-            enabled=self.enabled,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )

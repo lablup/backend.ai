@@ -8,6 +8,9 @@ import sqlalchemy as sa
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
+from ai.backend.manager.models.system_session_environ.searchable_fields import (
+    SystemSessionEnvironSearchableFields,
+)
 
 __all__ = ("SystemSessionEnvironSearcher",)
 
@@ -20,4 +23,4 @@ class SystemSessionEnvironSearcher(Searcher[SystemSessionEnvironRow, SystemSessi
 
     @override
     def to_data(self, row: SystemSessionEnvironRow) -> SystemSessionEnvironData:
-        return row.to_data()
+        return SystemSessionEnvironSearchableFields.own.to_data(row)
