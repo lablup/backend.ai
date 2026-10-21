@@ -24,18 +24,18 @@ __all__ = ("UserSSHKeypairTarget",)
 class UserSSHKeypairTarget(ScopeTarget):
     """The SSH keypairs a user owns."""
 
-    user_uuid: UUID
+    user_id: UserID
 
     @override
     def scope_id(self) -> EntityIdentifier:
-        return UserID(self.user_uuid)
+        return self.user_id
 
     @override
     def to_condition(self) -> QueryCondition:
-        user_uuid = self.user_uuid
+        user_id = self.user_id
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return SSHKeypairRow.user_id == user_uuid
+            return SSHKeypairRow.user_id == user_id
 
         return inner
 
@@ -45,7 +45,7 @@ class UserSSHKeypairTarget(ScopeTarget):
         return [
             ExistenceCheck(
                 column=UserRow.uuid,
-                value=self.user_uuid,
-                error=UserNotFound(f"User {self.user_uuid} not found"),
+                value=self.user_id,
+                error=UserNotFound(f"User {self.user_id} not found"),
             ),
         ]

@@ -107,7 +107,7 @@ class SearchSSHKeypairsAction(BulkScopedSearchOpsAction[SSHKeypairRow, SSHKeypai
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return [UserSSHKeypairTarget(user_uuid=user_id) for user_id in self.user_ids]
+        return [UserSSHKeypairTarget(user_id=user_id) for user_id in self.user_ids]
 
     @override
     @classmethod
