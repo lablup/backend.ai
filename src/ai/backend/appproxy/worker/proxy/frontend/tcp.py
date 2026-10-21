@@ -135,7 +135,10 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
 
     async def _close_writer(self, writer: asyncio.StreamWriter) -> None:
         writer.close()
-        await writer.wait_closed()
+        try:
+            await writer.wait_closed()
+        except OSError as e:  # the client is already gone: ENOTCONN / ECONNRESET
+            log.trace("rejected connection already closed by the client: {!r}", e)
 
     async def pipe(
         self, circuit_key: int, reader: asyncio.StreamReader, writer: asyncio.StreamWriter

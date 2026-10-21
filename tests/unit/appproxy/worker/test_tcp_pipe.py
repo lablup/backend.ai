@@ -294,6 +294,37 @@ class TestTCPPipe:
         down_writer.wait_closed.assert_awaited_once()
         assert [r for r in caplog.records if r.levelno >= logging.ERROR] == []
 
+    @pytest.mark.parametrize("reject", ["no_backend", "peer_not_allowed"])
+    async def test_client_reset_on_reject_path_is_a_normal_end(
+        self,
+        reject: str,
+        root_context: MagicMock,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        circuit = _create_circuit(1)
+        frontend = TCPFrontend(root_context)
+        frontend.circuits[PORT] = circuit
+        backend = MagicMock()
+        backend.circuit.ip_validator.is_restricted = True
+        backend.circuit.ip_validator.is_allowed.return_value = False
+        if reject == "peer_not_allowed":
+            frontend.backends[PORT] = backend
+
+        writer = MagicMock()
+        writer.get_extra_info.return_value = ("10.0.0.1", 12345)
+        writer.wait_closed = AsyncMock(
+            side_effect=ConnectionResetError(errno.ECONNRESET, "Connection reset by peer")
+        )
+
+        with caplog.at_level(logging.DEBUG):
+            await asyncio.wait_for(frontend.pipe(PORT, asyncio.StreamReader(), writer), TIMEOUT)
+
+        if reject == "peer_not_allowed":
+            backend.circuit.ip_validator.is_allowed.assert_called_once_with("10.0.0.1")
+        writer.close.assert_called_once()
+        writer.wait_closed.assert_awaited_once()
+        assert [r for r in caplog.records if r.levelno >= logging.ERROR] == []
+
     async def test_stop_returns_with_open_half_closed_connection(
         self,
         root_context: MagicMock,
