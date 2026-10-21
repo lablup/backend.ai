@@ -44,5 +44,5 @@ status: draft
 
 어느 시나리오도 부르지 않는 어댑터 호출이다. 실행 결과가 이 목록을 함께 낸다.
 
-`admin_create`, `update`, `purge`, `scoped_search`, `batch_load_fields`. `admin_search` 는
+`admin_create`, `get`, `update`, `purge`, `scoped_search`, `batch_load_fields`. `admin_search` 는
 할당 id 를 얻는 데만 쓴다.
