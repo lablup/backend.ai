@@ -102,6 +102,24 @@ class TestKernelCreationEventPayload:
         assert cuda.used[ResourceSlotName("cuda.shares")] == Decimal("0.5")
         assert cuda.memory_size == 21474836480
 
+    def test_attestation_roundtrip(
+        self,
+        kernel_id: KernelId,
+        session_id: SessionId,
+        creation_info: KernelCreationInfo,
+    ) -> None:
+        creation_info.attestation = {"attested": True, "claims_unverified": {"a": 1}}
+        event = KernelStartedAnycastEvent(
+            kernel_id=kernel_id, session_id=session_id, creation_info=creation_info
+        )
+
+        restored = KernelStartedAnycastEvent.from_message(event.to_message())
+
+        assert restored.creation_info.attestation == creation_info.attestation
+
+    def test_attestation_defaults_to_none(self, creation_info: KernelCreationInfo) -> None:
+        assert creation_info.attestation is None
+
     def test_earlier_creation_events_carry_no_creation_info(
         self, kernel_id: KernelId, session_id: SessionId
     ) -> None:

@@ -16,6 +16,7 @@ from ai.backend.agent.containerd.profile.base import (
     RuntimeProfile,
     TlsConnectReadiness,
     describe_profile_failure,
+    summarize_profile_attestation,
 )
 from ai.backend.agent.errors.containerd import (
     ContainerdOperationFailed,
@@ -123,6 +124,14 @@ class ContainerdKernel(AbstractKernel):
         with contextlib.suppress(OSError):
             await writer.wait_closed()
         return {}
+
+    @override
+    async def summarize_attestation(self, timeout_s: float) -> Mapping[str, Any] | None:
+        readiness = self.launch_plan.readiness
+        if not isinstance(readiness, TlsConnectReadiness):
+            return None
+        host, port = self._tls_target(readiness)
+        return await summarize_profile_attestation(self._profile, host, port, timeout_s)
 
     def _tls_target(self, readiness: TlsConnectReadiness) -> tuple[str, int]:
         # PROVISIONAL: probe the DNAT path (published host + host port), not the kernel IP.

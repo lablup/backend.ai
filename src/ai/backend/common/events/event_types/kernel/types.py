@@ -2,7 +2,7 @@ import enum
 from collections import defaultdict
 from collections.abc import Mapping, MutableMapping, Sequence
 from decimal import Decimal
-from typing import Self
+from typing import Any, Self
 
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.types import (
@@ -193,3 +193,5 @@ class KernelCreationInfo(BackendAISchema):
     repl_out_port: int
     service_ports: list[ServicePortInfo]
     used_devices: UsedDevices
+    # Informational and unverified: what a runtime profile reported after readiness.
+    attestation: Mapping[str, Any] | None = None

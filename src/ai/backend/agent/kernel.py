@@ -327,6 +327,10 @@ class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
     async def check_status(self) -> dict[str, Any] | None:
         raise NotImplementedError
 
+    async def summarize_attestation(self, timeout_s: float) -> Mapping[str, Any] | None:
+        """Describe the kernel's launch evidence once it is ready; None when the backend has none."""
+        return None
+
     @abstractmethod
     async def get_completions(self, text: str, opts: Mapping[str, Any]) -> CodeCompletionResp:
         raise NotImplementedError
