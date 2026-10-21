@@ -5,7 +5,7 @@ Based on BEP-1033 test scenarios for handler-level testing.
 Test Scenarios:
 - SC-SS-001 ~ SC-SS-005: ScheduleSessionsLifecycleHandler
 - SC-CP-001 ~ SC-CP-006: CheckPreconditionLifecycleHandler
-- SC-ST-001 ~ SC-ST-005: StartSessionsLifecycleHandler
+- SC-ST-001 ~ SC-ST-007: StartSessionsLifecycleHandler
 - SC-TE-001 ~ SC-TE-005: TerminateSessionsLifecycleHandler
 """
 
@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.check_precondition import (
     CheckPreconditionLifecycleHandler,
@@ -568,7 +569,7 @@ class TestCheckPreconditionLifecycleHandler:
 
 
 # =============================================================================
-# StartSessionsLifecycleHandler Tests (SC-ST-001 ~ SC-ST-005)
+# StartSessionsLifecycleHandler Tests (SC-ST-001 ~ SC-ST-007)
 # =============================================================================
 
 
@@ -584,11 +585,13 @@ class TestStartSessionsLifecycleHandler:
         self,
         mock_launcher: AsyncMock,
         mock_repository: AsyncMock,
+        mock_scheduling_controller: AsyncMock,
     ) -> StartSessionsLifecycleHandler:
         """Create handler with mocked dependencies."""
         return StartSessionsLifecycleHandler(
             launcher=mock_launcher,
             repository=mock_repository,
+            scheduling_controller=mock_scheduling_controller,
         )
 
     async def test_all_sessions_started_successfully(
@@ -596,6 +599,7 @@ class TestStartSessionsLifecycleHandler:
         handler: StartSessionsLifecycleHandler,
         mock_launcher: AsyncMock,
         mock_repository: AsyncMock,
+        mock_scheduling_controller: AsyncMock,
         prepared_sessions_multiple: list[SessionWithKernels],
         sessions_for_start_factory: Callable[..., SessionsForStartWithImages],
     ) -> None:
@@ -626,6 +630,66 @@ class TestStartSessionsLifecycleHandler:
         # Verify success reason
         for success in result.successes:
             assert success.reason == "triggered-by-scheduler"
+        mock_scheduling_controller.mark_sessions_for_termination.assert_not_awaited()
+
+    async def test_timed_out_session_is_terminated_not_reported(
+        self,
+        handler: StartSessionsLifecycleHandler,
+        mock_launcher: AsyncMock,
+        mock_repository: AsyncMock,
+        mock_scheduling_controller: AsyncMock,
+        prepared_sessions_multiple: list[SessionWithKernels],
+        sessions_for_start_factory: Callable[..., SessionsForStartWithImages],
+    ) -> None:
+        """SC-ST-006: A session whose start timed out is terminated, not retried or advanced.
+
+        Given: Multiple PREPARED sessions, the launcher reports one as timed out
+        When: Handler starts all sessions
+        Then: The timed-out session is in neither successes nor failures and
+            termination is requested for it with FAILED_TO_START
+        """
+        sessions_for_start = sessions_for_start_factory(prepared_sessions_multiple)
+        mock_repository.search_sessions_with_kernels_and_user.return_value = sessions_for_start
+        timed_out_id = prepared_sessions_multiple[0].session_info.identity.id
+        mock_launcher.start_sessions_for_handler.return_value = [timed_out_id]
+
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), prepared_sessions_multiple)
+
+        assert result.failures == []
+        assert timed_out_id not in result.success_ids()
+        assert len(result.successes) == len(prepared_sessions_multiple) - 1
+        mock_scheduling_controller.mark_sessions_for_termination.assert_awaited_once_with(
+            [timed_out_id],
+            reason=KernelLifecycleEventReason.FAILED_TO_START,
+            message="session start timed out",
+        )
+
+    async def test_termination_failure_keeps_successes(
+        self,
+        handler: StartSessionsLifecycleHandler,
+        mock_launcher: AsyncMock,
+        mock_repository: AsyncMock,
+        mock_scheduling_controller: AsyncMock,
+        prepared_sessions_multiple: list[SessionWithKernels],
+        sessions_for_start_factory: Callable[..., SessionsForStartWithImages],
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """SC-ST-007: A termination failure does not drop the other sessions' transition.
+
+        Given: One session timed out and requesting its termination raises
+        When: Handler starts all sessions
+        Then: The failure is logged and the started sessions are still returned as successes
+        """
+        sessions_for_start = sessions_for_start_factory(prepared_sessions_multiple)
+        mock_repository.search_sessions_with_kernels_and_user.return_value = sessions_for_start
+        timed_out_id = prepared_sessions_multiple[0].session_info.identity.id
+        mock_launcher.start_sessions_for_handler.return_value = [timed_out_id]
+        mock_scheduling_controller.mark_sessions_for_termination.side_effect = RuntimeError("down")
+
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), prepared_sessions_multiple)
+
+        assert len(result.successes) == len(prepared_sessions_multiple) - 1
+        assert any("failed to terminate timed-out sessions" in r.message for r in caplog.records)
 
     async def test_empty_session_list_returns_empty(
         self,

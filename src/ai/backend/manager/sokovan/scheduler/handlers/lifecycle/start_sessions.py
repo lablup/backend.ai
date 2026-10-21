@@ -27,6 +27,9 @@ from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
+    from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+        SchedulingController,
+    )
 
 log = StructuredLogger(logging.getLogger(__name__))
 
@@ -39,15 +42,20 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
     - Handler queries additional data (SessionDataForStart + ImageConfigData) via Repository
     - Handler starts kernels on agents via Launcher
     - Coordinator updates sessions to CREATING status and broadcasts events
+
+    Sessions whose start timed out (the launcher's own timeout, not history) are terminated
+    by this handler itself with FAILED_TO_START and are not reported to the coordinator.
     """
 
     def __init__(
         self,
         launcher: SessionLauncher,
         repository: SchedulerRepository,
+        scheduling_controller: SchedulingController,
     ) -> None:
         self._launcher = launcher
         self._repository = repository
+        self._scheduling_controller = scheduling_controller
 
     @classmethod
     @override
@@ -116,6 +124,7 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
         1. Extracts session IDs from SessionWithKernels
         2. Queries Repository for additional data (SessionDataForStart + ImageConfigData)
         3. Starts kernels on agents via Launcher
+        4. Terminates sessions whose start timed out and leaves them out of the result
         """
         result = SessionExecutionResult()
 
@@ -139,14 +148,19 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
 
         # Start kernels on agents via Launcher
         # Note: RecorderContext is handled inside Launcher
-        await self._launcher.start_sessions_for_handler(
-            sessions_data.sessions,
-            sessions_data.image_configs,
+        timed_out_ids = set(
+            await self._launcher.start_sessions_for_handler(
+                sessions_data.sessions,
+                sessions_data.image_configs,
+            )
         )
 
-        # Mark all sessions as success for status transition
+        # A start timeout is terminal: the kernels may already exist on the agent, so a retry
+        # would duplicate them. These sessions are left out of the result and terminated.
         for session in sessions:
             session_info = session.session_info
+            if session_info.identity.id in timed_out_ids:
+                continue
             result.successes.append(
                 SessionTransitionInfo(
                     session_id=session_info.identity.id,
@@ -156,5 +170,20 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
                     access_key=AccessKey(session_info.metadata.access_key),
                 )
             )
+
+        if timed_out_ids:
+            try:
+                await self._scheduling_controller.mark_sessions_for_termination(
+                    list(timed_out_ids),
+                    reason=KernelLifecycleEventReason.FAILED_TO_START,
+                    message="session start timed out",
+                )
+            except Exception:
+                # Keep the result: raising here would drop the CREATING transition of the
+                # sessions that started and they would be started again.
+                log.exception(
+                    "failed to terminate timed-out sessions",
+                    session_count=len(timed_out_ids),
+                )
 
         return result

@@ -170,7 +170,7 @@ class SessionLauncher:
         self,
         sessions: list[SessionDataForStart],
         image_configs: dict[UUID, ImageConfigData],
-    ) -> None:
+    ) -> list[SessionId]:
         """
         Start sessions on agents for the given sessions.
 
@@ -182,6 +182,7 @@ class SessionLauncher:
 
         :param sessions: List of sessions with full data for starting
         :param image_configs: Image configurations indexed by image ID
+        :return: IDs of sessions whose start timed out; the handler terminates them
         """
         with RecorderContext[SessionId].shared_phase(
             "trigger_kernel_creation",
@@ -191,38 +192,72 @@ class SessionLauncher:
                 "create_kernels",
                 success_detail="Kernel creation requested",
             ):
-                await self._start_sessions_concurrently(sessions, image_configs)
+                return await self._start_sessions_concurrently(sessions, image_configs)
 
     async def _start_sessions_concurrently(
         self,
         sessions: list[SessionDataForStart],
         image_configs: dict[UUID, ImageConfigData],
-    ) -> None:
+    ) -> list[SessionId]:
         """
         Start multiple sessions concurrently with individual timeouts.
 
         :param sessions: List of sessions to start
         :param image_configs: Image configurations indexed by image ID
+        :return: IDs of sessions whose start timed out
         """
 
         async def start_with_timeout(session: SessionDataForStart) -> None:
+            start_timeout = self._config_provider.config.session.start_timeout
             with with_log_context(session_id=session.session_id):
-                async with async_timeout.timeout(
-                    delay=self._config_provider.config.session.start_timeout
-                ):
-                    await self._start_single_session(session, image_configs)
+                try:
+                    async with async_timeout.timeout(delay=start_timeout):
+                        await self._start_single_session(session, image_configs)
+                except TimeoutError:
+                    await self._record_start_timeout(session, start_timeout)
+                    raise
 
         results = await asyncio.gather(
             *[start_with_timeout(session) for session in sessions],
             return_exceptions=True,
         )
+        timed_out: list[SessionId] = []
         for session, result in zip(sessions, results, strict=True):
-            if isinstance(result, BaseException):
+            if isinstance(result, TimeoutError):
+                log.warning(
+                    "session start timed out",
+                    session_id=session.session_id,
+                    exc_info=result,
+                )
+                timed_out.append(session.session_id)
+            elif isinstance(result, BaseException):
                 log.warning(
                     "session start failed with unhandled exception",
                     session_id=session.session_id,
                     exc_info=result,
                 )
+        return timed_out
+
+    async def _record_start_timeout(
+        self,
+        session: SessionDataForStart,
+        start_timeout: float,
+    ) -> None:
+        """Record the start timeout in the session's status_data.
+
+        The handler terminates the session; a start timeout is not retried.
+        """
+        try:
+            error_info = convert_to_status_data(
+                TimeoutError(f"session start timed out after {start_timeout} seconds"),
+                self._config_provider.config.debug.enabled,
+            )
+            await self._repository.update_session_error_info(session.session_id, error_info)
+        except Exception:
+            log.exception(
+                "failed to record session start timeout",
+                start_timeout=start_timeout,
+            )
 
     async def _start_single_session(
         self,
