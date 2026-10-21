@@ -1,15 +1,12 @@
 ---
 name: session-lifecycle-handler-adapter-scenarios
 type: reference
-description: what the session lifecycle handler adapter guarantees, as scenarios; lists every lifecycle handler registered on the schedule coordinator by name, no permission check of its own
+description: what the session lifecycle handler adapter guarantees, as scenarios; lists every lifecycle handler registered on the schedule coordinator with its name and the first line of its class docstring, no permission check of its own
 scope: src/ai/backend/manager/api/adapters/session_lifecycle_handler
 keywords: [session lifecycle handler, scenario, adapter, handler options, schedule coordinator]
 generated:
   by: claude-code/opus-5.5
   at: 2026-10-12
-updated:
-  by: claude-code/opus-5.5
-  at: 2026-10-21
 status: draft
 ---
 # session_lifecycle_handler 어댑터 — 시나리오
@@ -30,5 +27,10 @@ status: draft
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 등록된 처리기를 반환한다 | 코디네이터에 세션 종료 처리기가 등록되어 있다 | 목록 조회 | 세션 종료 처리기 하나가 반환된다. 이름은 그 처리기가 정한 이름이다 |
+| 등록된 처리기를 반환한다 | 코디네이터에 세션 종료 처리기가 등록되어 있다 | 목록 조회 | 세션 종료 처리기 하나가 반환된다. 이름은 그 처리기가 정한 이름이고, 설명은 처리기 클래스 설명의 첫 줄이다 |
 | 등록된 처리기가 없으면 빈 목록을 반환한다 | 코디네이터에 등록된 처리기가 없다 | 목록 조회 | 빈 목록이 반환된다 |
+
+## 아직 적지 않은 것
+
+- 클래스 설명이 없는 처리기의 설명이 null로 반환되는 경우. 설명이 없는 세션 처리기가 src에 없어서,
+  시나리오로 두려면 테스트 전용 처리기 클래스를 따로 만들어야 한다.
