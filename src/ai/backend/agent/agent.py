@@ -3028,6 +3028,7 @@ class AbstractAgent[
                         "kernel service initialization waiting",
                         container_id=container_data.get("container_id"),
                     )
+                    attestation: dict[str, Any] | None = None
                     try:
                         async for attempt in AsyncRetrying(
                             wait=wait_fixed(0.3),
@@ -3070,6 +3071,19 @@ class AbstractAgent[
                             container_id=container_data.get("container_id"),
                             service_ports=str(service_ports),
                         )
+                        try:
+                            async with asyncio.timeout(_ATTESTATION_SUMMARY_TIMEOUT_SEC):
+                                attestation = build_attestation_status(
+                                    await kernel_obj.summarize_attestation(
+                                        _ATTESTATION_SUMMARY_TIMEOUT_SEC
+                                    )
+                                )
+                        except Exception as e:
+                            log.warning(
+                                "attestation summary unavailable",
+                                kernel_id=kernel_id,
+                                error=repr(e),
+                            )
                     except TimeoutError as e:
                         await self.inject_container_lifecycle_event(
                             kernel_id,
@@ -3188,21 +3202,6 @@ class AbstractAgent[
                             model_service_task.add_done_callback(
                                 self._ongoing_model_service_tasks.discard
                             )
-
-                    attestation: dict[str, Any] | None = None
-                    try:
-                        async with asyncio.timeout(_ATTESTATION_SUMMARY_TIMEOUT_SEC):
-                            attestation = build_attestation_status(
-                                await kernel_obj.summarize_attestation(
-                                    _ATTESTATION_SUMMARY_TIMEOUT_SEC
-                                )
-                            )
-                    except Exception as e:
-                        log.warning(
-                            "attestation summary unavailable",
-                            kernel_id=kernel_id,
-                            error=repr(e),
-                        )
 
                     # Finally we are done.
                     creation_info = KernelCreationInfo(
