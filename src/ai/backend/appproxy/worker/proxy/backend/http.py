@@ -133,8 +133,9 @@ class HTTPBackend(BaseBackend):
 
     def _unreachable_error(self) -> ContainerConnectionRefused:
         sessions = ", ".join(str(session_id) for session_id in self.circuit.session_ids)
+        of_session = f" of session {sessions}" if sessions else ""
         return ContainerConnectionRefused(
-            extra_msg=f'The app "{self.circuit.app}" of session {sessions} is not reachable.'
+            extra_msg=f'The app "{self.circuit.app}"{of_session} is not reachable.'
         )
 
     async def proxy_http(self, frontend_request: web.Request) -> web.StreamResponse:

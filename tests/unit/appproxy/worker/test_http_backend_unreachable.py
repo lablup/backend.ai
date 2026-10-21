@@ -170,6 +170,23 @@ class TestHTTPBackendUnreachableUpstream:
         assert response.status == 502
         assert "not reachable" in (getattr(response, "text", "") or "")
 
+    async def test_message_omits_session_clause_without_sessions(
+        self,
+        mocker: pytest_mock.MockerFixture,
+        root_ctx: MagicMock,
+        backend: HTTPBackend,
+    ) -> None:
+        backend.circuit = _create_circuit().model_copy(update={"session_ids": []})
+        mocker.patch.object(backend._pool, "select", side_effect=WorkerNotAvailable)
+
+        response = await self._render(root_ctx, backend, self._request())
+
+        body = getattr(response, "text", "") or ""
+        assert response.status == 502
+        assert "not reachable" in body
+        assert "of session" not in body
+        assert "&#34;jupyter&#34; is not reachable." in body
+
     async def test_pool_marks_route_unhealthy_then_still_502(
         self,
         mocker: pytest_mock.MockerFixture,
