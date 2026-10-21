@@ -4,6 +4,7 @@ import asyncio
 import errno
 import gc
 import logging
+import socket
 import sys
 import weakref
 from collections.abc import AsyncIterator, Callable
@@ -420,6 +421,16 @@ class TestTCPPipe:
             await asyncio.Event().wait()
 
         monkeypatch.setattr(asyncio.get_running_loop(), "sock_connect", hang)
+        sockets: list[socket.socket] = []
+        real_socket = socket.socket
+
+        def tracking_socket(*args: Any, **kwargs: Any) -> socket.socket:
+            sockets.append(real_socket(*args, **kwargs))
+            return sockets[-1]
+
+        monkeypatch.setattr(
+            "ai.backend.appproxy.worker.proxy.backend.tcp.socket.socket", tracking_socket
+        )
         down_writer = MagicMock()
         down_writer.wait_closed = AsyncMock()
 
@@ -437,6 +448,7 @@ class TestTCPPipe:
         assert fields["log_tag_route_id"] == str(circuit.route_info[0].route_id)
         assert fields["log_tag_error"] == repr(TimeoutError())
         record_failure.assert_called_once()
+        assert [sock.fileno() for sock in sockets] == [-1]
         down_writer.close.assert_called_once()
         down_writer.wait_closed.assert_awaited_once()
 

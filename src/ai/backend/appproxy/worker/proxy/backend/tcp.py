@@ -112,6 +112,9 @@ class TCPBackend(BaseBackend):
                 )
                 sock.close()
                 return
+            except asyncio.CancelledError:
+                sock.close()
+                raise
 
             up_reader, up_writer = await asyncio.open_connection(sock=sock)
             self._pool.record_success(route)
