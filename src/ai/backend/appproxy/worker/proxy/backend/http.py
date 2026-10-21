@@ -132,6 +132,10 @@ class HTTPBackend(BaseBackend):
             yield ws
 
     def _unreachable_error(self) -> ContainerConnectionRefused:
+        if self.circuit.open_to_public:
+            return ContainerConnectionRefused(
+                extra_msg=f'The app "{self.circuit.app}" is temporarily unreachable.'
+            )
         sessions = ", ".join(str(session_id) for session_id in self.circuit.session_ids)
         of_session = f" of session {sessions}" if sessions else ""
         return ContainerConnectionRefused(

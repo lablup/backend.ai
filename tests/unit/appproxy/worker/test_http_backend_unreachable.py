@@ -29,7 +29,7 @@ KERNEL_HOST = "10.20.30.40"
 KERNEL_PORT = 30123
 
 
-def _create_circuit(app: str = "jupyter") -> Circuit:
+def _create_circuit(app: str = "jupyter", open_to_public: bool = False) -> Circuit:
     user_id = UUID("f38dea23-50fa-42a0-b5ae-338f5f4693f4")
     return Circuit(
         id=UUID("d0e6f60c-f375-4454-b4d3-e8ee202fa372"),
@@ -45,7 +45,7 @@ def _create_circuit(app: str = "jupyter") -> Circuit:
         runtime_variant=None,
         envs={},
         arguments=None,
-        open_to_public=True,
+        open_to_public=open_to_public,
         allowed_client_ips=None,
         user_id=user_id,
         access_key="AKIAIOSFODNN7EXAMPLE",
@@ -186,6 +186,29 @@ class TestHTTPBackendUnreachableUpstream:
         assert "not reachable" in body
         assert "of session" not in body
         assert "&#34;jupyter&#34; is not reachable." in body
+
+    @pytest.mark.parametrize("accept", [None, "application/json"])
+    async def test_public_circuit_shows_no_session_id(
+        self,
+        mocker: pytest_mock.MockerFixture,
+        root_ctx: MagicMock,
+        backend: HTTPBackend,
+        accept: str | None,
+    ) -> None:
+        backend.circuit = _create_circuit(open_to_public=True)
+        mocker.patch.object(
+            backend, "request_http", side_effect=aiohttp.ClientOSError(111, "refused")
+        )
+
+        response = await self._render(root_ctx, backend, self._request(accept=accept))
+
+        body = getattr(response, "text", "") or ""
+        assert response.status == 502
+        assert "temporarily unreachable" in body
+        assert "jupyter" in body
+        assert str(SESSION_ID) not in body
+        assert KERNEL_HOST not in body
+        assert str(KERNEL_PORT) not in body
 
     async def test_pool_marks_route_unhealthy_then_still_502(
         self,
