@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Awaitable, Callable
+from typing import Any
+
 import pytest
 
 from ai.backend.agent.containerd.client import ContainerRecord
@@ -87,6 +91,28 @@ class TestLaunch:
 
         with pytest.raises(ContainerdOperationFailed, match="create_task"):
             await _launch(fake)
+
+    @pytest.mark.parametrize(
+        "cancelled_op", ["prepare_snapshot", "create_container", "create_task"]
+    )
+    async def test_cancellation_removes_everything_created(
+        self, cancelled_op: str, fake: FakeContainerd
+    ) -> None:
+        """A cancel that lands after the daemon did the step leaves nothing behind."""
+        step: Callable[..., Awaitable[Any]] = getattr(fake, cancelled_op)
+
+        async def done_then_cancelled(*args: Any, **kwargs: Any) -> Any:
+            await step(*args, **kwargs)
+            raise asyncio.CancelledError
+
+        setattr(fake, cancelled_op, done_then_cancelled)
+
+        with pytest.raises(asyncio.CancelledError):
+            await _launch(fake)
+
+        assert fake.snapshots == {}
+        assert fake.containers == {}
+        assert fake.tasks == {}
 
 
 class TestDestroy:

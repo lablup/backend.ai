@@ -57,8 +57,8 @@ async def launch_container(
 
     A failed step removes what was created. FIXME(containerd-mvp): no lease holds the snapshot.
     """
-    rootfs: Sequence[MountSpec] = await client.prepare_snapshot(record.snapshot_key, chain_id)
     try:
+        rootfs: Sequence[MountSpec] = await client.prepare_snapshot(record.snapshot_key, chain_id)
         await client.create_container(record, runtime, spec, runtime_options)
         pid = await client.create_task(record.id, rootfs, stdio, stdio)
         await client.start_task(record.id)
