@@ -12,12 +12,14 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.session_group.request import (
     AdminSearchSessionGroupsInput,
+    PurgeSessionGroupInput,
     ScopedSearchSessionGroupsInput,
     SessionGroupFilter,
     SessionGroupOrder,
 )
 from ai.backend.common.dto.manager.v2.session_group.response import (
     AdminSearchSessionGroupsPayload,
+    PurgeSessionGroupPayload,
     SessionGroupNode,
 )
 from ai.backend.common.dto.manager.v2.session_group.types import (
@@ -35,6 +37,7 @@ from ai.backend.manager.models.condition_utils import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.models.session_group.purgers import SessionGroupPurger
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.session_group.scopes import (
     DomainSessionGroupTarget,
@@ -49,6 +52,7 @@ from ai.backend.manager.services.session_group.actions.get import GetSessionGrou
 from ai.backend.manager.services.session_group.actions.global_search import (
     GlobalSearchSessionGroupsAction,
 )
+from ai.backend.manager.services.session_group.actions.purge import PurgeSessionGroupAction
 from ai.backend.manager.services.session_group.actions.scoped_search import (
     ScopedSearchSessionGroupsAction,
 )
@@ -63,7 +67,7 @@ _SESSION_GROUP_PAGINATION_SPEC = PaginationSpec(
 
 
 class SessionGroupAdapter(BaseAdapter):
-    """Adapter for session group reads."""
+    """Adapter for session group reads and the purge."""
 
     _session_group: SessionGroupProcessors
 
@@ -151,6 +155,13 @@ class SessionGroupAdapter(BaseAdapter):
             )
         )
         return self._to_payload(result)
+
+    async def purge(self, input: PurgeSessionGroupInput) -> PurgeSessionGroupPayload:
+        """Remove a session group; its member sessions stay with their group cleared."""
+        result = await self._session_group.purge.run(
+            PurgeSessionGroupAction(purger=SessionGroupPurger(group_id=SessionGroupID(input.id)))
+        )
+        return PurgeSessionGroupPayload(entity_id=result.data.id)
 
     def _search_conditions(self, filter: SessionGroupFilter | None) -> list[QueryCondition]:
         """The filter's conditions; groups marked deleted are left out unless the top-level

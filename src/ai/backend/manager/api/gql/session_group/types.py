@@ -7,10 +7,14 @@ from datetime import datetime
 from typing import Any, Self, cast, override
 from uuid import UUID
 
+import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.dto.manager.v2.session_group.request import (
+    PurgeSessionGroupInput as PurgeSessionGroupInputDTO,
+)
 from ai.backend.common.dto.manager.v2.session_group.request import (
     SessionGroupFilter as SessionGroupFilterDTO,
 )
@@ -22,6 +26,9 @@ from ai.backend.common.dto.manager.v2.session_group.request import (
 )
 from ai.backend.common.dto.manager.v2.session_group.request import (
     SessionGroupPlacementEnforcementFilter as SessionGroupPlacementEnforcementFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.session_group.response import (
+    PurgeSessionGroupPayload as PurgeSessionGroupPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.session_group.response import (
     SessionGroupNode as SessionGroupNodeDTO,
@@ -53,11 +60,18 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_node_type,
     gql_pydantic_input,
+    gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import (
+    PydanticInputMixin,
+    PydanticNodeMixin,
+    PydanticOutputMixin,
+)
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
+    "PurgeSessionGroupInputGQL",
+    "PurgeSessionGroupPayloadGQL",
     "SessionGroupConnectionGQL",
     "SessionGroupEdgeGQL",
     "SessionGroupFilterGQL",
@@ -279,3 +293,27 @@ class SessionGroupScopeGQL(PydanticInputMixin[SessionGroupScopeDTO]):
     user: list[UUIDScopeGQL] | None = gql_field(
         description="Users whose session groups are being read.", default=None
     )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Identifies the session group to purge.",
+    ),
+    name="PurgeSessionGroupInput",
+)
+class PurgeSessionGroupInputGQL(PydanticInputMixin[PurgeSessionGroupInputDTO]):
+    id: UUID = gql_field(description="ID of the session group to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Names the session group removed. Its member sessions remain.",
+    ),
+    model=PurgeSessionGroupPayloadDTO,
+    name="PurgeSessionGroupPayload",
+)
+class PurgeSessionGroupPayloadGQL(PydanticOutputMixin[PurgeSessionGroupPayloadDTO]):
+    purged_id: strawberry.ID = gql_field(description="Global ID of the purged session group.")
+    entity_id: UUID = gql_field(description="UUID of the purged session group.")

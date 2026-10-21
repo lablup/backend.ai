@@ -1,4 +1,4 @@
-"""스코프로 세션 그룹 검색 — 스코프들이 닿는 사용자 그룹을 합쳐서, 그 스코프를 모두 읽을 수 있는 사람에게."""
+"""스코프로 세션 그룹 검색 — 스코프들이 닿는 사용자가 만든 세션 그룹을 합쳐서, 그 스코프를 모두 읽을 수 있는 사람에게."""
 
 from __future__ import annotations
 
@@ -46,7 +46,7 @@ type ScopedStep = Scenario[TestSeedingSession, Laid, SessionGroupAdapter, Search
 
 @dataclass(frozen=True)
 class SearchingInTheProject(When[Laid, SessionGroupAdapter, Searched]):
-    """그룹들이 있는 프로젝트 범위에서 필터 없이 검색한다."""
+    """세션 그룹들이 있는 프로젝트 범위에서 필터 없이 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -90,7 +90,7 @@ class SearchingTheirOwn(When[Laid, SessionGroupAdapter, Searched]):
 
 @dataclass(frozen=True)
 class SearchingTheOwners(When[Laid, SessionGroupAdapter, Searched]):
-    """그룹들을 만든 사람의 사용자 스코프에서 필터 없이 검색한다."""
+    """세션 그룹들을 만든 사람의 사용자 스코프에서 필터 없이 검색한다."""
 
     @override
     def operation(self) -> str:
@@ -140,11 +140,11 @@ class SearchingTheirOwnAndTheOtherProject(When[Laid, SessionGroupAdapter, Search
 
 @dataclass(frozen=True)
 class OnlyTheUsersGroupOfTheProject(Then[Laid, Searched]):
-    """그 프로젝트의 사용자가 만든 그룹만 남는다."""
+    """그 프로젝트의 사용자가 만든 세션 그룹만 남는다."""
 
     @override
     def says(self) -> str:
-        return "그 프로젝트의 사용자가 만든 그룹만 남는다"
+        return "그 프로젝트의 사용자가 만든 세션 그룹만 남는다"
 
     @override
     def look(self, laid: Laid, answered: Answered[Searched]) -> list[Verdict]:
@@ -155,7 +155,9 @@ class OnlyTheUsersGroupOfTheProject(Then[Laid, Searched]):
             Held(
                 "items",
                 [one.entity_id for one in payload.items],
-                TheseGroups(frozenset({laid.users_group.id}), "그 프로젝트의 사용자가 만든 그룹"),
+                TheseGroups(
+                    frozenset({laid.users_group.id}), "그 프로젝트의 사용자가 만든 세션 그룹"
+                ),
             ),
             Same("total_count", payload.total_count, 1),
             Same("has_next_page", payload.has_next_page, False),
@@ -165,11 +167,11 @@ class OnlyTheUsersGroupOfTheProject(Then[Laid, Searched]):
 
 @dataclass(frozen=True)
 class TheOwnersGroups(Then[Laid, Searched]):
-    """그 사용자가 두 프로젝트에 만든 그룹만 남는다."""
+    """그 사용자가 두 프로젝트에 만든 세션 그룹만 남는다."""
 
     @override
     def says(self) -> str:
-        return "그 사용자가 두 프로젝트에 만든 그룹만 남는다"
+        return "그 사용자가 두 프로젝트에 만든 세션 그룹만 남는다"
 
     @override
     def look(self, laid: Laid, answered: Answered[Searched]) -> list[Verdict]:
@@ -182,7 +184,7 @@ class TheOwnersGroups(Then[Laid, Searched]):
                 [one.entity_id for one in payload.items],
                 TheseGroups(
                     frozenset({laid.users_group.id, laid.elsewhere_group.id}),
-                    "그 사용자가 두 프로젝트에 만든 그룹",
+                    "그 사용자가 두 프로젝트에 만든 세션 그룹",
                 ),
             ),
             Same("total_count", payload.total_count, 2),
@@ -193,11 +195,11 @@ class TheOwnersGroups(Then[Laid, Searched]):
 
 @dataclass(frozen=True)
 class TheOwnersGroupsAndTheOtherProjects(Then[Laid, Searched]):
-    """그 사용자가 만든 그룹과 다른 프로젝트의 그룹이 합쳐져 남는다."""
+    """그 사용자가 만든 세션 그룹과 다른 프로젝트의 세션 그룹이 합쳐져 남는다."""
 
     @override
     def says(self) -> str:
-        return "그 사용자가 만든 그룹과 다른 프로젝트의 그룹이 합쳐져 남는다"
+        return "그 사용자가 만든 세션 그룹과 다른 프로젝트의 세션 그룹이 합쳐져 남는다"
 
     @override
     def look(self, laid: Laid, answered: Answered[Searched]) -> list[Verdict]:
@@ -214,7 +216,7 @@ class TheOwnersGroupsAndTheOtherProjects(Then[Laid, Searched]):
                         laid.elsewhere_group.id,
                         laid.strangers_group.id,
                     }),
-                    "그 사용자가 만든 그룹과 다른 프로젝트의 그룹",
+                    "그 사용자가 만든 세션 그룹과 다른 프로젝트의 세션 그룹",
                 ),
             ),
             Same("total_count", payload.total_count, 3),
@@ -235,7 +237,7 @@ class AGrantedUserFindsOnlyTheUsersGroup(
     def describe(self) -> str:
         return (
             "그 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 그 프로젝트 범위로 검색하면, "
-            "배포의 그룹과 다른 프로젝트의 그룹은 빠지고 그 프로젝트의 사용자가 만든 그룹만 온다"
+            "배포의 replica group이 가진 세션 그룹과 다른 프로젝트의 세션 그룹은 빠지고 그 프로젝트의 사용자가 만든 세션 그룹만 온다"
         )
 
     @override
@@ -262,7 +264,7 @@ class AProjectNotGrantedIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "다른 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 그룹들이 있는 프로젝트 "
+            "다른 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들이 있는 프로젝트 "
             "범위로 검색하면, 권한 부족으로 거부된다"
         )
 
@@ -291,7 +293,7 @@ class AnOwnerFindsTheirOwnGroups(
     def describe(self) -> str:
         return (
             "자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자가 자기 스코프로 검색하면, "
-            "두 프로젝트에 자기가 만든 그룹이 오고 배포의 그룹과 다른 사용자의 그룹은 빠진다"
+            "두 프로젝트에 자기가 만든 세션 그룹이 오고 배포의 replica group이 가진 세션 그룹과 다른 사용자가 만든 세션 그룹은 빠진다"
         )
 
     @override
@@ -318,7 +320,7 @@ class AnotherUsersScopeIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "그룹들이 있는 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 그룹들을 만든 "
+            "세션 그룹들이 있는 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들을 만든 "
             "사용자의 스코프로 검색하면, 권한 부족으로 거부된다"
         )
 
@@ -347,8 +349,8 @@ class ScopesOfDifferentKindsAreJoined(
     def describe(self) -> str:
         return (
             "자기 스코프와 다른 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 두 스코프를 "
-            "함께 넘겨 검색하면, 자기가 만든 그룹과 그 프로젝트에서 다른 사용자가 만든 그룹이 "
-            "합쳐져 오고 배포의 그룹은 빠진다"
+            "함께 넘겨 검색하면, 자기가 만든 세션 그룹과 그 프로젝트에서 다른 사용자가 만든 세션 그룹이 "
+            "합쳐져 오고 배포의 replica group이 가진 세션 그룹은 빠진다"
         )
 
     @override
