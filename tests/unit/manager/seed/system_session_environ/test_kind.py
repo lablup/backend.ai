@@ -4,9 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+from uuid import UUID
 
 import pytest
 
+from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironScopeID
+from ai.backend.common.data.system_session_environ.types import (
+    SystemSessionEnvironScopeType,
+    SystemSessionEnvironValueSource,
+)
 from ai.backend.manager.errors.seed import InvalidSeedDocument
 from ai.backend.manager.seed.system_session_environ.seed import SystemSessionEnvironSeed
 
@@ -16,8 +22,8 @@ _DOMAIN_ID = "0198a5a0-0000-7000-8000-00000000d001"
 @dataclass(frozen=True)
 class _SeedKeyCase:
     name: str
-    item: dict[str, Any]
-    expected: str
+    seed: SystemSessionEnvironSeed
+    expected_key: str
 
 
 @dataclass(frozen=True)
@@ -32,41 +38,41 @@ class TestSystemSessionEnvironSeed:
         [
             _SeedKeyCase(
                 name="public",
-                item={
-                    "value_source": "session_id",
-                    "key": "BACKENDAI_SESSION_ID",
-                    "scope_type": "public",
-                    "enabled": True,
-                },
-                expected="BACKENDAI_SESSION_ID:public",
+                seed=SystemSessionEnvironSeed(
+                    value_source=SystemSessionEnvironValueSource.SESSION_ID,
+                    key="BACKENDAI_SESSION_ID",
+                    scope_type=SystemSessionEnvironScopeType.PUBLIC,
+                    enabled=True,
+                ),
+                expected_key="BACKENDAI_SESSION_ID:public",
             ),
             _SeedKeyCase(
                 name="domain",
-                item={
-                    "value_source": "session_id",
-                    "key": "BACKENDAI_SESSION_ID",
-                    "scope_type": "domain",
-                    "scope_id": _DOMAIN_ID,
-                    "enabled": True,
-                },
-                expected=f"BACKENDAI_SESSION_ID:domain:{_DOMAIN_ID}",
+                seed=SystemSessionEnvironSeed(
+                    value_source=SystemSessionEnvironValueSource.SESSION_ID,
+                    key="BACKENDAI_SESSION_ID",
+                    scope_type=SystemSessionEnvironScopeType.DOMAIN,
+                    scope_id=SystemSessionEnvironScopeID(UUID(_DOMAIN_ID)),
+                    enabled=True,
+                ),
+                expected_key=f"BACKENDAI_SESSION_ID:domain:{_DOMAIN_ID}",
             ),
             _SeedKeyCase(
                 name="project",
-                item={
-                    "value_source": "session_id",
-                    "key": "BACKENDAI_SESSION_ID",
-                    "scope_type": "project",
-                    "scope_id": _DOMAIN_ID,
-                    "enabled": True,
-                },
-                expected=f"BACKENDAI_SESSION_ID:project:{_DOMAIN_ID}",
+                seed=SystemSessionEnvironSeed(
+                    value_source=SystemSessionEnvironValueSource.SESSION_ID,
+                    key="BACKENDAI_SESSION_ID",
+                    scope_type=SystemSessionEnvironScopeType.PROJECT,
+                    scope_id=SystemSessionEnvironScopeID(UUID(_DOMAIN_ID)),
+                    enabled=True,
+                ),
+                expected_key=f"BACKENDAI_SESSION_ID:project:{_DOMAIN_ID}",
             ),
         ],
         ids=lambda case: case.name,
     )
     def test_the_key_names_the_variable_and_its_scope(self, case: _SeedKeyCase) -> None:
-        assert SystemSessionEnvironSeed.model_validate(case.item).key() == case.expected
+        assert case.seed.key() == case.expected_key
 
     @pytest.mark.parametrize(
         "case",
