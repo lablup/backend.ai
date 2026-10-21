@@ -18,9 +18,7 @@ import sqlalchemy as sa
 from alembic import op
 
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.manager.models.rbac_models.role_permission_preset.ids import (
-    role_permission_preset_id,
-)
+from ai.backend.manager.cli.role_fixture import _identify
 
 # revision identifiers, used by Alembic.
 revision = "bf07cae92d86"  # Part of: NEXT_RELEASE_VERSION
@@ -57,7 +55,7 @@ def grant(conn: sa.engine.Connection, preset_id: str, entity_type: str, permissi
             WHERE p.id = CAST(:preset_id AS uuid)
             ON CONFLICT DO NOTHING
         """).bindparams(
-            id=role_permission_preset_id(preset_id, entity_type, permission),
+            id=_identify("role_permission_preset", preset_id, entity_type, str(permission)),
             preset_id=preset_id,
             entity_type=entity_type,
             permission=permission,
