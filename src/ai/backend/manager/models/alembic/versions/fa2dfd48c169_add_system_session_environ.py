@@ -5,7 +5,7 @@ environment, and bind every system value source at the global scope under the
 name the launcher has always used. The session owner's values are left unbound.
 
 Revision ID: fa2dfd48c169
-Revises: ede445fb9d0d
+Revises: e234d84a162f
 Create Date: 2026-10-14
 
 """
@@ -21,7 +21,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "fa2dfd48c169"  # Part of: NEXT_RELEASE_VERSION
-down_revision = "ede445fb9d0d"
+down_revision = "e234d84a162f"
 branch_labels = None
 depends_on = None
 
