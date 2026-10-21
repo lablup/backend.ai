@@ -78,7 +78,7 @@ def upgrade() -> None:
             ["kernel_group_id"],
             ["kernel_groups.id"],
             name=op.f("fk_kernel_group_resource_slots_kernel_group_id_kernel_groups"),
-            ondelete="CASCADE",
+            ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(
             ["slot_name"],
@@ -116,7 +116,7 @@ def upgrade() -> None:
         "kernel_groups",
         ["kernel_group_id"],
         ["id"],
-        ondelete="SET NULL",
+        ondelete="RESTRICT",
     )
 
 

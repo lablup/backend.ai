@@ -165,7 +165,7 @@ class KernelRow(CreatedAtMixin, Base):
         GUID(KernelGroupID),
         sa.ForeignKey(
             "kernel_groups.id",
-            ondelete="SET NULL",
+            ondelete="RESTRICT",
             use_alter=True,
             name="fk_kernels_kernel_group_id_kernel_groups",
         ),

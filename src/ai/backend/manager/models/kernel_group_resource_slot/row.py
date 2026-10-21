@@ -33,7 +33,7 @@ class KernelGroupResourceSlotRow(Base):
     kernel_group_id: Mapped[KernelGroupID] = mapped_column(
         "kernel_group_id",
         GUID(KernelGroupID),
-        sa.ForeignKey("kernel_groups.id", ondelete="CASCADE"),
+        sa.ForeignKey("kernel_groups.id", ondelete="RESTRICT"),
         nullable=False,
     )
     slot_name: Mapped[ResourceSlotName] = mapped_column(
