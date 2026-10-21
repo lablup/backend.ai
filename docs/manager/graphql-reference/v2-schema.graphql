@@ -4675,10 +4675,10 @@ type DeleteRuntimeVariantsPayload {
 }
 
 """
-Added in 26.10.0. Payload returned after withdrawing a storage volume from new use.
+Added in 26.10.0. Payload returned after soft-deleting a storage volume.
 """
 type DeleteStorageVolumePayload {
-  """The withdrawn storage volume."""
+  """The soft-deleted storage volume."""
   item: StorageVolumeV2!
 }
 
@@ -10528,20 +10528,22 @@ type Mutation {
   """
   Added in 26.10.0. Retune one storage volume: its name, its usage exposure and its stale threshold.
   """
-  updateStorageVolume(id: ID!, input: UpdateStorageVolumeInput!): UpdateStorageVolumePayload
+  updateStorageVolume(id: UUID!, input: UpdateStorageVolumeInput!): UpdateStorageVolumePayload
 
   """
   Added in 26.10.0. Remove one storage volume from the catalog. Refused while a folder sits on it.
   """
-  purgeStorageVolume(id: ID!): PurgeStorageVolumePayload
+  purgeStorageVolume(id: UUID!): PurgeStorageVolumePayload
 
   """
-  Added in 26.10.0. Withhold one storage volume from new use. The folders already on it keep working and the volume still answers get and search.
+  Added in 26.10.0. Soft-delete one storage volume, withholding it from new use. The folders already on it keep working. A get still answers it; a search lists it only when the filter gives deletedAt.
   """
-  deleteStorageVolume(id: ID!): DeleteStorageVolumePayload
+  deleteStorageVolume(id: UUID!): DeleteStorageVolumePayload
 
-  """Added in 26.10.0. Take one withdrawn storage volume back into use."""
-  restoreStorageVolume(id: ID!): RestoreStorageVolumePayload
+  """
+  Added in 26.10.0. Restore one soft-deleted storage volume back into use.
+  """
+  restoreStorageVolume(id: UUID!): RestoreStorageVolumePayload
 
   """Added in 26.3.0. Create a new query preset category (admin only)."""
   adminCreatePrometheusQueryPresetCategory(input: CreateCategoryInput!): CreateCategoryPayload
@@ -14663,6 +14665,15 @@ type PurgeSessionGroupPayload {
   entityId: UUID!
 }
 
+"""Added in 26.10.0. Payload returned after purging a storage volume."""
+type PurgeStorageVolumePayload {
+  """Global ID of the purged storage volume."""
+  purgedId: ID!
+
+  """UUID of the purged storage volume."""
+  entityId: UUID!
+}
+
 """Added in 26.10.0. Payload for user resource policy purge."""
 type PurgeUserResourcePolicyPayload {
   """Global ID of the purged user resource policy."""
@@ -14670,12 +14681,6 @@ type PurgeUserResourcePolicyPayload {
 
   """UUID of the purged user resource policy."""
   entityId: UUID!
-}
-
-"""Added in 26.10.0. Payload returned after purging a storage volume."""
-type PurgeStorageVolumePayload {
-  """ID of the purged storage volume."""
-  id: UUID!
 }
 
 """
@@ -14980,7 +14985,7 @@ type Query {
   adminServiceCatalogs(filter: ServiceCatalogFilter = null, orderBy: [ServiceCatalogOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): [ServiceCatalog!]
 
   """Added in 26.10.0. Read one storage volume."""
-  storageVolume(id: ID!): StorageVolumeV2
+  storageVolume(id: UUID!): StorageVolumeV2
 
   """
   Added in 26.10.0. Page through every declared storage volume. Admin only.
@@ -14988,9 +14993,9 @@ type Query {
   adminStorageVolumes(filter: StorageVolumeFilter = null, orderBy: [StorageVolumeOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): StorageVolumeV2Connection
 
   """
-  Added in 26.10.0. Page through the storage volumes the named scopes reach, combined with OR. Every scope is authorized before the read runs.
+  Added in 26.10.0. Page through every storage volume service attachment. Admin only.
   """
-  scopedStorageVolumes(scope: StorageVolumeScope!, filter: StorageVolumeFilter = null, orderBy: [StorageVolumeOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): StorageVolumeV2Connection
+  adminStorageVolumeServiceAttachments(filter: StorageVolumeServiceAttachmentFilter = null, orderBy: [StorageVolumeServiceAttachmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): StorageVolumeServiceAttachmentConnection
 
   """Added in 26.4.2. List session scheduling history (admin only)"""
   adminSessionSchedulingHistories(filter: SessionSchedulingHistoryFilter = null, orderBy: [SessionSchedulingHistoryOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionSchedulingHistoryConnection
@@ -17461,7 +17466,7 @@ type RestoreRolePresetPayload {
 }
 
 """
-Added in 26.10.0. Payload returned after restoring a withdrawn storage volume.
+Added in 26.10.0. Payload returned after restoring a soft-deleted storage volume.
 """
 type RestoreStorageVolumePayload {
   """The restored storage volume."""
@@ -19329,8 +19334,10 @@ type ServiceCatalog implements Node {
   """Endpoints exposed by this service instance."""
   endpoints: [ServiceCatalogEndpoint!]!
 
-  """Added in 26.10.0. The storage volumes attached to this service."""
-  storageVolumeAttachments(filter: StorageVolumeServiceAttachmentFilter = null, orderBy: [StorageVolumeServiceAttachmentOrderBy!] = null, limit: Int = null, offset: Int = null): StorageVolumeServiceAttachmentList
+  """
+  Added in 26.10.0. The storage volumes attached to this service, one attachment per volume.
+  """
+  storageVolumeAttachments(filter: StorageVolumeServiceAttachmentFilter = null, orderBy: [StorageVolumeServiceAttachmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): StorageVolumeServiceAttachmentConnection
 }
 
 """Added in 26.3.0. An endpoint exposed by a service instance."""
@@ -20417,6 +20424,11 @@ input StorageVolumeFilter {
   """Filter by the backend the volume sits on."""
   storageBackendId: UUIDFilter = null
 
+  """
+  Filter by deletion time. Setting it on the top-level filter includes the volumes marked deleted; inside AND, OR or NOT it does not.
+  """
+  deletedAt: NullableDateTimeFilter = null
+
   """Combine multiple filters with AND logic."""
   AND: [StorageVolumeFilter!] = null
 
@@ -20441,32 +20453,13 @@ enum StorageVolumeOrderField {
   NAME
   CREATED_AT
   UPDATED_AT
-}
-
-"""
-Added in 26.10.0. The scopes a storage volume read is answered for. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
-"""
-input StorageVolumeScope {
-  """Domains whose storage volumes are being read."""
-  domain: [UUIDScope!] = null
-
-  """Projects whose storage volumes are being read."""
-  project: [UUIDScope!] = null
-
-  """Users whose storage volumes are being read."""
-  user: [UUIDScope!] = null
-
-  """Storage backends whose volumes are being read."""
-  storageBackend: [UUIDScope!] = null
+  DELETED_AT
 }
 
 """Added in 26.10.0. A storage volume as one service has it attached."""
-type StorageVolumeServiceAttachment {
-  """The volume attached."""
-  storageVolume: StorageVolumeV2
-
-  """The service the volume is attached to."""
-  serviceCatalog: ServiceCatalog
+type StorageVolumeServiceAttachment implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
 
   """ID of the service the volume is attached to."""
   serviceCatalogId: UUID!
@@ -20474,7 +20467,7 @@ type StorageVolumeServiceAttachment {
   """ID of the attached volume."""
   storageVolumeId: UUID!
 
-  """When the service last checked the volume."""
+  """When the service last checked the volume. Null until the first check."""
   statusCheckedAt: DateTime
 
   """Creation timestamp."""
@@ -20482,15 +20475,49 @@ type StorageVolumeServiceAttachment {
 
   """Last update timestamp."""
   updatedAt: DateTime!
+
+  """The attached volume."""
+  storageVolume: StorageVolumeV2!
+
+  """The service the volume is attached to."""
+  serviceCatalog: ServiceCatalog!
+}
+
+"""
+Added in 26.10.0. Paginated connection for storage volume service attachments.
+"""
+type StorageVolumeServiceAttachmentConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [StorageVolumeServiceAttachmentEdge!]!
+
+  """Total number of storage volume service attachments matching the query."""
+  count: Int!
+}
+
+"""
+Added in 26.10.0. One storage volume service attachment within a connection.
+"""
+type StorageVolumeServiceAttachmentEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: StorageVolumeServiceAttachment!
 }
 
 """Added in 26.10.0. Filter for the storage volume service attachments."""
 input StorageVolumeServiceAttachmentFilter {
-  """Filter by the service the volume is attached to."""
-  serviceCatalogId: UUIDFilter = null
+  """Filter by when the service last checked the volume."""
+  statusCheckedAt: NullableDateTimeFilter = null
 
-  """Filter by the attached volume's ID."""
-  storageVolumeId: UUIDFilter = null
+  """Filter by conditions on the attached volume."""
+  storageVolume: StorageVolumeFilter = null
+
+  """Filter by conditions on the service the volume is attached to."""
+  serviceCatalog: ServiceCatalogFilter = null
 
   """Combine multiple filters with AND logic."""
   AND: [StorageVolumeServiceAttachmentFilter!] = null
@@ -20500,23 +20527,6 @@ input StorageVolumeServiceAttachmentFilter {
 
   """Negate the given filters."""
   NOT: [StorageVolumeServiceAttachmentFilter!] = null
-}
-
-"""
-Added in 26.10.0. A page of the storage volume service attachments. Paged by limit and offset: an attachment is keyed by its pair and carries no id of its own.
-"""
-type StorageVolumeServiceAttachmentList {
-  """The storage volume service attachments read."""
-  items: [StorageVolumeServiceAttachment!]!
-
-  """Total number of matching storage volume service attachments."""
-  totalCount: Int!
-
-  """Whether more rows follow this page."""
-  hasNextPage: Boolean!
-
-  """Whether more rows precede this page."""
-  hasPreviousPage: Boolean!
 }
 
 """
@@ -20534,9 +20544,8 @@ input StorageVolumeServiceAttachmentOrderBy {
 Added in 26.10.0. Fields available for ordering the storage volume service attachments.
 """
 enum StorageVolumeServiceAttachmentOrderField {
-  SERVICE_CATALOG_ID
-  STORAGE_VOLUME_ID
   STATUS_CHECKED_AT
+  CREATED_AT
   UPDATED_AT
 }
 
@@ -20589,8 +20598,11 @@ type StorageVolumeV2 implements Node {
   """Last update timestamp."""
   updatedAt: DateTime!
 
-  """Which services have this volume attached, one row per service."""
-  serviceAttachments(filter: StorageVolumeServiceAttachmentFilter = null, orderBy: [StorageVolumeServiceAttachmentOrderBy!] = null, limit: Int = null, offset: Int = null): StorageVolumeServiceAttachmentList
+  """Deletion timestamp. Null while the volume is in use."""
+  deletedAt: DateTime
+
+  """The services this volume is attached to, one attachment per service."""
+  serviceAttachments(filter: StorageVolumeServiceAttachmentFilter = null, orderBy: [StorageVolumeServiceAttachmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): StorageVolumeServiceAttachmentConnection
 }
 
 """Added in 26.10.0. Paginated connection for storage volumes."""
