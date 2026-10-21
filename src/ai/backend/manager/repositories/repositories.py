@@ -76,9 +76,6 @@ from ai.backend.manager.repositories.storage_namespace.repositories import (
     StorageNamespaceRepositories,
 )
 from ai.backend.manager.repositories.stream.repositories import StreamRepositories
-from ai.backend.manager.repositories.system_session_environ.repositories import (
-    SystemSessionEnvironRepositories,
-)
 from ai.backend.manager.repositories.template.repositories import TemplateRepositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.repositories.user.repositories import UserRepositories
@@ -143,7 +140,6 @@ class Repositories:
     role_preset: RolePresetRepositories
     secret: SecretRepositories
     service_catalog: ServiceCatalogRepositories
-    system_session_environ: SystemSessionEnvironRepositories
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
@@ -198,7 +194,6 @@ class Repositories:
         role_preset_repositories = RolePresetRepositories.create(args)
         secret_repositories = SecretRepositories.create(args)
         service_catalog_repositories = ServiceCatalogRepositories.create(args)
-        system_session_environ_repositories = SystemSessionEnvironRepositories.create(args)
 
         return cls(
             agent=agent_repositories,
@@ -253,5 +248,4 @@ class Repositories:
             role_preset=role_preset_repositories,
             secret=secret_repositories,
             service_catalog=service_catalog_repositories,
-            system_session_environ=system_session_environ_repositories,
         )
