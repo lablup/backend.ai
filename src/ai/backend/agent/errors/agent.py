@@ -332,6 +332,21 @@ class KernelNotFoundError(BackendAIError, web.HTTPNotFound):
         )
 
 
+class KernelAlreadyExistsError(BackendAIError, web.HTTPConflict):
+    """Raised when a kernel is created for a kernel id that is already registered."""
+
+    error_type = "https://api.backend.ai/probs/agent/kernel-already-exists"
+    error_title = "Kernel already exists."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.ALREADY_EXISTS,
+        )
+
+
 class InitializationError(BackendAIError, web.HTTPInternalServerError):
     """Raised during agent initialization and compute plugin setup."""
 
