@@ -14,7 +14,7 @@ from ai.backend.agent.containerd.lifecycle import (
     launch_container,
 )
 from ai.backend.agent.containerd.profile.base import RuntimeOptions
-from ai.backend.agent.errors.containerd import ContainerdOperationFailed
+from ai.backend.agent.errors.containerd import ContainerdOperationFailed, ContainerTaskStuck
 
 from .fakes import FakeContainerd
 
@@ -191,7 +191,7 @@ class TestClean:
         await _launch(fake)
         fake.failing.add("delete_task")
 
-        with pytest.raises(ContainerdOperationFailed, match="delete_task"):
+        with pytest.raises(ContainerTaskStuck, match="delete_task"):
             await clean_container(fake, CID)
 
         assert CID in fake.containers
@@ -208,11 +208,50 @@ class TestClean:
 
         monkeypatch.setattr(fake, "kill_task", ignored)
 
-        with pytest.raises(ContainerdOperationFailed, match="did not exit"):
+        with pytest.raises(ContainerTaskStuck, match="survived SIGKILL"):
             await clean_container(fake, CID)
 
         assert CID in fake.containers
         assert CID in fake.snapshots
+
+    async def test_task_still_present_after_its_deletion_is_stuck(
+        self, fake: FakeContainerd, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        await _launch(fake)
+
+        async def not_deleted(container_id: str) -> None:
+            return None
+
+        monkeypatch.setattr(fake, "delete_task", not_deleted)
+
+        with pytest.raises(ContainerTaskStuck, match="still there"):
+            await clean_container(fake, CID)
+
+        assert CID in fake.containers
+
+    async def test_failing_task_lookup_is_stuck(
+        self, fake: FakeContainerd, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        await _launch(fake)
+
+        async def unreadable(container_id: str) -> None:
+            raise ContainerdOperationFailed("get_task: injected failure")
+
+        monkeypatch.setattr(fake, "get_task", unreadable)
+
+        with pytest.raises(ContainerTaskStuck, match="not confirmed gone"):
+            await clean_container(fake, CID)
+
+        assert CID in fake.containers
+
+    async def test_failing_container_deletion_is_not_stuck(self, fake: FakeContainerd) -> None:
+        await _launch(fake)
+        fake.failing.add("delete_container")
+
+        with pytest.raises(ContainerdOperationFailed) as excinfo:
+            await clean_container(fake, CID)
+
+        assert not isinstance(excinfo.value, ContainerTaskStuck)
 
     async def test_failing_container_deletion_still_removes_the_snapshot(
         self, fake: FakeContainerd
