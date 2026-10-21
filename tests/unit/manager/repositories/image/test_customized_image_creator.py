@@ -589,3 +589,193 @@ class TestImageOwnershipGraph:
         )
 
         assert await self._kind_and_creator(db_with_cleanup, image_id) == (True, None)
+<<<<<<< HEAD
+=======
+
+    async def test_a_scanned_image_owned_by_an_unknown_user_is_created_without_a_creator(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+        registry_id: ContainerRegistryID,
+    ) -> None:
+        canonical = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:a"
+
+        scanned = await self._commit_rescan(
+            db_with_cleanup,
+            registry_id,
+            {ImageIdentifier(canonical, "x86_64"): self._scan_payload(UserID(uuid4()))},
+        )
+
+        assert [(image.customized, image.creator_id) for image in scanned] == [(True, None)]
+        assert await self._owning_projects(db_with_cleanup, scanned[0].id) == []
+
+    async def test_an_unknown_owner_leaves_the_other_scanned_images_registered(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+        registry_id: ContainerRegistryID,
+    ) -> None:
+        unknown = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:a"
+        plain = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:b"
+
+        scanned = await self._commit_rescan(
+            db_with_cleanup,
+            registry_id,
+            {
+                ImageIdentifier(unknown, "x86_64"): self._scan_payload(UserID(uuid4())),
+                ImageIdentifier(plain, "x86_64"): self._scan_payload(None),
+            },
+        )
+
+        assert {(str(image.name), image.customized, image.creator_id) for image in scanned} == {
+            (unknown, True, None),
+            (plain, False, None),
+        }
+
+    async def test_rescanning_an_image_whose_creator_was_purged_clears_the_creator(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+        registry_id: ContainerRegistryID,
+    ) -> None:
+        owner_id = await self._create_user(db_with_cleanup, domain_id, "owner@test.io")
+        image_id, canonical = await self._create_image(
+            db_with_cleanup, registry_id, "a", owner_user_id=owner_id
+        )
+        async with db_with_cleanup.begin_session() as sess:
+            await sess.execute(sa.delete(UserRow).where(UserRow.uuid == owner_id))
+            await sess.commit()
+
+        await self._commit_rescan(
+            db_with_cleanup,
+            registry_id,
+            {ImageIdentifier(canonical, "x86_64"): self._scan_payload(owner_id)},
+        )
+
+        assert await self._kind_and_creator(db_with_cleanup, image_id) == (True, None)
+
+
+class TestScanImage:
+    @pytest.fixture
+    def source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ImageDBSource:
+        return ImageDBSource(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
+
+    @pytest.fixture
+    def registry_manifests(self) -> Iterator[_RegistrySession]:
+        repository = "/v2/stable/python"
+        replies = {
+            "/v2/": _Reply(),
+            f"{repository}/manifests/latest": _Reply(
+                payload={
+                    "manifests": [
+                        {
+                            "digest": f"sha256:{arch}",
+                            "platform": {"os": "linux", "architecture": arch},
+                        }
+                        for arch in ("amd64", "arm64")
+                    ]
+                },
+                headers={"Content-Type": BaseContainerRegistry.MEDIA_TYPE_DOCKER_MANIFEST_LIST},
+            ),
+        }
+        for arch in ("amd64", "arm64"):
+            replies[f"{repository}/manifests/sha256:{arch}"] = _Reply(
+                payload={"config": {"digest": f"sha256:config-{arch}", "size": 10}, "layers": []}
+            )
+            replies[f"{repository}/blobs/sha256:config-{arch}"] = _Reply(
+                payload={"architecture": arch, "config": {"Labels": {}}}
+            )
+        session = _RegistrySession(replies)
+        with _serving(session):
+            yield session
+
+    @pytest.mark.parametrize(
+        "architecture, expected_architecture",
+        [("x86_64", "x86_64"), ("aarch64", "aarch64"), ("arm64", "aarch64")],
+    )
+    async def test_scan_registers_new_image_and_returns_requested_architecture(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        registry_id: ContainerRegistryID,
+        source: ImageDBSource,
+        registry_manifests: _RegistrySession,
+        architecture: str,
+        expected_architecture: str,
+    ) -> None:
+        canonical = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python"
+
+        image = await source.scan_image(canonical, architecture)
+
+        assert image.architecture == expected_architecture
+        assert str(image.name) == canonical + ":latest"
+        async with db_with_cleanup.begin_readonly_session() as session:
+            rows = (await session.scalars(sa.select(ImageRow))).all()
+            assert {row.architecture for row in rows} == {"x86_64", "aarch64"}
+            assert any(
+                row.id == image.id and row.architecture == expected_architecture for row in rows
+            )
+
+    async def test_scan_existing_image_preserves_id_without_duplicates(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        registry_id: ContainerRegistryID,
+        source: ImageDBSource,
+        registry_manifests: _RegistrySession,
+    ) -> None:
+        canonical = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:latest"
+        first = await source.scan_image(canonical, "x86_64")
+
+        second = await source.scan_image(canonical, "x86_64")
+
+        assert second.id == first.id
+        assert second.architecture == "x86_64"
+        async with db_with_cleanup.begin_readonly_session() as session:
+            assert await session.scalar(sa.select(sa.func.count()).select_from(ImageRow)) == 2
+
+    @pytest.mark.parametrize("canonical", ["unknown.example/stable/python:latest", REGISTRY_NAME])
+    async def test_canonical_scan_never_falls_back_to_registry_scan(
+        self,
+        registry_id: ContainerRegistryID,
+        source: ImageDBSource,
+        canonical: str,
+    ) -> None:
+        session = _RegistrySession({})
+        with _serving(session):
+            with pytest.raises(RegistryNotFoundForImage):
+                await source.scan_image(canonical, "x86_64")
+        assert not session.requested
+
+    async def test_canonical_scan_rejects_duplicate_registry_rows(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        registry_id: ContainerRegistryID,
+        source: ImageDBSource,
+    ) -> None:
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                ContainerRegistryRow(
+                    id=ContainerRegistryID(uuid4()),
+                    url=f"https://{REGISTRY_NAME}",
+                    registry_name=REGISTRY_NAME,
+                    type=ContainerRegistryType.DOCKER,
+                    project=REGISTRY_PROJECT,
+                    is_global=True,
+                )
+            )
+        with pytest.raises(InternalServerError):
+            await source.scan_image(f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:latest", "x86_64")
+
+    @pytest.mark.parametrize("tag, architecture", [("latest", "s390x"), ("removed", "x86_64")])
+    async def test_scan_missing_image_raises_image_not_found(
+        self,
+        registry_id: ContainerRegistryID,
+        source: ImageDBSource,
+        registry_manifests: _RegistrySession,
+        tag: str,
+        architecture: str,
+    ) -> None:
+        with pytest.raises(ImageNotFound):
+            await source.scan_image(
+                f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:{tag}", architecture
+            )
+>>>>>>> 39d84447 (fix(BA-8659): write no creator for a rescanned image whose owner is unknown (#15958))
