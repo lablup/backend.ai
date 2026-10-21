@@ -31,7 +31,7 @@ class SystemSessionEnvironSeed(SeedItem):
     enabled: bool
 
     @model_validator(mode="after")
-    def _scope_id_matches_scope_type(self) -> Self:
+    def _validate_scope_id_for_scope_type(self) -> Self:
         """The public scope is named, not stated by id, so the file fails ``seed check``."""
         if (self.scope_type is SystemSessionEnvironScopeType.PUBLIC) != (self.scope_id is None):
             raise ValueError("scope_id is left out for public and stated for domain and project")
