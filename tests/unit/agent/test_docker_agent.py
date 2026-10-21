@@ -4,9 +4,13 @@ Unit tests for `ai.backend.agent.docker.agent` helpers.
 
 from __future__ import annotations
 
+import sys
 from http import HTTPStatus
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any, cast
+from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
 
 import pytest
 from aiodocker.exceptions import DockerError
@@ -17,11 +21,14 @@ from ai.backend.agent.config.unified import (
     ContainerLogsConfig,
 )
 from ai.backend.agent.docker.agent import (
+    DockerAgent,
     DockerKernelCreationContext,
     LogDriverOptions,
     _build_log_config,
+    _clean_scratch,
     _parse_distro_from_ldd_output,
 )
+from ai.backend.common.types import ContainerId, KernelId
 
 LDD_PRELOAD_ERROR_LINES = "\n".join([
     "ERROR: ld.so: object '/opt/kernel/libbaihook.so' from LD_PRELOAD cannot be preloaded"
@@ -364,3 +371,109 @@ class TestBuildLogConfig:
 
         assert dumped == expected
         assert type(dumped["Type"]) is str
+
+
+class _GoneContainerDocker:
+    """A Docker client whose container delete fails with ``error``."""
+
+    containers: MagicMock
+
+    def __init__(self, error: DockerError) -> None:
+        container = MagicMock()
+        container.delete = AsyncMock(side_effect=error)
+        self.containers = MagicMock()
+        self.containers.container.return_value = container
+
+    async def close(self) -> None:
+        pass
+
+
+def _cleanable_agent() -> SimpleNamespace:
+    return SimpleNamespace(
+        _invalidate_cgroup_path_cache=MagicMock(),
+        collect_logs=AsyncMock(),
+        kernel_registry={},
+        local_config=SimpleNamespace(
+            debug=SimpleNamespace(skip_container_deletion=False),
+            container=SimpleNamespace(scratch_type="hostdir", scratch_root="/scratch"),
+        ),
+    )
+
+
+class TestAContainerAlreadyGoneStillReturnsItsScratch:
+    """A container already gone is what the delete wanted; the scratch below it must still go.
+    A removal already in progress belongs to another clean, which owns the scratch."""
+
+    async def _clean(self, error: DockerError, restarting: bool) -> AsyncMock:
+        clean_scratch = AsyncMock()
+        with (
+            patch("ai.backend.agent.docker.agent.Docker", lambda: _GoneContainerDocker(error)),
+            patch("ai.backend.agent.docker.agent._clean_scratch", clean_scratch),
+        ):
+            await DockerAgent.clean_kernel(
+                cast(Any, _cleanable_agent()), KernelId(uuid4()), ContainerId("cid-1"), restarting
+            )
+        return clean_scratch
+
+    async def test_the_scratch_is_cleaned_when_the_container_is_not_found(self) -> None:
+        clean_scratch = await self._clean(
+            DockerError(HTTPStatus.NOT_FOUND, "No such container"), restarting=False
+        )
+        clean_scratch.assert_awaited_once()
+
+    async def test_the_scratch_is_kept_for_a_restarting_kernel(self) -> None:
+        clean_scratch = await self._clean(
+            DockerError(HTTPStatus.NOT_FOUND, "No such container"), restarting=True
+        )
+        clean_scratch.assert_not_awaited()
+
+    async def test_a_removal_in_progress_leaves_the_scratch_to_its_owner(self) -> None:
+        clean_scratch = await self._clean(
+            DockerError(HTTPStatus.CONFLICT, "removal of container cid-1 is already in progress"),
+            restarting=False,
+        )
+        clean_scratch.assert_not_awaited()
+
+
+@pytest.mark.skipif(not sys.platform.startswith("linux"), reason="hostfile scratch is linux-only")
+class TestCleaningAHostfileScratch:
+    """A hostfile scratch an earlier clean already removed counts as cleaned;
+    a scratch still mounted whose umount fails is still an error."""
+
+    @pytest.fixture
+    def kernel_id(self) -> KernelId:
+        return KernelId(uuid4())
+
+    async def test_a_second_clean_of_a_removed_scratch_succeeds(
+        self, tmp_path: Path, kernel_id: KernelId
+    ) -> None:
+        spawn = AsyncMock()
+        with patch("ai.backend.agent.scratch.utils.asyncio.create_subprocess_exec", spawn):
+            await _clean_scratch("hostfile", tmp_path, kernel_id)
+        spawn.assert_not_awaited()
+
+    async def test_unmounted_leftovers_are_removed(
+        self, tmp_path: Path, kernel_id: KernelId
+    ) -> None:
+        (tmp_path / str(kernel_id)).mkdir()
+        (tmp_path / f"{kernel_id}.img").touch()
+
+        await _clean_scratch("hostfile", tmp_path, kernel_id)
+
+        assert list(tmp_path.iterdir()) == []
+
+    async def test_a_failed_umount_of_a_mounted_scratch_raises(
+        self, tmp_path: Path, kernel_id: KernelId
+    ) -> None:
+        (tmp_path / str(kernel_id)).mkdir()
+        umount = MagicMock()
+        umount.wait = AsyncMock(return_value=32)
+        with (
+            patch("ai.backend.agent.scratch.utils.os.path.ismount", return_value=True),
+            patch(
+                "ai.backend.agent.scratch.utils.asyncio.create_subprocess_exec",
+                AsyncMock(return_value=umount),
+            ),
+            pytest.raises(RuntimeError, match="umount failed"),
+        ):
+            await _clean_scratch("hostfile", tmp_path, kernel_id)
