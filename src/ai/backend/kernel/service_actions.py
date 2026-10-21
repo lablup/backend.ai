@@ -3,36 +3,36 @@ import logging
 import sys
 import tempfile
 from asyncio import create_subprocess_exec, subprocess
-from collections.abc import Iterable, Mapping, MutableMapping
+from collections.abc import Iterable, MutableMapping
 from pathlib import Path
-from typing import Any
 
+from .interpolation.base import AbstractServiceInterpolator
 from .logging import BraceStyleAdapter
 
 logger = BraceStyleAdapter(logging.getLogger())
 
 
 async def write_file(
-    variables: Mapping[str, Any],
+    interpolator: AbstractServiceInterpolator,
     filename: str,
     body: Iterable[str],
     mode: str = "644",
     append: bool = False,
 ) -> None:
-    filename = filename.format_map(variables)
+    filename = interpolator.render(filename)
     open_mode = "w" + ("+" if append else "")
     filepath = Path(filename)
 
     def _write() -> None:
         with filepath.open(open_mode) as fw:
-            fw.writelines(line.format_map(variables) + "\n" for line in body)
+            fw.writelines(interpolator.render(line) + "\n" for line in body)
         filepath.chmod(int(mode, 8))
 
     await asyncio.to_thread(_write)
 
 
 async def write_tempfile(
-    variables: Mapping[str, Any],
+    interpolator: AbstractServiceInterpolator,
     body: Iterable[str],
     mode: str = "644",
 ) -> str | None:
@@ -41,7 +41,7 @@ async def write_tempfile(
             "w", encoding="utf-8", suffix=".py", delete=False
         ) as config:
             for line in body:
-                config.write(line.format_map(variables))
+                config.write(interpolator.render(line))
         Path(config.name).chmod(int(mode, 8))
         return config.name
 
@@ -49,12 +49,12 @@ async def write_tempfile(
 
 
 async def run_command(
-    variables: Mapping[str, Any],
+    interpolator: AbstractServiceInterpolator,
     command: Iterable[str],
     echo: bool = False,
 ) -> MutableMapping[str, str] | None:
     proc = await create_subprocess_exec(
-        *(str(piece).format_map(variables) for piece in command),
+        *(interpolator.render(str(piece)) for piece in command),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
     )
@@ -68,18 +68,18 @@ async def run_command(
 
 
 async def mkdir(
-    variables: Mapping[str, Any],
+    interpolator: AbstractServiceInterpolator,
     path: str,
 ) -> None:
-    Path(path.format_map(variables)).mkdir(parents=True, exist_ok=True)
+    Path(interpolator.render(path)).mkdir(parents=True, exist_ok=True)
 
 
 async def log(
-    variables: Mapping[str, Any],
+    interpolator: AbstractServiceInterpolator,
     message: str,
     debug: bool = False,
 ) -> None:
-    message = message.format_map(variables).replace("{", "{{").replace("}", "}}")
+    message = interpolator.render(message).replace("{", "{{").replace("}", "}}")
     if debug:
         logger.debug(message)
     else:
