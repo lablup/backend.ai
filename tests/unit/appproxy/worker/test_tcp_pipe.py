@@ -366,6 +366,45 @@ class TestTCPPipe:
         writer.close.assert_called_once()
         writer.wait_closed.assert_awaited_once()
 
+    async def test_upstream_connect_failure_logs_one_warning_and_closes_client(
+        self,
+        root_context: MagicMock,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        circuit = _create_circuit(1)
+        backend = TCPBackend(circuit.route_info, root_context, circuit)
+        record_failure = MagicMock()
+        monkeypatch.setattr(backend._pool, "record_failure", record_failure)
+        refused = ConnectionRefusedError(errno.ECONNREFUSED, "Connection refused")
+
+        async def refuse(*_args: Any) -> None:
+            raise refused
+
+        monkeypatch.setattr(
+            "ai.backend.appproxy.worker.proxy.backend.tcp.run_in_executor_with_context", refuse
+        )
+        down_writer = MagicMock()
+        down_writer.wait_closed = AsyncMock()
+
+        try:
+            with caplog.at_level(logging.DEBUG):
+                await asyncio.wait_for(backend.bind(asyncio.StreamReader(), down_writer), TIMEOUT)
+        finally:
+            await backend.close()
+
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert len(warnings) == 1
+        record = warnings[0]
+        fields = vars(record)
+        assert record.getMessage() == "failed to connect to the TCP upstream"
+        assert fields["log_tag_circuit_id"] == str(circuit.id)
+        assert fields["log_tag_route_id"] == str(circuit.route_info[0].route_id)
+        assert fields["log_tag_error"] == repr(refused)
+        record_failure.assert_called_once()
+        down_writer.close.assert_called_once()
+        down_writer.wait_closed.assert_awaited_once()
+
     async def test_stop_returns_with_open_half_closed_connection(
         self,
         root_context: MagicMock,

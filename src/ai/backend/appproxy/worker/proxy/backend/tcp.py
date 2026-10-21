@@ -100,7 +100,12 @@ class TCPBackend(BaseBackend):
                 )
             except OSError as e:
                 self._pool.record_failure(route)
-                log.trace("app refused the connection: {!r}", e, route_id=route.route_id)
+                log.warning(
+                    "failed to connect to the TCP upstream",
+                    circuit_id=self.circuit.id,
+                    route_id=route.route_id,
+                    error=repr(e),
+                )
                 sock.close()
                 return
 
