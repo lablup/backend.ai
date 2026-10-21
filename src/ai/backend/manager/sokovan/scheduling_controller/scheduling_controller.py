@@ -76,6 +76,7 @@ from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.merge_
 )
 from ai.backend.manager.sokovan.scheduling_controller.preparers.session_spec_preparer import (
     SessionSpecPreparer,
+    SessionSpecPreparerArgs,
 )
 from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.assign_container_user_mapping_rule import (
     AssignContainerUserMappingRule,
@@ -192,26 +193,31 @@ class SchedulingController:
         self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
         # Draft-based spec preparer. Order matters — RG defaults merge
-        # first so later rules see the merged baseline; expand last on
-        # the options side so kernel specs exist before per-kernel rules
-        # run. The resource rules determine resource amounts (identity
-        # included so the draft can be promoted) and are runnable alone
-        # via prepare_resources() for the fitting check.
+        # first so the pre-expand rules see the merged baseline; those
+        # rules complete each group before expansion so a stored group
+        # and its kernels hold the same values; the per-kernel spec
+        # rules run after expansion. The resource rules determine
+        # resource amounts and run with expansion alone via
+        # prepare_resources() for the fitting check.
         self._spec_preparer = SessionSpecPreparer(
-            resource_rules=(
-                MergeResourceGroupDefaultsRule(),
-                ComputeKernelResourcesRule(),
-                DropZeroResourceSlotsRule(),
-                ExpandKernelGroupsRule(),
-            ),
-            spec_rules=(
-                AssignUserIdentityRule(),
-                AssignNetworkConfigRule(),
-                AssignContainerUserMappingRule(),
-                InjectSessionEnvironRule(),
-                BuildInternalDataRule(),
-                ResolveVFolderMountsRule(),
-            ),
+            SessionSpecPreparerArgs(
+                resource_rules=(
+                    MergeResourceGroupDefaultsRule(),
+                    ComputeKernelResourcesRule(),
+                    DropZeroResourceSlotsRule(),
+                ),
+                pre_expand_spec_rules=(
+                    InjectSessionEnvironRule(),
+                    ResolveVFolderMountsRule(),
+                ),
+                expand_rule=ExpandKernelGroupsRule(),
+                spec_rules=(
+                    AssignUserIdentityRule(),
+                    AssignNetworkConfigRule(),
+                    AssignContainerUserMappingRule(),
+                    BuildInternalDataRule(),
+                ),
+            )
         )
 
         # Draft-based spec validator chain. Runs against the finalized
