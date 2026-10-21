@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import html
 import logging
 import time
 from collections.abc import AsyncIterator
@@ -13,7 +14,6 @@ from aiohttp import ClientConnectorError, web
 from multidict import CIMultiDict
 from yarl import URL
 
-from ai.backend.appproxy.common.errors import ContainerConnectionRefused
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.common.clients.http_client.client_pool import (
     ClientKey,
@@ -131,6 +131,20 @@ class HTTPBackend(BaseBackend):
         async with client_session.ws_connect(request.rel_url, protocols=protocols) as ws:
             yield ws
 
+    def _unreachable_response(self, route: RouteInfo) -> web.Response:
+        app = html.escape(self.circuit.app)
+        return web.Response(
+            status=502,
+            content_type="text/html",
+            text=(
+                "<!DOCTYPE html><html><head><title>App not reachable</title></head><body>"
+                f"<h1>The app &quot;{app}&quot; is not reachable</h1>"
+                "<p>State: unreachable</p>"
+                f"<p>Session: {route.session_id}</p>"
+                "</body></html>"
+            ),
+        )
+
     async def proxy_http(self, frontend_request: web.Request) -> web.StreamResponse:
         protocol = self.get_x_forwarded_proto(frontend_request)
         host = self.get_x_forwarded_host(frontend_request)
@@ -241,10 +255,10 @@ class HTTPBackend(BaseBackend):
         except ConnectionResetError as e:
             self._pool.record_failure(route)
             raise asyncio.CancelledError() from e
-        except aiohttp.ClientOSError as e:
+        except (aiohttp.ClientOSError, TimeoutError) as e:
             self._pool.record_failure(route)
-            log.trace("app refused the connection: {!r}", e, route_id=route.route_id)
-            raise ContainerConnectionRefused from e
+            log.trace("app is unreachable: {!r}", e, route_id=route.route_id)
+            return self._unreachable_response(route)
         except Exception:
             log.exception("failed to proxy an HTTP request", route_id=route.route_id)
             raise
