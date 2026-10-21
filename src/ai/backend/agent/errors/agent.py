@@ -68,6 +68,11 @@ class ContainerCreationFailedError(BackendAIError, web.HTTPInternalServerError):
     error_type = "https://api.backend.ai/probs/agent/container-creation-failed"
     error_title = "Container creation failed."
 
+    def __init__(self, extra_msg: str | None = None, *, failure_reason: str | None = None) -> None:
+        if failure_reason is not None:
+            extra_msg = f"{failure_reason}: {extra_msg}" if extra_msg else failure_reason
+        super().__init__(extra_msg)
+
     @override
     def error_code(self) -> ErrorCode:
         return ErrorCode(

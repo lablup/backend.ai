@@ -21,19 +21,26 @@ from pytest_mock import MockerFixture
 from tenacity import TryAgain
 
 from ai.backend.agent.containerd import kernel as kernel_module
+from ai.backend.agent.containerd.client import TaskInfo, TaskState
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.profile.base import LaunchPlan, TlsConnectReadiness
+from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.errors.containerd import (
     ContainerdOperationFailed,
+    KernelTaskExited,
     KernelVerbNotSupported,
     ReadinessTimeout,
 )
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.types import KernelId, ServicePortProtocols
 
+from .fakes import FakeContainerd
+
 
 @pytest.fixture
-def kernel(ownership_data: KernelOwnershipData, launch_plan: LaunchPlan) -> ContainerdKernel:
+def kernel(
+    ownership_data: KernelOwnershipData, launch_plan: LaunchPlan, fake: FakeContainerd
+) -> ContainerdKernel:
     return ContainerdKernel(
         ownership_data,
         "net-1",
@@ -45,6 +52,8 @@ def kernel(ownership_data: KernelOwnershipData, launch_plan: LaunchPlan) -> Cont
         environ={},
         data={},
         launch_plan=launch_plan,
+        profile=RuncProfile(1.0),
+        client=fake,
     )
 
 
@@ -419,3 +428,122 @@ class TestCheckStatusTls:
 
         with pytest.raises(ContainerdOperationFailed, match="published host"):
             await tls_kernel.check_status()
+
+
+class TestCheckStatusTlsTaskExit:
+    """A task that exited ends the TLS readiness wait instead of running it out."""
+
+    @pytest.fixture
+    def running(self, tls_kernel: ContainerdKernel, fake: FakeContainerd) -> str:
+        container_id = "kid-1234abcd"
+        tls_kernel.data["container_id"] = container_id
+        fake.tasks[container_id] = TaskInfo(pid=1000, state=TaskState.RUNNING, exit_status=0)
+        _publish(tls_kernel, 30001)
+        return container_id
+
+    async def test_running_task_keeps_retrying(
+        self, tls_kernel: ContainerdKernel, running: str, fast_probe: None, refused: FakeConnect
+    ) -> None:
+        with pytest.raises(TryAgain):
+            await tls_kernel.check_status()
+
+        assert refused.calls >= 2
+
+    async def test_stopped_task_fails_with_its_exit_status(
+        self,
+        tls_kernel: ContainerdKernel,
+        fake: FakeContainerd,
+        running: str,
+        fast_probe: None,
+        refused: FakeConnect,
+    ) -> None:
+        fake.tasks[running] = TaskInfo(pid=1000, state=TaskState.STOPPED, exit_status=137)
+
+        with pytest.raises(KernelTaskExited, match="status 137") as exc_info:
+            await tls_kernel.check_status()
+
+        assert not isinstance(exc_info.value, TryAgain)
+        assert refused.calls == 1
+        assert exc_info.value.exit_status == 137
+
+    async def test_task_exiting_between_calls_ends_the_wait(
+        self,
+        tls_kernel: ContainerdKernel,
+        fake: FakeContainerd,
+        running: str,
+        fast_probe: None,
+        refused: FakeConnect,
+    ) -> None:
+        with pytest.raises(TryAgain):
+            await tls_kernel.check_status()
+        fake.tasks[running] = TaskInfo(pid=1000, state=TaskState.STOPPED, exit_status=1)
+
+        with pytest.raises(KernelTaskExited):
+            await tls_kernel.check_status()
+
+    async def test_missing_task_fails(
+        self,
+        tls_kernel: ContainerdKernel,
+        fake: FakeContainerd,
+        running: str,
+        fast_probe: None,
+        refused: FakeConnect,
+    ) -> None:
+        del fake.tasks[running]
+
+        with pytest.raises(KernelTaskExited, match="gone") as exc_info:
+            await tls_kernel.check_status()
+
+        assert exc_info.value.exit_status is None
+
+    async def test_failed_task_lookup_keeps_retrying(
+        self,
+        tls_kernel: ContainerdKernel,
+        fake: FakeContainerd,
+        running: str,
+        fast_probe: None,
+        refused: FakeConnect,
+        mocker: MockerFixture,
+    ) -> None:
+        mocker.patch.object(fake, "get_task", side_effect=ContainerdOperationFailed("rpc"))
+
+        with pytest.raises(TryAgain):
+            await tls_kernel.check_status()
+
+    async def test_unknown_container_id_skips_the_lookup(
+        self, tls_kernel: ContainerdKernel, fast_probe: None, refused: FakeConnect
+    ) -> None:
+        _publish(tls_kernel, 30001)
+
+        with pytest.raises(TryAgain):
+            await tls_kernel.check_status()
+
+    async def test_ready_kernel_never_looks_up_the_task(
+        self,
+        tls_kernel: ContainerdKernel,
+        fake: FakeContainerd,
+        tls_server: int,
+        mocker: MockerFixture,
+    ) -> None:
+        mocker.patch.object(fake, "get_task", side_effect=AssertionError("must not run"))
+        tls_kernel.data["container_id"] = "kid-1234abcd"
+        _publish(tls_kernel, tls_server)
+
+        assert await tls_kernel.check_status() == {}
+
+    @pytest.mark.parametrize("state", [TaskState.CREATED, TaskState.UNKNOWN])
+    async def test_not_yet_running_task_keeps_retrying(
+        self,
+        tls_kernel: ContainerdKernel,
+        fake: FakeContainerd,
+        running: str,
+        fast_probe: None,
+        refused: FakeConnect,
+        state: TaskState,
+    ) -> None:
+        fake.tasks[running] = TaskInfo(pid=0, state=state, exit_status=0)
+
+        with pytest.raises(TryAgain):
+            await tls_kernel.check_status()
+
+        assert refused.calls >= 2

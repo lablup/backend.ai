@@ -10,9 +10,16 @@ from typing import Any, Final, override
 
 from tenacity import TryAgain
 
-from ai.backend.agent.containerd.profile.base import LaunchPlan, TlsConnectReadiness
+from ai.backend.agent.containerd.client import ContainerdAPI, TaskState
+from ai.backend.agent.containerd.profile.base import (
+    LaunchPlan,
+    RuntimeProfile,
+    TlsConnectReadiness,
+    describe_profile_failure,
+)
 from ai.backend.agent.errors.containerd import (
     ContainerdOperationFailed,
+    KernelTaskExited,
     KernelVerbNotSupported,
     ReadinessTimeout,
 )
@@ -22,6 +29,7 @@ from ai.backend.agent.types import AgentEventData, KernelOwnershipData
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import CommitStatus, KernelId
 from ai.backend.logging.structured import StructuredLogger
 
@@ -39,6 +47,8 @@ _TLS_RETRY_INTERVAL_SEC: Final = 1.0
 
 class ContainerdKernel(AbstractKernel):
     launch_plan: LaunchPlan
+    _profile: RuntimeProfile
+    _client: ContainerdAPI
     _readiness_deadline: float | None
 
     def __init__(
@@ -54,6 +64,8 @@ class ContainerdKernel(AbstractKernel):
         environ: Mapping[str, Any],
         data: dict[str, Any],
         launch_plan: LaunchPlan,
+        profile: RuntimeProfile,
+        client: ContainerdAPI,
     ) -> None:
         super().__init__(
             ownership_data,
@@ -67,6 +79,9 @@ class ContainerdKernel(AbstractKernel):
             environ=environ,
         )
         self.launch_plan = launch_plan
+        self._profile = profile
+        # Process-local handle; never pickled because the containerd agent does not persist its kernel registry.
+        self._client = client
         self._readiness_deadline = None
 
     @override
@@ -124,6 +139,36 @@ class ContainerdKernel(AbstractKernel):
             f"the kernel has no published service port {readiness.port_name!r}"
         )
 
+    async def _raise_if_task_exited(self) -> None:
+        # A task that exited can never answer the handshake, so end the wait instead of
+        # running it out to the profile's timeout.
+        container_id = self.data.get("container_id")
+        if not container_id:
+            return
+        try:
+            task = await self._client.get_task(container_id)
+        except BackendAIError as e:
+            log.debug(
+                "kernel task lookup failed",
+                kernel_id=str(self.kernel_id),
+                error=repr(e),
+            )
+            return
+        if task is None:
+            message = f"the kernel task is gone (container {container_id})"
+            raise KernelTaskExited(
+                message, failure_reason=describe_profile_failure(self._profile, None, message)
+            )
+        if task.state is TaskState.STOPPED:
+            message = (
+                f"the kernel task exited with status {task.exit_status} (container {container_id})"
+            )
+            raise KernelTaskExited(
+                message,
+                exit_status=task.exit_status,
+                failure_reason=describe_profile_failure(self._profile, task.exit_status, message),
+            )
+
     async def _check_tls_status(self, readiness: TlsConnectReadiness) -> dict[str, Any]:
         loop = asyncio.get_running_loop()
         host, port = self._tls_target(readiness)
@@ -149,6 +194,7 @@ class ContainerdKernel(AbstractKernel):
                     port=port,
                     error=repr(e),
                 )
+                await self._raise_if_task_exited()
                 now = loop.time()
                 if now >= deadline:
                     raise ReadinessTimeout(
