@@ -1749,18 +1749,7 @@ class AbstractAgent[
             for computer_ctx in self.computers.values():
                 computer_ctx.alloc_map.clear()
             for kernel_id, container in containers:
-                for computer_ctx in self.computers.values():
-                    try:
-                        await computer_ctx.instance.restore_from_container(
-                            container,
-                            computer_ctx.alloc_map,
-                        )
-                    except Exception:
-                        log.warning(
-                            "kernel resource info read failed",
-                            kernel_id=kernel_id,
-                            container_id=container.id,
-                        )
+                await self._restore_container_resources(kernel_id, container, strict=False)
 
     async def sync_container_lifecycles(self) -> None:
         """
@@ -2269,22 +2258,8 @@ class AbstractAgent[
                     for p in container.ports:
                         if p.host_port is not None:
                             self.port_pool.discard(p.host_port)
-                    # Restore compute resources.
                     async with self.resource_lock:
-                        for computer_ctx in self.computers.values():
-                            try:
-                                await computer_ctx.instance.restore_from_container(
-                                    container,
-                                    computer_ctx.alloc_map,
-                                )
-                            except FileNotFoundError:
-                                log.warning(
-                                    "kernel resource info read failed",
-                                    kernel_id=kernel_id,
-                                    session_id=session_id,
-                                    container_id=container.id,
-                                )
-                                continue
+                        await self._restore_container_resources(kernel_id, container)
                     await self.inject_container_lifecycle_event(
                         kernel_id,
                         session_id,
@@ -2313,6 +2288,32 @@ class AbstractAgent[
                 device_name=computer_name,
                 allocations=str(dict(computer_ctx.alloc_map.allocations)),
             )
+
+    async def _restore_container_resources(
+        self,
+        kernel_id: KernelId,
+        container: Container,
+        *,
+        strict: bool = True,
+    ) -> None:
+        """Re-apply a container's allocations; the caller holds resource_lock.
+
+        Warns and continues on FileNotFoundError, or on any Exception if not ``strict``."""
+        tolerate = FileNotFoundError if strict else Exception
+        for computer_ctx in self.computers.values():
+            try:
+                await computer_ctx.instance.restore_from_container(
+                    container,
+                    computer_ctx.alloc_map,
+                )
+            except tolerate as e:
+                log.warning(
+                    "kernel resource info read failed",
+                    kernel_id=kernel_id,
+                    session_id=container.labels.get(LabelName.SESSION_ID),
+                    container_id=container.id,
+                    error_repr=repr(e),
+                )
 
     @abstractmethod
     async def init_kernel_context(

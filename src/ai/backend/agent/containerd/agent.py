@@ -53,6 +53,7 @@ from ai.backend.agent.containerd.scratch import (
     Owner,
     ScratchDirs,
     create_scratch,
+    read_resource_spec,
     remove_scratch,
     write_config_files,
     write_dotfiles,
@@ -683,6 +684,34 @@ class ContainerdAgent(
                 snapshotter=containerd_config.snapshotter,
             )
         )
+
+    @override
+    async def _restore_container_resources(
+        self,
+        kernel_id: KernelId,
+        container: Container,
+        *,
+        strict: bool = True,
+    ) -> None:
+        """Restore from resource.txt; accelerator plugins' restore expects a Docker container.
+
+        The plugin hook is not called; a read failure always warns and continues."""
+        try:
+            spec = await read_resource_spec(container.labels)
+        except Exception as e:
+            log.warning(
+                "kernel resource info read failed",
+                kernel_id=kernel_id,
+                session_id=container.labels.get(LabelName.SESSION_ID),
+                container_id=container.id,
+                error_repr=repr(e),
+            )
+            return
+        if spec is None:
+            return
+        for device_name, allocation in spec.allocations.items():
+            if (computer_ctx := self.computers.get(device_name)) is not None:
+                computer_ctx.alloc_map.apply_allocation(allocation)
 
     @override
     async def __ainit__(self) -> None:

@@ -13,6 +13,8 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pytest_mock import MockerFixture
 
+from ai.backend.agent.agent import AbstractAgent
+from ai.backend.agent.alloc_map import DiscretePropertyAllocMap
 from ai.backend.agent.config.unified import ContainerdConfig
 from ai.backend.agent.containerd import agent as agent_module
 from ai.backend.agent.containerd.agent import HOST_PORTS_LABEL, ContainerdAgent, _kernel_slots
@@ -21,25 +23,32 @@ from ai.backend.agent.containerd.network import KernelNetwork
 from ai.backend.agent.containerd.profile.base import KernelLaunch, LaunchPlan, RuntimeProfile
 from ai.backend.agent.containerd.profile.loader import select_profile
 from ai.backend.agent.containerd.profile.runc import RuncProfile
+from ai.backend.agent.containerd.scratch import CONFIG_DIR_LABEL
 from ai.backend.agent.errors.agent import UnsupportedBaseDistroError
 from ai.backend.agent.errors.containerd import KernelVerbNotSupported, ProfileNotApplicable
 from ai.backend.agent.port_pool import PortPool
-from ai.backend.agent.types import KernelOwnershipData
+from ai.backend.agent.resources import ComputerContext, DeviceSlotInfo, KernelResourceSpec
+from ai.backend.agent.types import Container, KernelOwnershipData
 from ai.backend.common.types import (
     AgentId,
     AutoPullBehavior,
     ContainerId,
     ContainerStatus,
+    DeviceId,
+    DeviceName,
     ImageConfig,
     KernelCreationConfig,
     KernelId,
+    ResourceSlot,
     SlotName,
+    SlotTypes,
 )
 
 from .conftest import FakeProfile
 from .fakes import FakeCommandRunner, FakeContainerd
 
 TDX = SlotName("confidential.tdx")
+GPU = SlotName("cuda.shares")
 
 
 @pytest.fixture
@@ -697,3 +706,176 @@ class TestAinit:
 
         assert await agent.enumerate_containers() == []
         assert fake.calls == []
+
+
+def _gpu_context() -> ComputerContext:
+    """An accelerator plugin that, like cuda_vfio, can only inspect a Docker container."""
+    plugin = MagicMock()
+    plugin.restore_from_container = AsyncMock(side_effect=TypeError("not a docker container"))
+    alloc_map = DiscretePropertyAllocMap(
+        device_slots={
+            DeviceId("0"): DeviceSlotInfo(SlotTypes.COUNT, GPU, Decimal(1)),
+            DeviceId("1"): DeviceSlotInfo(SlotTypes.COUNT, GPU, Decimal(1)),
+        },
+    )
+    return ComputerContext(instance=plugin, devices=[], alloc_map=alloc_map)
+
+
+def _add_gpu_container(
+    agent: ContainerdAgent,
+    tmp_path: Path,
+    name: str,
+    device_id: str,
+    *,
+    resource_txt: bool = True,
+    config_label: bool = True,
+) -> None:
+    fake = cast(FakeContainerd, agent._client)
+    _add_container(fake, name, state=TaskState.RUNNING, session_id=str(uuid.uuid4()))
+    config = tmp_path / name
+    config.mkdir()
+    if resource_txt:
+        spec = KernelResourceSpec(
+            allocations={DeviceName("cuda"): {GPU: {DeviceId(device_id): Decimal(1)}}},
+            slots=ResourceSlot({GPU: Decimal(1)}),
+            mounts=[],
+            scratch_disk_size=0,
+        )
+        (config / "resource.txt").write_text(spec.write_to_string())
+    if config_label:
+        record = fake.containers[name]
+        fake.containers[name] = dataclasses.replace(
+            record, labels={**record.labels, CONFIG_DIR_LABEL: str(config)}
+        )
+
+
+def _held(context: ComputerContext, device_id: str) -> Decimal:
+    return context.alloc_map.allocations[GPU][DeviceId(device_id)]
+
+
+class TestRestoreContainerResources:
+    @pytest.fixture
+    def gpu(self, agent: ContainerdAgent) -> ComputerContext:
+        context = _gpu_context()
+        agent.computers = {DeviceName("cuda"): context}
+        return context
+
+    @pytest.fixture
+    def scan_agent(
+        self, agent: ContainerdAgent, monkeypatch: pytest.MonkeyPatch
+    ) -> ContainerdAgent:
+        agent.registry_lock = asyncio.Lock()
+        monkeypatch.setattr(
+            agent, "_load_kernel_registry_from_recovery", AsyncMock(return_value={})
+        )
+        monkeypatch.setattr(agent, "inject_container_lifecycle_event", AsyncMock())
+        return agent
+
+    async def test_scan_restores_from_resource_txt_not_the_plugin(
+        self, scan_agent: ContainerdAgent, gpu: ComputerContext, tmp_path: Path
+    ) -> None:
+        _add_gpu_container(scan_agent, tmp_path, "c1", "0")
+
+        await scan_agent.scan_running_kernels()
+
+        assert _held(gpu, "0") == Decimal(1)
+        cast(AsyncMock, gpu.instance.restore_from_container).assert_not_called()
+        cast(AsyncMock, scan_agent.inject_container_lifecycle_event).assert_awaited_once()
+
+    async def test_scan_continues_past_an_unreadable_resource_txt(
+        self, scan_agent: ContainerdAgent, gpu: ComputerContext, tmp_path: Path
+    ) -> None:
+        _add_gpu_container(scan_agent, tmp_path, "c1", "0", resource_txt=False)
+        _add_gpu_container(scan_agent, tmp_path, "c2", "1")
+
+        await scan_agent.scan_running_kernels()
+
+        assert _held(gpu, "0") == Decimal(0)
+        assert _held(gpu, "1") == Decimal(1)
+        assert cast(AsyncMock, scan_agent.inject_container_lifecycle_event).await_count == 2
+
+    async def test_scan_skips_a_container_without_a_config_dir_label(
+        self, scan_agent: ContainerdAgent, gpu: ComputerContext, tmp_path: Path
+    ) -> None:
+        _add_gpu_container(scan_agent, tmp_path, "c1", "0", config_label=False)
+        _add_gpu_container(scan_agent, tmp_path, "c2", "1")
+
+        await scan_agent.scan_running_kernels()
+
+        assert _held(gpu, "0") == Decimal(0)
+        assert _held(gpu, "1") == Decimal(1)
+
+    async def test_scan_continues_past_a_corrupt_resource_txt(
+        self, scan_agent: ContainerdAgent, gpu: ComputerContext, tmp_path: Path
+    ) -> None:
+        _add_gpu_container(scan_agent, tmp_path, "c1", "0")
+        (tmp_path / "c1" / "resource.txt").write_text("not a resource spec")
+        _add_gpu_container(scan_agent, tmp_path, "c2", "1")
+
+        await scan_agent.scan_running_kernels()
+
+        assert _held(gpu, "0") == Decimal(0)
+        assert _held(gpu, "1") == Decimal(1)
+
+    async def test_reconstruct_keeps_the_allocations_of_running_containers(
+        self, agent: ContainerdAgent, gpu: ComputerContext, tmp_path: Path
+    ) -> None:
+        _add_gpu_container(agent, tmp_path, "c1", "0")
+        _add_gpu_container(agent, tmp_path, "c2", "1")
+        gpu.alloc_map.apply_allocation({GPU: {DeviceId("0"): Decimal(1)}})
+
+        # The fixture replaces reconstruct_resource_usage with a mock; run the real one.
+        await AbstractAgent.reconstruct_resource_usage(agent)
+
+        assert _held(gpu, "0") == Decimal(1)
+        assert _held(gpu, "1") == Decimal(1)
+        cast(AsyncMock, gpu.instance.restore_from_container).assert_not_called()
+
+
+class TestBaseRestoreContainerResources:
+    @staticmethod
+    def _plugin(error: Exception | None) -> ComputerContext:
+        plugin = MagicMock(restore_from_container=AsyncMock(side_effect=error))
+        return ComputerContext(instance=plugin, devices=[], alloc_map=MagicMock())
+
+    def _container(self) -> Container:
+        return Container(
+            id=ContainerId("c1"),
+            status=ContainerStatus.RUNNING,
+            image="img:1",
+            labels={},
+            ports=[],
+            backend_obj=None,
+        )
+
+    async def test_strict_tolerates_file_not_found_and_runs_the_next_plugin(
+        self, agent: ContainerdAgent
+    ) -> None:
+        first, second = self._plugin(FileNotFoundError()), self._plugin(None)
+        agent.computers = {DeviceName("a"): first, DeviceName("b"): second}
+
+        await AbstractAgent._restore_container_resources(
+            agent, KernelId(uuid.uuid4()), self._container()
+        )
+
+        cast(AsyncMock, second.instance.restore_from_container).assert_awaited_once()
+
+    async def test_strict_propagates_other_errors(self, agent: ContainerdAgent) -> None:
+        agent.computers = {DeviceName("a"): self._plugin(ValueError("bad"))}
+
+        with pytest.raises(ValueError):
+            await AbstractAgent._restore_container_resources(
+                agent, KernelId(uuid.uuid4()), self._container()
+            )
+
+    async def test_lenient_tolerates_any_error_and_runs_the_next_plugin(
+        self, agent: ContainerdAgent
+    ) -> None:
+        first, second = self._plugin(ValueError("bad")), self._plugin(None)
+        agent.computers = {DeviceName("a"): first, DeviceName("b"): second}
+
+        await AbstractAgent._restore_container_resources(
+            agent, KernelId(uuid.uuid4()), self._container(), strict=False
+        )
+
+        cast(AsyncMock, second.instance.restore_from_container).assert_awaited_once()
