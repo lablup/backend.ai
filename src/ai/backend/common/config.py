@@ -5,7 +5,6 @@ import os
 import shlex
 import sys
 from collections.abc import Mapping, MutableMapping
-from enum import StrEnum
 from pathlib import Path
 from typing import Any, Self, override
 
@@ -187,51 +186,6 @@ agent_selector_config_iv = t.Dict({}) | agent_selector_globalconfig_iv
 DEFAULT_SHELL = "/bin/bash"
 
 
-class ServiceInterpolationMode(StrEnum):
-    """How the kernel runner fills variables into a service command and pre-start action args."""
-
-    LEGACY = "legacy"
-    """``{var}`` and ``${{ var }}``, the syntax image service-defs are written in."""
-
-    DELIMITER = "delimiter"
-    """Only ``<start> var <end>`` is filled; every other character, braces included, stays."""
-
-
-class ServiceInterpolationDelimiter(BaseConfigModel):
-    start: str = Field(
-        min_length=1,
-        max_length=16,
-        description="String that opens a variable reference.",
-        examples=["{{"],
-    )
-    end: str = Field(
-        min_length=1,
-        max_length=16,
-        description="String that closes a variable reference.",
-        examples=["}}"],
-    )
-
-
-class ServiceInterpolation(BaseConfigModel):
-    mode: ServiceInterpolationMode = Field(
-        default=ServiceInterpolationMode.LEGACY,
-        description=(
-            "`legacy` keeps `{var}` and `${{ var }}`. `delimiter` fills only the expressions "
-            "wrapped in `delimiter`, so JSON and bash brace expansion stay literal."
-        ),
-    )
-    delimiter: ServiceInterpolationDelimiter | None = Field(
-        default=None,
-        description="Required when `mode` is `delimiter`, rejected otherwise.",
-    )
-
-    @model_validator(mode="after")
-    def _delimiter_matches_mode(self) -> Self:
-        if (self.mode == ServiceInterpolationMode.DELIMITER) != (self.delimiter is not None):
-            raise ValueError("delimiter must be set exactly when mode is delimiter")
-        return self
-
-
 class PreStartAction(BaseConfigModel):
     action: str = Field(
         description="The name of the pre-start action to execute.",
@@ -340,13 +294,6 @@ class ModelServiceConfig(BaseConfigModel):
             "`[shell, '-c', command]`; null or empty disables shell wrapping."
         ),
         examples=[DEFAULT_SHELL],
-    )
-    interpolation: ServiceInterpolation | None = Field(
-        default=None,
-        description=(
-            "Variable syntax for `start_command` and `pre_start_actions` args. "
-            "`None` keeps the legacy syntax."
-        ),
     )
     port: int = Field(
         description="Port number for the model service. Must be greater than 1.",
@@ -507,7 +454,6 @@ def _merge_service_config(
         ),
         start_command=_pick(base.start_command, override.start_command, "start_command" in s),
         shell=_pick(base.shell, override.shell, "shell" in s),
-        interpolation=_pick(base.interpolation, override.interpolation, "interpolation" in s),
         port=_pick(base.port, override.port, "port" in s),
         health_check=health_check,
     )
@@ -651,7 +597,6 @@ class ModelServiceConfigDraft(BaseConfigModel):
     pre_start_actions: list[PreStartAction] | None = None
     start_command: str | None = None
     shell: str | None = None
-    interpolation: ServiceInterpolation | None = None
     port: int | None = Field(default=None, gt=1)
     health_check: ModelHealthCheckDraft | None = None
 
@@ -740,9 +685,6 @@ def _merge_service_config_draft(
         ),
         # shell requires explicit none to disable shell wrapping; otherwise the baseline's default is preserved.
         shell=_pick(base.shell, override.shell, "shell" in s),
-        interpolation=_pick_non_null_override(
-            base.interpolation, override.interpolation, "interpolation" in s
-        ),
         port=_pick_non_null_override(base.port, override.port, "port" in s),
         health_check=health_check,
     )
