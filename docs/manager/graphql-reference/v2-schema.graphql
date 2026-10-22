@@ -16017,6 +16017,11 @@ type Query {
   """
   checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2
 
+  """
+  Added in 26.10.0. Get the number of sessions the current user is running.
+  """
+  myConcurrency: UserConcurrency!
+
   """Added in 26.4.2. Search all virtual folders (superadmin only)."""
   adminVfoldersV2(
     """
@@ -22520,6 +22525,20 @@ Added in 26.1.0. Fields available for ordering usage bucket query results. PERIO
 """
 enum UsageBucketOrderField {
   PERIOD_START
+}
+
+"""Added in 26.10.0. Number of sessions a user is running."""
+type UserConcurrency {
+  """User UUID."""
+  userId: UUID!
+
+  """
+  Number of interactive, batch and inference sessions the user is running.
+  """
+  sessionCount: Int!
+
+  """Number of system sessions, such as SFTP sessions, the user is running."""
+  privateSessionCount: Int!
 }
 
 """

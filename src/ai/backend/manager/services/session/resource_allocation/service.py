@@ -38,6 +38,10 @@ from ai.backend.manager.services.session.resource_allocation.actions.get_resourc
     GetResourceGroupUsageAction,
     GetResourceGroupUsageActionResult,
 )
+from ai.backend.manager.services.session.resource_allocation.actions.get_user_concurrency import (
+    GetUserConcurrencyAction,
+    GetUserConcurrencyActionResult,
+)
 from ai.backend.manager.services.session.resource_allocation.actions.resolve_keypair_context import (
     ResolveKeypairContextAction,
     ResolveKeypairContextActionResult,
@@ -71,6 +75,15 @@ class ResourceAllocationService:
             access_key=ctx.access_key,
             resource_policy=ctx.resource_policy,
         )
+
+    async def get_user_concurrency(
+        self, action: GetUserConcurrencyAction
+    ) -> GetUserConcurrencyActionResult:
+        """Get the user's active regular and private session counts."""
+        concurrency = await self._resource_allocation_repository.get_user_concurrency(
+            action.user_id
+        )
+        return GetUserConcurrencyActionResult(concurrency=concurrency)
 
     async def get_keypair_usage(self, action: GetKeypairUsageAction) -> GetKeypairUsageActionResult:
         """Get keypair resource usage."""

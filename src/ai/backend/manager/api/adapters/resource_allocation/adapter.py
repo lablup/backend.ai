@@ -30,7 +30,9 @@ from ai.backend.common.dto.manager.v2.resource_allocation.response import (
     ResourceGroupResourceAllocationPayload,
     ResourceGroupUsageNode,
     ScopeResourceUsageNode,
+    UserConcurrencyPayload,
 )
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import AccessKey, BinarySize, SlotQuantity
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -60,6 +62,9 @@ from ai.backend.manager.services.session.resource_allocation.actions.get_project
 )
 from ai.backend.manager.services.session.resource_allocation.actions.get_resource_group_usage import (
     GetResourceGroupUsageAction,
+)
+from ai.backend.manager.services.session.resource_allocation.actions.get_user_concurrency import (
+    GetUserConcurrencyAction,
 )
 from ai.backend.manager.services.session.resource_allocation.actions.resolve_keypair_context import (
     ResolveKeypairContextAction,
@@ -181,6 +186,21 @@ class ResourceAllocationAdapter(BaseAdapter):
             input=input,
             access_key=access_key,
             resource_policy=resource_policy,
+        )
+
+    async def my_concurrency(self) -> UserConcurrencyPayload:
+        """Get the current user's concurrent session counts."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        user_id = UserID(me.user_id)
+        result = await self._session.resource_allocation.get_user_concurrency.run(
+            GetUserConcurrencyAction(user_id=user_id)
+        )
+        return UserConcurrencyPayload(
+            user_id=user_id,
+            session_count=result.concurrency.session_count,
+            private_session_count=result.concurrency.private_session_count,
         )
 
     async def _keypair_owner(self, access_key: AccessKey) -> UserID:

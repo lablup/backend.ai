@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from typing import Any
 from uuid import UUID
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
     AccessKey,
     SlotName,
@@ -19,6 +20,7 @@ from ai.backend.manager.data.resource_allocation.types import (
     KeypairContextData,
     ResourceGroupUsageData,
     ScopeUsageData,
+    UserConcurrencyData,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -44,6 +46,10 @@ class ResourceAllocationRepository:
     async def get_keypair_context(self, user_id: UUID) -> KeypairContextData:
         """Resolve a user's default keypair context (access_key + resource_policy)."""
         return await self._db_source.get_keypair_context(user_id)
+
+    async def get_user_concurrency(self, user_id: UserID) -> UserConcurrencyData:
+        """Count the user's active regular and private sessions."""
+        return await self._db_source.get_user_concurrency(user_id)
 
     async def _get_known_slot_types(self) -> Mapping[SlotName, SlotTypes]:
         """Get known slot types from etcd config."""
