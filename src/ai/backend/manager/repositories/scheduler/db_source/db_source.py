@@ -83,6 +83,7 @@ from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryData,
     SessionStatus,
 )
+from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.network import NetworkNotFound
@@ -1954,19 +1955,24 @@ class ScheduleDBSource:
                     )
                 matched_dependency_ids.append(SessionID(dependency_id))
 
-            # An agent id missing from ``agents`` designates nothing.
-            designated_agent_ids = list(
+            # Validate designated agents — each one must be registered.
+            designated_agent_ids = set(
                 spec.resource_spec.options.scheduling_target.designated_agents
             )
             designated_agent_uuids: list[AgentUUID] = []
             if designated_agent_ids:
-                designated_agent_uuids = list(
-                    (
-                        await read_sess.scalars(
-                            sa.select(AgentRow.uuid).where(AgentRow.id.in_(designated_agent_ids))
+                registered = (
+                    await read_sess.execute(
+                        sa.select(AgentRow.id, AgentRow.uuid).where(
+                            AgentRow.id.in_(designated_agent_ids)
                         )
-                    ).all()
-                )
+                    )
+                ).all()
+                if unknown := designated_agent_ids - {row.id for row in registered}:
+                    raise AgentNotFound(
+                        f"Designated agents {sorted(unknown)} are not registered.",
+                    )
+                designated_agent_uuids = [row.uuid for row in registered]
 
         kernel_creators = [
             KernelCreator(
