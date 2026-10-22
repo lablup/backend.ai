@@ -8,6 +8,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from ai.backend.common.configs.volume_status_check import VfsVolumeStatusCheckConfig
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.exception import ConfigurationError
 from ai.backend.common.types import HostPortPair, QuotaScopeID, QuotaScopeType
@@ -120,6 +122,10 @@ async def volume(
         options=backend_options,
         event_dispatcher=mock_event_dispatcher,
         event_producer=mock_event_producer,
+        volume_name=StorageVolumeName("test-volume"),
+        status_check_config=VfsVolumeStatusCheckConfig(
+            check_interval=60.0, marker_filename=".backend.ai-volume-id"
+        ),
     )
     await volume.init()
     try:

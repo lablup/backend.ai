@@ -45,6 +45,12 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.configs.volume_status_check import (
+    VolumeStatusCheckConfig,
+    validate_volume_status_check_config,
+)
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
+from ai.backend.common.data.storage.types import StorageVolumeType
 from ai.backend.common.meta import (
     NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
@@ -2308,6 +2314,51 @@ class DockerExtraConfig(BaseConfigSchema):
     ]
 
 
+class VolumeConfig(BaseConfigSchema):
+    volume_type: Annotated[
+        StorageVolumeType,
+        Field(
+            validation_alias=AliasChoices("volume-type", "volume_type", "backend"),
+            serialization_alias="volume-type",
+        ),
+        BackendAIConfigMeta(
+            description="The type of the volume, such as 'vfs'.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="vfs", prod="vfs"),
+        ),
+    ]
+    path: Annotated[
+        Path,
+        Field(),
+        BackendAIConfigMeta(
+            description="The mount path of the volume on this agent's node.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="/var/lib/backend.ai/vfolder", prod="/mnt/vfroot"),
+        ),
+    ]
+    status_check: Annotated[
+        VolumeStatusCheckConfig | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("status-check", "status_check"),
+            serialization_alias="status-check",
+        ),
+        BackendAIConfigMeta(
+            description="Configuration for the periodic status checks of the volume.",
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
+        ),
+    ]
+
+    @model_validator(mode="after")
+    def _validate_status_check(self) -> Self:
+        if self.status_check is not None:
+            self.status_check = validate_volume_status_check_config(
+                self.volume_type, self.status_check
+            )
+        return self
+
+
 class AgentGlobalConfig(BaseConfigSchema):
     """
     Configuration shared across all agents (logging, etcd, API, etc.).
@@ -2455,6 +2506,15 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "Plugin settings are managed centrally in etcd and distributed to agents automatically."
             ),
             added_version="25.12.0",
+        ),
+    ]
+    volume: Annotated[
+        dict[StorageVolumeName, VolumeConfig] | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description="Configurations of the volumes this agent holds, keyed by volume name.",
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.DICT,
         ),
     ]
     redis: Annotated[
