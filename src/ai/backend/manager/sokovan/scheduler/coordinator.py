@@ -1091,7 +1091,7 @@ class ScheduleCoordinator:
 
         # SUCCESS transitions
         if transitions.success and result.successes:
-            await self._apply_transition(
+            transitioned = await self._apply_transition(
                 handler_name,
                 result.successes,
                 transitions.success,
@@ -1101,9 +1101,7 @@ class ScheduleCoordinator:
             )
             # Broadcast events for successful transitions
             if transitions.success.session:
-                await self._broadcast_transition_events(
-                    result.successes, transitions.success.session
-                )
+                await self._broadcast_transition_events(transitioned, transitions.success.session)
 
         # FAILURE transitions - Coordinator classifies failures into give_up/expired/need_retry.
         # A classification without a declared transition keeps the current status but
@@ -1250,7 +1248,7 @@ class ScheduleCoordinator:
         scheduling_result: SchedulingResult,
         records: Mapping[SessionId, ExecutionRecord],
         status_changed_at: datetime,
-    ) -> None:
+    ) -> list[Any]:
         """Apply a single transition type to sessions (BEP-1030).
 
         Args:
@@ -1260,9 +1258,14 @@ class ScheduleCoordinator:
             scheduling_result: Result type for history recording
             records: Mapping of session IDs to their execution records
             status_changed_at: Database timestamp for status change
+
+        Returns:
+            The session infos whose session was moved; without a session status in the
+            transition, all of them. A session left alone by
+            ``transition.except_session_statuses`` gets no history row and is left out.
         """
         if not session_infos:
-            return
+            return []
 
         session_ids = [s.session_id for s in session_infos]
 
@@ -1289,17 +1292,19 @@ class ScheduleCoordinator:
                 )
                 for info in session_infos
             ]
-            updated = await self._repository.update_with_history(updater, histories)
+            updated_ids = set(await self._repository.update_with_history(updater, histories))
             log.debug(
                 "session status updated",
-                session_count=updated,
+                session_count=len(updated_ids),
                 to_status=transition.session,
                 scheduling_result=scheduling_result,
             )
+            session_infos = [info for info in session_infos if info.session_id in updated_ids]
 
         # Kernel status reset if transitioning to PENDING
         if transition.kernel == KernelStatus.PENDING:
             await self._apply_kernel_pending_resets(session_ids)
+        return session_infos
 
     async def _apply_kernel_pending_resets(
         self,

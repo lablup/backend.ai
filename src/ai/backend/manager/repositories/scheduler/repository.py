@@ -856,11 +856,11 @@ class SchedulerRepository:
         self,
         updater: SessionStatusBatchUpdater,
         histories: Sequence[SessionHistoryToCreate],
-    ) -> int:
+    ) -> list[SessionId]:
         """Move the sessions the updater selects and record each transition, in one
         transaction.
 
-        Returns the number of sessions updated.
+        Returns the IDs of the sessions updated.
         """
         return await self._db_source.update_with_history(updater, histories)
 

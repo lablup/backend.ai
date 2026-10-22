@@ -11,23 +11,33 @@ from __future__ import annotations
 import asyncio
 import uuid
 from collections.abc import Awaitable, Callable
+from datetime import datetime
 from decimal import Decimal
 from typing import cast
 
 import pytest
 import sqlalchemy as sa
+from dateutil.tz import tzutc
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AccessKey, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.scheduling_history.creators import SessionSchedulingHistoryCreator
+from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.repositories.scheduler.types.session import SessionHistoryToCreate
+from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.start_sessions import (
+    StartSessionsLifecycleHandler,
+)
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import create_pending_session_with_kernels
@@ -49,6 +59,28 @@ async def _kernel_statuses(db: ExtendedAsyncSAEngine, session_id: SessionId) -> 
             sa.select(KernelRow.status).where(KernelRow.session_id == session_id)
         )
     return list(statuses)
+
+
+async def _start_history_count(db: ExtendedAsyncSAEngine, session_id: SessionId) -> int:
+    async with db.begin_readonly_session() as db_sess:
+        count = await db_sess.scalar(
+            sa.select(sa.func.count())
+            .select_from(SessionSchedulingHistoryRow)
+            .where(
+                SessionSchedulingHistoryRow.session_id == session_id,
+                SessionSchedulingHistoryRow.phase == StartSessionsLifecycleHandler.name(),
+            )
+        )
+    return cast(int, count)
+
+
+async def _set_session_status(
+    db: ExtendedAsyncSAEngine, session_id: SessionId, status: SessionStatus
+) -> None:
+    async with db.begin_session() as db_sess:
+        await db_sess.execute(
+            sa.update(SessionRow).where(SessionRow.id == session_id).values(status=status)
+        )
 
 
 class TestClaimSessionsForStart:
@@ -201,13 +233,66 @@ class TestClaimSessionsForStart:
         """A claimed session terminated in the meantime is not handed back to START."""
         session_id = await create_session()
         await db_source.claim_sessions_for_start([session_id], _CLAIM_REASON)
-        async with db_with_cleanup.begin_session() as db_sess:
-            await db_sess.execute(
-                sa.update(SessionRow)
-                .where(SessionRow.id == session_id)
-                .values(status=SessionStatus.TERMINATING)
-            )
+        await _set_session_status(db_with_cleanup, session_id, SessionStatus.TERMINATING)
 
         assert await db_source.release_sessions_for_start([session_id]) == 0
         assert await _session_status(db_with_cleanup, session_id) == SessionStatus.TERMINATING
         assert await _kernel_statuses(db_with_cleanup, session_id) == [KernelStatus.CREATING]
+
+    async def _apply_start_success(
+        self, db_source: ScheduleDBSource, session_id: SessionId
+    ) -> list[SessionId]:
+        """Apply START's success transition the way the coordinator does."""
+        transition = StartSessionsLifecycleHandler.status_transitions().success
+        assert transition is not None and transition.session is not None
+        updater = SessionStatusBatchUpdater(
+            session_ids=[session_id],
+            to_status=transition.session,
+            status_changed_at=datetime.now(tzutc()),
+            except_statuses=transition.except_session_statuses,
+        )
+        history = SessionHistoryToCreate(
+            session_id=SessionID(session_id),
+            creator=SessionSchedulingHistoryCreator(
+                phase=StartSessionsLifecycleHandler.name(),
+                result=SchedulingResult.SUCCESS,
+                message="start-sessions success",
+                from_status=SessionStatus.PREPARED,
+                to_status=transition.session,
+            ),
+        )
+        return await db_source.update_with_history(updater, [history])
+
+    async def test_start_success_records_a_claimed_session(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        db_source: ScheduleDBSource,
+        create_session: Callable[..., Awaitable[SessionId]],
+    ) -> None:
+        """The pass's CREATING transition records the history of a session it claimed."""
+        session_id = await create_session()
+        await db_source.claim_sessions_for_start([session_id], _CLAIM_REASON)
+
+        assert await self._apply_start_success(db_source, session_id) == [session_id]
+        assert await _session_status(db_with_cleanup, session_id) == SessionStatus.CREATING
+        assert await _start_history_count(db_with_cleanup, session_id) == 1
+
+    @pytest.mark.parametrize(
+        "moved_to",
+        [SessionStatus.RUNNING, SessionStatus.TERMINATING],
+    )
+    async def test_start_success_leaves_a_session_that_moved_on(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        db_source: ScheduleDBSource,
+        create_session: Callable[..., Awaitable[SessionId]],
+        moved_to: SessionStatus,
+    ) -> None:
+        """A session promoted or terminated during the pass is not written back to CREATING."""
+        session_id = await create_session()
+        await db_source.claim_sessions_for_start([session_id], _CLAIM_REASON)
+        await _set_session_status(db_with_cleanup, session_id, moved_to)
+
+        assert await self._apply_start_success(db_source, session_id) == []
+        assert await _session_status(db_with_cleanup, session_id) == moved_to
+        assert await _start_history_count(db_with_cleanup, session_id) == 0

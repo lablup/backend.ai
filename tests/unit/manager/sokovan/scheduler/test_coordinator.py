@@ -1009,7 +1009,9 @@ class TestScheduleCoordinatorStatusTransition:
             kernel=KernelStatus.PENDING,
         )
 
-        mock_coordinator._repository.update_with_history = AsyncMock(return_value=1)
+        mock_coordinator._repository.update_with_history = AsyncMock(
+            return_value=[session_info.session_id]
+        )
         mock_coordinator._apply_kernel_pending_resets = AsyncMock()
 
         # Act
@@ -1043,7 +1045,9 @@ class TestScheduleCoordinatorStatusTransition:
             kernel=KernelStatus.SCHEDULED,
         )
 
-        mock_coordinator._repository.update_with_history = AsyncMock(return_value=1)
+        mock_coordinator._repository.update_with_history = AsyncMock(
+            return_value=[session_info.session_id]
+        )
         mock_coordinator._apply_kernel_pending_resets = AsyncMock()
 
         # Act
@@ -1079,10 +1083,10 @@ class TestScheduleCoordinatorStatusTransition:
 
         captured_updater = None
 
-        async def capture_update_with_history(updater: Any, histories: Any) -> int:
+        async def capture_update_with_history(updater: Any, histories: Any) -> list[SessionId]:
             nonlocal captured_updater
             captured_updater = updater
-            return 1
+            return [session_info.session_id]
 
         mock_coordinator._repository.update_with_history = capture_update_with_history
         mock_coordinator._apply_kernel_pending_resets = AsyncMock()
@@ -1112,8 +1116,9 @@ class TestScheduleCoordinatorStatusTransition:
         """SC-CO-019c: START's CREATING transition only writes a session still CREATING.
 
         Given: START's success transition (the claim already set the session CREATING)
-        When: Apply transition is called after the session may have been promoted
-        Then: The updater leaves every status other than CREATING alone
+        When: Apply transition is called after the session was promoted to RUNNING
+        Then: The updater leaves every status other than CREATING alone, and the
+              skipped session is not returned for the CREATING broadcast
         """
         # Arrange
         session_info = _create_session_transition_info(
@@ -1124,16 +1129,16 @@ class TestScheduleCoordinatorStatusTransition:
 
         captured_updater = None
 
-        async def capture_update_with_history(updater: Any, histories: Any) -> int:
+        async def capture_update_with_history(updater: Any, histories: Any) -> list[SessionId]:
             nonlocal captured_updater
             captured_updater = updater
-            return 1
+            return []  # the session was promoted to RUNNING meanwhile
 
         mock_coordinator._repository.update_with_history = capture_update_with_history
         mock_coordinator._apply_kernel_pending_resets = AsyncMock()
 
         # Act
-        await ScheduleCoordinator._apply_transition(
+        transitioned = await ScheduleCoordinator._apply_transition(
             mock_coordinator,
             handler_name=StartSessionsLifecycleHandler.name(),
             session_infos=[session_info],
@@ -1144,6 +1149,7 @@ class TestScheduleCoordinatorStatusTransition:
         )
 
         # Assert
+        assert transitioned == []  # nothing to broadcast
         assert isinstance(captured_updater, SessionStatusBatchUpdater)
         assert captured_updater.to_status == SessionStatus.CREATING
         assert SessionStatus.CREATING not in captured_updater.except_statuses
