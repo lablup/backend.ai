@@ -34,6 +34,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
+    AgentId,
     AutoScalingMetricSource,
     KernelId,
     MountPermission,
@@ -441,6 +442,14 @@ class DeploymentRepository:
     ) -> Mapping[DeploymentID, list[AgentUUID]]:
         """Fetch the designated agents of each deployment; one with none maps to ``[]``."""
         return await self._db_source.fetch_designated_agents_by_deployment_ids(deployment_ids)
+
+    @deployment_repository_resilience.apply()
+    async def fetch_designated_agent_ids_by_deployment_ids(
+        self,
+        deployment_ids: set[DeploymentID],
+    ) -> Mapping[DeploymentID, list[AgentId]]:
+        """Fetch the agent ids each deployment designates; one with none maps to ``[]``."""
+        return await self._db_source.fetch_designated_agent_ids_by_deployment_ids(deployment_ids)
 
     @deployment_repository_resilience.apply()
     async def delete_endpoint(

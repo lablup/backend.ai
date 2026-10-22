@@ -270,3 +270,21 @@ class TestDeploymentDesignatedAgents:
 
         designated = await repository.fetch_designated_agents_by_deployment_ids({deployment_id})
         assert designated[deployment_id] == [agent_uuids[1]]
+
+    async def test_fetching_agent_ids_maps_uuids_to_agent_ids_in_order(
+        self,
+        repository: DeploymentRepository,
+        deployment_ids: list[DeploymentID],
+        agent_uuids: list[AgentUUID],
+    ) -> None:
+        with_agents, without_agents = deployment_ids
+        await repository.replace_designated_agents(with_agents, set(agent_uuids[:2]))
+
+        designated = await repository.fetch_designated_agent_ids_by_deployment_ids(
+            set(deployment_ids)
+        )
+
+        assert designated == {
+            with_agents: sorted(AgentId(f"i-{u.hex[:12]}") for u in agent_uuids[:2]),
+            without_agents: [],
+        }

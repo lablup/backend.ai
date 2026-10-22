@@ -12,6 +12,7 @@ rolling its own translation.
 from __future__ import annotations
 
 import secrets
+from collections.abc import Sequence
 from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
@@ -24,6 +25,7 @@ from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.defs.session import SESSION_PRIORITY_DEFAULT
 from ai.backend.common.types import (
+    AgentId,
     MountInfoEntry,
     ResourceSlotEntry,
     SessionTypes,
@@ -56,7 +58,8 @@ class DeploymentSessionDraftBuilder:
     """Assemble a :class:`SessionSpecDraft` from deployment-originated inputs.
 
     Single entry point :meth:`build`: route executor passes
-    ``(deployment_info, context, route_id, target_revision, session_group_id)``
+    ``(deployment_info, context, route_id, target_revision, session_group_id,
+    designated_agents)``
     and receives a draft ready for ``SchedulingController.enqueue_session_from_draft``.
     Consolidates the behavior the retired ``SessionCreationSpec.from_deployment_info``
     classmethod used to provide, moved out of the session data layer so
@@ -71,6 +74,7 @@ class DeploymentSessionDraftBuilder:
         route_id: UUID,
         target_revision: ModelRevisionData,
         session_group_id: SessionGroupID | None,
+        designated_agents: Sequence[AgentId],
     ) -> SessionSpecDraft:
         """Assemble the draft for one route's session.
 
@@ -129,7 +133,10 @@ class DeploymentSessionDraftBuilder:
                         is_preemptible=False,
                         cluster_mode=target_revision.cluster_config.mode,
                         cluster_size=target_revision.cluster_config.size,
-                        scheduling_target=SchedulingTargetDraft(),
+                        scheduling_target=SchedulingTargetDraft(
+                            designated_agents=tuple(designated_agents),
+                            agent_selection_policy=deployment_info.options.agent_selection_policy,
+                        ),
                         kernel_groups=kernel_groups,
                         handler_options=None,
                     ),
