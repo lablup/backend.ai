@@ -400,6 +400,7 @@ class TestTCPPipe:
         assert record.getMessage() == "failed to connect to the TCP upstream"
         assert fields["log_tag_circuit_id"] == str(circuit.id)
         assert fields["log_tag_route_id"] == str(circuit.route_info[0].route_id)
+        assert fields["log_tag_session_id"] == str(circuit.route_info[0].session_id)
         assert fields["log_tag_error"] == repr(refused)
         record_failure.assert_called_once()
         down_writer.close.assert_called_once()
@@ -446,6 +447,7 @@ class TestTCPPipe:
         assert warnings[0].getMessage() == "failed to connect to the TCP upstream"
         assert fields["log_tag_circuit_id"] == str(circuit.id)
         assert fields["log_tag_route_id"] == str(circuit.route_info[0].route_id)
+        assert fields["log_tag_session_id"] == str(circuit.route_info[0].session_id)
         assert fields["log_tag_error"] == repr(TimeoutError())
         record_failure.assert_called_once()
         assert [sock.fileno() for sock in sockets] == [-1]

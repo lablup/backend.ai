@@ -108,6 +108,7 @@ class TCPBackend(BaseBackend):
                     "failed to connect to the TCP upstream",
                     circuit_id=self.circuit.id,
                     route_id=route.route_id,
+                    session_id=route.session_id,
                     error=repr(e),
                 )
                 sock.close()
