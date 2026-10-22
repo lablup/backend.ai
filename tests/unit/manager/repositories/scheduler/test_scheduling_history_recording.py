@@ -9,6 +9,7 @@ import uuid
 from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
@@ -44,6 +45,7 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.network.types import NetworkType
 from ai.backend.manager.data.session.options import (
     KernelExecutionSpec,
+    KernelGroup,
     KernelResourceConfig,
     SchedulingTarget,
     SessionHandlerOptions,
@@ -62,11 +64,15 @@ from ai.backend.manager.data.session.types import SchedulingResult, SessionStatu
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.kernel import InvalidKernelConfig
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.kernel_group.row import KernelGroupRow
+from ai.backend.manager.models.kernel_group_environ.row import KernelGroupEnvironRow
+from ai.backend.manager.models.kernel_group_resource_slot.row import KernelGroupResourceSlotRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
@@ -134,8 +140,11 @@ class TestEnqueueSessionSchedulingHistory:
                 ContainerRegistryRow,
                 ImageRow,
                 SessionRow,
+                KernelGroupRow,
                 KernelRow,
                 ResourceSlotTypeRow,
+                KernelGroupResourceSlotRow,
+                KernelGroupEnvironRow,
                 ResourceAllocationRow,
                 SessionDependencyRow,
                 SessionSchedulingHistoryRow,
@@ -413,6 +422,31 @@ class TestEnqueueSessionSchedulingHistory:
 
         yield
 
+    def _group(
+        self,
+        *,
+        role: str,
+        replica_count: int,
+        image_id: ImageID,
+        cpu: str = "2",
+        mem: str = "1024",
+        environ: dict[str, str] | None = None,
+    ) -> KernelGroup:
+        return KernelGroup(
+            role=role,
+            replica_count=replica_count,
+            execution_spec=KernelExecutionSpec(
+                resource_input=KernelResourceConfig(
+                    image_id=image_id,
+                    resources=[
+                        ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity=cpu),
+                        ResourceSlotEntry(resource_type=ResourceSlotName("mem"), quantity=mem),
+                    ],
+                ),
+                environ=environ or {},
+            ),
+        )
+
     def _spec(
         self,
         *,
@@ -425,15 +459,19 @@ class TestEnqueueSessionSchedulingHistory:
         access_key: AccessKey,
         image_id: ImageID,
         dependencies: tuple[SessionID, ...] = (),
+        groups: list[KernelGroup] | None = None,
     ) -> SessionSpec:
-        execution_spec = KernelExecutionSpec(
-            resource_input=KernelResourceConfig(
-                image_id=image_id,
-                resources=[
-                    ResourceSlotEntry(resource_type=ResourceSlotName("cpu"), quantity="2"),
-                    ResourceSlotEntry(resource_type=ResourceSlotName("mem"), quantity="1024"),
-                ],
-            ),
+        kernel_groups = groups or [self._group(role="main", replica_count=1, image_id=image_id)]
+        kernel_specs = tuple(
+            KernelSpec(
+                cluster_role=group.role,
+                cluster_idx=replica_idx + 1,
+                cluster_hostname=f"{group.role}{replica_idx + 1}",
+                local_rank=0,
+                execution_spec=group.execution_spec,
+            )
+            for group in kernel_groups
+            for replica_idx in range(group.replica_count)
         )
         return SessionSpec(
             resource_spec=SessionResourceSpec(
@@ -451,20 +489,12 @@ class TestEnqueueSessionSchedulingHistory:
                     priority=10,
                     is_preemptible=False,
                     cluster_mode=ClusterMode.SINGLE_NODE,
-                    cluster_size=1,
+                    cluster_size=len(kernel_specs),
                     scheduling_target=SchedulingTarget(),
-                    kernel_groups=[],
+                    kernel_groups=kernel_groups,
                     handler_options=SessionHandlerOptions(),
                 ),
-                kernel_specs=(
-                    KernelSpec(
-                        cluster_role="main",
-                        cluster_idx=1,
-                        cluster_hostname="main1",
-                        local_rank=0,
-                        execution_spec=execution_spec,
-                    ),
-                ),
+                kernel_specs=kernel_specs,
             ),
             scope=SessionScope(
                 domain_id=domain.domain_id,
@@ -715,6 +745,189 @@ class TestEnqueueSessionSchedulingHistory:
         )
 
         with pytest.raises(ImageNotFound):
+            await db_source.enqueue_session_from_spec(spec)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            assert (
+                await db_sess.scalar(sa.select(SessionRow).where(SessionRow.id == session_id))
+            ) is None
+
+    @pytest.fixture
+    async def enqueue_spec_args(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        enrolled_scopes: None,
+        resource_slot_types: None,
+    ) -> dict[str, Any]:
+        """The spec arguments every kernel group enqueue shares."""
+        return {
+            "domain": test_domain,
+            "resource_group_id": await self._resource_group_id(
+                db_with_cleanup, test_scaling_group_name
+            ),
+            "resource_group_name": test_scaling_group_name,
+            "project_id": test_group_id,
+            "user_uuid": test_user_uuid,
+            "access_key": test_access_key,
+        }
+
+    async def _groups_by_role(
+        self, db: ExtendedAsyncSAEngine, session_id: SessionID
+    ) -> dict[str, KernelGroupRow]:
+        async with db.begin_readonly_session() as db_sess:
+            rows = (
+                await db_sess.scalars(
+                    sa.select(KernelGroupRow).where(KernelGroupRow.session_id == session_id)
+                )
+            ).all()
+        return {row.role: row for row in rows}
+
+    async def test_enqueue_writes_a_group_row_per_role(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_image_id: ImageID,
+        enqueue_spec_args: dict[str, Any],
+    ) -> None:
+        """One main and three workers write two group rows; the worker row keeps the
+        requested image and slots."""
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        session_id = SessionID(uuid.uuid4())
+        spec = self._spec(
+            session_id=session_id,
+            image_id=test_image_id,
+            groups=[
+                self._group(role="main", replica_count=1, image_id=test_image_id),
+                self._group(
+                    role="worker", replica_count=3, image_id=test_image_id, cpu="4", mem="2048"
+                ),
+            ],
+            **enqueue_spec_args,
+        )
+
+        await db_source.enqueue_session_from_spec(spec)
+
+        groups = await self._groups_by_role(db_with_cleanup, session_id)
+        assert set(groups) == {"main", "worker"}
+        assert groups["worker"].image_id == test_image_id
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            slots = (
+                await db_sess.scalars(
+                    sa.select(KernelGroupResourceSlotRow).where(
+                        KernelGroupResourceSlotRow.kernel_group_id == groups["worker"].id
+                    )
+                )
+            ).all()
+        assert {slot.slot_name: slot.quantity for slot in slots} == {
+            "cpu": Decimal("4"),
+            "mem": Decimal("2048"),
+        }
+
+    async def test_enqueue_points_each_kernel_at_its_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_image_id: ImageID,
+        enqueue_spec_args: dict[str, Any],
+    ) -> None:
+        """Every worker kernel references the worker group row."""
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        session_id = SessionID(uuid.uuid4())
+        spec = self._spec(
+            session_id=session_id,
+            image_id=test_image_id,
+            groups=[
+                self._group(role="main", replica_count=1, image_id=test_image_id),
+                self._group(role="worker", replica_count=3, image_id=test_image_id),
+            ],
+            **enqueue_spec_args,
+        )
+
+        await db_source.enqueue_session_from_spec(spec)
+
+        groups = await self._groups_by_role(db_with_cleanup, session_id)
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            kernels = (
+                await db_sess.scalars(
+                    sa.select(KernelRow).where(KernelRow.session_id == session_id)
+                )
+            ).all()
+        assert sorted((kernel.cluster_role, kernel.kernel_group_id) for kernel in kernels) == [
+            ("main", groups["main"].id),
+            ("worker", groups["worker"].id),
+            ("worker", groups["worker"].id),
+            ("worker", groups["worker"].id),
+        ]
+
+    async def test_enqueue_writes_environ_under_its_group_only(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_image_id: ImageID,
+        enqueue_spec_args: dict[str, Any],
+    ) -> None:
+        """Environ given to the worker group is stored only under that group."""
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        session_id = SessionID(uuid.uuid4())
+        spec = self._spec(
+            session_id=session_id,
+            image_id=test_image_id,
+            groups=[
+                self._group(role="main", replica_count=1, image_id=test_image_id),
+                self._group(
+                    role="worker",
+                    replica_count=3,
+                    image_id=test_image_id,
+                    environ={"WORKER_ONLY": "1"},
+                ),
+            ],
+            **enqueue_spec_args,
+        )
+
+        await db_source.enqueue_session_from_spec(spec)
+
+        groups = await self._groups_by_role(db_with_cleanup, session_id)
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            environ = (
+                await db_sess.execute(
+                    sa.select(KernelGroupEnvironRow.kernel_group_id, KernelGroupEnvironRow.key)
+                    .join(
+                        KernelGroupRow,
+                        KernelGroupRow.id == KernelGroupEnvironRow.kernel_group_id,
+                    )
+                    .where(KernelGroupRow.session_id == session_id)
+                )
+            ).all()
+        assert [(row.kernel_group_id, row.key) for row in environ] == [
+            (groups["worker"].id, "WORKER_ONLY")
+        ]
+
+    async def test_enqueue_refuses_an_environ_key_that_is_not_a_variable_name(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_image_id: ImageID,
+        enqueue_spec_args: dict[str, Any],
+    ) -> None:
+        """A key that is not an environment variable name leaves nothing behind."""
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        session_id = SessionID(uuid.uuid4())
+        spec = self._spec(
+            session_id=session_id,
+            image_id=test_image_id,
+            groups=[
+                self._group(
+                    role="main",
+                    replica_count=1,
+                    image_id=test_image_id,
+                    environ={"1-NOT-A-NAME": "x"},
+                ),
+            ],
+            **enqueue_spec_args,
+        )
+
+        with pytest.raises(InvalidKernelConfig):
             await db_source.enqueue_session_from_spec(spec)
 
         async with db_with_cleanup.begin_readonly_session() as db_sess:

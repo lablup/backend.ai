@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import override
 
 from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.kernel_group import KernelGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.types import ResourceSlot, ResourceSlotEntry
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
@@ -32,6 +33,7 @@ class KernelCreator(FieldCreator[SessionID, KernelRow, KernelInfo]):
     kernel_spec: KernelSpec
     image_info: ImageInfo | None
     enqueue_time: datetime
+    kernel_group_id: KernelGroupID | None
 
     def requested_slots(self) -> ResourceSlot:
         return ResourceSlotEntry.inputs_to_resource_slot(
@@ -56,6 +58,7 @@ class KernelCreator(FieldCreator[SessionID, KernelRow, KernelInfo]):
 
         return KernelRow(
             session_id=owner_id,
+            kernel_group_id=self.kernel_group_id,
             session_creation_id=self.spec.resource_spec.identity.creation_id,
             session_name=self.spec.resource_spec.identity.session_name,
             session_type=self.spec.resource_spec.classification.session_type,

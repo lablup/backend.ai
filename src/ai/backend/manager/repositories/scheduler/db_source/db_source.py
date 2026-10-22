@@ -26,6 +26,7 @@ from ai.backend.common import msgpack
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.kernel_group import KernelGroupID, KernelGroupRole
 from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import (
@@ -67,6 +68,10 @@ from ai.backend.manager.data.dotfile.types import (
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
+from ai.backend.manager.data.kernel_group.types import (
+    KernelGroupEnvironData,
+    KernelGroupResourceSlotData,
+)
 from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePolicy
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
@@ -84,6 +89,7 @@ from ai.backend.manager.data.session.types import (
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.kernel import IncompleteSessionSpec
 from ai.backend.manager.errors.network import NetworkNotFound
 from ai.backend.manager.errors.resource import DomainNotFound, ResourceGroupNotFound
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
@@ -99,6 +105,13 @@ from ai.backend.manager.models.kernel.row import (
 )
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
+from ai.backend.manager.models.kernel_group.creators import KernelGroupCreator
+from ai.backend.manager.models.kernel_group_environ.creators import KernelGroupEnvironCreator
+from ai.backend.manager.models.kernel_group_environ.row import KernelGroupEnvironRow
+from ai.backend.manager.models.kernel_group_resource_slot.creators import (
+    KernelGroupResourceSlotCreator,
+)
+from ai.backend.manager.models.kernel_group_resource_slot.row import KernelGroupResourceSlotRow
 from ai.backend.manager.models.keypair.row import KeyPairRow, keypairs
 from ai.backend.manager.models.network.row import NetworkRow
 from ai.backend.manager.models.project.row import ProjectRow
@@ -1942,19 +1955,13 @@ class ScheduleDBSource:
                     )
                 matched_dependency_ids.append(SessionID(dependency_id))
 
-        kernel_creators = [
-            KernelCreator(
-                spec=spec,
-                kernel_spec=kernel,
-                image_info=(
-                    image_metadata.get(kernel.execution_spec.resource_input.image_id)
-                    if kernel.execution_spec.resource_input.image_id is not None
-                    else None
-                ),
-                enqueue_time=enqueue_time,
-            )
-            for kernel in spec.resource_spec.kernel_specs
-        ]
+        kernel_groups = spec.resource_spec.options.kernel_groups
+        group_roles = {group.role for group in kernel_groups}
+        for kernel in spec.resource_spec.kernel_specs:
+            if kernel.cluster_role not in group_roles:
+                raise IncompleteSessionSpec(
+                    extra_msg=f"Kernel '{kernel.cluster_hostname}' has no kernel group.",
+                )
 
         async with self._reconcile_ops.write_ops() as w:
             await w.create_entity(
@@ -1964,6 +1971,57 @@ class ScheduleDBSource:
                     enqueue_time=enqueue_time,
                 )
             )
+            groups = await w.atomic_create_field_entities(
+                session_id, [KernelGroupCreator(group=group) for group in kernel_groups]
+            )
+            slot_creations: list[
+                NestedFieldToCreate[
+                    KernelGroupID, KernelGroupResourceSlotRow, KernelGroupResourceSlotData
+                ]
+            ] = []
+            environ_creations: list[
+                NestedFieldToCreate[KernelGroupID, KernelGroupEnvironRow, KernelGroupEnvironData]
+            ] = []
+            for group, group_data in zip(kernel_groups, groups, strict=True):
+                requested = resource_slot_to_quantities(
+                    ResourceSlotEntry.inputs_to_resource_slot(
+                        group.execution_spec.resource_input.resources
+                    )
+                )
+                slot_creations.extend(
+                    NestedFieldToCreate(
+                        owner_id=group_data.id,
+                        creator=KernelGroupResourceSlotCreator(
+                            slot_name=ResourceSlotName(quantity.slot_name),
+                            quantity=quantity.quantity,
+                        ),
+                    )
+                    for quantity in requested
+                )
+                environ_creations.extend(
+                    NestedFieldToCreate(
+                        owner_id=group_data.id,
+                        creator=KernelGroupEnvironCreator(key=key, value=value),
+                    )
+                    for key, value in group.execution_spec.environ.items()
+                )
+            await w.atomic_create_nested_fields(slot_creations)
+            await w.atomic_create_nested_fields(environ_creations)
+            group_ids = {group_data.role: group_data.id for group_data in groups}
+            kernel_creators = [
+                KernelCreator(
+                    spec=spec,
+                    kernel_spec=kernel,
+                    image_info=(
+                        image_metadata.get(kernel.execution_spec.resource_input.image_id)
+                        if kernel.execution_spec.resource_input.image_id is not None
+                        else None
+                    ),
+                    enqueue_time=enqueue_time,
+                    kernel_group_id=group_ids[KernelGroupRole(kernel.cluster_role)],
+                )
+                for kernel in spec.resource_spec.kernel_specs
+            ]
             kernels = await w.atomic_create_field_entities(session_id, kernel_creators)
             await w.atomic_create_nested_fields([
                 NestedFieldToCreate(

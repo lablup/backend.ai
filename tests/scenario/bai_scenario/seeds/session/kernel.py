@@ -93,6 +93,7 @@ class TestSeedKernelOf(TestSeedFieldWithNestedRows[SessionEntityData, KernelInfo
                 resource_spec={},
             ),
             enqueue_time=datetime.now(UTC),
+            kernel_group_id=None,
         )
 
     @override
