@@ -88,7 +88,7 @@ Given
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
   - 프로젝트 other-1
-  - 프로젝트에서 세션 그룹 권한 하나를 받은 사용자 준비
+  - 프로젝트에서 세션 그룹 생성 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
       - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
@@ -127,7 +127,7 @@ Given
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
   - 프로젝트 other-1
-  - 프로젝트에서 세션 그룹 권한 하나를 받은 사용자 준비
+  - 프로젝트에서 세션 그룹 생성 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
       - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
@@ -158,14 +158,14 @@ Given
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
   - 프로젝트 other-1
-  - 프로젝트에서 세션 그룹 권한 하나를 받은 사용자 준비
+  - 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
       - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
       - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-group-creator-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-group-creator-1: session_group 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 session-group-creator-1 보유
+    - 역할 session-group-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 session-group-reader-1: session_group 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 session-group-reader-1 보유
 
 When
 
