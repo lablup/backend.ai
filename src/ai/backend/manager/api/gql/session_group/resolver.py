@@ -142,7 +142,7 @@ async def scoped_session_groups(
 async def update_session_group(
     info: Info[StrawberryGQLContext],
     input: UpdateSessionGroupInputGQL,
-) -> UpdateSessionGroupPayloadGQL:
+) -> UpdateSessionGroupPayloadGQL | None:
     payload = await info.context.adapters.session_group.update(input.to_pydantic())
     return UpdateSessionGroupPayloadGQL.from_pydantic(payload)
 
@@ -159,7 +159,7 @@ async def update_session_group(
 async def purge_session_group(
     info: Info[StrawberryGQLContext],
     input: PurgeSessionGroupInputGQL,
-) -> PurgeSessionGroupPayloadGQL:
+) -> PurgeSessionGroupPayloadGQL | None:
     payload = await info.context.adapters.session_group.purge(input.to_pydantic())
     return PurgeSessionGroupPayloadGQL.from_pydantic(
         payload, extra={"purged_id": to_global_id(SessionGroupGQL, payload.entity_id)}
