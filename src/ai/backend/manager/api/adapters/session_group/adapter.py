@@ -179,7 +179,6 @@ class SessionGroupAdapter(BaseAdapter):
         if me is None:
             raise UnreachableError("User context is not available")
         creator = SessionGroupCreator(
-            domain_name=me.domain_name,
             project_id=ProjectID(input.project_id),
             owner_user_id=UserID(me.user_id),
             placement_direction=SessionGroupPlacementDirection(input.placement_direction),

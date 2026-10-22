@@ -365,7 +365,6 @@ class DeploymentDBSource:
             # placement policy of its replicas.
             primary_session_group = await w.create_entity(
                 SessionGroupCreator.for_replica_group(
-                    domain_name=deployment.metadata.domain,
                     project_id=ProjectID(deployment.metadata.project),
                     owner_user_id=UserID(deployment.metadata.session_owner),
                 )

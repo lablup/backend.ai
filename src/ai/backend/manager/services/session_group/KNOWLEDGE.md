@@ -82,7 +82,8 @@ shape, operation, gate and backing.
 - `create` is wired through `entity_create_ops` with no service method. The action's
   scope target is the project, so the gate is session_group CREATE on that project.
 - The caller becomes the owner, and the row joins its project and its owner. The domain
-  is the caller's, as the model card creation takes it.
+  is the project's, resolved by the insert, so a caller from another domain cannot put
+  the group in its own.
 
 ## The purge runs against ops
 
