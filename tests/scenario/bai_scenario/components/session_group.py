@@ -4,6 +4,7 @@ Two projects, each with a session group a user made; the first also has one a re
 holds, the second one another user made. The caller is the owner only when the grant sits in
 the owner's own scope, so the grant decides what the caller reaches. The purge lays one
 project: a session group a user made, with member sessions, beside one a replica group holds.
+The creation lays two projects and a caller granted in one of them.
 """
 
 from __future__ import annotations
@@ -451,4 +452,117 @@ class UsersGroupLook:
             ),
             Held(f"{prefix}created_at", node.created_at, WrittenByThisRun(self.started)),
             Same(f"{prefix}deleted_at", node.deleted_at, None),
+        ]
+
+
+class CallerGrant(enum.Enum):
+    """세션 그룹을 만드는 사람이 받은 세션 그룹 권한과 그 자리."""
+
+    CREATE_IN_THE_PROJECT = "세션 그룹을 만들 프로젝트에서 세션 그룹 생성"
+    READ_IN_THE_PROJECT = "세션 그룹을 만들 프로젝트에서 세션 그룹 읽기"
+    CREATE_IN_THE_OTHER_PROJECT = "다른 프로젝트에서만 세션 그룹 생성"
+
+    def permission(self) -> Permission:
+        match self:
+            case CallerGrant.CREATE_IN_THE_PROJECT | CallerGrant.CREATE_IN_THE_OTHER_PROJECT:
+                return Permission.CREATE
+            case CallerGrant.READ_IN_THE_PROJECT:
+                return Permission.READ
+
+    def in_the_project(self) -> bool:
+        """권한이 세션 그룹을 만들 프로젝트에 있는지."""
+        match self:
+            case CallerGrant.CREATE_IN_THE_PROJECT | CallerGrant.READ_IN_THE_PROJECT:
+                return True
+            case CallerGrant.CREATE_IN_THE_OTHER_PROJECT:
+                return False
+
+
+@dataclass(frozen=True)
+class AProjectAndACaller:
+    """세션 그룹을 만들 프로젝트와 만드는 사람."""
+
+    domain: DomainData
+    project: ProjectData
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class SomeoneGrantedInAProject(TestSeedNest[Laid[UserData]]):
+    """한 프로젝트에서 세션 그룹 권한 하나를 받은 사용자."""
+
+    domain: Laid[DomainData]
+    project: Laid[ProjectData]
+    granted: CallerGrant
+
+    @override
+    def kind(self) -> str:
+        return "프로젝트에서 세션 그룹 권한 하나를 받은 사용자 준비"
+
+    @override
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        someone = seed.within(SomeoneOf(self.domain))
+        role = seed.creating_from(
+            TestSeedRole(lambda p: ProjectID(p.id), name_hint="session-group-creator"),
+            self.project,
+        )
+        seed.adding(
+            TestSeedPermission(
+                entity_type=SessionGroupEntityType(), permission=self.granted.permission()
+            ),
+            role,
+        )
+        seed.granting(role, someone, role_id=lambda r: r.id, user_id=lambda u: UserID(u.id))
+        return someone
+
+
+@dataclass(frozen=True)
+class AProjectAndACallerGranted(Given[Any, AProjectAndACaller]):
+    """한 도메인의 두 프로젝트와 정해진 곳에서 세션 그룹 권한을 받은 사용자."""
+
+    granted: CallerGrant
+
+    @override
+    def describe(self) -> str:
+        return f"한 도메인의 두 프로젝트, 그리고 {self.granted.value} 권한을 받은 사용자"
+
+    @override
+    async def lay(self, seeding: Any) -> AProjectAndACaller:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
+        other = await seeding.creating_from_two(TestSeedProject(name_hint="other"), domain, policy)
+        caller = await seeding.within(
+            SomeoneGrantedInAProject(
+                domain, project if self.granted.in_the_project() else other, self.granted
+            )
+        )
+        return AProjectAndACaller(
+            domain=seeding.made(domain),
+            project=seeding.made(project),
+            caller=seeding.made(caller),
+        )
+
+
+@dataclass(frozen=True)
+class CreatedGroupLook:
+    """만든 세션 그룹의 노드가 어떤 값으로 와야 하는지."""
+
+    started: datetime
+    direction: SessionGroupPlacementDirectionEnum
+    enforcement: SessionGroupPlacementEnforcementEnum
+
+    def verdicts(self, node: SessionGroupNode, laid: AProjectAndACaller) -> list[Verdict]:
+        return [
+            Skipped("id", "데이터베이스가 만든다"),
+            Held[UUID]("entity_id", node.entity_id, SameAs(node.id, "id")),
+            Held[UUID]("domain_id", node.domain_id, SameAs(laid.domain.id, "그 도메인의 id")),
+            Held[UUID]("project_id", node.project_id, SameAs(laid.project.id, "그 프로젝트의 id")),
+            Held[UUID](
+                "owner_user_id", node.owner_user_id, SameAs(laid.caller.id, "만든 사람의 id")
+            ),
+            Same("placement_direction", node.placement_direction, self.direction),
+            Same("placement_enforcement", node.placement_enforcement, self.enforcement),
+            Held("created_at", node.created_at, WrittenByThisRun(self.started)),
+            Same("deleted_at", node.deleted_at, None),
         ]
