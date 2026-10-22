@@ -160,17 +160,17 @@ class TestBootstrapScriptRevision:
             )
             return [(row.revision_number, row.script, row.creator_id) for row in rows]
 
-    async def test_update_appends_a_revision_and_read_returns_the_latest(
+    async def test_add_appends_a_revision_and_read_returns_the_latest(
         self,
         db: ExtendedAsyncSAEngine,
         repository: UserRepository,
         user_id: UserID,
         default_script: BootstrapScriptID,
     ) -> None:
-        await repository.update_default_bootstrap_script(
+        await repository.add_default_bootstrap_script_revision(
             user_id, BootstrapScript("echo 2"), user_id
         )
-        await repository.update_default_bootstrap_script(
+        await repository.add_default_bootstrap_script_revision(
             user_id, BootstrapScript("echo 3"), user_id
         )
 
