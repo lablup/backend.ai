@@ -2,7 +2,143 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/user/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/user/adapter.py)
 
+<<<<<<< HEAD
 Not exercised by any scenario: batch_load_fields, resolve_domain_id.
+=======
+시나리오: 미완 8 / 48
+
+- ops 로 구성 (23)
+  - LoginHistoryAdapter.admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - LoginHistoryAdapter.batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - LoginHistoryAdapter.my_search — 대표 성공 ✓ · 대표 실패 ✓
+  - LoginSessionAdapter.admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - LoginSessionAdapter.batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - LoginSessionAdapter.my_search — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.admin_search_keypairs — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.batch_lookup_by_emails — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.bulk_get_keypair_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - UserAdapter.bulk_lookup_keypair_access_keys — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - UserAdapter.domain_search — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.gql_admin_search — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.gql_admin_search_keypairs — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.gql_scoped_search — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.gql_search_by_domain — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.gql_search_by_project — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.project_search — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.resolve_domain_id — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - UserAdapter.role_search — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.scoped_search — 대표 성공 ✓ · 대표 실패 ✓
+  - UserAdapter.search_my_keypairs — 대표 성공 ✓ · 대표 실패 ✓
+- ops + 직접 구현 (7)
+  - UserAdapter.bulk_create_users — 성공 없음 · 실패 있음 1 (atomic_bulk_get_ops, global_scope) — SCENARIO-GAP
+  - UserAdapter.bulk_create_users_with_keypair — 성공 없음 · 실패 있음 1 (atomic_bulk_get_ops, global_scope) — SCENARIO-GAP
+  - UserAdapter.bulk_update_users — 성공 있음 3 · 실패 있음 1 (atomic_bulk_get_ops, global_scope, partial_bulk_get_ops, single_entity)
+  - UserAdapter.create_user — 성공 없음 · 실패 있음 2 (atomic_bulk_get_ops, scope) — SCENARIO-GAP
+  - UserAdapter.delete_user_by_id — 성공 있음 1 · 실패 있음 1 (atomic_bulk_get_ops, single_entity)
+  - UserAdapter.get — 성공 있음 1 · 실패 있음 1 (atomic_bulk_get_ops, single_entity)
+  - UserAdapter.update_user_by_id — 성공 있음 7 · 실패 있음 6 (atomic_bulk_get_ops, single_entity)
+- 직접 구현 (18)
+  - LoginSessionAdapter.admin_revoke — 성공 있음 1 · 실패 있음 2 (global_scope)
+  - LoginSessionAdapter.admin_unblock_user — 성공 있음 2 · 실패 있음 1 (global_scope)
+  - LoginSessionAdapter.my_revoke — 성공 있음 1 · 실패 있음 3 (single_field)
+  - UserAdapter.admin_create_keypair — 성공 있음 1 · 실패 있음 2 (single_entity)
+  - UserAdapter.admin_delete_keypair — 성공 있음 1 · 실패 있음 3 (single_field)
+  - UserAdapter.admin_delete_ssh_keypair — 성공 있음 1 · 실패 있음 2 (single_entity)
+  - UserAdapter.admin_get_keypair — 성공 있음 1 · 실패 있음 1 (single_field)
+  - UserAdapter.admin_get_ssh_keypair — 성공 있음 1 · 실패 있음 1 (single_entity)
+  - UserAdapter.admin_register_ssh_keypair — 성공 있음 1 · 실패 있음 2 (single_entity)
+  - UserAdapter.admin_update_keypair — 성공 있음 1 · 실패 있음 3 (single_field)
+  - UserAdapter.bulk_purge_users — 성공 있음 2 · 실패 있음 1 (global_scope)
+  - UserAdapter.issue_my_keypair — 성공 있음 2 · 실패 있음 1 (single_entity)
+  - UserAdapter.purge_user_by_id — 성공 있음 1 · 실패 있음 2 (single_entity)
+  - UserAdapter.restore_user_by_id — 성공 있음 2 · 실패 있음 1 (single_entity)
+  - UserAdapter.revoke_my_keypair — 성공 있음 1 · 실패 있음 4 (single_field)
+  - UserAdapter.switch_default_access_key — 성공 있음 1 · 실패 있음 2 (single_entity)
+  - UserAdapter.update_my_keypair — 성공 있음 1 · 실패 있음 3 (single_field)
+  - UserAdapter.update_user — 성공 있음 1 · 실패 있음 1 (single_entity)
+
+**LoginHistoryAdapter.admin_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [전역 역할이 문인 이력 검색에서 슈퍼관리자가 훑으면, 사용자와 무관하게 심은 이력이 생성 시각 내림차순으로 온다](#login_history-the-superadmin-searches-every-users-login-history) | 성공 |
+| [권한 받은 사용자가 이력 전체 검색을 하려 하면, 전역 역할 문이 막는다](#login_history-a-user-who-is-not-the-superadmin-may-not-search-every-login-history) | 거부 |
+
+**LoginHistoryAdapter.my_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [자기 스코프에서 READ를 받은 사용자가 훑으면, 다른 사용자의 이력은 빠진다](#login_history-a-user-granted-read-on-themselves-searches-only-their-own-login-history) | 성공 |
+| [역할 없이 자기 이력을 훑으려 하면, 본인이어도 스코프 권한 문이 막는다](#login_history-a-user-granted-nothing-may-not-search-their-own-login-history) | 거부 |
+
+**LoginSessionAdapter.admin_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [전역 역할이 문인 세션 검색에서 슈퍼관리자가 페이지 인자 없이 훑으면, 사용자와 무관하게 심은 세션이 생성 시각 내림차순으로 온다](#login_sessions-the-superadmin-searches-every-users-login-sessions) | 성공 |
+| [권한 받은 사용자가 세션 전체 검색을 하려 하면, 전역 역할 문이 막는다](#login_sessions-a-user-who-is-not-the-superadmin-may-not-search-every-login-session) | 거부 |
+
+**LoginSessionAdapter.my_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [자기 스코프에서 READ를 받은 사용자가 훑으면, 다른 사용자의 세션은 빠진다](#login_sessions-a-user-granted-read-on-themselves-searches-only-their-own-login-sessions) | 성공 |
+| [역할 없이 자기 세션을 훑으려 하면, 본인이어도 스코프 권한 문이 막는다](#login_sessions-a-user-granted-nothing-may-not-search-their-own-login-sessions) | 거부 |
+
+**UserAdapter.admin_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [전역 역할이 문인 검색에서 슈퍼관리자가 필터 없이 훑으면, 삭제 상태 사용자를 포함해 심은 사용자가 모두 온다](#searching-the-superadmin-searching-every-user-counts-deleted-ones-too) | 성공 |
+| [도메인 스코프 권한을 받은 사용자라도 전체 검색을 하려 하면, 전역 역할 문이 막는다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-user) | 거부 |
+
+**UserAdapter.admin_search_keypairs**
+
+| 시나리오 | 판정 |
+|---|---|
+| [전역 역할이 문인 키 검색에서 슈퍼관리자가 페이지 인자 없이 훑으면, 모든 사용자의 키가 오고 limit 자리는 비어서 온다](#managing_keypairs-the-superadmin-searching-every-key-gets-every-users-key) | 성공 |
+| [권한 받은 사용자가 키 전체 검색을 하려 하면, 전역 역할 문이 막는다](#managing_keypairs-a-user-who-is-not-the-superadmin-may-not-search-every-key) | 거부 |
+
+**UserAdapter.batch_load_by_ids**
+
+| 시나리오 | 판정 |
+|---|---|
+| [권한 없는 사용자가 빈 id 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다](#reading-a-batch-load-of-no-ids-answers-an-empty-list) | 성공 |
+| [슈퍼관리자가 있는 id와 없는 id를 함께 요청하면, 권한 문을 지나 없는 원소 자리에 빈 값이 온다](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | 성공 |
+| [한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 id를 한 번에 요청하면, 입력 순서대로 원소별 결과가 온다](#reading-a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order) | 거부 |
+
+**UserAdapter.batch_lookup_by_emails**
+
+| 시나리오 | 판정 |
+|---|---|
+| [대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 그 사용자의 email 을 찾으면, 그 사용자의 id 가 답으로 온다](#reading-a-user-granted-read-on-another-user-looks-up-their-id-by-email) | 성공 |
+| [권한 없는 사용자가 빈 email 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다](#reading-an-email-lookup-of-no-emails-answers-an-empty-list) | 성공 |
+| [한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 email 을 한 번에 찾으면, 첫째는 id, 나머지 둘은 같은 거부가 입력 순서대로 온다](#reading-an-unreadable-user-and-a-missing-email-are-refused-alike) | 거부 |
+
+**UserAdapter.domain_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [도메인 스코프에서 사용자 READ를 받은 사용자가 도메인 이름으로 훑으면, 다른 도메인 사용자는 빠진다](#searching-a-user-granted-on-a-domain-searching-it-by-name-finds-only-its-users) | 성공 |
+| [역할을 받지 않은 사용자가 도메인 이름으로 훑으려 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-search-a-domain-by-name) | 거부 |
+| [권한 받은 사용자가 없는 도메인 이름으로 훑으려 하면, 스코프 검사 전에 이름 조회 단계가 대상 없음으로 막는다](#searching-searching-a-domain-name-nothing-answers-to-is-not-found) | 거부 |
+
+**UserAdapter.gql_admin_search**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 커서와 페이지 인자를 모두 생략하고 훑으면, 생성 시각 내림차순으로 열 명까지 오고 다음 페이지 여부가 함께 온다](#searching-a-gql-search-without-page-arguments-answers-the-newest-ten) | 성공 |
+| [권한 받은 사용자가 GQL 전체 검색을 하려 하면, 전역 역할 문이 막는다](#searching-a-user-who-is-not-the-superadmin-may-not-gql-search-every-user) | 거부 |
+
+**UserAdapter.gql_admin_search_keypairs**
+
+| 시나리오 | 판정 |
+|---|---|
+| [전역 역할이 문인 GQL 키 검색에서 슈퍼관리자가 정책 이름을 주면, 그 정책을 쓰는 키만 온다](#managing_keypairs-the-superadmin-gql-key-search-by-policy-name-gets-that-policys-keys-only) | 성공 |
+| [권한 받은 사용자가 GQL 키 검색을 하려 하면, 전역 역할 문이 막는다](#managing_keypairs-a-user-who-is-not-the-superadmin-may-not-search-every-key-over-gql) | 거부 |
+>>>>>>> 6c4973b0 (fix(BA-8671): clear need_password_change when a user changes their own password (#15979))
 
 ### creating
 
@@ -87,7 +223,25 @@ Then
 
 권한 받은 사용자가 이 일괄 생성을 하려 하면, 전역 역할 문이 막는다
 
+<<<<<<< HEAD
 Given
+=======
+| 시나리오 | 판정 |
+|---|---|
+| [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 전체 이름만 주면, 전체 이름만 바뀐 노드가 온다](#editing-a-user-granted-update-changing-only-the-full-name-leaves-the-rest) | 성공 |
+| [대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 삭제 상태 사용자에 수정으로 ACTIVE를 주면, 되살리기와 같이 활성이 된다](#retiring-an-edit-to-active-on-a-deleted-user-restores-the-user) | 성공 |
+| [대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 수정으로 DELETED를 주면, 물리기와 같이 삭제 상태가 된다](#retiring-an-edit-to-deleted-soft-deletes-the-user) | 성공 |
+| [대상 사용자 스코프에서 UPDATE와 READ를 받은 다른 사용자가 비밀번호 변경을 요구받는 사용자에게 새 비밀번호만 주면, 요구가 남은 노드가 온다](#editing-another-users-new-password-leaves-the-password-change-requirement) | 성공 |
+| [권한 받은 사용자가 대상 사용자의 다른 키를 기본 키로 주면, 수정이 반영된 뒤 기본 키가 옮겨간 노드가 온다](#editing-naming-a-default-key-in-an-edit-moves-the-default-to-it) | 성공 |
+| [권한 받은 사용자가 소속 프로젝트 자리에 빈 값을 주면, 소속을 건드리지 않고 나머지 수정만 반영된다](#editing-null-project-ids-in-an-edit-leave-the-membership-as-it-is) | 성공 |
+| [비밀번호 변경을 요구받는 사용자가 자기 사용자 스코프에서 UPDATE와 READ를 받고, 새 비밀번호와 요구 해제를 함께 주면, 요구가 풀린 노드가 온다](#editing-setting-ones-own-new-password-lifts-the-password-change-requirement) | 성공 |
+| [역할을 받지 않은 사용자가 수정하려 하면, 엔티티 권한 문이 막는다](#editing-a-user-granted-nothing-may-not-edit-another-user) | 거부 |
+| [권한 받은 사용자가 이미 쓰이는 사용자 이름을 주면, 입력 검증이 막는다](#editing-a-username-another-user-holds-may-not-be-taken) | 거부 |
+| [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 삭제 상태 사용자의 전체 이름을 고치면, 삭제된 사용자라 막힌다](#retiring-an-edit-of-another-field-on-a-deleted-user-is-refused) | 거부 |
+| [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 수정으로 BEFORE_VERIFICATION을 주면, 입력 검증이 막는다](#retiring-an-edit-to-a-status-other-than-active-or-inactive-is-refused) | 거부 |
+| [대상 사용자 스코프에서 UPDATE와 READ만 받은 사용자가 수정으로 DELETED를 주면, 물리기의 엔티티 권한 문이 막는다](#retiring-an-edit-to-deleted-is-refused-without-soft-delete) | 거부 |
+| [삭제 상태 사용자에 수정으로 DELETED만 주면, 아무것도 바뀌지 않고 그 사용자가 온다](#retiring-an-edit-to-deleted-on-a-deleted-user-changes-nothing) | 거부 |
+>>>>>>> 6c4973b0 (fix(BA-8671): clear need_password_change when a user changes their own password (#15979))
 
 - 도메인 하나와, 그 도메인 스코프에서 사용자 생성 권한을 받은 사용자 한 명
   - 도메인 home-1
@@ -2450,6 +2604,2404 @@ Then
   - items[기본 키].created_at: 이 실행이 쓴 시각
   - items[기본 키].modified_at: 이 실행이 쓴 시각
 
+<<<<<<< HEAD
+=======
+<a id="own_keypairs-searching-own-keys-without-page-arguments-answers-the-ten-newest"></a>
+
+#### [searching-own-keys-without-page-arguments-answers-the-ten-newest](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+
+권한 받은 사용자가 페이지 인자 없이 훑으면, 생성 시각 내림차순 열 개와 다음 페이지 여부가 온다
+
+Given
+
+- 도메인 하나와 기본 아닌 키 10개를 가진 사용자 한 명, 그 사용자는 자기 사용자에 READ 권한을 받았다
+  - 도메인 home-1
+  - 키 정책을 아는 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 사용자 READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.search_my_keypairs — user-1이 페이지 인자 없이 자기 키를 훑음
+
+Then
+
+- 자기 키 열한 개 중 열 개가 최근순으로 오고 다음 페이지가 있다
+  - total_count = 11
+  - has_next_page = True
+  - has_previous_page = False
+  - items.length = 10
+  - items(created_at, field_id): 생성 시각 내림차순, 같은 시각이면 field id 오름차순
+  - items.user_id: 모두 부른 사람와 같다
+  - items.created_at: 이 실행이 쓴 시각
+  - items의 나머지 자리: 무시함 — 순서와 개수를 보는 행이다. 키 노드 전체는 다른 행이 본다
+
+<a id="own_keypairs-a-user-granted-nothing-may-not-search-their-own-keys"></a>
+
+#### [a-user-granted-nothing-may-not-search-their-own-keys](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+
+역할 없이 자기 키를 훑으려 하면, 스코프 권한 문이 막는다
+
+Given
+
+- 도메인 하나와 기본 아닌 키 0개를 가진 사용자 한 명, 그 사용자는 아무 권한도 받지 않았다
+  - 도메인 home-1
+  - 키 정책을 아는 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- UserAdapter.search_my_keypairs — user-1이 페이지 인자 없이 자기 키를 훑음
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+### UserAdapter.bulk_create_users
+
+<a id="creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-bulk-create-users](/tests/scenario/bai_scenario/manager/user/test_creating.py) — pass
+
+도메인 스코프에서 CREATE를 받은 사용자라도 일괄 생성을 하려 하면, 전역 역할 문이 막는다
+
+Given
+
+- 도메인 하나와, 그 도메인 스코프에서 사용자 생성 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 CREATE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.bulk_create_users — user-1이 home-1에 made을 일괄 생성
+
+Then
+
+- 거부된다
+  - 거부: InsufficientPrivilege
+
+### UserAdapter.bulk_create_users_with_keypair
+
+<a id="creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs](/tests/scenario/bai_scenario/manager/user/test_creating.py) — pass
+
+권한 받은 사용자가 이 일괄 생성을 하려 하면, 전역 역할 문이 막는다
+
+Given
+
+- 도메인 하나와, 그 도메인 스코프에서 사용자 생성 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 CREATE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.bulk_create_users_with_keypair — user-1이 home-1에 made을 일괄 생성
+
+Then
+
+- 거부된다
+  - 거부: InsufficientPrivilege
+
+### UserAdapter.bulk_update_users
+
+<a id="retiring-a-bulk-edit-deletes-and-restores-per-item-and-refuses-a-deleted-user-edit"></a>
+
+#### [a-bulk-edit-deletes-and-restores-per-item-and-refuses-a-deleted-user-edit](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+슈퍼관리자가 일괄 수정으로 활성 사용자에 DELETED, 삭제 상태 사용자에 ACTIVE, 다른 삭제 상태 사용자에 전체 이름을 주면, 둘은 물리고 되살린 뒤 수정 목록에, 하나는 실패로 담긴다
+
+Given
+
+- 도메인 하나와 슈퍼관리자 하나, 활성 사용자 하나, 삭제 상태 사용자 둘
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-4: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-4: 동시 세션 5개까지
+    - 슈퍼관리자 user-4: 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 deleted 상태 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 상태 deleted, 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-3: 상태 deleted, 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- UserAdapter.bulk_update_users — user-4이 user-1에 DELETED, user-2에 ACTIVE, user-3에 전체 이름을 일괄 수정으로 줌
+
+Then
+
+- 물린 사용자와 되살린 사용자가 수정 목록에, 나머지 하나가 실패 목록에 온다
+  - updated_users.id: DELETED와 ACTIVE를 준 사용자와 같다
+  - failed.user_id: 삭제 상태에서 전체 이름만 고친 사용자와 같다
+  - failed.message: 무시함 — 예외 문장은 바뀌어도 되는 값이다
+  - updated_users[물린 사용자].id: 심은 사용자와 같다
+  - updated_users[물린 사용자].basic_info.username = 'user-1'
+  - updated_users[물린 사용자].basic_info.email = 'user-1@scenario.local'
+  - updated_users[물린 사용자].basic_info.full_name = None
+  - updated_users[물린 사용자].basic_info.description = None
+  - updated_users[물린 사용자].basic_info.integration_name = None
+  - updated_users[물린 사용자].status.status = 'deleted'
+  - updated_users[물린 사용자].status.status_info = 'admin-requested'
+  - updated_users[물린 사용자].status.need_password_change = False
+  - updated_users[물린 사용자].organization.domain_name = 'home-1'
+  - updated_users[물린 사용자].organization.role = 'user'
+  - updated_users[물린 사용자].organization.resource_policy = 'user-policy-1'
+  - updated_users[물린 사용자].organization.main_access_key: 그 사용자의 기본 키가 채워져 있다
+  - updated_users[물린 사용자].security.allowed_client_ip = None
+  - updated_users[물린 사용자].security.totp_activated = False
+  - updated_users[물린 사용자].security.totp_activated_at = None
+  - updated_users[물린 사용자].security.sudo_session_enabled = False
+  - updated_users[물린 사용자].container.container_uid = None
+  - updated_users[물린 사용자].container.container_main_gid = None
+  - updated_users[물린 사용자].container.container_gids = None
+  - updated_users[물린 사용자].timestamps.created_at: 이 실행이 쓴 시각
+  - updated_users[물린 사용자].timestamps.modified_at: 이 실행이 쓴 시각
+  - updated_users[되살린 사용자].id: 심은 사용자와 같다
+  - updated_users[되살린 사용자].basic_info.username = 'user-2'
+  - updated_users[되살린 사용자].basic_info.email = 'user-2@scenario.local'
+  - updated_users[되살린 사용자].basic_info.full_name = None
+  - updated_users[되살린 사용자].basic_info.description = None
+  - updated_users[되살린 사용자].basic_info.integration_name = None
+  - updated_users[되살린 사용자].status.status = 'active'
+  - updated_users[되살린 사용자].status.status_info = 'admin-requested'
+  - updated_users[되살린 사용자].status.need_password_change = False
+  - updated_users[되살린 사용자].organization.domain_name = 'home-1'
+  - updated_users[되살린 사용자].organization.role = 'user'
+  - updated_users[되살린 사용자].organization.resource_policy = 'user-policy-2'
+  - updated_users[되살린 사용자].organization.main_access_key: 활성 기본 키가 없어 비어 있다
+  - updated_users[되살린 사용자].security.allowed_client_ip = None
+  - updated_users[되살린 사용자].security.totp_activated = False
+  - updated_users[되살린 사용자].security.totp_activated_at = None
+  - updated_users[되살린 사용자].security.sudo_session_enabled = False
+  - updated_users[되살린 사용자].container.container_uid = None
+  - updated_users[되살린 사용자].container.container_main_gid = None
+  - updated_users[되살린 사용자].container.container_gids = None
+  - updated_users[되살린 사용자].timestamps.created_at: 이 실행이 쓴 시각
+  - updated_users[되살린 사용자].timestamps.modified_at: 이 실행이 쓴 시각
+
+<a id="editing-a-bulk-edit-whose-default-key-switch-fails-reports-that-user-as-failed"></a>
+
+#### [a-bulk-edit-whose-default-key-switch-fails-reports-that-user-as-failed](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+
+슈퍼관리자가 일괄 수정과 함께 남의 키로 기본 키 전환을 주면, 그 사용자는 수정 목록에서 빠지고 실패로 담긴다
+
+Given
+
+- 도메인 하나와 대상 사용자, 사용자 1명 더, 부르는 superadmin 한 명, 한 사람에게 기본이 아닌 키가 하나 더 있다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-4: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-4: 동시 세션 5개까지
+    - 슈퍼관리자 user-4: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-5: 동시 세션 5개까지
+  - 일반 사용자 user-2: 기본이 아닌 활성 키 하나를 더 갖는다
+
+When
+
+- UserAdapter.bulk_update_users — user-3이 user-1을 일괄 수정하며 user-2의 키로 기본 키를 옮김
+
+Then
+
+- 수정 목록은 비고, 그 사용자가 실패 목록에 온다
+  - updated_users = []
+  - failed.length = 1
+  - failed[0].user_id: 기본 키를 옮기려던 사용자와 같다
+  - failed[0].message: 무시함 — 예외 메시지는 바뀌어도 되는 값이다
+
+<a id="editing-the-superadmin-bulk-edit-answers-the-updated-and-the-failed-apart"></a>
+
+#### [the-superadmin-bulk-edit-answers-the-updated-and-the-failed-apart](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+
+전역 역할이 문인 일괄 수정에서 슈퍼관리자가 있는 사용자와 이름이 겹치게 바꾸는 사용자를 함께 주면, 하나는 수정되고 하나는 사용자 id와 함께 실패로 담긴다
+
+Given
+
+- 도메인 하나와 대상 사용자, 사용자 2명 더, 부르는 superadmin 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-4: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-4: 동시 세션 5개까지
+    - 슈퍼관리자 user-4: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-5: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-5: 동시 세션 5개까지
+    - 슈퍼관리자 user-5: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- UserAdapter.bulk_update_users — user-4이 user-1의 전체 이름을 바꾸고 user-3의 이름을 user-2로 일괄 수정
+
+Then
+
+- 하나는 수정 목록에, 하나는 실패 목록에 온다
+  - updated_users.length = 1
+  - failed.length = 1
+  - updated_users[0].id: 심은 사용자와 같다
+  - updated_users[0].basic_info.username = 'user-1'
+  - updated_users[0].basic_info.email = 'user-1@scenario.local'
+  - updated_users[0].basic_info.full_name = 'renamed'
+  - updated_users[0].basic_info.description = None
+  - updated_users[0].basic_info.integration_name = None
+  - updated_users[0].status.status = 'active'
+  - updated_users[0].status.status_info = None
+  - updated_users[0].status.need_password_change = False
+  - updated_users[0].organization.domain_name = 'home-1'
+  - updated_users[0].organization.role = 'user'
+  - updated_users[0].organization.resource_policy = 'user-policy-1'
+  - updated_users[0].organization.main_access_key: 그 사용자의 기본 키가 채워져 있다
+  - updated_users[0].security.allowed_client_ip = None
+  - updated_users[0].security.totp_activated = False
+  - updated_users[0].security.totp_activated_at = None
+  - updated_users[0].security.sudo_session_enabled = False
+  - updated_users[0].container.container_uid = None
+  - updated_users[0].container.container_main_gid = None
+  - updated_users[0].container.container_gids = None
+  - updated_users[0].timestamps.created_at: 이 실행이 쓴 시각
+  - updated_users[0].timestamps.modified_at: 이 실행이 쓴 시각
+  - failed[0].user_id: 이름이 겹치게 바꾼 사용자와 같다
+  - failed[0].message: 무시함 — 예외 메시지는 바뀌어도 되는 값이다
+
+<a id="editing-a-user-who-is-not-the-superadmin-may-not-bulk-edit-users"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-bulk-edit-users](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+
+도메인 스코프에서 UPDATE를 받은 사용자라도 일괄 수정을 하려 하면, 전역 역할 문이 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 사용자 2명 더, 부르는 user 한 명, 부르는 사람은 도메인 스코프에서 UPDATE를 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-4: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-4: 동시 세션 5개까지
+    - 일반 사용자 user-4: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-5: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-5: 동시 세션 5개까지
+    - 슈퍼관리자 user-5: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 UPDATE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-4: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.bulk_update_users — user-4이 user-1의 전체 이름을 바꾸고 user-3의 이름을 user-2로 일괄 수정
+
+Then
+
+- 거부된다
+  - 거부: InsufficientPrivilege
+
+### UserAdapter.create_user
+
+<a id="creating-a-user-granted-nothing-may-not-create-a-user"></a>
+
+#### [a-user-granted-nothing-may-not-create-a-user](/tests/scenario/bai_scenario/manager/user/test_creating.py) — pass
+
+역할을 받지 않은 사용자가 만들려 하면, 도메인 스코프 권한 문이 막는다
+
+Given
+
+- 도메인 하나와, 아무 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- UserAdapter.create_user — user-1이 home-1에 made을 만듦
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="creating-a-user-may-not-be-created-in-a-domain-name-nothing-answers-to"></a>
+
+#### [a-user-may-not-be-created-in-a-domain-name-nothing-answers-to](/tests/scenario/bai_scenario/manager/user/test_creating.py) — pass
+
+권한 받은 사용자가 없는 도메인 이름을 주면, 도메인 이름 조회 단계가 대상 없음으로 막는다
+
+Given
+
+- 도메인 하나와, 그 도메인 스코프에서 사용자 생성 권한을 받은 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 CREATE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.create_user — user-1이 no-such-domain에 made을 만듦
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+### UserAdapter.delete_user_by_id
+
+<a id="retiring-a-user-granted-soft-delete-marks-another-user-deleted"></a>
+
+#### [a-user-granted-soft-delete-marks-another-user-deleted](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 물리면, 성공이 오고 그 사용자 상태가 삭제로 바뀐다
+
+Given
+
+- 도메인 하나와 대상 사용자 하나, 부르는 사람 하나, 부르는 사람은 대상에 대한 사용자 SOFT_DELETE, READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 SOFT_DELETE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 SOFT_DELETE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.delete_user_by_id — user-2이 user-1을 물림 뒤 다시 읽음
+
+Then
+
+- 성공이 오고, 다시 읽은 사용자는 deleted 상태다
+  - success = True
+  - 뒤이은 읽기.id: 심은 사용자와 같다
+  - 뒤이은 읽기.basic_info.username = 'user-1'
+  - 뒤이은 읽기.basic_info.email = 'user-1@scenario.local'
+  - 뒤이은 읽기.basic_info.full_name = None
+  - 뒤이은 읽기.basic_info.description = None
+  - 뒤이은 읽기.basic_info.integration_name = None
+  - 뒤이은 읽기.status.status = 'deleted'
+  - 뒤이은 읽기.status.status_info = 'admin-requested'
+  - 뒤이은 읽기.status.need_password_change = False
+  - 뒤이은 읽기.organization.domain_name = 'home-1'
+  - 뒤이은 읽기.organization.role = 'user'
+  - 뒤이은 읽기.organization.resource_policy = 'user-policy-1'
+  - 뒤이은 읽기.organization.main_access_key: 그 사용자의 기본 키가 채워져 있다
+  - 뒤이은 읽기.security.allowed_client_ip = None
+  - 뒤이은 읽기.security.totp_activated = False
+  - 뒤이은 읽기.security.totp_activated_at = None
+  - 뒤이은 읽기.security.sudo_session_enabled = False
+  - 뒤이은 읽기.container.container_uid = None
+  - 뒤이은 읽기.container.container_main_gid = None
+  - 뒤이은 읽기.container.container_gids = None
+  - 뒤이은 읽기.timestamps.created_at: 이 실행이 쓴 시각
+  - 뒤이은 읽기.timestamps.modified_at: 이 실행이 쓴 시각
+
+<a id="retiring-a-user-granted-nothing-may-not-delete-another-user"></a>
+
+#### [a-user-granted-nothing-may-not-delete-another-user](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+역할 없이 물리려 하면, 엔티티 권한 문이 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자 하나, 부르는 사람 하나, 부르는 사람은 아무 권한도 받지 않았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- UserAdapter.delete_user_by_id — user-2이 user-1을 물림
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+### UserAdapter.get
+
+<a id="reading-a-user-granted-read-on-another-user-reads-their-whole-node"></a>
+
+#### [a-user-granted-read-on-another-user-reads-their-whole-node](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
+
+대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 읽으면, 기본 키까지 채운 노드 전체가 답으로 온다
+
+Given
+
+- 도메인 하나와 사용자 둘, 한 사람은 다른 사람에 대한 사용자 읽기 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.get — user-2이 user-1을 읽음
+
+Then
+
+- 읽힌 사용자 전체가 온다
+  - id: 심은 사용자와 같다
+  - basic_info.username = 'user-1'
+  - basic_info.email = 'user-1@scenario.local'
+  - basic_info.full_name = None
+  - basic_info.description = None
+  - basic_info.integration_name = None
+  - status.status = 'active'
+  - status.status_info = None
+  - status.need_password_change = False
+  - organization.domain_name = 'home-1'
+  - organization.role = 'user'
+  - organization.resource_policy = 'user-policy-1'
+  - organization.main_access_key: 그 사용자의 기본 키가 채워져 있다
+  - security.allowed_client_ip = None
+  - security.totp_activated = False
+  - security.totp_activated_at = None
+  - security.sudo_session_enabled = False
+  - container.container_uid = None
+  - container.container_main_gid = None
+  - container.container_gids = None
+  - timestamps.created_at: 이 실행이 쓴 시각
+  - timestamps.modified_at: 이 실행이 쓴 시각
+
+<a id="reading-a-user-granted-nothing-may-not-read-another-user"></a>
+
+#### [a-user-granted-nothing-may-not-read-another-user](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
+
+아무 역할도 받지 않은 사용자가 다른 사용자를 읽으려 하면, 엔티티 권한 문이 막는다
+
+Given
+
+- 도메인 하나와 사용자 둘, 아무도 권한을 받지 않았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- UserAdapter.get — user-2이 user-1을 읽음
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+### UserAdapter.update_user_by_id
+
+<a id="editing-a-user-granted-update-changing-only-the-full-name-leaves-the-rest"></a>
+
+#### [a-user-granted-update-changing-only-the-full-name-leaves-the-rest](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+
+대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 전체 이름만 주면, 전체 이름만 바뀐 노드가 온다
+
+Given
+
+- 도메인 하나와 대상 사용자, 사용자 0명 더, 부르는 user 한 명, 부르는 사람은 대상 사용자 스코프에서 UPDATE, READ를 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 UPDATE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 전체 이름을 renamed로 바꿈
+
+Then
+
+- 전체 이름만 바뀐 사용자 전체가 온다
+  - id: 심은 사용자와 같다
+  - basic_info.username = 'user-1'
+  - basic_info.email = 'user-1@scenario.local'
+  - basic_info.full_name = 'renamed'
+  - basic_info.description = None
+  - basic_info.integration_name = None
+  - status.status = 'active'
+  - status.status_info = None
+  - status.need_password_change = False
+  - organization.domain_name = 'home-1'
+  - organization.role = 'user'
+  - organization.resource_policy = 'user-policy-1'
+  - organization.main_access_key: 그 사용자의 기본 키가 채워져 있다
+  - security.allowed_client_ip = None
+  - security.totp_activated = False
+  - security.totp_activated_at = None
+  - security.sudo_session_enabled = False
+  - container.container_uid = None
+  - container.container_main_gid = None
+  - container.container_gids = None
+  - timestamps.created_at: 이 실행이 쓴 시각
+  - timestamps.modified_at: 이 실행이 쓴 시각
+
+<a id="retiring-an-edit-to-active-on-a-deleted-user-restores-the-user"></a>
+
+#### [an-edit-to-active-on-a-deleted-user-restores-the-user](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 삭제 상태 사용자에 수정으로 ACTIVE를 주면, 되살리기와 같이 활성이 된다
+
+Given
+
+- 도메인 하나와 대상 deleted 상태 사용자 하나, 부르는 사람 하나, 부르는 사람은 대상에 대한 사용자 SOFT_DELETE, READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 deleted 상태 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 상태 deleted, 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 SOFT_DELETE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 SOFT_DELETE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 상태에 ACTIVE를 줌
+
+Then
+
+- active 상태의 사용자 전체가 온다
+  - id: 심은 사용자와 같다
+  - basic_info.username = 'user-1'
+  - basic_info.email = 'user-1@scenario.local'
+  - basic_info.full_name = None
+  - basic_info.description = None
+  - basic_info.integration_name = None
+  - status.status = 'active'
+  - status.status_info = 'admin-requested'
+  - status.need_password_change = False
+  - organization.domain_name = 'home-1'
+  - organization.role = 'user'
+  - organization.resource_policy = 'user-policy-1'
+  - organization.main_access_key: 활성 기본 키가 없어 비어 있다
+  - security.allowed_client_ip = None
+  - security.totp_activated = False
+  - security.totp_activated_at = None
+  - security.sudo_session_enabled = False
+  - container.container_uid = None
+  - container.container_main_gid = None
+  - container.container_gids = None
+  - timestamps.created_at: 이 실행이 쓴 시각
+  - timestamps.modified_at: 이 실행이 쓴 시각
+
+<a id="retiring-an-edit-to-deleted-soft-deletes-the-user"></a>
+
+#### [an-edit-to-deleted-soft-deletes-the-user](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 수정으로 DELETED를 주면, 물리기와 같이 삭제 상태가 된다
+
+Given
+
+- 도메인 하나와 대상 사용자 하나, 부르는 사람 하나, 부르는 사람은 대상에 대한 사용자 SOFT_DELETE, READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 SOFT_DELETE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 SOFT_DELETE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 상태에 DELETED를 줌
+
+Then
+
+- deleted 상태의 사용자 전체가 온다
+  - id: 심은 사용자와 같다
+  - basic_info.username = 'user-1'
+  - basic_info.email = 'user-1@scenario.local'
+  - basic_info.full_name = None
+  - basic_info.description = None
+  - basic_info.integration_name = None
+  - status.status = 'deleted'
+  - status.status_info = 'admin-requested'
+  - status.need_password_change = False
+  - organization.domain_name = 'home-1'
+  - organization.role = 'user'
+  - organization.resource_policy = 'user-policy-1'
+  - organization.main_access_key: 그 사용자의 기본 키가 채워져 있다
+  - security.allowed_client_ip = None
+  - security.totp_activated = False
+  - security.totp_activated_at = None
+  - security.sudo_session_enabled = False
+  - container.container_uid = None
+  - container.container_main_gid = None
+  - container.container_gids = None
+  - timestamps.created_at: 이 실행이 쓴 시각
+  - timestamps.modified_at: 이 실행이 쓴 시각
+
+<a id="editing-another-users-new-password-leaves-the-password-change-requirement"></a>
+
+#### [another-users-new-password-leaves-the-password-change-requirement](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+
+대상 사용자 스코프에서 UPDATE와 READ를 받은 다른 사용자가 비밀번호 변경을 요구받는 사용자에게 새 비밀번호만 주면, 요구가 남은 노드가 온다
+
+Given
+
+- 도메인 하나와 대상 사용자, 사용자 0명 더, 부르는 user 한 명, 부르는 사람은 대상 사용자 스코프에서 UPDATE, READ를 받았다, 대상 사용자는 비밀번호 변경을 요구받는다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다, 비밀번호 변경을 요구받는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 UPDATE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 비밀번호만 바꿈
+
+Then
+
+- 비밀번호 변경 요구가 남은 사용자 전체가 온다
+  - id: 심은 사용자와 같다
+  - basic_info.username = 'user-1'
+  - basic_info.email = 'user-1@scenario.local'
+  - basic_info.full_name = None
+  - basic_info.description = None
+  - basic_info.integration_name = None
+  - status.status = 'active'
+  - status.status_info = None
+  - status.need_password_change = True
+  - organization.domain_name = 'home-1'
+  - organization.role = 'user'
+  - organization.resource_policy = 'user-policy-1'
+  - organization.main_access_key: 그 사용자의 기본 키가 채워져 있다
+  - security.allowed_client_ip = None
+  - security.totp_activated = False
+  - security.totp_activated_at = None
+  - security.sudo_session_enabled = False
+  - container.container_uid = None
+  - container.container_main_gid = None
+  - container.container_gids = None
+  - timestamps.created_at: 이 실행이 쓴 시각
+  - timestamps.modified_at: 이 실행이 쓴 시각
+
+<a id="editing-naming-a-default-key-in-an-edit-moves-the-default-to-it"></a>
+
+#### [naming-a-default-key-in-an-edit-moves-the-default-to-it](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+
+권한 받은 사용자가 대상 사용자의 다른 키를 기본 키로 주면, 수정이 반영된 뒤 기본 키가 옮겨간 노드가 온다
+
+Given
+
+- 도메인 하나와 대상 사용자, 사용자 0명 더, 부르는 user 한 명, 부르는 사람은 대상 사용자 스코프에서 UPDATE, READ를 받았다, 한 사람에게 기본이 아닌 키가 하나 더 있다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 UPDATE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+  - 키페어 정책 keypair-policy-4: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 추가한 키를 기본 키로 줌
+
+Then
+
+- 기본 키가 추가한 키로 옮겨간 사용자 전체가 온다
+  - id: 심은 사용자와 같다
+  - basic_info.username = 'user-1'
+  - basic_info.email = 'user-1@scenario.local'
+  - basic_info.full_name = None
+  - basic_info.description = None
+  - basic_info.integration_name = None
+  - status.status = 'active'
+  - status.status_info = None
+  - status.need_password_change = False
+  - organization.domain_name = 'home-1'
+  - organization.role = 'user'
+  - organization.resource_policy = 'user-policy-1'
+  - organization.main_access_key: 추가한 키와 같다
+  - security.allowed_client_ip = None
+  - security.totp_activated = False
+  - security.totp_activated_at = None
+  - security.sudo_session_enabled = False
+  - container.container_uid = None
+  - container.container_main_gid = None
+  - container.container_gids = None
+  - timestamps.created_at: 이 실행이 쓴 시각
+  - timestamps.modified_at: 이 실행이 쓴 시각
+
+<a id="editing-null-project-ids-in-an-edit-leave-the-membership-as-it-is"></a>
+
+#### [null-project-ids-in-an-edit-leave-the-membership-as-it-is](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+
+권한 받은 사용자가 소속 프로젝트 자리에 빈 값을 주면, 소속을 건드리지 않고 나머지 수정만 반영된다
+
+Given
+
+- 도메인 하나와 프로젝트 하나, 그 명부에 오른 대상 사용자, 대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 프로젝트 team-1
+  - 일반 사용자 user-1: 프로젝트 team-1 명부에 오름
+  - 사용자 UPDATE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 소속 프로젝트에 빈 값을 주고, user-3이 team-1으로 훑음
+
+Then
+
+- 사용자는 그대로이고 프로젝트 명부에 남아 있다
+  - id: 심은 사용자와 같다
+  - basic_info.username = 'user-1'
+  - basic_info.email = 'user-1@scenario.local'
+  - basic_info.full_name = None
+  - basic_info.description = None
+  - basic_info.integration_name = None
+  - status.status = 'active'
+  - status.status_info = None
+  - status.need_password_change = False
+  - organization.domain_name = 'home-1'
+  - organization.role = 'user'
+  - organization.resource_policy = 'user-policy-1'
+  - organization.main_access_key: 그 사용자의 기본 키가 채워져 있다
+  - security.allowed_client_ip = None
+  - security.totp_activated = False
+  - security.totp_activated_at = None
+  - security.sudo_session_enabled = False
+  - container.container_uid = None
+  - container.container_main_gid = None
+  - container.container_gids = None
+  - timestamps.created_at: 이 실행이 쓴 시각
+  - timestamps.modified_at: 이 실행이 쓴 시각
+  - 뒤이은 프로젝트 검색.items: 명부에 올린 대상 사용자 하나와 같다
+  - 뒤이은 프로젝트 검색.pagination.total = 1
+  - 뒤이은 프로젝트 검색.pagination.offset = 0
+  - 뒤이은 프로젝트 검색.pagination.limit = 50
+
+<a id="editing-setting-ones-own-new-password-lifts-the-password-change-requirement"></a>
+
+#### [setting-ones-own-new-password-lifts-the-password-change-requirement](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+
+비밀번호 변경을 요구받는 사용자가 자기 사용자 스코프에서 UPDATE와 READ를 받고, 새 비밀번호와 요구 해제를 함께 주면, 요구가 풀린 노드가 온다
+
+Given
+
+- 도메인 하나와 비밀번호 변경을 요구받는 사용자 한 명, 그 사용자는 자기 사용자 스코프에서 UPDATE, READ를 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다, 비밀번호 변경을 요구받는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 UPDATE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-1이 자기 비밀번호를 바꾸며 비밀번호 변경 요구를 풂
+
+Then
+
+- 비밀번호 변경 요구가 풀린 사용자 전체가 온다
+  - id: 심은 사용자와 같다
+  - basic_info.username = 'user-1'
+  - basic_info.email = 'user-1@scenario.local'
+  - basic_info.full_name = None
+  - basic_info.description = None
+  - basic_info.integration_name = None
+  - status.status = 'active'
+  - status.status_info = None
+  - status.need_password_change = False
+  - organization.domain_name = 'home-1'
+  - organization.role = 'user'
+  - organization.resource_policy = 'user-policy-1'
+  - organization.main_access_key: 그 사용자의 기본 키가 채워져 있다
+  - security.allowed_client_ip = None
+  - security.totp_activated = False
+  - security.totp_activated_at = None
+  - security.sudo_session_enabled = False
+  - container.container_uid = None
+  - container.container_main_gid = None
+  - container.container_gids = None
+  - timestamps.created_at: 이 실행이 쓴 시각
+  - timestamps.modified_at: 이 실행이 쓴 시각
+
+<a id="editing-a-user-granted-nothing-may-not-edit-another-user"></a>
+
+#### [a-user-granted-nothing-may-not-edit-another-user](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+
+역할을 받지 않은 사용자가 수정하려 하면, 엔티티 권한 문이 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 사용자 0명 더, 부르는 user 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 전체 이름을 renamed로 바꿈
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="editing-a-username-another-user-holds-may-not-be-taken"></a>
+
+#### [a-username-another-user-holds-may-not-be-taken](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+
+권한 받은 사용자가 이미 쓰이는 사용자 이름을 주면, 입력 검증이 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 사용자 1명 더, 부르는 user 한 명, 부르는 사람은 대상 사용자 스코프에서 UPDATE를 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-3: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-4: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-4: 동시 세션 5개까지
+    - 슈퍼관리자 user-4: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 UPDATE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-3: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-3이 user-1의 이름을 user-2로 바꿈
+
+Then
+
+- 거부된다
+  - 거부: UserModificationBadRequest
+
+<a id="retiring-an-edit-of-another-field-on-a-deleted-user-is-refused"></a>
+
+#### [an-edit-of-another-field-on-a-deleted-user-is-refused](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 삭제 상태 사용자의 전체 이름을 고치면, 삭제된 사용자라 막힌다
+
+Given
+
+- 도메인 하나와 대상 deleted 상태 사용자 하나, 부르는 사람 하나, 부르는 사람은 대상에 대한 사용자 UPDATE, READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 deleted 상태 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 상태 deleted, 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 UPDATE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 전체 이름을 바꿈
+
+Then
+
+- 거부된다
+  - 거부: UserDeleted
+
+<a id="retiring-an-edit-to-a-status-other-than-active-or-inactive-is-refused"></a>
+
+#### [an-edit-to-a-status-other-than-active-or-inactive-is-refused](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 수정으로 BEFORE_VERIFICATION을 주면, 입력 검증이 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자 하나, 부르는 사람 하나, 부르는 사람은 대상에 대한 사용자 UPDATE, READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 UPDATE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 상태에 BEFORE_VERIFICATION을 줌
+
+Then
+
+- 거부된다
+  - 거부: UserModificationBadRequest
+
+<a id="retiring-an-edit-to-deleted-is-refused-without-soft-delete"></a>
+
+#### [an-edit-to-deleted-is-refused-without-soft-delete](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+대상 사용자 스코프에서 UPDATE와 READ만 받은 사용자가 수정으로 DELETED를 주면, 물리기의 엔티티 권한 문이 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자 하나, 부르는 사람 하나, 부르는 사람은 대상에 대한 사용자 UPDATE, READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 UPDATE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 상태에 DELETED를 줌
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="retiring-an-edit-to-deleted-on-a-deleted-user-changes-nothing"></a>
+
+#### [an-edit-to-deleted-on-a-deleted-user-changes-nothing](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+삭제 상태 사용자에 수정으로 DELETED만 주면, 아무것도 바뀌지 않고 그 사용자가 온다
+
+Given
+
+- 도메인 하나와 대상 deleted 상태 사용자 하나, 부르는 사람 하나, 부르는 사람은 대상에 대한 사용자 SOFT_DELETE, READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 deleted 상태 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 상태 deleted, 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 SOFT_DELETE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 SOFT_DELETE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 상태에 DELETED를 줌
+
+Then
+
+- 삭제 상태 그대로인 사용자 전체가 온다
+  - 거부: NotEnoughPermission
+
+### LoginSessionAdapter.admin_revoke
+
+<a id="login_sessions-the-superadmin-revokes-another-users-login-session"></a>
+
+#### [the-superadmin-revokes-another-users-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+
+전역 역할이 문인 관리자 회수에서 슈퍼관리자가 다른 사용자의 세션을 회수하면, 성공이 오고 세션 전체 검색에서 빠지며 관리자가 회수했다는 이력이 생긴다
+
+Given
+
+- 도메인 하나와 슈퍼관리자, 세션 하나를 가진 사용자 하나
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 활성 로그인 세션 하나를 갖는다
+
+When
+
+- LoginSessionAdapter.admin_revoke — user-2이 관리자 경로로 user-1의 세션을 회수
+
+Then
+
+- 회수가 성공하고 뒤이은 조회에 세션이 없다
+  - revoked.success = True
+  - after.items = []
+  - after.total_count = 0
+  - after.has_next_page = False
+  - after.has_previous_page = False
+
+<a id="login_sessions-a-user-who-is-not-the-superadmin-may-not-revoke-a-login-session-as-admin"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-revoke-a-login-session-as-admin](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+
+권한 받은 사용자가 관리자 회수를 하려 하면, 전역 역할 문이 막는다
+
+Given
+
+- 도메인 하나와 세션을 가진 사용자 하나, 부르는 사람은 도메인 스코프에서 사용자 UPDATE 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 활성 로그인 세션 하나를 갖는다
+  - 사용자 UPDATE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- LoginSessionAdapter.admin_revoke — user-2이 관리자 경로로 user-1의 세션을 회수
+
+Then
+
+- 거부된다
+  - 거부: InsufficientPrivilege
+
+<a id="login_sessions-even-the-superadmin-may-not-revoke-a-login-session-that-does-not-exist"></a>
+
+#### [even-the-superadmin-may-not-revoke-a-login-session-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+
+슈퍼관리자가 없는 세션 id를 주면, 입력 검증이 막는다
+
+Given
+
+- 도메인 하나와 슈퍼관리자, 세션 하나를 가진 사용자 하나
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 활성 로그인 세션 하나를 갖는다
+
+When
+
+- LoginSessionAdapter.admin_revoke — user-2이 관리자 경로로 없는 세션을 회수
+
+Then
+
+- 거부된다
+  - 거부: LoginSessionNotFoundError
+
+### LoginSessionAdapter.admin_unblock_user
+
+<a id="login_sessions-the-superadmin-unblocks-a-user"></a>
+
+#### [the-superadmin-unblocks-a-user](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+
+전역 역할이 문인 차단 해제에서 슈퍼관리자가 사용자 이름을 주면, 성공이 오고 그 이름의 차단 기록이 사라진다
+
+Given
+
+- 도메인 하나와 슈퍼관리자, 세션 하나를 가진 사용자 하나
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 활성 로그인 세션 하나를 갖는다
+
+When
+
+- LoginSessionAdapter.admin_unblock_user — user-2이 user-1의 차단을 풂
+
+Then
+
+- 차단 해제가 성공한다
+  - success = True
+
+<a id="login_sessions-unblocking-a-username-nobody-holds-still-succeeds"></a>
+
+#### [unblocking-a-username-nobody-holds-still-succeeds](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+
+슈퍼관리자가 어떤 사용자도 아닌 이름을 주면, 존재를 확인하지 않고 성공이 온다
+
+Given
+
+- 도메인 하나와 슈퍼관리자, 세션 하나를 가진 사용자 하나
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 활성 로그인 세션 하나를 갖는다
+
+When
+
+- LoginSessionAdapter.admin_unblock_user — user-2이 없는 이름의 차단을 풂
+
+Then
+
+- 차단 해제가 성공한다
+  - success = True
+
+<a id="login_sessions-a-user-who-is-not-the-superadmin-may-not-unblock-a-user"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-unblock-a-user](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+
+권한 받은 사용자가 차단을 풀려 하면, 전역 역할 문이 막는다
+
+Given
+
+- 도메인 하나와 세션을 가진 사용자 하나, 부르는 사람은 도메인 스코프에서 사용자 UPDATE 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 활성 로그인 세션 하나를 갖는다
+  - 사용자 UPDATE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- LoginSessionAdapter.admin_unblock_user — user-2이 user-1의 차단을 풂
+
+Then
+
+- 거부된다
+  - 거부: InsufficientPrivilege
+
+### LoginSessionAdapter.my_revoke
+
+<a id="login_sessions-a-user-granted-update-on-themselves-revokes-their-own-login-session"></a>
+
+#### [a-user-granted-update-on-themselves-revokes-their-own-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+
+자기 스코프에서 READ와 UPDATE를 받은 사용자가 자기 세션을 회수하면, 성공이 오고 그 세션은 더 조회되지 않으며 사용자가 회수했다는 이력이 생긴다
+
+Given
+
+- 도메인 하나와 사용자 둘, 부르는 사람은 자기 사용자에 READ, UPDATE 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 활성 로그인 세션 하나를 갖는다
+  - 사용자 READ, UPDATE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- LoginSessionAdapter.my_revoke — user-1이 자기 세션을 회수
+
+Then
+
+- 회수가 성공하고 뒤이은 조회에 세션이 없다
+  - revoked.success = True
+  - after.items = []
+  - after.total_count = 0
+  - after.has_next_page = False
+  - after.has_previous_page = False
+
+<a id="login_sessions-a-user-granted-nothing-may-not-revoke-their-own-login-session"></a>
+
+#### [a-user-granted-nothing-may-not-revoke-their-own-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+
+역할 없이 회수하려 하면, 소유자 조회 단계가 막는다
+
+Given
+
+- 도메인 하나와 사용자 둘, 부르는 사람은 아무 권한도 받지 않았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 활성 로그인 세션 하나를 갖는다
+
+When
+
+- LoginSessionAdapter.my_revoke — user-1이 자기 세션을 회수
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+<a id="login_sessions-a-user-granted-only-on-themselves-may-not-revoke-another-users-login-session"></a>
+
+#### [a-user-granted-only-on-themselves-may-not-revoke-another-users-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+
+자기 스코프에서만 READ와 UPDATE를 받은 사용자가 다른 사용자의 세션을 주면, 그 소유자에 대한 조회 단계가 막는다
+
+Given
+
+- 도메인 하나와 사용자 둘, 부르는 사람은 자기 사용자에 READ, UPDATE 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+  - 일반 사용자 user-2: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-2: 활성 로그인 세션 하나를 갖는다
+  - 사용자 READ, UPDATE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- LoginSessionAdapter.my_revoke — user-1이 user-2 세션을 회수
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+<a id="login_sessions-a-user-granted-only-read-may-not-revoke-their-own-login-session"></a>
+
+#### [a-user-granted-only-read-may-not-revoke-their-own-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+
+READ만 받고 회수하려 하면, 엔티티 권한 문이 막는다
+
+Given
+
+- 도메인 하나와 사용자 둘, 부르는 사람은 자기 사용자에 READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 일반 사용자 user-1: 활성 로그인 세션 하나를 갖는다
+  - 사용자 READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- LoginSessionAdapter.my_revoke — user-1이 자기 세션을 회수
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+### UserAdapter.admin_create_keypair
+
+<a id="managing_keypairs-a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy"></a>
+
+#### [a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+슈퍼관리자가 아니어도 대상 사용자 스코프에서 UPDATE를 받은 사용자가 정책을 주고 키를 만들면, 기본 아닌 새 키와 secret이 온다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 부르는 사람은 대상에 대한 사용자 UPDATE 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 사용자 UPDATE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_create_keypair — user-2이 user-1에게 granted-policy-1으로 키를 만듦
+
+Then
+
+- 만든 키 전체와 secret이 온다
+  - id: 무시함 — 매니저가 만든 access key다
+  - access_key: 무시함 — 매니저가 만든다
+  - is_active = True
+  - is_admin = False
+  - is_default = False
+  - rate_limit = 30000
+  - resource_policy = 'granted-policy-1'
+  - ssh_public_key: 무시함 — 매니저가 만든 RSA 키다
+  - num_queries = 0
+  - last_used = None
+  - user_id: 키의 주인와 같다
+  - created_at: 이 실행이 쓴 시각
+  - modified_at: 이 실행이 쓴 시각
+  - secret_key: 무시함 — 매니저가 만든다
+
+<a id="managing_keypairs-a-key-may-not-be-made-under-a-policy-that-does-not-exist"></a>
+
+#### [a-key-may-not-be-made-under-a-policy-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 부르는 사람은 대상에 대한 사용자 UPDATE 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 사용자 UPDATE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_create_keypair — user-2이 user-1에게 없는 정책으로 키를 만듦
+
+Then
+
+- 거부된다
+  - 거부: KeypairResourcePolicyNotFound
+
+<a id="managing_keypairs-a-user-granted-nothing-may-not-make-a-key-for-another"></a>
+
+#### [a-user-granted-nothing-may-not-make-a-key-for-another](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+역할 없이 키를 만들려 하면, 엔티티 권한 문이 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 부르는 사람은 아무 권한도 받지 않았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+
+When
+
+- UserAdapter.admin_create_keypair — user-2이 user-1에게 granted-policy-1으로 키를 만듦
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+### UserAdapter.admin_delete_keypair
+
+<a id="managing_keypairs-a-granted-user-deleting-another-users-extra-key-gets-its-access-key"></a>
+
+#### [a-granted-user-deleting-another-users-extra-key-gets-its-access-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+대상 스코프에서 READ와 UPDATE를 받은 사용자가 지우면, 지운 키의 access key가 답으로 온다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 대상에게 기본 아닌 키 하나, 부르는 사람은 대상에 대한 사용자 READ, UPDATE 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 사용자 READ, UPDATE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_delete_keypair — user-2이 user-1의 기본 아닌 키를 지움
+
+Then
+
+- 지운 키의 access key가 온다
+  - access_key: 심은 키와 같다
+
+<a id="managing_keypairs-a-user-granted-nothing-may-not-delete-another-users-key"></a>
+
+#### [a-user-granted-nothing-may-not-delete-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+역할 없이 지우려 하면, 소유자 조회 단계가 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 대상에게 기본 아닌 키 하나, 부르는 사람은 아무 권한도 받지 않았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+
+When
+
+- UserAdapter.admin_delete_keypair — user-2이 user-1의 기본 아닌 키를 지움
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+<a id="managing_keypairs-a-user-granted-only-read-may-not-delete-another-users-key"></a>
+
+#### [a-user-granted-only-read-may-not-delete-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+READ만 받고 지우려 하면, 엔티티 권한 문이 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 대상에게 기본 아닌 키 하나, 부르는 사람은 대상에 대한 사용자 READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 사용자 READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_delete_keypair — user-2이 user-1의 기본 아닌 키를 지움
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="managing_keypairs-another-users-default-key-may-not-be-deleted"></a>
+
+#### [another-users-default-key-may-not-be-deleted](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+권한 받은 사용자가 대상의 기본 키를 지우려 하면, 입력 검증이 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 부르는 사람은 대상에 대한 사용자 READ, UPDATE 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 사용자 READ, UPDATE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_delete_keypair — user-2이 user-1의 기본 키를 지움
+
+Then
+
+- 거부된다
+  - 거부: KeyPairForbidden
+
+### UserAdapter.admin_delete_ssh_keypair
+
+<a id="managing_keypairs-a-granted-user-clearing-another-users-ssh-key-empties-the-public-key"></a>
+
+#### [a-granted-user-clearing-another-users-ssh-key-empties-the-public-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+대상 스코프에서 READ와 UPDATE를 받은 사용자가 지우면, access key가 오고 공개키가 비워진다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 부르는 사람은 대상에 대한 사용자 READ, UPDATE 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 사용자 READ, UPDATE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_delete_ssh_keypair — user-2이 user-1의 기본 키에서 SSH 키를 지우고 읽음
+
+Then
+
+- 대상 기본 키가 오고, 뒤이은 읽기에서 공개키가 바뀌어 있다
+  - access_key: 대상의 기본 키와 같다
+  - 뒤이은 읽기의 ssh_public_key = None
+
+<a id="managing_keypairs-a-user-granted-nothing-may-not-clear-another-users-ssh-key"></a>
+
+#### [a-user-granted-nothing-may-not-clear-another-users-ssh-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+역할 없이 지우려 하면, 소유자 조회 단계가 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 부르는 사람은 아무 권한도 받지 않았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+
+When
+
+- UserAdapter.admin_delete_ssh_keypair — user-2이 user-1의 기본 키에서 SSH 키를 지우고 읽음
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+<a id="managing_keypairs-a-user-granted-only-read-may-not-clear-another-users-ssh-key"></a>
+
+#### [a-user-granted-only-read-may-not-clear-another-users-ssh-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+READ만 받고 지우려 하면, 엔티티 권한 문이 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 부르는 사람은 대상에 대한 사용자 READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 사용자 READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_delete_ssh_keypair — user-2이 user-1의 기본 키에서 SSH 키를 지우고 읽음
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+### UserAdapter.admin_get_keypair
+
+<a id="managing_keypairs-a-granted-user-reads-another-users-key-by-access-key"></a>
+
+#### [a-granted-user-reads-another-users-key-by-access-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+대상 스코프에서 READ를 받은 사용자가 읽으면, 그 키 노드 전체가 온다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 대상에게 기본 아닌 키 하나, 부르는 사람은 대상에 대한 사용자 READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 사용자 READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_get_keypair — user-2이 user-1의 키를 access key로 읽음
+
+Then
+
+- 심은 키 전체가 온다
+  - id: 심은 키와 같다
+  - access_key: 심은 키와 같다
+  - is_active = True
+  - is_admin = False
+  - is_default = False
+  - rate_limit = 10000
+  - resource_policy = 'granted-policy-1'
+  - ssh_public_key = ''
+  - num_queries = 0
+  - last_used = None
+  - user_id: 키의 주인와 같다
+  - created_at: 이 실행이 쓴 시각
+  - modified_at: 이 실행이 쓴 시각
+
+<a id="managing_keypairs-a-user-granted-nothing-may-not-read-another-users-key"></a>
+
+#### [a-user-granted-nothing-may-not-read-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+역할 없이 읽으려 하면, 소유자 조회 단계가 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 대상에게 기본 아닌 키 하나, 부르는 사람은 아무 권한도 받지 않았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+
+When
+
+- UserAdapter.admin_get_keypair — user-2이 user-1의 키를 access key로 읽음
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+### UserAdapter.admin_get_ssh_keypair
+
+<a id="managing_keypairs-a-granted-user-reads-another-users-ssh-public-key-only"></a>
+
+#### [a-granted-user-reads-another-users-ssh-public-key-only](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+대상 스코프에서 READ를 받은 사용자가 읽으면, access key와 공개키만 오고 개인키는 오지 않는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 부르는 사람은 대상에 대한 사용자 READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 사용자 READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_get_ssh_keypair — user-2이 user-1의 SSH 공개키를 읽음
+
+Then
+
+- access key와 공개키만 온다
+  - keypair.access_key: 대상의 기본 키와 같다
+  - keypair.ssh_public_key = ''
+
+<a id="managing_keypairs-a-user-granted-nothing-may-not-read-another-users-ssh-public-key"></a>
+
+#### [a-user-granted-nothing-may-not-read-another-users-ssh-public-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+역할 없이 읽으려 하면, 소유자 조회 단계가 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 부르는 사람은 아무 권한도 받지 않았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+
+When
+
+- UserAdapter.admin_get_ssh_keypair — user-2이 user-1의 SSH 공개키를 읽음
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+### UserAdapter.admin_register_ssh_keypair
+
+<a id="managing_keypairs-a-granted-user-registering-another-users-ssh-key-gets-the-access-key"></a>
+
+#### [a-granted-user-registering-another-users-ssh-key-gets-the-access-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+대상 스코프에서 READ와 UPDATE를 받은 사용자가 공개키와 개인키를 주면, 형식 검사 없이 덮어쓰고 access key가 답으로 온다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 부르는 사람은 대상에 대한 사용자 READ, UPDATE 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 사용자 READ, UPDATE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_register_ssh_keypair — user-2이 user-1의 기본 키에 SSH 키를 등록하고 읽음
+
+Then
+
+- 대상 기본 키가 오고, 뒤이은 읽기에서 공개키가 바뀌어 있다
+  - access_key: 대상의 기본 키와 같다
+  - 뒤이은 읽기의 ssh_public_key = 'ssh-rsa scenario-public-key'
+
+<a id="managing_keypairs-a-user-granted-nothing-may-not-register-another-users-ssh-key"></a>
+
+#### [a-user-granted-nothing-may-not-register-another-users-ssh-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+역할 없이 등록하려 하면, 소유자 조회 단계가 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 부르는 사람은 아무 권한도 받지 않았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+
+When
+
+- UserAdapter.admin_register_ssh_keypair — user-2이 user-1의 기본 키에 SSH 키를 등록하고 읽음
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+<a id="managing_keypairs-a-user-granted-only-read-may-not-register-another-users-ssh-key"></a>
+
+#### [a-user-granted-only-read-may-not-register-another-users-ssh-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+READ만 받고 등록하려 하면, 엔티티 권한 문이 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 부르는 사람은 대상에 대한 사용자 READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 사용자 READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_register_ssh_keypair — user-2이 user-1의 기본 키에 SSH 키를 등록하고 읽음
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+### UserAdapter.admin_update_keypair
+
+<a id="managing_keypairs-a-granted-user-changing-another-users-rate-limit-changes-only-that"></a>
+
+#### [a-granted-user-changing-another-users-rate-limit-changes-only-that](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+대상 스코프에서 READ와 UPDATE를 받은 사용자가 요청 한도만 주면, 나머지는 그대로이고 한도만 바뀐 키 노드가 온다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 대상에게 기본 아닌 키 하나, 부르는 사람은 대상에 대한 사용자 READ, UPDATE 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 사용자 READ, UPDATE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_update_keypair — user-2이 user-1의 키에 요청 한도를 줌
+
+Then
+
+- 요청 한도만 바뀐 키 전체가 온다
+  - id: 심은 키와 같다
+  - access_key: 심은 키와 같다
+  - is_active = True
+  - is_admin = False
+  - is_default = False
+  - rate_limit = 45000
+  - resource_policy = 'granted-policy-1'
+  - ssh_public_key = ''
+  - num_queries = 0
+  - last_used = None
+  - user_id: 키의 주인와 같다
+  - created_at: 이 실행이 쓴 시각
+  - modified_at: 이 실행이 쓴 시각
+
+<a id="managing_keypairs-a-user-granted-nothing-may-not-change-another-users-key"></a>
+
+#### [a-user-granted-nothing-may-not-change-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+역할 없이 바꾸려 하면, 소유자 조회 단계가 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 대상에게 기본 아닌 키 하나, 부르는 사람은 아무 권한도 받지 않았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+
+When
+
+- UserAdapter.admin_update_keypair — user-2이 user-1의 키에 요청 한도를 줌
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+<a id="managing_keypairs-a-user-granted-only-read-may-not-change-another-users-key"></a>
+
+#### [a-user-granted-only-read-may-not-change-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+READ만 받고 바꾸려 하면, 엔티티 권한 문이 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 대상에게 기본 아닌 키 하나, 부르는 사람은 대상에 대한 사용자 READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 사용자 READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_update_keypair — user-2이 user-1의 키에 요청 한도를 줌
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="managing_keypairs-another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist"></a>
+
+#### [another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+
+권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막는다
+
+Given
+
+- 도메인 하나와 대상 사용자, 부르는 사용자, 대상에게 기본 아닌 키 하나, 부르는 사람은 대상에 대한 사용자 READ, UPDATE 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 granted-policy-1: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 사용자 READ, UPDATE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.admin_update_keypair — user-2이 user-1의 키에 요청 한도와 없는 정책를 줌
+
+Then
+
+- 거부된다
+  - 거부: KeypairResourcePolicyNotFound
+
+### UserAdapter.bulk_purge_users
+
+<a id="retiring-a-bulk-purge-records-a-missing-id-as-a-failure"></a>
+
+#### [a-bulk-purge-records-a-missing-id-as-a-failure](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+슈퍼관리자가 있는 사용자와 없는 id를 함께 주면, 하나는 지워지고 없는 id는 실패로 담긴다
+
+Given
+
+- 도메인 하나와 슈퍼관리자 하나, 사용자 1명, 그리고 어떤 사용자도 아닌 id 하나
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- UserAdapter.bulk_purge_users — user-2이 user-1와 없는 id를 일괄로 지움
+
+Then
+
+- 지운 사용자 id와 개수, 그리고 실패가 온다
+  - successes: 심은 사용자 전부와 같다
+  - purged_count = 1
+  - failed.user_id: 없는 id와 같다
+  - failed.message: 무시함 — 예외 문장은 바뀌어도 되는 값이다
+
+<a id="retiring-the-superadmin-bulk-purge-answers-the-purged-ids-and-count"></a>
+
+#### [the-superadmin-bulk-purge-answers-the-purged-ids-and-count](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+전역 역할이 문인 일괄 지우기에서 슈퍼관리자가 사용자 둘을 주면, 두 id와 개수 둘이 온다
+
+Given
+
+- 도메인 하나와 슈퍼관리자 하나, 사용자 2명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- UserAdapter.bulk_purge_users — user-3이 user-1, user-2를 일괄로 지움
+
+Then
+
+- 지운 사용자 id와 개수, 그리고 실패가 온다
+  - successes: 심은 사용자 전부와 같다
+  - purged_count = 2
+  - failed = []
+
+<a id="retiring-a-user-who-is-not-the-superadmin-may-not-purge-in-bulk"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-purge-in-bulk](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+도메인 스코프에서 HARD_DELETE를 받은 사용자라도 일괄 지우기를 하려 하면, 전역 역할 문이 막는다
+
+Given
+
+- 도메인 하나와 사용자 하나, 부르는 사람은 도메인 스코프의 사용자 HARD_DELETE 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 HARD_DELETE 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 HARD_DELETE 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.bulk_purge_users — user-2이 user-1를 일괄로 지움
+
+Then
+
+- 거부된다
+  - 거부: InsufficientPrivilege
+
+### UserAdapter.issue_my_keypair
+
+<a id="own_keypairs-a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key"></a>
+
+>>>>>>> 6c4973b0 (fix(BA-8671): clear need_password_change when a user changes their own password (#15979))
 #### [a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
 
 자기 사용자 스코프에서 UPDATE를 받은 사용자가 발급하면, 기본 키의 관리자 표시, 정책, 요청 한도를 따르고 기본 표시는 없는 키와 secret이 온다

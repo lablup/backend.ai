@@ -252,17 +252,31 @@ class SomeoneOf(SeedNest[Laid[UserData]]):
     domain: Laid[DomainData]
     role: UserRole = UserRole.USER
     vfolder_hosts: Sequence[str] = ()
+    need_password_change: bool = False
 
     @override
     def kind(self) -> str:
         return "도메인에 속한 사용자 한 명 준비"
 
     @override
+<<<<<<< HEAD
     def lay(self, seed: Seeder) -> Laid[UserData]:
         seed.once(SeedProjectPolicy())
         policy = seed.creating(SeedUserPolicy())
         key_policy = seed.creating(SeedKeypairPolicy(vfolder_hosts=self.vfolder_hosts))
         return seed.provisioning(SeedUserOf(role=self.role), self.domain, policy, key_policy)
+=======
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        seed.once(TestSeedProjectPolicy())
+        policy = seed.creating(TestSeedUserPolicy())
+        key_policy = seed.creating(TestSeedKeypairPolicy(vfolder_hosts=self.vfolder_hosts))
+        return seed.provisioning(
+            TestSeedUserOf(role=self.role, need_password_change=self.need_password_change),
+            self.domain,
+            policy,
+            key_policy,
+        )
+>>>>>>> 6c4973b0 (fix(BA-8671): clear need_password_change when a user changes their own password (#15979))
 
 
 @dataclass(frozen=True)
