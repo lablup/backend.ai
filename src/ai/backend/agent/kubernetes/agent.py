@@ -40,7 +40,6 @@ from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
 from ai.backend.agent.kernel_registry.recovery.kubernetes_recovery import (
     KubernetesKernelRegistryRecovery,
-    KubernetesKernelRegistryRecoveryArgs,
 )
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.resources import (
@@ -871,15 +870,7 @@ class KubernetesAgent(
             agent_class=agent_class,
             sentinel_monitors=sentinel_monitors,
         )
-        self._kernel_recovery = KubernetesKernelRegistryRecovery.create(
-            KubernetesKernelRegistryRecoveryArgs(
-                scratch_root=self.local_config.container.scratch_root,
-                ipc_base_path=self.local_config.agent.ipc_base_path,
-                var_base_path=self.local_config.agent.var_base_path,
-                agent_id=self.id,
-                local_instance_id=self.local_instance_id,
-            )
-        )
+        self._kernel_recovery = KubernetesKernelRegistryRecovery.create()
 
     @override
     async def __ainit__(self) -> None:

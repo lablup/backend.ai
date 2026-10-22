@@ -67,17 +67,9 @@ from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.fs import create_scratch_filesystem, destroy_scratch_filesystem
 from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
-from ai.backend.agent.kernel_registry.adapter import (
-    KernelRecoveryDataAdapter,
-    KernelRecoveryDataAdapterTarget,
-)
 from ai.backend.agent.kernel_registry.container.creator import (
     ContainerBasedKernelRegistryCreatorArgs,
     ContainerBasedLoaderWriterCreator,
-)
-from ai.backend.agent.kernel_registry.pickle.creator import (
-    PickleBasedKernelRegistryCreatorArgs,
-    PickleBasedLoaderWriterCreator,
 )
 from ai.backend.agent.kernel_registry.recovery.docker_recovery import (
     DockerKernelRegistryRecovery,
@@ -1627,33 +1619,15 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self.checked_invalid_images = set()
         self._seccomp_profile_as_path = False
         self._cgroup_path_cache = LRUCache(maxsize=_CGROUP_PATH_CACHE_SIZE)
-        pickle_loader_writer_creator = PickleBasedLoaderWriterCreator.create(
-            PickleBasedKernelRegistryCreatorArgs(
-                scratch_root=local_config.container.scratch_root,
-                ipc_base_path=local_config.agent.ipc_base_path,
-                var_base_path=local_config.agent.var_base_path,
-                agent_class=self.agent_class,
-                agent_id=self.id,
-                local_instance_id=self.local_instance_id,
-            ),
-        )
-        pickle_loader = pickle_loader_writer_creator.create_loader()
-        pickle_writer = pickle_loader_writer_creator.create_writer()
         container_loader_writer_creator = ContainerBasedLoaderWriterCreator(
             ContainerBasedKernelRegistryCreatorArgs(
                 scratch_root=local_config.container.scratch_root,
                 agent=self,
             )
         )
-        container_loader = container_loader_writer_creator.create_loader()
-        container_writer = container_loader_writer_creator.create_writer()
         self._kernel_recovery = DockerKernelRegistryRecovery(
-            loader=container_loader,
-            writers=[pickle_writer, container_writer],
-        )
-        self._kernel_recovery_adapter = KernelRecoveryDataAdapter(
-            pickle_loader,
-            [KernelRecoveryDataAdapterTarget(container_loader, container_writer)],
+            loader=container_loader_writer_creator.create_loader(),
+            writers=[container_loader_writer_creator.create_writer()],
         )
 
     @override
@@ -1701,7 +1675,6 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                 cgroup_version=str(docker_info["CgroupVersion"]),
             )
             self.docker_info = docker_info
-        await self._kernel_recovery_adapter.adapt_recovery_data()
         await super().__ainit__()
         try:
             async with Docker() as docker:

@@ -88,12 +88,6 @@ def local_config(
     redis_addr = redis_container[1]
     mount_path = Path.cwd() / "vfroot"
 
-    registry_state_path = var_base_path / f"last_registry.{test_id}.dat"
-    try:
-        os.unlink(registry_state_path)
-    except FileNotFoundError:
-        pass
-
     raw_server_config = {
         "agent": {
             "region": f"rg-{test_id}",
@@ -162,10 +156,6 @@ def local_config(
         pass
     yield server_config
     shutil.rmtree(ipc_base_path)
-    try:
-        os.unlink(registry_state_path)
-    except FileNotFoundError:
-        pass
 
 
 @pytest.fixture(scope="session", autouse=True)
