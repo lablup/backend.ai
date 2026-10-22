@@ -115,6 +115,10 @@ from ai.backend.manager.services.user.actions.ssh_keypair_ops import (
     LookupSSHKeypairOwnerAction,
     SearchSSHKeypairsAction,
 )
+from ai.backend.manager.services.user.actions.switch_default_dotfile import (
+    SwitchDefaultDotfileAction,
+    SwitchDefaultDotfileActionResult,
+)
 from ai.backend.manager.services.user.actions.update_user import (
     BulkUpdateUserAction,
     BulkUpdateUserActionResult,
@@ -193,6 +197,9 @@ class UserProcessors:
         AdminGetSSHKeypairAction, AdminGetSSHKeypairActionResult
     ]
     create_dotfile: SingleEntityActionProcessor[CreateDotfileAction, CreateDotfileActionResult]
+    switch_default_dotfile: SingleEntityActionProcessor[
+        SwitchDefaultDotfileAction, SwitchDefaultDotfileActionResult
+    ]
     get_default_bootstrap_script: SingleEntityActionProcessor[
         GetDefaultBootstrapScriptAction, GetDefaultBootstrapScriptActionResult
     ]
@@ -251,6 +258,9 @@ class UserProcessors:
             AdminGetSSHKeypairAction, user_service.admin_get_ssh_keypair
         )
         self.create_dotfile = group.single_entity(CreateDotfileAction, user_service.create_dotfile)
+        self.switch_default_dotfile = group.single_entity(
+            SwitchDefaultDotfileAction, user_service.switch_default_dotfile
+        )
         self.get_default_bootstrap_script = group.single_entity(
             GetDefaultBootstrapScriptAction, user_service.get_default_bootstrap_script
         )
