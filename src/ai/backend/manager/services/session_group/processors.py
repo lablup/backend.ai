@@ -3,6 +3,7 @@ from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActi
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
+    CreatedEntityOpsResult,
     EntityOpsResult,
     ScopedBatchOpsResult,
 )
@@ -10,6 +11,7 @@ from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.session_group.types import SessionGroupData
 from ai.backend.manager.services.session_group.actions.bulk_get import BulkGetSessionGroupsAction
+from ai.backend.manager.services.session_group.actions.create import CreateSessionGroupAction
 from ai.backend.manager.services.session_group.actions.get import GetSessionGroupAction
 from ai.backend.manager.services.session_group.actions.global_search import (
     GlobalSearchSessionGroupsAction,
@@ -34,6 +36,7 @@ class SessionGroupProcessors:
     scoped_search: ScopeActionProcessor[
         ScopedSearchSessionGroupsAction, ScopedBatchOpsResult[SessionGroupData]
     ]
+    create: ScopeActionProcessor[CreateSessionGroupAction, CreatedEntityOpsResult[SessionGroupData]]
     purge: SingleEntityActionProcessor[PurgeSessionGroupAction, EntityOpsResult[SessionGroupData]]
     update: SingleEntityActionProcessor[UpdateSessionGroupAction, EntityOpsResult[SessionGroupData]]
 
@@ -46,5 +49,6 @@ class SessionGroupProcessors:
         self.bulk_get_ids = group.partial_bulk(BulkGetSessionGroupsAction, service.bulk_get_ids)
         self.global_search = group.global_searcher_ops(GlobalSearchSessionGroupsAction)
         self.scoped_search = group.scoped_search_ops(ScopedSearchSessionGroupsAction)
+        self.create = group.entity_create_ops(CreateSessionGroupAction)
         self.purge = group.entity_purge_ops(PurgeSessionGroupAction)
         self.update = group.single_update_ops(UpdateSessionGroupAction)
