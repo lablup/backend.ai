@@ -464,6 +464,7 @@ from ai.backend.manager.api.gql.resource_allocation.resolver import (
     admin_effective_resource_allocation_v2,
     check_preset_availability_v2,
     effective_resource_allocation_v2,
+    my_concurrency,
     my_keypair_resource_allocation_v2,
     project_resource_allocation_v2,
     resource_group_resource_allocation_v2,
@@ -1059,6 +1060,7 @@ class Query:
     effective_resource_allocation_v2 = effective_resource_allocation_v2
     admin_effective_resource_allocation_v2 = admin_effective_resource_allocation_v2
     check_preset_availability_v2 = check_preset_availability_v2
+    my_concurrency = my_concurrency
     # VFolder APIs
     admin_vfolders_v2 = admin_vfolders_v2
     vfolder_v2 = vfolder_v2

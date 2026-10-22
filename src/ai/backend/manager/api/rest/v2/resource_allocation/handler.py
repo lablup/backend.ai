@@ -116,3 +116,8 @@ class V2ResourceAllocationHandler:
             resource_policy=resource_policy,
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def my_concurrency(self) -> APIResponse:
+        """Get the current user's concurrent session counts."""
+        result = await self._adapter.my_concurrency()
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
