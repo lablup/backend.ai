@@ -24,7 +24,7 @@ from bai_scenario.runner.unwired import unwired
 
 @pytest.fixture
 def lifecycle_handlers() -> Sequence[SessionLifecycleHandler]:
-    """등록된 세션 처리기. 이름과 클래스 설명만 읽으므로 안쪽은 배선하지 않는다."""
+    """등록된 세션 처리기. 이름과 설명만 읽으므로 안쪽은 배선하지 않는다."""
     return (
         TerminateSessionsLifecycleHandler(
             terminator=unwired(SessionTerminator, "처리기의 이름과 설명만 읽는다"),

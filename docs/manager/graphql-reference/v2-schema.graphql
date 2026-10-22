@@ -19711,10 +19711,8 @@ type SessionLifecycleHandlerNode {
   """
   name: String!
 
-  """
-  First line of the handler's docstring, if any. Null when the backing class has no docstring.
-  """
-  description: String
+  """One-line description of what the handler does."""
+  description: String!
 }
 
 """

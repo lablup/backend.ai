@@ -18,12 +18,7 @@ class SessionLifecycleHandlerNode(BaseResponseModel):
     name: str = Field(
         description="Handler key accepted in the session options' handler_options.by_handler."
     )
-    description: str | None = Field(
-        description=(
-            "First line of the handler's docstring, if any. "
-            "Null when the backing class has no docstring."
-        ),
-    )
+    description: str = Field(description="One-line description of what the handler does.")
 
 
 class ListSessionLifecycleHandlersPayload(BaseResponseModel):

@@ -14,17 +14,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 
 
-def _first_docstring_line(cls: type[SessionLifecycleHandler]) -> str | None:
-    doc = cls.__doc__
-    if doc is None:
-        return None
-    for raw_line in doc.splitlines():
-        stripped = raw_line.strip()
-        if stripped:
-            return stripped
-    return None
-
-
 class SessionLifecycleHandlerAdapter:
     """Expose the lifecycle handlers the schedule coordinator runs as DTO nodes."""
 
@@ -38,7 +27,7 @@ class SessionLifecycleHandlerAdapter:
         items = [
             SessionLifecycleHandlerNode(
                 name=handler.name(),
-                description=_first_docstring_line(type(handler)),
+                description=handler.description(),
             )
             for handler in self._handlers
         ]

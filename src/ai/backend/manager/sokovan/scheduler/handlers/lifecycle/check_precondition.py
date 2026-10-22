@@ -53,6 +53,11 @@ class CheckPreconditionLifecycleHandler(SessionLifecycleHandler):
 
     @classmethod
     @override
+    def description(cls) -> str:
+        return "Pulls the images of scheduled sessions onto their assigned agents."
+
+    @classmethod
+    @override
     def target_statuses(cls) -> list[SessionStatus]:
         """Sessions in SCHEDULED or PREPARING state.
 

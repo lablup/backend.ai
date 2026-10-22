@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import inspect
 from dataclasses import dataclass
 from typing import override
 
@@ -84,7 +83,7 @@ class Listing(When[None, SessionLifecycleHandlerAdapter, list[SessionLifecycleHa
 class TheTerminatorIsListed(Then[None, list[SessionLifecycleHandlerNode]]):
     @override
     def says(self) -> str:
-        return "세션 종료 처리기 하나가 그 이름과 클래스 설명의 첫 줄로 반환된다"
+        return "세션 종료 처리기 하나가 그 이름과 설명으로 반환된다"
 
     @override
     def look(
@@ -99,9 +98,7 @@ class TheTerminatorIsListed(Then[None, list[SessionLifecycleHandlerNode]]):
                 [
                     SessionLifecycleHandlerNode(
                         name=TerminateSessionsLifecycleHandler.name(),
-                        description=inspect.cleandoc(
-                            TerminateSessionsLifecycleHandler.__doc__ or ""
-                        ).partition("\n")[0],
+                        description=TerminateSessionsLifecycleHandler.description(),
                     )
                 ],
             )
@@ -135,7 +132,7 @@ class TheRegisteredHandlerIsListed(
 
     @override
     def describe(self) -> str:
-        return "코디네이터에 등록된 처리기가 그 이름과 클래스 설명의 첫 줄로 반환된다"
+        return "코디네이터에 등록된 처리기가 그 이름과 설명으로 반환된다"
 
     @override
     def given(self) -> Given[TestSeedingSession, None]:

@@ -12,7 +12,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [코디네이터에 등록된 처리기가 없으면 빈 목록이 반환된다](#listing-no-registered-handler-lists-nothing) | 성공 |
-| [코디네이터에 등록된 처리기가 그 이름과 클래스 설명의 첫 줄로 반환된다](#listing-the-registered-handler-is-listed) | 성공 |
+| [코디네이터에 등록된 처리기가 그 이름과 설명으로 반환된다](#listing-the-registered-handler-is-listed) | 성공 |
 
 ### list_session_lifecycle_handlers
 
@@ -39,7 +39,7 @@ Then
 
 #### [the-registered-handler-is-listed](/tests/scenario/bai_scenario/manager/session_lifecycle_handler/test_listing.py) — pass
 
-코디네이터에 등록된 처리기가 그 이름과 클래스 설명의 첫 줄로 반환된다
+코디네이터에 등록된 처리기가 그 이름과 설명으로 반환된다
 
 Given
 
@@ -51,6 +51,6 @@ When
 
 Then
 
-- 세션 종료 처리기 하나가 그 이름과 클래스 설명의 첫 줄로 반환된다
-  - items = [SessionLifecycleHandlerNode(name='terminate-sessions', description='Handler for terminating sessions marked for termination.')]
+- 세션 종료 처리기 하나가 그 이름과 설명으로 반환된다
+  - items = [SessionLifecycleHandlerNode(name='terminate-sessions', description='Terminates the kernels of sessions marked for termination.')]
 

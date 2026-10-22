@@ -46,6 +46,11 @@ class SweepSessionsLifecycleHandler(SessionLifecycleHandler):
 
     @classmethod
     @override
+    def description(cls) -> str:
+        return "Terminates pending sessions that waited longer than the pending timeout."
+
+    @classmethod
+    @override
     def target_statuses(cls) -> list[SessionStatus]:
         """Sessions that may need sweeping - PENDING with timeout."""
         return [SessionStatus.PENDING]

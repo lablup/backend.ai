@@ -43,9 +43,12 @@ class TestAdminSessionLifecycleHandlers:
         return [
             SessionLifecycleHandlerNode(
                 name="check-precondition",
-                description="Handler for checking session preconditions and triggering image pulling.",
+                description="Checks that scheduled sessions are ready to start.",
             ),
-            SessionLifecycleHandlerNode(name="terminate-sessions", description=None),
+            SessionLifecycleHandlerNode(
+                name="terminate-sessions",
+                description="Terminates the kernels of sessions marked for termination.",
+            ),
         ]
 
     @pytest.fixture
