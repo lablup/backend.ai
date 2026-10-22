@@ -8,7 +8,7 @@ from typing import Any, Self, cast, override
 from uuid import UUID
 
 import strawberry
-from strawberry import Info
+from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.session_group import SessionGroupID
@@ -27,11 +27,17 @@ from ai.backend.common.dto.manager.v2.session_group.request import (
 from ai.backend.common.dto.manager.v2.session_group.request import (
     SessionGroupPlacementEnforcementFilter as SessionGroupPlacementEnforcementFilterDTO,
 )
+from ai.backend.common.dto.manager.v2.session_group.request import (
+    UpdateSessionGroupInput as UpdateSessionGroupInputDTO,
+)
 from ai.backend.common.dto.manager.v2.session_group.response import (
     PurgeSessionGroupPayload as PurgeSessionGroupPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.session_group.response import (
     SessionGroupNode as SessionGroupNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.session_group.response import (
+    UpdateSessionGroupPayload as UpdateSessionGroupPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.session_group.types import (
     SessionGroupOrderField as SessionGroupOrderFieldDTO,
@@ -78,6 +84,8 @@ __all__ = (
     "SessionGroupGQL",
     "SessionGroupOrderByGQL",
     "SessionGroupScopeGQL",
+    "UpdateSessionGroupInputGQL",
+    "UpdateSessionGroupPayloadGQL",
 )
 
 
@@ -298,12 +306,44 @@ class SessionGroupScopeGQL(PydanticInputMixin[SessionGroupScopeDTO]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for changing a session group's placement policy. At least one of the two "
+            "fields must be given; members placed afterwards follow the new policy."
+        ),
+    ),
+    name="UpdateSessionGroupInput",
+)
+class UpdateSessionGroupInputGQL(PydanticInputMixin[UpdateSessionGroupInputDTO]):
+    id: UUID = gql_field(description="ID of the session group to update.")
+    placement_direction: SessionGroupPlacementDirectionGQL | None = gql_field(
+        description="New placement direction. Omit to leave unchanged.", default=UNSET
+    )
+    placement_enforcement: SessionGroupPlacementEnforcementGQL | None = gql_field(
+        description="New placement enforcement. Omit to leave unchanged.", default=UNSET
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
         description="Identifies the session group to purge.",
     ),
     name="PurgeSessionGroupInput",
 )
 class PurgeSessionGroupInputGQL(PydanticInputMixin[PurgeSessionGroupInputDTO]):
     id: UUID = gql_field(description="ID of the session group to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for a session group update.",
+    ),
+    model=UpdateSessionGroupPayloadDTO,
+    name="UpdateSessionGroupPayload",
+)
+class UpdateSessionGroupPayloadGQL(PydanticOutputMixin[UpdateSessionGroupPayloadDTO]):
+    session_group: SessionGroupGQL = gql_field(description="The updated session group.")
 
 
 @gql_pydantic_type(

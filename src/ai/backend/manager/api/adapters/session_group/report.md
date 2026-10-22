@@ -4,10 +4,11 @@
 
 시나리오: 완성
 
-- ops 로 구성 (3)
+- ops 로 구성 (4)
   - global_search — 대표 성공 ✓ · 대표 실패 ✓
   - purge — 대표 성공 ✓ · 대표 실패 ✓
   - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
+  - update — 대표 성공 ✓ · 대표 실패 ✓
 - 직접 구현 (2)
   - bulk_get_ids — 성공 있음 2 · 실패 있음 1 (partial_bulk)
   - get — 성공 있음 1 · 실패 있음 2 (single_entity)
@@ -37,6 +38,15 @@
 | [자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자가 자기 스코프로 검색하면, 두 프로젝트에 자기가 만든 세션 그룹이 오고 배포의 replica group이 가진 세션 그룹과 다른 사용자가 만든 세션 그룹은 빠진다](#scoped_searching-an-owner-finds-the-groups-they-made-in-their-own-scope) | 성공 |
 | [다른 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들이 있는 프로젝트 범위로 검색하면, 권한 부족으로 거부된다](#scoped_searching-searching-a-project-not-granted-is-refused) | 거부 |
 | [세션 그룹들이 있는 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들을 만든 사용자의 스코프로 검색하면, 권한 부족으로 거부된다](#scoped_searching-searching-another-users-scope-is-refused) | 거부 |
+
+**update**
+
+| 시나리오 | 판정 |
+|---|---|
+| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향만 바꾸면, 강제 수준은 그대로인 그 세션 그룹이 온다](#updating-an-owner-changes-only-the-direction) | 성공 |
+| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향과 강제 수준을 바꾸면, 두 항목이 바뀐 그 세션 그룹이 온다](#updating-an-owner-changes-the-direction-and-the-enforcement) | 성공 |
+| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기 배포의 replica group이 가진 세션 그룹 정책을 바꾸면, 권한이 아니라 사용 중이라는 것으로 거부된다](#updating-a-deployments-session-group-is-refused-as-in-use) | 거부 |
+| [자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹의 정책을 바꾸면, 권한 부족으로 거부된다](#updating-an-owner-granted-only-read-may-not-update) | 거부 |
 
 **bulk_get_ids**
 
@@ -159,7 +169,7 @@ Given
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
   - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 자기 스코프에서 세션 그룹 권한 하나를 받은 사용자 준비
+  - 자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
       - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
@@ -198,7 +208,7 @@ Given
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
   - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 자기 스코프에서 세션 그룹 권한 하나를 받은 사용자 준비
+  - 자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
       - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
@@ -272,7 +282,7 @@ Given
   - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
   - 프로젝트 team-1
   - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 자기 스코프에서 세션 그룹 권한 하나를 받은 사용자 준비
+  - 자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
       - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
@@ -525,6 +535,192 @@ Given
 When
 
 - SessionGroupAdapter.scoped_search — user-3이 user-1의 스코프에서 조회
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+### update
+
+<a id="updating-an-owner-changes-only-the-direction"></a>
+
+#### [an-owner-changes-only-the-direction](/tests/scenario/bai_scenario/manager/session_group/test_updating.py) — pass
+
+자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향만 바꾸면, 강제 수준은 그대로인 그 세션 그룹이 온다
+
+Given
+
+- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 자기 스코프에서 세션 그룹 수정 권한을 받은 세션 그룹들을 만든 사용자
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 자기 스코프에서 세션 그룹 수정 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 session-group-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 session-group-owner-1: session_group 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 session-group-owner-1 보유
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
+  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
+  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
+  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+
+When
+
+- SessionGroupAdapter.update — user-1이 사용자가 만든 세션 그룹의 방향만 퍼뜨리기로 바꾼다
+
+Then
+
+- 방향만 바뀌고 강제 수준은 그대로인 세션 그룹 전체가 온다
+  - id: 무시함 — 데이터베이스가 만든다
+  - entity_id: 사용자가 만든 세션 그룹의 id와 같다
+  - domain_id: 그 도메인의 id와 같다
+  - project_id: 그 프로젝트의 id와 같다
+  - owner_user_id: 만든 사람의 id와 같다
+  - placement_direction = <SessionGroupPlacementDirectionEnum.SPREAD: 'spread'>
+  - placement_enforcement = <SessionGroupPlacementEnforcementEnum.STRICT: 'strict'>
+  - created_at: 이 실행이 쓴 시각
+  - deleted_at = None
+
+<a id="updating-an-owner-changes-the-direction-and-the-enforcement"></a>
+
+#### [an-owner-changes-the-direction-and-the-enforcement](/tests/scenario/bai_scenario/manager/session_group/test_updating.py) — pass
+
+자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향과 강제 수준을 바꾸면, 두 항목이 바뀐 그 세션 그룹이 온다
+
+Given
+
+- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 자기 스코프에서 세션 그룹 수정 권한을 받은 세션 그룹들을 만든 사용자
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 자기 스코프에서 세션 그룹 수정 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 session-group-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 session-group-owner-1: session_group 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 session-group-owner-1 보유
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
+  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
+  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
+  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+
+When
+
+- SessionGroupAdapter.update — user-1이 사용자가 만든 세션 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
+
+Then
+
+- 두 항목이 바뀐 세션 그룹 전체가 온다
+  - id: 무시함 — 데이터베이스가 만든다
+  - entity_id: 사용자가 만든 세션 그룹의 id와 같다
+  - domain_id: 그 도메인의 id와 같다
+  - project_id: 그 프로젝트의 id와 같다
+  - owner_user_id: 만든 사람의 id와 같다
+  - placement_direction = <SessionGroupPlacementDirectionEnum.SPREAD: 'spread'>
+  - placement_enforcement = <SessionGroupPlacementEnforcementEnum.PREFERRED: 'preferred'>
+  - created_at: 이 실행이 쓴 시각
+  - deleted_at = None
+
+<a id="updating-a-deployments-session-group-is-refused-as-in-use"></a>
+
+#### [a-deployments-session-group-is-refused-as-in-use](/tests/scenario/bai_scenario/manager/session_group/test_updating.py) — pass
+
+자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기 배포의 replica group이 가진 세션 그룹 정책을 바꾸면, 권한이 아니라 사용 중이라는 것으로 거부된다
+
+Given
+
+- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 자기 스코프에서 세션 그룹 수정 권한을 받은 세션 그룹들을 만든 사용자
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 자기 스코프에서 세션 그룹 수정 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 session-group-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 session-group-owner-1: session_group 전체에 UPDATE 허용
+    - 일반 사용자 user-1: 역할 session-group-owner-1 보유
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
+  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
+  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
+  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+
+When
+
+- SessionGroupAdapter.update — user-1이 배포의 replica group이 가진 세션 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
+
+Then
+
+- 거부된다
+  - 거부: SessionGroupInUseForUpdate
+
+<a id="updating-an-owner-granted-only-read-may-not-update"></a>
+
+#### [an-owner-granted-only-read-may-not-update](/tests/scenario/bai_scenario/manager/session_group/test_updating.py) — pass
+
+자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹의 정책을 바꾸면, 권한 부족으로 거부된다
+
+Given
+
+- 한 프로젝트에 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹, 다른 프로젝트에 같은 사용자가 만든 세션 그룹과 다른 사용자가 만든 세션 그룹, 그리고 자기 스코프에서 세션 그룹 읽기 권한을 받은 세션 그룹들을 만든 사용자
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 프로젝트 other-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 session-group-owner-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 session-group-owner-1: session_group 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 session-group-owner-1 보유
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자가 만든 세션 그룹 session-group-1: 멤버를 한 에이전트에 모으고, 반드시 지킨다
+  - 사용자가 만든 세션 그룹 session-group-2: 멤버를 한 에이전트에 모으고, 반드시 지킨다
+  - 사용자가 만든 세션 그룹 session-group-3: 멤버를 한 에이전트에 모으고, 반드시 지킨다
+  - 배포 deployment-1: 복제를 1개 두려 한다, 아직 리비전이 없다
+  - 배포의 세션 그룹 deployment-session-group-1: 배포가 replica group과 함께 만드는 세션 그룹이다
+  - 배포 deployment-1: 세션 그룹을 가진 replica group 하나를 갖는다
+
+When
+
+- SessionGroupAdapter.update — user-1이 사용자가 만든 세션 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
 
 Then
 

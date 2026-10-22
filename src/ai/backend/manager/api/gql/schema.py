@@ -643,6 +643,7 @@ from ai.backend.manager.api.gql.session_group.resolver import (
     purge_session_group,
     scoped_session_groups,
     session_group,
+    update_session_group,
 )
 from ai.backend.manager.api.gql.storage_volume.resolver import (
     admin_storage_volumes,
@@ -1513,6 +1514,7 @@ class Mutation:
     exclude_session_idle_checks = exclude_session_idle_checks
     include_session_idle_checks = include_session_idle_checks
     # Session Group mutations
+    update_session_group = update_session_group
     purge_session_group = purge_session_group
     # Entity Label mutations
     upsert_entity_label = upsert_entity_label

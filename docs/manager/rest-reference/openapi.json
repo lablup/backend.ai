@@ -36679,6 +36679,65 @@
         "title": "TerminateSessionsInput",
         "type": "object"
       },
+      "SessionGroupPlacementDirectionEnum": {
+        "description": "How the member sessions of a group sit relative to each other, per agent.",
+        "enum": [
+          "spread",
+          "pack",
+          "none"
+        ],
+        "title": "SessionGroupPlacementDirectionEnum",
+        "type": "string"
+      },
+      "SessionGroupPlacementEnforcementEnum": {
+        "description": "How hard the placement direction is enforced when it cannot be satisfied.",
+        "enum": [
+          "preferred",
+          "strict"
+        ],
+        "title": "SessionGroupPlacementEnforcementEnum",
+        "type": "string"
+      },
+      "UpdateSessionGroupInput": {
+        "description": "Input for changing a session group's placement policy.\n\nAt least one of the two fields must be given.",
+        "properties": {
+          "id": {
+            "description": "ID of the session group to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "placement_direction": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionGroupPlacementDirectionEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "New placement direction. Omit to leave unchanged.",
+            "title": "Placement Direction"
+          },
+          "placement_enforcement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionGroupPlacementEnforcementEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "New placement enforcement. Omit to leave unchanged.",
+            "title": "Placement Enforcement"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "UpdateSessionGroupInput",
+        "type": "object"
+      },
       "SessionGroupFilter": {
         "description": "Filter for session groups.\n\nGroups marked deleted are left out unless the top-level filter gives ``deleted_at``.\nA ``deleted_at`` inside ``AND``/``OR``/``NOT`` does not lift that default.",
         "properties": {
@@ -36860,16 +36919,6 @@
         "title": "SessionGroupOrderField",
         "type": "string"
       },
-      "SessionGroupPlacementDirectionEnum": {
-        "description": "How the member sessions of a group sit relative to each other, per agent.",
-        "enum": [
-          "spread",
-          "pack",
-          "none"
-        ],
-        "title": "SessionGroupPlacementDirectionEnum",
-        "type": "string"
-      },
       "SessionGroupPlacementDirectionFilter": {
         "description": "Filter for the placement direction of a session group.",
         "properties": {
@@ -36932,15 +36981,6 @@
         },
         "title": "SessionGroupPlacementDirectionFilter",
         "type": "object"
-      },
-      "SessionGroupPlacementEnforcementEnum": {
-        "description": "How hard the placement direction is enforced when it cannot be satisfied.",
-        "enum": [
-          "preferred",
-          "strict"
-        ],
-        "title": "SessionGroupPlacementEnforcementEnum",
-        "type": "string"
       },
       "SessionGroupPlacementEnforcementFilter": {
         "description": "Filter for the placement enforcement of a session group.",
@@ -64604,6 +64644,42 @@
           }
         ],
         "description": "Retrieve a single session group by id.\n\n**Preconditions:**\n* User privilege required.\n"
+      },
+      "patch": {
+        "operationId": "v2/session-groups.update",
+        "tags": [
+          "v2/session-groups"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSessionGroupInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "session_group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Change a session group's placement direction and enforcement.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/session-groups/search": {

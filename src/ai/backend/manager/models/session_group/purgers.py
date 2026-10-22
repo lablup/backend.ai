@@ -27,11 +27,11 @@ class SessionGroupPurger(GuardedEntityPurger[SessionGroupRow, SessionGroupData])
     A group a replica group still references is refused as in use.
     """
 
-    group_id: SessionGroupID
+    session_group_id: SessionGroupID
 
     @override
     def entity_id(self) -> EntityIdentifier:
-        return self.group_id
+        return self.session_group_id
 
     @override
     def row_class(self) -> type[SessionGroupRow]:
@@ -47,7 +47,7 @@ class SessionGroupPurger(GuardedEntityPurger[SessionGroupRow, SessionGroupData])
             GuardCheck(
                 condition=SessionGroupSearchableFields.linked.replica_groups.not_exists(),
                 error=SessionGroupInUse(
-                    f"Session group {self.group_id} cannot be purged while a replica group uses it"
+                    f"Session group {self.session_group_id} cannot be purged while a replica group uses it"
                 ),
             ),
         )
