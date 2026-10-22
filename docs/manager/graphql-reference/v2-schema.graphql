@@ -11219,9 +11219,14 @@ type Mutation {
   includeSessionIdleChecks(input: IncludeSessionIdleChecksInput!): IncludeSessionIdleChecksPayload
 
   """
+  Added in 26.10.0. Change a session group's placement direction and enforcement. Members placed afterwards follow the new policy; a group a deployment's replica group holds is refused as in use.
+  """
+  updateSessionGroup(input: UpdateSessionGroupInput!): UpdateSessionGroupPayload
+
+  """
   Added in 26.10.0. Permanently remove a session group. Its member sessions remain with their group cleared. A group a deployment's replica group references is refused as in use.
   """
-  purgeSessionGroup(input: PurgeSessionGroupInput!): PurgeSessionGroupPayload!
+  purgeSessionGroup(input: PurgeSessionGroupInput!): PurgeSessionGroupPayload
 
   """
   Added in 26.9.0. Set one key on an entity, replacing the value it carries. Reachable by any caller RBAC authorizes to write the entity.
@@ -22140,6 +22145,26 @@ input UpdateRuntimeVariantPresetInput {
 type UpdateRuntimeVariantPresetPayload {
   """The updated preset."""
   preset: RuntimeVariantPreset!
+}
+
+"""
+Added in 26.10.0. Input for changing a session group's placement policy. At least one of the two fields must be given; members placed afterwards follow the new policy.
+"""
+input UpdateSessionGroupInput {
+  """ID of the session group to update."""
+  id: UUID!
+
+  """New placement direction. Omit to leave unchanged."""
+  placementDirection: SessionGroupPlacementDirection
+
+  """New placement enforcement. Omit to leave unchanged."""
+  placementEnforcement: SessionGroupPlacementEnforcement
+}
+
+"""Added in 26.10.0. Payload for a session group update."""
+type UpdateSessionGroupPayload {
+  """The updated session group."""
+  sessionGroup: SessionGroup!
 }
 
 """
