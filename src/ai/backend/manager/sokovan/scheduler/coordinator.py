@@ -1272,6 +1272,7 @@ class ScheduleCoordinator:
                 session_ids=session_ids,
                 to_status=transition.session,
                 status_changed_at=status_changed_at,
+                except_statuses=transition.except_session_statuses,
             )
             histories = [
                 SessionHistoryToCreate(

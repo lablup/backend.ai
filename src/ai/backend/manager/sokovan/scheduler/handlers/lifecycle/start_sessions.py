@@ -36,9 +36,13 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
 
     Following the DeploymentCoordinator pattern:
     - Coordinator queries sessions with PREPARED status (provides HandlerSessionData)
+    - Handler claims the sessions by moving them and their kernels to CREATING
     - Handler queries additional data (SessionDataForStart + ImageConfigData) via Repository
     - Handler starts kernels on agents via Launcher
-    - Coordinator updates sessions to CREATING status and broadcasts events
+    - Coordinator records the CREATING transition and broadcasts events
+
+    The claim keeps two passes from starting the same session, so the handler takes
+    no lock: a pass does not wait for another pass's create_kernels.
     """
 
     def __init__(
@@ -77,8 +81,10 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
     def status_transitions(cls) -> StatusTransitions:
         """Define state transitions for start sessions handler (BEP-1030).
 
-        - success: Session/kernel → CREATING
-        - need_retry: None (stays PREPARED)
+        - success: Session/kernel → CREATING (already set by the claim; a session that
+          moved on during the pass, e.g. promoted to RUNNING or terminated, keeps its status)
+        - need_retry: None (keeps the current status; a session reported as a failure
+          must have its claim released first, or it stays CREATING and no pass retries it)
         - expired: Session/kernel → PENDING (re-scheduling after timeout —
           a different agent or a later slot may succeed)
         - give_up: Session/kernel → TERMINATING (retry budget exhausted —
@@ -90,6 +96,7 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
             success=TransitionStatus(
                 session=SessionStatus.CREATING,
                 kernel=KernelStatus.CREATING,
+                except_session_statuses=frozenset(SessionStatus) - {SessionStatus.CREATING},
             ),
             need_retry=None,
             expired=TransitionStatus(
@@ -105,8 +112,12 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
     @property
     @override
     def lock_id(self) -> LockID | None:
-        """Lock for operations targeting PREPARED sessions transitioning to CREATING."""
-        return LockID.LOCKID_SOKOVAN_TARGET_CREATING
+        """No lock: the claim in execute() keeps passes from starting a session twice.
+
+        A lock held across create_kernels would make every later START pass wait for
+        the slowest kernel creation in flight.
+        """
+        return None
 
     @override
     async def execute(
@@ -118,7 +129,7 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
 
         The coordinator provides SessionWithKernels data.
         This handler:
-        1. Extracts session IDs from SessionWithKernels
+        1. Claims the sessions; a session claimed by another pass is left out of the result
         2. Queries Repository for additional data (SessionDataForStart + ImageConfigData)
         3. Starts kernels on agents via Launcher
         """
@@ -127,7 +138,13 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
         if not sessions:
             return result
 
-        # Extract session IDs from SessionWithKernels
+        claimed_ids = await self._repository.claim_sessions_for_start(
+            [s.session_info.identity.id for s in sessions],
+            KernelLifecycleEventReason.TRIGGERED_BY_SCHEDULER,
+        )
+        sessions = [s for s in sessions if s.session_info.identity.id in claimed_ids]
+        if not sessions:
+            return result
         session_ids = [s.session_info.identity.id for s in sessions]
 
         # Query Repository for additional data needed by Launcher
@@ -140,7 +157,13 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
                 )
             ],
         )
-        sessions_data = await self._repository.search_sessions_with_kernels_and_user(searcher)
+        try:
+            sessions_data = await self._repository.search_sessions_with_kernels_and_user(searcher)
+        except BaseException:
+            # Nothing was sent to the agents yet, so hand the sessions back to the next
+            # pass; cancellation included, or the sessions would stay CREATING unstarted.
+            await self._repository.release_sessions_for_start(session_ids)
+            raise
 
         # Start kernels on agents via Launcher
         # Note: RecorderContext is handled inside Launcher

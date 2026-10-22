@@ -658,6 +658,18 @@ class SchedulerRepository:
         return await self._db_source.update_kernels_to_creating_for_sessions(session_ids, reason)
 
     @scheduler_repository_resilience.apply()
+    async def claim_sessions_for_start(
+        self, session_ids: Sequence[SessionId], reason: str
+    ) -> set[SessionId]:
+        """Claim PREPARED sessions for one START pass; returns the sessions this pass won."""
+        return await self._db_source.claim_sessions_for_start(session_ids, reason)
+
+    @scheduler_repository_resilience.apply()
+    async def release_sessions_for_start(self, session_ids: Sequence[SessionId]) -> int:
+        """Return the claim of sessions a START pass did not launch."""
+        return await self._db_source.release_sessions_for_start(session_ids)
+
+    @scheduler_repository_resilience.apply()
     async def update_kernels_to_terminated(self, kernel_ids: list[str], reason: str) -> int:
         """Update multiple kernels to TERMINATED status."""
         return await self._db_source.update_kernels_to_terminated(kernel_ids, reason)
