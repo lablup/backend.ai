@@ -16,6 +16,7 @@ from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
 from ai.backend.common.clients.valkey_client.valkey_tus.client import (
     ValkeyTusClient,
 )
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
     EventDispatcher,
@@ -92,5 +93,5 @@ class RootContext:
             plugins[plugin_name] = plugin_instance
         self.artifact_verifier_ctx.load_verifiers(plugins)
 
-    def list_volumes(self) -> Mapping[str, VolumeInfo]:
+    def list_volumes(self) -> Mapping[StorageVolumeName, VolumeInfo]:
         return {name: info.to_dataclass() for name, info in self.local_config.volume.items()}

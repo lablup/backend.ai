@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING, override
 
 from ai.backend.common.clients.valkey_client.valkey_volume_stats import ValkeyVolumeStatsClient
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.observer.types import AbstractObserver
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.metrics.volume_perf import VolumePerfMetricObserver
@@ -76,7 +77,9 @@ class VolumeStatsObserver(AbstractObserver):
         """Clean up resources used by the observer."""
         pass
 
-    async def _observe_single(self, volume_name: str) -> CachedFSPerfMetricData | None:
+    async def _observe_single(
+        self, volume_name: StorageVolumeName
+    ) -> CachedFSPerfMetricData | None:
         """Observe metric for a single volume and store in Redis."""
         start_time = time.monotonic()
         now = datetime.now(UTC)

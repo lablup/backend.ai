@@ -21,6 +21,7 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.exception import GenericNotImplementedError, InvalidConfigError
 from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
@@ -1651,7 +1652,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
         ),
     ]
     volume: Annotated[
-        dict[str, VolumeInfoConfig],
+        dict[StorageVolumeName, VolumeInfoConfig],
         Field(),
         BackendAIConfigMeta(
             description=(

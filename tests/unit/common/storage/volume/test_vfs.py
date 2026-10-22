@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from ai.backend.common.data.entity.storage_volume import StorageVolumeID
+from ai.backend.common.data.entity.storage_volume import StorageVolumeID, StorageVolumeName
 from ai.backend.common.storage.volume.vfs import (
     VfsVolumeStatusCheck,
     VfsVolumeStatusCheckArgs,
@@ -21,7 +21,7 @@ MARKER_VOLUME_ID = StorageVolumeID(uuid.uuid4())
 def _make_check(mount_path: Path, executor: Executor) -> VfsVolumeStatusCheck:
     return VfsVolumeStatusCheck(
         VfsVolumeStatusCheckArgs(
-            volume_id=StorageVolumeID(uuid.uuid4()),
+            volume_name=StorageVolumeName("volume-1"),
             mount_path=mount_path,
             marker_filename=MARKER_FILENAME,
             executor=executor,

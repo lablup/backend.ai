@@ -8,7 +8,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.data.entity.storage_backend import StorageBackendID
-from ai.backend.common.data.entity.storage_volume import StorageVolumeID
+from ai.backend.common.data.entity.storage_volume import StorageVolumeID, StorageVolumeName
 from ai.backend.common.data.storage.types import (
     DEFAULT_STATUS_STALE_AFTER,
     ServiceStorageStatus,
@@ -44,7 +44,9 @@ class StorageVolumeRow(LifecycleTimestampsMixin, Base):
         primary_key=True,
         server_default=sa.text("uuid_generate_v7()"),
     )
-    name: Mapped[str] = mapped_column("name", sa.String(length=64), nullable=False)
+    name: Mapped[StorageVolumeName] = mapped_column(
+        "name", sa.String(length=64), unique=True, nullable=False
+    )
     storage_backend_id: Mapped[StorageBackendID] = mapped_column(
         "storage_backend_id",
         GUID(StorageBackendID),
