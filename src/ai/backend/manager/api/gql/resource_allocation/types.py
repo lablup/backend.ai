@@ -43,6 +43,10 @@ from ai.backend.common.dto.manager.v2.resource_allocation.response import (
 from ai.backend.common.dto.manager.v2.resource_allocation.response import (
     ScopeResourceUsageNode as ScopeResourceUsageNodeDTO,
 )
+from ai.backend.common.dto.manager.v2.resource_allocation.response import (
+    UserConcurrencyPayload as UserConcurrencyPayloadDTO,
+)
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.common_types import (
     BinarySizeInfoGQL,
     ResourceLimitEntryGQL,
@@ -71,6 +75,7 @@ __all__ = (
     "ResourceGroupResourceAllocationPayloadGQL",
     "ResourceGroupUsageGQL",
     "ScopeResourceUsageGQL",
+    "UserConcurrencyPayloadGQL",
 )
 
 
@@ -262,6 +267,24 @@ class ResourceGroupResourceAllocationPayloadGQL(
 ):
     resource_group: ResourceGroupUsageGQL = gql_field(
         description="Resource group resource usage.",
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Number of sessions a user is running.",
+    ),
+    model=UserConcurrencyPayloadDTO,
+    name="UserConcurrency",
+)
+class UserConcurrencyPayloadGQL(PydanticOutputMixin[UserConcurrencyPayloadDTO]):
+    user_id: UUID = gql_field(description="User UUID.")
+    session_count: int = gql_field(
+        description="Number of interactive, batch and inference sessions the user is running.",
+    )
+    private_session_count: int = gql_field(
+        description="Number of system sessions, such as SFTP sessions, the user is running.",
     )
 
 

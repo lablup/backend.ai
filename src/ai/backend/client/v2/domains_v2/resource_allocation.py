@@ -17,6 +17,7 @@ from ai.backend.common.dto.manager.v2.resource_allocation.response import (
     KeypairResourceAllocationPayload,
     ProjectResourceAllocationPayload,
     ResourceGroupResourceAllocationPayload,
+    UserConcurrencyPayload,
 )
 
 _PATH = "/v2/resource-allocation"
@@ -88,4 +89,12 @@ class V2ResourceAllocationClient(BaseDomainClient):
             f"{_PATH}/check-preset-availability",
             request=request,
             response_model=CheckPresetAvailabilityPayload,
+        )
+
+    async def my_concurrency(self) -> UserConcurrencyPayload:
+        """Get the number of sessions the current user is running."""
+        return await self._client.typed_request(
+            "GET",
+            f"{_PATH}/my/concurrency",
+            response_model=UserConcurrencyPayload,
         )

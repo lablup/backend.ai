@@ -6,6 +6,7 @@ from uuid import UUID
 
 from strawberry import Info
 
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
@@ -23,6 +24,7 @@ from .types import (
     KeypairResourceAllocationPayloadGQL,
     ProjectResourceAllocationPayloadGQL,
     ResourceGroupResourceAllocationPayloadGQL,
+    UserConcurrencyPayloadGQL,
 )
 
 
@@ -137,3 +139,16 @@ async def check_preset_availability_v2(
         )
     )
     return CheckPresetAvailabilityPayloadGQL.from_pydantic(payload)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Get the number of sessions the current user is running.",
+    )
+)  # type: ignore[misc]
+async def my_concurrency(
+    info: Info[StrawberryGQLContext],
+) -> UserConcurrencyPayloadGQL:
+    payload = await info.context.adapters.resource_allocation.my_concurrency()
+    return UserConcurrencyPayloadGQL.from_pydantic(payload)
