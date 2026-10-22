@@ -253,6 +253,17 @@ class AbstractKVStore(ABC):
         pass
 
     @abstractmethod
+    async def compare_and_replace_prefixes(
+        self,
+        replacements: Mapping[str, NestedStrKeyedMapping],
+        *,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        pass
+
+    @abstractmethod
     async def delete_if_value(
         self,
         key: str,
@@ -641,27 +652,64 @@ class AsyncEtcd(AbstractKVStore):
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
 
         async def _replace(communicator: EtcdCommunicator) -> None:
-            new_pairs: dict[str, str] = {}
-            existing_keys: set[str] = set()
-            for prefix, dict_obj in replacements.items():
-                mangled_prefix = self._mangle_key(f"{_slash(scope_prefix)}{prefix}")
-                pairs = await communicator.get_prefix(mangled_prefix.encode(self.encoding))
-                for raw_key, _ in pairs:
-                    existing_keys.add(bytes(raw_key).decode(self.encoding))
-                for k, v in _flatten_nested_dict(prefix, dict_obj).items():
-                    new_pairs[self._mangle_key(f"{_slash(scope_prefix)}{k}")] = str(v)
-
-            stale_keys = existing_keys - new_pairs.keys()
-            actions = [TxnOp.delete(k.encode(self.encoding)) for k in stale_keys]
-            actions.extend(
-                TxnOp.put(k.encode(self.encoding), v.encode(self.encoding))
-                for k, v in new_pairs.items()
-            )
+            actions = await self._replacement_ops(communicator, replacements, scope_prefix)
             if not actions:
                 return
             await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
 
         await self._request(_replace)
+
+    @override
+    async def compare_and_replace_prefixes(
+        self,
+        replacements: Mapping[str, NestedStrKeyedMapping],
+        *,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        """Replace the subtrees as :meth:`atomic_replace_prefixes` does, only if every guard key
+        holds its given value (``None``: absent) when the transaction commits.
+
+        :return: ``True`` if the replacement landed, ``False`` if any guard failed."""
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        conditions = [
+            self._holds(self._mangle_key(f"{_slash(scope_prefix)}{guard_key}"), guard_val)
+            for guard_key, guard_val in guards.items()
+        ]
+
+        async def _replace(communicator: EtcdCommunicator) -> bool:
+            actions = await self._replacement_ops(communicator, replacements, scope_prefix)
+            result = await communicator.txn(
+                EtcdTransactionAction().when(conditions).and_then(actions).or_else([])
+            )
+            return cast(bool, result.succeeded())
+
+        return await self._request(_replace, conditional=True)
+
+    async def _replacement_ops(
+        self,
+        communicator: EtcdCommunicator,
+        replacements: Mapping[str, NestedStrKeyedMapping],
+        scope_prefix: str,
+    ) -> list[TxnOp]:
+        new_pairs: dict[str, str] = {}
+        existing_keys: set[str] = set()
+        for prefix, dict_obj in replacements.items():
+            mangled_prefix = self._mangle_key(f"{_slash(scope_prefix)}{prefix}")
+            pairs = await communicator.get_prefix(mangled_prefix.encode(self.encoding))
+            for raw_key, _ in pairs:
+                existing_keys.add(bytes(raw_key).decode(self.encoding))
+            for k, v in _flatten_nested_dict(prefix, dict_obj).items():
+                new_pairs[self._mangle_key(f"{_slash(scope_prefix)}{k}")] = str(v)
+
+        stale_keys = existing_keys - new_pairs.keys()
+        actions = [TxnOp.delete(k.encode(self.encoding)) for k in stale_keys]
+        actions.extend(
+            TxnOp.put(k.encode(self.encoding), v.encode(self.encoding))
+            for k, v in new_pairs.items()
+        )
+        return actions
 
     @override
     async def get(
