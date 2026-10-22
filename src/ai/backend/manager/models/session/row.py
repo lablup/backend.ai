@@ -411,8 +411,8 @@ class SessionRow(CreatedAtMixin, Base):
     # JSONB side of SessionOptions — only fields that do not map to a
     # dedicated column (kernel_groups, timeouts, agent_selection_policy).
     # Individual columns still carry priority / is_preemptible /
-    # cluster_mode / cluster_size / scaling_group_name /
-    # designated_agent_ids so pre-existing filters keep working.
+    # cluster_mode / cluster_size / scaling_group_name so pre-existing
+    # filters keep working.
     options: Mapped[SessionStoredOptions] = mapped_column(
         "options",
         PydanticColumn(SessionStoredOptions),
@@ -421,9 +421,6 @@ class SessionRow(CreatedAtMixin, Base):
     )
     agent_ids: Mapped[list[str] | None] = mapped_column(
         "agent_ids", sa.ARRAY(sa.String), nullable=True
-    )
-    designated_agent_ids: Mapped[list[str] | None] = mapped_column(
-        "designated_agent_ids", sa.ARRAY(sa.String), nullable=True
     )
     # The placement group this session belongs to. NULL (the default) means no
     # placement constraint. ON DELETE SET NULL: a group may be swept before its
@@ -680,7 +677,6 @@ class SessionRow(CreatedAtMixin, Base):
             cluster_mode=session_data.cluster_mode,
             cluster_size=session_data.cluster_size,
             agent_ids=session_data.agent_ids,
-            designated_agent_ids=session_data.designated_agent_ids,
             session_group_id=session_data.session_group_id,
             scaling_group_name=session_data.resource_group_name,
             target_sgroup_names=session_data.target_sgroup_names,
@@ -728,7 +724,6 @@ class SessionRow(CreatedAtMixin, Base):
             cluster_mode=ClusterMode(self.cluster_mode),
             cluster_size=self.cluster_size,
             agent_ids=self.agent_ids,
-            designated_agent_ids=self.designated_agent_ids,
             session_group_id=self.session_group_id,
             resource_group_name=self.scaling_group_name,
             target_sgroup_names=self.target_sgroup_names,

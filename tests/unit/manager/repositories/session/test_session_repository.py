@@ -15,11 +15,13 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
+    AgentId,
     ClusterMode,
     DefaultForUnspecified,
     KernelId,
@@ -28,6 +30,7 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -51,6 +54,7 @@ from ai.backend.manager.models.resource_policy.row import (
 from ai.backend.manager.models.resource_slot.aggregates import batch_load_session_allocations
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow, ResourceSlotTypeRow
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.session_template.row import SessionTemplateRow
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -547,6 +551,7 @@ class TestBatchLoadSessionAllocations:
                 KernelRow,
                 ResourceSlotTypeRow,
                 ResourceAllocationRow,
+                SessionDesignatedAgentRow,
             ],
         ):
             yield database_connection
@@ -812,6 +817,72 @@ class TestBatchLoadSessionAllocations:
         """Verify that an empty id list is handled gracefully."""
         async with db_with_resource_tables.begin_readonly_session() as db_sess:
             assert await batch_load_session_allocations(db_sess, []) == {}
+
+    @pytest.fixture
+    async def designated_agent_id(
+        self,
+        db_with_resource_tables: ExtendedAsyncSAEngine,
+        session_with_allocations: SessionTestData,
+    ) -> AgentId:
+        """An agent the session designates."""
+        agent_id = AgentId(f"i-{uuid.uuid4().hex[:12]}")
+        agent_uuid = AgentUUID(uuid.uuid4())
+        async with db_with_resource_tables.begin_session() as db_sess:
+            db_sess.add(
+                AgentRow(
+                    id=agent_id,
+                    uuid=agent_uuid,
+                    status=AgentStatus.ALIVE,
+                    region="local",
+                    scaling_group="default",
+                    resource_group_id=session_with_allocations.resource_group_id,
+                    addr="127.0.0.1:6001",
+                    version="1.0.0",
+                    architecture="x86_64",
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                SessionDesignatedAgentRow(
+                    session_id=SessionID(session_with_allocations.session_id),
+                    agent_uuid=agent_uuid,
+                )
+            )
+        return agent_id
+
+    async def test_the_designated_agents_come_back_by_agent_id(
+        self,
+        db_with_resource_tables: ExtendedAsyncSAEngine,
+        session_with_allocations: SessionTestData,
+        designated_agent_id: AgentId,
+    ) -> None:
+        repository = SessionRepository(
+            db_with_resource_tables,
+            V2DBOpsProvider(db_with_resource_tables),
+            registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(db_with_resource_tables)),
+        )
+        session_id = SessionID(session_with_allocations.session_id)
+
+        designated = await repository.bulk_get_designated_agents_by_session([session_id])
+
+        assert designated == {session_id: [designated_agent_id]}
+
+    async def test_a_session_designating_no_agent_is_absent(
+        self,
+        db_with_resource_tables: ExtendedAsyncSAEngine,
+        session_with_allocations: SessionTestData,
+    ) -> None:
+        repository = SessionRepository(
+            db_with_resource_tables,
+            V2DBOpsProvider(db_with_resource_tables),
+            registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(db_with_resource_tables)),
+        )
+
+        designated = await repository.bulk_get_designated_agents_by_session([
+            SessionID(session_with_allocations.session_id)
+        ])
+
+        assert designated == {}
 
     async def test_repository_aggregate_returns_computed_slots(
         self,
