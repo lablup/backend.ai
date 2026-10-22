@@ -12,4 +12,3 @@ class BootstrapScriptData(FieldData):
     script: BootstrapScript
     is_default: bool
     created_at: datetime
-    updated_at: datetime

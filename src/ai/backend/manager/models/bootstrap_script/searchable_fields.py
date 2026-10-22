@@ -46,11 +46,6 @@ class _BootstrapScriptOwnFields(RowDataConverter[BootstrapScriptRow, BootstrapSc
         DateTimeConditions(BootstrapScriptRow.created_at),
         ColumnOrder(BootstrapScriptRow.created_at),
     )
-    updated_at = SearchableField(
-        BootstrapScriptRow.updated_at,
-        DateTimeConditions(BootstrapScriptRow.updated_at),
-        ColumnOrder(BootstrapScriptRow.updated_at),
-    )
 
     @override
     def to_data(self, row: BootstrapScriptRow) -> BootstrapScriptData:
@@ -60,7 +55,6 @@ class _BootstrapScriptOwnFields(RowDataConverter[BootstrapScriptRow, BootstrapSc
             script=BootstrapScript(self.script.read(row)),
             is_default=self.is_default.read(row),
             created_at=self.created_at.read(row),
-            updated_at=self.updated_at.read(row),
         )
 
 
