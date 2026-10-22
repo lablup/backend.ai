@@ -1,0 +1,88 @@
+from collections.abc import Collection, Sequence
+from dataclasses import dataclass
+from typing import override
+
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
+from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountID
+from ai.backend.common.data.vfolder_auto_mount.types import VFolderAutoMountScopeType
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.vfolder_auto_mount.types import (
+    VFolderAutoMountData,
+    VFolderAutoMountSpec,
+)
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.repository import (
+    ForeignKeyViolationError,
+    UniqueConstraintViolationError,
+)
+from ai.backend.manager.errors.storage import VFolderNotFound
+from ai.backend.manager.errors.vfolder_auto_mount import VFolderAutoMountAlreadyExists
+from ai.backend.manager.models.specs.creator import EntityCreator
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
+from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
+    VFolderAutoMountSearchableFields,
+)
+
+
+@dataclass(frozen=True)
+class VFolderAutoMountCreator(EntityCreator[VFolderAutoMountRow, VFolderAutoMountData]):
+    """Add one vfolder to the auto-mounts of a project.
+
+    The row carries the project; the own and govern edges are derived from it.
+    """
+
+    scope: ProjectID
+    spec: VFolderAutoMountSpec
+
+    @override
+    def entity_id(self, row: VFolderAutoMountRow) -> VFolderAutoMountID:
+        return row.id
+
+    @override
+    def created_in(self, row: VFolderAutoMountRow) -> Collection[EntityIdentifier]:
+        return (RuntimeEntityID(EntityType(row.scope_type), row.scope_id),)
+
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        already_exists = VFolderAutoMountAlreadyExists()
+        return (
+            IntegrityErrorCheck(
+                violation_type=UniqueConstraintViolationError,
+                error=already_exists,
+                constraint_name="uq_vfolder_auto_mounts_live_vfolder",
+            ),
+            IntegrityErrorCheck(
+                violation_type=UniqueConstraintViolationError,
+                error=already_exists,
+                constraint_name="uq_vfolder_auto_mounts_live_destination",
+            ),
+            IntegrityErrorCheck(
+                violation_type=ForeignKeyViolationError,
+                error=VFolderNotFound(),
+                constraint_name="fk_vfolder_auto_mounts_vfolder_id_vfolders",
+            ),
+            IntegrityErrorCheck(
+                violation_type=ForeignKeyViolationError,
+                error=EntityNotFoundError(
+                    entity_type=self.scope.entity_type(), operation=ActionOperationType.CREATE
+                ),
+                constraint_name="fk_vfolder_auto_mounts_scope_type_virtual_entities",
+            ),
+        )
+
+    @override
+    def build_row(self) -> VFolderAutoMountRow:
+        return VFolderAutoMountRow(
+            scope_type=VFolderAutoMountScopeType.PROJECT,
+            scope_id=self.scope,
+            vfolder_id=self.spec.vfolder_id,
+            mount_destination=self.spec.mount_destination,
+            subpath=self.spec.subpath,
+            mount_permission=self.spec.mount_permission,
+        )
+
+    @override
+    def to_data(self, row: VFolderAutoMountRow) -> VFolderAutoMountData:
+        return VFolderAutoMountSearchableFields.own.to_data(row)

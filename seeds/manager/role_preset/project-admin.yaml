@@ -53,4 +53,5 @@ items:
       user:                             [read]
       user_resource_policy:             []
       vfolder:                          [read, update, create, soft_delete, hard_delete]
+      vfolder_auto_mount:               [read, update, create, soft_delete, hard_delete]
       vfs_storage:                      []

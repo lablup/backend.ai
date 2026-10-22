@@ -132,6 +132,9 @@ from ai.backend.manager.models.vfolder.updaters import (
     VFolderTrashUpdater,
 )
 from ai.backend.manager.models.vfolder.upserters import VFolderUserMountPolicyUpserter
+from ai.backend.manager.models.vfolder_auto_mount.purgers import (
+    VFolderAutoMountVFolderBatchPurger,
+)
 from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_exists,
 )
@@ -727,6 +730,10 @@ class VfolderRepository:
                 reference_checks = vfolder_reference_conflict_checks(
                     VFolderID(vfolder.quota_scope_id, vfolder.id)
                 )
+            # The FK cascade would take the auto-mount rows first and leave their nodes.
+            await w.batch_purge_entities_in_global(
+                VFolderAutoMountVFolderBatchPurger(vfolder_id=vfolder_id)
+            )
             try:
                 purged = await w.purge_entity(
                     VFolderPurger(vfolder_id=vfolder_id, reference_checks=reference_checks)

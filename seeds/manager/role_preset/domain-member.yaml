@@ -53,4 +53,5 @@ items:
       user:                             []
       user_resource_policy:             []
       vfolder:                          []
+      vfolder_auto_mount:               []
       vfs_storage:                      []
