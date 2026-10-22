@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScript, BootstrapScriptID
 from ai.backend.common.data.entity.types import FieldData, RuntimeEntityID
@@ -10,3 +11,5 @@ class BootstrapScriptData(FieldData):
     entity: RuntimeEntityID
     script: BootstrapScript
     is_default: bool
+    created_at: datetime
+    updated_at: datetime
