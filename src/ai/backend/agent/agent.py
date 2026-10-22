@@ -281,6 +281,7 @@ from .resources import (
 )
 from .stats import StatContext, StatModes
 from .types import (
+    CREATION_DESTROYED_MESSAGE,
     Container,
     ContainerLifecycleEvent,
     KernelLifecycleStatus,
@@ -338,6 +339,9 @@ class CreateTaskInfo:
 
     kernel_id: KernelId
     session_id: SessionId
+    task: asyncio.Task[Any] | None = None
+    cancellable: bool = True
+    cancelled_by_destroy: bool = False
 
 
 class AgentClass(enum.Enum):
@@ -892,7 +896,9 @@ class AbstractAgent[
             yield False
             return
 
-        create_info = CreateTaskInfo(kernel_id=kernel_id, session_id=session_id)
+        create_info = CreateTaskInfo(
+            kernel_id=kernel_id, session_id=session_id, task=asyncio.current_task()
+        )
         self._active_creates[kernel_id] = create_info
         try:
             yield True
@@ -1432,6 +1438,32 @@ class AbstractAgent[
                     kernel_obj.set_container_id(ev.container_id)
         log.debug("start event handled", container_id=ev.container_id)
 
+    async def _cancel_ongoing_create(self, kernel_id: KernelId) -> tuple[bool, bool]:
+        """
+        Cancel the creation of the kernel and wait until it has unwound.
+        Returns (waited, first): whether a creation was waited for, and whether this destroy
+        is the one that cancelled it.
+
+        Skipped from the readiness polling phase on (cancelled when the termination is reported),
+        for a creation that already failed on its own, and for a restart.
+        """
+        create_info = self._active_creates.get(kernel_id)
+        if create_info is None or create_info.task is None or create_info.task.done():
+            return False, False
+        if (
+            not create_info.cancellable
+            or kernel_id in self._pending_creation_tasks
+            or kernel_id in self.restarting_kernels
+        ):
+            return False, False
+        first = not create_info.cancelled_by_destroy
+        if first:
+            log.debug("kernel creation cancelling for destroy")
+            create_info.cancelled_by_destroy = True
+            create_info.task.cancel(CREATION_DESTROYED_MESSAGE)
+        await asyncio.wait({create_info.task})
+        return True, first
+
     async def _handle_destroy_event(self, ev: ContainerLifecycleEvent) -> None:
         log.debug("destroy event handling", container_id=ev.container_id)
         try:
@@ -1440,23 +1472,32 @@ class AbstractAgent[
                 raise AsyncioTaskNotAvailableError("No current asyncio task is available.")
             if ev.kernel_id not in self._ongoing_destruction_tasks:
                 self._ongoing_destruction_tasks[ev.kernel_id] = current_task
+            waited, create_cancelled = await self._cancel_ongoing_create(ev.kernel_id)
             async with self.registry_lock:
                 kernel_obj = self.kernel_registry.get(ev.kernel_id)
                 if kernel_obj is None:
                     log.warning("kernel to destroy missing", container_id=ev.container_id)
                     if ev.container_id is None:
+                        reason = (
+                            ev.reason
+                            if create_cancelled
+                            else KernelLifecycleEventReason.ALREADY_TERMINATED
+                        )
+                        if create_cancelled:
+                            # The cancelled creation may have left its scratch behind.
+                            await self.clean_kernel(ev.kernel_id, None, False)
                         await self.reconstruct_resource_usage()
                         if not ev.suppress_events:
                             await self.anycast_and_broadcast_event(
                                 KernelTerminatedAnycastEvent(
                                     kernel_id=ev.kernel_id,
                                     session_id=ev.session_id,
-                                    reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
+                                    reason=reason,
                                 ),
                                 KernelTerminatedBroadcastEvent(
                                     kernel_id=ev.kernel_id,
                                     session_id=ev.session_id,
-                                    reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
+                                    reason=reason,
                                 ),
                             )
                         ev.set_done_future_result(None)
@@ -1464,6 +1505,9 @@ class AbstractAgent[
                 else:
                     kernel_obj.state = KernelLifecycleStatus.TERMINATING
                     kernel_obj.termination_reason = ev.reason
+                    if waited and ev.container_id is None:
+                        # The cancelled creation may have recorded its container meanwhile.
+                        ev.container_id = kernel_obj.container_id
                     if kernel_obj.runner is not None:
                         await kernel_obj.runner.close()
                     kernel_obj.clean_event = ev.done_future
@@ -1683,6 +1727,12 @@ class AbstractAgent[
         suppress_events: bool = False,
     ) -> None:
         cid: ContainerId | None = None
+        if reason in (
+            KernelLifecycleEventReason.FAILED_TO_CREATE,
+            KernelLifecycleEventReason.FAILED_TO_START,
+        ) and (create_info := self._active_creates.get(kernel_id)):
+            # The creation is failing on its own: its destroy must not cancel it.
+            create_info.cancellable = False
         try:
             kernel_obj = self.kernel_registry[kernel_id]
         except KeyError:
@@ -2573,6 +2623,49 @@ class AbstractAgent[
             service.start_command = f"{service.start_command} {shlex.join(extra_args)}"
         return models
 
+    @staticmethod
+    def _record_started_container(
+        kernel_obj: AbstractKernel, container_data: Mapping[str, Any]
+    ) -> None:
+        # No await: a destroy cannot see the kernel between its start and its container id.
+        kernel_obj.data.update(container_data)
+        if "container_id" in container_data:
+            kernel_obj.set_container_id(container_data["container_id"])
+
+    async def _settle_cancelled_start(
+        self,
+        kernel_obj: AbstractKernel,
+        start_task: asyncio.Future[Mapping[str, Any]],
+        kernel_id: KernelId,
+        session_id: SessionId,
+    ) -> None:
+        """
+        Let a container whose start was cancelled come up and record it, so that the destroy
+        that cancelled the creation stops it by its id. Further cancellations are deferred.
+        """
+        while not start_task.done():
+            try:
+                await asyncio.wait({start_task})
+            except asyncio.CancelledError:
+                pass
+        try:
+            self._record_started_container(kernel_obj, start_task.result())
+        except ContainerCreationError as e:
+            if e.container_id:
+                kernel_obj.set_container_id(ContainerId(e.container_id))
+        except BaseException:
+            pass
+        create_info = self._active_creates.get(kernel_id)
+        if create_info is None or not create_info.cancelled_by_destroy:
+            # Not a destroy: nobody else is going to stop the container.
+            await self.inject_container_lifecycle_event(
+                kernel_id,
+                session_id,
+                LifecycleEvent.DESTROY,
+                KernelLifecycleEventReason.FAILED_TO_CREATE,
+                container_id=kernel_obj.container_id,
+            )
+
     async def create_kernel(
         self,
         ownership_data: KernelOwnershipData,
@@ -2981,19 +3074,26 @@ class AbstractAgent[
                     async with self.registry_lock:
                         self.kernel_registry[kernel_id] = kernel_obj
                     log.debug("kernel container starting")
-                    try:
-                        container_data = await ctx.start_container(
+                    start_task = asyncio.ensure_future(
+                        ctx.start_container(
                             kernel_obj,
                             cmdargs,
                             resource_opts,
                             preopen_ports,
                             cluster_info,
                         )
+                    )
+                    try:
+                        container_data = await asyncio.shield(start_task)
+                    except asyncio.CancelledError:
+                        await self._settle_cancelled_start(
+                            kernel_obj, start_task, kernel_id, session_id
+                        )
+                        raise
                     except ContainerCreationError as e:
                         msg = e.message or "unknown"
                         cid = e.container_id
-                        async with self.registry_lock:
-                            self.kernel_registry[ctx.kernel_id].set_container_id(ContainerId(cid))
+                        kernel_obj.set_container_id(ContainerId(cid))
                         await self.inject_container_lifecycle_event(
                             kernel_id,
                             session_id,
@@ -3017,12 +3117,7 @@ class AbstractAgent[
                     log.debug(
                         "kernel container started", container_id=container_data.get("container_id")
                     )
-                    async with self.registry_lock:
-                        self.kernel_registry[kernel_id].data.update(container_data)
-                        if "container_id" in container_data:
-                            self.kernel_registry[kernel_id].set_container_id(
-                                container_data["container_id"]
-                            )
+                    self._record_started_container(kernel_obj, container_data)
                     await kernel_obj.init(self.event_producer)
                     log.debug(
                         "kernel object initialized", container_id=container_data.get("container_id")
@@ -3133,6 +3228,9 @@ class AbstractAgent[
                         self._pending_creation_tasks[kernel_id].remove(current_task)
                         if not self._pending_creation_tasks[kernel_id]:
                             del self._pending_creation_tasks[kernel_id]
+                        if create_info := self._active_creates.get(kernel_id):
+                            # The kernel has started: its destroy is no longer a creation to cancel.
+                            create_info.cancellable = False
 
                     public_service_ports: list[ServicePort] = self.get_public_service_ports(
                         service_ports

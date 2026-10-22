@@ -57,6 +57,7 @@ from ai.backend.agent.errors import (
 from ai.backend.agent.errors.agent import (
     ImagePullFailedError,
     ImagePullTimeoutError,
+    KernelCreationCancelledError,
     KernelNotFoundError,
 )
 from ai.backend.agent.health.docker import DockerHealthChecker
@@ -166,6 +167,7 @@ from .config.unified import (
     KernelLifecyclesConfig,
 )
 from .types import (
+    CREATION_DESTROYED_MESSAGE,
     KernelLifecycleStatus,
     KernelOwnershipData,
     LifecycleEvent,
@@ -851,7 +853,16 @@ class AgentRPCServer(aobject):
                         cluster_info,
                         throttle_sema=throttle_sema,
                     )
-                except (TimeoutError, asyncio.CancelledError, ResourceError):
+                except asyncio.CancelledError as e:
+                    if e.args != (CREATION_DESTROYED_MESSAGE,):
+                        raise
+                    # The destroy of this kernel cancelled it: not a cancellation of the request.
+                    if (current_task := asyncio.current_task()) is not None:
+                        current_task.uncancel()
+                    raise KernelCreationCancelledError(
+                        f"Kernel was destroyed during creation (k:{ownership_data.kernel_id!s})"
+                    ) from e
+                except (TimeoutError, ResourceError):
                     raise
                 except (ImagePullTimeoutError, ImagePullFailedError) as e:
                     log.trace("kernel image pull failed", error_repr=repr(e))
