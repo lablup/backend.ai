@@ -25,6 +25,7 @@ from ai.backend.agent.containerd import agent as agent_module
 from ai.backend.agent.containerd.agent import (
     HOST_PORTS_LABEL,
     ContainerdAgent,
+    ContainerdKernelCreationContext,
     _kernel_slots,
     _run_scratch_work,
 )
@@ -101,6 +102,7 @@ def agent(monkeypatch: pytest.MonkeyPatch, runner: FakeCommandRunner) -> Contain
     instance._tolerate_lookup_errors = False
     instance._lookup_warned = set()
     instance.restarting_kernels = {}
+    instance._active_creates = {}
     instance.registry_lock = asyncio.Lock()
     instance._network = KernelNetwork(
         "bai-t", IPv4Network("172.30.9.0/24"), "", (30000, 30009), run=runner
@@ -1014,6 +1016,42 @@ class TestStuckKernel:
         await agent.reconstruct_resource_usage()
         assert alloc_map.held == {"gpu0"}
 
+    async def test_create_is_refused_before_it_starts(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+        runner: FakeCommandRunner,
+        mocker: MockerFixture,
+        kernel_config: KernelCreationConfig,
+        ownership_data: KernelOwnershipData,
+    ) -> None:
+        """A fresh create with the id of a held kernel would run beside the held container."""
+        await self._stick(agent, scratch_root)
+        agent._stuck_kernels["c1"].kernel_id = ownership_data.kernel_id
+        mocker.patch.object(agent, "anycast_and_broadcast_event", new=AsyncMock())
+        # Guards against the refusal moving after the creation context is built.
+        steps = [
+            mocker.patch.object(ContainerdKernelCreationContext, name, new=AsyncMock())
+            for name in ("prepare_scratch", "apply_network", "prepare_ssh")
+        ]
+        runner.calls.clear()
+
+        with pytest.raises(ContainerTaskStuck, match="c1"):
+            await agent.create_kernel(
+                ownership_data, MagicMock(), kernel_config, cast(Any, {}), restarting=False
+            )
+
+        for step in steps:
+            step.assert_not_awaited()
+        assert runner.calls == []
+        assert ownership_data.kernel_id not in agent.kernel_registry
+        assert agent._stuck_kernels["c1"].kernel_id == ownership_data.kernel_id
+        assert agent.port_pool.used_ports() == {30000, 30001}
+        await agent.reconstruct_resource_usage()
+        assert alloc_map.held == {"gpu0"}
+
     async def test_restart_whose_old_container_gets_stuck_fails_and_is_forgotten(
         self,
         agent: ContainerdAgent,
@@ -1230,6 +1268,7 @@ class TestStuckKernel:
         assert not agent._resources_stale
         assert alloc_map.held == set()
 
+    @pytest.mark.parametrize("restarting", [True, False])
     async def test_another_kernel_is_not_affected_by_a_stuck_container(
         self,
         agent: ContainerdAgent,
@@ -1238,6 +1277,7 @@ class TestStuckKernel:
         alloc_map: _GpuAllocMap,
         kernel_config: KernelCreationConfig,
         ownership_data: KernelOwnershipData,
+        restarting: bool,
     ) -> None:
         await self._stick(agent, scratch_root)
         agent._runtime_profiles = []
@@ -1246,7 +1286,7 @@ class TestStuckKernel:
             ownership_data,
             MagicMock(),
             kernel_config,
-            restarting=True,
+            restarting=restarting,
         )
 
         assert ctx.kernel_id == ownership_data.kernel_id

@@ -1033,8 +1033,7 @@ class ContainerdAgent(
         restarting: bool = False,
         cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
     ) -> ContainerdKernelCreationContext:
-        if restarting:
-            self._refuse_while_stuck(ownership_data.kernel_id)
+        self._refuse_while_stuck(ownership_data.kernel_id)
         slots = _kernel_slots(kernel_config)
         profile = select_profile(
             self._runtime_profiles,
@@ -1074,7 +1073,7 @@ class ContainerdAgent(
         for entry in self._stuck_kernels.values():
             if entry.kernel_id == kernel_id:
                 raise ContainerTaskStuck(
-                    f"the kernel cannot restart while its container {entry.container_id} "
+                    f"the kernel cannot start while its container {entry.container_id} "
                     "is not confirmed gone"
                 )
 
