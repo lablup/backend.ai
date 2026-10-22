@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import assert_never
 
+from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session_group import SessionGroupID
@@ -12,6 +13,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.session_group.request import (
     AdminSearchSessionGroupsInput,
+    CreateSessionGroupInput,
     PurgeSessionGroupInput,
     ScopedSearchSessionGroupsInput,
     SessionGroupFilter,
@@ -20,6 +22,7 @@ from ai.backend.common.dto.manager.v2.session_group.request import (
 )
 from ai.backend.common.dto.manager.v2.session_group.response import (
     AdminSearchSessionGroupsPayload,
+    CreateSessionGroupPayload,
     PurgeSessionGroupPayload,
     SessionGroupNode,
     UpdateSessionGroupPayload,
@@ -29,6 +32,7 @@ from ai.backend.common.dto.manager.v2.session_group.types import (
     SessionGroupPlacementDirectionEnum,
     SessionGroupPlacementEnforcementEnum,
 )
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -43,6 +47,7 @@ from ai.backend.manager.models.condition_utils import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.session_group.purgers import SessionGroupPurger
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.session_group.scopes import (
@@ -55,6 +60,7 @@ from ai.backend.manager.models.session_group.searchers import SessionGroupSearch
 from ai.backend.manager.models.session_group.updaters import SessionGroupUpdater
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.services.session_group.actions.bulk_get import BulkGetSessionGroupsAction
+from ai.backend.manager.services.session_group.actions.create import CreateSessionGroupAction
 from ai.backend.manager.services.session_group.actions.get import GetSessionGroupAction
 from ai.backend.manager.services.session_group.actions.global_search import (
     GlobalSearchSessionGroupsAction,
@@ -76,7 +82,7 @@ _SESSION_GROUP_PAGINATION_SPEC = PaginationSpec(
 
 
 class SessionGroupAdapter(BaseAdapter):
-    """Adapter for session group reads, placement policy updates and the purge."""
+    """Adapter for session group reads, the creation, placement policy updates and the purge."""
 
     _session_group: SessionGroupProcessors
 
@@ -166,6 +172,21 @@ class SessionGroupAdapter(BaseAdapter):
             )
         )
         return self._to_payload(result)
+
+    async def create(self, input: CreateSessionGroupInput) -> CreateSessionGroupPayload:
+        """Create a session group in a project, owned by the caller."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        creator = SessionGroupCreator(
+            domain_name=me.domain_name,
+            project_id=ProjectID(input.project_id),
+            owner_user_id=UserID(me.user_id),
+            placement_direction=SessionGroupPlacementDirection(input.placement_direction),
+            placement_enforcement=SessionGroupPlacementEnforcement(input.placement_enforcement),
+        )
+        result = await self._session_group.create.run(CreateSessionGroupAction(creator=creator))
+        return CreateSessionGroupPayload(session_group=self._data_to_node(result.data))
 
     async def purge(self, input: PurgeSessionGroupInput) -> PurgeSessionGroupPayload:
         """Remove a session group; its member sessions stay with their group cleared."""
