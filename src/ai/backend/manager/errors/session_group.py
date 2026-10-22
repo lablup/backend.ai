@@ -25,3 +25,16 @@ class SessionGroupInUse(EntityError, web.HTTPConflict):
         return EntityErrorCode(
             SessionGroupEntityType(), ActionOperationType.PURGE, ErrorDetail.CONFLICT
         )
+
+
+class SessionGroupInUseForUpdate(EntityError, web.HTTPConflict):
+    """Raised when updating a session group a deployment's replica group still references."""
+
+    error_type = "https://api.backend.ai/probs/session-group-in-use"
+    error_title = "Session group cannot be updated while a replica group uses it."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            SessionGroupEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT
+        )

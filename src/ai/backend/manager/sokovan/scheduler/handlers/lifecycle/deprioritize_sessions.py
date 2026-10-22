@@ -54,6 +54,11 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
 
     @classmethod
     @override
+    def description(cls) -> str:
+        return "Lowers the priority of sessions past the scheduling retry limit and requeues them."
+
+    @classmethod
+    @override
     def target_statuses(cls) -> list[SessionStatus]:
         """Sessions in DEPRIORITIZING state."""
         return [SessionStatus.DEPRIORITIZING]

@@ -42,7 +42,10 @@ class BulkGetSessionGroupsAction(BasePartialBulkAction):
     @override
     def narrowed_to(self, entity_ids: Sequence[EntityIdentifier]) -> Self:
         allowed = frozenset(entity_ids)
-        return replace(self, ids=[group_id for group_id in self.ids if group_id in allowed])
+        return replace(
+            self,
+            ids=[session_group_id for session_group_id in self.ids if session_group_id in allowed],
+        )
 
     def to_searcher(self) -> SessionGroupSearcher:
         """The groups named, leaving out the ones a replica group holds."""

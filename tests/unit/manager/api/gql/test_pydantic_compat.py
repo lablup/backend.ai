@@ -363,6 +363,7 @@ class TestAdaptersRegistry:
             key_provider_pool=MagicMock(),
             deployment_coordinator=MagicMock(),
             schedule_coordinator=MagicMock(),
+            session_lifecycle_handlers=(),
         )
         assert isinstance(adapters, Adapters)
 
@@ -374,5 +375,6 @@ class TestAdaptersRegistry:
             key_provider_pool=MagicMock(),
             deployment_coordinator=MagicMock(),
             schedule_coordinator=MagicMock(),
+            session_lifecycle_handlers=(),
         )
         assert isinstance(adapters.container_registry, ContainerRegistryAdapter)

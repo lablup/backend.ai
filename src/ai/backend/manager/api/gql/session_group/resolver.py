@@ -31,6 +31,8 @@ from ai.backend.manager.api.gql.session_group.types import (
     SessionGroupGQL,
     SessionGroupOrderByGQL,
     SessionGroupScopeGQL,
+    UpdateSessionGroupInputGQL,
+    UpdateSessionGroupPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -131,6 +133,24 @@ async def scoped_session_groups(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
+            "Change a session group's placement direction and enforcement. Members placed "
+            "afterwards follow the new policy; a group a deployment's replica group holds "
+            "is refused as in use."
+        ),
+    )
+)
+async def update_session_group(
+    info: Info[StrawberryGQLContext],
+    input: UpdateSessionGroupInputGQL,
+) -> UpdateSessionGroupPayloadGQL | None:
+    payload = await info.context.adapters.session_group.update(input.to_pydantic())
+    return UpdateSessionGroupPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
             "Permanently remove a session group. Its member sessions remain with their group "
             "cleared. A group a deployment's replica group references is refused as in use."
         ),
@@ -139,7 +159,7 @@ async def scoped_session_groups(
 async def purge_session_group(
     info: Info[StrawberryGQLContext],
     input: PurgeSessionGroupInputGQL,
-) -> PurgeSessionGroupPayloadGQL:
+) -> PurgeSessionGroupPayloadGQL | None:
     payload = await info.context.adapters.session_group.purge(input.to_pydantic())
     return PurgeSessionGroupPayloadGQL.from_pydantic(
         payload, extra={"purged_id": to_global_id(SessionGroupGQL, payload.entity_id)}

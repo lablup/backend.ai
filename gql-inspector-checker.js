@@ -40,11 +40,14 @@ const ACCEPTED_REMOVALS = {
 // Type changes decided deliberately, keyed and dropped the same way as ACCEPTED_REMOVALS.
 const ENTITY_SHARE_FILTER_RETYPE =
   "The old type failed DTO validation for every value, so no client could use the field.";
+const NULLABLE_MUTATION_PAYLOAD =
+  "The payload became nullable so a failed mutation leaves the other fields of the response. It was added in this same unreleased cycle and went out in no release tag.";
 
 const ACCEPTED_TYPE_CHANGES = {
   "EntityShareFilter.status": ENTITY_SHARE_FILTER_RETYPE,
   "EntityShareFilter.recipientEntityId": ENTITY_SHARE_FILTER_RETYPE,
   "EntityShareFilter.recipientEmail": ENTITY_SHARE_FILTER_RETYPE,
+  "Mutation.purgeSessionGroup": NULLABLE_MUTATION_PAYLOAD,
 };
 
 const TYPE_CHANGES = ["INPUT_FIELD_TYPE_CHANGED", "FIELD_TYPE_CHANGED"];

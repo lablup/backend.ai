@@ -11219,9 +11219,14 @@ type Mutation {
   includeSessionIdleChecks(input: IncludeSessionIdleChecksInput!): IncludeSessionIdleChecksPayload
 
   """
+  Added in 26.10.0. Change a session group's placement direction and enforcement. Members placed afterwards follow the new policy; a group a deployment's replica group holds is refused as in use.
+  """
+  updateSessionGroup(input: UpdateSessionGroupInput!): UpdateSessionGroupPayload
+
+  """
   Added in 26.10.0. Permanently remove a session group. Its member sessions remain with their group cleared. A group a deployment's replica group references is refused as in use.
   """
-  purgeSessionGroup(input: PurgeSessionGroupInput!): PurgeSessionGroupPayload!
+  purgeSessionGroup(input: PurgeSessionGroupInput!): PurgeSessionGroupPayload
 
   """
   Added in 26.9.0. Set one key on an entity, replacing the value it carries. Reachable by any caller RBAC authorizes to write the entity.
@@ -14955,6 +14960,11 @@ type Query {
   Added in 26.4.4. List all registered deployment scheduling handlers (superadmin only). The returned ``name`` values are valid keys for ``DeploymentOptions.handler_options.by_handler``.
   """
   schedulingHandlers: [SchedulingHandlerNode!]
+
+  """
+  Added in 26.10.0. List all registered session lifecycle handlers (superadmin only). The returned ``name`` values are valid keys for ``DefaultSessionOptionsInfo.handlerOptions.byHandler``.
+  """
+  adminSessionLifecycleHandlers: [SessionLifecycleHandlerNode!]
 
   """
   Added in 26.8.0. Compute whether a session could be created on a resource group, without actually provisioning it. Checks each kernel's resource request against the group's agents and returns per-kernel admission outcomes, with hints on what to reduce for kernels that do not fit.
@@ -19693,6 +19703,19 @@ input SessionIdleCheckTargetInput {
 }
 
 """
+Added in 26.10.0. Metadata for a single registered session lifecycle handler. Surfaces the ``name`` accepted in ``DefaultSessionOptionsInfo.handlerOptions.byHandler``.
+"""
+type SessionLifecycleHandlerNode {
+  """
+  Handler key accepted in the session options' handler_options.by_handler.
+  """
+  name: String!
+
+  """One-line description of what the handler does."""
+  description: String!
+}
+
+"""
 Added in 26.8.0. Configures the maximum lifetime of a running session. The checker expires a session after the configured duration is reached.
 """
 type SessionLifetimeIdleCheckerSpec {
@@ -22140,6 +22163,26 @@ input UpdateRuntimeVariantPresetInput {
 type UpdateRuntimeVariantPresetPayload {
   """The updated preset."""
   preset: RuntimeVariantPreset!
+}
+
+"""
+Added in 26.10.0. Input for changing a session group's placement policy. At least one of the two fields must be given; members placed afterwards follow the new policy.
+"""
+input UpdateSessionGroupInput {
+  """ID of the session group to update."""
+  id: UUID!
+
+  """New placement direction. Omit to leave unchanged."""
+  placementDirection: SessionGroupPlacementDirection
+
+  """New placement enforcement. Omit to leave unchanged."""
+  placementEnforcement: SessionGroupPlacementEnforcement
+}
+
+"""Added in 26.10.0. Payload for a session group update."""
+type UpdateSessionGroupPayload {
+  """The updated session group."""
+  sessionGroup: SessionGroup!
 }
 
 """

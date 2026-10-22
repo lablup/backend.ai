@@ -16,11 +16,13 @@ from ai.backend.common.dto.manager.v2.session_group.request import (
     ScopedSearchSessionGroupsInput,
     SessionGroupFilter,
     SessionGroupOrder,
+    UpdateSessionGroupInput,
 )
 from ai.backend.common.dto.manager.v2.session_group.response import (
     AdminSearchSessionGroupsPayload,
     PurgeSessionGroupPayload,
     SessionGroupNode,
+    UpdateSessionGroupPayload,
 )
 from ai.backend.common.dto.manager.v2.session_group.types import (
     SessionGroupOrderField,
@@ -30,7 +32,11 @@ from ai.backend.common.dto.manager.v2.session_group.types import (
 from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.session_group.types import SessionGroupData
+from ai.backend.manager.data.session_group.types import (
+    SessionGroupData,
+    SessionGroupPlacementDirection,
+    SessionGroupPlacementEnforcement,
+)
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import (
     combine_conditions_and,
@@ -46,6 +52,7 @@ from ai.backend.manager.models.session_group.scopes import (
 )
 from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
 from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
+from ai.backend.manager.models.session_group.updaters import SessionGroupUpdater
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.services.session_group.actions.bulk_get import BulkGetSessionGroupsAction
 from ai.backend.manager.services.session_group.actions.get import GetSessionGroupAction
@@ -56,7 +63,9 @@ from ai.backend.manager.services.session_group.actions.purge import PurgeSession
 from ai.backend.manager.services.session_group.actions.scoped_search import (
     ScopedSearchSessionGroupsAction,
 )
+from ai.backend.manager.services.session_group.actions.update import UpdateSessionGroupAction
 from ai.backend.manager.services.session_group.processors import SessionGroupProcessors
+from ai.backend.manager.types import OptionalState
 
 __all__ = ("SessionGroupAdapter",)
 
@@ -67,7 +76,7 @@ _SESSION_GROUP_PAGINATION_SPEC = PaginationSpec(
 
 
 class SessionGroupAdapter(BaseAdapter):
-    """Adapter for session group reads and the purge."""
+    """Adapter for session group reads, placement policy updates and the purge."""
 
     _session_group: SessionGroupProcessors
 
@@ -90,9 +99,11 @@ class SessionGroupAdapter(BaseAdapter):
             for item in result.items
         ]
 
-    async def get(self, group_id: SessionGroupID) -> SessionGroupNode:
+    async def get(self, session_group_id: SessionGroupID) -> SessionGroupNode:
         """Retrieve a single session group by id."""
-        result = await self._session_group.get.run(GetSessionGroupAction(group_id=group_id))
+        result = await self._session_group.get.run(
+            GetSessionGroupAction(session_group_id=session_group_id)
+        )
         return self._data_to_node(result.data)
 
     async def global_search(
@@ -159,9 +170,25 @@ class SessionGroupAdapter(BaseAdapter):
     async def purge(self, input: PurgeSessionGroupInput) -> PurgeSessionGroupPayload:
         """Remove a session group; its member sessions stay with their group cleared."""
         result = await self._session_group.purge.run(
-            PurgeSessionGroupAction(purger=SessionGroupPurger(group_id=SessionGroupID(input.id)))
+            PurgeSessionGroupAction(
+                purger=SessionGroupPurger(session_group_id=SessionGroupID(input.id))
+            )
         )
         return PurgeSessionGroupPayload(entity_id=result.data.id)
+
+    async def update(self, input: UpdateSessionGroupInput) -> UpdateSessionGroupPayload:
+        """Change a session group's placement direction and enforcement."""
+        updater = SessionGroupUpdater(
+            session_group_id=SessionGroupID(input.id),
+            placement_direction=OptionalState.from_unset(input.placement_direction).map(
+                SessionGroupPlacementDirection
+            ),
+            placement_enforcement=OptionalState.from_unset(input.placement_enforcement).map(
+                SessionGroupPlacementEnforcement
+            ),
+        )
+        result = await self._session_group.update.run(UpdateSessionGroupAction(updater=updater))
+        return UpdateSessionGroupPayload(session_group=self._data_to_node(result.data))
 
     def _search_conditions(self, filter: SessionGroupFilter | None) -> list[QueryCondition]:
         """The filter's conditions; groups marked deleted are left out unless the top-level

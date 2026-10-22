@@ -20,6 +20,7 @@ __all__ = (
     "AdminSearchSessionGroupsPayload",
     "PurgeSessionGroupPayload",
     "SessionGroupNode",
+    "UpdateSessionGroupPayload",
 )
 
 
@@ -58,3 +59,9 @@ class PurgeSessionGroupPayload(BaseResponseModel):
     """Payload naming the session group removed."""
 
     entity_id: UUID = Field(description="UUID of the purged session group.")
+
+
+class UpdateSessionGroupPayload(BaseResponseModel):
+    """Payload for a session group update."""
+
+    session_group: SessionGroupNode = Field(description="The updated session group.")

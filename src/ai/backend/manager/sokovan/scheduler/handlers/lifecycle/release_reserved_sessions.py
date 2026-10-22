@@ -52,6 +52,11 @@ class ReleaseReservedSessionsLifecycleHandler(SessionLifecycleHandler):
 
     @classmethod
     @override
+    def description(cls) -> str:
+        return "Schedules reserved sessions once the resources freed by preemption are available."
+
+    @classmethod
+    @override
     def target_statuses(cls) -> list[SessionStatus]:
         """Sessions holding a reservation."""
         return [SessionStatus.RESERVED]

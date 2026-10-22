@@ -643,6 +643,10 @@ from ai.backend.manager.api.gql.session_group.resolver import (
     purge_session_group,
     scoped_session_groups,
     session_group,
+    update_session_group,
+)
+from ai.backend.manager.api.gql.session_lifecycle_handler.resolver import (
+    admin_session_lifecycle_handlers,
 )
 from ai.backend.manager.api.gql.storage_volume.resolver import (
     admin_storage_volumes,
@@ -849,6 +853,7 @@ class Query:
     scoped_resource_groups = scoped_resource_groups
     admin_resource_group_v2 = admin_resource_group_v2
     scheduling_handlers = scheduling_handlers
+    admin_session_lifecycle_handlers = admin_session_lifecycle_handlers
     compute_schedule = compute_schedule
     admin_allowed_resource_groups_for_domain_v2 = admin_allowed_resource_groups_for_domain_v2
     admin_allowed_resource_groups_for_project_v2 = admin_allowed_resource_groups_for_project_v2
@@ -1513,6 +1518,7 @@ class Mutation:
     exclude_session_idle_checks = exclude_session_idle_checks
     include_session_idle_checks = include_session_idle_checks
     # Session Group mutations
+    update_session_group = update_session_group
     purge_session_group = purge_session_group
     # Entity Label mutations
     upsert_entity_label = upsert_entity_label
