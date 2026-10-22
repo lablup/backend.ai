@@ -60255,6 +60255,26 @@
         "description": "Check which resource presets are available for session creation.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/v2/resource-allocation/my/concurrency": {
+      "get": {
+        "operationId": "v2/resource-allocation.my_concurrency",
+        "tags": [
+          "v2/resource-allocation"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Get the current user's concurrent session counts.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/resource-groups/scoped/search": {
       "post": {
         "operationId": "v2/resource-groups.scoped_search",
