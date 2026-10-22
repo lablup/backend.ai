@@ -11,6 +11,8 @@ from typing import (
     final,
 )
 
+from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.data.storage.types import (
     StorageBackendCapability,
     StorageBackendType,
@@ -18,6 +20,7 @@ from ai.backend.common.data.storage.types import (
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.storage.probe.registry import VolumeStatusCheck
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import InvalidSubpathError, VFolderNotFoundError
@@ -187,6 +190,8 @@ class AbstractVolume(metaclass=ABCMeta):
     quota_model: AbstractQuotaModel
     fsop_model: AbstractFSOpModel
     name: ClassVar[StorageBackendType]
+    _volume_name: StorageVolumeName
+    _status_check_config: VolumeStatusCheckConfig | None
 
     def __init__(
         self,
@@ -198,6 +203,8 @@ class AbstractVolume(metaclass=ABCMeta):
         event_producer: EventProducer,
         watcher: WatcherClient | None = None,
         options: Mapping[str, Any] | None = None,
+        volume_name: StorageVolumeName,
+        status_check_config: VolumeStatusCheckConfig | None,
     ) -> None:
         self.local_config = local_config
         self.mount_path = mount_path
@@ -206,6 +213,8 @@ class AbstractVolume(metaclass=ABCMeta):
         self.event_dispatcher = event_dispatcher
         self.event_producer = event_producer
         self.watcher = watcher
+        self._volume_name = volume_name
+        self._status_check_config = status_check_config
 
     async def init(self) -> None:
         self.fsop_model = await self.create_fsop_model()
@@ -224,6 +233,10 @@ class AbstractVolume(metaclass=ABCMeta):
 
     @abstractmethod
     async def create_fsop_model(self) -> AbstractFSOpModel:
+        raise NotImplementedError
+
+    @abstractmethod
+    def volume_status_checker(self) -> VolumeStatusCheck | None:
         raise NotImplementedError
 
     @final

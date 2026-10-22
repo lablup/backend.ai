@@ -3,13 +3,15 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, ClassVar, override
 
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.data.storage.types import (
     StorageBackendCapability,
     StorageBackendType,
 )
-from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
+from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE, NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.storage.probe.registry import VolumeStatusCheck
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.storage.types import (
     CapacityUsage,
@@ -154,6 +156,10 @@ class NoopVolume(AbstractVolume):
     @override
     async def create_fsop_model(self) -> AbstractFSOpModel:
         return NoopFSOpModel()
+
+    @override
+    def volume_status_checker(self) -> VolumeStatusCheck | None:
+        return None
 
     # ------ volume operations -------
 
@@ -332,4 +338,6 @@ def init_noop_volume(
         event_producer=event_producer,
         watcher=None,
         options=None,
+        volume_name=StorageVolumeName(NOOP_STORAGE_VOLUME_NAME),
+        status_check_config=None,
     )

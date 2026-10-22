@@ -35,6 +35,8 @@ ArtifactStorageTarget = NamedStorageTarget | VFolderStorageTarget
 # registers names of its own.
 StorageBackendType = NewType("StorageBackendType", str)
 
+StorageVolumeType = StorageBackendType
+
 
 class ArtifactStorageType(enum.StrEnum):
     OBJECT_STORAGE = "object_storage"
