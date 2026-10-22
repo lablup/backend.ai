@@ -58,6 +58,7 @@ Check options with `--help`.
 - **runtime-variant-preset**: user(get, search) · admin(get, search, create, update, delete)
 - **scheduling-history**: sub session / kernel / deployment / route / replica-group — each (search, search-scoped)
 - **scheduling-handler**: admin(list)
+- **session-lifecycle-handler**: admin(list)
 
 ### Storage
 

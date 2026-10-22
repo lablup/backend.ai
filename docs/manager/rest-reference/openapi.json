@@ -64789,6 +64789,26 @@
         "description": "Remove a session group; its member sessions stay with their group cleared.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/v2/session-lifecycle-handlers": {
+      "get": {
+        "operationId": "v2/session-lifecycle-handlers.admin_list",
+        "tags": [
+          "v2/session-lifecycle-handlers"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "List all registered session lifecycle handlers (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
     "/v2/storage-hosts/my/permissions": {
       "get": {
         "operationId": "v2/storage-hosts.my_storage_host_permissions",
