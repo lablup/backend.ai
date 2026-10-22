@@ -29,6 +29,7 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 class TCPFrontend(BaseFrontend[TCPBackend, int]):
     servers: list[asyncio.Server]
     server_tasks: list[asyncio.Task[Any]]
+    _conn_tasks: set[asyncio.Task[Any]]
 
     root_context: RootContext
 
@@ -37,6 +38,7 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
 
         self.servers = []
         self.server_tasks = []
+        self._conn_tasks = set()
 
     @override
     async def start(self) -> None:
@@ -76,11 +78,17 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
 
     @override
     async def stop(self) -> None:
-        for task in self.server_tasks:
-            task.cancel()
-            await task
         for server in self.servers:
             server.close()
+        # asyncio's wait_closed() waits for open connections; end them first.
+        conn_tasks = list(self._conn_tasks)
+        for conn_task in conn_tasks:
+            conn_task.cancel()
+        await asyncio.gather(*conn_tasks, return_exceptions=True)
+        for task in self.server_tasks:
+            task.cancel()
+        await asyncio.gather(*self.server_tasks, return_exceptions=True)
+        for server in self.servers:
             await server.wait_closed()
 
     def ensure_credential(self, request: web.Request, circuit: Circuit) -> None:
@@ -127,9 +135,26 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
 
     async def _close_writer(self, writer: asyncio.StreamWriter) -> None:
         writer.close()
-        await writer.wait_closed()
+        try:
+            await writer.wait_closed()
+        except OSError as e:  # the client is already gone: ENOTCONN / ECONNRESET
+            log.trace("client connection already closed: {!r}", e)
 
     async def pipe(
+        self, circuit_key: int, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
+        # The loop does not reference this task after the client half-closes,
+        # so the GC can finalize it mid-suspension. Hold it until it is done.
+        task = asyncio.current_task()
+        if task is not None:
+            self._conn_tasks.add(task)
+        try:
+            await self._pipe(circuit_key, reader, writer)
+        finally:
+            if task is not None:
+                self._conn_tasks.discard(task)
+
+    async def _pipe(
         self, circuit_key: int, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ) -> None:
         metrics = self.root_context.metrics
@@ -150,8 +175,11 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
                 await backend.bind(reader, writer)
             except WorkerNotAvailable:
                 log.trace("no healthy route for the TCP connection")
+                await self._close_writer(writer)
             except Exception:
                 log.exception("failed to proxy a TCP connection")
+                # bind may have failed before its own cleanup; closing twice is harmless.
+                await self._close_writer(writer)
             finally:
                 end = time.monotonic()
                 metrics.proxy.observe_downstream_tcp_end(duration=int(end - start))

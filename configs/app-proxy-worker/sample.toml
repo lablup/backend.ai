@@ -149,6 +149,11 @@
   # 'grpc' is not directly supported; use 'h2' instead for gRPC traffic.
   # Added in 25.9.0
   protocol = "http"
+  # Seconds to wait for the TCP connection to a session's upstream to be
+  # established when proxying with the 'tcp' protocol. A timeout is treated like
+  # a refused connection.
+  # Added in 26.10.0
+  tcp_connect_timeout = 10.0
   # The types of traffic this worker accepts. Use 'interactive' for user-facing
   # applications (Jupyter, VSCode, etc.) and 'inference' for model serving
   # endpoints. Separate workers for each traffic type enables specialized
