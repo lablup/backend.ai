@@ -4,6 +4,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
+from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import VolumeID
@@ -42,23 +44,39 @@ def mock_volume() -> AsyncMock:
     return volume
 
 
-async def test_get_volume(mock_volume: AsyncMock) -> None:
-    # Create a VolumePool with mocked volumes
-    volume_id = VolumeID(uuid.UUID("550e8400-e29b-41d4-a716-446655440000"))
-    pool = VolumePool(volumes={str(volume_id): mock_volume, "test_volume": mock_volume})
+VOLUME_ID = VolumeID(uuid.UUID("550e8400-e29b-41d4-a716-446655440000"))
 
-    # Test get_volume with valid volume ID
-    assert pool.get_volume(volume_id) is mock_volume
 
-    # Test get_volume_by_name with valid name, including a UUID key
-    assert pool.get_volume_by_name("test_volume") is mock_volume
-    assert pool.get_volume_by_name(str(volume_id).upper()) is mock_volume
+async def test_get_volume_by_name(mock_volume: AsyncMock) -> None:
+    pool = VolumePool(volumes={StorageVolumeName("test_volume"): mock_volume})
 
-    # Test get_volume with invalid volume ID
-    invalid_id = VolumeID(uuid.UUID("00000000-0000-0000-0000-000000000000"))
+    assert pool.get_volume_by_name(StorageVolumeName("test_volume")) is mock_volume
+
     with pytest.raises(InvalidVolumeError):
-        pool.get_volume(invalid_id)
+        pool.get_volume_by_name(StorageVolumeName("nonexistent"))
 
-    # Test get_volume_by_name with invalid name
+
+async def test_get_volume_by_id(mock_volume: AsyncMock) -> None:
+    pool = VolumePool(
+        volumes={
+            StorageVolumeName(str(VOLUME_ID).upper()): mock_volume,
+            StorageVolumeName("test_volume"): mock_volume,
+        }
+    )
+
+    assert pool.get_volume(VOLUME_ID) is mock_volume
+    assert set(pool.list_volumes_by_id()) == {VOLUME_ID}
+
     with pytest.raises(InvalidVolumeError):
-        pool.get_volume_by_name("nonexistent")
+        pool.get_volume(VolumeID(uuid.UUID("00000000-0000-0000-0000-000000000000")))
+
+
+async def test_list_volumes_excludes_noop_volume(mock_volume: AsyncMock) -> None:
+    pool = VolumePool(
+        volumes={
+            StorageVolumeName("test_volume"): mock_volume,
+            StorageVolumeName(NOOP_STORAGE_VOLUME_NAME): mock_volume,
+        }
+    )
+
+    assert set(pool.list_volumes()) == {StorageVolumeName("test_volume")}

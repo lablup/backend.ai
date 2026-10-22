@@ -5,13 +5,13 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql.expression import false
 
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScript, BootstrapScriptID
-from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
-from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
 from ai.backend.manager.models.base import GUID, Base
+from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 
 
-class BootstrapScriptRow(Base):
+class BootstrapScriptRow(CreatedAtMixin, Base):
     """A bootstrap script set on an entity; at most one per entity is the default."""
 
     __tablename__ = "bootstrap_scripts"
@@ -36,11 +36,3 @@ class BootstrapScriptRow(Base):
     entity_id: Mapped[UUID] = mapped_column(GUID(), nullable=False)
     script: Mapped[BootstrapScript] = mapped_column(sa.Text, nullable=False)
     is_default: Mapped[bool] = mapped_column(sa.Boolean, nullable=False, server_default=false())
-
-    def to_data(self) -> BootstrapScriptData:
-        return BootstrapScriptData(
-            id=self.id,
-            entity=RuntimeEntityID(self.entity_type, self.entity_id),
-            script=BootstrapScript(self.script),
-            is_default=self.is_default,
-        )

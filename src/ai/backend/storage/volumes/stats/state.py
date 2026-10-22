@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_volume_stats import ValkeyVolumeStatsClient
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.logging.structured import StructuredLogger
 
 from .types import CachedFSPerfMetricData, VolumeStatsObserverOptions
@@ -74,7 +75,7 @@ class VolumeState:
         """Fetch metric from volume API and store in cache."""
         now = datetime.now(UTC)
 
-        volume = self._volume_pool.get_volume_by_name(volume_name)
+        volume = self._volume_pool.get_volume_by_name(StorageVolumeName(volume_name))
         metric = await volume.get_performance_metric()
         cached = CachedFSPerfMetricData.from_metric(
             volume_name=volume_name,

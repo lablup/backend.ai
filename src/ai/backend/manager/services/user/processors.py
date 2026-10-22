@@ -1,5 +1,6 @@
 from ai.backend.common.data.entity.error_log import ErrorLogFieldType
 from ai.backend.common.data.entity.keypair import KeyPairFieldType, KeyPairID
+from ai.backend.common.data.entity.ssh_keypair import SSHKeypairFieldType
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
@@ -29,6 +30,7 @@ from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.data.keypair.types import KeyPairData
+from ai.backend.manager.data.ssh_keypair.types import SSHKeypairData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsAction,
@@ -108,6 +110,15 @@ from ai.backend.manager.services.user.actions.scoped_search import (
     ScopedSearchUsersAction,
 )
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
+from ai.backend.manager.services.user.actions.ssh_keypair_ops import (
+    LookupBulkSSHKeypairOwnerAction,
+    LookupSSHKeypairOwnerAction,
+    SearchSSHKeypairsAction,
+)
+from ai.backend.manager.services.user.actions.switch_default_dotfile import (
+    SwitchDefaultDotfileAction,
+    SwitchDefaultDotfileActionResult,
+)
 from ai.backend.manager.services.user.actions.update_user import (
     BulkUpdateUserAction,
     BulkUpdateUserActionResult,
@@ -133,6 +144,7 @@ class UserProcessors:
         LookupKeypairOwnerByAccessKeyAction, FieldOwnerLookupOpsResult
     ]
     keypair_group: LookupFieldGroup[KeyPairData]
+    ssh_keypair_group: LookupFieldGroup[SSHKeypairData]
     error_log: ErrorLogProcessors
     bulk_get: PartialBulkActionProcessor[BulkGetUsersAction, UserData]
     global_search: GlobalActionProcessor[GlobalSearchUsersAction, BatchOpsResult[UserData]]
@@ -162,6 +174,9 @@ class UserProcessors:
     get_default_keypairs: BulkActionProcessor[
         GetDefaultKeypairsAction, OwnedFieldsOpsResult[UserID, KeyPairData]
     ]
+    search_ssh_keypairs: BulkActionProcessor[
+        SearchSSHKeypairsAction, ScopedFieldsOpsResult[SSHKeypairData]
+    ]
     update_keypair: SingleFieldActionProcessor[UpdateKeypairAction, UpdateKeypairActionResult]
     search_my_keypairs: ScopeActionProcessor[
         SearchMyKeypairsAction, ScopedFieldsOpsResult[KeyPairData]
@@ -182,6 +197,9 @@ class UserProcessors:
         AdminGetSSHKeypairAction, AdminGetSSHKeypairActionResult
     ]
     create_dotfile: SingleEntityActionProcessor[CreateDotfileAction, CreateDotfileActionResult]
+    switch_default_dotfile: SingleEntityActionProcessor[
+        SwitchDefaultDotfileAction, SwitchDefaultDotfileActionResult
+    ]
     get_default_bootstrap_script: SingleEntityActionProcessor[
         GetDefaultBootstrapScriptAction, GetDefaultBootstrapScriptActionResult
     ]
@@ -240,6 +258,9 @@ class UserProcessors:
             AdminGetSSHKeypairAction, user_service.admin_get_ssh_keypair
         )
         self.create_dotfile = group.single_entity(CreateDotfileAction, user_service.create_dotfile)
+        self.switch_default_dotfile = group.single_entity(
+            SwitchDefaultDotfileAction, user_service.switch_default_dotfile
+        )
         self.get_default_bootstrap_script = group.single_entity(
             GetDefaultBootstrapScriptAction, user_service.get_default_bootstrap_script
         )
@@ -258,6 +279,15 @@ class UserProcessors:
         )
         self.search_my_keypairs = self.keypair_group.search_ops(SearchMyKeypairsAction)
         self.get_default_keypairs = self.keypair_group.atomic_bulk_get_ops(GetDefaultKeypairsAction)
+        self.ssh_keypair_group = group.field_group(
+            FieldGroupMeta(SSHKeypairFieldType()),
+            SSHKeypairData,
+            LookupSSHKeypairOwnerAction,
+            LookupBulkSSHKeypairOwnerAction,
+        )
+        self.search_ssh_keypairs = self.ssh_keypair_group.atomic_bulk_scoped_search_ops(
+            SearchSSHKeypairsAction
+        )
         self.lookup_keypair = group.key_field_lookup_ops(LookupKeypairByAccessKeyAction)
         self.bulk_lookup_keypairs = group.public_bulk_key_field_lookup_ops(BulkLookupKeypairsAction)
         self.bulk_get_keypairs = self.keypair_group.partial_bulk_get_ops(BulkGetKeypairsAction)

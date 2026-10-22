@@ -3,13 +3,16 @@
 Ports the legacy per-session environ composition
 (``SessionPreparer.prepare`` lines 87-92) into the draft chain: when
 ``sudo_session_enabled`` is set on the preparation context, every
-kernel draft's ``execution_spec.environ`` gets an
+kernel group's ``execution_spec.environ`` gets an
 ``"SUDO_SESSION_ENABLED": "1"`` entry overlaid on top.
 
-Runs after :class:`.expand_kernel_groups_rule.ExpandKernelGroupsRule`
-so the overlay lands on the per-replica drafts directly, and caller-
-supplied environ keys (from the request adapter) survive underneath —
-the overlay only ever adds one deterministic key.
+Runs before :class:`.expand_kernel_groups_rule.ExpandKernelGroupsRule`
+so the stored group carries the same environ its replicas start with,
+and after
+:class:`.merge_resource_group_defaults_rule.MergeResourceGroupDefaultsRule`
+whose environ merge replaces the whole mapping when the draft's own is
+non-empty. Caller-supplied environ keys (from the request adapter)
+survive underneath — the overlay only ever adds one deterministic key.
 """
 
 from __future__ import annotations
@@ -29,7 +32,7 @@ _SUDO_ENABLED_ENV_VALUE = "1"
 
 
 class InjectSessionEnvironRule(SessionSpecDraftRule):
-    """Overlay ``SUDO_SESSION_ENABLED=1`` on every kernel when sudo is enabled."""
+    """Overlay ``SUDO_SESSION_ENABLED=1`` on every kernel group when sudo is enabled."""
 
     @override
     def name(self) -> str:
@@ -43,22 +46,26 @@ class InjectSessionEnvironRule(SessionSpecDraftRule):
     ) -> SessionResourceSpecDraft:
         if not draft.internal_data_extras.sudo_session_enabled:
             return draft
+        groups = draft.resource.options.kernel_groups
+        if not groups:
+            return draft
 
-        new_kernels = tuple(
-            k.model_copy(
+        new_groups = tuple(
+            group.model_copy(
                 update={
-                    "execution_spec": k.execution_spec.model_copy(
+                    "execution_spec": group.execution_spec.model_copy(
                         update={
                             "environ": {
-                                **dict(k.execution_spec.environ),
+                                **dict(group.execution_spec.environ),
                                 _SUDO_ENABLED_ENV_KEY: _SUDO_ENABLED_ENV_VALUE,
                             }
                         }
                     )
                 }
             )
-            for k in draft.resource.kernel_specs
+            for group in groups
         )
+        new_options = draft.resource.options.model_copy(update={"kernel_groups": new_groups})
         return draft.model_copy(
-            update={"resource": draft.resource.model_copy(update={"kernel_specs": new_kernels})}
+            update={"resource": draft.resource.model_copy(update={"options": new_options})}
         )

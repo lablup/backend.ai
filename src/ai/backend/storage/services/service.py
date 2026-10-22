@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import uuid
 import weakref
 from collections.abc import AsyncIterator
 from contextlib import AbstractContextManager
@@ -42,6 +41,8 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class VolumeService:
+    """Deprecated: serves the storage API that addresses volumes by `VolumeID`."""
+
     _volume_pool: VolumePool
     _event_producer: EventProducer
     _deletion_tasks: weakref.WeakValueDictionary[VFolderID, asyncio.Task[Any]]
@@ -142,14 +143,14 @@ class VolumeService:
 
     async def get_volumes(self) -> list[VolumeMeta]:
         await log_manager_api_entry_new(log, "get_volumes", params=None)
-        volumes = self._volume_pool.list_volumes()
+        volumes = self._volume_pool.list_volumes_by_id()
         return [
             VolumeMeta(
-                volume_id=VolumeID(uuid.UUID(volume_id)),
+                volume_id=volume_id,
                 backend=info.backend,
                 path=info.path,
                 fsprefix=info.fsprefix,
-                capabilities=await self._get_capabilities(VolumeID(uuid.UUID(volume_id))),
+                capabilities=await self._get_capabilities(volume_id),
             )
             for volume_id, info in volumes.items()
         ]

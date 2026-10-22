@@ -338,6 +338,11 @@ class TestEnqueueSessionFromDraft:
         # vfolder mounts flowed through context → resolved on the kernel spec
         assert len(kernel.vfolder_mounts) == 1
         assert kernel.vfolder_mounts[0].kernel_path == PurePosixPath("/home/work/data")
+        # ... and narrowed onto the group the kernel was expanded from
+        enqueued_groups = enqueued_spec.resource_spec.options.kernel_groups
+        assert len(enqueued_groups) == 1
+        group_mounts = enqueued_groups[0].execution_spec.mounts
+        assert [m.mount_destination for m in group_mounts] == ["/home/work/data"]
 
         # PRE + POST hooks fired
         assert hook_plugin_ctx.dispatch.await_count == 1

@@ -77,6 +77,10 @@ from ai.backend.manager.services.user.actions.restore_user import (
     RestoreUserAction,
     RestoreUserActionResult,
 )
+from ai.backend.manager.services.user.actions.switch_default_dotfile import (
+    SwitchDefaultDotfileAction,
+    SwitchDefaultDotfileActionResult,
+)
 from ai.backend.manager.services.user.actions.update_user import (
     BulkUpdateUserAction,
     BulkUpdateUserActionResult,
@@ -356,6 +360,12 @@ class UserService:
         # Variants count too, so creation cannot grow a user's storage without bound.
         data = await self._user_repository.create_dotfile(action.creator, MAXIMUM_DOTFILE_COUNT)
         return CreateDotfileActionResult(data=data)
+
+    async def switch_default_dotfile(
+        self, action: SwitchDefaultDotfileAction
+    ) -> SwitchDefaultDotfileActionResult:
+        data = await self._user_repository.switch_default_dotfile(action.user_id, action.dotfile_id)
+        return SwitchDefaultDotfileActionResult(data=data)
 
     async def get_default_bootstrap_script(
         self, action: GetDefaultBootstrapScriptAction

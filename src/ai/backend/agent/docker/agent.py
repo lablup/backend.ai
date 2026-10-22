@@ -211,6 +211,9 @@ _CGROUP_PATH_CACHE_SIZE: Final[int] = 2048
 # Docker `HostConfig.NetworkMode` value for host networking.
 _HOST_NETWORK_MODE: Final[str] = "host"
 
+_SOCKET_RELAY_UID: Final[int] = 65534
+_SOCKET_RELAY_GID: Final[int] = 65534
+
 # Docker splits the configured total container-log size across this many files.
 _CONTAINER_LOG_FILE_COUNT: Final[int] = 5
 # Controllers the intrinsic plugins read, resolved together from a single inspect.
@@ -1712,25 +1715,58 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         self.agent_sockpath = ipc_base_path / "container" / f"agent.{self.id}.sock"
         # Workaround for Docker Desktop for Mac's UNIX socket mount failure with virtiofs
         if sys.platform != "darwin":
+            socket_dir = ipc_base_path / "container"
+            relay_config = self.local_config.agent.socket_relay
+            relay_user: str | None
+            if relay_config.run_as_non_root:
+                if os.geteuid() == 0:
+                    os.chown(socket_dir, _SOCKET_RELAY_UID, _SOCKET_RELAY_GID)
+                    relay_user = f"{_SOCKET_RELAY_UID}:{_SOCKET_RELAY_GID}"
+                else:
+                    relay_user = f"{os.geteuid()}:{os.getegid()}"
+            else:
+                relay_user = None
+            listen_address = (
+                f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777"
+            )
+            relay_host_config: dict[str, Any] = {
+                "Mounts": [
+                    {
+                        "Type": "bind",
+                        "Source": str(socket_dir),
+                        "Target": "/ipc",
+                    },
+                ],
+                "NetworkMode": "host",
+            }
+            if relay_config.no_new_privileges:
+                relay_host_config["SecurityOpt"] = ["no-new-privileges"]
+            if relay_config.drop_all_capabilities:
+                relay_host_config["CapDrop"] = ["ALL"]
+            if relay_config.read_only_rootfs:
+                relay_host_config["ReadonlyRootfs"] = True
+            # Unset limits are left out rather than sent as 0, which Podman applies literally.
+            if relay_config.max_children is not None:
+                listen_address += f",max-children={relay_config.max_children}"
+            if relay_config.pids_limit is not None:
+                relay_host_config["PidsLimit"] = relay_config.pids_limit
+            if relay_config.memory is not None:
+                relay_host_config["Memory"] = int(relay_config.memory)
+            if relay_config.cpus is not None:
+                relay_host_config["NanoCpus"] = int(relay_config.cpus * 1_000_000_000)
+            relay_container_config: dict[str, Any] = {
+                "Cmd": [
+                    listen_address,
+                    f"TCP-CONNECT:127.0.0.1:{self.local_config.agent.agent_sock_port}",
+                ],
+                "HostConfig": relay_host_config,
+            }
+            if relay_user is not None:
+                relay_container_config["User"] = relay_user
             socket_relay_name = f"backendai-socket-relay.{self.id}"
             socket_relay_container = PersistentServiceContainer(
                 "backendai-socket-relay:latest",
-                {
-                    "Cmd": [
-                        f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777",
-                        f"TCP-CONNECT:127.0.0.1:{self.local_config.agent.agent_sock_port}",
-                    ],
-                    "HostConfig": {
-                        "Mounts": [
-                            {
-                                "Type": "bind",
-                                "Source": str(ipc_base_path / "container"),
-                                "Target": "/ipc",
-                            },
-                        ],
-                        "NetworkMode": "host",
-                    },
-                },
+                relay_container_config,
                 name=socket_relay_name,
             )
             await socket_relay_container.ensure_running_latest()
@@ -2369,11 +2405,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     with timeout(90):
                         await container.delete(force=True, v=True)
                 except DockerError as e:
-                    if (
-                        e.status == HTTPStatus.CONFLICT and "already in progress" in e.message
-                    ) or e.status == HTTPStatus.NOT_FOUND:
+                    if e.status == HTTPStatus.CONFLICT and "already in progress" in e.message:
+                        # Whoever is removing the container also cleans what is left.
                         return
-                    log.exception("container delete failed", container_id=container_id)
+                    if e.status == HTTPStatus.NOT_FOUND:
+                        # Already gone: carry on so its scratch is still cleaned.
+                        log.debug("container already removed", container_id=container_id)
+                    else:
+                        log.exception("container delete failed", container_id=container_id)
                 except TimeoutError:
                     log.warning("container delete timed out", container_id=container_id)
 

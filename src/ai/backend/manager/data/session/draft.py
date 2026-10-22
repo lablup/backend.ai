@@ -109,8 +109,10 @@ class KernelSpecDraft(_DraftBaseModel):
     Cluster-layout and user-mapping fields are filled by their
     respective rules; ``execution_spec`` is eagerly initialized so a
     rule can ``model_copy`` just the execution-level sub-draft without
-    absence checks. ``vfolder_mounts`` is the per-kernel resolved slot
-    :class:`ResolveVFolderMountsRule` populates after expand.
+    absence checks. ``preopen_ports`` is copied from the kernel's
+    :class:`KernelGroupDraft` at expand; ``vfolder_mounts`` is the
+    per-kernel resolved slot :class:`ResolveVFolderMountsRule`
+    populates after expand.
     """
 
     cluster_role: str | None = None

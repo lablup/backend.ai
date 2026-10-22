@@ -35,7 +35,7 @@
   - UserAdapter.create_user — 성공 없음 · 실패 있음 2 (atomic_bulk_get_ops, scope) — SCENARIO-GAP
   - UserAdapter.delete_user_by_id — 성공 있음 1 · 실패 있음 1 (atomic_bulk_get_ops, single_entity)
   - UserAdapter.get — 성공 있음 1 · 실패 있음 1 (atomic_bulk_get_ops, single_entity)
-  - UserAdapter.update_user_by_id — 성공 있음 5 · 실패 있음 6 (atomic_bulk_get_ops, single_entity)
+  - UserAdapter.update_user_by_id — 성공 있음 7 · 실패 있음 6 (atomic_bulk_get_ops, single_entity)
 - 직접 구현 (18)
   - LoginSessionAdapter.admin_revoke — 성공 있음 1 · 실패 있음 2 (global_scope)
   - LoginSessionAdapter.admin_unblock_user — 성공 있음 2 · 실패 있음 1 (global_scope)
@@ -237,8 +237,10 @@
 | [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 전체 이름만 주면, 전체 이름만 바뀐 노드가 온다](#editing-a-user-granted-update-changing-only-the-full-name-leaves-the-rest) | 성공 |
 | [대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 삭제 상태 사용자에 수정으로 ACTIVE를 주면, 되살리기와 같이 활성이 된다](#retiring-an-edit-to-active-on-a-deleted-user-restores-the-user) | 성공 |
 | [대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 수정으로 DELETED를 주면, 물리기와 같이 삭제 상태가 된다](#retiring-an-edit-to-deleted-soft-deletes-the-user) | 성공 |
+| [대상 사용자 스코프에서 UPDATE와 READ를 받은 다른 사용자가 비밀번호 변경을 요구받는 사용자에게 새 비밀번호만 주면, 요구가 남은 노드가 온다](#editing-another-users-new-password-leaves-the-password-change-requirement) | 성공 |
 | [권한 받은 사용자가 대상 사용자의 다른 키를 기본 키로 주면, 수정이 반영된 뒤 기본 키가 옮겨간 노드가 온다](#editing-naming-a-default-key-in-an-edit-moves-the-default-to-it) | 성공 |
 | [권한 받은 사용자가 소속 프로젝트 자리에 빈 값을 주면, 소속을 건드리지 않고 나머지 수정만 반영된다](#editing-null-project-ids-in-an-edit-leave-the-membership-as-it-is) | 성공 |
+| [비밀번호 변경을 요구받는 사용자가 자기 사용자 스코프에서 UPDATE와 READ를 받고, 새 비밀번호와 요구 해제를 함께 주면, 요구가 풀린 노드가 온다](#editing-setting-ones-own-new-password-lifts-the-password-change-requirement) | 성공 |
 | [역할을 받지 않은 사용자가 수정하려 하면, 엔티티 권한 문이 막는다](#editing-a-user-granted-nothing-may-not-edit-another-user) | 거부 |
 | [권한 받은 사용자가 이미 쓰이는 사용자 이름을 주면, 입력 검증이 막는다](#editing-a-username-another-user-holds-may-not-be-taken) | 거부 |
 | [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 삭제 상태 사용자의 전체 이름을 고치면, 삭제된 사용자라 막힌다](#retiring-an-edit-of-another-field-on-a-deleted-user-is-refused) | 거부 |
@@ -2715,6 +2717,63 @@ Then
   - timestamps.created_at: 이 실행이 쓴 시각
   - timestamps.modified_at: 이 실행이 쓴 시각
 
+<a id="editing-another-users-new-password-leaves-the-password-change-requirement"></a>
+
+#### [another-users-new-password-leaves-the-password-change-requirement](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+
+대상 사용자 스코프에서 UPDATE와 READ를 받은 다른 사용자가 비밀번호 변경을 요구받는 사용자에게 새 비밀번호만 주면, 요구가 남은 노드가 온다
+
+Given
+
+- 도메인 하나와 대상 사용자, 사용자 0명 더, 부르는 user 한 명, 부르는 사람은 대상 사용자 스코프에서 UPDATE, READ를 받았다, 대상 사용자는 비밀번호 변경을 요구받는다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다, 비밀번호 변경을 요구받는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 UPDATE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 비밀번호만 바꿈
+
+Then
+
+- 비밀번호 변경 요구가 남은 사용자 전체가 온다
+  - id: 심은 사용자와 같다
+  - basic_info.username = 'user-1'
+  - basic_info.email = 'user-1@scenario.local'
+  - basic_info.full_name = None
+  - basic_info.description = None
+  - basic_info.integration_name = None
+  - status.status = 'active'
+  - status.status_info = None
+  - status.need_password_change = True
+  - organization.domain_name = 'home-1'
+  - organization.role = 'user'
+  - organization.resource_policy = 'user-policy-1'
+  - organization.main_access_key: 그 사용자의 기본 키가 채워져 있다
+  - security.allowed_client_ip = None
+  - security.totp_activated = False
+  - security.totp_activated_at = None
+  - security.sudo_session_enabled = False
+  - container.container_uid = None
+  - container.container_main_gid = None
+  - container.container_gids = None
+  - timestamps.created_at: 이 실행이 쓴 시각
+  - timestamps.modified_at: 이 실행이 쓴 시각
+
 <a id="editing-naming-a-default-key-in-an-edit-moves-the-default-to-it"></a>
 
 #### [naming-a-default-key-in-an-edit-moves-the-default-to-it](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
@@ -2836,6 +2895,60 @@ Then
   - 뒤이은 프로젝트 검색.pagination.total = 1
   - 뒤이은 프로젝트 검색.pagination.offset = 0
   - 뒤이은 프로젝트 검색.pagination.limit = 50
+
+<a id="editing-setting-ones-own-new-password-lifts-the-password-change-requirement"></a>
+
+#### [setting-ones-own-new-password-lifts-the-password-change-requirement](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+
+비밀번호 변경을 요구받는 사용자가 자기 사용자 스코프에서 UPDATE와 READ를 받고, 새 비밀번호와 요구 해제를 함께 주면, 요구가 풀린 노드가 온다
+
+Given
+
+- 도메인 하나와 비밀번호 변경을 요구받는 사용자 한 명, 그 사용자는 자기 사용자 스코프에서 UPDATE, READ를 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다, 비밀번호 변경을 요구받는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 UPDATE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-1이 자기 비밀번호를 바꾸며 비밀번호 변경 요구를 풂
+
+Then
+
+- 비밀번호 변경 요구가 풀린 사용자 전체가 온다
+  - id: 심은 사용자와 같다
+  - basic_info.username = 'user-1'
+  - basic_info.email = 'user-1@scenario.local'
+  - basic_info.full_name = None
+  - basic_info.description = None
+  - basic_info.integration_name = None
+  - status.status = 'active'
+  - status.status_info = None
+  - status.need_password_change = False
+  - organization.domain_name = 'home-1'
+  - organization.role = 'user'
+  - organization.resource_policy = 'user-policy-1'
+  - organization.main_access_key: 그 사용자의 기본 키가 채워져 있다
+  - security.allowed_client_ip = None
+  - security.totp_activated = False
+  - security.totp_activated_at = None
+  - security.sudo_session_enabled = False
+  - container.container_uid = None
+  - container.container_main_gid = None
+  - container.container_gids = None
+  - timestamps.created_at: 이 실행이 쓴 시각
+  - timestamps.modified_at: 이 실행이 쓴 시각
 
 <a id="editing-a-user-granted-nothing-may-not-edit-another-user"></a>
 

@@ -45,6 +45,7 @@ class TestSeedUserOf(TestSeedUser[DomainData, UserResourcePolicyData, KeyPairRes
     status: UserStatus | None = None
     """Written as is when given; otherwise the row derives it from ``is_active``."""
     secret_key: SecretValue | None = None
+    need_password_change: bool = False
 
     @override
     def kind(self) -> str:
@@ -60,6 +61,8 @@ class TestSeedUserOf(TestSeedUser[DomainData, UserResourcePolicyData, KeyPairRes
 
     @override
     def detail(self) -> str:
+        if self.need_password_change:
+            return "자기 키와 개인 프로젝트를 갖는다, 비밀번호 변경을 요구받는다"
         if self.status is not None and self.status != UserStatus.ACTIVE:
             return f"상태 {self.status.value}, 자기 키와 개인 프로젝트를 갖는다"
         if self.secret_key is not None and not isinstance(self.secret_key.content, str):
@@ -89,7 +92,7 @@ class TestSeedUserOf(TestSeedUser[DomainData, UserResourcePolicyData, KeyPairRes
                     rounds=1000,
                     salt_size=16,
                 ),
-                need_password_change=False,
+                need_password_change=self.need_password_change,
                 domain_id=domain.id,
                 role=self.role,
                 is_active=self.is_active,
