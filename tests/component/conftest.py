@@ -122,6 +122,14 @@ from ai.backend.manager.models.dotfile.row import DotfileRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel.row import kernels
+
+# ``kernels.kernel_group_id`` references ``kernel_groups``; nothing under src imports the
+# kernel group rows yet, so name them for the sandbox to resolve the foreign key.
+from ai.backend.manager.models.kernel_group.row import KernelGroupRow  # noqa: F401
+from ai.backend.manager.models.kernel_group_environ.row import KernelGroupEnvironRow  # noqa: F401
+from ai.backend.manager.models.kernel_group_resource_slot.row import (  # noqa: F401
+    KernelGroupResourceSlotRow,
+)
 from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
 from ai.backend.manager.models.project.row import (
