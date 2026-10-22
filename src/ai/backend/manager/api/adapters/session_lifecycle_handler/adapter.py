@@ -31,10 +31,10 @@ class SessionLifecycleHandlerAdapter:
     _handlers: tuple[SessionLifecycleHandler, ...]
 
     def __init__(self, handlers: Sequence[SessionLifecycleHandler]) -> None:
-        self._handlers = tuple(handlers)
+        self._handlers = tuple(sorted(handlers, key=lambda handler: handler.name()))
 
     async def list_session_lifecycle_handlers(self) -> ListSessionLifecycleHandlersPayload:
-        """Return every lifecycle handler the schedule coordinator runs."""
+        """Return every lifecycle handler the schedule coordinator runs, in name order."""
         items = [
             SessionLifecycleHandlerNode(
                 name=handler.name(),

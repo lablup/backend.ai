@@ -15,19 +15,27 @@ from ai.backend.manager.api.adapters.session_lifecycle_handler.adapter import (
 )
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
+from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.check_precondition import (
+    CheckPreconditionLifecycleHandler,
+)
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.terminate_sessions import (
     TerminateSessionsLifecycleHandler,
 )
+from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
 from ai.backend.manager.sokovan.scheduler.terminator.terminator import SessionTerminator
 from bai_scenario.runner.unwired import unwired
 
 
 @pytest.fixture
 def lifecycle_handlers() -> Sequence[SessionLifecycleHandler]:
-    """등록된 세션 처리기. 이름과 클래스 설명만 읽으므로 안쪽은 배선하지 않는다."""
+    """이름 순과 반대로 등록된 세션 처리기. 이름과 클래스 설명만 읽으므로 안쪽은 배선하지 않는다."""
     return (
         TerminateSessionsLifecycleHandler(
             terminator=unwired(SessionTerminator, "처리기의 이름과 설명만 읽는다"),
+            repository=unwired(SchedulerRepository, "처리기의 이름과 설명만 읽는다"),
+        ),
+        CheckPreconditionLifecycleHandler(
+            launcher=unwired(SessionLauncher, "처리기의 이름과 설명만 읽는다"),
             repository=unwired(SchedulerRepository, "처리기의 이름과 설명만 읽는다"),
         ),
     )

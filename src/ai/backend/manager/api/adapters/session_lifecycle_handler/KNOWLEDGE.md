@@ -1,7 +1,7 @@
 ---
 name: session-lifecycle-handler-adapter-scenarios
 type: reference
-description: what the session lifecycle handler adapter guarantees, as scenarios; lists every lifecycle handler registered on the schedule coordinator with its name and the first line of its class docstring, no permission check of its own
+description: what the session lifecycle handler adapter guarantees, as scenarios; lists every lifecycle handler registered on the schedule coordinator in name order with its name and the first line of its class docstring, no permission check of its own
 scope: src/ai/backend/manager/api/adapters/session_lifecycle_handler
 keywords: [session lifecycle handler, scenario, adapter, handler options, schedule coordinator]
 generated:
@@ -9,7 +9,7 @@ generated:
   at: 2026-10-12
 updated:
   by: claude-code/opus-5.5
-  at: 2026-10-21
+  at: 2026-10-22
 status: draft
 ---
 # session_lifecycle_handler 어댑터 — 시나리오
@@ -19,10 +19,11 @@ status: draft
 
 어댑터가 제공하는 호출은 목록 조회 하나다.
 
-이 호출은 스케줄 코디네이터에 등록된 세션 처리기 목록을 그대로 반환한다. 서버가 뜬 뒤에는 바뀌지 않는
-목록이라, 어댑터는 코디네이터를 들지 않고 서버가 시작할 때 읽어 둔 처리기를 받는다. 리소스 그룹의 기본 세션
-옵션을 교체할 때 처리기별 설정의 이름을 검사하는 목록도 같은 코디네이터에서 읽는다. 그래서 이 호출이
-반환한 이름은 그 검사를 통과한다.
+이 호출은 스케줄 코디네이터에 등록된 세션 처리기를 이름 순으로 반환한다.
+
+리소스 그룹의 기본 세션 옵션은 처리기별 설정을 처리기 이름으로 가리킨다. 그 옵션을 교체하는 요청에
+코디네이터에 등록되지 않은 이름이 있으면 거부된다. 이 호출은 같은 코디네이터의 처리기를 반환하므로,
+여기서 받은 이름은 그 교체 요청에서 거부되지 않는다.
 
 어댑터는 권한을 검사하지 않는다. 슈퍼관리자 검사는 GQL resolver가 한다.
 그래서 권한이 있는 경우와 없는 경우의 짝을 이 문서에 두지 않는다.
@@ -31,7 +32,7 @@ status: draft
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 등록된 처리기를 반환한다 | 코디네이터에 세션 종료 처리기가 등록되어 있다 | 목록 조회 | 세션 종료 처리기 하나가 반환된다. 이름은 그 처리기가 정한 이름이고, 설명은 처리기 클래스 설명의 첫 줄이다 |
+| 등록된 처리기를 이름 순으로 반환한다 | 코디네이터에 세션 종료 처리기와 사전 조건 검사 처리기가 이 순서로 등록되어 있다 | 목록 조회 | 사전 조건 검사 처리기, 세션 종료 처리기 순으로 반환된다. 이름은 각 처리기가 정한 이름이고, 설명은 처리기 클래스 설명의 첫 줄이다 |
 | 등록된 처리기가 없으면 빈 목록을 반환한다 | 코디네이터에 등록된 처리기가 없다 | 목록 조회 | 빈 목록이 반환된다 |
 
 ## 아직 적지 않은 것
