@@ -15,6 +15,7 @@ from ai.backend.manager.api.gql.user.types.enums import UserRoleEnumGQL, UserSta
 from ai.backend.manager.api.gql.user.types.inputs import UpdateUserV2InputGQL
 from ai.backend.manager.api.gql.user.types.payloads import UpdateUserPayloadGQL
 from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.user import UserModificationBadRequest
 from ai.backend.manager.models.user.row import UserRole
 
 SELF_EDITABLE_INPUTS: list[dict[str, Any]] = [
@@ -45,7 +46,7 @@ ALL_FIELDS_INPUT: dict[str, Any] = {
     "domain_name": "other",
     "group_ids": [uuid.uuid4()],
     "allowed_client_ip": ["10.0.0.1"],
-    "need_password_change": True,
+    "need_password_change": False,
     "resource_policy": "unlimited",
     "sudo_session_enabled": True,
     "main_access_key": "AKIAEXAMPLE",
@@ -100,7 +101,7 @@ class TestUpdateUserV2:
         mock_info.context.adapters.user.update_user_by_id.assert_awaited_once()
         user_id, dto = mock_info.context.adapters.user.update_user_by_id.await_args.args
         assert user_id == me.user_id
-        assert dto.model_fields_set == set(fields)
+        assert dto.model_fields_set - {"need_password_change"} == set(fields)
 
     @pytest.mark.usefixtures("stub_payload")
     async def test_superadmin_updates_all_fields(self, mock_info: MagicMock) -> None:
@@ -112,3 +113,39 @@ class TestUpdateUserV2:
         user_id, dto = mock_info.context.adapters.user.update_user_by_id.await_args.args
         assert user_id == me.user_id
         assert dto.model_fields_set == set(ALL_FIELDS_INPUT)
+
+    @pytest.mark.usefixtures("stub_payload")
+    @pytest.mark.parametrize("role", [UserRole.USER, UserRole.SUPERADMIN])
+    async def test_own_password_change_clears_need_password_change(
+        self, mock_info: MagicMock, role: UserRole
+    ) -> None:
+        with with_user_context(_user(role)):
+            await cast(Any, update_user_v2).base_resolver(
+                mock_info, UpdateUserV2InputGQL(password="new-password")
+            )
+        _, dto = mock_info.context.adapters.user.update_user_by_id.await_args.args
+        assert dto.need_password_change is False
+
+    @pytest.mark.usefixtures("stub_payload")
+    async def test_update_without_password_leaves_need_password_change(
+        self, mock_info: MagicMock
+    ) -> None:
+        with with_user_context(_user(UserRole.USER)):
+            await cast(Any, update_user_v2).base_resolver(
+                mock_info, UpdateUserV2InputGQL(full_name="New Name")
+            )
+        _, dto = mock_info.context.adapters.user.update_user_by_id.await_args.args
+        assert "need_password_change" not in dto.model_fields_set
+
+    async def test_own_password_change_requiring_change_rejected(
+        self, mock_info: MagicMock
+    ) -> None:
+        with (
+            with_user_context(_user(UserRole.SUPERADMIN)),
+            pytest.raises(UserModificationBadRequest),
+        ):
+            await cast(Any, update_user_v2).base_resolver(
+                mock_info,
+                UpdateUserV2InputGQL(password="new-password", need_password_change=True),
+            )
+        mock_info.context.adapters.user.update_user_by_id.assert_not_awaited()
