@@ -33,7 +33,7 @@ class KernelCreator(FieldCreator[SessionID, KernelRow, KernelInfo]):
     kernel_spec: KernelSpec
     image_info: ImageInfo | None
     enqueue_time: datetime
-    kernel_group_id: KernelGroupID | None
+    kernel_group_id: KernelGroupID
 
     def requested_slots(self) -> ResourceSlot:
         return ResourceSlotEntry.inputs_to_resource_slot(
