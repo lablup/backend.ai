@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
+import pickle
+import threading
 import uuid
+import weakref
 from collections.abc import Mapping
 from decimal import Decimal
+from functools import partial
 from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, cast, override
 from unittest.mock import AsyncMock, MagicMock
 
@@ -17,7 +22,13 @@ from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.alloc_map import DiscretePropertyAllocMap
 from ai.backend.agent.config.unified import ContainerdConfig
 from ai.backend.agent.containerd import agent as agent_module
-from ai.backend.agent.containerd.agent import HOST_PORTS_LABEL, ContainerdAgent, _kernel_slots
+from ai.backend.agent.containerd.agent import (
+    HOST_PORTS_LABEL,
+    ContainerdAgent,
+    ContainerdKernelCreationContext,
+    _kernel_slots,
+    _run_scratch_work,
+)
 from ai.backend.agent.containerd.client import ContainerRecord, TaskInfo, TaskState
 from ai.backend.agent.containerd.network import KernelNetwork
 from ai.backend.agent.containerd.profile.base import KernelLaunch, LaunchPlan, RuntimeProfile
@@ -25,10 +36,22 @@ from ai.backend.agent.containerd.profile.loader import select_profile
 from ai.backend.agent.containerd.profile.runc import RuncProfile
 from ai.backend.agent.containerd.scratch import CONFIG_DIR_LABEL
 from ai.backend.agent.errors.agent import UnsupportedBaseDistroError
-from ai.backend.agent.errors.containerd import KernelVerbNotSupported, ProfileNotApplicable
+from ai.backend.agent.errors.containerd import (
+    ContainerdOperationFailed,
+    ContainerTaskStuck,
+    KernelVerbNotSupported,
+    ProfileNotApplicable,
+)
+from ai.backend.agent.errors.resources import InsufficientResource
 from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.resources import ComputerContext, DeviceSlotInfo, KernelResourceSpec
-from ai.backend.agent.types import Container, KernelOwnershipData
+from ai.backend.agent.types import (
+    Container,
+    ContainerLifecycleEvent,
+    KernelOwnershipData,
+    LifecycleEvent,
+)
+from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AgentId,
     AutoPullBehavior,
@@ -40,6 +63,8 @@ from ai.backend.common.types import (
     KernelCreationConfig,
     KernelId,
     ResourceSlot,
+    Sentinel,
+    SessionId,
     SlotName,
     SlotTypes,
 )
@@ -71,6 +96,14 @@ def agent(monkeypatch: pytest.MonkeyPatch, runner: FakeCommandRunner) -> Contain
     instance.resource_lock = asyncio.Lock()
     instance._client = FakeContainerd()
     instance._orphan_ports = {}
+    instance._stuck_kernels = {}
+    instance._stuck_retry_task = None
+    instance._resources_stale = False
+    instance._tolerate_lookup_errors = False
+    instance._lookup_warned = set()
+    instance.restarting_kernels = {}
+    instance._active_creates = {}
+    instance.registry_lock = asyncio.Lock()
     instance._network = KernelNetwork(
         "bai-t", IPv4Network("172.30.9.0/24"), "", (30000, 30009), run=runner
     )
@@ -627,6 +660,800 @@ class TestCleanKernel:
         assert not (scratch_root / str(kid)).exists()
 
 
+class _GpuAllocMap(DiscretePropertyAllocMap):
+    @property
+    def held(self) -> set[str]:
+        return {str(dev) for dev, amount in self.allocations[SlotName("gpu")].items() if amount}
+
+
+class _FakeKernel(dict[str, Any]):
+    termination_reason: KernelLifecycleEventReason | None = None
+    service_ports: list[Any] = []
+    runner: None = None
+
+
+class TestStuckKernel:
+    """A kernel whose task is not confirmed gone keeps its device allocation reserved."""
+
+    config_root: Path
+
+    @pytest.fixture(autouse=True)
+    def _config_root(self, tmp_path: Path) -> None:
+        self.config_root = tmp_path / "config"
+
+    @pytest.fixture
+    def scratch_root(self, agent: ContainerdAgent, tmp_path: Path) -> Path:
+        config = cast(MagicMock, agent.local_config)
+        config.container.scratch_root = tmp_path
+        config.debug.skip_container_deletion = False
+        return tmp_path
+
+    @pytest.fixture
+    def clock(self, monkeypatch: pytest.MonkeyPatch) -> list[float]:
+        now = [1000.0]
+        monkeypatch.setattr(agent_module, "monotonic", lambda: now[0])
+        return now
+
+    @pytest.fixture
+    def alloc_map(self, agent: ContainerdAgent, monkeypatch: pytest.MonkeyPatch) -> _GpuAllocMap:
+        async def collect_logs(kernel_id: KernelId, container_id: str, iterator: Any) -> None:
+            return None
+
+        monkeypatch.setattr(agent, "collect_logs", collect_logs)
+        monkeypatch.setattr(agent, "produce_error_event", AsyncMock())
+        monkeypatch.setattr(
+            agent,
+            "reconstruct_resource_usage",
+            partial(ContainerdAgent.reconstruct_resource_usage, agent),
+        )
+        alloc = _GpuAllocMap(
+            device_slots={
+                DeviceId("gpu0"): DeviceSlotInfo(SlotTypes.COUNT, SlotName("gpu"), Decimal(1))
+            }
+        )
+        cast(Any, agent).computers = {
+            DeviceName("gpu"): SimpleNamespace(alloc_map=alloc, instance=MagicMock())
+        }
+        return alloc
+
+    def _add_gpu_container(self, agent: ContainerdAgent, state: TaskState | None) -> KernelId:
+        fake = cast(FakeContainerd, agent._client)
+        kid = _add_container(fake, "c1", state=state)
+        record = fake.containers["c1"]
+        config_dir = self.config_root / "c1"
+        config_dir.mkdir(parents=True)
+        spec = KernelResourceSpec(
+            slots=ResourceSlot({"gpu": "1"}),
+            allocations={DeviceName("gpu"): {SlotName("gpu"): {DeviceId("gpu0"): Decimal(1)}}},
+            scratch_disk_size=0,
+        )
+        (config_dir / "resource.txt").write_text(spec.write_to_string())
+        fake.containers["c1"] = dataclasses.replace(
+            record, labels={**record.labels, CONFIG_DIR_LABEL: str(config_dir)}
+        )
+        for port in (30000, 30001):
+            agent.port_pool.discard(port)
+        return kid
+
+    async def _stick(self, agent: ContainerdAgent, scratch_root: Path) -> KernelId:
+        fake = cast(FakeContainerd, agent._client)
+        kid = self._add_gpu_container(agent, TaskState.RUNNING)
+        (scratch_root / str(kid)).mkdir()
+        fake.failing.add("delete_task")
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+        return kid
+
+    async def _init(
+        self,
+        agent: ContainerdAgent,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        base_scan: bool = False,
+    ) -> None:
+        """Start the agent as a restart would, with the base startup replaced.
+
+        `base_scan` makes the replaced base startup enumerate the containers like the real one.
+        """
+        cast(MagicMock, agent.local_config).containerd = ContainerdConfig.model_validate({})
+
+        async def scan() -> None:
+            if base_scan:
+                await agent.enumerate_containers(ContainerStatus.active_set())
+
+        mocker.patch(
+            "ai.backend.agent.agent.AbstractAgent.__ainit__", new=AsyncMock(side_effect=scan)
+        )
+        mocker.patch("ai.backend.agent.agent.AbstractAgent.shutdown", new=AsyncMock())
+        await agent.__ainit__()
+
+    async def test_clean_keeps_allocation_ports_and_scratch(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+    ) -> None:
+        kid = await self._stick(agent, scratch_root)
+
+        await agent.reconstruct_resource_usage()
+
+        assert agent._stuck_kernels["c1"].kernel_id == kid
+        assert alloc_map.held == {"gpu0"}
+        with pytest.raises(InsufficientResource):
+            alloc_map.allocate({SlotName("gpu"): Decimal(1)})
+        assert (scratch_root / str(kid)).exists()
+        assert agent.port_pool.used_ports() == {30000, 30001}
+
+    async def test_clean_of_a_stuck_launch_keeps_the_network_and_scratch(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+    ) -> None:
+        """A failed launch's clean event has no container id; the held task still needs both."""
+        kid = await self._stick(agent, scratch_root)
+
+        await agent.clean_kernel(kid, None, False)
+
+        assert agent._stuck_kernels["c1"].kernel_id == kid
+        assert (scratch_root / str(kid)).exists()
+        assert agent.port_pool.used_ports() == {30000, 30001}
+
+    async def test_hold_of_a_launch_keeps_its_ports_when_the_record_is_unreadable(
+        self,
+        agent: ContainerdAgent,
+        clock: list[float],
+    ) -> None:
+        """A launch that failed early has no ports on the kernel yet and may have no record."""
+        kid = KernelId(uuid.uuid4())
+        agent.port_pool.discard(30004)
+
+        await agent._hold_stuck(kid, "c-missing", [30004])
+
+        assert agent._stuck_kernels["c-missing"].host_ports == [30004]
+
+    async def test_the_clean_event_does_not_release_the_ports_of_a_stuck_kernel(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = self._add_gpu_container(agent, TaskState.RUNNING)
+        fake.failing.add("delete_task")
+        kernel_obj = MagicMock(runner=None, clean_event=None, close=AsyncMock())
+        kernel_obj.get.return_value = [30000, 30001]
+        agent.kernel_registry[kid] = kernel_obj
+        agent._ongoing_destruction_tasks = weakref.WeakValueDictionary()
+        agent.stat_ctx = MagicMock(remove_kernel_metric=AsyncMock())
+        monkeypatch.setattr(agent, "anycast_and_broadcast_event", AsyncMock())
+        event = ContainerLifecycleEvent(
+            kid,
+            SessionId(uuid.uuid4()),
+            ContainerId("c1"),
+            LifecycleEvent.CLEAN,
+            KernelLifecycleEventReason.SELF_TERMINATED,
+        )
+
+        await agent._handle_clean_event(event)
+
+        assert kid not in agent.kernel_registry
+        kernel_obj.__setitem__.assert_called_with("host_ports", [])
+        assert agent.port_pool.used_ports() == {30000, 30001}
+        assert alloc_map.held == {"gpu0"}
+
+    async def test_a_cleaned_kernel_releases_its_allocation(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = self._add_gpu_container(agent, TaskState.RUNNING)
+
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+        await agent.reconstruct_resource_usage()
+
+        assert agent._stuck_kernels == {}
+        assert fake.containers == {}
+        assert alloc_map.held == set()
+
+    @pytest.mark.parametrize("failing_lookup", ["get_container", "get_task"])
+    async def test_a_failing_lookup_is_stuck_and_releases_nothing(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+        monkeypatch: pytest.MonkeyPatch,
+        failing_lookup: str,
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = self._add_gpu_container(agent, TaskState.RUNNING)
+        (scratch_root / str(kid)).mkdir()
+        real_get_container = fake.get_container
+
+        async def unreadable(container_id: str) -> None:
+            raise ContainerdOperationFailed("injected failure")
+
+        monkeypatch.setattr(fake, failing_lookup, unreadable)
+        agent._orphan_ports[kid] = [30000, 30001]
+
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+        monkeypatch.setattr(fake, "get_container", real_get_container)
+        await agent.reconstruct_resource_usage()
+        assert "c1" in agent._stuck_kernels
+        assert (scratch_root / str(kid)).exists()
+        assert agent.port_pool.used_ports() == {30000, 30001}
+        assert agent._stuck_kernels["c1"].host_ports == [30000, 30001]
+        assert alloc_map.held == {"gpu0"}
+
+    async def test_retry_success_runs_the_deferred_cleanup(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = await self._stick(agent, scratch_root)
+        fake.failing.clear()
+        clock[0] += 5.0
+
+        await agent._retry_stuck_kernels()
+
+        assert agent._stuck_kernels == {}
+        assert fake.containers == {} and fake.tasks == {}
+        assert alloc_map.held == set()
+        assert alloc_map.allocate({SlotName("gpu"): Decimal(1)})
+        assert not (scratch_root / str(kid)).exists()
+        assert agent.port_pool.used_ports() == set()
+
+    async def test_retry_waits_for_the_backoff_and_doubles_it_up_to_the_cap(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+    ) -> None:
+        await self._stick(agent, scratch_root)
+        entry = agent._stuck_kernels["c1"]
+
+        await agent._retry_stuck_kernels()
+        assert entry.attempts == 0
+
+        delays: list[float] = []
+        for _ in range(8):
+            clock[0] = entry.next_retry_at
+            await agent._retry_stuck_kernels()
+            delays.append(entry.next_retry_at - clock[0])
+        await agent.reconstruct_resource_usage()
+
+        assert delays == [10.0, 20.0, 40.0, 80.0, 160.0, 300.0, 300.0, 300.0]
+        assert alloc_map.held == {"gpu0"}
+
+    async def test_an_unexpected_error_backs_off_too(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        await self._stick(agent, scratch_root)
+        entry = agent._stuck_kernels["c1"]
+        monkeypatch.setattr(agent_module, "clean_container", AsyncMock(side_effect=OSError))
+        clock[0] = entry.next_retry_at
+
+        await agent._retry_stuck_kernels()
+
+        assert entry.next_retry_at == clock[0] + 10.0
+        assert "c1" in agent._stuck_kernels
+
+    async def test_error_event_once_after_thirty_minutes_and_allocation_stays_held(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+    ) -> None:
+        await self._stick(agent, scratch_root)
+        entry = agent._stuck_kernels["c1"]
+        produce = cast(AsyncMock, agent.produce_error_event)
+
+        clock[0] += 29 * 60
+        await agent._retry_stuck_kernels()
+        produce.assert_not_awaited()
+
+        clock[0] += 2 * 60
+        await agent._retry_stuck_kernels()
+        clock[0] = entry.next_retry_at
+        await agent._retry_stuck_kernels()
+        await agent.reconstruct_resource_usage()
+
+        produce.assert_awaited_once()
+        assert entry.attempts == 3
+        assert alloc_map.held == {"gpu0"}
+
+    async def test_sync_does_not_see_a_stuck_container(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+    ) -> None:
+        await self._stick(agent, scratch_root)
+
+        found = await agent.enumerate_containers(
+            ContainerStatus.active_set() | ContainerStatus.dead_set()
+        )
+
+        assert found == []
+
+    async def test_restart_is_refused_before_it_starts(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+        mocker: MockerFixture,
+        kernel_config: KernelCreationConfig,
+        ownership_data: KernelOwnershipData,
+    ) -> None:
+        await self._stick(agent, scratch_root)
+        agent._stuck_kernels["c1"].kernel_id = ownership_data.kernel_id
+        base = mocker.patch("ai.backend.agent.agent.AbstractAgent.restart_kernel", new=AsyncMock())
+
+        with pytest.raises(ContainerTaskStuck, match="c1"):
+            await agent.restart_kernel(ownership_data, MagicMock(), kernel_config)
+
+        base.assert_not_awaited()
+        assert ownership_data.kernel_id not in agent.restarting_kernels
+        await agent.reconstruct_resource_usage()
+        assert alloc_map.held == {"gpu0"}
+
+    async def test_create_is_refused_before_it_starts(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+        runner: FakeCommandRunner,
+        mocker: MockerFixture,
+        kernel_config: KernelCreationConfig,
+        ownership_data: KernelOwnershipData,
+    ) -> None:
+        """A fresh create with the id of a held kernel would run beside the held container."""
+        await self._stick(agent, scratch_root)
+        agent._stuck_kernels["c1"].kernel_id = ownership_data.kernel_id
+        mocker.patch.object(agent, "anycast_and_broadcast_event", new=AsyncMock())
+        # Guards against the refusal moving after the creation context is built.
+        steps = [
+            mocker.patch.object(ContainerdKernelCreationContext, name, new=AsyncMock())
+            for name in ("prepare_scratch", "apply_network", "prepare_ssh")
+        ]
+        runner.calls.clear()
+
+        with pytest.raises(ContainerTaskStuck, match="c1"):
+            await agent.create_kernel(
+                ownership_data, MagicMock(), kernel_config, cast(Any, {}), restarting=False
+            )
+
+        for step in steps:
+            step.assert_not_awaited()
+        assert runner.calls == []
+        assert ownership_data.kernel_id not in agent.kernel_registry
+        assert agent._stuck_kernels["c1"].kernel_id == ownership_data.kernel_id
+        assert agent.port_pool.used_ports() == {30000, 30001}
+        await agent.reconstruct_resource_usage()
+        assert alloc_map.held == {"gpu0"}
+
+    async def test_restart_whose_old_container_gets_stuck_fails_and_is_forgotten(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+        monkeypatch: pytest.MonkeyPatch,
+        kernel_config: KernelCreationConfig,
+        ownership_data: KernelOwnershipData,
+    ) -> None:
+        """The real base restart_kernel; its destroy handling and re-creation are faked."""
+        kid = ownership_data.kernel_id
+        fake = cast(FakeContainerd, agent._client)
+        self._add_gpu_container(agent, TaskState.RUNNING)
+        fake.containers["c1"] = dataclasses.replace(
+            fake.containers["c1"],
+            labels={**fake.containers["c1"].labels, "ai.backend.kernel-id": str(kid)},
+        )
+        fake.failing.add("delete_task")
+        kernel_obj = _FakeKernel(
+            container_id="c1",
+            host_ports=[30000, 30001],
+            repl_in_port=0,
+            repl_out_port=0,
+            stdin_port=0,
+            stdout_port=0,
+        )
+        kernel_obj.termination_reason = KernelLifecycleEventReason.RESTARTING
+        agent.kernel_registry[kid] = cast(Any, kernel_obj)
+        queue: asyncio.Queue[ContainerLifecycleEvent | Sentinel] = asyncio.Queue()
+        agent.container_lifecycle_queue = queue
+
+        async def load_config(kernel_id: KernelId, name: str) -> bytes:
+            return pickle.dumps({}) if name == "kconfig.dat" else b"{}"
+
+        monkeypatch.setattr(agent, "restart_kernel__load_config", load_config)
+
+        async def create_kernel(
+            ownership: KernelOwnershipData,
+            image: Any,
+            config: Any,
+            cluster_info: Any,
+            *,
+            restarting: bool,
+        ) -> None:
+            await agent.init_kernel_context(ownership, image, config, restarting=restarting)
+
+        monkeypatch.setattr(agent, "create_kernel", create_kernel)
+
+        async def destroy_handler() -> None:
+            event = await queue.get()
+            assert isinstance(event, ContainerLifecycleEvent)
+            assert event.event == LifecycleEvent.DESTROY
+            await agent.clean_kernel(kid, ContainerId("c1"), True)
+            agent.restarting_kernels[kid].destroy_event.set()
+
+        handler = asyncio.create_task(destroy_handler())
+        with pytest.raises(ContainerTaskStuck):
+            await agent.restart_kernel(ownership_data, MagicMock(), kernel_config)
+        await handler
+
+        assert kid not in agent.restarting_kernels
+        event = queue.get_nowait()
+        assert isinstance(event, ContainerLifecycleEvent)
+        assert (event.event, event.reason) == (
+            LifecycleEvent.CLEAN,
+            KernelLifecycleEventReason.FAILED_TO_START,
+        )
+        await agent.reconstruct_resource_usage()
+        assert alloc_map.held == {"gpu0"}
+
+    @pytest.mark.parametrize("restarting", [True, False])
+    async def test_retry_success_keeps_the_scratch_only_while_the_kernel_restarts(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+        restarting: bool,
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = await self._stick(agent, scratch_root)
+        if restarting:
+            agent.restarting_kernels[kid] = MagicMock()
+        fake.failing.clear()
+        clock[0] += 5.0
+
+        await agent._retry_stuck_kernels()
+
+        assert (scratch_root / str(kid)).exists() is restarting
+
+    async def test_retry_skips_an_entry_cleaned_meanwhile(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        await self._stick(agent, scratch_root)
+        entry = agent._stuck_kernels.pop("c1")
+        clean = AsyncMock()
+        monkeypatch.setattr(agent_module, "clean_container", clean)
+
+        await agent._retry_stuck(entry)
+
+        clean.assert_not_awaited()
+
+    async def test_the_clean_runs_outside_the_registry_lock(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        await self._stick(agent, scratch_root)
+        locked: list[bool] = []
+
+        async def clean(client: Any, container_id: str) -> None:
+            locked.append(agent.registry_lock.locked())
+
+        monkeypatch.setattr(agent_module, "clean_container", clean)
+        clock[0] += 5.0
+
+        await agent._retry_stuck_kernels()
+
+        assert locked == [False]
+        assert agent._stuck_kernels == {}
+
+    async def test_a_failing_leftover_cleanup_is_not_a_failed_retry(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        await self._stick(agent, scratch_root)
+        await agent.reconstruct_resource_usage()
+        entry = agent._stuck_kernels["c1"]
+        fake.failing.clear()
+        monkeypatch.setattr(agent, "_remove_kernel_leftovers", AsyncMock(side_effect=OSError))
+        info = mocker.patch.object(agent_module.log, "info")
+        clock[0] += 5.0
+
+        await agent._retry_stuck_kernels()
+
+        assert not entry.escalated
+        assert entry.next_retry_at == 1005.0
+        assert alloc_map.held == set()
+        assert info.call_args.args[0] == "stuck container cleaned"
+
+    async def test_a_failing_error_event_does_not_stop_the_retry(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+    ) -> None:
+        await self._stick(agent, scratch_root)
+        entry = agent._stuck_kernels["c1"]
+        cast(AsyncMock, agent.produce_error_event).side_effect = ConnectionError
+        clock[0] += 31 * 60
+
+        await agent._retry_stuck_kernels()
+
+        assert entry.escalated
+        assert entry.next_retry_at > clock[0]
+
+    async def test_the_retry_loop_survives_a_failing_cycle(
+        self, agent: ContainerdAgent, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(agent_module, "_STUCK_RETRY_MIN_SEC", 0.0)
+        cycle = AsyncMock(side_effect=[RuntimeError("boom"), None, None])
+        monkeypatch.setattr(agent, "_retry_stuck_kernels", cycle)
+
+        task = asyncio.create_task(agent._stuck_retry_loop())
+        while cycle.await_count < 3:
+            await asyncio.sleep(0)
+        task.cancel()
+        await asyncio.wait({task})
+
+        assert task.cancelled()
+
+    async def test_a_failed_rebuild_is_retried_on_the_next_cycle(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        await self._stick(agent, scratch_root)
+        await agent.reconstruct_resource_usage()
+        fake.failing.clear()
+        clock[0] += 5.0
+        real = agent.reconstruct_resource_usage
+        monkeypatch.setattr(agent, "reconstruct_resource_usage", AsyncMock(side_effect=OSError))
+
+        await agent._retry_stuck_kernels()
+
+        stale_after_failure = agent._resources_stale
+        assert agent._stuck_kernels == {}
+        assert stale_after_failure
+        assert alloc_map.held == {"gpu0"}
+
+        monkeypatch.setattr(agent, "reconstruct_resource_usage", real)
+        await agent._retry_stuck_kernels()
+
+        assert not agent._resources_stale
+        assert alloc_map.held == set()
+
+    @pytest.mark.parametrize("restarting", [True, False])
+    async def test_another_kernel_is_not_affected_by_a_stuck_container(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+        kernel_config: KernelCreationConfig,
+        ownership_data: KernelOwnershipData,
+        restarting: bool,
+    ) -> None:
+        await self._stick(agent, scratch_root)
+        agent._runtime_profiles = []
+
+        ctx = await agent.init_kernel_context(
+            ownership_data,
+            MagicMock(),
+            kernel_config,
+            restarting=restarting,
+        )
+
+        assert ctx.kernel_id == ownership_data.kernel_id
+        assert "c1" in agent._stuck_kernels
+
+    @pytest.mark.parametrize("state", [TaskState.STOPPED, TaskState.UNKNOWN])
+    async def test_restart_holds_and_retries_a_task_that_is_not_removed(
+        self,
+        agent: ContainerdAgent,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+        state: TaskState,
+    ) -> None:
+        kid = self._add_gpu_container(agent, state)
+
+        await self._init(agent, mocker, monkeypatch)
+        try:
+            assert agent._stuck_kernels["c1"].kernel_id == kid
+            assert agent._stuck_kernels["c1"].host_ports == [30000, 30001]
+            assert alloc_map.held == {"gpu0"}
+            with pytest.raises(InsufficientResource):
+                alloc_map.allocate({SlotName("gpu"): Decimal(1)})
+            assert agent.port_pool.used_ports() == {30000, 30001}
+            assert agent._stuck_retry_task is not None
+        finally:
+            await agent.shutdown(MagicMock())
+
+    async def test_a_failed_lookup_in_a_sync_cycle_is_an_error_not_a_dead_container(
+        self,
+        agent: ContainerdAgent,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        self._add_gpu_container(agent, TaskState.RUNNING)
+
+        async def unreadable(container_id: str) -> None:
+            raise ContainerdOperationFailed("get_task: injected failure")
+
+        monkeypatch.setattr(fake, "get_task", unreadable)
+
+        with pytest.raises(ContainerdOperationFailed):
+            await agent.enumerate_containers(
+                ContainerStatus.active_set() | ContainerStatus.dead_set()
+            )
+
+    async def test_restart_survives_a_failing_task_lookup_and_keeps_the_allocation(
+        self,
+        agent: ContainerdAgent,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        self._add_gpu_container(agent, TaskState.RUNNING)
+
+        async def unreadable(container_id: str) -> None:
+            raise ContainerdOperationFailed("get_task: injected failure")
+
+        monkeypatch.setattr(fake, "get_task", unreadable)
+
+        await self._init(agent, mocker, monkeypatch, base_scan=True)
+        try:
+            assert "c1" in agent._stuck_kernels
+            assert alloc_map.held == {"gpu0"}
+            assert agent._tolerate_lookup_errors is False
+        finally:
+            await agent.shutdown(MagicMock())
+
+    async def test_a_lookup_failure_is_warned_once_per_container_while_starting(
+        self,
+        agent: ContainerdAgent,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        self._add_gpu_container(agent, TaskState.RUNNING)
+
+        async def unreadable(container_id: str) -> None:
+            raise ContainerdOperationFailed("get_task: injected failure")
+
+        monkeypatch.setattr(fake, "get_task", unreadable)
+        agent._tolerate_lookup_errors = True
+        warning = mocker.patch.object(agent_module.log, "warning")
+
+        assert await agent.enumerate_containers() == []
+        assert await agent.enumerate_containers() == []
+
+        warning.assert_called_once()
+
+    async def test_seeding_an_unreadable_task_keeps_the_allocation_and_schedules_a_retry(
+        self,
+        agent: ContainerdAgent,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = self._add_gpu_container(agent, TaskState.RUNNING)
+
+        async def unreadable(container_id: str) -> None:
+            raise ContainerdOperationFailed("get_task: injected failure")
+
+        monkeypatch.setattr(fake, "get_task", unreadable)
+
+        await agent._seed_stuck_kernels()
+        await agent.reconstruct_resource_usage()
+
+        entry = agent._stuck_kernels["c1"]
+        assert (entry.kernel_id, entry.next_retry_at) == (kid, clock[0] + 5.0)
+        assert alloc_map.held == {"gpu0"}
+
+    async def test_restart_holds_a_running_task_without_seeding_it(
+        self,
+        agent: ContainerdAgent,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+    ) -> None:
+        self._add_gpu_container(agent, TaskState.RUNNING)
+
+        await self._init(agent, mocker, monkeypatch)
+        try:
+            assert agent._stuck_kernels == {}
+            assert alloc_map.held == {"gpu0"}
+        finally:
+            await agent.shutdown(MagicMock())
+
+    async def test_a_container_without_a_task_holds_nothing(
+        self,
+        agent: ContainerdAgent,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+    ) -> None:
+        self._add_gpu_container(agent, None)
+
+        await self._init(agent, mocker, monkeypatch)
+        try:
+            assert agent._stuck_kernels == {}
+            assert alloc_map.held == set()
+        finally:
+            await agent.shutdown(MagicMock())
+
+    async def test_shutdown_cancels_the_retry_loop(
+        self,
+        agent: ContainerdAgent,
+        mocker: MockerFixture,
+        monkeypatch: pytest.MonkeyPatch,
+        clock: list[float],
+        alloc_map: _GpuAllocMap,
+    ) -> None:
+        await self._init(agent, mocker, monkeypatch)
+        task = agent._stuck_retry_task
+        assert task is not None and not task.done()
+
+        await agent.shutdown(MagicMock())
+
+        assert task.cancelled()
+
+
 class TestShutdown:
     async def test_client_is_closed_even_if_the_base_shutdown_fails(
         self, agent: ContainerdAgent, mocker: MockerFixture
@@ -879,3 +1706,28 @@ class TestBaseRestoreContainerResources:
         )
 
         cast(AsyncMock, second.instance.restore_from_container).assert_awaited_once()
+
+
+class TestRunScratchWork:
+    async def test_cancellation_waits_for_the_thread_to_finish(self) -> None:
+        """The scratch work is done before the cancel propagates, so a removal after it holds."""
+        started = threading.Event()
+        release = threading.Event()
+        finished: list[bool] = []
+
+        def work() -> None:
+            started.set()
+            release.wait(5)
+            finished.append(True)
+
+        task = asyncio.create_task(_run_scratch_work(work))
+        await asyncio.get_running_loop().run_in_executor(None, started.wait, 5)
+
+        task.cancel()
+        await asyncio.sleep(0.05)
+        assert not task.done()
+        release.set()
+
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        assert finished == [True]

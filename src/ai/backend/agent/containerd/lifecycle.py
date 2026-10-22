@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import signal
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Mapping, Sequence
 from typing import Any, Final
 
 from ai.backend.agent.containerd.client import (
@@ -16,7 +16,7 @@ from ai.backend.agent.containerd.client import (
     TaskState,
 )
 from ai.backend.agent.containerd.profile.base import RuntimeOptions
-from ai.backend.agent.errors.containerd import ContainerdOperationFailed
+from ai.backend.agent.errors.containerd import ContainerdOperationFailed, ContainerTaskStuck
 from ai.backend.common.exception import BackendAIError
 from ai.backend.logging.structured import StructuredLogger
 
@@ -56,15 +56,19 @@ async def launch_container(
     """Prepare the snapshot, create the container and start its task; returns the PID.
 
     A failed step removes what was created. FIXME(containerd-mvp): no lease holds the snapshot.
+    If the task survives that cleanup, ContainerTaskStuck is raised from the original error.
     """
-    rootfs: Sequence[MountSpec] = await client.prepare_snapshot(record.snapshot_key, chain_id)
     try:
+        rootfs: Sequence[MountSpec] = await client.prepare_snapshot(record.snapshot_key, chain_id)
         await client.create_container(record, runtime, spec, runtime_options)
         pid = await client.create_task(record.id, rootfs, stdio, stdio)
         await client.start_task(record.id)
-    except BaseException:
+    except BaseException as e:
         try:
             await clean_container(client, record.id, snapshot_key=record.snapshot_key)
+        except ContainerTaskStuck as stuck:
+            log.exception("cleanup after a failed launch failed", container_id=record.id)
+            raise stuck from e
         except BackendAIError:
             log.exception("cleanup after a failed launch failed", container_id=record.id)
         raise
@@ -99,14 +103,36 @@ async def clean_container(
     """Remove the task, the container record and the rootfs snapshot; missing pieces are skipped.
 
     The snapshot key is the container record's; `snapshot_key` covers a record not created yet.
+    The record stays while the task may still exist, and ContainerTaskStuck is raised. Once the
+    task is gone, a failing step is logged and the next one still runs; the first failure is
+    raised at the end.
     """
-    record = await client.get_container(container_id)
-    task = await client.get_task(container_id)
-    if task is not None:
-        if not is_gone(task):
-            await client.kill_task(container_id, signal.SIGKILL, all_processes=True)
-            await _wait_gone(client, container_id, KILL_WAIT_SEC)
-        await client.delete_task(container_id)
-    await client.delete_container(container_id)
+    try:
+        record = await client.get_container(container_id)
+        task = await client.get_task(container_id)
+        if task is not None:
+            if not is_gone(task):
+                await client.kill_task(container_id, signal.SIGKILL, all_processes=True)
+                if not await _wait_gone(client, container_id, KILL_WAIT_SEC):
+                    raise ContainerTaskStuck(f"the task of {container_id} survived SIGKILL")
+            await client.delete_task(container_id)
+            if await client.get_task(container_id) is not None:
+                raise ContainerTaskStuck(f"the task of {container_id} is still there")
+    except ContainerTaskStuck:
+        raise
+    except BackendAIError as e:
+        raise ContainerTaskStuck(f"the task of {container_id} is not confirmed gone: {e}") from e
+    failures: list[BackendAIError] = []
+
+    async def attempt(step: Awaitable[Any]) -> None:
+        try:
+            await step
+        except BackendAIError as e:
+            log.exception("container cleanup step failed", container_id=container_id)
+            failures.append(e)
+
+    await attempt(client.delete_container(container_id))
     key = record.snapshot_key if record is not None else snapshot_key or container_id
-    await client.remove_snapshot(key)
+    await attempt(client.remove_snapshot(key))
+    if failures:
+        raise failures[0]

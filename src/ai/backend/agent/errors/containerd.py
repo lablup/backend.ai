@@ -105,6 +105,13 @@ class ContainerdOperationFailed(BackendAIError, web.HTTPInternalServerError):
         )
 
 
+class ContainerTaskStuck(ContainerdOperationFailed):
+    """Raised when the task of a container is not confirmed gone, so its devices may be held."""
+
+    error_type = "https://api.backend.ai/probs/agent/container-task-stuck"
+    error_title = "The container task is not confirmed gone."
+
+
 class ContainerdImageNotFound(BackendAIError, web.HTTPNotFound):
     """Raised when the image is not in the containerd image store of the namespace."""
 

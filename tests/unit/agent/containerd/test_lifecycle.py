@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Awaitable, Callable
+from typing import Any
+
 import pytest
 
+from ai.backend.agent.containerd import lifecycle
 from ai.backend.agent.containerd.client import ContainerRecord
 from ai.backend.agent.containerd.lifecycle import (
     clean_container,
@@ -9,7 +14,7 @@ from ai.backend.agent.containerd.lifecycle import (
     launch_container,
 )
 from ai.backend.agent.containerd.profile.base import RuntimeOptions
-from ai.backend.agent.errors.containerd import ContainerdOperationFailed
+from ai.backend.agent.errors.containerd import ContainerdOperationFailed, ContainerTaskStuck
 
 from .fakes import FakeContainerd
 
@@ -88,6 +93,41 @@ class TestLaunch:
         with pytest.raises(ContainerdOperationFailed, match="create_task"):
             await _launch(fake)
 
+    async def test_stuck_cleanup_raises_stuck_from_the_launch_error(
+        self, fake: FakeContainerd
+    ) -> None:
+        """The caller learns that the task survived, and still gets the launch error."""
+        fake.failing.update({"start_task", "delete_task"})
+
+        with pytest.raises(ContainerTaskStuck) as excinfo:
+            await _launch(fake)
+
+        assert isinstance(excinfo.value.__cause__, ContainerdOperationFailed)
+        assert "start_task" in str(excinfo.value.__cause__)
+        assert CID in fake.containers
+
+    @pytest.mark.parametrize(
+        "cancelled_op", ["prepare_snapshot", "create_container", "create_task"]
+    )
+    async def test_cancellation_removes_everything_created(
+        self, cancelled_op: str, fake: FakeContainerd
+    ) -> None:
+        """A cancel that lands after the daemon did the step leaves nothing behind."""
+        step: Callable[..., Awaitable[Any]] = getattr(fake, cancelled_op)
+
+        async def done_then_cancelled(*args: Any, **kwargs: Any) -> Any:
+            await step(*args, **kwargs)
+            raise asyncio.CancelledError
+
+        setattr(fake, cancelled_op, done_then_cancelled)
+
+        with pytest.raises(asyncio.CancelledError):
+            await _launch(fake)
+
+        assert fake.snapshots == {}
+        assert fake.containers == {}
+        assert fake.tasks == {}
+
 
 class TestDestroy:
     async def test_sigterm_stops_the_task_and_deletes_it(self, fake: FakeContainerd) -> None:
@@ -156,6 +196,87 @@ class TestClean:
         await clean_container(fake, "absent")
 
         assert ("remove_snapshot", "absent") in fake.calls
+
+    async def test_failing_task_deletion_keeps_the_container_record_and_snapshot(
+        self, fake: FakeContainerd
+    ) -> None:
+        """The record is the way to the task: a task that is not confirmed gone keeps it."""
+        await _launch(fake)
+        fake.failing.add("delete_task")
+
+        with pytest.raises(ContainerTaskStuck, match="delete_task"):
+            await clean_container(fake, CID)
+
+        assert CID in fake.containers
+        assert CID in fake.snapshots
+
+    async def test_task_surviving_sigkill_keeps_the_container_record_and_snapshot(
+        self, fake: FakeContainerd, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        await _launch(fake)
+        monkeypatch.setattr(lifecycle, "KILL_WAIT_SEC", 0.2)
+
+        async def ignored(*args: Any, **kwargs: Any) -> None:
+            return None
+
+        monkeypatch.setattr(fake, "kill_task", ignored)
+
+        with pytest.raises(ContainerTaskStuck, match="survived SIGKILL"):
+            await clean_container(fake, CID)
+
+        assert CID in fake.containers
+        assert CID in fake.snapshots
+
+    async def test_task_still_present_after_its_deletion_is_stuck(
+        self, fake: FakeContainerd, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        await _launch(fake)
+
+        async def not_deleted(container_id: str) -> None:
+            return None
+
+        monkeypatch.setattr(fake, "delete_task", not_deleted)
+
+        with pytest.raises(ContainerTaskStuck, match="still there"):
+            await clean_container(fake, CID)
+
+        assert CID in fake.containers
+
+    async def test_failing_task_lookup_is_stuck(
+        self, fake: FakeContainerd, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        await _launch(fake)
+
+        async def unreadable(container_id: str) -> None:
+            raise ContainerdOperationFailed("get_task: injected failure")
+
+        monkeypatch.setattr(fake, "get_task", unreadable)
+
+        with pytest.raises(ContainerTaskStuck, match="not confirmed gone"):
+            await clean_container(fake, CID)
+
+        assert CID in fake.containers
+
+    async def test_failing_container_deletion_is_not_stuck(self, fake: FakeContainerd) -> None:
+        await _launch(fake)
+        fake.failing.add("delete_container")
+
+        with pytest.raises(ContainerdOperationFailed) as excinfo:
+            await clean_container(fake, CID)
+
+        assert not isinstance(excinfo.value, ContainerTaskStuck)
+
+    async def test_failing_container_deletion_still_removes_the_snapshot(
+        self, fake: FakeContainerd
+    ) -> None:
+        await _launch(fake)
+        fake.failing.add("delete_container")
+
+        with pytest.raises(ContainerdOperationFailed, match="delete_container"):
+            await clean_container(fake, CID)
+
+        assert fake.tasks == {}
+        assert fake.snapshots == {}
 
     async def test_is_idempotent(self, fake: FakeContainerd) -> None:
         await _launch(fake)

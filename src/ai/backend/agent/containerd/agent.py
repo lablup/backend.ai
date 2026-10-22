@@ -4,13 +4,23 @@ import asyncio
 import logging
 import signal
 import uuid
-from collections.abc import AsyncGenerator, Mapping, MutableMapping, Sequence
+from collections.abc import (
+    AsyncGenerator,
+    Awaitable,
+    Callable,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
+from dataclasses import dataclass
 from decimal import Decimal
 from functools import partial
 from importlib.resources import files
 from io import StringIO
 from ipaddress import IPv4Address, ip_address
 from pathlib import Path
+from time import monotonic
 from typing import Any, Final, cast, override
 
 import aiofiles
@@ -27,6 +37,7 @@ from ai.backend.agent.containerd.client import (
     ContainerdClient,
     ContainerdClientConfig,
     ContainerRecord,
+    TaskInfo,
     TaskState,
 )
 from ai.backend.agent.containerd.image import resolve_image
@@ -34,6 +45,7 @@ from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.lifecycle import (
     clean_container,
     destroy_container,
+    is_gone,
     launch_container,
 )
 from ai.backend.agent.containerd.mounts import host_system_mounts, to_generated_mounts
@@ -69,7 +81,11 @@ from ai.backend.agent.containerd.spec import (
 )
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.agent import InvalidAgentConfigError, UnsupportedBaseDistroError
-from ai.backend.agent.errors.containerd import KernelNetworkSetupFailed, KernelVerbNotSupported
+from ai.backend.agent.errors.containerd import (
+    ContainerTaskStuck,
+    KernelNetworkSetupFailed,
+    KernelVerbNotSupported,
+)
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
@@ -81,7 +97,13 @@ from ai.backend.agent.resources import (
     Mount,
     known_slot_types,
 )
-from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo, Port
+from ai.backend.agent.types import (
+    Container,
+    KernelOwnershipData,
+    LifecycleEvent,
+    MountInfo,
+    Port,
+)
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cgroup import CgroupController
@@ -89,6 +111,7 @@ from ai.backend.common.docker import ImageRef, KernelFeatures, LabelName
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.kernel import KernelLifecycleEventReason
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     AutoPullBehavior,
@@ -114,6 +137,24 @@ from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
+
+async def _run_scratch_work[**P, T](func: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
+    """Run blocking scratch work in the executor; a cancel waits until the thread has finished.
+
+    Otherwise the thread could recreate the scratch dir after its removal.
+    """
+    work = asyncio.ensure_future(run_in_executor_with_context(None, partial(func, *args, **kwargs)))
+    try:
+        return await asyncio.shield(work)
+    except asyncio.CancelledError:
+        while not work.done():
+            try:
+                await asyncio.wait({work})
+            except asyncio.CancelledError:
+                pass
+        raise
+
+
 HOST_PORTS_LABEL: Final = "ai.backend.containerd.host-ports"
 KERNEL_IP_LABEL: Final = "ai.backend.containerd.kernel-ip"
 _INTRINSIC_SLOTS: Final = frozenset({SlotName("cpu"), SlotName("mem")})
@@ -128,6 +169,22 @@ _CONTAINER_STATUS: Final[Mapping[TaskState, ContainerStatus]] = {
     TaskState.UNKNOWN: ContainerStatus.DEAD,
 }
 _DEFAULT_SHM_BYTES: Final = 64 * 2**20
+_STUCK_RETRY_MIN_SEC: Final = 5.0
+_STUCK_RETRY_MAX_SEC: Final = 300.0
+_STUCK_ESCALATE_SEC: Final = 30 * 60.0
+
+
+@dataclass(slots=True)
+class _StuckKernel:
+    """A kernel whose container task is not confirmed gone; its allocations stay reserved."""
+
+    kernel_id: KernelId
+    container_id: str
+    host_ports: list[int]
+    first_failed_at: float
+    next_retry_at: float
+    attempts: int = 0
+    escalated: bool = False
 
 
 def _kernel_slots(kernel_config: KernelCreationConfig) -> Mapping[SlotName, Decimal]:
@@ -199,6 +256,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _network: KernelNetwork
     _address: IPv4Address | None
     _resource_lock: asyncio.Lock
+    _hold_stuck: Callable[[KernelId, str, Sequence[int]], Awaitable[None]]
     _dirs: ScratchDirs
     _generated_mounts: list[GeneratedMount]
     _base_spec: dict[str, Any]
@@ -221,6 +279,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         port_pool: PortPool,
         network: KernelNetwork,
         resource_lock: asyncio.Lock,
+        hold_stuck: Callable[[KernelId, str, Sequence[int]], Awaitable[None]],
     ) -> None:
         super().__init__(
             ownership_data,
@@ -239,6 +298,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         self._network = network
         self._address = None
         self._resource_lock = resource_lock
+        self._hold_stuck = hold_stuck
         self._dirs = ScratchDirs.for_kernel(
             local_config.container.scratch_root, str(ownership_data.kernel_id)
         )
@@ -296,14 +356,11 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     # says (memory and hostfile are not implemented)
     @override
     async def prepare_scratch(self) -> None:
-        await run_in_executor_with_context(
-            None,
-            partial(
-                create_scratch,
-                self._dirs,
-                self._owner(),
-                clone_dotfiles=not self.restarting,
-            ),
+        await _run_scratch_work(
+            create_scratch,
+            self._dirs,
+            self._owner(),
+            clone_dotfiles=not self.restarting,
         )
 
     # Not mirrored from the Docker agent: the agent socket, domain-socket proxies, extra
@@ -492,7 +549,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         )
 
     async def _add_spec_jws(self, signature: str) -> None:
-        await run_in_executor_with_context(None, write_spec_jws, self._dirs.spec_jws, signature)
+        await _run_scratch_work(write_spec_jws, self._dirs.spec_jws, signature)
         # Appended to the base spec, not a GeneratedMount: a profile's spec_patch["mounts"] keeps
         # the base mounts (coco-tdx replaces the list with base mounts + resolver binds).
         self._base_spec["mounts"].append(spec_jws_mount(self._dirs.spec_jws))
@@ -520,7 +577,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             write_hosts_file(self._dirs, self.kernel_config["cluster_hostname"])
             write_resolv_conf(self._dirs)
 
-        await run_in_executor_with_context(None, _write)
+        await _run_scratch_work(_write)
 
     def _acquire_host_ports(self, count: int) -> list[int]:
         acquired: list[int] = []
@@ -605,6 +662,13 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 stdio=stdio,
                 runtime_options=launch_plan.runtime_options,
             )
+        except ContainerTaskStuck as stuck:
+            # The task survived the cleanup and still holds the devices, ports and network.
+            await self._hold_stuck(self.kernel_id, container_id, host_ports)
+            launch_error = stuck.__cause__
+            if launch_error is None:
+                raise
+            raise launch_error from launch_error.__cause__
         except BaseException:
             await self._teardown_network()
             self._port_pool.release_many(host_ports)
@@ -649,6 +713,11 @@ class ContainerdAgent(
     _client: ContainerdAPI
     _network: KernelNetwork
     _orphan_ports: dict[KernelId, list[int]]
+    _stuck_kernels: dict[str, _StuckKernel]  # keyed by container id
+    _stuck_retry_task: asyncio.Task[None] | None
+    _resources_stale: bool
+    _tolerate_lookup_errors: bool
+    _lookup_warned: set[str]
 
     def __init__(
         self,
@@ -670,6 +739,11 @@ class ContainerdAgent(
         )
         self._runc_profile = RuncProfile(local_config.kernel_lifecycles.init_timeout_sec)
         self._orphan_ports = {}
+        self._stuck_kernels = {}
+        self._stuck_retry_task = None
+        self._resources_stale = False
+        self._tolerate_lookup_errors = False
+        self._lookup_warned = set()
         self._network = KernelNetwork(
             containerd_config.bridge_name,
             containerd_config.bridge_subnet,
@@ -721,7 +795,17 @@ class ContainerdAgent(
         log.info("containerd connected", address=config.address, namespace=config.namespace)
         await self._network.init()
         await self._record_orphans()
-        await super().__ainit__()
+        await self._seed_stuck_kernels()
+        # A container whose task cannot be read is skipped, not reported dead, while starting.
+        self._tolerate_lookup_errors = True
+        try:
+            await super().__ainit__()
+        finally:
+            self._tolerate_lookup_errors = False
+        # The base scan restores active containers only; the stopped ones still hold devices.
+        async with self.registry_lock:
+            await self.reconstruct_resource_usage()
+        self._stuck_retry_task = asyncio.create_task(self._stuck_retry_loop())
 
     async def _record_orphans(self) -> None:
         """Recovery is a stub, so each container found at startup has no kernel object.
@@ -729,22 +813,61 @@ class ContainerdAgent(
         Its ports are returned once, by its clean; its address is kept until then, and the
         network of any kernel without a container is swept.
         """
-        found = await self.enumerate_containers(frozenset(ContainerStatus))
-        for kernel_id, container in found:
-            if container.status in ACTIVE_STATUS_SET:
-                self._orphan_ports[kernel_id] = [
-                    p.host_port for p in container.ports if p.host_port is not None
-                ]
-            if address := container.labels.get(KERNEL_IP_LABEL):
+        known: list[KernelId] = []
+        for kernel_id, record, task in await self._scan_containers():
+            known.append(kernel_id)
+            if address := record.labels.get(KERNEL_IP_LABEL):
                 self._network.restore(kernel_id, IPv4Address(address))
-        await self._network.sweep([kernel_id for kernel_id, _ in found])
+            if isinstance(task, BackendAIError):
+                log.warning(
+                    "container task lookup failed at startup",
+                    kernel_id=kernel_id,
+                    container_id=record.id,
+                )
+                continue
+            if task is not None and _CONTAINER_STATUS[task.state] in ACTIVE_STATUS_SET:
+                self._orphan_ports[kernel_id] = _host_ports_of(record)
+        await self._network.sweep(known)
+
+    async def _seed_stuck_kernels(self) -> None:
+        """Resume the retry of containers whose task is stopped or unreadable but not removed.
+
+        A task still running is destroyed by the lifecycle sync, which must be enabled.
+        """
+        now = monotonic()
+        for kernel_id, record, task in await self._scan_containers():
+            if task is None or (isinstance(task, TaskInfo) and not is_gone(task)):
+                continue
+            host_ports = _host_ports_of(record)
+            for port in host_ports:
+                self.port_pool.discard(port)
+            self._stuck_kernels[record.id] = _StuckKernel(
+                kernel_id=kernel_id,
+                container_id=record.id,
+                host_ports=host_ports,
+                first_failed_at=now,
+                next_retry_at=now + _STUCK_RETRY_MIN_SEC,
+            )
+            log.warning(
+                "container task not confirmed gone at startup",
+                kernel_id=kernel_id,
+                container_id=record.id,
+            )
 
     @override
     async def shutdown(self, stop_signal: signal.Signals) -> None:
         try:
             await super().shutdown(stop_signal)
         finally:
+            if self._stuck_retry_task is not None:
+                self._stuck_retry_task.cancel()
+                await asyncio.wait({self._stuck_retry_task})
             await self._client.close()
+
+    @override
+    def _restore_ports(self, host_ports: Iterable[int]) -> None:
+        held = {port for entry in self._stuck_kernels.values() for port in entry.host_ports}
+        super()._restore_ports(port for port in host_ports if port not in held)
 
     # FIXME(containerd-mvp): kernel recovery is not supported; an agent restart destroys
     # running kernels
@@ -762,11 +885,10 @@ class ContainerdAgent(
     ) -> None:
         return None
 
-    @override
-    async def enumerate_containers(
+    async def _scan_containers(
         self,
-        status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
-    ) -> Sequence[tuple[KernelId, Container]]:
+    ) -> list[tuple[KernelId, ContainerRecord, TaskInfo | BackendAIError | None]]:
+        """Own containers with their task; a failed task lookup is returned in its place."""
         if not self._client.connected:
             # The base cleanup loop may run before __ainit__ has connected the client.
             return []
@@ -774,18 +896,73 @@ class ContainerdAgent(
             LabelName.OWNER_AGENT: str(self.id),
             LabelName.KERNEL_ID: "",
         })
-        # A task is gone once it stops; a container without one counts as exited.
-        tasks = await asyncio.gather(*(self._client.get_task(r.id) for r in records))
-        result: list[tuple[KernelId, Container]] = []
+        tasks = await asyncio.gather(
+            *(self._client.get_task(r.id) for r in records), return_exceptions=True
+        )
+        result: list[tuple[KernelId, ContainerRecord, TaskInfo | BackendAIError | None]] = []
         for record, task in zip(records, tasks, strict=True):
-            status = _CONTAINER_STATUS[task.state] if task is not None else ContainerStatus.EXITED
             kernel_id = _kernel_id_of(record)
-            if kernel_id is None or status not in status_filter:
+            if kernel_id is None:
                 continue
             if record.labels.get(LabelName.OWNER_AGENT) != str(self.id):
                 continue  # the server-side filter is a pre-selection only
+            if isinstance(task, BaseException) and not isinstance(task, BackendAIError):
+                raise task
+            result.append((kernel_id, record, task))
+        return result
+
+    @override
+    async def enumerate_containers(
+        self,
+        status_filter: frozenset[ContainerStatus] = ACTIVE_STATUS_SET,
+    ) -> Sequence[tuple[KernelId, Container]]:
+        result: list[tuple[KernelId, Container]] = []
+        for kernel_id, record, task in await self._scan_containers():
+            if record.id in self._stuck_kernels:
+                continue  # the retry loop is the only cleaner of a stuck container
+            if isinstance(task, BackendAIError):
+                if not self._tolerate_lookup_errors:
+                    raise task
+                if record.id not in self._lookup_warned:
+                    self._lookup_warned.add(record.id)
+                    log.warning("container task lookup failed", container_id=record.id)
+                continue
+            self._lookup_warned.discard(record.id)
+            if task is None:
+                # A task is gone once it stops; a container without one counts as exited.
+                status = ContainerStatus.EXITED
+            else:
+                status = _CONTAINER_STATUS[task.state]
+            if status in status_filter:
+                result.append((kernel_id, _to_container(record, status)))
+        return result
+
+    async def _held_containers(self) -> Sequence[tuple[KernelId, Container]]:
+        """Every container with a task in any state, or whose task lookup fails."""
+        result: list[tuple[KernelId, Container]] = []
+        for kernel_id, record, task in await self._scan_containers():
+            if task is None:
+                continue
+            status = (
+                ContainerStatus.DEAD
+                if isinstance(task, BackendAIError)
+                else _CONTAINER_STATUS[task.state]
+            )
             result.append((kernel_id, _to_container(record, status)))
         return result
+
+    @override
+    async def reconstruct_resource_usage(self) -> None:
+        """Rebuild the alloc maps from the resource.txt of every held container.
+
+        The base sees active containers only; a stopped or unreadable task still holds devices.
+        """
+        containers = await self._held_containers()
+        async with self.resource_lock:
+            for computer_ctx in self.computers.values():
+                computer_ctx.alloc_map.clear()
+            for kernel_id, container in containers:
+                await self._restore_container_resources(kernel_id, container, strict=False)
 
     @override
     async def resolve_image_distro(self, image: ImageConfig) -> str:
@@ -856,6 +1033,7 @@ class ContainerdAgent(
         restarting: bool = False,
         cluster_ssh_port_mapping: ClusterSSHPortMapping | None = None,
     ) -> ContainerdKernelCreationContext:
+        self._refuse_while_stuck(ownership_data.kernel_id)
         slots = _kernel_slots(kernel_config)
         profile = select_profile(
             self._runtime_profiles,
@@ -885,7 +1063,46 @@ class ContainerdAgent(
             port_pool=self.port_pool,
             network=self._network,
             resource_lock=self.resource_lock,
+            hold_stuck=self._hold_stuck,
         )
+
+    def _is_stuck(self, kernel_id: KernelId) -> bool:
+        return any(entry.kernel_id == kernel_id for entry in self._stuck_kernels.values())
+
+    def _refuse_while_stuck(self, kernel_id: KernelId) -> None:
+        for entry in self._stuck_kernels.values():
+            if entry.kernel_id == kernel_id:
+                raise ContainerTaskStuck(
+                    f"the kernel cannot start while its container {entry.container_id} "
+                    "is not confirmed gone"
+                )
+
+    @override
+    async def restart_kernel(
+        self,
+        ownership_data: KernelOwnershipData,
+        kernel_image: ImageRef,
+        updating_kernel_config: KernelCreationConfig,
+    ) -> dict[str, Any]:
+        kernel_id = ownership_data.kernel_id
+        self._refuse_while_stuck(kernel_id)
+        result = await super().restart_kernel(ownership_data, kernel_image, updating_kernel_config)
+        if kernel_id in self.restarting_kernels:
+            # The old container got stuck during this restart and the base swallowed the refusal.
+            try:
+                self._refuse_while_stuck(kernel_id)
+            except ContainerTaskStuck:
+                self.restarting_kernels.pop(kernel_id, None)
+                if (kernel_obj := self.kernel_registry.get(kernel_id)) is not None:
+                    kernel_obj.termination_reason = None  # RESTARTING would replace the reason
+                await self.inject_container_lifecycle_event(
+                    kernel_id,
+                    ownership_data.session_id,
+                    LifecycleEvent.CLEAN,
+                    KernelLifecycleEventReason.FAILED_TO_START,
+                )
+                raise
+        return result
 
     @override
     async def destroy_kernel(
@@ -912,16 +1129,26 @@ class ContainerdAgent(
         container_id: ContainerId | None,
         restarting: bool,
     ) -> None:
+        if container_id is None and self._is_stuck(kernel_id):
+            return  # a launch whose task survived its cleanup; the retry loop finishes it
         dirs = ScratchDirs.for_kernel(self.local_config.container.scratch_root, str(kernel_id))
         if container_id is not None:
-            # Ports of kernels created by this process are released by the base.
-            self.port_pool.release_many(self._orphan_ports.pop(kernel_id, []))
             await self._collect_task_log(kernel_id, container_id, dirs)
             if not self.local_config.debug.skip_container_deletion:
                 try:
                     await clean_container(self._client, str(container_id))
+                except ContainerTaskStuck:
+                    await self._hold_stuck(kernel_id, str(container_id))
+                    return
                 except BackendAIError:
                     log.exception("container delete failed", container_id=container_id)
+            # Ports of kernels created by this process are released by the base.
+            self.port_pool.release_many(self._orphan_ports.pop(kernel_id, []))
+            if entry := self._stuck_kernels.pop(str(container_id), None):
+                self.port_pool.release_many(entry.host_ports)
+        await self._remove_kernel_leftovers(kernel_id, restarting)
+
+    async def _remove_kernel_leftovers(self, kernel_id: KernelId, restarting: bool) -> None:
         try:
             await self._network.teardown(kernel_id)
         except BackendAIError:
@@ -930,6 +1157,125 @@ class ContainerdAgent(
             await run_in_executor_with_context(
                 None, remove_scratch, self.local_config.container.scratch_root, str(kernel_id)
             )
+
+    async def _hold_stuck(
+        self, kernel_id: KernelId, container_id: str, launch_ports: Sequence[int] = ()
+    ) -> None:
+        """Keep the allocations, ports, network and scratch of a kernel whose task survives.
+
+        `launch_ports` are the pool ports of a launch that failed before the kernel recorded them.
+        """
+        entry = self._stuck_kernels.get(container_id)
+        if entry is None:
+            host_ports: set[int] = {*launch_ports, *self._orphan_ports.pop(kernel_id, [])}
+            if (kernel_obj := self.kernel_registry.get(kernel_id)) is not None:
+                host_ports.update(kernel_obj.get("host_ports") or [])
+                kernel_obj["host_ports"] = []  # the base must not release them again
+            try:
+                record = await self._client.get_container(container_id)
+            except BackendAIError:
+                record = None
+            if record is not None:
+                host_ports.update(_host_ports_of(record))
+            now = monotonic()
+            self._stuck_kernels[container_id] = entry = _StuckKernel(
+                kernel_id=kernel_id,
+                container_id=container_id,
+                host_ports=sorted(host_ports),
+                first_failed_at=now,
+                next_retry_at=now + _STUCK_RETRY_MIN_SEC,
+            )
+        log.warning(
+            "container task not confirmed gone; allocations held",
+            kernel_id=kernel_id,
+            container_id=container_id,
+            attempts=entry.attempts,
+        )
+
+    async def _stuck_retry_loop(self) -> None:
+        while True:
+            try:
+                await self._retry_stuck_kernels()
+            except Exception:
+                log.exception("stuck container retry cycle failed")
+            await asyncio.sleep(_STUCK_RETRY_MIN_SEC)
+
+    async def _retry_stuck_kernels(self) -> None:
+        if self._resources_stale:
+            async with self.registry_lock:
+                await self._rebuild_resources()
+        for entry in list(self._stuck_kernels.values()):
+            if monotonic() < entry.next_retry_at:
+                continue
+            try:
+                await self._retry_stuck(entry)
+            except Exception:
+                log.exception("stuck container retry failed", container_id=entry.container_id)
+                await self._back_off(entry)
+
+    async def _back_off(self, entry: _StuckKernel) -> None:
+        """Delay the next retry; the caller is in an except block, which the error event reports."""
+        now = monotonic()
+        stuck_sec = now - entry.first_failed_at
+        entry.next_retry_at = now + min(
+            _STUCK_RETRY_MIN_SEC * 2**entry.attempts, _STUCK_RETRY_MAX_SEC
+        )
+        log.warning(
+            "container task still not confirmed gone",
+            kernel_id=entry.kernel_id,
+            container_id=entry.container_id,
+            attempts=entry.attempts,
+            stuck_sec=stuck_sec,
+        )
+        if stuck_sec >= _STUCK_ESCALATE_SEC and not entry.escalated:
+            entry.escalated = True
+            try:
+                await self.produce_error_event()
+            except Exception:
+                log.exception("stuck container error event failed", container_id=entry.container_id)
+
+    async def _rebuild_resources(self) -> None:
+        """Rebuild the alloc maps; a failure is retried on the next cycle."""
+        try:
+            await self.reconstruct_resource_usage()
+        except Exception:
+            self._resources_stale = True
+            log.exception("resource usage rebuild failed; retrying on the next cycle")
+        else:
+            self._resources_stale = False
+
+    async def _retry_stuck(self, entry: _StuckKernel) -> None:
+        if self._stuck_kernels.get(entry.container_id) is not entry:
+            return
+        entry.attempts += 1
+        # The clean runs outside the registry lock: it can wait for the kill and the RPCs.
+        try:
+            await clean_container(self._client, entry.container_id)
+        except ContainerTaskStuck:
+            await self._back_off(entry)
+            return
+        except BackendAIError:
+            # The task is gone, so the allocations are freed; clean_container logged it.
+            log.warning("container record left behind", container_id=entry.container_id)
+        async with self.registry_lock:
+            if self._stuck_kernels.get(entry.container_id) is not entry:
+                return  # a clean event of the same container finished it meanwhile
+            del self._stuck_kernels[entry.container_id]
+            try:
+                self.port_pool.release_many(entry.host_ports)
+                self._orphan_ports.pop(entry.kernel_id, None)
+                await self._remove_kernel_leftovers(
+                    entry.kernel_id, entry.kernel_id in self.restarting_kernels
+                )
+            except Exception:
+                log.exception("stuck container leftovers cleanup failed", kernel_id=entry.kernel_id)
+            await self._rebuild_resources()
+        log.info(
+            "stuck container cleaned",
+            kernel_id=entry.kernel_id,
+            container_id=entry.container_id,
+            attempts=entry.attempts,
+        )
 
     async def _collect_task_log(
         self, kernel_id: KernelId, container_id: ContainerId, dirs: ScratchDirs
