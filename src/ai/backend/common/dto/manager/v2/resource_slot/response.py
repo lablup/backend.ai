@@ -11,7 +11,6 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.dto.manager.v2.fair_share.types import ResourceSlotInfo
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 from .types import NumberFormatInfo
 
@@ -36,12 +35,12 @@ class ResourceSlotTypeNode(BaseResponseModel):
 
     id: str | None = Field(default=None, description="Node ID (same as slot_name).")
     entity_id: UUID = Field(
-        description=f"UUID of the resource slot type. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the resource slot type. Added in 26.9.0.",
     )
     uuid: UUID = Field(
         description=(
             "Stable UUID identity of the resource slot type. "
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use entity_id."
+            "Deprecated since 26.9.0. Use entity_id."
         ),
         deprecated=True,
     )
@@ -98,6 +97,7 @@ class PurgeResourceSlotTypePayload(BaseResponseModel):
     """Payload for resource slot type removal."""
 
     slot_name: str = Field(description="Slot name of the removed resource slot type.")
+    entity_id: UUID = Field(description="UUID of the purged resource slot type. Added in 26.10.0.")
 
 
 class AgentResourceNode(BaseResponseModel):
@@ -105,7 +105,7 @@ class AgentResourceNode(BaseResponseModel):
 
     id: str = Field(description="Node ID (format: '{agent_id}:{slot_name}').")
     field_id: UUID = Field(
-        description=f"UUID of the agent resource. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the agent resource. Added in 26.9.0.",
     )
     agent_id: str = Field(description="Agent identifier.")
     slot_name: str = Field(
@@ -114,6 +114,8 @@ class AgentResourceNode(BaseResponseModel):
     capacity: str = Field(
         description="Total hardware resource capacity for this slot on the agent."
     )
+    reserved: str = Field(description="Amount reserved by scheduling for this slot.")
+    prereserved: str = Field(description="Amount reserved in advance by preemption plans.")
     used: str = Field(
         description="Amount of this slot currently consumed by running and scheduled sessions."
     )
@@ -133,7 +135,7 @@ class ResourceAllocationNode(BaseResponseModel):
 
     id: str = Field(description="Node ID (format: '{kernel_id}:{slot_name}').")
     field_id: UUID = Field(
-        description=f"UUID of the resource allocation. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the resource allocation. Added in 26.9.0.",
     )
     kernel_id: str = Field(description="Kernel identifier (UUID).")
     slot_name: str = Field(

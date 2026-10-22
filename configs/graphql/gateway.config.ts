@@ -1,4 +1,144 @@
-import { defineConfig, WSTransportOptions, type GatewayPlugin } from '@graphql-hive/gateway';
+import {
+  defineConfig,
+  DisposableSymbols,
+  WSTransport,
+  WSTransportOptions,
+  type GatewayPlugin,
+} from '@graphql-hive/gateway';
+
+const MANAGER_PROBE_PATH = '/health/readyz';
+
+// Returns the default when the variable is unset; rejects anything but a positive number
+const readPositiveNumberEnv = (name: string, defaultValue: number): number => {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === '') {
+    return defaultValue;
+  }
+  const value = Number(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    throw new Error(`${name} must be a positive number: ${raw}`);
+  }
+  return value;
+};
+
+const managerEndpoints = (process.env.BACKENDAI_MANAGER_ENDPOINTS || '')
+  .split(',')
+  .map((endpoint) => endpoint.trim())
+  .filter((endpoint) => endpoint.length > 0)
+  .map((endpoint) => new URL(endpoint).origin);
+const managerRequestTimeoutMs = readPositiveNumberEnv('BACKENDAI_MANAGER_REQUEST_TIMEOUT', 60) * 1000;
+
+// Opens each subgraph request or subscription on a ready manager in BACKENDAI_MANAGER_ENDPOINTS
+// (comma-separated origins). Without the list, the transportEntries locations are used as is.
+const useManagerPoolPlugin = (): GatewayPlugin => {
+  const managers = managerEndpoints;
+  if (managers.length === 0) {
+    return {};
+  }
+  const intervalMs = readPositiveNumberEnv('BACKENDAI_MANAGER_HEALTH_CHECK_INTERVAL', 10) * 1000;
+  const probeTimeoutMs = readPositiveNumberEnv('BACKENDAI_MANAGER_HEALTH_CHECK_PROBE_TIMEOUT', 3) * 1000;
+  const failureThreshold = readPositiveNumberEnv('BACKENDAI_MANAGER_HEALTH_CHECK_FAILURE_THRESHOLD', 3);
+  const readyManagers = new Set<string>(managers);
+  const failureCounts = new Map<string, number>(managers.map((manager) => [manager, 0]));
+  const probingManagers = new Set<string>();
+  // Keyed by the manager-specific subscription location
+  const wsExecutors = new Map<string, any>();
+  let cursor = 0;
+  let timer: ReturnType<typeof setInterval> | undefined;
+
+  const pickManager = (): string => {
+    const candidates = managers.filter((manager) => readyManagers.has(manager));
+    if (candidates.length === 0) {
+      throw new Error('No ready manager is available');
+    }
+    return candidates[cursor++ % candidates.length];
+  };
+  const relocate = (location: string, manager: string): string => {
+    const url = new URL(location);
+    return `${manager}${url.pathname}${url.search}`;
+  };
+  // A 503 removes the manager at once; other failures remove it after the threshold
+  const probe = async (manager: string) => {
+    if (probingManagers.has(manager)) {
+      return;
+    }
+    probingManagers.add(manager);
+    let status: number | undefined;
+    try {
+      const response = await fetch(`${manager}${MANAGER_PROBE_PATH}`, {
+        signal: AbortSignal.timeout(probeTimeoutMs),
+      });
+      status = response.status;
+      await response.body?.cancel();
+    } catch {
+      status = undefined;
+    } finally {
+      probingManagers.delete(manager);
+    }
+    if (status !== undefined && status >= 200 && status < 300) {
+      failureCounts.set(manager, 0);
+      readyManagers.add(manager);
+      return;
+    }
+    const failureCount = failureCounts.get(manager)! + 1;
+    failureCounts.set(manager, failureCount);
+    if (status === 503 || failureCount >= failureThreshold) {
+      readyManagers.delete(manager);
+    }
+  };
+  const probeAll = () => Promise.allSettled(managers.map(probe));
+
+  return {
+    onPluginInit() {
+      void probeAll();
+      timer = setInterval(probeAll, intervalMs);
+    },
+    onFetch({ url, setURL, executionRequest }) {
+      if (!executionRequest) {
+        return;
+      }
+      setURL(relocate(url, pickManager()));
+    },
+    onSubgraphExecute({ executionRequest, transportEntry, setExecutor, log }) {
+      const subscriptions = transportEntry?.options?.subscriptions;
+      if (
+        executionRequest.operationType !== 'subscription' ||
+        !transportEntry?.location ||
+        subscriptions?.kind !== 'ws'
+      ) {
+        return;
+      }
+      const location = relocate(transportEntry.location, pickManager());
+      let executor = wsExecutors.get(location);
+      if (!executor) {
+        // Same entry the HTTP transport hands to the WS transport for subscriptions
+        executor = WSTransport.getSubgraphExecutor({
+          transportEntry: {
+            ...transportEntry,
+            kind: 'ws',
+            location,
+            headers: subscriptions.headers,
+            options: {
+              ...transportEntry.options,
+              ...subscriptions.options,
+              subscriptions: undefined,
+            },
+          },
+          log,
+        } as any);
+        wsExecutors.set(location, executor);
+      }
+      setExecutor(executor);
+    },
+    async onDispose() {
+      clearInterval(timer);
+      await Promise.allSettled(
+        Array.from(wsExecutors.values()).map((executor) => executor[DisposableSymbols.asyncDispose]()),
+      );
+      wsExecutors.clear();
+    },
+  };
+};
 
 // Custom plugin to forward headers from context to subgraph requests
 // This ensures headers (including JWT tokens) are included in each GraphQL operation
@@ -15,6 +155,9 @@ const useConnectionParamsToHeadersPlugin = (): GatewayPlugin => {
         let new_headers: Record<string, string> = {};
         if (reqHeaders["x-backendai-token"]) {
           new_headers["x-backendai-token"] = reqHeaders["x-backendai-token"];
+        }
+        if (reqHeaders["x-backendai-act-as"]) {
+          new_headers["x-backendai-act-as"] = reqHeaders["x-backendai-act-as"];
         }
         // Forward X-Forwarded-For so the manager can resolve the real client IP
         // (e.g. for the my_client_ip GQL query). Without this, extract_client_ip()
@@ -39,6 +182,8 @@ const useConnectionParamsToHeadersPlugin = (): GatewayPlugin => {
 
 export const gatewayConfig = defineConfig({
   plugins: (ctx) => [
+    // Must come first: the next plugin wraps the executor this one sets
+    useManagerPoolPlugin(),
     useConnectionParamsToHeadersPlugin(),
   ],
   propagateHeaders: {
@@ -51,6 +196,13 @@ export const gatewayConfig = defineConfig({
   disableIntrospection: {
     disableIf: () => true
   },
+  // With the manager list, requests fail after BACKENDAI_MANAGER_REQUEST_TIMEOUT seconds (default 60).
+  // Subscriptions are excluded since the timeout would end them.
+  upstreamTimeout:
+    managerEndpoints.length > 0
+      ? ({ executionRequest }) =>
+          executionRequest?.operationType === 'subscription' ? undefined : managerRequestTimeoutMs
+      : undefined,
   maskedErrors: false,
   logging: false,
   supergraph: '/gateway/supergraph.graphql',

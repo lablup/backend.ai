@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from abc import abstractmethod
+from collections.abc import Mapping
 from typing import override
 
 from ai.backend.common.events.kernel import KernelLifecycleEventReason
-from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
+from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain, LogScopedEvent
 from ai.backend.common.events.user_event.user_event import UserEvent
-from ai.backend.common.types import SessionExecutionStatus, SessionId
+from ai.backend.common.types import AgentId, SessionExecutionStatus, SessionId
+from ai.backend.logging.structured import LogValue
 
 
 class SessionLifecycleEvent(AbstractAnycastEvent):
@@ -24,8 +26,12 @@ class SessionLifecycleEvent(AbstractAnycastEvent):
         return None
 
 
-class BaseSessionEvent(AbstractAnycastEvent):
+class BaseSessionEvent(AbstractAnycastEvent, LogScopedEvent):
     session_id: SessionId
+
+    @override
+    def log_fields(self, source: AgentId) -> Mapping[str, LogValue]:
+        return {"session_id": self.session_id}
 
     @classmethod
     @override

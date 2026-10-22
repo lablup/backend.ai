@@ -21,11 +21,21 @@ def register_v2_project_routes(
     reg = RouteRegistry.create("projects", route_deps.cors_options)
     reg.add("GET", "/{project_id}", handler.get, middlewares=[auth_required])
     reg.add("POST", "/search", handler.admin_search, middlewares=[superadmin_required])
+    reg.add("POST", "/my/search", handler.my_search, middlewares=[auth_required])
     reg.add("POST", "/scoped/search", handler.scoped_search, middlewares=[auth_required])
     reg.add("POST", "", handler.admin_create, middlewares=[superadmin_required])
-    reg.add("PATCH", "/{project_id}", handler.admin_update, middlewares=[superadmin_required])
-    reg.add("POST", "/delete", handler.admin_delete, middlewares=[superadmin_required])
-    reg.add("POST", "/restore", handler.admin_restore, middlewares=[superadmin_required])
+    reg.add("PATCH", "/{project_id}", handler.update, middlewares=[auth_required])
+    reg.add("POST", "/{project_id}/delete", handler.delete, middlewares=[auth_required])
+    reg.add("POST", "/{project_id}/restore", handler.restore, middlewares=[auth_required])
+    reg.add(
+        "POST", "/partial-bulk-update", handler.partial_bulk_update, middlewares=[auth_required]
+    )
+    reg.add(
+        "POST", "/partial-bulk-delete", handler.partial_bulk_delete, middlewares=[auth_required]
+    )
+    reg.add(
+        "POST", "/partial-bulk-restore", handler.partial_bulk_restore, middlewares=[auth_required]
+    )
     reg.add("POST", "/purge", handler.admin_purge, middlewares=[superadmin_required])
     reg.add(
         "POST",
@@ -39,4 +49,7 @@ def register_v2_project_routes(
         handler.unassign_users,
         middlewares=[auth_required],
     )
+    # Deprecated since NEXT_RELEASE_VERSION.
+    reg.add("POST", "/delete", handler.admin_delete, middlewares=[superadmin_required])
+    reg.add("POST", "/restore", handler.admin_restore, middlewares=[superadmin_required])
     return reg

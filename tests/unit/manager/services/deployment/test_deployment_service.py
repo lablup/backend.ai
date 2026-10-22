@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.config import ModelDefinitionDraft
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.endpoint.types import EndpointLifecycle, ScalingState
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
@@ -60,12 +60,12 @@ from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.services.deployment.actions.access_token.create_access_token import (
     CreateAccessTokenAction,
 )
-from ai.backend.manager.services.deployment.actions.deployment_policy import (
+from ai.backend.manager.services.deployment.actions.deployment_policy.upsert_deployment_policy import (
     UpsertDeploymentPolicyAction,
 )
 from ai.backend.manager.services.deployment.actions.model_revision.add_model_revision import (
@@ -76,7 +76,7 @@ from ai.backend.manager.services.deployment.service import (
     _convert_deployment_info_to_data,
     _convert_deployment_info_to_legacy_data,
 )
-from ai.backend.manager.sokovan.deployment import DeploymentController
+from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 
 
 class DeploymentServiceBaseFixtures:
@@ -400,7 +400,7 @@ class TestAddModelRevision(ModelRevisionFixtures):
 
     @pytest.fixture(autouse=True)
     def set_user_context(self, requester: UserData) -> Iterator[None]:
-        with with_user(requester):
+        with with_user_context(requester):
             yield
 
     async def test_add_model_revision_delegates_to_controller(

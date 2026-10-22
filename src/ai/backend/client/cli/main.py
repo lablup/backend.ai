@@ -36,12 +36,7 @@ def main(ctx: click.Context, skip_sslcert_validation: bool, output: str) -> None
     from ai.backend.client.config import APIConfig, set_config
     from ai.backend.client.output import get_output_handler
 
-    from .announcement import announce
-
-    config = APIConfig(
-        skip_sslcert_validation=skip_sslcert_validation,
-        announcement_handler=announce,
-    )
+    config = APIConfig(skip_sslcert_validation=skip_sslcert_validation)
     set_config(config)
 
     output_mode = OutputMode(output)

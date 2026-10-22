@@ -25,8 +25,8 @@ from ai.backend.manager.models.rbac_models.role.searchable_fields import (
 )
 from ai.backend.manager.models.rbac_models.role.updaters import RoleUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.types import OptionalState, TriState
 
 __all__ = ("RoleAdapter",)

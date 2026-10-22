@@ -5,8 +5,9 @@ from collections.abc import Sequence
 from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
+    RouteData,
     RouteHandlerCategory,
     RouteHealthStatus,
     RouteStatus,
@@ -14,13 +15,12 @@ from ai.backend.manager.data.deployment.types import (
     RouteTargetStatuses,
 )
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResult
 
 from .base import RouteHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class ServiceDiscoverySyncHandler(RouteHandler):
@@ -76,8 +76,6 @@ class ServiceDiscoverySyncHandler(RouteHandler):
     @override
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute service discovery synchronization for healthy routes."""
-        log.debug("Syncing {} healthy routes to service discovery", len(routes))
-
         # Execute service discovery sync logic via executor
         return await self._route_executor.sync_service_discovery(routes)
 
@@ -88,18 +86,16 @@ class ServiceDiscoverySyncHandler(RouteHandler):
         failed_count = len(result.errors)
 
         if failed_count > 0:
-            log.warning(
-                "Service discovery sync complete: {} synced, {} failed",
-                synced_count,
-                failed_count,
+            log.debug(
+                "service discovery synced",
+                success_count=synced_count,
+                failure_count=failed_count,
             )
-
-            # Log details of failed syncs
             for error in result.errors:
                 log.warning(
-                    "Failed to sync route {} to service discovery: {}",
-                    error.route_info.route_id,
-                    error.reason,
+                    "route service discovery sync failed",
+                    route_id=error.route_info.route_id,
+                    failure_reason=error.reason,
                 )
         else:
-            log.trace("Successfully synced {} routes to service discovery", synced_count)
+            log.trace("service discovery synced", success_count=synced_count)

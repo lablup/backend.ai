@@ -82,8 +82,8 @@ from ai.backend.manager.models.resource_usage_history.searchable_fields import (
     UserUsageBucketSearchableFields,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 
 SECONDS_PER_DAY = Decimal("86400")
 

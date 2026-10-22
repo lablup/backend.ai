@@ -11,15 +11,17 @@ from uuid import UUID
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
     AccessKey,
     DefaultForUnspecified,
     ResourceSlot,
+    SessionTypes,
     SlotName,
     SlotQuantity,
     SlotTypes,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.resource_allocation.types import (
@@ -27,24 +29,27 @@ from ai.backend.manager.data.resource_allocation.types import (
     KeypairContextData,
     ResourceGroupUsageData,
     ScopeUsageData,
+    UserConcurrencyData,
 )
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.resource import (
     DomainNotFound,
     ProjectNotFound,
     ResourceGroupNotFound,
 )
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import groups
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
-from ai.backend.manager.models.resource_slot import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import groups
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
+from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.resource_preset.db_source.types import (
     AccessKeyFilter,
@@ -60,7 +65,7 @@ from ai.backend.manager.repositories.resource_slot.types import (
     subtract_quantities,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourceAllocationDBSource:
@@ -101,6 +106,26 @@ class ResourceAllocationDBSource:
                     "total_resource_slots": row.total_resource_slots,
                     "default_for_unspecified": row.default_for_unspecified,
                 },
+            )
+
+    async def get_user_concurrency(self, user_id: UserID) -> UserConcurrencyData:
+        """Count the user's active sessions with the scheduler's concurrency-check conditions."""
+        is_private = SessionRow.session_type.in_(SessionTypes.private_types())
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            row = (
+                await db_sess.execute(
+                    sa.select(
+                        sa.func.count().filter(~is_private).label("session_count"),
+                        sa.func.count().filter(is_private).label("private_session_count"),
+                    ).where(
+                        SessionRow.user_uuid == user_id,
+                        SessionRow.status.in_(SessionStatus.resource_occupied_statuses()),
+                    )
+                )
+            ).one()
+            return UserConcurrencyData(
+                session_count=row.session_count,
+                private_session_count=row.private_session_count,
             )
 
     async def get_keypair_usage(

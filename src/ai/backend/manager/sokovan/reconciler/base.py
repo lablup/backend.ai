@@ -182,6 +182,11 @@ class ReconcilerStageRunner(ABC):
 
     @property
     @abstractmethod
+    def handler_name(self) -> str:
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
     def lock_id(self) -> LockID | None:
         """Lock to acquire before running, or None."""
         raise NotImplementedError
@@ -218,6 +223,11 @@ class ReconcilerStage[
         self._source = source
         self._applier = applier
         self._metadata = metadata
+
+    @property
+    @override
+    def handler_name(self) -> str:
+        return self._metadata.name
 
     @property
     @override

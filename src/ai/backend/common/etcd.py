@@ -10,6 +10,7 @@ using callbacks in separate threads.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import enum
 import functools
 import logging
@@ -17,6 +18,8 @@ from abc import ABC, abstractmethod
 from collections import ChainMap, namedtuple
 from collections.abc import (
     AsyncGenerator,
+    AsyncIterator,
+    Awaitable,
     Callable,
     Iterable,
     Mapping,
@@ -57,7 +60,7 @@ from etcd_client import (
 )
 
 from ai.backend.common.data.config.types import EtcdConfigData
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .types import HostPortPair, QueueSentinel
 
@@ -69,7 +72,7 @@ __all__ = (
 
 Event = namedtuple("Event", "key event value")
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ConfigScopes(enum.Enum):
@@ -214,6 +217,64 @@ class AbstractKVStore(ABC):
         pass
 
     @abstractmethod
+    async def put_if_absent(
+        self,
+        key: str,
+        val: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        pass
+
+    @abstractmethod
+    async def compare_and_put(
+        self,
+        key: str,
+        val: str,
+        *,
+        expected: str | None,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        pass
+
+    @abstractmethod
+    async def compare_and_delete(
+        self,
+        key: str,
+        expected: str,
+        *,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        pass
+
+    @abstractmethod
+    async def compare_and_replace_prefixes(
+        self,
+        replacements: Mapping[str, NestedStrKeyedMapping],
+        *,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        pass
+
+    @abstractmethod
+    async def delete_if_value(
+        self,
+        key: str,
+        expected: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        pass
+
+    @abstractmethod
     async def delete(
         self,
         key: str,
@@ -275,6 +336,9 @@ class AbstractKVStore(ABC):
 class AsyncEtcd(AbstractKVStore):
     etcd: EtcdClient
     _connect_options: ConnectOptions | None
+    _request_options: ConnectOptions
+    _connection: EtcdClient | None
+    _communicator: EtcdCommunicator | None
 
     def __init__(
         self,
@@ -286,6 +350,9 @@ class AsyncEtcd(AbstractKVStore):
         encoding: str = "utf-8",
         watch_reconnect_intvl: float = 0.5,
         watch_reconnect_max_intvl: float = 30.0,
+        request_timeout: float = 5.0,
+        request_retries: int = 3,
+        request_retry_intvl: float = 0.05,
     ) -> None:
         self.scope_prefix_map = t.Dict({
             t.Key(ConfigScopes.GLOBAL): t.String(allow_blank=True),
@@ -299,23 +366,34 @@ class AsyncEtcd(AbstractKVStore):
             )
         else:
             self._connect_options = None
+        self._request_options = (self._connect_options or ConnectOptions()).with_timeout(
+            request_timeout
+        )
+        self._connection = None
+        self._communicator = None
 
         self.ns = namespace
         if isinstance(addrs, HostPortPair):
             # Make it plural.
             addrs = [addrs]
         log.debug(
-            'using etcd cluster at [{}] with namespace "{}"',
-            ", ".join(str(addr) for addr in addrs),
-            namespace,
+            "etcd cluster configured",
+            etcd_addrs=", ".join(str(addr) for addr in addrs),
+            namespace=namespace,
         )
         self.encoding = encoding
         self.watch_reconnect_intvl = watch_reconnect_intvl
         self.watch_reconnect_max_intvl = watch_reconnect_max_intvl
+        self.request_retries = request_retries
+        self.request_retry_intvl = request_retry_intvl
         self.etcd = EtcdClient(
             [f"http://{addr.host}:{addr.port}" for addr in addrs],
             connect_options=self._connect_options,
         )
+
+    def _should_rewatch(self, e: GRPCStatusError) -> bool:
+        """A watch stream cut by a lost connection ends with ``UNAVAILABLE`` or ``UNKNOWN``."""
+        return e.args[0]["code"] in (GRPCStatusCode.Unavailable, GRPCStatusCode.Unknown)
 
     def _calc_watch_reconnect_delay(self, attempt: int) -> float:
         """Calculate exponential backoff delay for watch reconnection.
@@ -353,13 +431,14 @@ class AsyncEtcd(AbstractKVStore):
         return cls(etcd_addrs, namespace, scope_prefix_map, credentials=credentials)
 
     async def open(self) -> None:
-        await self.etcd.__aenter__()
+        self._connection = self.etcd.connect(self._request_options)
+        self._communicator = await self._connection.__aenter__()
 
     async def close(self) -> None:
-        await self.etcd.__aexit__(None, None, None)
+        await self.__aexit__(None, None, None)
 
     async def __aenter__(self) -> Self:
-        await self.etcd.__aenter__()
+        await self.open()
         return self
 
     async def __aexit__(
@@ -368,7 +447,51 @@ class AsyncEtcd(AbstractKVStore):
         exc_val: BaseException | None,
         exc_tb: TracebackType | None,
     ) -> bool | None:
-        return cast(bool | None, await self.etcd.__aexit__(exc_type, exc_val, exc_tb))
+        connection = self._connection
+        if connection is None:
+            return None
+        self._connection = None
+        self._communicator = None
+        return cast(bool | None, await connection.__aexit__(exc_type, exc_val, exc_tb))
+
+    @contextlib.asynccontextmanager
+    async def _connect(self) -> AsyncIterator[EtcdCommunicator]:
+        """The connection opened by :meth:`open`, or a new one per call when not opened."""
+        if self._communicator is not None:
+            yield self._communicator
+            return
+        async with self.etcd.connect(self._request_options) as communicator:
+            yield communicator
+
+    def _should_retry(self, e: GRPCStatusError, *, conditional: bool) -> bool:
+        """A conditional txn is retried only when it failed before reaching a server."""
+        err_detail = e.args[0]
+        if err_detail["code"] != GRPCStatusCode.Unavailable:
+            return False
+        return not conditional or err_detail.get("message") == "tcp connect error"
+
+    async def _request(
+        self,
+        request: Callable[[EtcdCommunicator], Awaitable[R]],
+        *,
+        conditional: bool = False,
+    ) -> R:
+        """Run ``request``, resending it up to ``request_retries`` times on ``UNAVAILABLE``.
+
+        Set ``conditional`` for a txn whose result changes once it has applied."""
+        attempt = 0
+        while True:
+            try:
+                async with self._connect() as communicator:
+                    return await request(communicator)
+            except GRPCStatusError as e:
+                if attempt >= self.request_retries or not self._should_retry(
+                    e, conditional=conditional
+                ):
+                    raise
+                attempt += 1
+                log.debug("etcd request unavailable, retrying", retry_count=attempt)
+                await asyncio.sleep(self.request_retry_intvl * (2 ** (attempt - 1)))
 
     async def ping(self) -> None:
         """
@@ -423,10 +546,11 @@ class AsyncEtcd(AbstractKVStore):
         """
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
-        async with self.etcd.connect() as communicator:
-            await communicator.put(
+        await self._request(
+            lambda communicator: communicator.put(
                 mangled_key.encode(self.encoding), str(val).encode(self.encoding)
             )
+        )
 
     @override
     async def put_prefix(
@@ -459,8 +583,11 @@ class AsyncEtcd(AbstractKVStore):
                 )
             )
 
-        async with self.etcd.connect() as communicator:
-            await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
+        await self._request(
+            lambda communicator: communicator.txn(
+                EtcdTransactionAction().and_then(actions).or_else([])
+            )
+        )
 
     @override
     async def put_dict(
@@ -491,8 +618,11 @@ class AsyncEtcd(AbstractKVStore):
                 )
             )
 
-        async with self.etcd.connect() as communicator:
-            await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
+        await self._request(
+            lambda communicator: communicator.txn(
+                EtcdTransactionAction().and_then(actions).or_else([])
+            )
+        )
 
     async def atomic_replace_prefixes(
         self,
@@ -521,26 +651,65 @@ class AsyncEtcd(AbstractKVStore):
         """
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
 
-        new_pairs: dict[str, str] = {}
-        existing_keys: set[str] = set()
-        async with self.etcd.connect() as communicator:
-            for prefix, dict_obj in replacements.items():
-                mangled_prefix = self._mangle_key(f"{_slash(scope_prefix)}{prefix}")
-                pairs = await communicator.get_prefix(mangled_prefix.encode(self.encoding))
-                for raw_key, _ in pairs:
-                    existing_keys.add(bytes(raw_key).decode(self.encoding))
-                for k, v in _flatten_nested_dict(prefix, dict_obj).items():
-                    new_pairs[self._mangle_key(f"{_slash(scope_prefix)}{k}")] = str(v)
-
-            stale_keys = existing_keys - new_pairs.keys()
-            actions = [TxnOp.delete(k.encode(self.encoding)) for k in stale_keys]
-            actions.extend(
-                TxnOp.put(k.encode(self.encoding), v.encode(self.encoding))
-                for k, v in new_pairs.items()
-            )
+        async def _replace(communicator: EtcdCommunicator) -> None:
+            actions = await self._replacement_ops(communicator, replacements, scope_prefix)
             if not actions:
                 return
             await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
+
+        await self._request(_replace)
+
+    @override
+    async def compare_and_replace_prefixes(
+        self,
+        replacements: Mapping[str, NestedStrKeyedMapping],
+        *,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        """Replace the subtrees as :meth:`atomic_replace_prefixes` does, only if every guard key
+        holds its given value (``None``: absent) when the transaction commits.
+
+        :return: ``True`` if the replacement landed, ``False`` if any guard failed."""
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        conditions = [
+            self._holds(self._mangle_key(f"{_slash(scope_prefix)}{guard_key}"), guard_val)
+            for guard_key, guard_val in guards.items()
+        ]
+
+        async def _replace(communicator: EtcdCommunicator) -> bool:
+            actions = await self._replacement_ops(communicator, replacements, scope_prefix)
+            result = await communicator.txn(
+                EtcdTransactionAction().when(conditions).and_then(actions).or_else([])
+            )
+            return cast(bool, result.succeeded())
+
+        return await self._request(_replace, conditional=True)
+
+    async def _replacement_ops(
+        self,
+        communicator: EtcdCommunicator,
+        replacements: Mapping[str, NestedStrKeyedMapping],
+        scope_prefix: str,
+    ) -> list[TxnOp]:
+        new_pairs: dict[str, str] = {}
+        existing_keys: set[str] = set()
+        for prefix, dict_obj in replacements.items():
+            mangled_prefix = self._mangle_key(f"{_slash(scope_prefix)}{prefix}")
+            pairs = await communicator.get_prefix(mangled_prefix.encode(self.encoding))
+            for raw_key, _ in pairs:
+                existing_keys.add(bytes(raw_key).decode(self.encoding))
+            for k, v in _flatten_nested_dict(prefix, dict_obj).items():
+                new_pairs[self._mangle_key(f"{_slash(scope_prefix)}{k}")] = str(v)
+
+        stale_keys = existing_keys - new_pairs.keys()
+        actions = [TxnOp.delete(k.encode(self.encoding)) for k in stale_keys]
+        actions.extend(
+            TxnOp.put(k.encode(self.encoding), v.encode(self.encoding))
+            for k, v in new_pairs.items()
+        )
+        return actions
 
     @override
     async def get(
@@ -580,14 +749,16 @@ class AsyncEtcd(AbstractKVStore):
         else:
             raise ValueError("Invalid scope prefix value")
 
-        async with self.etcd.connect() as communicator:
+        async def _get(communicator: EtcdCommunicator) -> str | None:
             for scope_prefix in scope_prefixes:
                 value = await communicator.get(
                     self._mangle_key(f"{_slash(scope_prefix)}{key}").encode(self.encoding)
                 )
                 if value is not None:
                     return bytes(value).decode(self.encoding)
-        return None
+            return None
+
+        return await self._request(_get)
 
     @override
     async def get_prefix(
@@ -650,8 +821,9 @@ class AsyncEtcd(AbstractKVStore):
             scope_prefixes = [_scope_prefix_map[ConfigScopes.GLOBAL]]
         else:
             raise ValueError("Invalid scope prefix value")
-        pair_sets: list[list[tuple[str, str]]] = []
-        async with self.etcd.connect() as communicator:
+
+        async def _get_prefix(communicator: EtcdCommunicator) -> list[list[tuple[str, str]]]:
+            pair_sets: list[list[tuple[str, str]]] = []
             for scope_prefix in scope_prefixes:
                 mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")
                 values = await communicator.get_prefix(mangled_key_prefix.encode(self.encoding))
@@ -662,6 +834,9 @@ class AsyncEtcd(AbstractKVStore):
                     )
                     for k, v in values
                 ])
+            return pair_sets
+
+        pair_sets = await self._request(_get_prefix)
 
         pair_sets = [sorted(pairs, key=lambda x: x[0]) for pairs in pair_sets]
 
@@ -670,6 +845,26 @@ class AsyncEtcd(AbstractKVStore):
             for scope_prefix, pairs in zip(scope_prefixes, pair_sets, strict=True)
         ]
         return ChainMap(*configs)
+
+    async def iter_prefix(
+        self,
+        key_prefix: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> AsyncGenerator[tuple[str, str], None]:
+        """Every key under one scope's prefix with its raw value, in key order, from one read."""
+        scope_prefix = _slash(self._merge_scope_prefix_map(scope_prefix_map)[scope])
+        mangled_prefix = self._mangle_key(f"{scope_prefix}{key_prefix}")
+        values = await self._request(
+            lambda communicator: communicator.get_prefix(mangled_prefix.encode(self.encoding))
+        )
+        pairs = sorted(
+            (self._demangle_key(bytes(k).decode(self.encoding)), bytes(v).decode(self.encoding))
+            for k, v in values
+        )
+        for key, value in pairs:
+            yield key.removeprefix(scope_prefix), value
 
     # for legacy
     get_prefix_dict = get_prefix
@@ -687,8 +882,8 @@ class AsyncEtcd(AbstractKVStore):
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
 
-        async with self.etcd.connect() as communicator:
-            result = await communicator.txn(
+        result = await self._request(
+            lambda communicator: communicator.txn(
                 EtcdTransactionAction()
                 .when([
                     Compare.value(
@@ -701,9 +896,140 @@ class AsyncEtcd(AbstractKVStore):
                     TxnOp.put(mangled_key.encode(self.encoding), new_val.encode(self.encoding))
                 ])
                 .or_else([])
-            )
+            ),
+            conditional=True,
+        )
+        return cast(bool, result.succeeded())
 
-            return cast(bool, result.succeeded())
+    def _holds(self, mangled_key: str, value: str | None) -> Compare:
+        """The condition that ``mangled_key`` holds ``value``; ``None`` means it is absent."""
+        if value is None:
+            return Compare.create_revision(mangled_key.encode(self.encoding), CompareOp.EQUAL, 0)
+        return Compare.value(
+            mangled_key.encode(self.encoding), CompareOp.EQUAL, value.encode(self.encoding)
+        )
+
+    @override
+    async def put_if_absent(
+        self,
+        key: str,
+        val: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        """Atomically put a single key only if it does not exist yet.
+
+        :return: ``True`` if this call created the key, ``False`` if it already existed."""
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
+
+        result = await self._request(
+            lambda communicator: communicator.txn(
+                EtcdTransactionAction()
+                .when([self._holds(mangled_key, None)])
+                .and_then([TxnOp.put(mangled_key.encode(self.encoding), val.encode(self.encoding))])
+                .or_else([])
+            ),
+            conditional=True,
+        )
+        return cast(bool, result.succeeded())
+
+    @override
+    async def compare_and_put(
+        self,
+        key: str,
+        val: str,
+        *,
+        expected: str | None,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        """Atomically write ``key`` if it holds ``expected`` (``None``: absent) and every guard
+        key holds its given bytes (``None``: absent). Guards are only read, e.g. the owning record.
+
+        :return: ``True`` if the write landed, ``False`` if any condition failed."""
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
+
+        conditions = [self._holds(mangled_key, expected)]
+        conditions.extend(
+            self._holds(self._mangle_key(f"{_slash(scope_prefix)}{guard_key}"), guard_val)
+            for guard_key, guard_val in guards.items()
+        )
+
+        result = await self._request(
+            lambda communicator: communicator.txn(
+                EtcdTransactionAction()
+                .when(conditions)
+                .and_then([TxnOp.put(mangled_key.encode(self.encoding), val.encode(self.encoding))])
+                .or_else([])
+            ),
+            conditional=True,
+        )
+        return cast(bool, result.succeeded())
+
+    @override
+    async def compare_and_delete(
+        self,
+        key: str,
+        expected: str,
+        *,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        """Atomically delete ``key`` if it holds ``expected`` and every guard key holds its given
+        bytes (``None``: absent). The delete counterpart of :meth:`compare_and_put`.
+
+        :return: ``True`` if this call deleted the key, ``False`` if any condition failed."""
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
+
+        conditions = [self._holds(mangled_key, expected)]
+        conditions.extend(
+            self._holds(self._mangle_key(f"{_slash(scope_prefix)}{guard_key}"), guard_val)
+            for guard_key, guard_val in guards.items()
+        )
+
+        result = await self._request(
+            lambda communicator: communicator.txn(
+                EtcdTransactionAction()
+                .when(conditions)
+                .and_then([TxnOp.delete(mangled_key.encode(self.encoding))])
+                .or_else([])
+            ),
+            conditional=True,
+        )
+        return cast(bool, result.succeeded())
+
+    @override
+    async def delete_if_value(
+        self,
+        key: str,
+        expected: str,
+        *,
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        """Atomically delete a single key only if it still holds ``expected``.
+
+        :return: ``True`` if this call deleted the key, ``False`` if it held something else
+            (or nothing)."""
+        scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
+        mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
+
+        result = await self._request(
+            lambda communicator: communicator.txn(
+                EtcdTransactionAction()
+                .when([self._holds(mangled_key, expected)])
+                .and_then([TxnOp.delete(mangled_key.encode(self.encoding))])
+                .or_else([])
+            ),
+            conditional=True,
+        )
+        return cast(bool, result.succeeded())
 
     @override
     async def delete(
@@ -715,8 +1041,9 @@ class AsyncEtcd(AbstractKVStore):
     ) -> None:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key = self._mangle_key(f"{_slash(scope_prefix)}{key}")
-        async with self.etcd.connect() as communicator:
-            await communicator.delete(mangled_key.encode(self.encoding))
+        await self._request(
+            lambda communicator: communicator.delete(mangled_key.encode(self.encoding))
+        )
 
     @override
     async def delete_multi(
@@ -727,15 +1054,15 @@ class AsyncEtcd(AbstractKVStore):
         scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
     ) -> None:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
-        async with self.etcd.connect() as communicator:
-            actions = []
-            for k in keys:
-                actions.append(
-                    TxnOp.delete(
-                        self._mangle_key(f"{_slash(scope_prefix)}{k}").encode(self.encoding)
-                    )
-                )
-            await communicator.txn(EtcdTransactionAction().and_then(actions).or_else([]))
+        actions = [
+            TxnOp.delete(self._mangle_key(f"{_slash(scope_prefix)}{k}").encode(self.encoding))
+            for k in keys
+        ]
+        await self._request(
+            lambda communicator: communicator.txn(
+                EtcdTransactionAction().and_then(actions).or_else([])
+            )
+        )
 
     @override
     async def delete_prefix(
@@ -747,8 +1074,11 @@ class AsyncEtcd(AbstractKVStore):
     ) -> None:
         scope_prefix = self._merge_scope_prefix_map(scope_prefix_map)[scope]
         mangled_key_prefix = self._mangle_key(f"{_slash(scope_prefix)}{key_prefix}")
-        async with self.etcd.connect() as communicator:
-            await communicator.delete_prefix(mangled_key_prefix.encode(self.encoding))
+        await self._request(
+            lambda communicator: communicator.delete_prefix(
+                mangled_key_prefix.encode(self.encoding)
+            )
+        )
 
     async def _watch_impl(
         self,
@@ -759,7 +1089,7 @@ class AsyncEtcd(AbstractKVStore):
         wait_timeout: float | None = None,
     ) -> AsyncGenerator[QueueSentinel | Event, None]:
         try:
-            async with self.etcd.connect() as communicator:
+            async with self._connect() as communicator:
                 iterator = iterator_factory(communicator)
 
                 async for ev in iterator:
@@ -811,26 +1141,25 @@ class AsyncEtcd(AbstractKVStore):
                 ):
                     if retry_count > 0:
                         log.info(
-                            "watch(): successfully reconnected to Etcd server after %d retries",
-                            retry_count,
+                            "etcd watch reconnected",
+                            watch_type="key",
+                            retry_count=retry_count,
                         )
                         retry_count = 0
                     yield ev
                 ended_without_error = True
             except GRPCStatusError as e:
-                err_detail = e.args[0]
-
-                if err_detail["code"] == GRPCStatusCode.Unavailable:
+                if self._should_rewatch(e):
                     retry_count += 1
                     delay = self._calc_watch_reconnect_delay(retry_count)
                     if retry_count == 1:
-                        log.warning("watch(): error while connecting to Etcd server, retrying...")
+                        log.warning("etcd watch connection failed, retrying", watch_type="key")
                     else:
                         log.debug(
-                            "watch(): still unable to connect to Etcd server (attempt %d),"
-                            " next retry in %.1fs",
-                            retry_count,
-                            delay,
+                            "etcd watch still unable to connect",
+                            watch_type="key",
+                            retry_count=retry_count,
+                            delay_sec=delay,
                         )
                     await asyncio.sleep(delay)
                     ended_without_error = False
@@ -869,28 +1198,25 @@ class AsyncEtcd(AbstractKVStore):
                 ):
                     if retry_count > 0:
                         log.info(
-                            "watch_prefix(): successfully reconnected to Etcd server after %d retries",
-                            retry_count,
+                            "etcd watch reconnected",
+                            watch_type="prefix",
+                            retry_count=retry_count,
                         )
                         retry_count = 0
                     yield ev
                 ended_without_error = True
             except GRPCStatusError as e:
-                err_detail = e.args[0]
-
-                if err_detail["code"] == GRPCStatusCode.Unavailable:
+                if self._should_rewatch(e):
                     retry_count += 1
                     delay = self._calc_watch_reconnect_delay(retry_count)
                     if retry_count == 1:
-                        log.warning(
-                            "watch_prefix(): error while connecting to Etcd server, retrying..."
-                        )
+                        log.warning("etcd watch connection failed, retrying", watch_type="prefix")
                     else:
                         log.debug(
-                            "watch_prefix(): still unable to connect to Etcd server (attempt %d),"
-                            " next retry in %.1fs",
-                            retry_count,
-                            delay,
+                            "etcd watch still unable to connect",
+                            watch_type="prefix",
+                            retry_count=retry_count,
+                            delay_sec=delay,
                         )
                     await asyncio.sleep(delay)
                     ended_without_error = False

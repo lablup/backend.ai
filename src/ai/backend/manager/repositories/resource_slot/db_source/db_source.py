@@ -24,13 +24,13 @@ from ai.backend.manager.errors.resource_slot import (
     AgentResourceNotFound,
     ResourceAllocationNotFound,
 )
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.resource_slot import (
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import sql_json_merge
 
 if TYPE_CHECKING:

@@ -13,13 +13,12 @@ from ai.backend.common.exception import (
     FailedToGetMetric,
     PrometheusConnectionError,
 )
-from ai.backend.manager.clients.prometheus import (
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
+from ai.backend.manager.clients.prometheus.fixed_query_builder import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
-    LabelMatcher,
-    MetricPreset,
-    PrometheusClient,
 )
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
 
 
 def create_mock_response(

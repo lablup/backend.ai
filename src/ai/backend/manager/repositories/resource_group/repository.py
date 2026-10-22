@@ -33,8 +33,7 @@ from ai.backend.manager.models.resource_group.searchers import ResourceGroupSear
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-
-from .db_source import ResourceGroupDBSource
+from ai.backend.manager.repositories.resource_group.db_source.db_source import ResourceGroupDBSource
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

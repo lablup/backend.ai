@@ -12,7 +12,7 @@ import shutil
 import tempfile
 import uuid
 from abc import ABCMeta, abstractmethod
-from collections.abc import AsyncIterator, Iterator, Sequence
+from collections.abc import AsyncIterator, Callable, Iterator, Sequence
 from contextlib import asynccontextmanager as actxmgr
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -33,7 +33,6 @@ from textual.app import App
 from textual.containers import Vertical
 from textual.widgets import ProgressBar
 
-from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import HostPortPair
 
@@ -195,7 +194,15 @@ class Context(metaclass=ABCMeta):
 
     async def _configure_mock_accelerator(self, accelerator: Accelerator) -> None:
         """
-        cp "configs/accelerator/mock-accelerator.toml" mock-accelerator.toml
+        Copy the matching mock-accelerator config template into the install
+        directory as ``mock-accelerator.toml``.
+
+        NOTE: these templates live only in the source tree
+        (``configs/accelerator/`` at the repository root) — they are NOT
+        bundled into the ``ai.backend.install.configs`` package resources.
+        The copy therefore only succeeds when running from a source checkout
+        (DEVELOP mode) or when the operator has placed the file at the same
+        path relative to the installer's working directory.
         """
         mapping = {
             Accelerator.CUDA_MOCK: "configs/accelerator/mock-accelerator.toml",
@@ -203,11 +210,19 @@ class Context(metaclass=ABCMeta):
             Accelerator.ROCM_MOCK: "configs/accelerator/rocm-mock.toml",
         }
 
-        src = mapping.get(accelerator)
-        if not src:
+        relpath = mapping.get(accelerator)
+        if not relpath:
             return
 
-        dst = Path("mock-accelerator.toml")
+        src = self.cwd / relpath
+        if not src.exists():
+            raise RuntimeError(
+                f"Mock accelerator config template not found: {src} — these "
+                "templates ship only in the source tree; place the file at "
+                "that path relative to the installer's working directory and "
+                "retry."
+            )
+        dst = self.install_info.base_path / "mock-accelerator.toml"
         self.log_header(f"Copying accelerator config: {src} -> {dst}")
         shutil.copy(src, dst)
 
@@ -299,7 +314,17 @@ class Context(metaclass=ABCMeta):
         return await self.run_exec(["sh", "-c", script], **kwargs)
 
     def copy_config(self, template_name: str) -> Path:
-        raise NotImplementedError
+        """Copy a bundled config template into the install directory
+        (``install_info.base_path``: the source checkout in DEVELOP mode, the
+        target path in PACKAGE/DOCKER modes), preserving sub-paths."""
+        with self.resource_path("ai.backend.install.configs", template_name) as src_path:
+            dst_path = self.install_info.base_path / template_name
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
+            if src_path.is_dir():
+                shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
+            else:
+                shutil.copy(src_path, dst_path)
+        return dst_path
 
     @staticmethod
     def sed_in_place(path: Path, pattern: str | re.Pattern[str], replacement: str) -> None:
@@ -494,7 +519,10 @@ class Context(metaclass=ABCMeta):
 
     async def install_halfstack(self) -> None:
         self.log_header("Installing halfstack...")
+        await self._prepare_halfstack_files()
+        await self._start_halfstack()
 
+    async def _prepare_halfstack_files(self) -> None:
         base_path = self.install_info.base_path
 
         # Copy gateway config from package resources
@@ -553,6 +581,9 @@ class Context(metaclass=ABCMeta):
 
             # Construct URL for the release version. Release tags carry no "v"
             # prefix (e.g. "26.4.4rc9"), matching _fetch_package's download URL.
+            # NOTE: this uses the installer's own __version__, whereas the
+            # DOCKER-mode service images pin dist_info.version — the two only
+            # diverge when a DIST-INFO file overrides the version.
             version_tag = __version__
             url = (
                 f"https://raw.githubusercontent.com/lablup/backend.ai/{version_tag}/"
@@ -593,7 +624,8 @@ class Context(metaclass=ABCMeta):
                 ("8120:2379", f"{self.install_info.halfstack_config.etcd_addr[0].bind.port}:2379"),
             ],
         )
-        sudo = " ".join(self.docker_sudo)
+
+    def _halfstack_profile_args(self) -> list[str]:
         profile_args_list: list[str] = []
         if self.install_variable.enable_observability:
             # observability profile is a superset of telemetry; no need to add both.
@@ -602,7 +634,16 @@ class Context(metaclass=ABCMeta):
             profile_args_list.append("--profile telemetry")
         if self.install_variable.enable_storage:
             profile_args_list.append("--profile storage")
-        profile_args = " ".join(profile_args_list)
+        return profile_args_list
+
+    async def _start_halfstack(self) -> None:
+        """
+        Pull and start the halfstack containers from the prepared compose
+        file. Overridden by install modes that run the halfstack as part of a
+        larger compose project (see DockerContext).
+        """
+        sudo = " ".join(self.docker_sudo)
+        profile_args = " ".join(self._halfstack_profile_args())
         compose_file_arg = "-f docker-compose.halfstack.current.yml"
         await self.run_shell(
             f"""
@@ -614,48 +655,89 @@ class Context(metaclass=ABCMeta):
             cwd=self.install_info.base_path,
         )
 
-    async def load_fixtures(self) -> None:
-        with self.resource_path("ai.backend.install.fixtures", "example-users.json") as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+    async def load_seeds(self) -> None:
+        with (
+            self.resource_path("ai.backend.install.seeds", "manager") as manager_seeds,
+            self.resource_path("ai.backend.install.seeds", "examples/manager") as example_seeds,
+        ):
+            await self.run_manager_cli([
+                "mgr",
+                "seed",
+                "apply",
+                str(manager_seeds),
+                str(example_seeds),
+            ])
+            # Rows that carry this installation's addresses and secrets, rewritten on a re-run.
+            with tempfile.TemporaryDirectory() as tmpdir:
+                self.write_install_seeds(manager_seeds, Path(tmpdir))
+                await self.run_manager_cli(["mgr", "seed", "apply", "--overwrite", tmpdir])
+            await self.run_manager_cli([
+                "mgr",
+                "permissions",
+                "provision",
+                "--seeds",
+                str(manager_seeds),
+            ])
 
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-container-registries-harbor.json"
-        ) as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+    def read_seed_items(self, root: Path, kind: str) -> list[dict[str, Any]]:
+        yaml = YAML(typ="safe")
+        items: list[dict[str, Any]] = []
+        for path in sorted(root.rglob("*.yaml")):
+            document = yaml.load(path.read_text(encoding="utf8"))
+            if isinstance(document, dict) and document.get("kind") == kind:
+                items.extend(document["items"])
+        return items
 
-        with self.resource_path("ai.backend.install.fixtures", "example-keypairs.json") as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-resource-slot-types.json"
-        ) as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-resource-presets.json"
-        ) as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-runtime-variants.json"
-        ) as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-runtime-variant-presets.json"
-        ) as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with self.resource_path("ai.backend.install.fixtures", "example-role-presets.json") as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        await self.run_manager_cli(["mgr", "permissions", "provision"])
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-prometheus-query-preset-categories.json"
-        ) as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-prometheus-query-presets.json"
-        ) as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-retention-policies.json"
-        ) as path:
-            await self.run_manager_cli(["mgr", "fixture", "populate", str(path)])
+    def write_seed_file(self, path: Path, kind: str, items: Sequence[dict[str, Any]]) -> None:
+        with path.open("w", encoding="utf8") as fp:
+            YAML(typ="safe").dump({"kind": kind, "version": 1, "items": list(items)}, fp)
+
+    def write_install_seeds(self, manager_seeds: Path, out_dir: Path) -> None:
+        """Write the default resource group pointed at the app-proxy coordinator, and the SFTP
+        resource group allowed to the default domain when ``--with-sftp-agent`` is given."""
+        service = self.install_info.service_config
+        wsproxy_addr = (
+            f"http://{service.appproxy_coordinator_addr.face.host}"
+            f":{service.appproxy_coordinator_addr.face.port}"
+        )
+        resource_groups = [
+            {
+                **item,
+                "wsproxy_addr": wsproxy_addr,
+                "wsproxy_api_token": service.appproxy_api_secret,
+            }
+            for item in self.read_seed_items(manager_seeds, "resource_group")
+            if item["name"] == "default"
+        ]
+        sftp = service.sftp_agent
+        if sftp is not None:
+            self.log_header(f"Registering '{sftp.scaling_group}' scaling group for SFTP agent...")
+            resource_group_id = str(
+                uuid.uuid5(uuid.NAMESPACE_URL, f"backend.ai/scaling-group/{sftp.scaling_group}")
+            )
+            default_domain_id = next(
+                item["id"]
+                for item in self.read_seed_items(manager_seeds, "domain")
+                if item["name"] == "default"
+            )
+            resource_groups.append({
+                "id": resource_group_id,
+                "name": sftp.scaling_group,
+                "description": "Scaling group dedicated to SFTP upload sessions",
+                "is_active": True,
+                "driver": "static",
+                "driver_opts": {},
+                "scheduler": "fifo",
+                "scheduler_opts": {},
+                "wsproxy_addr": wsproxy_addr,
+                "wsproxy_api_token": service.appproxy_api_secret,
+            })
+            self.write_seed_file(
+                out_dir / "resource_group_for_domain.yaml",
+                "resource_group_for_domain",
+                [{"domain_id": default_domain_id, "resource_group_id": resource_group_id}],
+            )
+        self.write_seed_file(out_dir / "resource_group.yaml", "resource_group", resource_groups)
 
     async def check_prerequisites(self) -> None:
         self.os_info = await detect_os()
@@ -837,9 +919,7 @@ class Context(metaclass=ABCMeta):
                 ),
             ],
         )
-        Path(self.install_info.service_config.agent_var_base_path).mkdir(
-            parents=True, exist_ok=True
-        )
+        self._ensure_agent_var_base_path()
         if accelerator is not None:
             if accelerator == Accelerator.CUDA:
                 plugin_list = ['"ai.backend.accelerator.cuda_open"']
@@ -972,6 +1052,16 @@ class Context(metaclass=ABCMeta):
                     ),
                 ),
             ],
+        )
+
+    def _ensure_agent_var_base_path(self) -> None:
+        """
+        Create the agent's var-base-path host-side. Overridden to a no-op by
+        install modes whose var-base-path lives under a root-owned system
+        path the unprivileged installer cannot (and need not) create.
+        """
+        Path(self.install_info.service_config.agent_var_base_path).mkdir(
+            parents=True, exist_ok=True
         )
 
     async def configure_storage_proxy(self) -> None:
@@ -1190,11 +1280,19 @@ class Context(metaclass=ABCMeta):
         # resource path), so this must run through the coordinator CLI -- the
         # installer's own interpreter cannot import them in PACKAGE mode.
         alembic_ini = self.copy_config("alembic-appproxy.ini")
+        self._fixup_appproxy_alembic_ini(alembic_ini)
         await self.run_appproxy_coordinator_cli(["schema", "oneshot", "-f", str(alembic_ini)])
         # NOTE: The "default" scaling_group's wsproxy_addr/token are set by
-        # configure_appproxy_fixture(), which runs after load_fixtures() seeds
-        # the row. Do not update scaling_groups here -- the row does not exist
-        # yet at this point in the install flow.
+        # load_seeds(). Do not update scaling_groups here -- the row does not
+        # exist yet at this point in the install flow.
+
+    def _fixup_appproxy_alembic_ini(self, alembic_ini: Path) -> None:
+        """
+        Hook for install modes whose coordinator CLI container cannot reach
+        the database at the address the copied ini carries (see the
+        DockerContext override). The default (in-place package layouts) needs
+        no rewrite.
+        """
 
     async def configure_appproxy(self) -> None:
         halfstack = self.install_info.halfstack_config
@@ -1401,154 +1499,27 @@ class Context(metaclass=ABCMeta):
         for conf in (coord_conf, worker_conf):
             self.enable_observability_in_toml(conf)
 
-    async def configure_appproxy_fixture(self) -> None:
-        self.log_header("Updating manager scaling_groups to point to appproxy coordinator...")
-
-        service = self.install_info.service_config
-        with tempfile.TemporaryDirectory() as tmpdir:
-            fixture_path = Path(tmpdir) / "fixture.json"
-            with fixture_path.open("w") as fw:
-                fw.write(
-                    json.dumps({
-                        "__mode": "update",
-                        "scaling_groups": [
-                            {
-                                "name": "default",
-                                "wsproxy_addr": f"http://{service.appproxy_coordinator_addr.face.host}:{service.appproxy_coordinator_addr.face.port}",
-                                "wsproxy_api_token": service.appproxy_api_secret,
-                            }
-                        ],
-                    })
-                )
-            await self.run_manager_cli(["mgr", "fixture", "populate", fixture_path.as_posix()])
-
-    async def configure_sftp_agent_fixture(self) -> None:
-        """
-        Register the dedicated SFTP scaling group and associate it with the
-        default domain. This is only populated when the user passed
-        ``--with-sftp-agent`` — it mirrors the ``sgroups_for_domains``
-        association in ``example-users.json`` for the default scaling group.
-        """
-        service = self.install_info.service_config
-        sftp = service.sftp_agent
-        if sftp is None:
-            return
-
-        self.log_header(f"Registering '{sftp.scaling_group}' scaling group for SFTP agent...")
-        resource_group_id = str(
-            uuid.uuid5(uuid.NAMESPACE_URL, f"backend.ai/scaling-group/{sftp.scaling_group}")
-        )
-        with self.resource_path("ai.backend.install.fixtures", "example-users.json") as user_path:
-            user_fixture = json.loads(Path(user_path).read_bytes())
-        default_domain_id = next(
-            domain["id"] for domain in user_fixture["domains"] if domain["name"] == "default"
-        )
-        default_domain_node_id = next(
-            node["id"]
-            for node in user_fixture["virtual_entities"]
-            if node["entity_type"] == "domain" and node["entity_id"] == default_domain_id
-        )
-        resource_group_node_id = str(
-            uuid.uuid5(
-                uuid.NAMESPACE_URL,
-                f"backend.ai/virtual-entity/resource_group/{resource_group_id}",
-            )
-        )
-        membership_id = str(
-            uuid.uuid5(
-                uuid.NAMESPACE_URL,
-                f"backend.ai/entity-membership/resource_group/{resource_group_id}"
-                f"/domain/{default_domain_id}",
-            )
-        )
-        with tempfile.TemporaryDirectory() as tmpdir:
-            fixture_path = Path(tmpdir) / "fixture.json"
-            with fixture_path.open("w") as fw:
-                fw.write(
-                    json.dumps({
-                        "scaling_groups": [
-                            {
-                                "id": resource_group_id,
-                                "name": sftp.scaling_group,
-                                "description": "Scaling group dedicated to SFTP upload sessions",
-                                "is_active": True,
-                                "driver": "static",
-                                "driver_opts": {},
-                                "scheduler": "fifo",
-                                "scheduler_opts": {},
-                                "wsproxy_addr": (
-                                    f"http://{service.appproxy_coordinator_addr.face.host}"
-                                    f":{service.appproxy_coordinator_addr.face.port}"
-                                ),
-                                "wsproxy_api_token": service.appproxy_api_secret,
-                            }
-                        ],
-                        "sgroups_for_domains": [
-                            {
-                                "resource_group_id": resource_group_id,
-                                "domain_id": default_domain_id,
-                            }
-                        ],
-                        "virtual_entities": [
-                            {
-                                "id": resource_group_node_id,
-                                "entity_type": "resource_group",
-                                "entity_id": resource_group_id,
-                            }
-                        ],
-                        "entity_memberships": [
-                            {
-                                "id": membership_id,
-                                "virtual_entity_id": resource_group_node_id,
-                                "member_entity_id": default_domain_node_id,
-                                "capped": True,
-                            }
-                        ],
-                        "entity_membership_caps": [
-                            {
-                                "membership_id": membership_id,
-                                "permission": int(Permission.READ),
-                                "all_fields": True,
-                            }
-                        ],
-                        "scope_bindings": [
-                            {
-                                "virtual_entity_id": resource_group_node_id,
-                                "scope_entity_id": default_domain_node_id,
-                                "permission_cap": int(Permission.READ),
-                            }
-                        ],
-                    })
-                )
-            await self.run_manager_cli(["mgr", "fixture", "populate", fixture_path.as_posix()])
-
     async def configure_client(self) -> None:
         # TODO: add an option to generate keypairs
         base_path = self.install_info.base_path
         service = self.install_info.service_config
-        with self.resource_path("ai.backend.install.fixtures", "example-users.json") as user_path:
-            current_shell = os.environ.get("SHELL", "sh")
-            user_data = json.loads(Path(user_path).read_bytes())
-        username_by_uuid = {user["uuid"]: user["username"] for user in user_data["users"]}
-        with self.resource_path(
-            "ai.backend.install.fixtures", "example-keypairs.json"
-        ) as keypair_path:
-            keypair_data = json.loads(Path(keypair_path).read_bytes())
-        for keypair in keypair_data["keypairs"]:
-            username = username_by_uuid.get(keypair["user"])
-            if username is None:
-                continue
-            with (base_path / f"env-local-{username}-api.sh").open("w") as fp:
-                print("# Directly access to the manager using API keypair (admin)", file=fp)
-                print(
-                    "export"
-                    f" BACKEND_ENDPOINT=http://{service.manager_addr.face.host}:{service.manager_addr.face.port}/",
-                    file=fp,
-                )
-                print("export BACKEND_ENDPOINT_TYPE=api", file=fp)
-                print(f"export BACKEND_ACCESS_KEY={keypair['access_key']}", file=fp)
-                print(f"export BACKEND_SECRET_KEY={keypair['secret_key']}", file=fp)
-        for user in user_data["users"]:
+        current_shell = os.environ.get("SHELL", "sh")
+        with self.resource_path("ai.backend.install.seeds", "examples/manager") as example_seeds:
+            users = self.read_seed_items(example_seeds, "user")
+        for user in users:
+            username = user["username"]
+            for keypair in user.get("keypairs", []):
+                with (base_path / f"env-local-{username}-api.sh").open("w") as fp:
+                    print("# Directly access to the manager using API keypair (admin)", file=fp)
+                    print(
+                        "export"
+                        f" BACKEND_ENDPOINT=http://{service.manager_addr.face.host}:{service.manager_addr.face.port}/",
+                        file=fp,
+                    )
+                    print("export BACKEND_ENDPOINT_TYPE=api", file=fp)
+                    print(f"export BACKEND_ACCESS_KEY={keypair['access_key']}", file=fp)
+                    print(f"export BACKEND_SECRET_KEY={keypair['secret_key']}", file=fp)
+        for user in users:
             username = user["username"]
             with (base_path / f"env-local-{username}-session.sh").open("w") as fp:
                 print(
@@ -1835,10 +1806,9 @@ class Context(metaclass=ABCMeta):
         ``container_registries`` row (with admin credentials) so it shows up
         immediately in the manager API/UI without manual registration.
 
-        The fixture uses ``uuid5(NAMESPACE_URL, harbor_url)`` for the row ID
-        so re-running the installer does not create duplicate rows — the
-        manager's fixture loader treats a matching primary key as
-        idempotent.
+        The seed uses ``uuid5(NAMESPACE_URL, harbor_url)`` for the row ID
+        so re-running the installer does not create duplicate rows — an
+        existing row is skipped by ``mgr seed apply``.
         """
         harbor_url = f"http://{harbor.hostname}:{harbor.http_port}"
         # The registry name becomes the prefix of every image canonical
@@ -1849,8 +1819,11 @@ class Context(metaclass=ABCMeta):
         registry_name = f"{harbor.hostname}:{harbor.http_port}"
         project = "library"
         registry_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{harbor_url}/{project}"))
-        fixture = {
-            "container_registries": [
+        seed_path = self.install_info.base_path / "harbor" / "container-registry-seed.yaml"
+        self.write_seed_file(
+            seed_path,
+            "container_registry",
+            [
                 {
                     "id": registry_id,
                     "registry_name": registry_name,
@@ -1861,12 +1834,10 @@ class Context(metaclass=ABCMeta):
                     "password": harbor.admin_password,
                     "ssl_verify": False,
                 }
-            ]
-        }
-        fixture_path = self.install_info.base_path / "harbor" / "container-registry-fixture.json"
-        fixture_path.write_text(json.dumps(fixture, indent=2))
+            ],
+        )
         self.log_header("Registering local Harbor as a Backend.AI container registry...")
-        await self.run_manager_cli(["mgr", "fixture", "populate", str(fixture_path)])
+        await self.run_manager_cli(["mgr", "seed", "apply", str(seed_path)])
 
     async def dump_install_info(self) -> None:
         self.log_header("Dumping the installation configs...")
@@ -1894,6 +1865,10 @@ class Context(metaclass=ABCMeta):
         )
 
     async def prepare_local_vfolder_host(self) -> None:
+        await self._prepare_local_vfolder_files()
+        await self._grant_local_vfolder_host()
+
+    async def _prepare_local_vfolder_files(self) -> None:
         service = self.install_info.service_config
         volume_root = Path(self.install_info.base_path / service.vfolder_relpath)
         volume_root.mkdir(parents=True, exist_ok=True)
@@ -1902,6 +1877,8 @@ class Context(metaclass=ABCMeta):
         scratch_root = Path(self.install_info.base_path / "scratches")
         scratch_root.mkdir(parents=True, exist_ok=True)
         await asyncio.sleep(0)
+
+    async def _grant_local_vfolder_host(self) -> None:
         async with aiotools.closing_async(await self.get_db_connection()) as conn:
             default_vfolder_host_perms = [
                 "create-vfolder",
@@ -2050,17 +2027,6 @@ class DevContext(Context):
         )
 
     @override
-    def copy_config(self, template_name: str) -> Path:
-        with self.resource_path("ai.backend.install.configs", template_name) as src_path:
-            dst_path = Path.cwd() / template_name
-            dst_path.parent.mkdir(parents=True, exist_ok=True)
-            if src_path.is_dir():
-                shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
-            else:
-                shutil.copy(src_path, dst_path)
-        return dst_path
-
-    @override
     async def check_prerequisites(self) -> None:
         await super().check_prerequisites()
         await install_git_lfs(self)
@@ -2099,15 +2065,11 @@ class DevContext(Context):
         await self.configure_webserver()
         await self.configure_webui()
 
-        self.log_header("Loading fixtures...")
-        await self.load_fixtures()
+        self.log_header("Loading seeds...")
+        await self.load_seeds()
 
         self.log_header("Configuring app-proxy...")
         await self.configure_appproxy()
-        await self.configure_appproxy_fixture()
-
-        if self.install_variable.with_sftp_agent:
-            await self.configure_sftp_agent_fixture()
 
         self.log_header("Generating client environ configs...")
         await self.configure_client()
@@ -2129,17 +2091,6 @@ class PackageContext(Context):
             local_proxy_port=15050,
             loopback_aliases=("127.0.0.1", "0.0.0.0"),
         )
-
-    @override
-    def copy_config(self, template_name: str) -> Path:
-        with self.resource_path("ai.backend.install.configs", template_name) as src_path:
-            dst_path = self.dist_info.target_path / template_name
-            dst_path.parent.mkdir(parents=True, exist_ok=True)
-            if src_path.is_dir():
-                shutil.copytree(src_path, dst_path, dirs_exist_ok=True)
-            else:
-                shutil.copy(src_path, dst_path)
-        return dst_path
 
     @override
     async def check_prerequisites(self) -> None:
@@ -2312,7 +2263,7 @@ class PackageContext(Context):
         self.log_header("Configuring manager...")
         await self.configure_manager()
 
-        # Manager schema must exist before fixtures and the app-proxy DB step
+        # Manager schema must exist before seeds and the app-proxy DB step
         # update scaling_groups (mirrors the DevContext.configure() order).
         self.log_header("Initializing manager database schema...")
         await self.run_manager_cli(["mgr", "schema", "oneshot"])
@@ -2329,12 +2280,703 @@ class PackageContext(Context):
         await self.configure_appproxy()
         self.log_header("Generating client environ configs...")
         await self.configure_client()
-        self.log_header("Loading fixtures...")
-        await self.load_fixtures()
-        # load_fixtures() seeds the "default" scaling_group with placeholder
-        # wsproxy_addr/token from the example fixture, so this must run *after*
-        # it to overwrite them with the real coordinator address and secret.
-        await self.configure_appproxy_fixture()
+        self.log_header("Loading seeds...")
+        await self.load_seeds()
         self.log_header("Preparing vfolder volumes...")
         await self.prepare_local_vfolder_host()
+
+
+class DockerContext(Context):
+    """
+    Deploys the published ``lablup/backend.ai-*`` service images with docker
+    compose, reusing the same configuration, schema, fixture, and image
+    bootstrap steps as the package-based install.
+
+    Contract (mirrors ``docker/README.md``) — the generated compose file
+    follows the same conventions as a hand-written deployment:
+
+    - Every service reads its config from the image's default
+      ``/etc/backend.ai/*`` path via a per-file read-only mount and runs the
+      image's default command.
+    - Host networking is granted only to the manager and the agent (and to
+      manager-cli, the installer's one-off tool); the other services run on
+      the compose project's bridge network with published ports, and
+      ``_fixup_bridge_service_addresses`` rewrites their generated configs:
+      DB/etcd/apollo-router addresses become compose service DNS names (the halfstack
+      definition is MERGED into the single generated compose file, sharing
+      its "half" network, with depends_on health gating), the redis address
+      is the host's public IP + published port everywhere (it is shared
+      across both network profiles via etcd), the manager API address
+      becomes the host's public facing address (the host-network manager
+      binds 0.0.0.0), and bind addresses become ``0.0.0.0``.
+    - No running service mounts the install directory. The daemon-visible
+      state lives under fixed system paths with host==container path parity:
+      ``/var/lib/backend.ai`` + ``/tmp/backend.ai`` (agent) and
+      ``/vfroot/local`` (agent + storage-proxy; the volume dir is chowned to
+      the installing user by a root one-off). Only manager-cli — the
+      installer's one-off tool — mounts the install directory, for fixture
+      files (keeping ``working_dir`` there for relative-path CLI
+      invocations). The manager exchanges the RPC keypair through
+      ``<base_path>/fixtures`` mounted at ``/app/fixtures``.
+    - The storage-proxy runs as the installing user (uid/gid substituted into
+      the template), matching PACKAGE-mode file ownership.
+    - One-off management commands run through ``docker compose run`` using
+      the same images, with host paths passed as arguments bind-mounted
+      read-only on demand — paths already covered by the service's parity
+      mount are skipped.
+    """
+
+    # Bundled template resource name; the rendered+merged deployment file is
+    # written under the de-facto standard name so a bare `docker compose`
+    # from the install directory addresses the deployment without -f.
+    SERVICES_COMPOSE_TEMPLATE = "docker-compose.services.yml"
+    SERVICES_COMPOSE_FILENAME = "docker-compose.yaml"
+    HALFSTACK_COMPOSE_FILENAME = "docker-compose.halfstack.current.yml"
+    # Fixed system paths for the daemon-visible state, so NO service has to
+    # bind-mount the (home-directory-resident) install directory:
+    # - /var/lib/backend.ai: agent scratches / plugin var state / image
+    #   commits / krunner share (root-owned; the agent runs as root)
+    # - /tmp/backend.ai: agent<->kernel IPC sockets
+    # - /vfroot/local/volume1: the local vfolder volume (chowned to the
+    #   installing user for the non-root storage-proxy by a root one-off)
+    SYSTEM_STATE_PATH = Path("/var/lib/backend.ai")
+    SYSTEM_TMP_PATH = Path("/tmp/backend.ai")
+    VFROOT_MOUNT_PATH = Path("/vfroot/local")
+    VFROOT_VOLUME_PATH = Path("/vfroot/local/volume1")
+    # Must match the agent image entrypoint's krunner share location
+    # (env-overridable there via BACKENDAI_KRUNNER_SHARED; the entrypoint
+    # fails fast when the share is not mounted). Covered by the
+    # SYSTEM_STATE_PATH mount of the agent.
+    KRUNNER_SHARED_PATH = Path("/var/lib/backend.ai/krunner")
+    # Compose service DNS names of the halfstack members (same project via
+    # the include: in the services compose file); bridge services address
+    # them with the CONTAINER-side ports, not the host-published ones.
+    HALF_DB = "backendai-half-db"
+    HALF_ETCD = "backendai-half-etcd"
+    HALF_APOLLO = "backendai-half-apollo-router"
+    HALF_OTEL = "backendai-half-otel-collector"
+
+    # Halfstack service names active under the current profiles, recorded
+    # when the merged compose file is generated; consumed by
+    # _start_halfstack() to start only the halfstack members.
+    _halfstack_service_names: list[str] | None = None
+
+    @override
+    def hydrate_install_info(self) -> InstallInfo:
+        info = self._build_install_info(
+            install_type=InstallType.DOCKER,
+            base_path=self.dist_info.target_path.resolve(),
+            local_proxy_port=15050,
+            loopback_aliases=("127.0.0.1", "0.0.0.0"),
+        )
+        service = info.service_config
+        # The redis address is consumed from BOTH network profiles — the
+        # host-network manager/agent read it from etcd (config/redis/addr)
+        # and the bridge services from their generated configs — so its face
+        # must be reachable from both: the host's public IP with the
+        # host-published port.
+        halfstack = info.halfstack_config
+        if halfstack.redis_addr is not None:
+            halfstack.redis_addr = ServerAddr(
+                bind=halfstack.redis_addr.bind,
+                face=HostPortPair(
+                    self.install_variable.public_facing_address,
+                    halfstack.redis_addr.bind.port,
+                ),
+            )
+        # The agent hands these paths to the host Docker daemon as kernel
+        # bind-mount sources, so they must be absolute paths under the fixed
+        # system mounts (NOT the install directory, which no service mounts
+        # wholesale).
+        service.agent_ipc_base_path = str(self.SYSTEM_TMP_PATH / "ipc" / "agent")
+        # var-base-path is the mount root itself: plugin state dirs live as
+        # siblings of scratches/, commit/, and krunner/ under the single
+        # /var/lib/backend.ai mount of the agent container.
+        service.agent_var_base_path = str(self.SYSTEM_STATE_PATH)
+        # The storage-proxy's IPC sockets are consumed by nothing outside its
+        # own container, so an absolute container-local path suffices (its
+        # non-root user can always write under the container's /tmp).
+        service.storage_proxy_ipc_base_path = str(self.SYSTEM_TMP_PATH / "ipc" / "storage-proxy")
+        return info
+
+    @override
+    async def check_prerequisites(self) -> None:
+        await super().check_prerequisites()
+        if self.os_info.distro == "Darwin":
+            raise PrerequisiteError(
+                "DOCKER install mode requires a Linux host: the service containers "
+                "rely on host-network, host-PID, and host-cgroup semantics that "
+                "Docker Desktop on macOS cannot provide.",
+                instruction="Use a Linux host, or the PACKAGE install mode on macOS.",
+            )
+        if self.install_variable.public_facing_address in (
+            "127.0.0.1",
+            "localhost",
+            "::1",
+            "0.0.0.0",
+        ):
+            raise PrerequisiteError(
+                "DOCKER install mode requires a non-loopback public facing "
+                "address: the bridge-networked service containers reach the "
+                "shared redis and the manager API through it.",
+                instruction="Re-run with a routable host IP as the public facing address.",
+            )
+        if self.install_variable.with_harbor:
+            raise PrerequisiteError(
+                "--with-harbor is supported only in DEVELOP/SOURCE install modes; "
+                "docker mode does not provision a local Harbor registry."
+            )
+        if self.install_variable.with_sftp_agent:
+            raise PrerequisiteError(
+                "--with-sftp-agent is not yet supported in DOCKER install mode."
+            )
+        if self.install_variable.accelerator is not None:
+            raise PrerequisiteError(
+                "The published lablup/backend.ai-* service images do not yet "
+                "bundle the accelerator plugins, so --accelerator would produce "
+                "a broken DOCKER-mode deployment.",
+                instruction=(
+                    "Install without --accelerator, or use the PACKAGE/DEVELOP "
+                    "install modes for accelerator support."
+                ),
+            )
+
+    def _services_compose_args(self) -> list[str]:
+        # The single generated compose file carries the WHOLE deployment
+        # (the halfstack definition is merged in at generation time). The
+        # halfstack profile flags keep the active model complete (no orphan
+        # warnings about running observability containers).
+        args = ["docker", "compose"]
+        for profile_arg in self._halfstack_profile_args():
+            args += profile_arg.split(" ")
+        args += ["-f", str(self.install_info.base_path / self.SERVICES_COMPOSE_FILENAME)]
+        return args
+
+    @override
+    async def install_halfstack(self) -> None:
+        # The DOCKER mode generates ONE compose file: the halfstack
+        # definition the base prepare step produced is merged into the
+        # rendered services template (sharing the "half" network, so the
+        # bridge services reach halfstack by service DNS), and only then are
+        # the halfstack members started — the service containers start later,
+        # after their configs are generated.
+        self.log_header("Installing halfstack...")
+        await self._prepare_halfstack_files()
+        self.log_header("Generating the deployment compose file...")
+        compose_path = await self.generate_services_compose()
+        self.log.write(Text.from_markup(f"generated [bold]{compose_path}[/]"))
+        await self._start_halfstack()
+
+    @override
+    async def _start_halfstack(self) -> None:
+        if self._halfstack_service_names is None:
+            raise RuntimeError("generate_services_compose() must run before starting the halfstack")
+        # Start only the halfstack members of the merged compose file; the
+        # backend services follow in start_services() once configured.
+        halfstack_services = self._halfstack_service_names
+        compose_cmd = [*self.docker_sudo, *self._services_compose_args()]
+        steps: list[list[str]] = [
+            [*compose_cmd, "pull", *halfstack_services],
+            [*compose_cmd, "up", "-d", "--wait", "backendai-half-db"],
+            [*compose_cmd, "up", "-d", "--wait", *halfstack_services],
+            [*compose_cmd, "ps", *halfstack_services],
+        ]
+        for step in steps:
+            exit_code = await self.run_exec(step)
+            if exit_code != 0:
+                raise RuntimeError(
+                    f"Failed to start the halfstack containers (exit {exit_code}): {' '.join(step)}"
+                )
+
+    async def _run_service_cli(
+        self,
+        service: str,
+        container_cmd: Sequence[str],
+        *,
+        parity_mounted: bool = True,
+    ) -> int:
+        """
+        Run a one-off management command inside a fresh container of the given
+        compose service (same image, same networking, same volumes). Host
+        paths passed as arguments (e.g. fixture files extracted from the
+        installer package) are bind-mounted read-only at the identical path so
+        the in-container command can read them unchanged.
+
+        ``parity_mounted`` states whether the compose service carries the
+        base_path parity mount: when it does, arguments under base_path are
+        already visible and are not mounted again (a duplicate mount target
+        would fail); when it does not (the config-only services), base_path
+        arguments get the same per-file read-only treatment as outside paths.
+        """
+        base_path = self.install_info.base_path
+        volume_args: list[str] = []
+        for arg in container_cmd:
+            p = Path(arg)
+            if (
+                p.is_absolute()
+                and p.exists()
+                and (not parity_mounted or not p.is_relative_to(base_path))
+            ):
+                volume_args += ["-v", f"{p}:{p}:ro"]
+        return await self.run_exec([
+            *self.docker_sudo,
+            *self._services_compose_args(),
+            "run",
+            "--rm",
+            "--no-deps",
+            "--quiet-pull",
+            *volume_args,
+            service,
+            *container_cmd,
+        ])
+
+    @override
+    async def run_manager_cli(self, cmdargs: Sequence[str]) -> None:
+        # Use the dedicated non-privileged "manager-cli" service (no docker
+        # socket, no restart policy; its "cli" profile keeps `up -d` from
+        # starting it, while `docker compose run` ignores profile gating for
+        # the explicitly named service).
+        exit_code = await self._run_service_cli("manager-cli", ["backend.ai", *cmdargs])
+        if exit_code != 0:
+            raise RuntimeError(
+                f"Manager CLI command failed (exit {exit_code}): {' '.join(cmdargs)}"
+            )
+
+    @override
+    async def run_appproxy_coordinator_cli(self, cmdargs: Sequence[str]) -> None:
+        # The coordinator service mounts only its own config file, so
+        # base_path arguments (e.g. the copied alembic-appproxy.ini) need the
+        # per-file read-only mounts too.
+        exit_code = await self._run_service_cli(
+            "appproxy-coordinator",
+            ["backend.ai", "app-proxy-coordinator", *cmdargs],
+            parity_mounted=False,
+        )
+        if exit_code != 0:
+            raise RuntimeError(
+                f"App-proxy coordinator CLI command failed (exit {exit_code}): {' '.join(cmdargs)}"
+            )
+
+    @staticmethod
+    def render_services_compose(
+        template: str,
+        *,
+        base_path: Path,
+        version: str,
+        enable_gpu: bool,
+        uid: int,
+        gid: int,
+    ) -> str:
+        """
+        Fill the bundled compose template: substitute the install directory,
+        image version, and the installing user's uid/gid (the storage-proxy
+        runs as that user), and strip the ``#gpu#`` comment prefixes when a
+        CUDA accelerator is selected (leaving them keeps the block a comment).
+        """
+        rendered = (
+            template.replace("{{BASE_PATH}}", str(base_path))
+            .replace("{{VERSION}}", version)
+            .replace("{{UID}}", str(uid))
+            .replace("{{GID}}", str(gid))
+        )
+        if enable_gpu:
+            # Line-anchored so only the marker prefixes are stripped, never an
+            # occurrence of the token inside a line (e.g. in a comment).
+            rendered = re.sub(r"^#gpu#", "", rendered, flags=re.MULTILINE)
+        return rendered
+
+    @staticmethod
+    def merge_halfstack_into_services(services_doc: Any, halfstack_doc: Any) -> None:
+        """
+        Merge the prepared halfstack compose document into the rendered
+        services document in place (services, networks, volumes, configs), so
+        the whole deployment lives in ONE compose file. A service name
+        collision is a bug in the templates, not something to silently
+        overwrite.
+        """
+        for section in ("services", "networks", "volumes", "configs"):
+            addition = halfstack_doc.get(section)
+            if not addition:
+                continue
+            target = services_doc.setdefault(section, {})
+            for key, value in addition.items():
+                if key in target:
+                    raise RuntimeError(
+                        f"compose merge collision: {section}.{key} is defined by "
+                        "both the services template and the halfstack file"
+                    )
+                target[key] = value
+
+    async def generate_services_compose(self) -> Path:
+        with self.resource_path("ai.backend.install.configs", self.SERVICES_COMPOSE_TEMPLATE) as p:
+            template = Path(p).read_text()
+        compose_path = self.install_info.base_path / self.SERVICES_COMPOSE_FILENAME
+        rendered = self.render_services_compose(
+            template,
+            base_path=self.install_info.base_path,
+            version=self.dist_info.version,
+            enable_gpu=self.install_info.accelerator == Accelerator.CUDA,
+            uid=os.getuid(),
+            gid=os.getgid(),
+        )
+        # Fold the prepared halfstack definition into the rendered document
+        # and drop the separate halfstack file: the deployment is ONE compose
+        # file, and the halfstack services join it verbatim (their "half"
+        # network is shared with the bridge-networked backend services).
+        halfstack_path = self.install_info.base_path / self.HALFSTACK_COMPOSE_FILENAME
+        yaml = YAML()
+        yaml.preserve_quotes = True
+        services_doc = yaml.load(rendered)
+        halfstack_doc = yaml.load(halfstack_path.read_text())
+        self.merge_halfstack_into_services(services_doc, halfstack_doc)
+        active_profiles = {arg.split(" ")[1] for arg in self._halfstack_profile_args()}
+        self._halfstack_service_names = [
+            name
+            for name, svc in halfstack_doc.get("services", {}).items()
+            if not svc.get("profiles") or set(svc["profiles"]) & active_profiles
+        ]
+        with compose_path.open("w") as fp:
+            yaml.dump(services_doc, fp)
+        halfstack_path.unlink()
+        return compose_path
+
+    async def install(self) -> None:
+        base_path = self.install_info.base_path
+        base_path.mkdir(parents=True, exist_ok=True)
+        # Operator staging dir for extra plugin wheels (e.g. accelerator
+        # plugins), mounted read-write at /app/wheelhouse of the manager and
+        # agent containers (the install unpacks the wheels in place).
+        (base_path / "wheelhouse").mkdir(exist_ok=True)
+        # The daemon-visible state lives under fixed root-owned system paths
+        # (/var/lib/backend.ai, /tmp/backend.ai, /vfroot/local) — the Docker
+        # daemon creates missing bind-mount sources automatically, and the
+        # storage-proxy's user-owned volume dir is chowned by a root one-off
+        # during configure(), once its config files exist to be mounted. Only refuse an obviously hostile
+        # pre-existing krunner-share state here.
+        if self.KRUNNER_SHARED_PATH.is_symlink():
+            raise RuntimeError(
+                f"Refusing to use the krunner share at {self.KRUNNER_SHARED_PATH}: "
+                "the path is a symlink. Remove it (or point it back to a real "
+                "directory) and retry."
+            )
+
+        # install_halfstack() prepares the halfstack files, merges them into
+        # the single deployment compose file, and starts the halfstack
+        # members (see the override above).
+        await self.install_halfstack()
+
+        self.log_header(f"Pulling service images (version {self.dist_info.version})...")
+        exit_code = await self.run_exec([
+            *self.docker_sudo,
+            *self._services_compose_args(),
+            "pull",
+        ])
+        if exit_code != 0:
+            raise RuntimeError(
+                f"Failed to pull the service images (exit {exit_code}). "
+                f"Check that lablup/backend.ai-* images exist for version "
+                f"{self.dist_info.version}."
+            )
+
+    async def _bootstrap_vfroot(self) -> None:
+        """
+        Create the local vfolder volume directory and hand it to the
+        installing user. The installer runs unprivileged and /vfroot is
+        root territory, so this goes through a root one-off container of the
+        storage-proxy service: starting it makes the Docker daemon create
+        the missing bind-mount source, and the ``--user 0`` override lets it
+        chown the volume dir to the uid/gid the storage-proxy service runs
+        as.
+        """
+        self.log_header("Preparing the vfolder volume root...")
+        exit_code = await self.run_exec([
+            *self.docker_sudo,
+            *self._services_compose_args(),
+            "run",
+            "--rm",
+            "--no-deps",
+            "--quiet-pull",
+            "--user",
+            "0",
+            "storage-proxy",
+            "sh",
+            "-c",
+            f"mkdir -p {self.VFROOT_VOLUME_PATH} && "
+            f"chown {os.getuid()}:{os.getgid()} {self.VFROOT_VOLUME_PATH}",
+        ])
+        if exit_code != 0:
+            raise RuntimeError(
+                f"Failed to prepare the vfolder volume at {self.VFROOT_VOLUME_PATH} "
+                f"(exit {exit_code})."
+            )
+
+    @override
+    async def _prepare_local_vfolder_files(self) -> None:
+        # The volume root was created and chowned by _bootstrap_vfroot(); the
+        # scratch root is agent-managed under the root-owned system state
+        # path, so no host-side mkdir here.
+        version_txt = self.VFROOT_VOLUME_PATH / "version.txt"
+        if not version_txt.exists():
+            version_txt.write_text("3")
+
+    async def configure(self) -> None:
+        self.log_header("Configuring manager...")
+        await self.configure_manager()
+
+        # Manager schema must exist before seeds and the app-proxy DB step
+        # update scaling_groups (mirrors the PackageContext.configure() order).
+        self.log_header("Initializing manager database schema...")
+        await self.run_manager_cli(["mgr", "schema", "oneshot"])
+
+        self.log_header("Configuring agent...")
+        await self.configure_agent()
+        await self._fixup_agent_paths()
+        await self._fixup_agent_bind_addresses()
+        self.log_header("Configuring storage-proxy...")
+        await self.configure_storage_proxy()
+        self.log_header("Configuring webserver and webui...")
+        await self.configure_webserver()
+        await self.configure_webui()
+        self.log_header("Configuring app-proxy...")
+        # configure_appproxy() must run BEFORE install_appproxy_db(): the
+        # latter's schema-oneshot one-off starts the coordinator compose
+        # service, whose definition bind-mounts the coordinator config file —
+        # if the source does not exist yet, the Docker daemon creates a
+        # root-owned directory in its place. The bridge-address fixup must
+        # also precede it, so the coordinator container reaches the DB.
+        await self.configure_appproxy()
+        await self._fixup_bridge_service_addresses()
+        await self.install_appproxy_db()
+        self.log_header("Generating client environ configs...")
+        await self.configure_client()
+        self.log_header("Loading seeds...")
+        await self.load_seeds()
+        self.log_header("Preparing vfolder volumes...")
+        # The bootstrap runs a one-off container of the storage-proxy
+        # SERVICE, whose definition bind-mounts the generated config file and
+        # TLS directory — so it must run only after configure_storage_proxy()
+        # has written them (a compose run against missing bind-mount sources
+        # makes the Docker daemon create root-owned directories in their
+        # place, the same trap as the coordinator schema one-off).
+        await self._bootstrap_vfroot()
+        await self.prepare_local_vfolder_host()
+
+    @override
+    def _ensure_agent_var_base_path(self) -> None:
+        # /var/lib/backend.ai is root territory the unprivileged installer
+        # cannot create — and does not need to: the Docker daemon creates the
+        # mount source when the agent container starts, and the agent (root
+        # in its container) creates its own subdirectories at runtime.
+        pass
+
+    async def _fixup_agent_paths(self) -> None:
+        """
+        Rewrite the remaining relative paths of the generated ``agent.toml``
+        to absolute paths under the fixed system mounts. The containerized
+        agent hands these to the host Docker daemon as kernel bind-mount
+        sources, so container-relative (or unmounted) paths would not
+        resolve.
+        """
+        toml_path = self.install_info.base_path / "agent.toml"
+        self.sed_in_place_multi(
+            toml_path,
+            [
+                (
+                    re.compile(r"^scratch-root = .*$", flags=re.MULTILINE),
+                    f'scratch-root = "{self.SYSTEM_STATE_PATH / "scratches"}"',
+                ),
+                (
+                    re.compile(r"^mount-path = .*$", flags=re.MULTILINE),
+                    f'mount-path = "{self.VFROOT_MOUNT_PATH}"',
+                ),
+                (
+                    re.compile(r"^image-commit-path = .*$", flags=re.MULTILINE),
+                    f'image-commit-path = "{self.SYSTEM_STATE_PATH / "commit"}"',
+                ),
+            ],
+        )
+
+    async def _fixup_agent_bind_addresses(self) -> None:
+        """
+        Move the agent's two bind addresses off the loopback interface.
+
+        The bundled ``agent.toml`` pins both to 127.0.0.1, which is right for
+        the DEVELOP/PACKAGE modes: there the agent, the app-proxy workers and
+        the published kernel ports all share the host loopback. Here the
+        workers are bridge containers that cannot reach it, so kernel service
+        ports published on 127.0.0.1 would be unroutable and the manager
+        would record a loopback contact address for the agent.
+
+        This is DOCKER-mode only — the DEVELOP/PACKAGE modes keep the
+        loopback defaults, which do not expose these ports off-host.
+        """
+        toml_path = self.install_info.base_path / "agent.toml"
+        self.sed_in_place_multi(
+            toml_path,
+            self.agent_bind_address_subs(
+                public_addr=self.install_variable.public_facing_address,
+                rpc_port=self.install_info.service_config.agent_rpc_addr.bind.port,
+            ),
+        )
+
+    @staticmethod
+    def agent_bind_address_subs(
+        *, public_addr: str, rpc_port: int
+    ) -> list[tuple[str | re.Pattern[str], str]]:
+        """The substitutions of :meth:`_fixup_agent_bind_addresses`."""
+        return [
+            (
+                re.compile(r"^bind-host = .*$", flags=re.MULTILINE),
+                f'bind-host = "{public_addr}"',
+            ),
+            (
+                re.compile(r"^rpc-listen-addr = .*$", flags=re.MULTILINE),
+                f'rpc-listen-addr = {{ host = "{public_addr}", port = {rpc_port} }}',
+            ),
+        ]
+
+    @override
+    def _fixup_appproxy_alembic_ini(self, alembic_ini: Path) -> None:
+        # The schema-oneshot one-off runs inside the bridge-networked
+        # coordinator container, which shares the compose project (and
+        # network) with the halfstack — address the DB by service DNS and its
+        # container-side port instead of the host-published localhost port.
+        self.sed_in_place(alembic_ini, "@localhost:8100/", f"@{self.HALF_DB}:5432/")
+
+    async def _fixup_bridge_service_addresses(self) -> None:
+        """
+        Rewrite the generated configs of the bridge-networked services
+        (webserver, storage-proxy, app-proxy trio), which the package-layout
+        generators wrote with host-loopback addressing:
+
+        - halfstack and coordinator addresses become compose service DNS
+          names with container-side ports (same project, same network),
+        - the manager API address (a host-network process bound on 0.0.0.0)
+          becomes the host's public facing address, and
+        - bind addresses become ``0.0.0.0`` so the published container ports
+          actually receive traffic,
+
+        while announce/advertised addresses (consumed by *other* components
+        through the published host ports) are left untouched. The
+        storage-proxy additionally needs its working-dir-relative paths
+        (vfolder root, TLS material, IPC dir) made absolute, because it runs
+        with the image's default working directory instead of the install
+        directory.
+        """
+        base_path = self.install_info.base_path
+        service = self.install_info.service_config
+
+        def rewrite(filename: str, mutate: Callable[[Any], None]) -> None:
+            path = base_path / filename
+            with path.open("r") as fp:
+                data = tomlkit.load(fp)
+            mutate(data)
+            with path.open("w") as fp:
+                tomlkit.dump(data, fp)
+
+        def fixup_otel(data: Any) -> None:
+            # Only the untouched default — a custom --otel-endpoint given at
+            # install time must stay as the operator wrote it.
+            if data.get("otel", {}).get("endpoint") == "http://127.0.0.1:4317":
+                data["otel"]["endpoint"] = f"http://{self.HALF_OTEL}:4317"
+
+        def fixup_webserver(data: Any) -> None:
+            data["api"]["endpoint"] = (
+                f"http://{self.install_variable.public_facing_address}"
+                f":{service.manager_addr.face.port}"
+            )
+            data["apollo-router"]["endpoint"] = f"http://{self.HALF_APOLLO}:4000"
+            fixup_otel(data)
+
+        def fixup_storage_proxy(data: Any) -> None:
+            data["etcd"]["addr"]["host"] = self.HALF_ETCD
+            data["etcd"]["addr"]["port"] = 2379
+            data["api"]["client"]["service-addr"]["host"] = "0.0.0.0"
+            data["api"]["manager"]["service-addr"]["host"] = "0.0.0.0"
+            data["api"]["manager"]["ssl-cert"] = str(
+                base_path / "configs" / "storage-proxy" / "ssl" / "manager-api-selfsigned.cert.pem"
+            )
+            data["api"]["manager"]["ssl-privkey"] = str(
+                base_path / "configs" / "storage-proxy" / "ssl" / "manager-api-selfsigned.key.pem"
+            )
+            data["volume"]["volume1"]["path"] = str(self.VFROOT_VOLUME_PATH)
+            fixup_otel(data)
+
+        def fixup_coordinator(data: Any) -> None:
+            data["db"]["addr"]["host"] = self.HALF_DB
+            data["db"]["addr"]["port"] = 5432
+            fixup_otel(data)
+
+        def fixup_worker(data: Any) -> None:
+            data["proxy_worker"]["coordinator_endpoint"] = (
+                f"http://appproxy-coordinator:{service.appproxy_coordinator_addr.bind.port}"
+            )
+            data["proxy_worker"]["api_bind_addr"]["host"] = "0.0.0.0"
+            fixup_otel(data)
+
+        rewrite("webserver.conf", fixup_webserver)
+        rewrite("storage-proxy.toml", fixup_storage_proxy)
+        rewrite("app-proxy-coordinator.toml", fixup_coordinator)
+        rewrite("app-proxy-worker.toml", fixup_worker)
+        rewrite("app-proxy-worker-tcp.toml", fixup_worker)
+
+    async def start_services(self) -> None:
+        self.log_header("Starting the Backend.AI services...")
+        compose_cmd = [*self.docker_sudo, *self._services_compose_args()]
+        exit_code = await self.run_exec([*compose_cmd, "up", "-d"])
+        if exit_code != 0:
+            raise RuntimeError(f"Failed to start the service containers (exit {exit_code}).")
+        await self.run_exec([*compose_cmd, "ps"])
+        # Post-start health verification: warn (but do not fail the install)
+        # when some services are not in the running state.
+        non_running = await self._collect_non_running_services()
+        if non_running:
+            self.log.write(
+                Text.from_markup(
+                    "[yellow bold]:warning: Some service containers are not "
+                    f"running: {', '.join(sorted(non_running))}.[/]\n"
+                    "[yellow]Inspect them with "
+                    f"[bold]docker compose -f {self.SERVICES_COMPOSE_FILENAME} "
+                    "ps / logs <service>[/] before using the deployment.[/]"
+                )
+            )
         # TODO: install as systemd services?
+
+    async def _collect_non_running_services(self) -> list[str]:
+        """
+        Return the compose service names whose containers are not in the
+        ``running`` state, parsed from ``docker compose ps --format json``.
+        Output is captured directly (not streamed to the TUI log), so this
+        uses a raw subprocess with the same space-safe argument list.
+        """
+        proc = await asyncio.create_subprocess_exec(
+            *self.docker_sudo,
+            *self._services_compose_args(),
+            "ps",
+            "--format",
+            "json",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode != 0:
+            return []
+        entries: list[Any] = []
+        for line in stdout.decode().splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                parsed = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            # docker compose emits one JSON object per line (v2.21+) or a
+            # single JSON array (older releases).
+            entries.extend(parsed if isinstance(parsed, list) else [parsed])
+        non_running: list[str] = []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            if str(entry.get("State", "")).lower() != "running":
+                non_running.append(str(entry.get("Service") or entry.get("Name") or "<unknown>"))
+        return non_running

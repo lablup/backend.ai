@@ -8,9 +8,9 @@ from sqlalchemy.orm import selectinload
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
-from ai.backend.manager.models.artifact import ArtifactRow
-from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
-from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
+from ai.backend.manager.models.artifact.row import ArtifactRow
+from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
+from ai.backend.manager.models.huggingface_registry.row import HuggingFaceRegistryRow
 from ai.backend.manager.models.huggingface_registry.searchable_fields import (
     HuggingFaceRegistrySearchableFields,
 )

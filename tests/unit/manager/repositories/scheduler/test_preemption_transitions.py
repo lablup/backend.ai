@@ -20,14 +20,16 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.schema.resource_group import PreemptionConfig
 from ai.backend.common.types import AccessKey, PreemptionMode, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_slot import ResourceAllocationRow
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
@@ -35,7 +37,7 @@ from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import create_pending_session_with_kernels
 
-_REASON = "PREEMPTED_BY_SCHEDULER"
+_REASON = KernelLifecycleEventReason.PREEMPTED_BY_SCHEDULER
 
 
 async def _free_allocations(db: ExtendedAsyncSAEngine, session_id: SessionId) -> None:

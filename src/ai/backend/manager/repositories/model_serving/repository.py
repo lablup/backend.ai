@@ -28,20 +28,25 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import (
     AccessKey,
+    AutoScalingMetricComparator,
+    AutoScalingMetricSource,
     ResourceSlot,
     SessionTypes,
+    VFolderUsageMode,
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAccessTokenData,
     RouteHealthStatus,
+    RouteStatus,
 )
 from ai.backend.manager.data.image.types import ImageData
 from ai.backend.manager.data.model_serving.types import (
     EndpointAccessValidationData,
     EndpointAutoScalingRuleData,
     EndpointData,
+    EndpointLifecycle,
     ModelServiceValidationContext,
     MutationResult,
     ResourceGroupData,
@@ -57,41 +62,32 @@ from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden, ServiceUnavailable
 from ai.backend.manager.errors.image import ImageNotFound
-from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable, DomainNotFound
-from ai.backend.manager.errors.service import AutoScalingRuleNotFound, EndpointNotFound
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+from ai.backend.manager.errors.resource import DomainNotFound
+from ai.backend.manager.errors.service import EndpointNotFound
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.domain.lookups import DomainNameLookup
-from ai.backend.manager.models.endpoint import (
-    AutoScalingMetricComparator,
-    AutoScalingMetricSource,
-    EndpointAutoScalingRuleRow,
-    EndpointLifecycle,
-    EndpointRow,
-)
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
+from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow, EndpointRow
 from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
 from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.endpoint.updaters import (
     AutoScalingRuleUpdater,
     LegacyEndpointUpdater,
 )
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import resolve_group_name_or_id
-from ai.backend.manager.models.resource_group import resource_groups
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.resource_group.row import resource_groups
 from ai.backend.manager.models.resource_group.searchers import AllowedResourceGroupsSearch
-from ai.backend.manager.models.resource_policy import keypair_resource_policies
-from ai.backend.manager.models.routing import RouteStatus, RoutingRow
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import RoutingDataSearcher
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
+from ai.backend.manager.models.session.row import KernelLoadingStrategy, SessionRow
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
-from ai.backend.manager.models.vfolder import VFolderRow, VFolderUsageMode
-from ai.backend.manager.models.vfolder.row import vfolders
+from ai.backend.manager.models.vfolder.row import VFolderRow, vfolders
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.registry import check_resource_group as registry_check_resource_group
 from ai.backend.manager.repositories.model_serving.mount import check_extra_mounts
@@ -183,21 +179,20 @@ class ModelServingRepository:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             stmt = (
-                sa.select(EndpointRow)
+                sa.select(EndpointRow.session_owner, EndpointRow.domain, UserRow.role)
+                .outerjoin(UserRow, UserRow.uuid == EndpointRow.session_owner)
                 .where(EndpointRow.id == endpoint_id)
-                .options(selectinload(EndpointRow.session_owner_row))
             )
             result = await session.execute(stmt)
-            endpoint_row = result.scalar_one_or_none()
-            if endpoint_row is None:
+            row = result.first()
+            if row is None:
                 return None
+            session_owner_id, domain, session_owner_role = row
 
             return EndpointAccessValidationData(
-                session_owner_id=endpoint_row.session_owner,
-                session_owner_role=(
-                    endpoint_row.session_owner_row.role if endpoint_row.session_owner_row else None
-                ),
-                domain=endpoint_row.domain,
+                session_owner_id=session_owner_id,
+                session_owner_role=session_owner_role,
+                domain=domain,
             )
 
     @model_serving_repository_resilience.apply()
@@ -271,9 +266,7 @@ class ModelServingRepository:
             if not endpoint:
                 return False
 
-            update_values: dict[str, Any] = {"lifecycle_stage": lifecycle_stage}
-            if lifecycle_stage == EndpointLifecycle.DESTROYED:
-                update_values["destroyed_at"] = sa.func.now()
+            update_values: dict[str, Any] = EndpointRow.lifecycle_values(lifecycle_stage)
             if replicas is not None:
                 update_values["replicas"] = replicas
 
@@ -320,12 +313,22 @@ class ModelServingRepository:
         Get route by ID.
         Returns None if route doesn't exist or doesn't belong to service.
         """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            route = await self._get_route_by_id(session, route_id, load_endpoint=True)
-            if not route or route.endpoint != service_id:
-                return None
-
-            return route.to_data()
+        replica_fields = ReplicaSearchableFields.own
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(
+                RoutingDataSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        replica_fields.field_id.filter.equals(
+                            UUIDEqualMatchSpec(value=route_id, negated=False)
+                        ),
+                        replica_fields.deployment_id.filter.equals(
+                            UUIDEqualMatchSpec(value=service_id, negated=False)
+                        ),
+                    ],
+                )
+            )
+        return result.items[0] if result.items else None
 
     @model_serving_repository_resilience.apply()
     async def update_route_traffic(
@@ -340,8 +343,14 @@ class ModelServingRepository:
         Returns updated endpoint data if successful, None if not found.
         """
         async with self._db.begin_session() as session:
-            route = await self._get_route_by_id(session, route_id, load_endpoint=True)
-            if not route or route.endpoint != service_id:
+            route = (
+                await session.execute(
+                    sa.select(RoutingRow.endpoint, RoutingRow.session).where(
+                        RoutingRow.id == route_id
+                    )
+                )
+            ).one_or_none()
+            if route is None or route.endpoint != service_id:
                 return None
 
             query = (
@@ -359,7 +368,7 @@ class ModelServingRepository:
                 load_revisions=True,
             )
             if endpoint is None:
-                raise NoResultFound
+                raise EndpointNotFound
 
             await valkey_live.store_live_data(
                 f"endpoint.{service_id}.session.{route.session}.traffic_ratio",
@@ -450,33 +459,22 @@ class ModelServingRepository:
         """
         Private method to get endpoint by ID using an existing session.
         """
-        try:
-            return await EndpointRow.get(
-                session,
-                endpoint_id,
-                load_routes=load_routes,
-                load_session_owner=load_session_owner,
-                load_revisions=load_revisions,
+        query = sa.select(EndpointRow).where(EndpointRow.id == endpoint_id)
+        if load_routes:
+            query = query.options(selectinload(EndpointRow.routings))
+        if load_session_owner:
+            query = query.options(selectinload(EndpointRow.session_owner_row))
+        if load_revisions:
+            query = query.options(
+                selectinload(EndpointRow.current_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
+                selectinload(EndpointRow.deploying_revision_row).selectinload(
+                    DeploymentRevisionRow.image_row
+                ),
             )
-        except NoResultFound:
-            return None
-
-    async def _get_route_by_id(
-        self,
-        session: SASession,
-        route_id: uuid.UUID,
-        load_endpoint: bool = False,
-        load_session: bool = False,
-    ) -> RoutingRow | None:
-        """
-        Private method to get route by ID using an existing session.
-        """
-        try:
-            return await RoutingRow.get(
-                session, route_id, load_endpoint=load_endpoint, load_session=load_session
-            )
-        except NoResultFound:
-            return None
+        endpoint: EndpointRow | None = await session.scalar(query)
+        return endpoint
 
     async def _validate_endpoint_access(
         self,
@@ -523,50 +521,21 @@ class ModelServingRepository:
             return vfolder_ownership_type
 
     @model_serving_repository_resilience.apply()
-    async def get_user_with_keypair(self, user_id: uuid.UUID) -> Any | None:
+    async def get_user_with_keypair(self, user_id: uuid.UUID) -> UserRow:
         """
         Get the user row joined with one of their keypairs.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             query = (
-                sa.select(UserRow, KeyPairRow)
+                sa.select(UserRow)
                 .select_from(sa.join(UserRow, KeyPairRow, KeyPairRow.user == UserRow.uuid))
                 .where(UserRow.uuid == user_id)
             )
             result = await session.execute(query)
-            return result.fetchone()
-
-    @model_serving_repository_resilience.apply()
-    async def get_keypair_resource_policy(self, policy_name: str) -> Any | None:
-        """
-        Get keypair resource policy by name.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            query = (
-                sa.select(keypair_resource_policies)
-                .select_from(keypair_resource_policies)
-                .where(keypair_resource_policies.c.name == policy_name)
-            )
-            result = await session.execute(query)
-            return result.first()
-
-    @model_serving_repository_resilience.apply()
-    async def get_endpoint_for_appproxy_update(self, service_id: uuid.UUID) -> EndpointRow | None:
-        """
-        Get endpoint with routes loaded for AppProxy updates.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            return await self._get_endpoint_by_id(session, service_id, load_routes=True)
-
-    @model_serving_repository_resilience.apply()
-    async def get_route_with_session(self, route_id: uuid.UUID) -> RoutingRow | None:
-        """
-        Get route with endpoint and session data loaded.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            return await self._get_route_by_id(
-                session, route_id, load_endpoint=True, load_session=True
-            )
+            user = result.scalar()
+            if user is None:
+                raise InvalidAPIParameters("User not found")
+            return user
 
     @model_serving_repository_resilience.apply()
     async def update_endpoint_replicas(
@@ -601,11 +570,10 @@ class ModelServingRepository:
         Returns None if rule doesn't exist.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
-            try:
-                rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-                return rule.to_data()
-            except AutoScalingRuleNotFound:
+            rule = await session.get(EndpointAutoScalingRuleRow, rule_id)
+            if rule is None:
                 return None
+            return rule.to_data()
 
     @model_serving_repository_resilience.apply()
     async def create_auto_scaling_rule(
@@ -642,17 +610,19 @@ class ModelServingRepository:
                 max_threshold_val = Decimal(str(threshold))
             else:
                 min_threshold_val = Decimal(str(threshold))
-            rule = await endpoint.create_auto_scaling_rule(
-                session,
-                metric_source,
-                metric_name,
-                min_threshold_val,
-                max_threshold_val,
-                step_size,
+            rule = EndpointAutoScalingRuleRow(
+                endpoint=endpoint.id,
+                metric_source=metric_source,
+                metric_name=metric_name,
+                min_threshold=min_threshold_val,
+                max_threshold=max_threshold_val,
+                step_size=step_size,
                 cooldown_seconds=cooldown_seconds,
                 min_replicas=min_replicas,
                 max_replicas=max_replicas,
             )
+            session.add(rule)
+            await session.flush()
             return rule.to_data()
 
     @model_serving_repository_resilience.apply()
@@ -667,12 +637,18 @@ class ModelServingRepository:
         rule_id = uuid.UUID(str(updater.rule_id))
 
         async with self._db.begin_readonly_session() as session:
-            try:
-                # Validate lifecycle stage before update
-                rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-            except AutoScalingRuleNotFound:
+            # Validate lifecycle stage before update
+            lifecycle_stage = await session.scalar(
+                sa.select(EndpointRow.lifecycle_stage)
+                .join(
+                    EndpointAutoScalingRuleRow,
+                    EndpointAutoScalingRuleRow.endpoint == EndpointRow.id,
+                )
+                .where(EndpointAutoScalingRuleRow.id == rule_id)
+            )
+            if lifecycle_stage is None:
                 return None
-            if rule.endpoint_row.lifecycle_stage in EndpointLifecycle.inactive_states():
+            if lifecycle_stage in EndpointLifecycle.inactive_states():
                 return None
 
         async with self._v2_ops.write_ops() as w:
@@ -688,25 +664,11 @@ class ModelServingRepository:
         Returns True if deleted, False if not found.
         """
         async with self._db.begin_session() as session:
-            try:
-                rule = await EndpointAutoScalingRuleRow.get(session, rule_id, load_endpoint=True)
-                await session.delete(rule)
-                return True
-            except AutoScalingRuleNotFound:
+            rule = await session.get(EndpointAutoScalingRuleRow, rule_id)
+            if rule is None:
                 return False
-
-    @model_serving_repository_resilience.apply()
-    async def resolve_group_id(
-        self, domain_name: str, group_name_or_id: str | uuid.UUID
-    ) -> uuid.UUID | None:
-        """
-        Resolve group name or ID to group ID.
-        """
-        async with self._db.begin_readonly_session_read_committed() as session:
-            conn = await session.connection()
-            if conn is None:
-                raise DatabaseConnectionUnavailable("Database connection is not available")
-            return await resolve_group_name_or_id(conn, domain_name, group_name_or_id)
+            await session.delete(rule)
+            return True
 
     @model_serving_repository_resilience.apply()
     async def get_session_by_id(
@@ -754,30 +716,28 @@ class ModelServingRepository:
 
         async def _do_mutate() -> MutationResult:
             async with self._db.begin_session() as db_session:
-                try:
-                    endpoint_row = await EndpointRow.get(
-                        db_session,
-                        deployment_id,
-                        load_session_owner=True,
-                        load_revisions=True,
-                        load_routes=True,
-                    )
-                    user_data = current_user()
-                    if user_data is None:
-                        raise GenericForbidden("User context not available.")
-                    match user_data.role:
-                        case UserRole.SUPERADMIN:
-                            pass
-                        case UserRole.ADMIN:
-                            domain_name = user_data.domain_name
-                            if endpoint_row.domain != domain_name:
-                                raise EndpointNotFound
-                        case _:
-                            user_id = user_data.user_id
-                            if endpoint_row.session_owner != user_id:
-                                raise EndpointNotFound
-                except NoResultFound as e:
-                    raise EndpointNotFound from e
+                endpoint_row = await self._get_endpoint_by_id(
+                    db_session,
+                    deployment_id,
+                    load_revisions=True,
+                    load_routes=True,
+                )
+                if endpoint_row is None:
+                    raise EndpointNotFound
+                user_data = current_user()
+                if user_data is None:
+                    raise GenericForbidden("User context not available.")
+                match user_data.role:
+                    case UserRole.SUPERADMIN:
+                        pass
+                    case UserRole.ADMIN:
+                        domain_name = user_data.domain_name
+                        if endpoint_row.domain != domain_name:
+                            raise EndpointNotFound
+                    case _:
+                        user_id = user_data.user_id
+                        if endpoint_row.session_owner != user_id:
+                            raise EndpointNotFound
 
                 if endpoint_row.lifecycle_stage in (
                     EndpointLifecycle.DESTROYING,
@@ -789,7 +749,7 @@ class ModelServingRepository:
                 for column, value in updater.build_values().items():
                     setattr(endpoint_row, column, value)
 
-                session_owner = endpoint_row.session_owner_row
+                session_owner = await db_session.get(UserRow, endpoint_row.session_owner)
                 if session_owner is None:
                     raise InvalidAPIParameters("Session owner not found for endpoint")
                 if session_owner.role is None:
@@ -814,13 +774,22 @@ class ModelServingRepository:
                 await db_session.commit()
 
                 # Reload with revisions for to_data()
-                endpoint_row = await EndpointRow.get(
-                    db_session,
-                    endpoint_row.id,
-                    load_revisions=True,
-                    load_created_user=True,
-                    load_session_owner=True,
+                endpoint_row = await db_session.scalar(
+                    sa.select(EndpointRow)
+                    .where(EndpointRow.id == endpoint_row.id)
+                    .options(
+                        selectinload(EndpointRow.created_user_row),
+                        selectinload(EndpointRow.session_owner_row),
+                        selectinload(EndpointRow.current_revision_row).selectinload(
+                            DeploymentRevisionRow.image_row
+                        ),
+                        selectinload(EndpointRow.deploying_revision_row).selectinload(
+                            DeploymentRevisionRow.image_row
+                        ),
+                    )
                 )
+                if endpoint_row is None:
+                    raise EndpointNotFound
                 return MutationResult(
                     success=True,
                     message="success",

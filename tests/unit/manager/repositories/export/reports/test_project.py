@@ -18,23 +18,23 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.api.rest.export.adapter import ExportAdapter
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.association_container_registries_groups import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.resource_group import (
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForProjectRow,
-    ResourceGroupOpts,
     ResourceGroupRow,
 )
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.base.export import (
     ExportFieldDef,
@@ -848,7 +848,7 @@ class TestProjectExportExecuteStreamingDB:
                 AssociationContainerRegistriesGroupsRow(
                     id=uuid.uuid4(),
                     registry_id=registry_id,
-                    group_id=project_id,
+                    project_id=project_id,
                 )
             )
             await db_sess.commit()
@@ -1117,7 +1117,7 @@ class TestGlobalContainerRegistryExport:
                 AssociationContainerRegistriesGroupsRow(
                     id=uuid.uuid4(),
                     registry_id=scoped_registry_id,
-                    group_id=project_id,
+                    project_id=project_id,
                 )
             )
             await db_sess.commit()

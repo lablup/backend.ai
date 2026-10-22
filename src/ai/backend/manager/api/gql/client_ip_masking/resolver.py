@@ -10,12 +10,15 @@ from ai.backend.common.dto.manager.v2.client_ip_masking.request import (
     AdminSearchClientIPMaskingPoliciesInput,
     ClientIPMaskingPolicyOrder,
 )
+from ai.backend.common.dto.manager.v2.client_ip_masking.response import (
+    PurgeClientIPMaskingPolicyPayload,
+)
 from ai.backend.common.dto.manager.v2.client_ip_masking.types import (
     ClientIPMaskingPolicyOrderField,
 )
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.client_ip_masking.types import (
     ClientIPMaskingPolicyConnectionGQL,
     ClientIPMaskingPolicyEdgeGQL,
@@ -23,6 +26,9 @@ from ai.backend.manager.api.gql.client_ip_masking.types import (
     ClientIPMaskingPolicyGQL,
     ClientIPMaskingPolicyOrderByGQL,
     ClientIPMaskingPolicyPayloadGQL,
+    PartialBulkClientIPMaskingPoliciesPayloadGQL,
+    PartialBulkPurgeClientIPMaskingPoliciesInputGQL,
+    PurgeClientIPMaskingPolicyPayloadGQL,
     UpsertClientIPMaskingPolicyInputGQL,
 )
 from ai.backend.manager.api.gql.decorators import (
@@ -36,7 +42,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Read the client IP masking set for every target (superadmin only).",
     )
 )  # type: ignore[misc]
@@ -92,31 +98,82 @@ async def admin_client_ip_masking_policies(
 @gql_mutation(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Set the client IP masking one target gets (superadmin only).",
+        description="Set the client IP masking one target gets.",
     )
 )
-async def admin_upsert_client_ip_masking_policy(
+async def upsert_client_ip_masking_policy(
     info: Info[StrawberryGQLContext],
     input: UpsertClientIPMaskingPolicyInputGQL,
-) -> ClientIPMaskingPolicyPayloadGQL | None:
-    check_admin_only()
-    payload = await info.context.adapters.client_ip_masking.admin_upsert(input.to_pydantic())
+) -> ClientIPMaskingPolicyPayloadGQL:
+    payload = await info.context.adapters.client_ip_masking.upsert(input.to_pydantic())
     return ClientIPMaskingPolicyPayloadGQL.from_pydantic(payload)
 
 
 @gql_mutation(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
+        description=("Drop one target's client IP masking policy so it falls back to the default."),
+    )
+)
+async def purge_client_ip_masking_policy(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> PurgeClientIPMaskingPolicyPayloadGQL:
+    payload = await info.context.adapters.client_ip_masking.purge(ClientIPMaskingPolicyID(id))
+    return PurgeClientIPMaskingPolicyPayloadGQL.from_pydantic(
+        PurgeClientIPMaskingPolicyPayload(entity_id=payload.policy.entity_id),
+        extra={"purged_id": to_global_id(ClientIPMaskingPolicyGQL, payload.policy.id)},
+    )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Drop several client IP masking policies, answering for each one.",
+    )
+)
+async def partial_bulk_purge_client_ip_masking_policies(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeClientIPMaskingPoliciesInputGQL,
+) -> PartialBulkClientIPMaskingPoliciesPayloadGQL:
+    payload = await info.context.adapters.client_ip_masking.partial_bulk_purge(input.to_pydantic())
+    return PartialBulkClientIPMaskingPoliciesPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Set the client IP masking one target gets (superadmin only).",
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `upsertClientIpMaskingPolicy`."
+    ),
+)
+async def admin_upsert_client_ip_masking_policy(
+    info: Info[StrawberryGQLContext],
+    input: UpsertClientIPMaskingPolicyInputGQL,
+) -> ClientIPMaskingPolicyPayloadGQL | None:
+    check_admin_only()
+    payload = await info.context.adapters.client_ip_masking.upsert(input.to_pydantic())
+    return ClientIPMaskingPolicyPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
         description=(
             "Drop one target's client IP masking policy so it falls back to the "
             "default (superadmin only)."
         ),
-    )
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeClientIpMaskingPolicy`."
+    ),
 )
 async def admin_purge_client_ip_masking_policy(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> ClientIPMaskingPolicyPayloadGQL | None:
     check_admin_only()
-    payload = await info.context.adapters.client_ip_masking.admin_purge(ClientIPMaskingPolicyID(id))
+    payload = await info.context.adapters.client_ip_masking.purge(ClientIPMaskingPolicyID(id))
     return ClientIPMaskingPolicyPayloadGQL.from_pydantic(payload)

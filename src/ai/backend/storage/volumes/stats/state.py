@@ -5,7 +5,8 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_volume_stats import ValkeyVolumeStatsClient
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
+from ai.backend.logging.structured import StructuredLogger
 
 from .types import CachedFSPerfMetricData, VolumeStatsObserverOptions
 
@@ -13,7 +14,7 @@ if TYPE_CHECKING:
     from ai.backend.storage.volumes.pool import VolumePool
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class VolumeState:
@@ -67,14 +68,14 @@ class VolumeState:
                 return None
             return CachedFSPerfMetricData.model_validate_json(data_bytes)
         except Exception as e:
-            log.warning("Failed to get volume stats from cache for {}: {}", volume_name, e)
+            log.warning("volume stats cache read failed", exc_info=e, volume_name=volume_name)
             return None
 
     async def _fetch_and_cache(self, volume_name: str) -> CachedFSPerfMetricData:
         """Fetch metric from volume API and store in cache."""
         now = datetime.now(UTC)
 
-        volume = self._volume_pool.get_volume_by_name(volume_name)
+        volume = self._volume_pool.get_volume_by_name(StorageVolumeName(volume_name))
         metric = await volume.get_performance_metric()
         cached = CachedFSPerfMetricData.from_metric(
             volume_name=volume_name,
@@ -94,4 +95,6 @@ class VolumeState:
                 ttl_seconds=int(self._options.cache_ttl),
             )
         except Exception as e:
-            log.warning("Failed to store volume stats in cache for {}: {}", cached.volume_name, e)
+            log.warning(
+                "volume stats cache store failed", exc_info=e, volume_name=cached.volume_name
+            )

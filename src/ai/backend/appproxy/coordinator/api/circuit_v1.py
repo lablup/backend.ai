@@ -15,12 +15,12 @@ from ai.backend.appproxy.common.utils import (
 )
 from ai.backend.appproxy.coordinator.models import Circuit
 from ai.backend.appproxy.coordinator.types import RootContext
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .types import StubResponseModel
 from .utils import auth_required
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @auth_required("worker")
@@ -42,9 +42,7 @@ async def clear_circuit(request: web.Request) -> PydanticResponse[StubResponseMo
 
         await sess.commit()
 
-        log.info(
-            "clear_circuit(c: {}): removed circuit by request", request.match_info["circuit_id"]
-        )
+        log.trace("circuit removed by request", circuit_id=circuit_id)
         return PydanticResponse(StubResponseModel(success=True))
 
 

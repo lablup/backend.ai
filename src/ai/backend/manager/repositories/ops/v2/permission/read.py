@@ -27,8 +27,8 @@ from ai.backend.manager.data.permission.virtual_entity import (
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_field import PermissionFieldRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow

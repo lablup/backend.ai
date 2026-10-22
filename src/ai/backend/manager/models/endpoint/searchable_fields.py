@@ -55,7 +55,10 @@ from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditio
 from ai.backend.manager.models.specs.conditions.enum import EnumConditions
 from ai.backend.manager.models.specs.conditions.integer import IntConditions
 from ai.backend.manager.models.specs.conditions.number import DecimalConditions
-from ai.backend.manager.models.specs.conditions.string import StringConditions
+from ai.backend.manager.models.specs.conditions.string import (
+    DelimitedStringConditions,
+    StringConditions,
+)
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
@@ -115,7 +118,9 @@ class _DeploymentOwnFields(RowDataConverter[EndpointRow, ModelDeploymentData]):
         ColumnOrder(EndpointRow.scaling_state),
     )
     tag = SearchableField(
-        EndpointRow.tag, StringConditions(EndpointRow.tag), ColumnOrder(EndpointRow.tag)
+        EndpointRow.tag,
+        DelimitedStringConditions(EndpointRow.tag),
+        ColumnOrder(EndpointRow.tag),
     )
     open_to_public = SearchableField(
         EndpointRow.open_to_public,

@@ -47,8 +47,17 @@ from ai.backend.common.dto.manager.v2.resource_usage.types import (
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
+from ai.backend.manager.data.resource_usage_history.types import (
+    DomainUsageBucketData,
+    ProjectUsageBucketData,
+    UserUsageBucketData,
+)
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.resource_usage_history.row import (
     DomainUsageBucketRow,
     ProjectUsageBucketRow,
@@ -71,12 +80,7 @@ from ai.backend.manager.models.resource_usage_history.searchers import (
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.resource_usage_history import (
-    DomainUsageBucketData,
-    ProjectUsageBucketData,
-    UserUsageBucketData,
-)
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.services.resource_group.actions.lookup import LookupResourceGroupAction
 from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 from ai.backend.manager.services.resource_usage.actions.global_search_domain_usage_buckets import (
@@ -814,6 +818,13 @@ class ResourceUsageAdapter(BaseAdapter):
                 )
             )
 
+        if filter_req.field_id is not None:
+            conditions.extend(
+                self.apply_uuid_filter(
+                    filter_req.field_id, DomainUsageBucketSearchableFields.own.id.filter
+                )
+            )
+
         if filter_req.AND:
             for sub_filter in filter_req.AND:
                 conditions.extend(self._convert_domain_filter(sub_filter))
@@ -821,16 +832,17 @@ class ResourceUsageAdapter(BaseAdapter):
         if filter_req.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter_req.OR:
-                or_conditions.extend(self._convert_domain_filter(sub_filter))
+                sub_conditions = self._convert_domain_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
 
         if filter_req.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter_req.NOT:
-                not_conditions.extend(self._convert_domain_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_domain_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 
@@ -891,6 +903,13 @@ class ResourceUsageAdapter(BaseAdapter):
                 )
             )
 
+        if filter_req.field_id is not None:
+            conditions.extend(
+                self.apply_uuid_filter(
+                    filter_req.field_id, ProjectUsageBucketSearchableFields.own.id.filter
+                )
+            )
+
         if filter_req.AND:
             for sub_filter in filter_req.AND:
                 conditions.extend(self._convert_project_filter(sub_filter))
@@ -898,16 +917,17 @@ class ResourceUsageAdapter(BaseAdapter):
         if filter_req.OR:
             or_conditions_p: list[QueryCondition] = []
             for sub_filter in filter_req.OR:
-                or_conditions_p.extend(self._convert_project_filter(sub_filter))
+                sub_conditions = self._convert_project_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions_p.append(combine_conditions_and(sub_conditions))
             if or_conditions_p:
                 conditions.append(combine_conditions_or(or_conditions_p))
 
         if filter_req.NOT:
-            not_conditions_p: list[QueryCondition] = []
             for sub_filter in filter_req.NOT:
-                not_conditions_p.extend(self._convert_project_filter(sub_filter))
-            if not_conditions_p:
-                conditions.append(negate_conditions(not_conditions_p))
+                sub_conditions = self._convert_project_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 
@@ -973,6 +993,13 @@ class ResourceUsageAdapter(BaseAdapter):
                 )
             )
 
+        if filter_req.field_id is not None:
+            conditions.extend(
+                self.apply_uuid_filter(
+                    filter_req.field_id, UserUsageBucketSearchableFields.own.id.filter
+                )
+            )
+
         if filter_req.AND:
             for sub_filter in filter_req.AND:
                 conditions.extend(self._convert_user_filter(sub_filter))
@@ -980,16 +1007,17 @@ class ResourceUsageAdapter(BaseAdapter):
         if filter_req.OR:
             or_conditions_u: list[QueryCondition] = []
             for sub_filter in filter_req.OR:
-                or_conditions_u.extend(self._convert_user_filter(sub_filter))
+                sub_conditions = self._convert_user_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions_u.append(combine_conditions_and(sub_conditions))
             if or_conditions_u:
                 conditions.append(combine_conditions_or(or_conditions_u))
 
         if filter_req.NOT:
-            not_conditions_u: list[QueryCondition] = []
             for sub_filter in filter_req.NOT:
-                not_conditions_u.extend(self._convert_user_filter(sub_filter))
-            if not_conditions_u:
-                conditions.append(negate_conditions(not_conditions_u))
+                sub_conditions = self._convert_user_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 

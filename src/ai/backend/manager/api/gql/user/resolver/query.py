@@ -11,23 +11,19 @@ from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.dto.manager.v2.user.request import AdminSearchUsersInput
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_root_field,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
-from ai.backend.manager.api.gql.user.types import (
+from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
+from ai.backend.manager.api.gql.user.types.node import UserV2Connection, UserV2Edge, UserV2GQL
+from ai.backend.manager.api.gql.user.types.payloads import MyClientIpGQL
+from ai.backend.manager.api.gql.user.types.scopes import (
     DomainUserScopeGQL,
-    MyClientIpGQL,
     ProjectUserScopeGQL,
-    UserFilterGQL,
-    UserOrderByGQL,
     UserScopeGQL,
-    UserV2Connection,
-    UserV2Edge,
-    UserV2GQL,
 )
 from ai.backend.manager.api.gql.utils import check_admin_only
 
@@ -93,7 +89,7 @@ async def admin_users_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Page through the users the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."

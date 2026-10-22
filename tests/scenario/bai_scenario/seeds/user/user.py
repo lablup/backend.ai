@@ -26,13 +26,13 @@ from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.types import SecretValue
-from bai_scenario.seeds.seeder import Naming, SeedUser
+from bai_scenario.seeds.seeder import Naming, TestSeedUser
 
 PASSWORD = "scenario-password"
 
 
 @dataclass(frozen=True)
-class SeedUserOf(SeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePolicyData]):
+class TestSeedUserOf(TestSeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePolicyData]):
     """A user of the given domain, held to the given policies.
 
     All three are values earlier rows answered, so nothing here names a domain or a
@@ -45,6 +45,7 @@ class SeedUserOf(SeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePol
     status: UserStatus | None = None
     """Written as is when given; otherwise the row derives it from ``is_active``."""
     secret_key: SecretValue | None = None
+    need_password_change: bool = False
 
     @override
     def kind(self) -> str:
@@ -60,6 +61,8 @@ class SeedUserOf(SeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePol
 
     @override
     def detail(self) -> str:
+        if self.need_password_change:
+            return "자기 키와 개인 프로젝트를 갖는다, 비밀번호 변경을 요구받는다"
         if self.status is not None and self.status != UserStatus.ACTIVE:
             return f"상태 {self.status.value}, 자기 키와 개인 프로젝트를 갖는다"
         if self.secret_key is not None and not isinstance(self.secret_key.content, str):
@@ -89,7 +92,7 @@ class SeedUserOf(SeedUser[DomainData, UserResourcePolicyData, KeyPairResourcePol
                     rounds=1000,
                     salt_size=16,
                 ),
-                need_password_change=False,
+                need_password_change=self.need_password_change,
                 domain_id=domain.id,
                 role=self.role,
                 is_active=self.is_active,

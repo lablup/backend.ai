@@ -186,6 +186,7 @@ from pathlib import Path
 from pprint import pformat
 from typing import Annotated, Any, Literal, Self, override
 
+import sqlalchemy as sa
 from pydantic import (
     AliasChoices,
     ConfigDict,
@@ -224,8 +225,8 @@ from ai.backend.common.typed_validators import (
     UserID,
     _TimeDurationPydanticAnnotation,
 )
-from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.secret.types import (
@@ -236,7 +237,7 @@ from ai.backend.manager.data.secret.types import (
 from ai.backend.manager.defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
 from ai.backend.manager.pglock import PgAdvisoryLock
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 _default_smtp_template = """
 Action type: {{ action_type }}
@@ -277,16 +278,47 @@ class DatabaseConfig(BaseConfigSchema):
         ),
     ]
     addr: Annotated[
-        HostPortPair,
-        Field(default=HostPortPair(host="127.0.0.1", port=5432)),
+        HostPortPair | None,
+        Field(default=None),
         BackendAIConfigMeta(
             description=(
                 "Network address and port of the PostgreSQL database server. "
-                "Default is the standard PostgreSQL port (5432) on localhost. "
-                "In production, point this to your database server or cluster endpoint."
+                "Read as a one-member addrs list when addrs is not set."
             ),
             added_version="25.8.0",
-            example=ConfigExample(local="127.0.0.1:5432", prod="db.example.com:5432"),
+            deprecated_version="26.9.0",
+            deprecation_hint="Use addrs instead.",
+        ),
+    ]
+    addrs: Annotated[
+        list[HostPortPair],
+        Field(default_factory=lambda: [HostPortPair(host="127.0.0.1", port=5432)], min_length=1),
+        BackendAIConfigMeta(
+            description=(
+                "Addresses of the PostgreSQL cluster members. "
+                "List every member of an HA cluster, or a single address of a standalone "
+                "server or a proxy in front of the cluster."
+            ),
+            added_version="26.9.0",
+            composite=CompositeType.LIST,
+            example=ConfigExample(local="127.0.0.1:5432", prod="db1.example.com:5432"),
+        ),
+    ]
+    connect_timeout: Annotated[
+        float,
+        Field(
+            default=10.0,
+            gt=0,
+            validation_alias=AliasChoices("connect-timeout", "connect_timeout"),
+            serialization_alias="connect-timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for connecting to one member of addrs. "
+                "When it expires, the next member is tried."
+            ),
+            added_version="26.9.0",
+            example=ConfigExample(local="10", prod="5"),
         ),
     ]
     name: Annotated[
@@ -425,6 +457,30 @@ class DatabaseConfig(BaseConfigSchema):
         ),
     ]
 
+    @model_validator(mode="before")
+    @classmethod
+    def _read_addr_as_addrs(cls, data: Any) -> Any:
+        if (
+            not isinstance(data, Mapping)
+            or data.get("addr") is None
+            or data.get("addrs") is not None
+        ):
+            return data
+        return {**data, "addrs": [data["addr"]]}
+
+    def sqlalchemy_url(self) -> sa.engine.URL:
+        return sa.engine.URL.create(
+            "postgresql+asyncpg",
+            username=self.user,
+            password=self.password,
+            database=self.name,
+            query={
+                "host": ",".join(addr.host for addr in self.addrs),
+                "port": ",".join(str(addr.port) for addr in self.addrs),
+                "target_session_attrs": "primary",
+            },
+        )
+
 
 class EventLoopType(enum.StrEnum):
     ASYNCIO = "asyncio"
@@ -550,7 +606,7 @@ class ConfigKeyProviderConfig(BaseConfigSchema):
                 "id to the key list and pointing this at it; the previous ids stay so their "
                 "values keep decrypting."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             example=ConfigExample(local="v1", prod="v1"),
         ),
     ]
@@ -565,7 +621,7 @@ class ConfigKeyProviderConfig(BaseConfigSchema):
                 "values themselves, so an id may be retired only once no stored value still "
                 "names it."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             secret=True,
         ),
     ]
@@ -604,7 +660,7 @@ class SecretEncryptionConfig(BaseConfigSchema):
                 "secrets written earlier keep decrypting through the provider they name, and "
                 "a batch re-encryption normalizes stored secrets to whatever this names."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             example=ConfigExample(local="plain", prod="config"),
         ),
     ]
@@ -621,7 +677,7 @@ class SecretEncryptionConfig(BaseConfigSchema):
                 "id 'config'. Omit this section to leave that provider unconfigured, in which "
                 "case no stored secret naming it can be read."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             composite=CompositeType.FIELD,
         ),
     ]
@@ -651,6 +707,25 @@ class RBACConfig(BaseConfigSchema):
 
 
 class ManagerConfig(BaseConfigSchema):
+    shutdown_grace_period: Annotated[
+        float,
+        Field(
+            default=30.0,
+            gt=0,
+            allow_inf_nan=False,
+            validation_alias=AliasChoices("shutdown-grace-period", "shutdown_grace_period"),
+            serialization_alias="shutdown-grace-period",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds to keep accepting and serving requests after announcing the drain, "
+                "before closing the listeners. "
+                "Set it to about three times the health check interval of the clients' endpoint pool."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
     ipc_base_path: Annotated[
         AutoDirectoryPath,
         Field(
@@ -1369,9 +1444,7 @@ class ManagerConfig(BaseConfigSchema):
     @classmethod
     def _parse_rpc_auth_manager_keypair(cls, v: str) -> str:
         if not Path(v).exists():
-            log.warning(
-                f'RPC authentication keypair file does not exist: "{v}".',
-            )
+            log.warning("RPC authentication keypair file does not exist", keypair_path=v)
         return v
 
 
@@ -1610,7 +1683,7 @@ class AuditLogConfig(BaseConfigSchema):
                 "operations are always recorded and listing them here is rejected. Failed "
                 "and denied reads are recorded either way."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
         ),
     ]
 
@@ -3018,14 +3091,18 @@ class VolumeProxyConfig(BaseConfigSchema):
         ),
     ]
     manager_api: Annotated[
-        str,
+        CommaSeparatedStrList,
         Field(
             validation_alias=AliasChoices("manager_api", "manager-api"),
             serialization_alias="manager_api",
         ),
         BackendAIConfigMeta(
             description=(
-                "Manager-facing API endpoint URL of the storage proxy. This internal URL is used "
+                "Manager-facing API endpoint URL(s) of storage proxy instances mounting the same storage. "
+                "Accepts a single URL or comma-separated URLs, for example "
+                "http://a:6022,http://b:6022. Each request selects a healthy instance using "
+                "its configured readiness path (default /readyz); failed requests are not retried. "
+                "These internal URLs are used "
                 "by the manager to perform administrative operations like creating/deleting folders, "
                 "managing quotas, and checking storage status. Should only be accessible from "
                 "the manager's network."
@@ -3034,6 +3111,93 @@ class VolumeProxyConfig(BaseConfigSchema):
             example=ConfigExample(
                 local="http://localhost:6022", prod="http://storage-internal:6022"
             ),
+        ),
+    ]
+    health_check_probe_path: Annotated[
+        str,
+        Field(
+            default="/readyz",
+            validation_alias=AliasChoices("health_check_probe_path", "health-check-probe-path"),
+            serialization_alias="health_check_probe_path",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "HTTP path probed on each manager-facing storage proxy endpoint. "
+                "Must return 2xx when ready and be accessible without token authentication."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="/readyz", prod="/readyz"),
+        ),
+    ]
+    health_check_interval: Annotated[
+        float,
+        Field(
+            default=10.0,
+            gt=0,
+            validation_alias=AliasChoices("health_check_interval", "health-check-interval"),
+            serialization_alias="health_check_interval",
+        ),
+        BackendAIConfigMeta(
+            description="Seconds between readiness probe rounds for this storage proxy.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="10.0", prod="10.0"),
+        ),
+    ]
+    health_check_failure_threshold: Annotated[
+        int,
+        Field(
+            default=3,
+            ge=1,
+            validation_alias=AliasChoices(
+                "health_check_failure_threshold", "health-check-failure-threshold"
+            ),
+            serialization_alias="health_check_failure_threshold",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Consecutive probe or request connection failures before an endpoint is excluded. "
+                "A successful probe or request resets the count; a successful probe restores "
+                "an excluded endpoint."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="3", prod="3"),
+        ),
+    ]
+    health_check_recovery_timeout: Annotated[
+        float,
+        Field(
+            default=60.0,
+            gt=0,
+            validation_alias=AliasChoices(
+                "health_check_recovery_timeout", "health-check-recovery-timeout"
+            ),
+            serialization_alias="health_check_recovery_timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Recovery timeout in seconds, reserved for future endpoint eviction policies. "
+                "Currently unused by the pool; endpoints recover on the next successful probe."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="60.0", prod="60.0"),
+        ),
+    ]
+    health_check_probe_timeout: Annotated[
+        float,
+        Field(
+            default=2.0,
+            gt=0,
+            validation_alias=AliasChoices(
+                "health_check_probe_timeout", "health-check-probe-timeout"
+            ),
+            serialization_alias="health_check_probe_timeout",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for each readiness probe, independent of operation timeouts."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="2.0", prod="2.0"),
         ),
     ]
     secret: Annotated[
@@ -3101,6 +3265,14 @@ class VolumeProxyConfig(BaseConfigSchema):
             composite=CompositeType.FIELD,
         ),
     ]
+
+    @field_validator("manager_api")
+    @classmethod
+    def validate_manager_api(cls, endpoints: CommaSeparatedStrList) -> CommaSeparatedStrList:
+        normalized = [endpoint.strip() for endpoint in endpoints]
+        if not normalized or any(not endpoint for endpoint in normalized):
+            raise ValueError("manager_api must contain non-empty endpoint URLs")
+        return CommaSeparatedStrList(list(dict.fromkeys(normalized)))
 
 
 class VolumesConfig(BaseConfigSchema):
@@ -3665,7 +3837,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "failures and permission denials; this section only opts successful read "
                 "operations in."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             composite=CompositeType.FIELD,
         ),
     ]
@@ -3801,7 +3973,7 @@ class ManagerUnifiedConfig(BaseConfigSchema):
                 "Names which key provider writes new secrets and configures the providers. "
                 "New secrets are stored as plaintext until a write provider is named."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             composite=CompositeType.FIELD,
         ),
     ]

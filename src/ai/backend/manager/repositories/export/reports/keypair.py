@@ -6,12 +6,15 @@ import json
 from decimal import Decimal
 from typing import Any
 
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.resource_group import ResourceGroupForKeypairsRow, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import KeyPairResourcePolicyRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.resource_group.row import (
+    ResourceGroupForKeypairsRow,
+    ResourceGroupRow,
+)
+from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
 from ai.backend.manager.models.resource_slot.aggregates import session_requested_slots_expr
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.repositories.base.export import (
     ExportFieldDef,
     ExportFieldType,

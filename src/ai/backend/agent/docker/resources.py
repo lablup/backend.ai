@@ -15,9 +15,9 @@ from ai.backend.agent.resources import (
 )
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.types import DeviceName, SlotName
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 _HOST_CONFIG_FIELD: Final[str] = "HostConfig"
 _MOUNTS_FIELD: Final[str] = "Mounts"

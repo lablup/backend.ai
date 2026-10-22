@@ -17,6 +17,7 @@ from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.common import (
     EnvironmentVariableEntryInput,
+    NonEmptyList,
     OrderDirection,
     ResourceSlotEntryInput,
 )
@@ -29,6 +30,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetUsage,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsEntryDTO
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 
@@ -281,8 +283,29 @@ class UpdateDeploymentRevisionPresetInput(BaseRequestModel):
     deployment_strategy: DeploymentStrategyInput | None | Unset = Field(default=UNSET)
 
 
+class PartialBulkUpdateDeploymentRevisionPresetsInput(BaseRequestModel):
+    """Input for updating several presets, each answered for separately."""
+
+    items: NonEmptyList[UpdateDeploymentRevisionPresetInput] = Field(
+        description="The presets to update, each naming its preset by `id`."
+    )
+
+
+class PartialBulkPurgeDeploymentRevisionPresetsInput(BaseRequestModel):
+    """Input for permanently removing several presets, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the presets to purge.")
+
+
 class DeploymentRevisionPresetFilter(BaseRequestModel):
-    id: UUIDFilter | None = Field(default=None, description="Filter by preset ID.")
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entity_id`.",
+        deprecated=True,
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by preset ID."
+    )
     name: StringFilter | None = Field(default=None)
     runtime_variant_id: UUIDFilter | None = Field(default=None)
     AND: list[DeploymentRevisionPresetFilter] | None = Field(default=None)

@@ -6,19 +6,21 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import (
     SessionId,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
-from ai.backend.manager.repositories.fair_share import FairShareRepository
-from ai.backend.manager.repositories.scheduler import SchedulerRepository
-from ai.backend.manager.sokovan.recorder import (
+from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.sokovan.recorder.context import (
     RecorderContext,
 )
+from ai.backend.manager.sokovan.scheduler.exceptions import SchedulingError
 from ai.backend.manager.sokovan.scheduler.results import (
     PreemptionPlanEntry,
     ScheduleResult,
@@ -49,7 +51,7 @@ from .sequencers.lifo import LIFOSequencer
 from .sequencers.sequencer import SchedulingSequencer, WorkloadSequencer
 from .validators.validator import SchedulingValidator
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -184,43 +186,42 @@ class SessionProvisioner:
         scheduling_skips: list[SchedulingSkip] = []
 
         for index, session_workload in enumerate(sequenced_workloads):
-            try:
-                # Sequencing phase is automatically included via shared phases
-                session_allocation = await self._schedule_workload(
-                    state,
-                    session_workload,
-                    claimed_victim_ids,
-                )
-                if session_allocation.preempting_session_ids:
-                    reserved_allocations.append(session_allocation)
-                    claimed_victim_ids.update(session_allocation.preempting_session_ids)
-                else:
-                    session_allocations.append(session_allocation)
-            except (BatchAgentSelectionFailedError, NoAvailableAgentError) as e:
-                # The group ran out of resources. This is the one failure the
-                # sessions behind share: they would take exactly what this one
-                # is waiting for, so they are left unattempted.
-                self._record_failure(scheduling_failures, session_workload, e)
-                scheduling_skips.extend(
-                    self._skips_behind(
-                        sequenced_workloads[index + 1 :], session_workload.meta.session_id
+            with with_log_context(session_id=session_workload.meta.session_id):
+                try:
+                    # Sequencing phase is automatically included via shared phases
+                    session_allocation = await self._schedule_workload(
+                        state,
+                        session_workload,
+                        claimed_victim_ids,
                     )
-                )
-                break
-            except Exception as e:
-                # Specific to the session that hit it (an architecture mismatch,
-                # an unsatisfied dependency, an exceeded quota, a group with no
-                # agents at all), so it must not stall the sessions behind it.
-                self._record_failure(scheduling_failures, session_workload, e)
+                    if session_allocation.preempting_session_ids:
+                        reserved_allocations.append(session_allocation)
+                        claimed_victim_ids.update(session_allocation.preempting_session_ids)
+                    else:
+                        session_allocations.append(session_allocation)
+                except (BatchAgentSelectionFailedError, NoAvailableAgentError) as e:
+                    # The group ran out of resources. This is the one failure the
+                    # sessions behind share: they would take exactly what this one
+                    # is waiting for, so they are left unattempted.
+                    self._record_failure(scheduling_failures, session_workload, e)
+                    scheduling_skips.extend(
+                        self._skips_behind(
+                            sequenced_workloads[index + 1 :], session_workload.meta.session_id
+                        )
+                    )
+                    break
+                except Exception as e:
+                    # Specific to the session that hit it (an architecture mismatch,
+                    # an unsatisfied dependency, an exceeded quota, a group with no
+                    # agents at all), so it must not stall the sessions behind it.
+                    self._record_failure(scheduling_failures, session_workload, e)
 
-        log.info(
-            "Processing {} allocations, {} reservations, {} failures"
-            " and {} skips in resource group {}",
-            len(session_allocations),
-            len(reserved_allocations),
-            len(scheduling_failures),
-            len(scheduling_skips),
-            resource_group_id,
+        log.debug(
+            "resource group scheduled",
+            allocation_count=len(session_allocations),
+            reservation_count=len(reserved_allocations),
+            failure_count=len(scheduling_failures),
+            skip_count=len(scheduling_skips),
         )
         with self._phase_metrics.measure_phase("scheduler", resource_group_id, "allocation"):
             scheduled_session_ids = await self._repository.allocate_sessions(session_allocations)
@@ -255,17 +256,21 @@ class SessionProvisioner:
         session_workload: SessionWorkload,
         error: Exception,
     ) -> None:
-        log.debug(
-            "Scheduling failed for workload {}: {}",
-            session_workload.meta.session_id,
-            error,
-        )
+        if self._is_rejection(error):
+            log.trace("session scheduling failed: {}", error)
+        else:
+            log.exception("session scheduling failed")
         scheduling_failures.append(
             SchedulingFailure(
                 session_id=session_workload.meta.session_id,
                 msg=str(error),
             )
         )
+
+    def _is_rejection(self, error: Exception) -> bool:
+        if isinstance(error, SchedulingError):
+            return True
+        return isinstance(error, BackendAIError) and error.is_client_error()
 
     def _skips_behind(
         self,

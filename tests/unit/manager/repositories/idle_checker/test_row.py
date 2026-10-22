@@ -24,16 +24,16 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow, SessionIdleCheckRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.db import with_tables
 
@@ -75,6 +75,7 @@ class TestSessionIdleCheckRow:
         project_id = uuid.uuid4()
         resource_group_id = ResourceGroupID(uuid.uuid4())
         session_id = SessionId(uuid.uuid4())
+        user_id = uuid.uuid4()
         checker_id = IdleCheckerID(uuid.uuid4())
         created_at = datetime(2026, 1, 1, tzinfo=UTC)
         expire_at = datetime(2026, 1, 2, tzinfo=UTC)
@@ -119,6 +120,25 @@ class TestSessionIdleCheckRow:
                 )
             )
             db_sess.add(
+                UserResourcePolicyRow(
+                    name="session-idle-check-user-policy",
+                    max_vfolder_count=10,
+                    max_quota_scope_size=1024,
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
+            db_sess.add(
+                UserRow(
+                    uuid=user_id,
+                    username="session-idle-check-user",
+                    email="session-idle-check-user@example.com",
+                    domain_name="session-idle-check-domain",
+                    domain_id=domain_id,
+                    resource_policy="session-idle-check-user-policy",
+                )
+            )
+            db_sess.add(
                 SessionRow(
                     id=session_id,
                     creation_id=str(session_id)[:32],
@@ -130,7 +150,7 @@ class TestSessionIdleCheckRow:
                     domain_id=domain_id,
                     resource_group_id=resource_group_id,
                     group_id=project_id,
-                    user_uuid=uuid.uuid4(),
+                    user_uuid=user_id,
                     access_key=None,
                     tag=None,
                     status=SessionStatus.RUNNING,

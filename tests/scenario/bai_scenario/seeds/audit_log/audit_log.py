@@ -24,15 +24,16 @@ from ai.backend.manager.models.audit_log.creators import (
     SingleEntityAuditLogCreator,
 )
 from ai.backend.manager.models.specs.creator import NestedFieldCreator
-from bai_scenario.seeds.seeder import SeedField, SeedFieldWithNestedRows
+from bai_scenario.seeds.seeder import TestSeedFieldCreator, TestSeedFieldWithNestedRows
 
 
 @dataclass(frozen=True)
-class SeedAuditRecord[Owner](SeedField[Owner, AuditLogData]):
+class TestSeedAuditRecord[Owner](TestSeedFieldCreator[Owner, AuditLogData]):
     """One record of an operation on the entity ``owner_of`` reads off the laid row.
 
     The record's ``triggered_by`` is a user id, or none; the actor axis of a scoped read
-    matches on it while the entity axis matches on the owner.
+    matches on it while the entity axis matches on the owner. Records given the same
+    ``action_id`` are rows of one run; without one, each record is its own run.
     """
 
     owner_of: Callable[[Owner], EntityIdentifier]
@@ -40,6 +41,7 @@ class SeedAuditRecord[Owner](SeedField[Owner, AuditLogData]):
     created_at: datetime
     status: OperationStatus = OperationStatus.SUCCESS
     triggered_by: UserID | None = None
+    action_id: UUID | None = None
 
     @override
     def kind(self) -> str:
@@ -48,6 +50,8 @@ class SeedAuditRecord[Owner](SeedField[Owner, AuditLogData]):
             parts.append(f"{self.status.value} 상태")
         if self.triggered_by is not None:
             parts.append("실행한 사용자가 정해져 있음")
+        if self.action_id is not None:
+            parts.append("다른 기록과 같은 실행에서 남음")
         return ", ".join(parts)
 
     @override
@@ -57,7 +61,7 @@ class SeedAuditRecord[Owner](SeedField[Owner, AuditLogData]):
     @override
     def seed(self) -> SingleEntityAuditLogCreator:
         return SingleEntityAuditLogCreator(
-            action_id=uuid4(),
+            action_id=self.action_id if self.action_id is not None else uuid4(),
             operation=self.operation,
             action_name=self.operation,
             created_at=self.created_at,
@@ -72,7 +76,7 @@ class SeedAuditRecord[Owner](SeedField[Owner, AuditLogData]):
 
 
 @dataclass(frozen=True)
-class SeedScopedAuditRecord[Owner](SeedFieldWithNestedRows[Owner, AuditLogData]):
+class TestSeedScopedAuditRecord[Owner](TestSeedFieldWithNestedRows[Owner, AuditLogData]):
     """A scope-action record: written under the entity it affected, tagged with the scopes
     the run covered. A search by one of those scopes finds it through ``audit_log_scopes``,
     not through the record's own entity.
@@ -112,6 +116,6 @@ class SeedScopedAuditRecord[Owner](SeedFieldWithNestedRows[Owner, AuditLogData])
     @override
     def nested(self) -> Sequence[NestedFieldCreator[Any, Any, Any]]:
         return [
-            AuditLogScopeCreator(scope_type=str(scope_type), scope_id=scope_id)
+            AuditLogScopeCreator(scope_type=scope_type, scope_id=scope_id)
             for scope_type, scope_id in self.scopes
         ]

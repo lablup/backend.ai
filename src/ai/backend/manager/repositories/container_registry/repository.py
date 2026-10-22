@@ -8,25 +8,26 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.container_registry.types import (
     ContainerRegistryData,
 )
 from ai.backend.manager.data.image.types import ImageStatus
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.errors.image import ContainerRegistryNotFound
-from ai.backend.manager.models.container_registry import (
+from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
+from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
+from ai.backend.manager.models.container_registry.row import (
     ContainerRegistryRow,
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
-from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
-from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
 from ai.backend.manager.models.container_registry.searchable_fields import (
     ContainerRegistrySearchableFields,
 )
@@ -34,11 +35,13 @@ from ai.backend.manager.models.container_registry.updaters import (
     ContainerRegistryGlobalUpdater,
     ContainerRegistryUpdater,
 )
-from ai.backend.manager.models.image import ImageRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.rbac import ProjectScope
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # How many images join or leave `public` per transaction when a registry is switched.
 IMAGE_MEMBERSHIP_CHUNK_SIZE = 1000
@@ -63,10 +66,12 @@ container_registry_repository_resilience = Resilience(
 class ContainerRegistryRepository:
     _db: ExtendedAsyncSAEngine
     _ops_provider: ShareOpsProvider
+    _db_source: ContainerRegistryDBSource
 
     def __init__(self, db: ExtendedAsyncSAEngine, ops_provider: ShareOpsProvider) -> None:
         self._db = db
         self._ops_provider = ops_provider
+        self._db_source = ContainerRegistryDBSource(ops_provider)
 
     async def create_registry(
         self,
@@ -248,6 +253,13 @@ class ContainerRegistryRepository:
             )
             result = await session.execute(stmt)
             return result.scalars().one_or_none()
+
+    @container_registry_repository_resilience.apply()
+    async def get_project_registry(self, scope_id: ProjectScope) -> ContainerRegistryData:
+        registry_id = await self._db_source.lookup_image_commit_registry_id(
+            ProjectID(scope_id.project_id)
+        )
+        return await self._db_source.fetch_by_id(registry_id)
 
     @container_registry_repository_resilience.apply()
     async def get_registry_row_for_scanner(

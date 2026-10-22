@@ -1,6 +1,9 @@
 from uuid import UUID, uuid4
 
 import pytest
+from opentelemetry import trace
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import SpanKind
 from pydantic import ValidationError
 
 from ai.backend.common.contexts.user import current_user, triggered_user
@@ -208,3 +211,33 @@ class TestMessageMetadata:
         # Reset after the block — also covers the system-event case (both None).
         assert current_user() is None
         assert triggered_user() is None
+
+
+class TestMessageMetadataTraceContext:
+    def test_traceparent_round_trip(self, span_exporter: InMemorySpanExporter) -> None:
+        with trace.get_tracer(__name__).start_as_current_span("sender") as sender:
+            metadata = MessageMetadata.from_current_context()
+
+        restored = MessageMetadata.deserialize(metadata.serialize())
+        with restored.continue_trace("receiver", SpanKind.CONSUMER):
+            receiver_context = trace.get_current_span().get_span_context()
+
+        assert restored.traceparent == metadata.traceparent
+        assert receiver_context.trace_id == sender.get_span_context().trace_id
+        (receiver,) = [s for s in span_exporter.get_finished_spans() if s.name == "receiver"]
+        assert receiver.parent is not None
+        assert receiver.parent.span_id == sender.get_span_context().span_id
+
+    def test_no_traceparent_outside_span(self) -> None:
+        assert MessageMetadata.from_current_context().traceparent is None
+
+    def test_message_without_traceparent_opens_no_span(
+        self, span_exporter: InMemorySpanExporter
+    ) -> None:
+        metadata = MessageMetadata.deserialize(b'{"request_id": "req-old", "user": null}')
+
+        with metadata.continue_trace("receiver", SpanKind.CONSUMER):
+            assert trace.get_current_span().get_span_context().is_valid is False
+
+        assert metadata.traceparent is None
+        assert span_exporter.get_finished_spans() == ()

@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -21,6 +22,7 @@ class IdleCheckerInput:
     config_provider: ManagerConfigProvider
     event_producer: EventProducer
     lock_factory: DistributedLockFactory
+    sentinel_monitors: SentinelMonitorSet
 
 
 class IdleCheckerHostDependency(
@@ -53,6 +55,7 @@ class IdleCheckerHostDependency(
             setup_input.config_provider,
             setup_input.event_producer,
             setup_input.lock_factory,
+            setup_input.sentinel_monitors,
         )
         await checker_host.start()
         try:

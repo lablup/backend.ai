@@ -9,7 +9,6 @@ from .request import (
     PerformSchedulerOpsRequest,
     PushBackgroundTaskEventsRequest,
     PushSessionEventsRequest,
-    UpdateAnnouncementRequest,
     UpdateManagerStatusRequest,
 )
 from .response import (
@@ -17,7 +16,6 @@ from .response import (
     ClearErrorLogResponse,
     ErrorLogItem,
     FetchManagerStatusResponse,
-    GetAnnouncementResponse,
     ListErrorLogsResponse,
     ManagerNodeInfo,
 )
@@ -35,14 +33,12 @@ __all__ = (
     "PerformSchedulerOpsRequest",
     "PushBackgroundTaskEventsRequest",
     "PushSessionEventsRequest",
-    "UpdateAnnouncementRequest",
     "UpdateManagerStatusRequest",
     # Response DTOs
     "AppendErrorLogResponse",
     "ClearErrorLogResponse",
     "ErrorLogItem",
     "FetchManagerStatusResponse",
-    "GetAnnouncementResponse",
     "ListErrorLogsResponse",
     "ManagerNodeInfo",
     # Types

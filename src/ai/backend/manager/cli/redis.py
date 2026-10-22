@@ -7,14 +7,14 @@ from typing import TYPE_CHECKING
 import click
 import glide
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.utils import enforce_debug_logging
 from ai.backend.manager.cli.context import redis_ctx
 
 if TYPE_CHECKING:
     from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @click.group()
@@ -34,11 +34,8 @@ def ping(cli_ctx: CLIContext) -> None:
     """
 
     async def _impl() -> None:
-        # TODO: Remove redis after migrating to Valkey completely.
         enforce_debug_logging([
-            "redis",
             "glide",
-            "ai.backend.common.redis_helper",
             "ai.backend.common.clients.valkey_client",
         ])
         async with redis_ctx(cli_ctx) as redis_conn_set:
@@ -49,6 +46,6 @@ def ping(cli_ctx: CLIContext) -> None:
                 await redis_conn_set.stream.ping()
                 print("Redis is healthy")
             except (glide.ConnectionError, glide.TimeoutError):
-                log.exception("ping(): Valkey ping failed")
+                log.exception("valkey ping failed")
 
     asyncio.run(_impl())

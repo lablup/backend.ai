@@ -15,10 +15,11 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.entity.network import NetworkID
-from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.network.types import NetworkData
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import (
     GenericForbidden,
     ServerMisconfiguredError,
@@ -28,11 +29,12 @@ from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
-from ai.backend.manager.models.network import NetworkRow
 from ai.backend.manager.models.network.creators import NetworkCreator
 from ai.backend.manager.models.network.purgers import NetworkPurger
-from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.network.row import NetworkRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.user.row import UserRole
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 
 from .base import (
     FilterExprArg,
@@ -55,7 +57,7 @@ __all__ = (
     "NetworkNode",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @graphene_federation.key("id")
@@ -148,12 +150,14 @@ class NetworkNode(graphene.ObjectType):  # type: ignore[misc]
         _, raw_network_id = AsyncNode.resolve_global_id(info, id)
         if not raw_network_id:
             raw_network_id = id
+        try:
+            network_id = uuid.UUID(raw_network_id)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid id: {id}") from e
 
         async with graph_ctx.db.begin_readonly_session() as db_session:
             try:
-                return cls.from_row(
-                    await NetworkRow.get(db_session, uuid.UUID(raw_network_id), load_project=True)
-                )
+                return cls.from_row(await NetworkRow.get(db_session, network_id, load_project=True))
             except NoResultFound as e:
                 raise ValueError(f"Network not found (id: {raw_network_id})") from e
 
@@ -207,12 +211,12 @@ class NetworkNode(graphene.ObjectType):  # type: ignore[misc]
                 case UserRole.ADMIN:
                     additional_cond = NetworkRow.domain_name == graph_ctx.user["domain_name"]
                 case UserRole.USER:
-                    project_query = sa.select(AssocGroupUserRow).where(
-                        AssocGroupUserRow.user_id == graph_ctx.user["uuid"]
+                    project_query = user_scope_membership_query(
+                        ProjectEntityType(), graph_ctx.user["uuid"]
                     )
-                    available_projects = (await db_session.execute(project_query)).scalars().all()
+                    available_projects = (await db_session.execute(project_query)).all()
                     additional_cond = NetworkRow.project.in_([
-                        p.group_id for p in available_projects
+                        p.scope_id for p in available_projects
                     ])
 
             query = query.where(additional_cond)
@@ -290,12 +294,8 @@ class CreateNetwork(graphene.Mutation):  # type: ignore[misc]
                 )
 
         network_plugin = graph_ctx.network_plugin_ctx.plugins[_driver]
-        try:
-            network_info = await network_plugin.create_network()
-            network_name = network_info.network_id
-        except Exception:
-            log.exception("Failed to create the inter-container network (plugin: {})", _driver)
-            raise
+        network_info = await network_plugin.create_network()
+        network_name = network_info.network_id
 
         async def _do_mutate() -> CreateNetwork:
             data = await graph_ctx.network_repository.create_entity(

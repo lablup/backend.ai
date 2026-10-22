@@ -19,7 +19,8 @@ from ai.backend.manager.models.base import (
     IDColumn,
     convention,
 )
-from ai.backend.manager.models.user import PasswordColumn, UserRole
+from ai.backend.manager.models.hasher.types import PasswordColumn
+from ai.backend.manager.models.user.row import UserRole
 
 # from ai.backend.manager.models import keypairs, users, UserRole
 

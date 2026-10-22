@@ -38,6 +38,7 @@ from jupyter_client.manager import AsyncKernelManager
 from .compat import current_loop
 from .intrinsic import (
     init_sshd_service,
+    prepare_etty_service,
     prepare_sshd_service,
     prepare_ttyd_service,
 )
@@ -902,6 +903,8 @@ class BaseRunner(metaclass=ABCMeta):
                     cmdargs, env = None, {}
                     if service_info["name"] == "ttyd":
                         cmdargs, env = await prepare_ttyd_service(service_info)
+                    elif service_info["name"] == "etty":
+                        cmdargs, env = await prepare_etty_service(service_info)
                     elif service_info["name"] == "sshd":
                         cmdargs, env = await prepare_sshd_service(service_info)
                     elif self.service_parser is not None:
@@ -928,6 +931,7 @@ class BaseRunner(metaclass=ABCMeta):
                             "status": "failed",
                             "error": error_reason,
                         }
+                    cmdargs = self._override_jupyter_cookie(service_info["name"], cmdargs)
                     service_env = {**self.child_env, **env}
                     # avoid conflicts with Python binary used by service apps.
                     if "LD_LIBRARY_PATH" in service_env:
@@ -1004,6 +1008,18 @@ class BaseRunner(metaclass=ABCMeta):
         finally:
             if error_reason:
                 log.warning("failed to start service {}: {}", service_info["name"], error_reason)
+
+    def _override_jupyter_cookie(
+        self, service_name: str, cmdargs: Sequence[str | os.PathLike[str]]
+    ) -> Sequence[str | os.PathLike[str]]:
+        # Jupyter's default login cookie lasts 30 days under a name that carries the host port,
+        # so every session left one behind. Applied here to cover images' service-defs too.
+        if service_name not in ("jupyter", "jupyterlab"):
+            return cmdargs
+        overrides = ['--IdentityProvider.cookie_options={"expires_days": None}']
+        if session_id := os.environ.get("BACKENDAI_SESSION_ID"):
+            overrides.append(f"--IdentityProvider.cookie_name=bai-jupyter-{session_id}")
+        return [*cmdargs, *overrides]
 
     async def _wait_service_proc(
         self,
@@ -1177,7 +1193,7 @@ class BaseRunner(metaclass=ABCMeta):
         self._pid_set_history: list[dict[int, dict[str, Any]]] = []
         monitor_proc_task = asyncio.create_task(self._monitor_processes())
 
-        log.debug("starting intrinsic services: sshd, ttyd ...")
+        log.debug("starting intrinsic services: sshd, ttyd, etty ...")
         intrinsic_spawn_coros = []
         intrinsic_spawn_coros.append(
             self._start_service(
@@ -1194,6 +1210,16 @@ class BaseRunner(metaclass=ABCMeta):
                 {
                     "name": "ttyd",
                     "port": self.intrinsic_host_ports_mapping.get("ttyd", 7681),
+                    "protocol": "http",
+                },
+                launch_timeout=10.0,
+            )
+        )
+        intrinsic_spawn_coros.append(
+            self._start_service(
+                {
+                    "name": "etty",
+                    "port": self.intrinsic_host_ports_mapping.get("etty", 7682),
                     "protocol": "http",
                 },
                 launch_timeout=10.0,

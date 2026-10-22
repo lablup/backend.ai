@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
 )
@@ -32,6 +33,7 @@ class RedisProviderInput:
     """Input for the Valkey client provider."""
 
     redis_config: RedisConfig
+    sentinel_monitors: SentinelMonitorSet
     pidx: int
 
 
@@ -60,33 +62,37 @@ class RedisProvider(DependencyProvider[RedisProviderInput, StorageProxyValkeyCli
     ) -> AsyncIterator[StorageProxyValkeyClients]:
         pidx = setup_input.pidx
         redis_profile_target = setup_input.redis_config.to_redis_profile_target()
+        sentinel_monitors = setup_input.sentinel_monitors
+        bgtask_target = redis_profile_target.profile_target(RedisRole.BGTASK).to_valkey_target()
+        stat_target = redis_profile_target.profile_target(RedisRole.STATISTICS).to_valkey_target()
+        tus_target = redis_profile_target.profile_target(RedisRole.TUS).to_valkey_target()
 
         bgtask_client = await ValkeyBgtaskClient.create(
-            redis_profile_target.profile_target(RedisRole.BGTASK).to_valkey_target(),
+            bgtask_target,
             human_readable_name=f"storage-proxy-bgtask-{pidx}",
             db_id=REDIS_BGTASK_DB,
+            sentinel_monitor=sentinel_monitors.monitor_for(bgtask_target),
         )
 
         artifact_client = await ValkeyArtifactDownloadTrackingClient.create(
-            valkey_target=redis_profile_target.profile_target(
-                RedisRole.STATISTICS
-            ).to_valkey_target(),
+            valkey_target=stat_target,
             db_id=REDIS_STATISTICS_DB,
             human_readable_name=f"storage-proxy-artifact-download-tracker-{pidx}",
+            sentinel_monitor=sentinel_monitors.monitor_for(stat_target),
         )
 
         tus_client = await ValkeyTusClient.create(
-            valkey_target=redis_profile_target.profile_target(RedisRole.TUS).to_valkey_target(),
+            valkey_target=tus_target,
             db_id=REDIS_TUS_DB,
             human_readable_name=f"storage-proxy-tus-{pidx}",
+            sentinel_monitor=sentinel_monitors.monitor_for(tus_target),
         )
 
         volume_stats_client = await ValkeyVolumeStatsClient.create(
-            valkey_target=redis_profile_target.profile_target(
-                RedisRole.STATISTICS
-            ).to_valkey_target(),
+            valkey_target=stat_target,
             db_id=REDIS_STATISTICS_DB,
             human_readable_name=f"storage-proxy-volume-stats-{pidx}",
+            sentinel_monitor=sentinel_monitors.monitor_for(stat_target),
         )
 
         try:

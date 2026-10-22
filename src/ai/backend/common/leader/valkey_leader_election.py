@@ -10,9 +10,9 @@ from typing import Final, override
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
 from ai.backend.common.leader.base import AbstractLeaderElection, LeaderTask
 from ai.backend.common.leader.exceptions import AlreadyStartedError
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass(frozen=True)
@@ -91,7 +91,7 @@ class ValkeyLeaderElection(AbstractLeaderElection):
         if self._started:
             raise AlreadyStartedError("Cannot register tasks after leader election has started")
         self._leader_tasks.append(task)
-        log.info("Registered leader task: {}", task.__class__.__name__)
+        log.debug("leader task registered", task_class_name=task.__class__.__name__)
 
     async def _try_acquire_or_renew_leadership(self) -> bool:
         return await self._leader_client.acquire_or_renew_leadership(
@@ -115,34 +115,35 @@ class ValkeyLeaderElection(AbstractLeaderElection):
                     if not was_leader:
                         self._is_leader = True
                         log.info(
-                            "Server {} became the leader for {}",
-                            self._config.server_id,
-                            self._config.leader_key,
+                            "leadership acquired",
+                            server_id=self._config.server_id,
+                            leader_key=self._config.leader_key,
                         )
                 else:
                     if was_leader:
                         self._is_leader = False
                         log.info(
-                            "Server {} lost leadership for {}",
-                            self._config.server_id,
-                            self._config.leader_key,
+                            "leadership lost",
+                            server_id=self._config.server_id,
+                            leader_key=self._config.leader_key,
                         )
             except Exception:
                 failure_count += 1
                 log.warning(
-                    "Error during leadership renewal for {} (failure {}/{})",
-                    self._config.leader_key,
-                    failure_count,
-                    self._config.failure_threshold,
+                    "leadership renewal failed",
+                    exc_info=True,
+                    leader_key=self._config.leader_key,
+                    failure_count=failure_count,
+                    failure_threshold=self._config.failure_threshold,
                 )
                 if failure_count >= self._config.failure_threshold:
                     # Too many failures, lose leadership
                     if self._is_leader:
                         log.warning(
-                            "Server {} lost leadership for {} after {} consecutive failures",
-                            self._config.server_id,
-                            self._config.leader_key,
-                            self._config.failure_threshold,
+                            "leadership lost after consecutive renewal failures",
+                            server_id=self._config.server_id,
+                            leader_key=self._config.leader_key,
+                            failure_count=self._config.failure_threshold,
                         )
                     self._is_leader = False
                     failure_count = 0  # Reset after losing leadership
@@ -154,7 +155,7 @@ class ValkeyLeaderElection(AbstractLeaderElection):
         """
         Start the leader election renewal loop and all registered tasks.
         """
-        log.info("Starting Valkey leader election for server {}", self._config.server_id)
+        log.debug("valkey leader election starting", server_id=self._config.server_id)
 
         if self._started:
             raise AlreadyStartedError("Leader election already started")
@@ -169,9 +170,13 @@ class ValkeyLeaderElection(AbstractLeaderElection):
         # Start all registered leader tasks
         for task in self._leader_tasks:
             await task.start(self)  # Pass self as LeadershipChecker
-            log.debug("Started leader task: {}", task.__class__.__name__)
+            log.debug("leader task started", task_class_name=task.__class__.__name__)
 
-        log.info("Valkey leader election started")
+        log.info(
+            "valkey leader election started",
+            server_id=self._config.server_id,
+            leader_key=self._config.leader_key,
+        )
 
     @override
     async def stop(self) -> None:
@@ -179,16 +184,16 @@ class ValkeyLeaderElection(AbstractLeaderElection):
         Stop the leader election, all tasks, and release leadership if held.
         """
         if self._stopped:
-            log.debug("Leader election already stopped")
+            log.debug("valkey leader election already stopped")
             return
 
-        log.info("Stopping Valkey leader election for server {}", self._config.server_id)
+        log.debug("valkey leader election stopping", server_id=self._config.server_id)
         self._stopped = True
 
         # Stop all registered leader tasks
         for task in self._leader_tasks:
             await task.stop()
-            log.debug("Stopped leader task: {}", task.__class__.__name__)
+            log.debug("leader task stopped", task_class_name=task.__class__.__name__)
 
         # Stop election task
         if self._election_task and not self._election_task.done():
@@ -206,4 +211,4 @@ class ValkeyLeaderElection(AbstractLeaderElection):
                 leader_key=self._config.leader_key,
             )
             self._is_leader = False
-        log.info("Valkey leader election stopped")
+        log.info("valkey leader election stopped", server_id=self._config.server_id)

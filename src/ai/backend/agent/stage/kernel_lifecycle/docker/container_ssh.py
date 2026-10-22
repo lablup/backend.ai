@@ -4,12 +4,12 @@ Container SSH stage for kernel lifecycle.
 This stage handles SSH key setup inside containers for inter-container communication.
 """
 
-import asyncio
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
 from ai.backend.agent.resources import Mount
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 from ai.backend.common.types import ContainerSSHKeyPair
 
@@ -71,9 +71,9 @@ class ContainerSSHProvisioner(Provisioner[ContainerSSHSpec, ContainerSSHResult])
                 # SSH directory is already mounted, skip setup
                 return ContainerSSHResult(ssh_dir=None)
 
-        loop = asyncio.get_running_loop()
-
-        ssh_dir = await loop.run_in_executor(None, self._populate_ssh_config, spec, ssh_keypair)
+        ssh_dir = await run_in_executor_with_context(
+            None, self._populate_ssh_config, spec, ssh_keypair
+        )
         return ContainerSSHResult(ssh_dir=ssh_dir)
 
     def _populate_ssh_config(

@@ -5,13 +5,19 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.dependency import (
+    SentinelMonitorDependency,
+)
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import (
+    SentinelMonitorSet,
+)
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from .database import DatabaseDependency
-from .redis import ValkeyClients, ValkeyDependency
+from .redis import ValkeyClients, ValkeyDependency, ValkeyInput
 
 
 @dataclass
@@ -35,6 +41,7 @@ class InfrastructureResources:
     """
 
     etcd: AsyncEtcd
+    sentinel_monitors: SentinelMonitorSet
     valkey: ValkeyClients
     db: ExtendedAsyncSAEngine
 
@@ -42,7 +49,7 @@ class InfrastructureResources:
 class InfrastructureComposer(DependencyComposer[InfrastructureInput, InfrastructureResources]):
     """Composes all infrastructure dependencies as a single unit.
 
-    Composes valkey and database dependencies in order.
+    Composes Sentinel monitor, valkey and database dependencies in order.
     Etcd is passed from the bootstrap stage and not managed here.
     """
 
@@ -72,9 +79,13 @@ class InfrastructureComposer(DependencyComposer[InfrastructureInput, Infrastruct
         db_dep = DatabaseDependency()
 
         # Enter dependencies using the stack
+        sentinel_monitors = await stack.enter_dependency(
+            SentinelMonitorDependency(),
+            setup_input.config.redis.to_valkey_profile_target().targets(),
+        )
         valkey = await stack.enter_dependency(
             valkey_dep,
-            setup_input.config,
+            ValkeyInput(config=setup_input.config, sentinel_monitors=sentinel_monitors),
         )
         db = await stack.enter_dependency(
             db_dep,
@@ -84,6 +95,7 @@ class InfrastructureComposer(DependencyComposer[InfrastructureInput, Infrastruct
         # Yield the infrastructure resources
         yield InfrastructureResources(
             etcd=setup_input.etcd,
+            sentinel_monitors=sentinel_monitors,
             valkey=valkey,
             db=db,
         )

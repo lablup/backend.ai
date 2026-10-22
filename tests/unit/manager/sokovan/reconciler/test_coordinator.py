@@ -13,21 +13,20 @@ import pytest
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.reconciler.types import BaseReconcilerCategory
 from ai.backend.manager.metrics.reconciler import ReconcilerMetricObserver
-from ai.backend.manager.sokovan.reconciler import (
+from ai.backend.manager.sokovan.reconciler.base import (
     BaseReconcilerInfo,
     BaseReconcilerKind,
     BaseReconcilerResult,
     BaseReconcilerTargetStatuses,
     ReconcilerApplier,
     ReconcilerApplyInput,
-    ReconcilerCoordinator,
     ReconcilerDecision,
-    ReconcilerFlag,
     ReconcilerHandler,
     ReconcilerSource,
     ReconcilerStage,
     ReconcilerStageMetadata,
 )
+from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator, ReconcilerFlag
 from ai.backend.manager.types import DistributedLockFactory
 
 

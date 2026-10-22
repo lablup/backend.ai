@@ -12,15 +12,17 @@ from pydantic import Field
 from ai.backend.common.api_handlers import APIResponse, BaseRequestModel, BodyParam, PathParam
 from ai.backend.common.data.entity.entity_label import EntityLabelID
 from ai.backend.common.dto.manager.v2.entity_label.request import (
+    PartialBulkPurgeEntityLabelInput,
+    PartialBulkUpsertEntityLabelInput,
     SearchEntityLabelsInput,
     UpsertEntityLabelInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.entity_label.adapter import EntityLabelAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class EntityLabelIdPathParam(BaseRequestModel):
@@ -41,12 +43,44 @@ class V2EntityLabelHandler:
         result = await self._adapter.upsert(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def partial_bulk_upsert_labels(
+        self,
+        body: BodyParam[PartialBulkUpsertEntityLabelInput],
+    ) -> APIResponse:
+        """Set keys on several entities in one call, answering per entity."""
+        result = await self._adapter.partial_bulk_upsert(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def bulk_upsert_labels(
+        self,
+        body: BodyParam[PartialBulkUpsertEntityLabelInput],
+    ) -> APIResponse:
+        """Deprecated. Use `POST /v2/entity-labels/partial-bulk-upsert`."""
+        result = await self._adapter.partial_bulk_upsert(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def purge_label(
         self,
         path: PathParam[EntityLabelIdPathParam],
     ) -> APIResponse:
         """Take one label off, named by its own id."""
         result = await self._adapter.purge(EntityLabelID(path.parsed.label_id))
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge_labels(
+        self,
+        body: BodyParam[PartialBulkPurgeEntityLabelInput],
+    ) -> APIResponse:
+        """Take several labels off in one call, answering per label."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def bulk_purge_labels(
+        self,
+        body: BodyParam[PartialBulkPurgeEntityLabelInput],
+    ) -> APIResponse:
+        """Deprecated. Use `POST /v2/entity-labels/partial-bulk-purge`."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def search_labels(

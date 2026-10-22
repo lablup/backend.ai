@@ -6,7 +6,7 @@ from typing import (
 )
 
 from ai.backend.common.types import VFolderMountPolicy
-from ai.backend.manager.models.vfolder import (
+from ai.backend.manager.data.vfolder.types import (
     VFolderInvitationState,
 )
 

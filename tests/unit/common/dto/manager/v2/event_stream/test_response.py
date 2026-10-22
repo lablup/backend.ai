@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from uuid import uuid4
 
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.event_stream.response import (
     BgtaskCancelledNode,
     BgtaskDoneNode,
@@ -14,12 +16,14 @@ from ai.backend.common.dto.manager.v2.event_stream.response import (
     SessionKernelEventNode,
 )
 
+_OWNER_USER_ID = UserID(uuid4())
+
 
 class TestSessionEventNode:
     """Tests for SessionEventNode model creation and defaults."""
 
     def test_creation_with_all_defaults(self) -> None:
-        node = SessionEventNode()
+        node = SessionEventNode(owner_user_id=_OWNER_USER_ID)
         assert node.reason == ""
         assert node.session_name == ""
         assert node.owner_access_key == ""
@@ -28,6 +32,7 @@ class TestSessionEventNode:
 
     def test_creation_with_explicit_values(self) -> None:
         node = SessionEventNode(
+            owner_user_id=_OWNER_USER_ID,
             reason="OOM",
             session_name="sess-1",
             owner_access_key="AKIAIOSFODNN7EXAMPLE",
@@ -41,15 +46,16 @@ class TestSessionEventNode:
         assert node.exit_code == 1
 
     def test_exit_code_can_be_zero(self) -> None:
-        node = SessionEventNode(exit_code=0)
+        node = SessionEventNode(owner_user_id=_OWNER_USER_ID, exit_code=0)
         assert node.exit_code == 0
 
     def test_exit_code_none_by_default(self) -> None:
-        node = SessionEventNode()
+        node = SessionEventNode(owner_user_id=_OWNER_USER_ID)
         assert node.exit_code is None
 
     def test_round_trip_serialization(self) -> None:
         node = SessionEventNode(
+            owner_user_id=_OWNER_USER_ID,
             reason="OOM",
             session_name="sess-1",
             owner_access_key="test-key",
@@ -65,7 +71,9 @@ class TestSessionEventNode:
         assert restored.exit_code == node.exit_code
 
     def test_model_dump_json_has_snake_case_keys(self) -> None:
-        node = SessionEventNode(session_name="test", owner_access_key="key")
+        node = SessionEventNode(
+            owner_user_id=_OWNER_USER_ID, session_name="test", owner_access_key="key"
+        )
         data = json.loads(node.model_dump_json())
         assert "session_name" in data
         assert "owner_access_key" in data
@@ -80,13 +88,13 @@ class TestSessionKernelEventNode:
         assert issubclass(SessionKernelEventNode, SessionEventNode)
 
     def test_creation_with_kernel_defaults(self) -> None:
-        node = SessionKernelEventNode()
+        node = SessionKernelEventNode(owner_user_id=_OWNER_USER_ID)
         assert node.kernel_id == ""
         assert node.cluster_role == "main"
         assert node.cluster_idx == 0
 
     def test_inherits_parent_defaults(self) -> None:
-        node = SessionKernelEventNode()
+        node = SessionKernelEventNode(owner_user_id=_OWNER_USER_ID)
         assert node.reason == ""
         assert node.session_name == ""
         assert node.owner_access_key == ""
@@ -95,6 +103,7 @@ class TestSessionKernelEventNode:
 
     def test_creation_with_all_fields(self) -> None:
         node = SessionKernelEventNode(
+            owner_user_id=_OWNER_USER_ID,
             reason="OOM",
             session_name="sess-1",
             owner_access_key="test-key",
@@ -111,6 +120,7 @@ class TestSessionKernelEventNode:
 
     def test_round_trip_serialization(self) -> None:
         node = SessionKernelEventNode(
+            owner_user_id=_OWNER_USER_ID,
             session_name="sess-1",
             kernel_id="kernel-123",
             cluster_role="sub",

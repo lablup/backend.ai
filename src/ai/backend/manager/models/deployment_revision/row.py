@@ -19,7 +19,7 @@ from ai.backend.common.types import (
     MountInfoEntry,
     MountPermission,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -32,25 +32,18 @@ from ai.backend.manager.models.mixins.timestamp import CreatedAtMixin
 from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.image import ImageRow
+    from ai.backend.manager.models.image.row import ImageRow
     from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
-    from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 
 __all__ = ("DeploymentRevisionRow",)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _get_image_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.image import ImageRow
+    from ai.backend.manager.models.image.row import ImageRow
 
     return foreign(DeploymentRevisionRow.image) == ImageRow.id
-
-
-def _get_runtime_variant_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-
-    return foreign(DeploymentRevisionRow.runtime_variant_id) == RuntimeVariantRow.id
 
 
 class DeploymentRevisionRow(CreatedAtMixin, Base):
@@ -227,13 +220,8 @@ class DeploymentRevisionRow(CreatedAtMixin, Base):
         lazy="selectin",
     )
 
+    # Still read by api/gql_legacy/endpoint.py; remove together with gql_legacy.
     image_row: Mapped[ImageRow] = relationship(
         "ImageRow",
         primaryjoin=_get_image_join_condition,
-    )
-    runtime_variant_row: Mapped[RuntimeVariantRow] = relationship(
-        "RuntimeVariantRow",
-        primaryjoin=_get_runtime_variant_join_condition,
-        lazy="joined",
-        innerjoin=True,
     )

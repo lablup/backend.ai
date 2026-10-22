@@ -16,7 +16,6 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     ProjectUsageScopeDTO,
 )
 from ai.backend.common.dto.manager.v2.group.response import ProjectNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -25,10 +24,10 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_pydantic_input,
 )
-from ai.backend.manager.api.gql.fair_share.types import ProjectFairShareGQL
+from ai.backend.manager.api.gql.fair_share.types.project import ProjectFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
-from ai.backend.manager.api.gql.resource_usage.types import (
+from ai.backend.manager.api.gql.resource_usage.types.project_usage import (
     ProjectUsageBucketConnection,
     ProjectUsageBucketFilter,
     ProjectUsageBucketOrderBy,
@@ -103,7 +102,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
     id: NodeID[str] = gql_field(description="Unique identifier for the project (UUID).")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the project.",
         ),
     )
@@ -173,7 +172,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         from strawberry.relay import PageInfo
 
         from ai.backend.manager.api.gql.base import encode_cursor
-        from ai.backend.manager.api.gql.resource_usage.types import (
+        from ai.backend.manager.api.gql.resource_usage.types.project_usage import (
             ProjectUsageBucketEdge,
             ProjectUsageBucketGQL,
         )
@@ -219,8 +218,13 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
     ):
         from ai.backend.manager.errors.resource import DomainNotFound
 
-        domain: DomainV2GQL | None = await info.context.data_loaders.domain_loader.load(
+        domain_id = await info.context.data_loaders.domain_id_by_name_loader.load(
             self.organization.domain_name
+        )
+        if domain_id is None:
+            raise DomainNotFound(self.organization.domain_name)
+        domain: DomainV2GQL | None = await info.context.data_loaders.domain_by_id_loader.load(
+            domain_id
         )
         if domain is None:
             raise DomainNotFound(self.organization.domain_name)
@@ -292,7 +296,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Resource groups this project may schedule on.",
         )
     )  # type: ignore[misc]
@@ -366,7 +370,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Model cards belonging to this project.",
         )
     )  # type: ignore[misc]

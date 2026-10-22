@@ -12,6 +12,7 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.group.types import (
     OrderDirection,
     ProjectDomainFilter,
@@ -21,6 +22,7 @@ from ai.backend.common.dto.manager.v2.group.types import (
     ProjectTypeFilter,
     ProjectUserFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
@@ -28,6 +30,10 @@ __all__ = (
     "AssignUsersToProjectInput",
     "CreateProjectInput",
     "DeleteProjectInput",
+    "PartialBulkDeleteProjectsInput",
+    "PartialBulkRestoreProjectsInput",
+    "PartialBulkUpdateProjectItemInput",
+    "PartialBulkUpdateProjectsInput",
     "ProjectFilter",
     "ProjectOrder",
     "PurgeProjectInput",
@@ -81,7 +87,13 @@ class UpdateProjectInput(BaseRequestModel):
     )
     is_active: bool | None | Unset = Field(
         default=UNSET,
-        description="Updated active status. Omit to leave unchanged.",
+        description=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use the project delete and restore "
+            "operations. false soft-deletes the project and true restores it, as those "
+            "operations do; nothing happens when it is already in that state. Omit to "
+            "leave unchanged."
+        ),
+        deprecated=True,
     )
     integration_name: str | None | Unset = Field(
         default=UNSET,
@@ -111,10 +123,45 @@ class PurgeProjectInput(BaseRequestModel):
     group_id: UUID = Field(description="UUID of the group to permanently purge.")
 
 
+class PartialBulkUpdateProjectItemInput(BaseRequestModel):
+    """One project of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the project to update.")
+    input: UpdateProjectInput = Field(description="Fields to update on the project.")
+
+
+class PartialBulkUpdateProjectsInput(BaseRequestModel):
+    """Input for updating several projects, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateProjectItemInput] = Field(
+        description="The projects to update, each with its fields."
+    )
+
+
+class PartialBulkDeleteProjectsInput(BaseRequestModel):
+    """Input for soft-deleting several projects, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the projects to soft-delete.")
+
+
+class PartialBulkRestoreProjectsInput(BaseRequestModel):
+    """Input for restoring several soft-deleted projects, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the projects to restore.")
+
+
 class ProjectFilter(BaseRequestModel):
     """Filter criteria for searching groups."""
 
-    id: UUIDFilter | None = Field(default=None, description="Filter by project ID (UUID).")
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entity_id`.",
+        deprecated=True,
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by project ID.",
+    )
     name: StringFilter | None = Field(default=None, description="Filter by group name.")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name.")
     description: StringFilter | None = Field(

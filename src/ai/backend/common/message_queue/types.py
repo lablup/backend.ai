@@ -2,12 +2,14 @@ from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
 from typing import NewType, Self
 
+from opentelemetry import trace
+from opentelemetry.propagate import extract, inject
+from opentelemetry.trace import SpanKind
 from pydantic import BaseModel, ConfigDict
 
-from ai.backend.common.contexts.request_id import with_request_id
-from ai.backend.common.contexts.user import with_triggered_user, with_user
+from ai.backend.common.contexts.request_id import current_request_id, with_request_context
+from ai.backend.common.contexts.user import current_user, triggered_user, with_user_context
 from ai.backend.common.data.user.types import UserData
-from ai.backend.logging.utils import with_log_context_fields
 
 # What a message is routed by: consumers and subscribers are registered under it.
 # It carries the name of the event the message was built from.
@@ -23,6 +25,19 @@ class MessageMetadata(BaseModel):
     request_id: str | None = None
     user: UserData | None = None
     triggered_user: UserData | None = None
+    # W3C trace context of the sender's span. Absent in messages from older senders.
+    traceparent: str | None = None
+
+    @classmethod
+    def from_current_context(cls) -> Self:
+        carrier: dict[str, str] = {}
+        inject(carrier)
+        return cls(
+            request_id=current_request_id(),
+            user=current_user(),
+            triggered_user=triggered_user(),
+            traceparent=carrier.get("traceparent"),
+        )
 
     def serialize(self) -> bytes:
         """
@@ -43,16 +58,20 @@ class MessageMetadata(BaseModel):
         Context manager to apply all context variables stored in metadata.
         """
         with ExitStack() as stack:
-            log_fields: dict[str, str] = {}
             if self.request_id:
-                stack.enter_context(with_request_id(self.request_id))
-                log_fields["request_id"] = self.request_id
-            if self.user:
-                stack.enter_context(with_user(self.user))
-                log_fields["user_id"] = str(self.user.user_id)
-            if self.triggered_user:
-                stack.enter_context(with_triggered_user(self.triggered_user))
-                log_fields["triggered_user_id"] = str(self.triggered_user.user_id)
-            if log_fields:
-                stack.enter_context(with_log_context_fields(log_fields))
+                stack.enter_context(with_request_context(self.request_id))
+            stack.enter_context(with_user_context(self.user, self.triggered_user))
+            yield
+
+    @contextmanager
+    def continue_trace(self, span_name: str, kind: SpanKind) -> Iterator[None]:
+        """Open a span under the sender's span. Opens none when the sender had no span."""
+        if self.traceparent is None:
+            yield
+            return
+        with trace.get_tracer(__name__).start_as_current_span(
+            span_name,
+            context=extract({"traceparent": self.traceparent}),
+            kind=kind,
+        ):
             yield

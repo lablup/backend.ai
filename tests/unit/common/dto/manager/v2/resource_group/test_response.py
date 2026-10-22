@@ -10,6 +10,9 @@ from ai.backend.common.dto.manager.v2.deployment_options.response import (
     DeploymentHandlerOptionsInfo,
     DeploymentOptionsInfo,
 )
+from ai.backend.common.dto.manager.v2.deployment_options.response import (
+    HandlerOptionsInfo as DeploymentHandlerOptionsDefaultInfo,
+)
 from ai.backend.common.dto.manager.v2.resource_group.response import (
     CreateResourceGroupPayload,
     DeleteResourceGroupPayload,
@@ -81,7 +84,7 @@ def _make_resource_group_detail_node(name: str = "test-group") -> ResourceGroupD
         ),
         default_deployment_options=DeploymentOptionsInfo(
             handler_options=DeploymentHandlerOptionsInfo(
-                default=HandlerOptionsInfo(timeout_sec=None, max_retry_count=None),
+                default=DeploymentHandlerOptionsDefaultInfo(timeout_sec=None, max_retry_count=None),
                 by_handler=[],
             ),
         ),
@@ -172,11 +175,12 @@ class TestDeleteResourceGroupPayload:
 
     def test_valid_creation(self) -> None:
         rg_id = ResourceGroupID(uuid.uuid4())
-        payload = DeleteResourceGroupPayload(id=rg_id)
+        payload = DeleteResourceGroupPayload(id=rg_id, entity_id=rg_id)
         assert payload.id == rg_id
 
     def test_round_trip(self) -> None:
-        payload = DeleteResourceGroupPayload(id=ResourceGroupID(uuid.uuid4()))
+        rg_id = ResourceGroupID(uuid.uuid4())
+        payload = DeleteResourceGroupPayload(id=rg_id, entity_id=rg_id)
         json_data = payload.model_dump_json()
         restored = DeleteResourceGroupPayload.model_validate_json(json_data)
         assert restored.id == payload.id

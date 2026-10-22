@@ -9,19 +9,20 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskHandler,
     BaseBackgroundTaskManifest,
 )
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderDeletionFailureEvent,
     VFolderDeletionSuccessEvent,
 )
 from ai.backend.common.type_adapters import VFolderIDField
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.bgtask.types import StorageBgtaskName
 
 if TYPE_CHECKING:
     from ai.backend.storage.volumes.pool import VolumePool
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class VFolderDeleteManifest(BaseBackgroundTaskManifest):
@@ -49,14 +50,13 @@ class VFolderDeleteTaskHandler(BaseBackgroundTaskHandler[VFolderDeleteManifest, 
     @override
     async def execute(self, manifest: VFolderDeleteManifest) -> None:
         try:
-            volume = self._volume_pool.get_volume_by_name(manifest.volume)
+            volume = self._volume_pool.get_volume_by_name(StorageVolumeName(manifest.volume))
             await volume.delete_vfolder(manifest.vfolder_id)
         except Exception as e:
             log.exception(
-                "Failed to delete vfolder (volume=%s, vfolder=%s): %s",
-                manifest.volume,
-                manifest.vfolder_id,
-                e,
+                "vfolder deletion failed",
+                volume_name=manifest.volume,
+                vfolder_id=str(manifest.vfolder_id),
             )
             await self._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(

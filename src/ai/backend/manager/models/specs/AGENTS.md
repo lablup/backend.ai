@@ -19,16 +19,18 @@ declare a spec there.
 - A row linking two entities belongs to neither: both own it. It is not a field row,
   which has exactly one owner, and it is not an entity, which has a node in the graph.
 - Its specs are `RelationCreator` / `RelationLifecycleUpdater` / `RelationPurger`
-  (`relation.py`), and they name the pair rather than a row id — a relation row's id
-  never leaves the layer that wrote it.
-- Create inserts a new row only. A pair already linked, switched off or not, is a
-  unique violation the spec's `integrity_error_checks` maps to a domain error;
-  switching it back on is the restore updater's.
-- Switching off / restoring (`RelationLifecycleUpdater`) writes the row's lifecycle
-  column alone. What each side reads of the other stays, so a relation switched off is
-  still listed on both sides and can be switched back on. Only purge removes access.
-  Only relations carrying a lifecycle column declare this updater, one class per
-  direction, each answering a constant.
+  (`relation.py`), and they name the pair.
+- A relation table has no row id column. The pair of ends is its primary key; a polymorphic
+  side adds its type column to the key.
+- Create inserts a new pair only. A pair already linked, soft-deleted or not, is left
+  as it stands and answered `False`; bringing it back is the restore updater's.
+- Soft delete / restore (`RelationLifecycleUpdater`) writes the soft delete mixin's
+  `deleted_at` alone. What each side reads of the other stays, so a soft-deleted relation
+  is still listed on both sides and can be restored. Only purge removes access. Only
+  relations carrying the soft delete mixin declare this updater, one class per direction,
+  each answering a constant.
+- A business value switched on and off, such as `idle_checker_bindings.enabled`, is not a
+  soft delete. The general updater writes it.
 - Do NOT carry a relation as a field on a `DataUpdater`. A value whose change drags
   other writes along does not belong on the general edit path — the same rule soft
   delete follows.
@@ -50,6 +52,15 @@ The roots are deliberately unrelated. Do NOT extract a common base across them
 or type any function against "any creator/purger" — the absence of a common supertype
 is the enforcement. Reuse execution logic through ops-layer helpers that take plain
 values (`row_class`, `pk_value`, ...).
+
+## An upsert and an insert if absent differ in the row alone
+
+- The graph writes (provision, `created_in`, a relation's govern and share) run whether
+  the row was inserted or already there. Running them again changes nothing.
+- A row already there is left as it stands by `*_if_absent` and updated with the update
+  values by an upsert. With no update values an upsert leaves it as well.
+- Do NOT put a column that decides an edge (one `created_in` reads, a relation's pair)
+  in the update values. Changing it keeps the old edge and adds the new one.
 
 ## A single-row write carries its guard on the root
 
@@ -193,14 +204,28 @@ is created in no scope.
 
 ## Soft delete belongs to its own updaters
 
-- The lifecycle column a domain deletes by — `deleted`, `status`, whichever carries
-  the removed state — is NOT exposed on the general `DataUpdater`. With no field for
-  it, the ordinary edit path cannot make the transition at all.
+Target layout from BEP-1069. The mixin is `SoftDeleteMixin` in `models/mixins/soft_delete.py`;
+the shared updaters are `SoftDeleteUpdater` / `RestoreUpdater` in `models/specs/soft_delete.py`.
+Rows not yet on the mixin keep the column they delete by today.
+
+- Whether a row is soft-deleted is the soft delete mixin's `deleted_at` (nullable
+  timestamp) alone; NULL means alive. Do NOT add a `deleted` boolean beside it.
+- Do NOT put a deletion value (`deleted`, `DELETED`, `delete-pending`) in a business
+  `status` enum. Restore resets `deleted_at` only, and the business state stays.
+- A lifecycle that ends by a `status` transition (session `TERMINATED`, deployment
+  `DESTROYED`) is a finished record, not a soft delete. It gets no `deleted_at`; retention
+  removes the row.
+- An entity whose purge has to clean up external resources carries a separate
+  `purge_status`: a NOT NULL enum with a named default. `purging` and `purge-error` occur
+  only on a row with `deleted_at` set (CHECK).
+- `deleted_at` and `purge_status` are NOT exposed on the general `DataUpdater`. With no
+  field for them, the ordinary edit path cannot make the transition at all.
 - Soft delete and restore each get their own updater, and `build_values()` returns a
   constant. A transition value taken as an argument is a value that can be passed
-  wrong.
-- Naming: `<Entity>SoftDeleteUpdater` / `<Entity>RestoreUpdater`, carried by a
-  `Delete*` and a `Restore*` action base respectively.
+  wrong. Rows with the mixin share one updater pair; do not declare one per entity.
+- An entity not yet on the mixin keeps `<Entity>SoftDeleteUpdater` /
+  `<Entity>RestoreUpdater`, carried by a `Delete*` and a `Restore*` action base
+  respectively.
 - A domain that offers soft delete offers restore.
 - ops executes both as an update — the DB operation is an UPDATE, so no delete
   operation exists to generalize. What records the run as a delete is the action's

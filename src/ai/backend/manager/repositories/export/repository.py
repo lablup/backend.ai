@@ -11,9 +11,8 @@ from typing import Any
 
 from ai.backend.manager.errors.export import ExportReportNotFound
 from ai.backend.manager.repositories.base.export import ReportDef, StreamingExportQuery
-
-from .db_source import ExportDBSource
-from .registry import ExportReportRegistry
+from ai.backend.manager.repositories.export.db_source.db_source import ExportDBSource
+from ai.backend.manager.repositories.export.registry.base import ExportReportRegistry
 
 
 class ExportRepository:

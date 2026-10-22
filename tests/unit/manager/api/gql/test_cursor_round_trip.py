@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
@@ -97,7 +97,7 @@ from ai.backend.manager.api.gql.role_preset.types.node import RolePresetGQL
 from ai.backend.manager.api.gql.runtime_variant.resolver import runtime_variants
 from ai.backend.manager.api.gql.runtime_variant_preset.resolver import runtime_variant_presets
 from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderGQL
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 
 _NOW = datetime(2026, 1, 1, tzinfo=UTC)
 _PAGE_SIZE = 2
@@ -452,7 +452,7 @@ async def test_end_cursor_is_accepted_as_after(case: ConnectionCase) -> None:
         _InMemorySearch(case.items, case.payload_type),
     )
 
-    with with_user(_superadmin()):
+    with with_user_context(_superadmin()):
         first_page = await case.call(info, _PAGE_SIZE, None)
         assert first_page is not None
         assert [edge.cursor for edge in first_page.edges] == [

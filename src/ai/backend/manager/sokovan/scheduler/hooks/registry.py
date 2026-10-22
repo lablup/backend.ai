@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.types import SessionStatus
@@ -22,7 +22,7 @@ from .status import (
     TerminatedTransitionHook,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 @dataclass
@@ -74,5 +74,5 @@ class HookRegistry:
         """
         hook = self._status_hooks.get(status)
         if hook:
-            log.trace("Found hook {} for status {}", hook.__class__.__name__, status)
+            log.trace("status hook found", hook_name=hook.__class__.__name__, session_status=status)
         return hook

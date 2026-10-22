@@ -7,7 +7,7 @@ from pydantic import Field, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
-from ai.backend.common.dto.manager.v2.common import OrderDirection, SemVersion
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, OrderDirection, SemVersion
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     VALUE_TYPE_VALIDATORS,
     PresetTarget,
@@ -15,6 +15,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     RuntimeVariantPresetOrderField,
     UIOption,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 
@@ -144,6 +145,20 @@ class UpdateRuntimeVariantPresetInput(BaseRequestModel):
         return self
 
 
+class PartialBulkUpdateRuntimeVariantPresetsInput(BaseRequestModel):
+    """Input for updating several runtime variant presets, each answered for separately."""
+
+    items: NonEmptyList[UpdateRuntimeVariantPresetInput] = Field(
+        description="The presets to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeRuntimeVariantPresetsInput(BaseRequestModel):
+    """Input for purging several runtime variant presets, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the presets to purge.")
+
+
 class RuntimeVariantPresetFilter(BaseRequestModel):
     name: StringFilter | None = Field(default=None)
     runtime_variant_id: UUIDFilter | None = Field(default=None)
@@ -153,6 +168,9 @@ class RuntimeVariantPresetFilter(BaseRequestModel):
             "Keep only presets valid at this runtime version "
             "(added_version <= version < deprecated_version)."
         ),
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by preset ID."
     )
     AND: list[RuntimeVariantPresetFilter] | None = Field(default=None)
     OR: list[RuntimeVariantPresetFilter] | None = Field(default=None)

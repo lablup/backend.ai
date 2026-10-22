@@ -40,7 +40,7 @@ from ai.backend.manager.models.alembic.versions.f4a1c9d20b73_sync_seed_roles_wit
     _write_role_permissions,
     downgrade,
 )
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.project.row import (
     ProjectRow,
@@ -48,18 +48,18 @@ from ai.backend.manager.models.project.row import (
     association_groups_users,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -97,6 +97,13 @@ async def db(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(database_connection, _TABLES):
+        async with database_connection.begin() as conn:
+            await conn.execute(
+                sa.text(
+                    "ALTER TABLE role_presets "
+                    "ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT false"
+                )
+            )
         yield database_connection
 
 
@@ -218,9 +225,10 @@ async def seeded(db: ExtendedAsyncSAEngine) -> dict[str, uuid.UUID]:
                     name=f"preset_{preset.name}",
                     scope_type=preset.scope_type,
                     auto_assign=preset.auto_assign,
-                    deleted=True,
                 )
             )
+        await session.flush()
+        await session.execute(sa.text("UPDATE role_presets SET deleted = true"))
         roles = {
             "project_admin": RoleRow(
                 name=f"role_project_{str(project_id)[:8]}_admin",
@@ -469,9 +477,10 @@ async def seeded_from_fixture(db: ExtendedAsyncSAEngine) -> dict[str, Any]:
                     name=f"preset_{preset.name}",
                     scope_type=preset.scope_type,
                     auto_assign=preset.auto_assign,
-                    deleted=True,
                 )
             )
+        await session.flush()
+        await session.execute(sa.text("UPDATE role_presets SET deleted = true"))
         roles = {
             name: RoleRow(
                 name=name,
@@ -544,7 +553,9 @@ class TestSyncSeedRoles:
         self, db: ExtendedAsyncSAEngine, migrated: dict[str, uuid.UUID]
     ) -> None:
         async with db.begin_readonly_session() as session:
-            rows = (await session.execute(sa.select(RolePresetRow))).scalars().all()
+            rows = (
+                await session.execute(sa.text("SELECT id, name, deleted FROM role_presets"))
+            ).all()
         assert {(row.id, row.name, row.deleted) for row in rows} == {
             (uuid.UUID(preset.id), preset.name, False) for preset in _PRESETS
         }

@@ -41,11 +41,12 @@ from ai.backend.common.dto.manager.v2.user.request import (
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import Permission
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.dotfile.row import DotfileRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.user.row import users
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -347,6 +348,31 @@ class TestUserUpdate:
                 UpdateUserRequest(full_name="Denied"),
             )
 
+    async def test_admin_updates_status_to_deleted_soft_deletes(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_user: CreateUserResponse,
+    ) -> None:
+        result = await admin_registry.user.update(
+            target_user.user.id,
+            UpdateUserRequest(status=UserStatus.DELETED, full_name="Before Delete"),
+        )
+        assert result.user.status == UserStatus.DELETED
+        assert result.user.full_name == "Before Delete"
+
+    async def test_admin_updates_deleted_user_to_active_restores(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_user: CreateUserResponse,
+    ) -> None:
+        await admin_registry.user.delete(DeleteUserRequest(user_id=target_user.user.id))
+        result = await admin_registry.user.update(
+            target_user.user.id,
+            UpdateUserRequest(status=UserStatus.ACTIVE, full_name="After Restore"),
+        )
+        assert result.user.status == UserStatus.ACTIVE
+        assert result.user.full_name == "After Restore"
+
 
 class TestUserDelete:
     async def test_admin_soft_deletes_user(
@@ -451,6 +477,27 @@ async def user_with_rbac_rows(
         await conn.execute(users.delete().where(users.c.uuid == str(user_id)))
 
 
+@pytest.fixture()
+async def target_user_dotfile_id(
+    db_engine: SAEngine,
+    target_user: CreateUserResponse,
+) -> uuid.UUID:
+    """A dotfile owned by ``target_user``, which purge takes with the user's graph node."""
+    async with db_engine.begin() as conn:
+        result = await conn.execute(
+            sa.insert(DotfileRow)
+            .values(
+                entity_type=UserEntityType(),
+                entity_id=target_user.user.id,
+                path=".bashrc",
+                perm="644",
+                data="export EDITOR=vim\n",
+            )
+            .returning(DotfileRow.id)
+        )
+        return result.scalar_one()
+
+
 class TestUserPurge:
     async def test_admin_purges_user(
         self,
@@ -493,6 +540,23 @@ class TestUserPurge:
                 .where(RoleRow.scope_id == user_id)
             )
         assert permissions_after == 0, "the role permissions should be gone after purge"
+
+    async def test_admin_purge_removes_dotfiles(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        target_user: CreateUserResponse,
+        target_user_dotfile_id: uuid.UUID,
+        db_engine: SAEngine,
+    ) -> None:
+        await admin_registry.user.purge(PurgeUserRequest(user_id=target_user.user.id))
+
+        async with db_engine.connect() as conn:
+            remaining = await conn.scalar(
+                sa.select(sa.func.count())
+                .select_from(DotfileRow)
+                .where(DotfileRow.id == target_user_dotfile_id)
+            )
+        assert remaining == 0
 
 
 class TestUserBulkOperations:

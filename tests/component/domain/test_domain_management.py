@@ -25,13 +25,14 @@ from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.models.domain import DomainRow, domains
+from ai.backend.manager.models.domain.row import DomainRow, domains
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.project import groups
-from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, resource_groups
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.project.row import groups
+from ai.backend.manager.models.resource_group.row import resource_groups
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import users
 
 DomainFactory = Callable[..., Coroutine[Any, Any, CreateDomainResponse]]
 
@@ -135,6 +136,7 @@ class TestDomainPurgeValidation:
         domain_name = created.domain.name
         user_uuid = uuid.uuid4()
         session_id = uuid.uuid4()
+        unique = secrets.token_hex(4)
 
         async with db_engine.begin() as conn:
             group_result = await conn.execute(
@@ -162,6 +164,30 @@ class TestDomainPurgeValidation:
                     .returning(resource_groups.c.id)
                 )
             ).scalar_one()
+            await conn.execute(
+                sa.insert(users).values(
+                    uuid=str(user_uuid),
+                    username=f"test-user-{unique}",
+                    email=f"test-user-{unique}@test.local",
+                    password=PasswordInfo(
+                        password=secrets.token_urlsafe(8),
+                        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                        rounds=600_000,
+                        salt_size=32,
+                    ),
+                    need_password_change=False,
+                    full_name=f"Test User {unique}",
+                    description=f"Test user for kernel conflict test {unique}",
+                    status=UserStatus.ACTIVE,
+                    status_info="test",
+                    domain_name=domain_name,
+                    resource_policy="default",
+                    role=UserRole.USER,
+                    domain_id=sa.select(DomainRow.id)
+                    .where(DomainRow.name == domain_name)
+                    .scalar_subquery(),
+                )
+            )
             await conn.execute(
                 sa.insert(SessionRow.__table__).values(
                     id=session_id,
@@ -213,6 +239,7 @@ class TestDomainPurgeValidation:
                 await conn.execute(
                     resource_groups.delete().where(resource_groups.c.name == sgroup_name)
                 )
+                await conn.execute(users.delete().where(users.c.uuid == str(user_uuid)))
 
     async def test_purge_nonexistent_domain_raises_not_found(
         self,
@@ -264,6 +291,30 @@ class TestDomainPurgeValidation:
                 )
             ).scalar_one()
             await conn.execute(
+                sa.insert(users).values(
+                    uuid=str(user_uuid),
+                    username=f"test-user-{unique}",
+                    email=f"test-user-{unique}@test.local",
+                    password=PasswordInfo(
+                        password=secrets.token_urlsafe(8),
+                        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                        rounds=600_000,
+                        salt_size=32,
+                    ),
+                    need_password_change=False,
+                    full_name=f"Test User {unique}",
+                    description=f"Test user for order test {unique}",
+                    status=UserStatus.ACTIVE,
+                    status_info="test",
+                    domain_name=domain_name,
+                    resource_policy="default",
+                    role=UserRole.USER,
+                    domain_id=sa.select(DomainRow.id)
+                    .where(DomainRow.name == domain_name)
+                    .scalar_subquery(),
+                )
+            )
+            await conn.execute(
                 sa.insert(SessionRow.__table__).values(
                     id=session_id,
                     domain_name=domain_name,
@@ -299,30 +350,6 @@ class TestDomainPurgeValidation:
                     stdin_port=0,
                     stdout_port=0,
                     use_host_network=False,
-                )
-            )
-            await conn.execute(
-                sa.insert(users).values(
-                    uuid=str(user_uuid),
-                    username=f"test-user-{unique}",
-                    email=f"test-user-{unique}@test.local",
-                    password=PasswordInfo(
-                        password=secrets.token_urlsafe(8),
-                        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
-                        rounds=600_000,
-                        salt_size=32,
-                    ),
-                    need_password_change=False,
-                    full_name=f"Test User {unique}",
-                    description=f"Test user for order test {unique}",
-                    status=UserStatus.ACTIVE,
-                    status_info="test",
-                    domain_name=domain_name,
-                    resource_policy="default",
-                    role=UserRole.USER,
-                    domain_id=sa.select(DomainRow.id)
-                    .where(DomainRow.name == domain_name)
-                    .scalar_subquery(),
                 )
             )
 

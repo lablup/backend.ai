@@ -6,9 +6,12 @@ on:
   workflow_dispatch:
 
 
+# `contents: read`: only runs the integration tests
+permissions:
+  contents: read
+
 jobs:
   integration:
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'skip:ci') }}
     runs-on: ubuntu-latest
     steps:
     - name: Checkout the revision

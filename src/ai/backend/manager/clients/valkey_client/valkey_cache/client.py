@@ -8,9 +8,9 @@ from contextlib import AbstractAsyncContextManager
 from glide import GlideClient
 
 from ai.backend.common.clients.valkey_client.client import AbstractValkeyClient
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ValkeyCache:

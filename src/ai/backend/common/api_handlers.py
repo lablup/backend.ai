@@ -26,7 +26,7 @@ from pydantic.fields import FieldInfo
 from pydantic_core._pydantic_core import ValidationError
 
 from ai.backend.common.types import BackendAISchema, StreamReader
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .exception import (
     BackendAISchemaValidationFailed,
@@ -37,7 +37,7 @@ from .exception import (
     ParameterNotParsedError,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class Sentinel(enum.Enum):
@@ -584,7 +584,7 @@ def stream_api_handler(handler: StreamBaseHandler) -> ParsedRequestHandler:
             # Normal completion - send chunked transfer encoding terminator
             await resp.write_eof()
         except Exception:
-            log.exception("Error during streaming response body iteration")
+            log.exception("streaming response body iteration failed")
             resp.force_close()
 
         return resp

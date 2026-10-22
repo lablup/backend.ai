@@ -24,10 +24,6 @@ from ai.backend.manager.services.domain.actions.create_domain_dotfile import (
     CreateDomainDotfileAction,
     CreateDomainDotfileActionResult,
 )
-from ai.backend.manager.services.domain.actions.create_domain_node import (
-    CreateDomainNodeAction,
-    CreateDomainNodeActionResult,
-)
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
 from ai.backend.manager.services.domain.actions.delete_domain_dotfile import (
     DeleteDomainDotfileAction,
@@ -35,6 +31,15 @@ from ai.backend.manager.services.domain.actions.delete_domain_dotfile import (
 )
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.domain.actions.partial_bulk_delete_domains import (
+    PartialBulkDeleteDomainsAction,
+)
+from ai.backend.manager.services.domain.actions.partial_bulk_restore_domains import (
+    PartialBulkRestoreDomainsAction,
+)
+from ai.backend.manager.services.domain.actions.partial_bulk_update_domains import (
+    PartialBulkUpdateDomainsAction,
+)
 from ai.backend.manager.services.domain.actions.purge_domain import (
     PurgeDomainAction,
     PurgeDomainActionResult,
@@ -47,32 +52,27 @@ from ai.backend.manager.services.domain.actions.update_domain_dotfile import (
     UpdateDomainDotfileAction,
     UpdateDomainDotfileActionResult,
 )
-from ai.backend.manager.services.domain.actions.update_domain_node import (
-    UpdateDomainNodeAction,
-    UpdateDomainNodeActionResult,
-)
 from ai.backend.manager.services.domain.service import DomainService
 
 
 class DomainProcessors:
     get: SingleEntityActionProcessor[GetDomainAction, EntityOpsResult[DomainData]]
-    lookup: LookupActionProcessor[LookupDomainAction, LookupOpsResult[DomainID]]
-    bulk_lookup: BulkLookupActionProcessor[
+    lookup_name: LookupActionProcessor[LookupDomainAction, LookupOpsResult[DomainID]]
+    bulk_lookup_names: BulkLookupActionProcessor[
         BulkLookupDomainsAction, BulkLookupOpsResult[DomainName, DomainID]
     ]
     # What the DataLoaders read: one READ check per domain named.
-    bulk_get: PartialBulkActionProcessor[BulkGetDomainsAction, DomainData]
+    bulk_get_ids: PartialBulkActionProcessor[BulkGetDomainsAction, DomainData]
     global_search: GlobalActionProcessor[GlobalSearchDomainsAction, BatchOpsResult[DomainData]]
     scoped_search: ScopeActionProcessor[ScopedSearchDomainsAction, ScopedBatchOpsResult[DomainData]]
-    update_domain: SingleEntityActionProcessor[UpdateDomainAction, EntityOpsResult[DomainData]]
-    delete_domain: SingleEntityActionProcessor[DeleteDomainAction, EntityOpsResult[DomainData]]
-    restore_domain: SingleEntityActionProcessor[RestoreDomainAction, EntityOpsResult[DomainData]]
-    create_domain: GlobalActionProcessor[CreateDomainAction, CreatedEntityOpsResult[DomainData]]
-    create_domain_node: GlobalActionProcessor[CreateDomainNodeAction, CreateDomainNodeActionResult]
-    update_domain_node: SingleEntityActionProcessor[
-        UpdateDomainNodeAction, UpdateDomainNodeActionResult
-    ]
-    purge_domain: SingleEntityActionProcessor[PurgeDomainAction, PurgeDomainActionResult]
+    create: GlobalActionProcessor[CreateDomainAction, CreatedEntityOpsResult[DomainData]]
+    update: SingleEntityActionProcessor[UpdateDomainAction, EntityOpsResult[DomainData]]
+    delete: SingleEntityActionProcessor[DeleteDomainAction, EntityOpsResult[DomainData]]
+    restore: SingleEntityActionProcessor[RestoreDomainAction, EntityOpsResult[DomainData]]
+    purge: SingleEntityActionProcessor[PurgeDomainAction, PurgeDomainActionResult]
+    partial_bulk_update: PartialBulkActionProcessor[PartialBulkUpdateDomainsAction, DomainData]
+    partial_bulk_delete: PartialBulkActionProcessor[PartialBulkDeleteDomainsAction, DomainData]
+    partial_bulk_restore: PartialBulkActionProcessor[PartialBulkRestoreDomainsAction, DomainData]
     create_dotfile: SingleEntityActionProcessor[
         CreateDomainDotfileAction, CreateDomainDotfileActionResult
     ]
@@ -89,22 +89,19 @@ class DomainProcessors:
         service: DomainService,
     ) -> None:
         self.get = group.single_get_ops(GetDomainAction)
-        self.lookup = group.public_lookup_ops(LookupDomainAction)
-        self.bulk_lookup = group.public_bulk_lookup_ops(BulkLookupDomainsAction)
-        self.bulk_get = group.partial_bulk_get_ops(BulkGetDomainsAction)
+        self.lookup_name = group.public_lookup_ops(LookupDomainAction)
+        self.bulk_lookup_names = group.public_bulk_lookup_ops(BulkLookupDomainsAction)
+        self.bulk_get_ids = group.partial_bulk_get_ops(BulkGetDomainsAction)
         self.global_search = group.global_searcher_ops(GlobalSearchDomainsAction)
         self.scoped_search = group.scoped_search_ops(ScopedSearchDomainsAction)
-        self.update_domain = group.single_update_ops(UpdateDomainAction)
-        self.delete_domain = group.single_delete_ops(DeleteDomainAction)
-        self.restore_domain = group.single_restore_ops(RestoreDomainAction)
-        self.create_domain = group.global_role_managed_create_ops(CreateDomainAction)
-        self.create_domain_node = group.global_scope(
-            CreateDomainNodeAction, service.create_domain_node
-        )
-        self.update_domain_node = group.single_entity(
-            UpdateDomainNodeAction, service.update_domain_node
-        )
-        self.purge_domain = group.single_entity(PurgeDomainAction, service.purge_domain)
+        self.create = group.global_scope(CreateDomainAction, service.create)
+        self.update = group.single_update_ops(UpdateDomainAction)
+        self.delete = group.single_delete_ops(DeleteDomainAction)
+        self.restore = group.single_restore_ops(RestoreDomainAction)
+        self.purge = group.single_entity(PurgeDomainAction, service.purge)
+        self.partial_bulk_update = group.partial_bulk_update_ops(PartialBulkUpdateDomainsAction)
+        self.partial_bulk_delete = group.partial_bulk_delete_ops(PartialBulkDeleteDomainsAction)
+        self.partial_bulk_restore = group.partial_bulk_restore_ops(PartialBulkRestoreDomainsAction)
         self.create_dotfile = group.single_entity(CreateDomainDotfileAction, service.create_dotfile)
         self.update_dotfile = group.single_entity(UpdateDomainDotfileAction, service.update_dotfile)
         self.delete_dotfile = group.single_entity(DeleteDomainDotfileAction, service.delete_dotfile)

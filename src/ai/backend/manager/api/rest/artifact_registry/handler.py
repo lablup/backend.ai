@@ -17,7 +17,7 @@ import sqlalchemy as sa
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam, QueryParam
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.data.storage.registries.types import ModelSortKey, ModelTarget
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.artifact.types import (
     ArtifactDataWithRevisionsResponse,
     ArtifactFilterOptions,
@@ -43,7 +43,7 @@ from ai.backend.manager.dto.response import (
     SearchArtifactsResponse,
 )
 from ai.backend.manager.errors.artifact import ArtifactImportDelegationError
-from ai.backend.manager.models.artifact import ArtifactRow
+from ai.backend.manager.models.artifact.row import ArtifactRow
 from ai.backend.manager.models.artifact.searchers import ArtifactWithRevisionsSearcher
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -64,7 +64,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.artifact.processors import ArtifactProcessors
     from ai.backend.manager.services.artifact.revision.processors import ArtifactRevisionProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ArtifactRegistryHandler:

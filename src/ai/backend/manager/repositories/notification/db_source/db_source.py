@@ -8,18 +8,18 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.notification import NotificationRuleType
-from ai.backend.manager.data.notification import (
+from ai.backend.manager.data.notification.types import (
+    MatchingNotificationRuleData,
     NotificationChannelData,
     NotificationChannelListResult,
     NotificationRuleData,
     NotificationRuleListResult,
 )
-from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
     NotificationRuleNotFound,
 )
-from ai.backend.manager.models.notification import (
+from ai.backend.manager.models.notification.row import (
     NotificationChannelRow,
     NotificationRuleRow,
 )

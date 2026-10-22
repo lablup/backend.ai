@@ -16,6 +16,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule.client import Valke
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
@@ -41,7 +42,7 @@ from ai.backend.common.types import (
     VFolderMountPolicy,
     VFolderUsageMode,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.clients.valkey_client.statistics import (
     EndpointStatistics,
@@ -76,6 +77,7 @@ from ai.backend.manager.data.deployment.types import (
     ModelRevisionData,
     ResourceGroupCleanupConfig,
     RevisionSearchResult,
+    RouteData,
     RouteHandlerCategory,
     RouteInfo,
     RouteSearchResult,
@@ -86,6 +88,7 @@ from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry, Rout
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.session.creation import DeploymentContext
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.errors.storage import VFolderNotFound, VFolderPermissionError
 from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
@@ -103,16 +106,18 @@ from ai.backend.manager.models.endpoint.updaters import (
     EndpointLifecycleBatchUpdater,
 )
 from ai.backend.manager.models.resource_slot.searchers import RevisionResourceSlotSearcher
-from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.creators import ReplicaCreator
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.searchers import RouteDataSearcher, RouteInfoSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater, ReplicaUpdater
 from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderOwnershipType
-from ai.backend.manager.repositories.deployment.types import (
+from ai.backend.manager.repositories.deployment.db_source.db_source import DeploymentDBSource
+from ai.backend.manager.repositories.deployment.storage_source.storage_source import (
+    DeploymentStorageSource,
+)
+from ai.backend.manager.repositories.deployment.types.endpoint import (
     DeploymentHistoryToCreate,
-    RouteData,
     RouteHistoryToCreate,
     RouteServiceDiscoveryInfo,
     RouteSessionInfo,
@@ -124,10 +129,7 @@ from ai.backend.manager.repositories.rbac.permission_check_repository import (
 )
 from ai.backend.manager.repositories.vfolder.mount_policy import resolve_mount_policy
 
-from .db_source import DeploymentDBSource
-from .storage_source import DeploymentStorageSource
-
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 _DEPLOYMENT_CONFIG_FILENAME = "deployment-config.yaml"
 _LEGACY_SERVICE_DEFINITION_FILENAME = "service-definition.toml"
@@ -414,6 +416,27 @@ class DeploymentRepository:
         return await self._db_source.replace_deployment_options(deployment_id, options)
 
     @deployment_repository_resilience.apply()
+    async def replace_designated_agents(
+        self,
+        deployment_id: DeploymentID,
+        agent_uuids: set[AgentUUID],
+    ) -> None:
+        """Replace the agents a deployment designates with ``agent_uuids``.
+
+        Raises:
+            EndpointNotFound: If the deployment does not exist.
+        """
+        await self._db_source.replace_designated_agents(deployment_id, agent_uuids)
+
+    @deployment_repository_resilience.apply()
+    async def fetch_designated_agents_by_deployment_ids(
+        self,
+        deployment_ids: set[DeploymentID],
+    ) -> Mapping[DeploymentID, list[AgentUUID]]:
+        """Fetch the designated agents of each deployment; one with none maps to ``[]``."""
+        return await self._db_source.fetch_designated_agents_by_deployment_ids(deployment_ids)
+
+    @deployment_repository_resilience.apply()
     async def delete_endpoint(
         self,
         endpoint_id: DeploymentID,
@@ -628,11 +651,10 @@ class DeploymentRepository:
                 )
             except Exception:
                 log.warning(
-                    "Failed to resolve image from deployment-config image ref "
-                    "{} / {} in vfolder {}; skipping the image layer.",
-                    raw.image,
-                    raw.architecture,
-                    vfolder_id,
+                    "deployment config image not resolved, image layer skipped",
+                    image_name=raw.image,
+                    architecture=raw.architecture,
+                    vfolder_id=vfolder_id,
                     exc_info=True,
                 )
 
@@ -1004,11 +1026,11 @@ class DeploymentRepository:
                             metric_aggregated_value += Decimal(str(metric_value.get("pct", 0)))
 
                 if metric_found_kernel_count == 0:
-                    log.warning(
-                        "AUTOSCALE(e:{}, rule:{}): skipping - metric {} not found",
-                        deployment.id,
-                        rule.id,
-                        rule.condition.metric_name,
+                    log.trace(
+                        "autoscaling metric not found, rule skipped",
+                        deployment_id=deployment.id,
+                        rule_id=rule.id,
+                        metric_name=rule.condition.metric_name,
                     )
                     continue
 
@@ -1018,18 +1040,18 @@ class DeploymentRepository:
                 # Use endpoint metrics
                 endpoint_stat = metrics_data.deployment_statistics.get(deployment.id)
                 if not endpoint_stat:
-                    log.warning(
-                        "AUTOSCALE(e:{}, rule:{}): skipping - no endpoint statistics",
-                        deployment.id,
-                        rule.id,
+                    log.trace(
+                        "autoscaling endpoint statistics not found, rule skipped",
+                        deployment_id=deployment.id,
+                        rule_id=rule.id,
                     )
                     continue
                 if rule.condition.metric_name not in endpoint_stat:
-                    log.warning(
-                        "AUTOSCALE(e:{}, rule:{}): skipping - metric {} not found",
-                        deployment.id,
-                        rule.id,
-                        rule.condition.metric_name,
+                    log.trace(
+                        "autoscaling metric not found, rule skipped",
+                        deployment_id=deployment.id,
+                        rule_id=rule.id,
+                        metric_name=rule.condition.metric_name,
                     )
                     continue
 
@@ -1038,7 +1060,12 @@ class DeploymentRepository:
                 metric_type = metric_value.get("__type")
                 match metric_type:
                     case "HISTOGRAM":
-                        log.exception("Unable to set auto-scaling rule on histogram metrics. Skip")
+                        log.warning(
+                            "autoscaling rule on histogram metric not supported, rule skipped",
+                            deployment_id=deployment.id,
+                            rule_id=rule.id,
+                            metric_name=rule.condition.metric_name,
+                        )
                         continue
                     case "GAUGE" | "COUNTER" | _:
                         current_metric_value = metric_value.get("current", 0)
@@ -1046,10 +1073,13 @@ class DeploymentRepository:
                             current_value = Decimal(str(current_metric_value)) / Decimal(
                                 route_count
                             )
-                        except DecimalException:
-                            log.exception(
-                                "Unable parse metric value '{}' to decimal. Skip",
-                                current_metric_value,
+                        except DecimalException as e:
+                            log.warning(
+                                "autoscaling metric value not parsable, rule skipped",
+                                deployment_id=deployment.id,
+                                rule_id=rule.id,
+                                metric_value=str(current_metric_value),
+                                exc_info=e,
                             )
                             continue
 
@@ -1057,10 +1087,10 @@ class DeploymentRepository:
                 # Use pre-fetched Prometheus metrics (populated by executor)
                 pre_fetched = metrics_data.prometheus_metrics.get(rule.id)
                 if pre_fetched is None:
-                    log.warning(
-                        "AUTOSCALE(e:{}, rule:{}): skipping - no prometheus metric",
-                        deployment.id,
-                        rule.id,
+                    log.trace(
+                        "autoscaling prometheus metric not found, rule skipped",
+                        deployment_id=deployment.id,
+                        rule_id=rule.id,
                     )
                     continue
                 current_value = pre_fetched
@@ -1075,11 +1105,11 @@ class DeploymentRepository:
                     scale_direction = 1
                     should_trigger = True
                     log.debug(
-                        "AUTOSCALE(e:{}, rule:{}): {} > {} → scale out",
-                        deployment.id,
-                        rule.id,
-                        current_value,
-                        rule.condition.scale_up_threshold,
+                        "autoscaling metric above threshold, scale out",
+                        deployment_id=deployment.id,
+                        rule_id=rule.id,
+                        metric_value=current_value,
+                        scale_up_threshold=rule.condition.scale_up_threshold,
                     )
                 elif (
                     rule.condition.scale_down_threshold is not None
@@ -1088,20 +1118,20 @@ class DeploymentRepository:
                     scale_direction = -1
                     should_trigger = True
                     log.debug(
-                        "AUTOSCALE(e:{}, rule:{}): {} < {} → scale in",
-                        deployment.id,
-                        rule.id,
-                        current_value,
-                        rule.condition.scale_down_threshold,
+                        "autoscaling metric below threshold, scale in",
+                        deployment_id=deployment.id,
+                        rule_id=rule.id,
+                        metric_value=current_value,
+                        scale_down_threshold=rule.condition.scale_down_threshold,
                     )
                 else:
-                    log.debug(
-                        "AUTOSCALE(e:{}, rule:{}): {} in range [{}, {}] → no action",
-                        deployment.id,
-                        rule.id,
-                        current_value,
-                        rule.condition.scale_down_threshold,
-                        rule.condition.scale_up_threshold,
+                    log.trace(
+                        "autoscaling metric within thresholds, no action",
+                        deployment_id=deployment.id,
+                        rule_id=rule.id,
+                        metric_value=current_value,
+                        scale_down_threshold=rule.condition.scale_down_threshold,
+                        scale_up_threshold=rule.condition.scale_up_threshold,
                     )
 
             if should_trigger:
@@ -1115,12 +1145,12 @@ class DeploymentRepository:
                     rule.action.min_replicas is not None
                     and new_replica_count < rule.action.min_replicas
                 ):
-                    log.info(
-                        "AUTOSCALE(e:{}, rule:{}): new count {} below min {}",
-                        deployment.id,
-                        rule.id,
-                        new_replica_count,
-                        rule.action.min_replicas,
+                    log.debug(
+                        "autoscaling replica count below minimum, rule skipped",
+                        deployment_id=deployment.id,
+                        rule_id=rule.id,
+                        new_replica_count=new_replica_count,
+                        min_replica_count=rule.action.min_replicas,
                     )
                     continue
 
@@ -1128,12 +1158,12 @@ class DeploymentRepository:
                     rule.action.max_replicas is not None
                     and new_replica_count > rule.action.max_replicas
                 ):
-                    log.info(
-                        "AUTOSCALE(e:{}, rule:{}): new count {} above max {}",
-                        deployment.id,
-                        rule.id,
-                        new_replica_count,
-                        rule.action.max_replicas,
+                    log.debug(
+                        "autoscaling replica count above maximum, rule skipped",
+                        deployment_id=deployment.id,
+                        rule_id=rule.id,
+                        new_replica_count=new_replica_count,
+                        max_replica_count=rule.action.max_replicas,
                     )
                     continue
 
@@ -1143,20 +1173,20 @@ class DeploymentRepository:
                         seconds=rule.action.cooldown_seconds
                     )
                     if current_datetime < cooldown_end:
-                        log.info(
-                            "AUTOSCALE(e:{}, rule:{}): in cooldown until {}",
-                            deployment.id,
-                            rule.id,
-                            cooldown_end,
+                        log.debug(
+                            "autoscaling rule in cooldown, rule skipped",
+                            deployment_id=deployment.id,
+                            rule_id=rule.id,
+                            cooldown_until=cooldown_end,
                         )
                         continue
 
                 log.info(
-                    "AUTOSCALE(e:{}, rule:{}): triggering scale from {} to {}",
-                    deployment.id,
-                    rule.id,
-                    current_replica_count,
-                    new_replica_count,
+                    "autoscaling triggered",
+                    deployment_id=deployment.id,
+                    rule_id=rule.id,
+                    current_replica_count=current_replica_count,
+                    new_replica_count=new_replica_count,
                 )
 
                 # Update last triggered time

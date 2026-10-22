@@ -16,7 +16,7 @@ import sqlalchemy as sa
 
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.data.entity.types import EntityType
@@ -52,8 +52,8 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
@@ -241,7 +241,7 @@ def regular_user_context(
     regular_user_fixture: UserFixtureData,
     domain_fixture: DomainFixtureData,
 ) -> Iterator[None]:
-    with with_user(
+    with with_user_context(
         UserData(
             user_id=regular_user_fixture.user_uuid,
             is_authorized=True,
@@ -260,7 +260,7 @@ def superadmin_context(
     admin_user_fixture: UserFixtureData,
     domain_fixture: DomainFixtureData,
 ) -> Iterator[None]:
-    with with_user(
+    with with_user_context(
         UserData(
             user_id=admin_user_fixture.user_uuid,
             is_authorized=True,

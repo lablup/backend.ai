@@ -4,14 +4,15 @@ import socket
 from typing import Any, Final, override
 
 from ai.backend.appproxy.common.types import RouteInfo
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cron import LocalCron
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .base import BaseBackend
 from .last_access_marker import LastAccessMarkerTask
 from .pool import RoutePool
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 MAX_BUFFER_SIZE: Final[int] = 1 * 1024 * 1024
 
@@ -62,22 +63,17 @@ class TCPBackend(BaseBackend):
                     metrics.proxy.observe_upstream_tcp_traffic_chunk(len(data))
                     writer.write(data)
                     await writer.drain()
-                    log.debug("TCPBackend._pipe(t: {}): sent {} bytes", tag, len(data))
             except ConnectionResetError:
-                log.debug("Conn reset")
-                pass
-            except Exception:
-                log.exception("")
-                raise
+                log.trace("{}: connection reset", tag)
             finally:
-                log.debug("setting stop event")
                 stop_event.set()
 
         route = await self._pool.select()
-        log.debug(
-            "Proxying TCP Request to {}:{}",
+        log.trace(
+            "proxying TCP connection to {}:{}",
             route.current_kernel_host,
             route.kernel_port,
+            route_id=route.route_id,
         )
 
         marker_cron = LocalCron([LastAccessMarkerTask(self, route)])
@@ -89,27 +85,23 @@ class TCPBackend(BaseBackend):
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
             # unlike .frontend.tcp this has a chance of being a blocking call since kernel host can be a domain
             try:
-                await asyncio.get_running_loop().run_in_executor(
+                await run_in_executor_with_context(
                     None, sock.connect, (route.current_kernel_host, route.kernel_port)
                 )
-            except Exception:
+            except OSError as e:
                 self._pool.record_failure(route)
-                raise
+                log.trace("app refused the connection: {!r}", e, route_id=route.route_id)
+                sock.close()
+                return
 
             up_reader, up_writer = await asyncio.open_connection(sock=sock)
             self._pool.record_success(route)
-            log.debug(
-                "Connected to {}:{}",
-                route.current_kernel_host,
-                route.kernel_port,
-            )
             async with asyncio.TaskGroup() as group:
                 group.create_task(_pipe(up_reader, down_writer, tag="up->down"))
                 group.create_task(_pipe(down_reader, up_writer, tag="down->up"))
         finally:
-            log.debug("tasks ended")
             metrics.proxy.observe_upstream_tcp_traffic_chunk(total_bytes)
             await marker_cron.stop()
             down_writer.close()
             await down_writer.wait_closed()
-        log.debug("TCP connection closed")
+        log.trace("TCP connection closed")

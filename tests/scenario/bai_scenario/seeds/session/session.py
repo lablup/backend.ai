@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import override
 
@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.types import AccessKey, ClusterMode, SessionTypes
 from ai.backend.manager.data.network.types import NetworkType
 from ai.backend.manager.data.project.types import ProjectData
@@ -32,7 +33,7 @@ from ai.backend.manager.data.session.spec import (
 from ai.backend.manager.data.session.types import SessionEntityData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.models.session.creators import SessionCreator
-from bai_scenario.seeds.seeder import Naming, SeedRowFromThree
+from bai_scenario.seeds.seeder import Naming, TestSeedRowFromThree
 
 
 def session_spec(
@@ -86,7 +87,9 @@ def session_spec(
 
 
 @dataclass(frozen=True)
-class SeedSession(SeedRowFromThree[ProjectData, UserData, ResourceGroupData, SessionEntityData]):
+class TestSeedSession(
+    TestSeedRowFromThree[ProjectData, UserData, ResourceGroupData, SessionEntityData]
+):
     """A session of the given project, owned by the given user, on the given group.
 
     It waits as enqueued and has no kernel yet; a kernel is laid under it. The access
@@ -131,3 +134,25 @@ class SeedSession(SeedRowFromThree[ProjectData, UserData, ResourceGroupData, Ses
             image_infos={},
             enqueue_time=datetime.now(UTC),
         )
+
+
+@dataclass(frozen=True, kw_only=True)
+class TestSeedSessionInGroup(TestSeedSession):
+    """A waiting session that is a member of the given session group.
+
+    The group is a value an earlier row answered.
+    """
+
+    session_group_id: SessionGroupID
+
+    @override
+    def detail(self) -> str:
+        return "세션 그룹의 멤버로 스케줄링을 기다리고 있다"
+
+    @override
+    def seed(
+        self, name: str, first: ProjectData, second: UserData, third: ResourceGroupData
+    ) -> SessionCreator:
+        creator = super().seed(name, first, second, third)
+        scope = creator.spec.scope.model_copy(update={"session_group_id": self.session_group_id})
+        return replace(creator, spec=creator.spec.model_copy(update={"scope": scope}))

@@ -13,17 +13,19 @@ from graphql import Undefined, UndefinedType
 
 from ai.backend.common.container_registry import AllowedGroupsModel, ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
+from ai.backend.manager.api.gql.base import resolve_entity_id
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.defs import PASSWORD_PLACEHOLDER
-from ai.backend.manager.models.container_registry import (
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
+from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
+from ai.backend.manager.models.container_registry.row import (
     ContainerRegistryRow,
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
-from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
-from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
@@ -37,11 +39,20 @@ from ai.backend.manager.models.rbac import (
 from ai.backend.manager.services.container_registry.actions.create_container_registry import (
     CreateContainerRegistryAction,
 )
+from ai.backend.manager.services.container_registry.actions.create_registry_quota import (
+    CreateRegistryQuotaAction,
+)
 from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
     DeleteContainerRegistryAction,
 )
+from ai.backend.manager.services.container_registry.actions.delete_registry_quota import (
+    DeleteRegistryQuotaAction,
+)
 from ai.backend.manager.services.container_registry.actions.update_container_registry import (
     UpdateContainerRegistryAction,
+)
+from ai.backend.manager.services.container_registry.actions.update_registry_quota import (
+    UpdateRegistryQuotaAction,
 )
 from ai.backend.manager.types import OptionalState, TriState
 
@@ -59,9 +70,9 @@ from .group import GroupConnection, GroupNode
 
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = (
     "AllowedGroups",
@@ -159,7 +170,7 @@ class ContainerRegistryNode(graphene.ObjectType):  # type: ignore[misc]
     @classmethod
     async def get_node(cls, info: graphene.ResolveInfo, id: str) -> ContainerRegistryNode:
         graph_ctx: GraphQueryContext = info.context
-        _, reg_id = AsyncNode.resolve_global_id(info, id)
+        reg_id = resolve_entity_id(id, ContainerRegistryID)
         select_stmt = sa.select(ContainerRegistryRow).where(ContainerRegistryRow.id == reg_id)
         async with graph_ctx.db.begin_readonly_session() as db_session:
             reg_row = cast(ContainerRegistryRow | None, await db_session.scalar(select_stmt))
@@ -445,7 +456,10 @@ class ModifyContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         _, _id = AsyncNode.resolve_global_id(info, id)
-        reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        try:
+            reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid id: {id}") from e
 
         action = UpdateContainerRegistryAction(
             updater=ContainerRegistryUpdater(
@@ -499,7 +513,10 @@ class DeleteContainerRegistryNode(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         _, _id = AsyncNode.resolve_global_id(info, id)
-        reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        try:
+            reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid id: {id}") from e
 
         result = await ctx.processors.container_registry.delete_container_registry.run(
             DeleteContainerRegistryAction(
@@ -536,10 +553,8 @@ class CreateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
         try:
             match scope_id:
                 case ProjectScope():
-                    await (
-                        graph_ctx.services_ctx.per_project_container_registries_quota.create_quota(
-                            scope_id, int(quota)
-                        )
+                    await graph_ctx.processors.container_registry.create_registry_quota.run(
+                        CreateRegistryQuotaAction(scope_id=scope_id, quota=int(quota))
                     )
                 case _:
                     raise NotImplementedError("Only project scope is supported for now.")
@@ -576,10 +591,8 @@ class UpdateContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
         try:
             match scope_id:
                 case ProjectScope(_):
-                    await (
-                        graph_ctx.services_ctx.per_project_container_registries_quota.update_quota(
-                            scope_id, int(quota)
-                        )
+                    await graph_ctx.processors.container_registry.update_registry_quota.run(
+                        UpdateRegistryQuotaAction(scope_id=scope_id, quota=int(quota))
                     )
                 case _:
                     raise NotImplementedError("Only project scope is supported for now.")
@@ -614,10 +627,8 @@ class DeleteContainerRegistryQuota(graphene.Mutation):  # type: ignore[misc]
         try:
             match scope_id:
                 case ProjectScope(_):
-                    await (
-                        graph_ctx.services_ctx.per_project_container_registries_quota.delete_quota(
-                            scope_id
-                        )
+                    await graph_ctx.processors.container_registry.delete_registry_quota.run(
+                        DeleteRegistryQuotaAction(scope_id=scope_id)
                     )
                 case _:
                     raise NotImplementedError("Only project scope is supported for now.")

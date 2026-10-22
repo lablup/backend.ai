@@ -9,8 +9,8 @@ from typing import cast
 import sqlalchemy as sa
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload
 
+from ai.backend.common.arch import arch_name_aliases
 from ai.backend.common.bgtask.reporter import ProgressReporter
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.user import UserID
@@ -18,17 +18,19 @@ from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.types import ImageID
 from ai.backend.common.utils import join_non_empty
-from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.container_registry import get_container_registry_cls
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.container_registry.factory import get_container_registry_cls
 from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageAliasListResult,
     ImageData,
     ImageDataWithDetails,
+    ImageIdentifier,
     ImageStatus,
     RescanImagesResult,
     ResourceLimitInput,
 )
+from ai.backend.manager.errors.common import InternalServerError
 from ai.backend.manager.errors.image import (
     AliasImageActionDBError,
     AliasImageActionValueError,
@@ -38,16 +40,12 @@ from ai.backend.manager.errors.image import (
     RegistryNotFoundForImage,
     UpdateImageActionValueError,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.image import (
-    ImageAliasRow,
-    ImageIdentifier,
-    ImageRow,
-)
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.lookups import ImageAliasOwnerLookup
 from ai.backend.manager.models.image.purgers import ImagePurger
 from ai.backend.manager.models.image.queriers import ImageQuerier
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.scopes import ImageTarget
 from ai.backend.manager.models.image.searchable_fields import (
     ImageAliasSearchableFields,
@@ -63,10 +61,10 @@ from ai.backend.manager.models.image.updaters import ImageUpdater
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier, execute_batch_querier
+from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ImageDBSource:
@@ -205,7 +203,8 @@ class ImageDBSource:
         """
         async with self._db.begin_session() as session:
             image_row = await self._get_image_row_for_write(session, image_id, [ImageStatus.ALIVE])
-            await image_row.mark_as_deleted(session)
+            image_row.status = ImageStatus.DELETED
+            await session.flush()
             return ImageSearchableFields.own.to_data(image_row)
 
     async def mark_image_alive_by_id(
@@ -219,7 +218,8 @@ class ImageDBSource:
             image_row = await self._get_image_row_for_write(
                 session, image_id, ImageStatus.restorable()
             )
-            await image_row.mark_as_alive(session)
+            image_row.status = ImageStatus.ALIVE
+            await session.flush()
             return ImageSearchableFields.own.to_data(image_row)
 
     async def fetch_image_by_id(self, image_id: ImageID, load_aliases: bool = False) -> ImageData:
@@ -343,31 +343,6 @@ class ImageDBSource:
         except DBAPIError as e:
             raise AliasImageActionDBError(str(e)) from e
 
-    async def query_images_by_ids(
-        self,
-        image_ids: list[ImageID],
-        status_filter: list[ImageStatus] | None = None,
-    ) -> dict[ImageID, ImageDataWithDetails]:
-        """
-        Queries images by their IDs with optional status filter.
-        Returns a dictionary mapping ImageID to ImageDataWithDetails.
-        """
-        if not image_ids:
-            return {}
-
-        query = (
-            sa.select(ImageRow)
-            .where(ImageRow.id.in_(image_ids))
-            .options(selectinload(ImageRow.aliases))
-        )
-        if status_filter:
-            query = query.where(ImageRow.status.in_(status_filter))
-
-        async with self._db.begin_readonly_session_read_committed() as session:
-            result = await session.execute(query)
-            image_rows = list(result.scalars().all())
-            return {ImageID(row.id): row.to_detailed_dataclass() for row in image_rows}
-
     async def clear_image_resource_limits_by_id(self, image_id: ImageID) -> ImageData:
         """
         Clears image resource limits by image ID.
@@ -436,6 +411,46 @@ class ImageDBSource:
                 has_previous_page=result.has_previous_page,
             )
 
+    async def scan_image(self, canonical: str, architecture: str) -> ImageData:
+        registries = await self._load_configured_registries(None)
+        result = await self.scan_registry_with_img_canonical(registries, canonical)
+        if result is None:
+            raise RegistryNotFoundForImage(
+                f"Registry not found for image: Image canonical - {canonical}"
+            )
+        architecture = arch_name_aliases.get(architecture, architecture)
+        image = next((image for image in result.images if image.architecture == architecture), None)
+        if image is None:
+            raise ImageNotFound
+        return image
+
+    async def scan_registry_with_img_canonical(
+        self, registries: dict[str, ContainerRegistryRow], canonical: str
+    ) -> RescanImagesResult | None:
+        """Scan the one registry whose registry/project prefix matches the canonical.
+
+        Answers None when no registry matches, so the caller decides what that means.
+        """
+        matching = self._filter_by_img_canonical(registries, canonical)
+        if not matching:
+            return None
+        registry_key, registry_row = next(iter(matching.items()))
+        # The loader keys rows by registry/project, so a duplicate row hides behind one key.
+        async with self._db.begin_readonly_session() as session:
+            count = await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(ContainerRegistryRow)
+                .where(
+                    ContainerRegistryRow.registry_name == registry_row.registry_name,
+                    ContainerRegistryRow.project == registry_row.project,
+                )
+            )
+        if len(matching) > 1 or count != 1:
+            raise InternalServerError(
+                f"Multiple container registries match image: Image canonical - {canonical}"
+            )
+        return await self.scan_single_image(registry_key, registry_row, canonical)
+
     async def rescan_images(
         self,
         registry_or_image: str | None = None,
@@ -456,23 +471,16 @@ class ImageDBSource:
         if registry_or_image is None:
             return await self._scan_registries(registries, reporter=reporter)
 
-        matching_registries = self._filter_by_img_canonical(registries, registry_or_image)
-
-        if matching_registries:
-            if len(matching_registries) > 1:
-                raise RuntimeError(
-                    "ContainerRegistryRows exist with the same registry_name and project!",
-                )
-
-            registry_key, registry_row = next(iter(matching_registries.items()))
-            return await self.scan_single_image(registry_key, registry_row, registry_or_image)
+        scanned = await self.scan_registry_with_img_canonical(registries, registry_or_image)
+        if scanned is not None:
+            return scanned
 
         matching_registries = self._filter_by_registry_name(registries, registry_or_image)
 
         if not matching_registries:
             raise RuntimeError("It is an unknown registry.", registry_or_image)
 
-        log.debug("running a per-registry metadata scan")
+        log.debug("per-registry image metadata scan started")
         return await self._scan_registries(matching_registries, reporter=reporter)
         # TODO: delete images removed from registry?
 
@@ -486,7 +494,9 @@ class ImageDBSource:
         registry_name = ImageRef.parse_image_str(registry_key, "*").registry
         image_name = image_canonical.removeprefix(registry_name + "/")
 
-        log.debug("running a per-image metadata scan: {}, {}", registry_name, image_name)
+        log.debug(
+            "per-image metadata scan started", registry_name=registry_name, image_name=image_name
+        )
 
         scanner_cls = get_container_registry_cls(registry_row)
         scanner = scanner_cls(self._db, registry_name, registry_row)
@@ -525,7 +535,7 @@ class ImageDBSource:
 
         for registry_key, registry_row in registries.items():
             registry_name = ImageRef.parse_image_str(registry_key, "*").registry
-            log.info('Scanning kernel images from the registry "{0}"', registry_name)
+            log.debug("registry image scan started", registry_name=registry_name)
 
             scanner_cls = get_container_registry_cls(registry_row)
             scanner = scanner_cls(self._db, registry_name, registry_row)

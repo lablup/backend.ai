@@ -49,6 +49,14 @@ class PresetAvailabilityData:
 
 
 @dataclass(frozen=True)
+class UserConcurrencyData:
+    """A user's active session counts, split as the scheduler's concurrency check does."""
+
+    session_count: int
+    private_session_count: int
+
+
+@dataclass(frozen=True)
 class KeypairContextData:
     """Resolved keypair context for a user (access_key + resource_policy)."""
 

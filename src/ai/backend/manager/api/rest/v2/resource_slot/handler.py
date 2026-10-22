@@ -7,22 +7,23 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AdminSearchAgentResourcesInput,
     AdminSearchResourceAllocationsInput,
     AdminSearchResourceSlotTypesInput,
     CreateResourceSlotTypeInput,
-    PurgeResourceSlotTypeInput,
+    PartialBulkPurgeResourceSlotTypesInput,
     ScopedSearchAgentResourcesInput,
     UpdateResourceSlotTypeInput,
 )
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.api.rest.v2.path_params import SlotNamePathParam
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.api.rest.v2.path_params import SlotNamePathParam, SlotTypeIdPathParam
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2ResourceSlotHandler:
@@ -57,14 +58,29 @@ class V2ResourceSlotHandler:
         result = await self._adapter.admin_update_slot_type(merged)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def purge_slot_type(
+        self,
+        path: PathParam[SlotTypeIdPathParam],
+    ) -> APIResponse:
+        """Remove a resource slot type, refusing while anything still references it."""
+        result = await self._adapter.purge_slot_type(ResourceSlotTypeUUID(path.parsed.slot_type_id))
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge_slot_types(
+        self,
+        body: BodyParam[PartialBulkPurgeResourceSlotTypesInput],
+    ) -> APIResponse:
+        """Remove several resource slot types, answering for each one."""
+        result = await self._adapter.partial_bulk_purge_slot_types(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def admin_purge_slot_type(
         self,
         path: PathParam[SlotNamePathParam],
     ) -> APIResponse:
-        """Remove a resource slot type by slot name (superadmin only)."""
-        result = await self._adapter.admin_purge_slot_type(
-            PurgeResourceSlotTypeInput(slot_name=path.parsed.slot_name)
-        )
+        """Deprecated. Use `DELETE /v2/resource-slots/slot-types/{slot_type_id}`."""
+        slot_type_id = await self._adapter.lookup_slot_type(path.parsed.slot_name)
+        result = await self._adapter.purge_slot_type(slot_type_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def scoped_search_agent_resources(

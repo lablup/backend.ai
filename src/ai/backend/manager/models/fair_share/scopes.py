@@ -17,10 +17,10 @@ from ai.backend.manager.errors.resource import (
     ResourceGroupNotFound,
 )
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
-from ai.backend.manager.models.resource_group import ResourceGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 
 __all__ = (

@@ -14,7 +14,6 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.user.response import UserNode
 from ai.backend.common.dto.manager.v2.user.types import UserFairShareScope, UserUsageScope
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -23,9 +22,9 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_pydantic_input,
 )
-from ai.backend.manager.api.gql.fair_share.types import UserFairShareGQL
+from ai.backend.manager.api.gql.fair_share.types.user import UserFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
-from ai.backend.manager.api.gql.resource_usage.types import (
+from ai.backend.manager.api.gql.resource_usage.types.user_usage import (
     UserUsageBucketConnection,
     UserUsageBucketFilter,
     UserUsageBucketOrderBy,
@@ -104,7 +103,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
     id: NodeID[str] = gql_field(description="Unique identifier for the user (UUID).")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the user.",
         ),
     )
@@ -165,7 +164,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
         from strawberry.relay import PageInfo
 
         from ai.backend.manager.api.gql.base import encode_cursor
-        from ai.backend.manager.api.gql.resource_usage.types import (
+        from ai.backend.manager.api.gql.resource_usage.types.user_usage import (
             UserUsageBucketEdge,
             UserUsageBucketGQL,
         )
@@ -214,8 +213,13 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
     ):
         if self.organization.domain_name is None:
             return None
-        domain: DomainV2GQL | None = await info.context.data_loaders.domain_loader.load(
+        domain_id = await info.context.data_loaders.domain_id_by_name_loader.load(
             self.organization.domain_name
+        )
+        if domain_id is None:
+            return None
+        domain: DomainV2GQL | None = await info.context.data_loaders.domain_by_id_loader.load(
+            domain_id
         )
         return domain
 
@@ -286,7 +290,7 @@ class UserV2GQL(PydanticNodeMixin[UserNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Resource groups this user may schedule on.",
         )
     )  # type: ignore[misc]

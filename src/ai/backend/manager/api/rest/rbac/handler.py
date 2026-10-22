@@ -13,6 +13,7 @@ from http import HTTPStatus
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import RuntimeEntityID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.rbac import (
     AssignRoleRequest,
     AssignRoleResponse,
@@ -48,15 +49,13 @@ from ai.backend.manager.models.rbac_models.role.searchers import RoleSearcher
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater
 from ai.backend.manager.models.rbac_models.user_role.scopes import RoleRoleAssignmentTarget
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
-from ai.backend.manager.services.permission_contoller.actions import (
-    CreateRoleAction,
-    DeleteRoleAction,
-    GetRoleDetailAction,
-    GlobalSearchRolesAction,
-    UpdateRoleAction,
-)
+from ai.backend.manager.services.permission_contoller.actions.create_role import CreateRoleAction
+from ai.backend.manager.services.permission_contoller.actions.delete_role import DeleteRoleAction
 from ai.backend.manager.services.permission_contoller.actions.get_entity_types import (
     PublicGetEntityTypesAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.get_role_detail import (
+    GetRoleDetailAction,
 )
 from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
     PublicGetScopeTypesAction,
@@ -65,6 +64,10 @@ from ai.backend.manager.services.permission_contoller.actions.purge_role import 
 from ai.backend.manager.services.permission_contoller.actions.search_my_role_assignments import (
     ScopedSearchRoleAssignmentsAction,
 )
+from ai.backend.manager.services.permission_contoller.actions.search_roles import (
+    GlobalSearchRolesAction,
+)
+from ai.backend.manager.services.permission_contoller.actions.update_role import UpdateRoleAction
 from ai.backend.manager.services.permission_contoller.processors import (
     PermissionControllerProcessors,
 )
@@ -202,7 +205,7 @@ class RBACHandler:
         input_data = UserRoleAssignmentInput(
             user_id=body.parsed.user_id,
             role_id=body.parsed.role_id,
-            granted_by=body.parsed.granted_by or ctx.user_uuid,
+            granted_by=UserID(ctx.user_uuid),
         )
         action_result = await self._rbac.assign_role.run(AssignRoleAction(input=input_data))
         resp = AssignRoleResponse(

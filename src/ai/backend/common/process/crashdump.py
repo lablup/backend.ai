@@ -8,9 +8,9 @@ import os
 from pathlib import Path
 from typing import IO, Final
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 # faulthandler writes through a raw file descriptor, so the file object must outlive the call.
 _dump_file: IO[str] | None = None
@@ -31,8 +31,8 @@ def enable_crash_dump(dump_dir: Path, tag: str) -> None:
         dump_dir.mkdir(parents=True, exist_ok=True)
         _dump_file = dump_path.open("a", buffering=1)
     except OSError as e:
-        log.warning("could not open the crash dump file {}: {}", dump_path, e)
+        log.warning("crash dump file open failed", exc_info=e, dump_path=dump_path)
         return
     _dump_pid = pid
     faulthandler.enable(file=_dump_file, all_threads=True)
-    log.debug("crash dumps enabled at {}", dump_path)
+    log.debug("crash dumps enabled", dump_path=dump_path)

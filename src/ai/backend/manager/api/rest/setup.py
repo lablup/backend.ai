@@ -8,13 +8,16 @@ from .app import _mount_registry_tree
 from .routing import RouteRegistry
 
 if TYPE_CHECKING:
-    from ai.backend.manager.dependencies import DependencyResources
+    from ai.backend.manager.api.rest.shutdown import ServerDrainNotifier
+    from ai.backend.manager.dependencies.composer import DependencyResources
 
 
 def setup_api(
     root_app: web.Application,
     dep_resources: DependencyResources,
     pidx: int,
+    *,
+    drain_notifier: ServerDrainNotifier,
 ) -> None:
     """Build the full API module tree and mount it on *root_app*.
 
@@ -37,6 +40,9 @@ def setup_api(
         key_provider_pool=r.bootstrap.key_provider_pool,
         deployment_coordinator=r.orchestration.sokovan_orchestrator.deployment_coordinator,
         schedule_coordinator=r.orchestration.sokovan_orchestrator.coordinator,
+        session_lifecycle_handlers=(
+            r.orchestration.sokovan_orchestrator.coordinator.registered_lifecycle_handlers()
+        ),
         config_provider=r.bootstrap.config_provider,
     )
     gql_context_deps = GQLContextDeps(
@@ -48,9 +54,9 @@ def setup_api(
         valkey_image=r.infrastructure.valkey.image,
         valkey_live=r.infrastructure.valkey.live,
         valkey_schedule=r.infrastructure.valkey.schedule,
+        sentinel_monitors=r.infrastructure.sentinel_monitors,
         network_plugin_ctx=r.plugins.network_plugin_ctx,
         background_task_manager=r.system.background_task_manager,
-        services_ctx=r.domain.services_ctx,
         storage_manager=r.components.storage_manager,
         registry=r.agents.registry,
         idle_checker_host=r.orchestration.idle_checker_host,
@@ -76,6 +82,7 @@ def setup_api(
         root_app=root_app,
         stream_cleanup_handler=r.processing.stream_cleanup_handler,
         health_probe=r.system.health_probe,
+        drain_notifier=drain_notifier,
         pidx=pidx,
     ):
         root_registry.add_subregistry(sub)

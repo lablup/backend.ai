@@ -29,40 +29,38 @@ from ai.backend.common.dto.manager.domain import (
     UpdateDomainResponse,
 )
 from ai.backend.common.types import ResourceSlot
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.domain_request import (
     GetDomainPathParam,
     UpdateDomainPathParam,
 )
 from ai.backend.manager.models.domain.creators import DomainCreator
-from ai.backend.manager.models.domain.updaters import DomainSoftDeleteUpdater
-from ai.backend.manager.models.project.creators import ProjectCreator
+from ai.backend.manager.models.domain.updaters import DomainRestoreUpdater, DomainSoftDeleteUpdater
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.delete_domain import DeleteDomainAction
 from ai.backend.manager.services.domain.actions.get import GetDomainAction
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.actions.purge_domain import PurgeDomainAction
+from ai.backend.manager.services.domain.actions.restore_domain import RestoreDomainAction
 from ai.backend.manager.services.domain.actions.search_domains import GlobalSearchDomainsAction
 from ai.backend.manager.services.domain.actions.update_domain import UpdateDomainAction
-from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 
 from .adapter import DomainAdapter
 
 if TYPE_CHECKING:
     from ai.backend.manager.services.domain.processors import DomainProcessors
-    from ai.backend.manager.services.project.processors import ProjectProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class DomainHandler:
     """Domain API handler with constructor-injected dependencies."""
 
-    def __init__(self, *, domain: DomainProcessors, project: ProjectProcessors) -> None:
+    def __init__(self, *, domain: DomainProcessors) -> None:
         self._domain = domain
-        self._project = project
         self._adapter = DomainAdapter()
 
     # ------------------------------------------------------------------
@@ -87,16 +85,8 @@ class DomainHandler:
             allowed_docker_registries=body.parsed.allowed_docker_registries,
             integration_name=body.parsed.integration_id,  # v1 DTO uses integration_id
         )
-        action_result = await self._domain.create_domain.run(CreateDomainAction(creator=creator))
+        action_result = await self._domain.create.run(CreateDomainAction(creator=creator))
         domain_data = action_result.data
-        await self._project.create_project.run(
-            CreateProjectAction(
-                domain_id=domain_data.id,
-                creator=ProjectCreator.model_store(
-                    domain_id=domain_data.id, domain_name=domain_data.name
-                ),
-            )
-        )
 
         resp = CreateDomainResponse(domain=self._adapter.convert_to_dto(domain_data))
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=resp)
@@ -110,7 +100,7 @@ class DomainHandler:
         path: PathParam[GetDomainPathParam],
         ctx: UserContext,
     ) -> APIResponse:
-        resolved = await self._domain.lookup.run(
+        resolved = await self._domain.lookup_name.run(
             LookupDomainAction(name=DomainName(path.parsed.domain_name))
         )
         action_result = await self._domain.get.run(GetDomainAction(domain_id=resolved.entity_id()))
@@ -154,13 +144,31 @@ class DomainHandler:
         ctx: UserContext,
     ) -> APIResponse:
         domain_name = path.parsed.domain_name
-        target = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        target = await self._domain.lookup_name.run(
+            LookupDomainAction(name=DomainName(domain_name))
+        )
         updater = self._adapter.build_updater(body.parsed, target.entity_id())
 
-        action_result = await self._domain.update_domain.run(UpdateDomainAction(updater=updater))
+        action_result = await self._domain.update.run(UpdateDomainAction(updater=updater))
+        data = await self._apply_is_active(action_result.data, body.parsed.is_active)
 
-        resp = UpdateDomainResponse(domain=self._adapter.convert_to_dto(action_result.data))
+        resp = UpdateDomainResponse(domain=self._adapter.convert_to_dto(data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
+
+    async def _apply_is_active(self, data: DomainData, is_active: bool | None) -> DomainData:
+        """Soft-delete (``False``) or restore (``True``) the domain; nothing when it is
+        already there."""
+        if is_active is None or data.is_active == is_active:
+            return data
+        if is_active:
+            restored = await self._domain.restore.run(
+                RestoreDomainAction(updater=DomainRestoreUpdater(domain_id=data.id))
+            )
+            return restored.data
+        deleted = await self._domain.delete.run(
+            DeleteDomainAction(updater=DomainSoftDeleteUpdater(domain_id=data.id))
+        )
+        return deleted.data
 
     # ------------------------------------------------------------------
     # delete (POST /admin/domains/delete)
@@ -171,10 +179,10 @@ class DomainHandler:
         body: BodyParam[DeleteDomainRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        target = await self._domain.lookup.run(
+        target = await self._domain.lookup_name.run(
             LookupDomainAction(name=DomainName(body.parsed.name))
         )
-        await self._domain.delete_domain.run(
+        await self._domain.delete.run(
             DeleteDomainAction(
                 updater=DomainSoftDeleteUpdater(domain_id=target.entity_id()),
             )
@@ -192,10 +200,10 @@ class DomainHandler:
         body: BodyParam[PurgeDomainRequest],
         ctx: UserContext,
     ) -> APIResponse:
-        target = await self._domain.lookup.run(
+        target = await self._domain.lookup_name.run(
             LookupDomainAction(name=DomainName(body.parsed.name))
         )
-        await self._domain.purge_domain.run(
+        await self._domain.purge.run(
             PurgeDomainAction(domain_id=target.entity_id(), name=body.parsed.name)
         )
 

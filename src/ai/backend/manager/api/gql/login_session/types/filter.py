@@ -8,9 +8,11 @@ from ai.backend.common.dto.manager.v2.login_session.request import (
     LoginSessionFilter,
     LoginSessionStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import DateTimeFilter, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_field,
     gql_pydantic_input,
 )
@@ -47,9 +49,19 @@ class LoginSessionStatusFilterGQL(PydanticInputMixin[LoginSessionStatusFilter]):
 class LoginSessionFilterGQL(PydanticInputMixin[LoginSessionFilter]):
     user_id: UUIDFilter | None = None
     status: LoginSessionStatusFilterGQL | None = None
-    access_key: StringFilter | None = None
+    access_key: StringFilter | None = gql_field(
+        description="Filter by the access key associated with the session.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `userId`.",
+    )
     created_at: DateTimeFilter | None = None
     last_accessed_at: DateTimeFilter | None = None
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by login session ID."
+        ),
+        default=None,
+    )
 
     AND: list[Self] | None = None
     OR: list[Self] | None = None

@@ -25,34 +25,36 @@ from ai.backend.common.types import (
     ResourceSlot,
     VFolderHostPermissionMap,
 )
+from ai.backend.manager.data.vfolder.types import (
+    VFolderMountPermission as VFolderPermission,
+)
+from ai.backend.manager.data.vfolder.types import (
+    VFolderOperationStatus,
+    VFolderOwnershipType,
+)
 from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import (
+from ai.backend.manager.models.user.row import (
     PasswordHashAlgorithm,
     UserRole,
     UserRow,
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import (
-    VFolderOperationStatus,
-    VFolderOwnershipType,
-    VFolderPermission,
-    VFolderRow,
-    VFolderUserMountPolicyRow,
-)
+from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,

@@ -19,20 +19,18 @@ from ai.backend.manager.data.image.types import (
     ImageAliasData,
     ImageAliasListResult,
     ImageData,
+    ImageIdentifier,
     ImageStatus,
     ImageWithAgentInstallStatus,
     RescanImagesResult,
     ResourceLimitInput,
-)
-from ai.backend.manager.models.image import (
-    ImageIdentifier,
 )
 from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.scopes import ImageTarget
 from ai.backend.manager.models.image.searchers import ImageSearcher
 from ai.backend.manager.models.image.updaters import ImageUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
 from ai.backend.manager.repositories.image.stateful_source.stateful_source import (
     ImageStatefulSource,
@@ -182,6 +180,10 @@ class ImageRepository:
     @image_repository_resilience.apply()
     async def delete_image_alias(self, alias: str) -> tuple[ImageID, ImageAliasData]:
         return await self._db_source.remove_image_alias(alias)
+
+    @image_repository_resilience.apply()
+    async def scan_image(self, canonical: str, architecture: str) -> ImageData:
+        return await self._db_source.scan_image(canonical, architecture)
 
     @image_repository_resilience.apply()
     async def scan_image_by_identifier(

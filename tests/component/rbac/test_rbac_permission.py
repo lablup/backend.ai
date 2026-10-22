@@ -5,7 +5,7 @@ from typing import Any
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.permission import PermissionID
 from ai.backend.common.data.entity.role import RoleID
@@ -45,7 +45,7 @@ def superadmin_context(domain_fixture: DomainFixtureData) -> Any:
         domain_name=domain_fixture.domain_name,
         domain_id=domain_fixture.domain_id,
     )
-    with with_user(user):
+    with with_user_context(user):
         yield
 
 

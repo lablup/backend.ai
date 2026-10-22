@@ -11,11 +11,11 @@ from ai.backend.agent.resources import (
 )
 from ai.backend.common.etcd import AbstractKVStore
 from ai.backend.common.types import DeviceName, SlotName
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .config import read_dummy_config
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 async def load_resources(
@@ -78,7 +78,7 @@ async def scan_available_resources(
                     f"The resource slot '{sname}' is not sufficient (zero or below zero). "
                     "Try to adjust the reserved resources or use a larger machine."
                 )
-    log.info("Resource slots: {!r}", slots)
-    log.info("Slot types: {!r}", known_slot_types)
+    log.info("resource slots scanned", resource_slots=str(slots))
+    log.info("slot types registered", slot_types=str(known_slot_types))
 
     return slots

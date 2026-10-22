@@ -18,7 +18,7 @@ from ai.backend.manager.models.base import GUID
 from ai.backend.manager.models.global_entity.seed import SEED_GLOBAL_ENTITIES_SQL
 
 # revision identifiers, used by Alembic.
-revision = "b76f2d5191d4"  # Part of: NEXT_RELEASE_VERSION
+revision = "b76f2d5191d4"  # Part of: 26.9.0
 down_revision = "a0f597deb5e5"
 branch_labels = None
 depends_on = None

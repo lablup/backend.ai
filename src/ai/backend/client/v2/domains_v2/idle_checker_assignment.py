@@ -5,14 +5,18 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     CreateIdleCheckerAssignmentInput,
+    PartialBulkPurgeIdleCheckerAssignmentsInput,
+    PartialBulkUpdateIdleCheckerAssignmentsInput,
     ScopedSearchIdleCheckerAssignmentsInput,
     SearchIdleCheckerAssignmentsInput,
     UpdateIdleCheckerAssignmentInput,
 )
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.response import (
     CreateIdleCheckerAssignmentPayload,
+    IdleCheckerAssignmentNode,
     PurgeIdleCheckerAssignmentPayload,
     SearchIdleCheckerAssignmentPayload,
     UpdateIdleCheckerAssignmentPayload,
@@ -82,4 +86,28 @@ class V2IdleCheckerAssignmentClient(BaseDomainClient):
             "DELETE",
             f"{_PATH}/{idle_checker_assignment_id}",
             response_model=PurgeIdleCheckerAssignmentPayload,
+        )
+
+    async def partial_bulk_update(
+        self,
+        request: PartialBulkUpdateIdleCheckerAssignmentsInput,
+    ) -> PartialBulkPayload[IdleCheckerAssignmentNode]:
+        """Update several idle checker assignments' enabled state, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-update",
+            request=request,
+            response_model=PartialBulkPayload[IdleCheckerAssignmentNode],
+        )
+
+    async def partial_bulk_purge(
+        self,
+        request: PartialBulkPurgeIdleCheckerAssignmentsInput,
+    ) -> PartialBulkPayload[IdleCheckerAssignmentNode]:
+        """Permanently remove several idle checker assignments, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[IdleCheckerAssignmentNode],
         )

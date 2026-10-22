@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 import pytest
@@ -259,6 +260,111 @@ class TestReplaceOperation:
         assert result is False
         # Value should remain unchanged
         assert await agent_etcd_view.get(key) == initial_val
+
+
+@dataclass(frozen=True)
+class _GuardedReplacementCase:
+    name: str
+    guarded_owner: str
+    expected_replaced: bool
+    expected_subtree: dict[str, str]
+
+
+@pytest.fixture
+async def node_subtree_owned_by_run_1(agent_etcd_view: AgentEtcdClientView) -> None:
+    # The etcd fixture clears only its own scope prefixes, not the agent view's.
+    await agent_etcd_view.delete_prefix("test/cas/replaced_subtree", scope=ConfigScopes.NODE)
+    await agent_etcd_view.put("test/cas/replace_owner", "run-1", scope=ConfigScopes.NODE)
+    await agent_etcd_view.put_prefix(
+        "test/cas/replaced_subtree", {"rule": "old-rule"}, scope=ConfigScopes.NODE
+    )
+
+
+class TestConditionalWrites:
+    async def test_put_if_absent_writes_into_the_agent_scope(
+        self,
+        agent_etcd_view: AgentEtcdClientView,
+    ) -> None:
+        scope = ConfigScopes.NODE
+
+        assert await agent_etcd_view.put_if_absent("test/cas/new", "first", scope=scope)
+        assert not await agent_etcd_view.put_if_absent("test/cas/new", "second", scope=scope)
+        assert await agent_etcd_view.get("test/cas/new", scope=scope) == "first"
+
+    async def test_compare_and_put_reads_guards_in_the_same_scope(
+        self,
+        agent_etcd_view: AgentEtcdClientView,
+    ) -> None:
+        scope = ConfigScopes.NODE
+        await agent_etcd_view.put("test/cas/owner", "run-1", scope=scope)
+
+        assert await agent_etcd_view.compare_and_put(
+            "test/cas/target",
+            "v1",
+            expected=None,
+            guards={"test/cas/owner": "run-1"},
+            scope=scope,
+        )
+        assert not await agent_etcd_view.compare_and_put(
+            "test/cas/target",
+            "v2",
+            expected="v1",
+            guards={"test/cas/owner": "run-2"},
+            scope=scope,
+        )
+        assert await agent_etcd_view.get("test/cas/target", scope=scope) == "v1"
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _GuardedReplacementCase(
+                name="guard_holds",
+                guarded_owner="run-1",
+                expected_replaced=True,
+                expected_subtree={"service": "new-service"},
+            ),
+            _GuardedReplacementCase(
+                name="guard_moved",
+                guarded_owner="run-2",
+                expected_replaced=False,
+                expected_subtree={"rule": "old-rule"},
+            ),
+        ],
+        ids=lambda case: case.name,
+    )
+    async def test_compare_and_replace_prefixes_reads_guards_in_the_same_scope(
+        self,
+        agent_etcd_view: AgentEtcdClientView,
+        node_subtree_owned_by_run_1: None,
+        case: _GuardedReplacementCase,
+    ) -> None:
+        replaced = await agent_etcd_view.compare_and_replace_prefixes(
+            {"test/cas/replaced_subtree": {"service": "new-service"}},
+            guards={"test/cas/replace_owner": case.guarded_owner},
+            scope=ConfigScopes.NODE,
+        )
+
+        assert replaced is case.expected_replaced
+        assert (
+            await agent_etcd_view.get_prefix("test/cas/replaced_subtree", scope=ConfigScopes.NODE)
+            == case.expected_subtree
+        )
+
+    async def test_conditional_deletes_remove_only_the_expected_value(
+        self,
+        agent_etcd_view: AgentEtcdClientView,
+    ) -> None:
+        scope = ConfigScopes.NODE
+        await agent_etcd_view.put("test/cas/a", "mine", scope=scope)
+        await agent_etcd_view.put("test/cas/b", "mine", scope=scope)
+
+        assert not await agent_etcd_view.delete_if_value("test/cas/a", "theirs", scope=scope)
+        assert await agent_etcd_view.delete_if_value("test/cas/a", "mine", scope=scope)
+        assert await agent_etcd_view.compare_and_delete(
+            "test/cas/b", "mine", guards={"test/cas/a": None}, scope=scope
+        )
+        assert await agent_etcd_view.get("test/cas/a", scope=scope) is None
+        assert await agent_etcd_view.get("test/cas/b", scope=scope) is None
 
 
 class TestDeleteOperations:

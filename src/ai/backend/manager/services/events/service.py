@@ -6,11 +6,11 @@ from typing import Any, Final
 
 from aiohttp_sse import EventSourceResponse
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.events.hub.propagators.session import SessionEventPropagator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class EventsService:

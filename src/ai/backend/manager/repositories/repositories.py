@@ -43,7 +43,7 @@ from ai.backend.manager.repositories.permission_controller.repositories import (
     PermissionControllerRepositories,
 )
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
-from ai.backend.manager.repositories.prometheus_query_preset import (
+from ai.backend.manager.repositories.prometheus_query_preset.repositories import (
     PrometheusQueryPresetRepositories,
 )
 from ai.backend.manager.repositories.rbac.repositories import RbacRepositories

@@ -19,7 +19,7 @@ from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import TooManyConcurrentLoginSessions
 from ai.backend.manager.errors.user import UserResourcePolicyNotFound
-from ai.backend.manager.models.user import UserRole, UserStatus
+from ai.backend.manager.models.user.row import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
     LoginSessionCreationResult,

@@ -1,15 +1,11 @@
-import logging
 from dataclasses import dataclass
 from typing import Self
 
 from ai.backend.common.exception import BackendAIError, ErrorCode, ErrorDetail
-from ai.backend.logging.utils import BraceStyleAdapter
 
 from .types import OperationStatus
 
 __all__ = ("ActionRunStatus",)
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass(frozen=True)
@@ -45,7 +41,6 @@ class ActionRunStatus:
                 description=str(exc),
                 error_code=error_code,
             )
-        log.exception("Unexpected error during action processing: {}", exc)
         return cls(
             status=OperationStatus.ERROR,
             description=str(exc),

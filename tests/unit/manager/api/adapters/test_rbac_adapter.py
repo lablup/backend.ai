@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pydantic import ValidationError
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.scope_admin import ScopeAdminEntityType
@@ -53,7 +53,7 @@ def caller() -> Iterator[UserID]:
         domain_name="default",
         domain_id=DomainID(uuid.uuid4()),
     )
-    with with_user(user):
+    with with_user_context(user):
         yield UserID(_CALLER_ID)
 
 

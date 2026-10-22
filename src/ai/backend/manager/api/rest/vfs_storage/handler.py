@@ -17,7 +17,7 @@ from ai.backend.common.dto.storage.request import (
     VFSStorageAPIPathParams,
 )
 from ai.backend.common.types import StreamReader
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.manager_facing_client import (
     StorageProxyManagerFacingClient,
 )
@@ -36,7 +36,7 @@ from ai.backend.manager.services.vfs_storage.actions.lookup import (
 )
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class VFSDirectoryDownloadProxyStreamReader(StreamReader):
@@ -79,7 +79,7 @@ class VFSDirectoryDownloadProxyStreamReader(StreamReader):
                 bytes_streamed += len(chunk)
                 yield chunk
 
-        log.debug("Successfully streamed {}: {} bytes", self._filepath, bytes_streamed)
+        log.trace("vfs file streamed", file_path=str(self._filepath), streamed_bytes=bytes_streamed)
 
 
 class VFSStorageHandler:

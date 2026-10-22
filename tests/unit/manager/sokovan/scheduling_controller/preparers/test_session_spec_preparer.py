@@ -2,23 +2,25 @@
 
 Covers two concerns:
 
-* the rule-chain runner — resource rules run before spec rules, spec
-  rules execute in declaration order, each receives the output of the
-  previous, and the final draft is projected into a frozen
+* the rule-chain runner — the four phases run in order (resource,
+  pre-expand spec, expansion, spec), rules within a phase execute in
+  declaration order, each receives the output of the previous, and the
+  final draft is projected into a frozen
   :class:`SessionResourceSpec`.
 * the finalization projection — empty / partially-populated drafts
   surface precise attribute paths, Optional spec fields default to
   ``None`` when the draft leaves them unset, and nested / list paths
   report correctly.
 
-Finalization is exercised by invoking the preparer with an empty rule
-chain, which makes the projection step the only behavior under test.
+Finalization is exercised by invoking the preparer with empty rule
+phases, leaving expansion and the projection step as the only behavior
+under test.
 """
 
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import override
 
 import pytest
@@ -52,12 +54,19 @@ from ai.backend.manager.data.session.options import (
     SessionHandlerOptions,
 )
 from ai.backend.manager.errors.kernel import IncompleteSessionSpec
-from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.network.row import NetworkType
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.draft_rule import (
+    ResourceSpecDraftRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.expand_kernel_groups_rule import (
+    ExpandKernelGroupsRule,
+)
 from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.merge_resource_group_defaults_rule import (
     MergeResourceGroupDefaultsRule,
 )
 from ai.backend.manager.sokovan.scheduling_controller.preparers.session_spec_preparer import (
     SessionSpecPreparer,
+    SessionSpecPreparerArgs,
 )
 from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.draft_rule import (
     SessionSpecDraftRule,
@@ -95,6 +104,23 @@ class _TransformRule(SessionSpecDraftRule):
     ) -> SessionResourceSpecDraft:
         self._log.append(self._tag)
         return self._transform(draft)
+
+
+def _preparer(
+    *,
+    resource_rules: Sequence[ResourceSpecDraftRule] = (),
+    pre_expand_spec_rules: Sequence[SessionSpecDraftRule] = (),
+    spec_rules: Sequence[SessionSpecDraftRule] = (),
+) -> SessionSpecPreparer:
+    """Build a preparer naming only the phases a test exercises."""
+    return SessionSpecPreparer(
+        SessionSpecPreparerArgs(
+            resource_rules=resource_rules,
+            pre_expand_spec_rules=pre_expand_spec_rules,
+            expand_rule=ExpandKernelGroupsRule(),
+            spec_rules=spec_rules,
+        )
+    )
 
 
 @pytest.fixture
@@ -199,7 +225,7 @@ class TestRuleChain:
         complete_draft: SessionResourceSpecDraft,
     ) -> None:
         """With no rules, the input draft must already be finalize-ready."""
-        preparer = SessionSpecPreparer([], [])
+        preparer = _preparer()
         spec = await preparer.prepare(complete_draft, context)
         assert spec.identity.session_name == "test-session"
 
@@ -210,9 +236,8 @@ class TestRuleChain:
     ) -> None:
         """Spec rules execute in the order they are passed to the constructor."""
         log: list[str] = []
-        preparer = SessionSpecPreparer(
-            [],
-            [
+        preparer = _preparer(
+            spec_rules=[
                 _TransformRule("A", log, lambda d: d),
                 _TransformRule("B", log, lambda d: d),
                 _TransformRule("C", log, lambda d: d),
@@ -243,9 +268,8 @@ class TestRuleChain:
             captured["priority"] = d.resource.options.priority
             return d
 
-        preparer = SessionSpecPreparer(
-            [],
-            [
+        preparer = _preparer(
+            spec_rules=[
                 _TransformRule("set", log, set_priority),
                 _TransformRule("capture", log, capture_priority),
             ],
@@ -257,6 +281,82 @@ class TestRuleChain:
 
         assert captured["priority"] == 7
         assert log == ["set", "capture"]
+
+    async def test_pre_expand_spec_rules_run_before_expansion(
+        self,
+        context: SessionSpecContext,
+        complete_draft: SessionResourceSpecDraft,
+        minimal_kernel_group: KernelGroupDraft,
+    ) -> None:
+        """Pre-expand rules see the groups unexpanded; spec rules see the replicas."""
+        log: list[str] = []
+        observed: dict[str, int] = {}
+
+        def observe(
+            phase: str,
+        ) -> Callable[[SessionResourceSpecDraft], SessionResourceSpecDraft]:
+            def _observe(d: SessionResourceSpecDraft) -> SessionResourceSpecDraft:
+                observed[phase] = len(d.resource.kernel_specs)
+                return d
+
+            return _observe
+
+        draft = complete_draft.model_copy(
+            update={
+                "resource": complete_draft.resource.model_copy(
+                    update={
+                        "options": complete_draft.resource.options.model_copy(
+                            update={
+                                "kernel_groups": (
+                                    minimal_kernel_group.model_copy(update={"replica_count": 3}),
+                                ),
+                            }
+                        ),
+                        "kernel_specs": (),
+                    }
+                )
+            }
+        )
+        preparer = _preparer(
+            pre_expand_spec_rules=[_TransformRule("pre_expand", log, observe("pre_expand"))],
+            spec_rules=[_TransformRule("spec", log, observe("spec"))],
+        )
+
+        spec = await preparer.prepare(draft, context)
+
+        assert log == ["pre_expand", "spec"]
+        assert observed["pre_expand"] == 0
+        assert observed["spec"] == 3
+        assert len(spec.kernel_specs) == 3
+
+    async def test_prepare_resources_still_expands(
+        self,
+        context: SessionSpecContext,
+        complete_draft: SessionResourceSpecDraft,
+        minimal_kernel_group: KernelGroupDraft,
+    ) -> None:
+        """The fitting-check path expands without running the pre-expand rules."""
+        log: list[str] = []
+        preparer = _preparer(
+            pre_expand_spec_rules=[_TransformRule("pre_expand", log, lambda d: d)],
+        )
+        resource_draft = complete_draft.resource.model_copy(
+            update={
+                "options": complete_draft.resource.options.model_copy(
+                    update={
+                        "kernel_groups": (
+                            minimal_kernel_group.model_copy(update={"replica_count": 2}),
+                        )
+                    }
+                ),
+                "kernel_specs": (),
+            }
+        )
+
+        prepared = await preparer.prepare_resources(resource_draft, context)
+
+        assert len(prepared.kernel_specs) == 2
+        assert log == []
 
     async def test_end_to_end_with_real_rule(
         self,
@@ -276,7 +376,7 @@ class TestRuleChain:
                 )
             }
         )
-        preparer = SessionSpecPreparer([MergeResourceGroupDefaultsRule()], [])
+        preparer = _preparer(resource_rules=[MergeResourceGroupDefaultsRule()])
         spec = await preparer.prepare(draft, context)
         # RG default for priority is 10 (DefaultSessionOptions.priority default).
         assert spec.options.priority == 10
@@ -287,7 +387,7 @@ class TestFinalization:
 
     @pytest.fixture
     def preparer(self) -> SessionSpecPreparer:
-        return SessionSpecPreparer([], [])
+        return _preparer()
 
     async def test_empty_draft_raises_with_required_paths(
         self,
@@ -396,10 +496,17 @@ class TestFinalization:
                 ),
             ),
         )
+        # kernel_groups cleared so expansion is a no-op and the hand-crafted
+        # entry reaches the projection; its own missing path is not asserted on.
         draft = complete_draft.model_copy(
             update={
                 "resource": complete_draft.resource.model_copy(
-                    update={"kernel_specs": (broken_kernel,)}
+                    update={
+                        "options": complete_draft.resource.options.model_copy(
+                            update={"kernel_groups": None}
+                        ),
+                        "kernel_specs": (broken_kernel,),
+                    }
                 )
             }
         )
@@ -431,10 +538,17 @@ class TestFinalization:
                 ),
             ),
         )
+        # kernel_groups cleared so expansion is a no-op and the hand-crafted
+        # entry reaches the projection; its own missing path is not asserted on.
         draft = complete_draft.model_copy(
             update={
                 "resource": complete_draft.resource.model_copy(
-                    update={"kernel_specs": (broken_kernel,)}
+                    update={
+                        "options": complete_draft.resource.options.model_copy(
+                            update={"kernel_groups": None}
+                        ),
+                        "kernel_specs": (broken_kernel,),
+                    }
                 )
             }
         )

@@ -11,7 +11,8 @@ import urllib.parse
 import uuid
 from collections.abc import AsyncGenerator, Iterator, Mapping, MutableMapping
 from contextlib import AbstractAsyncContextManager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
 from http import HTTPStatus
 from pathlib import Path
 from typing import (
@@ -37,6 +38,8 @@ from ai.backend.common.api_handlers import (
     QueryParam,
     stream_api_handler,
 )
+from ai.backend.common.asyncio import run_in_executor_with_context
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.dto.storage.request import (
     ArchiveDownloadQueryParams,
     ArchiveDownloadTokenData,
@@ -44,9 +47,10 @@ from ai.backend.common.dto.storage.request import (
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.metrics.http import build_api_metric_middleware
 from ai.backend.common.middlewares.exception import general_exception_middleware
+from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.typed_validators import PydanticJWTValidator
 from ai.backend.common.types import BinarySize, VFolderID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage import __version__
 from ai.backend.storage.dto.context import StorageRootCtx
 from ai.backend.storage.errors import (
@@ -74,7 +78,7 @@ from ai.backend.common.clients.valkey_client.valkey_tus import (
     TusSessionNotFoundError,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
@@ -108,7 +112,7 @@ async def _drain_into_upload_file(
                 await f.write(chunk)
                 bytes_written += len(chunk)
             await f.flush()
-            await asyncio.get_running_loop().run_in_executor(None, os.fsync, f.fileno())
+            await run_in_executor_with_context(None, os.fsync, f.fileno())
     except FileNotFoundError as e:
         raise TusSessionNotFoundError(
             f"Upload session {session_id} staging file is missing at offset {start_offset}"
@@ -146,6 +150,7 @@ class UploadTokenData(TypedDict):
     relpath: str
     session: str
     size: int
+    exp: int
 
 
 upload_token_data_iv = t.Dict(
@@ -156,6 +161,7 @@ upload_token_data_iv = t.Dict(
         t.Key("relpath"): t.String,
         t.Key("session"): t.String,
         t.Key("size"): t.Int,
+        t.Key("exp"): t.Int,
     },
 ).allow_extra(
     "*",
@@ -212,7 +218,7 @@ async def download(request: web.Request) -> web.StreamResponse:
             read_from=CheckParamSource.QUERY,
         ),
     ) as params:
-        volume = ctx.volume_pool.get_volume_by_name(params["token"]["volume"])
+        volume = ctx.volume_pool.get_volume_by_name(StorageVolumeName(params["token"]["volume"]))
         token_data = params["token"]
         if token_data["unmanaged_path"] is not None:
             vfpath = Path(token_data["unmanaged_path"]).resolve()
@@ -294,17 +300,24 @@ async def download_directory_as_archive(
         def _consume(
             _loop: asyncio.AbstractEventLoop, iter: Iterator[Any], q: janus.SyncQueue[Any]
         ) -> None:
-            for item in iter:
-                q.put(item)
-            q.put(SENTINEL)
+            # The producer always terminates the queue; otherwise the consumer waits forever.
+            try:
+                for item in iter:
+                    q.put(item)
+            except BaseException as e:
+                q.put(e)
+            else:
+                q.put(SENTINEL)
 
         async def _aiter() -> AsyncGenerator[Any, None]:
             loop = asyncio.get_running_loop()
             q: janus.Queue[Any] = janus.Queue(maxsize=DEFAULT_INFLIGHT_CHUNKS)
             try:
-                fut = loop.run_in_executor(None, lambda: _consume(loop, iter, q.sync_q))
+                fut = run_in_executor_with_context(None, lambda: _consume(loop, iter, q.sync_q))
                 while True:
                     item = await q.async_q.get()
+                    if isinstance(item, BaseException):
+                        raise item
                     if item is SENTINEL:
                         break
                     yield item
@@ -318,7 +331,7 @@ async def download_directory_as_archive(
 
     if zip_filename is None:
         zip_filename = file_path.name + ".zip"
-    zf = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED)
+    zf = zipstream.ZipFile(compression=zipstream.ZIP_DEFLATED, allowZip64=True)
     async for root, dirs, files in _iter2aiter(os.walk(file_path)):
         for file in files:
             zf.write(Path(root) / file, Path(root).relative_to(file_path) / file)
@@ -374,7 +387,7 @@ async def tus_check_session(request: web.Request) -> web.Response:
         ),
     ) as params:
         token_data = params["token"]
-        volume = ctx.volume_pool.get_volume_by_name(token_data["volume"])
+        volume = ctx.volume_pool.get_volume_by_name(StorageVolumeName(token_data["volume"]))
         headers = await prepare_tus_session_headers(request, token_data, volume)
     return web.Response(headers=headers)
 
@@ -407,7 +420,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
         ),
     ) as params:
         token_data = params["token"]
-        volume = ctx.volume_pool.get_volume_by_name(token_data["volume"])
+        volume = ctx.volume_pool.get_volume_by_name(StorageVolumeName(token_data["volume"]))
         headers = await prepare_tus_session_headers(request, token_data, volume)
         vfpath = volume.mangle_vfpath(token_data["vfid"])
         upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
@@ -456,12 +469,13 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                 await watcher_task
             except asyncio.CancelledError:
                 pass
-        new_offset = await ctx.valkey_tus_client.advance_offset(
+        upload_state = await ctx.valkey_tus_client.advance_offset(
             session_id, holder_token, bytes_written
         )
 
-        headers["Upload-Offset"] = str(new_offset)
-        if new_offset >= int(token_data["size"]):
+        headers["Upload-Offset"] = str(upload_state.offset)
+        headers["Upload-Expires"] = _upload_expires_at(token_data["exp"], upload_state.ttl_seconds)
+        if upload_state.offset >= int(token_data["size"]):
             parent_dir = vfpath
             if (dst_dir := params["dst_dir"]) is not None:
                 parent_dir = vfpath / dst_dir
@@ -487,11 +501,13 @@ async def tus_options(request: web.Request) -> web.Response:
         "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
     )
     headers["Access-Control-Expose-Headers"] = (
-        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+        "Tus-Resumable, Tus-Version, Tus-Extension, Tus-Max-Size, Upload-Length, "
+        "Upload-Metadata, Upload-Offset, Upload-Expires, Content-Type"
     )
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Tus-Resumable"] = "1.0.0"
     headers["Tus-Version"] = "1.0.0"
+    headers["Tus-Extension"] = "expiration"
     headers["Tus-Max-Size"] = str(
         int(BinarySize.from_str(ctx.local_config.storage_proxy.max_upload_size)),
     )
@@ -516,20 +532,30 @@ async def prepare_tus_session_headers(
         "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
     )
     headers["Access-Control-Expose-Headers"] = (
-        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Content-Type"
+        "Tus-Resumable, Upload-Length, Upload-Metadata, Upload-Offset, Upload-Expires, Content-Type"
     )
     headers["Access-Control-Allow-Methods"] = "*"
     headers["Cache-Control"] = "no-store"
     headers["Tus-Resumable"] = "1.0.0"
     ctx: RootContext = request.app["ctx"]
-    redis_offset = await ctx.valkey_tus_client.get_offset(TusSessionId(token_data["session"]))
-    if redis_offset is None:
+    upload_state = await ctx.valkey_tus_client.get_upload_state(TusSessionId(token_data["session"]))
+    if upload_state is None:
         raise TusSessionNotFoundError(
             f"Upload session {token_data['session']} is not registered or has expired"
         )
-    headers["Upload-Offset"] = str(redis_offset)
+    headers["Upload-Offset"] = str(upload_state.offset)
     headers["Upload-Length"] = str(token_data["size"])
+    headers["Upload-Expires"] = _upload_expires_at(token_data["exp"], upload_state.ttl_seconds)
     return headers
+
+
+def _upload_expires_at(token_exp: int, ttl_seconds: int) -> str:
+    """The upload token stops being accepted at its ``exp``, which no PATCH extends."""
+    expires_at = min(
+        datetime.fromtimestamp(token_exp, UTC),
+        datetime.now(UTC) + timedelta(seconds=ttl_seconds),
+    )
+    return format_datetime(expires_at, usegmt=True)
 
 
 class DownloadHandler:
@@ -553,7 +579,7 @@ class DownloadHandler:
         """Stream multiple files/directories as a ZIP archive."""
         token_data = self._jwt_validator.validate(query.parsed.token, ArchiveDownloadTokenData)
 
-        volume = ctx.root_ctx.volume_pool.get_volume_by_name(token_data.volume)
+        volume = ctx.root_ctx.volume_pool.get_volume_by_name(StorageVolumeName(token_data.volume))
         vfolder_root = volume.sanitize_vfpath(token_data.virtual_folder_id)
         sanitized: list[Path] = [(vfolder_root / relpath).resolve() for relpath in token_data.files]
         for file_path, relpath in zip(sanitized, token_data.files, strict=True):
@@ -573,6 +599,7 @@ class DownloadHandler:
 async def init_client_app(ctx: RootContext) -> web.Application:
     app = web.Application(
         middlewares=[
+            request_id_middleware,
             general_exception_middleware,
             build_api_metric_middleware(ctx.metric_registry.api),
         ]

@@ -4,12 +4,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
 from ai.backend.manager.data.deployment.types import (
+    RouteData,
     RouteHandlerCategory,
     RouteStatusTransitions,
     RouteTargetStatuses,
 )
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResult
 
 

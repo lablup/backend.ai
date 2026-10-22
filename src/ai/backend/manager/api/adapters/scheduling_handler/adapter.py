@@ -14,7 +14,7 @@ from ai.backend.common.dto.manager.v2.scheduling_handler.types import (
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
-    from ai.backend.manager.sokovan.deployment.handlers import DeploymentHandler
+    from ai.backend.manager.sokovan.deployment.handlers.base import DeploymentHandler
 
 
 def _first_docstring_line(cls: type[DeploymentHandler]) -> str | None:

@@ -12,7 +12,7 @@ from ai.backend.common.dto.manager.v2.resource_allocation.request import (
     CheckPresetAvailabilityInput,
     EffectiveResourceAllocationInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import (
     DomainNamePathParam,
     ProjectIdPathParam,
@@ -25,7 +25,7 @@ if TYPE_CHECKING:
         ResourceAllocationAdapter,
     )
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2ResourceAllocationHandler:
@@ -115,4 +115,9 @@ class V2ResourceAllocationHandler:
             access_key=ctx.access_key,
             resource_policy=resource_policy,
         )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def my_concurrency(self) -> APIResponse:
+        """Get the current user's concurrent session counts."""
+        result = await self._adapter.my_concurrency()
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

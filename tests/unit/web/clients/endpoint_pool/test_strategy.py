@@ -6,14 +6,14 @@ from unittest.mock import patch
 
 import pytest
 
-from ai.backend.web.clients.endpoint_pool.strategy import (
+from ai.backend.common.endpoint_pool.strategy import (
     EndpointSelectionPolicy,
     LeastConnectionsStrategy,
     RandomStrategy,
     RoundRobinStrategy,
     build_endpoint_selection_strategy,
 )
-from ai.backend.web.clients.endpoint_pool.types import EndpointEntry
+from ai.backend.common.endpoint_pool.types import EndpointEntry
 
 
 def _entries(*urls: str) -> list[EndpointEntry]:
@@ -56,7 +56,7 @@ class TestRandomStrategy:
             return seq[1]
 
         with patch(
-            "ai.backend.web.clients.endpoint_pool.strategy.random.choice",
+            "ai.backend.common.endpoint_pool.strategy.random.choice",
             side_effect=picker,
         ):
             async with strategy.acquire(_entries("a", "b", "c")) as entry:

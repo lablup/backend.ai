@@ -56,7 +56,9 @@ class KernelUserInfo(BaseResponseModel):
         default=None, description="The UUID of the user who owns this kernel."
     )
     access_key: str | None = Field(
-        default=None, description="The access key used to create this kernel."
+        default=None,
+        deprecated=True,
+        description=f"The access key used to create this kernel. Deprecated since {NEXT_RELEASE_VERSION}. Use `user_uuid`.",
     )
     domain_name: str | None = Field(default=None, description="The domain this kernel belongs to.")
     group_id: UUID | None = Field(
@@ -143,7 +145,7 @@ class KernelNode(BaseResponseModel):
 
     id: UUID = Field(description="Kernel ID.")
     field_id: UUID = Field(
-        description=f"UUID of the kernel. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the kernel. Added in 26.9.0.",
     )
     image_id: UUID | None = Field(
         default=None,
@@ -231,7 +233,9 @@ class KernelUserInfoGQLDTO(BaseResponseModel):
         default=None, description="The UUID of the user who owns this kernel."
     )
     access_key: str | None = Field(
-        default=None, description="The access key used to create this kernel."
+        default=None,
+        deprecated=True,
+        description=f"The access key used to create this kernel. Deprecated since {NEXT_RELEASE_VERSION}. Use `user_id`.",
     )
     domain_name: str | None = Field(default=None, description="The domain this kernel belongs to.")
     group_id: UUID | None = Field(

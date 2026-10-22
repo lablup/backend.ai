@@ -45,7 +45,12 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.configs.redis import RedisConfig
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     GroupID,
@@ -59,11 +64,11 @@ from ai.backend.common.types import (
     SlotName,
     SlotNameField,
 )
-from ai.backend.logging import BraceStyleAdapter
 from ai.backend.logging.config import LoggingConfig
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.validation_context import BaseConfigValidationContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Default of the removed `scaling-group` key, kept for the legacy `sgroup/<name>` etcd scope.
 LEGACY_SGROUP_NAME_FALLBACK: Final = "default"
@@ -129,6 +134,146 @@ class SyncContainerLifecyclesConfig(BaseConfigSchema):
             example=ConfigExample(local="10.0", prod="30.0"),
         ),
     ]
+
+
+class SocketRelayConfig(BaseConfigSchema):
+    run_as_non_root: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("run-as-non-root", "run_as_non_root"),
+            serialization_alias="run-as-non-root",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Run socat in the socket relay container as a non-root user. A root agent "
+                "changes the owner of the socket directory to uid/gid 65534 and runs the relay "
+                "as that user; a non-root agent runs the relay as its own user. The setting "
+                "applies when the relay container is created, so remove the "
+                "backendai-socket-relay.<agent id> container before restarting the agent "
+                "after changing it."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    no_new_privileges: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("no-new-privileges", "no_new_privileges"),
+            serialization_alias="no-new-privileges",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Create the socket relay container with the no-new-privileges security option, "
+                "so its processes cannot gain privileges through setuid binaries."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    drop_all_capabilities: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("drop-all-capabilities", "drop_all_capabilities"),
+            serialization_alias="drop-all-capabilities",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Drop all Linux capabilities from the socket relay container. Without "
+                "run-as-non-root, the relay then runs as root that cannot write to a socket "
+                "directory owned by another user, such as the directory of a non-root agent."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    read_only_rootfs: Annotated[
+        bool,
+        Field(
+            default=False,
+            validation_alias=AliasChoices("read-only-rootfs", "read_only_rootfs"),
+            serialization_alias="read-only-rootfs",
+        ),
+        BackendAIConfigMeta(
+            description="Mount the root filesystem of the socket relay container read-only.",
+            added_version="26.10.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+    pids_limit: Annotated[
+        int | None,
+        Field(
+            default=None,
+            ge=2,
+            validation_alias=AliasChoices("pids-limit", "pids_limit"),
+            serialization_alias="pids-limit",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum number of processes in the socket relay container. Unlimited if not set."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="64", prod="64"),
+        ),
+    ]
+    max_children: Annotated[
+        int | None,
+        Field(
+            default=None,
+            ge=1,
+            validation_alias=AliasChoices("max-children", "max_children"),
+            serialization_alias="max-children",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Maximum number of connections that socat serves at once, each in its own "
+                "child process. Must be smaller than pids-limit when both are set. "
+                "Unlimited if not set."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="32", prod="32"),
+        ),
+    ]
+    memory: Annotated[
+        BinarySizeField | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description="Memory limit of the socket relay container. Unlimited if not set.",
+            added_version="26.10.0",
+            example=ConfigExample(local="64M", prod="64M"),
+        ),
+    ]
+    cpus: Annotated[
+        float | None,
+        Field(default=None, gt=0),
+        BackendAIConfigMeta(
+            description=(
+                "CPU limit of the socket relay container, in cores. Unlimited if not set."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="1.0", prod="1.0"),
+        ),
+    ]
+
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+    )
+
+    @model_validator(mode="after")
+    def _validate_max_children(self) -> Self:
+        if (
+            self.max_children is not None
+            and self.pids_limit is not None
+            and self.max_children >= self.pids_limit
+        ):
+            raise ValueError(
+                f"max-children ({self.max_children}) must be smaller than "
+                f"pids-limit ({self.pids_limit})."
+            )
+        return self
 
 
 class NodeMetricConfig(BaseConfigSchema):
@@ -770,6 +915,22 @@ class CommonAgentConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             example=ConfigExample(local="/tmp/backend.ai/ipc", prod="/var/run/backend.ai/ipc"),
+        ),
+    ]
+    socket_relay: Annotated[
+        SocketRelayConfig,
+        Field(
+            default_factory=SocketRelayConfig,
+            validation_alias=AliasChoices("socket-relay", "socket_relay"),
+            serialization_alias="socket-relay",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "User, privilege, and resource limits of the socket relay container "
+                "that connects kernel containers to the agent socket."
+            ),
+            added_version="26.10.0",
+            composite=CompositeType.FIELD,
         ),
     ]
     var_base_path: Annotated[
@@ -1446,6 +1607,25 @@ class OverridableContainerConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             example=ConfigExample(local="-1", prod="1000"),
+        ),
+    ]
+    entrypoint_user: Annotated[
+        str | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("entrypoint-user", "entrypoint_user"),
+            serialization_alias="entrypoint-user",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "User the kernel container entrypoint starts as, as the container runtime's "
+                'User field ("uid", "uid:gid" or a name). '
+                "None lets the container runtime decide. "
+                "Agent-wide: it does not follow the per-user container_uid, "
+                "so the two can conflict."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="", prod="0:0"),
         ),
     ]
     port_range: Annotated[

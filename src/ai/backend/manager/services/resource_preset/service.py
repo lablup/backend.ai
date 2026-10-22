@@ -4,11 +4,11 @@ from typing import Any
 
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.resource_preset.updaters import (
     ResourcePresetResourceGroupUpdater,
 )
-from ai.backend.manager.repositories.resource_preset import ResourcePresetRepository
+from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
     CheckResourcePresetsActionResult,
@@ -34,7 +34,7 @@ from ai.backend.manager.services.resource_preset.actions.update_preset import (
     UpdateResourcePresetActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourcePresetService:
@@ -110,11 +110,9 @@ class ResourcePresetService:
         self, action: CheckResourcePresetsAction
     ) -> CheckResourcePresetsActionResult:
         result = await self._resource_preset_repository.check_presets(
-            access_key=action.access_key,
             user_id=action.user_id,
             group_name=action.group,
             domain_name=action.domain_name,
-            resource_policy=action.resource_policy,
             resource_group=action.resource_group,
         )
 

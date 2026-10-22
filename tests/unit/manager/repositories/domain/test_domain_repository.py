@@ -25,6 +25,7 @@ from ai.backend.common.types import (
 )
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.domain.types import DomainData, UserInfo
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.errors.resource import (
     DomainDeletionFailed,
     DomainHasActiveKernels,
@@ -32,48 +33,56 @@ from ai.backend.manager.errors.resource import (
     DomainHasUsers,
 )
 from ai.backend.manager.errors.resource import DomainNotFound as ResourceDomainNotFound
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain import DomainRow, domains
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
+    DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.creators import DomainCreator
+from ai.backend.manager.models.domain.row import DomainRow, domains
 from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
-from ai.backend.manager.models.domain.updaters import DomainUpdater
-from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow, KernelStatus
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow, ProjectType, groups
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType, groups
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_group import (
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.creators import (
+    ResourceGroupForDomainRelationCreator,
+)
+from ai.backend.manager.models.resource_group.purgers import (
+    ResourceGroupForDomainRelationPurger,
+)
+from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForDomainRow,
-    ResourceGroupOpts,
     ResourceGroupRow,
 )
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -84,7 +93,9 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.rbac.relation_repository import RbacRelationRepository
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -188,8 +199,15 @@ class TestDomainRepository:
         """Create DomainRepository instance with real database"""
         return DomainRepository(
             db=db_with_default_resource_policies,
-            relation_ops_provider=RelationOpsProvider(db_with_default_resource_policies),
+            domain_ops_provider=DomainOpsProvider(db_with_default_resource_policies),
         )
+
+    @pytest.fixture
+    def relation_repository(
+        self, db_with_default_resource_policies: ExtendedAsyncSAEngine
+    ) -> RbacRelationRepository:
+        """The relation writes a domain's resource groups go through."""
+        return RbacRelationRepository(RelationOpsProvider(db_with_default_resource_policies))
 
     @pytest.fixture
     def sample_domain_creator(self) -> DomainCreator:
@@ -477,7 +495,7 @@ class TestDomainRepository:
             await session.commit()
         return DomainFixtureData(domain_name=DomainName(domain_name), domain_id=domain_id)
 
-    async def test_create_domain_node_success(
+    async def test_create_domain_success(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
@@ -492,7 +510,7 @@ class TestDomainRepository:
             assert result.first() is None
 
         # Create domain
-        created_domain = await domain_repository.create_domain_node(sample_domain_creator)
+        created_domain = await domain_repository.create_domain(sample_domain_creator)
 
         assert created_domain.name == sample_domain_creator.name
         assert created_domain.description == sample_domain_creator.description
@@ -580,20 +598,22 @@ class TestDomainRepository:
             ).all()
         return associations or 0, cap, list(lent)
 
-    async def test_create_domain_node_writes_relation_edges(
+    async def test_linking_a_created_domain_writes_relation_edges(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
+        relation_repository: RbacRelationRepository,
         sample_domain_creator: DomainCreator,
     ) -> None:
-        """A resource group named at creation is reached through the graph, not by the
-        association row alone."""
+        """A resource group linked right after creation is reached through the graph,
+        not by the association row alone."""
         resource_group_id = await self._seed_resource_group(
             db_with_default_resource_policies, "created-with-domain"
         )
 
-        created_domain = await domain_repository.create_domain_node(
-            sample_domain_creator, [resource_group_id]
+        created_domain = await domain_repository.create_domain(sample_domain_creator)
+        await relation_repository.create(
+            [(created_domain.id, resource_group_id)], ResourceGroupForDomainRelationCreator()
         )
 
         associations, cap, lent = await self._read_relation_edge(
@@ -603,22 +623,21 @@ class TestDomainRepository:
         assert cap == Permission.READ
         assert lent == [Permission.READ]
 
-    async def test_update_domain_node_moves_relation_edges(
+    async def test_linking_and_unlinking_moves_relation_edges(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
+        relation_repository: RbacRelationRepository,
         sample_domain_creator: DomainCreator,
     ) -> None:
         """Adding a resource group writes the edges and removing it takes them back."""
         resource_group_id = await self._seed_resource_group(
             db_with_default_resource_policies, "added-after-domain"
         )
-        created_domain = await domain_repository.create_domain_node(sample_domain_creator)
+        created_domain = await domain_repository.create_domain(sample_domain_creator)
 
-        await domain_repository.update_domain_node(
-            created_domain.id,
-            DomainUpdater(domain_id=created_domain.id),
-            sgroup_ids_to_add=[resource_group_id],
+        await relation_repository.create(
+            [(created_domain.id, resource_group_id)], ResourceGroupForDomainRelationCreator()
         )
         associations, cap, lent = await self._read_relation_edge(
             db_with_default_resource_policies, created_domain.id, resource_group_id
@@ -627,10 +646,8 @@ class TestDomainRepository:
         assert cap == Permission.READ
         assert lent == [Permission.READ]
 
-        await domain_repository.update_domain_node(
-            created_domain.id,
-            DomainUpdater(domain_id=created_domain.id),
-            sgroup_ids_to_remove=[resource_group_id],
+        await relation_repository.purge(
+            [(created_domain.id, resource_group_id)], ResourceGroupForDomainRelationPurger()
         )
         associations, cap, lent = await self._read_relation_edge(
             db_with_default_resource_policies, created_domain.id, resource_group_id
@@ -639,14 +656,14 @@ class TestDomainRepository:
         assert cap is None
         assert lent == []
 
-    async def test_create_domain_node_duplicate_name(
+    async def test_create_domain_duplicate_name(
         self,
         domain_repository: DomainRepository,
         sample_domain_creator: DomainCreator,
     ) -> None:
         """Test domain creation with duplicate name"""
         # Create domain first
-        await domain_repository.create_domain_node(sample_domain_creator)
+        await domain_repository.create_domain(sample_domain_creator)
 
         # Try to create another domain with same name
         duplicate_creator = DomainCreator(
@@ -656,7 +673,7 @@ class TestDomainRepository:
         )
 
         with pytest.raises(InvalidAPIParameters):
-            await domain_repository.create_domain_node(duplicate_creator)
+            await domain_repository.create_domain(duplicate_creator)
 
     async def test_purge_domain_success(
         self,
@@ -696,7 +713,7 @@ class TestDomainRepository:
         with pytest.raises(DomainDeletionFailed):
             await domain_repository.purge_domain(DomainID(uuid.uuid4()), "nonexistent-domain")
 
-    async def test_create_domain_node_with_all_fields(
+    async def test_create_domain_with_all_fields(
         self,
         db_with_default_resource_policies: ExtendedAsyncSAEngine,
         domain_repository: DomainRepository,
@@ -723,7 +740,7 @@ class TestDomainRepository:
             dotfiles=b"comprehensive dotfiles configuration",
         )
 
-        created_domain = await domain_repository.create_domain_node(comprehensive_creator)
+        created_domain = await domain_repository.create_domain(comprehensive_creator)
 
         assert created_domain.name == "comprehensive-domain"
         assert created_domain.description == "Comprehensive domain with all features"

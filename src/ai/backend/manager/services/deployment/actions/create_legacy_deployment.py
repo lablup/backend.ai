@@ -41,3 +41,7 @@ class CreateLegacyDeploymentAction(DeploymentScopeAction):
 @dataclass
 class CreateLegacyDeploymentActionResult(DeploymentScopeActionResult):
     data: DeploymentInfo
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return (self.data.id,)

@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.audit_log import AuditLogFieldType
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
@@ -143,7 +143,7 @@ class TestReportRead:
     ) -> None:
         report = MagicMock()
         export_repository.get_report.return_value = report
-        with with_user(actor):
+        with with_user_context(actor):
             result = await processors.public_get_report.run(
                 PublicGetReportAction(report_key="sessions")
             )
@@ -168,7 +168,7 @@ class TestScopedExportPermissions:
             },
             owned={},
         )
-        with with_user(actor):
+        with with_user_context(actor):
             await processors.export_my_keypairs_csv.run(
                 ExportMyKeypairsCSVAction(user_uuid=UserID(actor.user_id), query=query)
             )
@@ -188,7 +188,7 @@ class TestScopedExportPermissions:
         export_repository: MagicMock,
         audit_repository: MagicMock,
     ) -> None:
-        with with_user(actor), pytest.raises(NotEnoughPermission):
+        with with_user_context(actor), pytest.raises(NotEnoughPermission):
             await processors.export_my_keypairs_csv.run(
                 ExportMyKeypairsCSVAction(user_uuid=UserID(actor.user_id), query=query)
             )

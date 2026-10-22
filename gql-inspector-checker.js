@@ -37,6 +37,21 @@ const ACCEPTED_REMOVALS = {
   "SessionUsedBy.resourceGroup": USAGE_RENAME,
 };
 
+// Type changes decided deliberately, keyed and dropped the same way as ACCEPTED_REMOVALS.
+const ENTITY_SHARE_FILTER_RETYPE =
+  "The old type failed DTO validation for every value, so no client could use the field.";
+const NULLABLE_MUTATION_PAYLOAD =
+  "The payload became nullable so a failed mutation leaves the other fields of the response. It was added in this same unreleased cycle and went out in no release tag.";
+
+const ACCEPTED_TYPE_CHANGES = {
+  "EntityShareFilter.status": ENTITY_SHARE_FILTER_RETYPE,
+  "EntityShareFilter.recipientEntityId": ENTITY_SHARE_FILTER_RETYPE,
+  "EntityShareFilter.recipientEmail": ENTITY_SHARE_FILTER_RETYPE,
+  "Mutation.purgeSessionGroup": NULLABLE_MUTATION_PAYLOAD,
+};
+
+const TYPE_CHANGES = ["INPUT_FIELD_TYPE_CHANGED", "FIELD_TYPE_CHANGED"];
+
 const REMOVAL_CHANGES = [
   "INPUT_FIELD_REMOVED",
   "FIELD_REMOVED",
@@ -56,6 +71,7 @@ module.exports = (props) => {
     typeIsNew(typeName) ||
     oldTypes[typeName].getFields()[fieldName] === undefined;
 
+  // NON_BREAKING changes are dropped: each would only add a notice annotation on the PR diff.
   return changes.map((change) => {
     // Allowed version notations: 'XX.XX.X', 'XX.X.X'
     const deprecateNotationRegex = /Deprecated since (\d{2}\.\d{1,2}\.\d{1})/;
@@ -65,6 +81,13 @@ module.exports = (props) => {
       change.criticality.level = "DANGEROUS";
       change.criticality.reason = acceptedRemovalReason;
       change.message = `${change.message} (accepted: ${acceptedRemovalReason})`;
+      return change;
+    }
+    const acceptedTypeChangeReason = ACCEPTED_TYPE_CHANGES[change.path];
+    if (TYPE_CHANGES.includes(change.type) && acceptedTypeChangeReason !== undefined) {
+      change.criticality.level = "DANGEROUS";
+      change.criticality.reason = acceptedTypeChangeReason;
+      change.message = `${change.message} (accepted: ${acceptedTypeChangeReason})`;
       return change;
     }
     if (
@@ -144,6 +167,6 @@ module.exports = (props) => {
       }
     }
     return change;
-  });
+  }).filter((change) => change.criticality.level !== "NON_BREAKING");
 };
 // TODO: update the rule to check for the version number in the description.

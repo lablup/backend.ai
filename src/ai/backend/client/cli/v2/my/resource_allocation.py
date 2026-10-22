@@ -74,3 +74,18 @@ def effective(project_id: str, resource_group: str) -> None:
             await registry.close()
 
     _run_async(_run)
+
+
+@resource_allocation.command(name="concurrency")
+def concurrency() -> None:
+    """Show how many sessions I am running."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.resource_allocation.my_concurrency()
+            print_result(result)
+        finally:
+            await registry.close()
+
+    _run_async(_run)

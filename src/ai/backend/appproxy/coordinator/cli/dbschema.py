@@ -7,12 +7,12 @@ from typing import TYPE_CHECKING
 import click
 
 from ai.backend.appproxy.coordinator.errors import MissingDatabaseURLError
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 if TYPE_CHECKING:
     from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @click.group()
@@ -94,7 +94,7 @@ def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
     def _create_all_sync(connection: Connection, engine: Engine) -> None:
         alembic_cfg.attributes["connection"] = connection
         metadata.create_all(engine, checkfirst=False)
-        log.info("Stamping alembic version to head...")
+        log.info("stamping the alembic version to head")
         script = ScriptDirectory.from_config(alembic_cfg)
         head_rev = script.get_heads()[0]
         connection.exec_driver_sql("CREATE TABLE alembic_version (\nversion_num varchar(32)\n);")
@@ -108,20 +108,18 @@ def oneshot(_cli_ctx: CLIContext, alembic_config: str) -> None:
         if current_rev is None:
             # For a fresh clean database, create all from scratch.
             # (it will raise error if tables already exist.)
-            log.info("Detected a fresh new database.")
-            log.info("Creating tables...")
+            log.info("detected a fresh new database, creating tables")
             async with engine.begin() as connection:
                 await connection.run_sync(_create_all_sync, engine=engine.sync_engine)
             log.info(
-                "If you don't need old migrations, delete them and set "
-                '"down_revision" value in the earliest migration to "None".'
+                "if old migrations are not needed, delete them and set down_revision "
+                "of the earliest migration to None"
             )
         else:
             log.info(
-                "Detected an existing database (current revision: {}).",
-                current_rev,
+                "detected an existing database; use 'alembic upgrade head' to apply pending migrations",
+                current_revision=current_rev,
             )
-            log.info("Use 'alembic upgrade head' to apply pending migrations.")
 
     alembic_cfg = Config(alembic_config)
     sa_url = alembic_cfg.get_main_option("sqlalchemy.url")

@@ -23,7 +23,10 @@ from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.events.event_types.kernel.types import KernelCreationInfo
+from ai.backend.common.events.event_types.kernel.types import (
+    KernelCreationInfo,
+    KernelLifecycleEventReason,
+)
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -41,7 +44,7 @@ from ai.backend.common.types import (
     VFolderMountOptions,
     VFolderMountRequest,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import DotfileBundle
 from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
@@ -90,7 +93,7 @@ from ai.backend.manager.views.sokovan.workload import SessionWorkload
 from .cache_source.cache_source import ScheduleCacheSource
 from .db_source.db_source import ScheduleDBSource
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 scheduler_repository_resilience = Resilience(
     policies=[
@@ -257,7 +260,7 @@ class SchedulerRepository:
     async def mark_sessions_terminating(
         self,
         session_ids: list[SessionId],
-        reason: str = "USER_REQUESTED",
+        reason: KernelLifecycleEventReason = KernelLifecycleEventReason.USER_REQUESTED,
         *,
         forced: bool = False,
         message: str = "mark_terminating success",
@@ -278,7 +281,7 @@ class SchedulerRepository:
         self,
         session_ids: list[SessionId],
         to_status: SessionStatus,
-        reason: str,
+        reason: KernelLifecycleEventReason,
     ) -> list[SessionId]:
         """
         Move sessions to ``to_status``, skipping the sessions whose current
@@ -715,19 +718,9 @@ class SchedulerRepository:
         await self._db_source.update_session_error_info(session_id, error_info)
 
     @scheduler_repository_resilience.apply()
-    async def get_keypair_concurrency(self, access_key: AccessKey, is_sftp: bool = False) -> int:
-        """
-        Count the keypair's active sessions straight from the database.
-
-        The database is the single source of truth for concurrency; the
-        former Valkey counter cache has been removed.
-
-        :param access_key: The access key to query
-        :param is_sftp: Whether to get SFTP concurrency (True) or regular concurrency (False)
-        :return: Current concurrency count
-        """
-        concurrency_data = await self._db_source.get_keypair_concurrencies_from_db(access_key)
-        return concurrency_data.sftp_count if is_sftp else concurrency_data.regular_count
+    async def get_user_concurrency(self, user_id: UserID) -> int:
+        """The user's active session count that the scheduler checks against the concurrency limit."""
+        return await self._db_source.count_user_active_sessions(user_id)
 
     @scheduler_repository_resilience.apply()
     async def invalidate_kernel_related_cache(self, access_keys: list[AccessKey]) -> None:
@@ -779,7 +772,7 @@ class SchedulerRepository:
             if cached_data is not None:
                 return cached_data
         except Exception as e:
-            log.warning("Failed to get total resource slots from cache: {}", e)
+            log.warning("total resource slots cache read failed", exc_info=e)
 
         # Cache miss - calculate from DB
         total_resource_data = await self._db_source.calculate_total_resource_slots()
@@ -788,7 +781,7 @@ class SchedulerRepository:
         try:
             await self._cache_source.set_total_resource_slots(total_resource_data)
         except Exception as e:
-            log.warning("Failed to update total resource slots cache: {}", e)
+            log.warning("total resource slots cache update failed", exc_info=e)
 
         return total_resource_data
 

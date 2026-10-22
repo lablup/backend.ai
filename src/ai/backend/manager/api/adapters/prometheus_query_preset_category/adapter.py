@@ -8,11 +8,12 @@ from uuid import UUID
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
 )
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request import (
     CategoryFilter,
     CategoryOrder,
     CreateCategoryInput,
-    DeleteCategoryInput,
+    PartialBulkPurgeQueryPresetCategoriesInput,
     SearchCategoriesInput,
 )
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response import (
@@ -25,18 +26,23 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.response 
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.types import (
     OrderDirection,
 )
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.prometheus_query_preset_category import (
+from ai.backend.manager.data.prometheus_query_preset_category.types import (
     PrometheusQueryPresetCategoryData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.prometheus_query_preset_category import (
-    PrometheusQueryPresetCategoryRow,
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
 )
 from ai.backend.manager.models.prometheus_query_preset_category.creators import (
     PrometheusQueryPresetCategoryCreator,
+)
+from ai.backend.manager.models.prometheus_query_preset_category.row import (
+    PrometheusQueryPresetCategoryRow,
 )
 from ai.backend.manager.models.prometheus_query_preset_category.scopes import (
     PublicPrometheusQueryPresetCategoryTarget,
@@ -56,6 +62,9 @@ from ai.backend.manager.services.prometheus_query_preset_category.actions.create
 )
 from ai.backend.manager.services.prometheus_query_preset_category.actions.get import (
     GetCategoryAction,
+)
+from ai.backend.manager.services.prometheus_query_preset_category.actions.partial_bulk_purge import (
+    PartialBulkPurgeCategoriesAction,
 )
 from ai.backend.manager.services.prometheus_query_preset_category.actions.purge import (
     PurgeCategoryAction,
@@ -146,13 +155,38 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
 
         return GetCategoryPayload(item=self._data_to_dto(action_result.data))
 
-    async def delete(self, input: DeleteCategoryInput) -> DeleteCategoryPayload:
-        """Remove a category by ID."""
+    async def purge(self, category_id: PrometheusQueryPresetCategoryID) -> DeleteCategoryPayload:
+        """Permanently remove a category."""
         action_result = await self._prometheus_query_preset_category.purge_category.run(
-            PurgeCategoryAction(category_id=PrometheusQueryPresetCategoryID(input.id))
+            PurgeCategoryAction(category_id=category_id)
         )
 
         return DeleteCategoryPayload(id=action_result.data.id)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeQueryPresetCategoriesInput
+    ) -> PartialBulkPayload[CategoryNode]:
+        """Permanently remove several categories, answering for each one."""
+        result = await self._prometheus_query_preset_category.partial_bulk_purge_categories.run(
+            PartialBulkPurgeCategoriesAction(
+                ids=[PrometheusQueryPresetCategoryID(category_id) for category_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[PrometheusQueryPresetCategoryData]
+    ) -> PartialBulkPayload[CategoryNode]:
+        return PartialBulkPayload[CategoryNode](
+            successes=[
+                self._data_to_dto(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
 
     _PAGINATION_SPEC = PaginationSpec(
         forward_order=PrometheusQueryPresetCategorySearchableFields.own.created_at.order.apply(
@@ -190,15 +224,16 @@ class PrometheusQueryPresetCategoryAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 

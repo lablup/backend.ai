@@ -48,7 +48,8 @@ REST v2 Handler → Adapter (api/adapters/) → Processor → Service → Reposi
 - All scoped search routes use the `auth_required` middleware.
 
 **self-service (`my`):**
-- `POST /v2/{entity}/my/{operation}` (e.g. `/v2/keypairs/my/search`). The adapter resolves the user via `current_user()`.
+- `POST /v2/{entity}/my/{operation}` (e.g. `/v2/keypairs/my/search`). `my/search`: the handler fills the `UserContext`
+  user in as the user scope and calls the adapter's `scoped_search`. Do not add `my_search` to the adapter.
   `auth_required` middleware.
 
 **anonymous (`public`) — reserved segment:**

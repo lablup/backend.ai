@@ -28,7 +28,7 @@ from ai.backend.common.types import (
     MountPermission,
     ResourceSlot,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.creator import (
@@ -72,21 +72,25 @@ from ai.backend.manager.models.routing.searchers import RouteInfoSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaUpdater
 from ai.backend.manager.models.runtime_variant_preset.types import RuntimeVariantPresetValueEntry
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.exceptions import (
     InvalidEndpointState,
 )
-from ai.backend.manager.sokovan.deployment.revision_draft import RevisionDraftReader
+from ai.backend.manager.sokovan.deployment.revision_draft.reader import RevisionDraftReader
 from ai.backend.manager.sokovan.deployment.types import (
     ActivateRevisionResult,
     DeploymentLifecycleType,
 )
-from ai.backend.manager.sokovan.deployment.validators import (
+from ai.backend.manager.sokovan.deployment.validators.base import (
     DeploymentRevisionValidationContext,
     DeploymentRevisionValidator,
+)
+from ai.backend.manager.sokovan.deployment.validators.required_resource_slot_rule import (
     RequiredResourceSlotRule,
 )
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
 from ai.backend.manager.types import OptionalState
 
@@ -95,7 +99,7 @@ if TYPE_CHECKING:
         DeploymentPresetRepository,
     )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -167,7 +171,7 @@ class DeploymentController:
         Returns:
             DeploymentInfo for the newly created endpoint.
         """
-        log.info("Creating deployment '{}'", creator.metadata.name)
+        log.trace("deployment creating", deployment_name=creator.metadata.name)
         resolved = await self._apply_deployment_level_preset(creator)
         metadata = resolved.metadata
         replica_spec = resolved.replica_spec
@@ -225,10 +229,10 @@ class DeploymentController:
         ``ImageID`` up front because the draft chain now carries a single
         image pointer (no canonical + architecture pair).
         """
-        log.info(
-            "Building creator from legacy draft '{}' in project {}",
-            draft.name,
-            draft.project,
+        log.trace(
+            "deployment creator building from legacy draft",
+            deployment_name=draft.name,
+            project_id=draft.project,
         )
         image_id = await self._resolve_draft_image_id(
             draft.draft_model_revision.image_identifier,
@@ -304,7 +308,7 @@ class DeploymentController:
         Returns:
             DeploymentInfo: Information about the updated deployment
         """
-        log.info("Updating deployment {}", endpoint_id)
+        log.trace("deployment updating", deployment_id=endpoint_id)
         modified_endpoint = await self._deployment_repository.get_modified_endpoint(
             endpoint_id=endpoint_id, updater=updater
         )
@@ -318,7 +322,7 @@ class DeploymentController:
         try:
             await self.mark_lifecycle_needed(DeploymentLifecycleType.CHECK_REPLICA)
         except Exception as e:
-            log.error("Failed to mark deployment lifecycle needed: {}", e)
+            log.warning("deployment lifecycle request failed", exc_info=e)
         return res
 
     async def destroy_deployment(
@@ -353,9 +357,7 @@ class DeploymentController:
         sub_step_value = sub_step.value if sub_step is not None else None
         await self._valkey_schedule.mark_deployment_needed(lifecycle_type.value, sub_step_value)
         log.debug(
-            "Marked deployment lifecycle needed for type: {}, sub_step: {}",
-            lifecycle_type.value,
-            sub_step_value,
+            "deployment lifecycle requested", lifecycle_type=lifecycle_type, sub_step=sub_step_value
         )
 
     # ========== Revision Trigger Operations ==========
@@ -387,7 +389,7 @@ class DeploymentController:
         card deploy) leave ``overrides.runtime_variant_id`` unset — in that
         case the preset's ``runtime_variant_id`` is used as the effective id.
         """
-        log.info("Adding revision to deployment {}", endpoint_id)
+        log.trace("deployment revision adding", deployment_id=endpoint_id)
 
         runtime_variant_id = overrides.runtime_variant_id
         if runtime_variant_id is None and preset_id is not None:
@@ -586,11 +588,11 @@ class DeploymentController:
             sub_step=DeploymentLifecycleSubStep.DEPLOYING_INITIALIZING,
         )
 
-        log.info(
-            "Started deploying revision {} for deployment {} (current: {})",
-            revision_id,
-            deployment_id,
-            previous_revision_id,
+        log.trace(
+            "deployment revision deploying",
+            deployment_id=deployment_id,
+            revision_id=revision_id,
+            previous_revision_id=previous_revision_id,
         )
 
         # 5. Return result with updated info and policy
@@ -702,9 +704,7 @@ class DeploymentController:
             )
         except Exception:
             log.warning(
-                "Failed to prune revision history for deployment {}, skipping",
-                deployment_id,
-                exc_info=True,
+                "revision history pruning failed", deployment_id=deployment_id, exc_info=True
             )
 
     # ========== Deployment-level Preset Resolution ==========

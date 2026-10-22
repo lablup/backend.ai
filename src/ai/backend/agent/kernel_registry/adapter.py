@@ -3,14 +3,14 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .exception import KernelRegistryNotFound
 from .loader.abc import AbstractKernelRegistryLoader
 from .writer.abc import AbstractKernelRegistryWriter
 from .writer.types import KernelRegistrySaveMetadata
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -39,7 +39,7 @@ class KernelRecoveryDataAdapter:
         try:
             source_data = await self._source_loader.load_kernel_registry()
         except KernelRegistryNotFound:
-            log.info("No source kernel registry found to adapt.")
+            log.debug("kernel registry adapt skipped, no source registry")
             return
         for target in self._targets:
             data = await target.loader.load_kernel_registry()

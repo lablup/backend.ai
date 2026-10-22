@@ -28,11 +28,10 @@ from ai.backend.manager.errors.image import (
     ContainerRegistryNotFound,
 )
 from ai.backend.manager.errors.resource import ProjectNotFound
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.association_container_registries_groups import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.container_registry.creators import (
     ContainerRegistryCreator,
     ContainerRegistryProjectCreator,
@@ -41,6 +40,7 @@ from ai.backend.manager.models.container_registry.purgers import (
     ContainerRegistryProjectPurger,
     ContainerRegistryPurger,
 )
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.container_registry.searchable_fields import (
     ContainerRegistrySearchableFields,
 )
@@ -48,40 +48,42 @@ from ai.backend.manager.models.container_registry.updaters import (
     ContainerRegistryGlobalUpdater,
     ContainerRegistryUpdater,
 )
-from ai.backend.manager.models.deployment_auto_scaling_policy import (
+from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
     DeploymentAutoScalingPolicyRow,
 )
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.image import ImageRow
 from ai.backend.manager.models.image.creators import ImageCreator
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac_models import PermissionRow, RoleRow, UserRoleRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -553,7 +555,7 @@ class TestContainerRegistryRepository:
             )
 
             assert len(associations) == 2
-            assert {str(a.group_id) for a in associations} == set(group_ids)
+            assert {str(a.project_id) for a in associations} == set(group_ids)
 
     @pytest.fixture
     async def sample_registry_with_images(
@@ -912,7 +914,7 @@ class TestContainerRegistryRepository:
             )
 
             assert len(associations) == 2
-            assert {a.group_id for a in associations} == set(
+            assert {a.project_id for a in associations} == set(
                 registry_and_groups_for_adding.group_ids
             )
 
@@ -975,7 +977,7 @@ class TestContainerRegistryRepository:
                 # Associate with registry
                 assoc = AssociationContainerRegistriesGroupsRow()
                 assoc.registry_id = registry.id
-                assoc.group_id = group.id
+                assoc.project_id = group.id
                 session.add(assoc)
 
             await session.commit()
@@ -1023,7 +1025,7 @@ class TestContainerRegistryRepository:
             )
 
             assert len(associations) == group_count - 1
-            assert {a.group_id for a in associations} == {
+            assert {a.project_id for a in associations} == {
                 registry_with_associated_groups.group_ids[1],
                 registry_with_associated_groups.group_ids[2],
             }
@@ -1097,7 +1099,7 @@ class TestContainerRegistryRepository:
             for gid in group_ids[:2]:
                 assoc = AssociationContainerRegistriesGroupsRow()
                 assoc.registry_id = registry.id
-                assoc.group_id = gid
+                assoc.project_id = gid
                 session.add(assoc)
 
             await session.commit()
@@ -1145,7 +1147,7 @@ class TestContainerRegistryRepository:
             )
 
             assert len(associations) == 3
-            assert {a.group_id for a in associations} == {
+            assert {a.project_id for a in associations} == {
                 group_ids[1],
                 group_ids[2],
                 group_ids[3],
@@ -1218,7 +1220,7 @@ class TestContainerRegistryRepository:
         async with db_with_cleanup.begin_readonly_session() as session:
             linked = (
                 await session.scalars(
-                    sa.select(AssociationContainerRegistriesGroupsRow.group_id).where(
+                    sa.select(AssociationContainerRegistriesGroupsRow.project_id).where(
                         AssociationContainerRegistriesGroupsRow.registry_id == registry_id
                     )
                 )

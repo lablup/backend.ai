@@ -20,7 +20,7 @@ from ai.backend.manager.models.entity_label.searchable_fields import (
 )
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
-from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.session.row import SessionRow

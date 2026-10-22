@@ -16,25 +16,25 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.service_discovery.service_discovery import ServiceDiscovery
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.clients.agent import AgentClientPool
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
-from ai.backend.manager.repositories.fair_share import FairShareRepository
+from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
-from ai.backend.manager.repositories.resource_usage_history import (
+from ai.backend.manager.repositories.resource_usage_history.repository import (
     ResourceUsageHistoryRepository,
 )
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
-from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.coordinator import RouteCoordinator
@@ -45,17 +45,17 @@ from ai.backend.manager.sokovan.scheduler.factory import (
     create_coordinator_handlers,
     create_default_scheduler_components,
 )
-from ai.backend.manager.sokovan.scheduler.fair_share import (
-    FairShareAggregator,
-    FairShareFactorCalculator,
-)
+from ai.backend.manager.sokovan.scheduler.fair_share.aggregator import FairShareAggregator
+from ai.backend.manager.sokovan.scheduler.fair_share.calculator import FairShareFactorCalculator
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
 from ai.backend.manager.sokovan.stages.factory import build_reconciler_coordinator
 from ai.backend.manager.types import DistributedLockFactory
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 @dataclass
@@ -219,6 +219,6 @@ class SokovanOrchestratorDependency(
             reconciler_task_specs=reconciler_task_specs,
         )
 
-        log.info("Sokovan orchestrator initialized")
+        log.info("sokovan orchestrator initialized")
 
         yield orchestrator

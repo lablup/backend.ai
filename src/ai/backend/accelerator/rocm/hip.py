@@ -7,11 +7,11 @@ from abc import ABCMeta, abstractmethod
 from collections.abc import MutableMapping
 from typing import Any
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .exception import LibraryError
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class hipDeviceArch_t(ctypes.Structure):

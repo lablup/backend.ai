@@ -11,7 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.types import AutoScalingMetricComparator, AutoScalingMetricSource
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -22,7 +22,7 @@ from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 __all__ = ("DeploymentAutoScalingPolicyRow",)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class DeploymentAutoScalingPolicyRow(LifecycleTimestampsMixin, Base):

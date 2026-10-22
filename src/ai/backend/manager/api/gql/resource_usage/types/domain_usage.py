@@ -23,7 +23,9 @@ from ai.backend.manager.api.gql.base import (
     DateFilter,
     OrderDirection,
     StringFilter,
+    UUIDFilter,
 )
+from ai.backend.manager.api.gql.common_types import ResourceSlotGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -32,7 +34,6 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
     gql_pydantic_input,
 )
-from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
 from ai.backend.manager.models.resource_usage_history.searchable_fields import (
@@ -70,7 +71,7 @@ class DomainUsageBucketGQL(PydanticNodeMixin[DomainUsageBucketNode]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the usage bucket.",
         ),
     )
@@ -218,6 +219,12 @@ class DomainUsageBucketFilter(PydanticInputMixin[DomainUsageBucketFilterDTO], GQ
     )
     period_end: DateFilter | None = gql_field(
         description="Filter by usage measurement period end date.", default=None
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by domain usage bucket ID."
+        ),
+        default=None,
     )
 
     AND: list[Self] | None = gql_field(

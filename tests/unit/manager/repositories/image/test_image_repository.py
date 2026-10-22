@@ -21,25 +21,26 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import BinarySize, KernelId, SessionId
-from ai.backend.manager.data.image.types import ImageData
-from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.data.image.types import ImageData, ImageStatus, ImageType
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.searchable_fields import (
     ImageAliasSearchableFields,
     ImageSearchableFields,
 )
 from ai.backend.manager.models.image.searchers import ImageSearcher
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
@@ -47,9 +48,10 @@ from ai.backend.manager.models.resource_policy import (
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.searcher import SearcherResult
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
@@ -500,7 +502,11 @@ class TestImageRepositoryLastUsedAt:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> SessionRepository:
-        return SessionRepository(db=db_with_cleanup, ops_provider=V2DBOpsProvider(db_with_cleanup))
+        return SessionRepository(
+            db=db_with_cleanup,
+            ops_provider=V2DBOpsProvider(db_with_cleanup),
+            registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(db_with_cleanup)),
+        )
 
     @pytest.fixture
     async def domain(

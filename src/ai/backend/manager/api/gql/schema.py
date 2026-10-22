@@ -3,51 +3,52 @@ from typing import override
 
 import strawberry
 from graphql import GraphQLError
-from strawberry.extensions import MaxAliasesLimiter, QueryDepthLimiter
+from strawberry.extensions import QueryDepthLimiter
 from strawberry.federation import Schema
 from strawberry.schema.config import StrawberryConfig
 from strawberry.types import ExecutionContext
 
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_field
-from ai.backend.manager.api.gql.extensions import (
-    GQLExceptionHandlerExtension,
-    GQLLoggingExtension,
-    GQLMetricExtension,
-    GQLValidationExtension,
-)
-
-from .agent import (
+from ai.backend.manager.api.gql.agent.resolver import (
     admin_update_agent_resource_group,
     agent_stats,
     agents_v2,
 )
-from .app_config import (
+from ai.backend.manager.api.gql.app_config.resolver import (
     my_app_configs,
     public_app_configs,
 )
-from .app_config_allow_list import (
+from ai.backend.manager.api.gql.app_config_allow_list.resolver import (
     admin_app_config_allow_list,
     admin_app_config_allow_lists,
     admin_create_app_config_allow_list,
     admin_purge_app_config_allow_list,
     admin_update_app_config_allow_list,
+    partial_bulk_purge_app_config_allow_lists,
+    partial_bulk_update_app_config_allow_lists,
+    purge_app_config_allow_list,
+    update_app_config_allow_list,
 )
-from .app_config_definition import (
+from ai.backend.manager.api.gql.app_config_definition.resolver import (
     admin_app_config_definition,
     admin_app_config_definitions,
     admin_create_app_config_definition,
     admin_purge_app_config_definition,
+    partial_bulk_purge_app_config_definitions,
+    purge_app_config_definition,
 )
-from .app_config_fragment import (
+from ai.backend.manager.api.gql.app_config_fragment.resolver import (
     admin_app_config_fragments,
     app_config_fragment,
     my_app_config_fragments_by_names,
+    my_atomic_bulk_upsert_app_config_fragments,
     my_upsert_app_config_fragments,
+    partial_bulk_purge_app_config_fragments,
+    purge_app_config_fragment,
     scoped_app_config_fragments_by_names,
+    scoped_atomic_bulk_upsert_app_config_fragments,
     scoped_upsert_app_config_fragments,
 )
-from .artifact import (
+from ai.backend.manager.api.gql.artifact.resolver import (
     approve_artifact_revision,
     artifact,
     artifact_import_progress_updated,
@@ -59,90 +60,129 @@ from .artifact import (
     cleanup_artifact_revisions,
     delegate_import_artifacts,
     delegate_scan_artifacts,
+    delete_artifact,
     delete_artifacts,
     import_artifacts,
+    partial_bulk_delete_artifacts,
+    partial_bulk_restore_artifacts,
+    partial_bulk_update_artifacts,
     reject_artifact_revision,
+    restore_artifact,
     restore_artifacts,
     scan_artifact_models,
     scan_artifacts,
     update_artifact,
 )
-from .artifact_registry import default_artifact_registry
-from .audit_log import admin_audit_logs_v2, scoped_audit_logs_v2
-from .background_task import background_task_events
-from .client_ip_masking import (
+from ai.backend.manager.api.gql.audit_log.resolver.query import (
+    admin_audit_logs_v2,
+    scoped_audit_logs_v2,
+)
+from ai.backend.manager.api.gql.client_ip_masking.resolver import (
     admin_client_ip_masking_policies,
     admin_purge_client_ip_masking_policy,
     admin_upsert_client_ip_masking_policy,
+    partial_bulk_purge_client_ip_masking_policies,
+    purge_client_ip_masking_policy,
+    upsert_client_ip_masking_policy,
 )
-from .container_registry import (
-    admin_container_registries_v2,
+from ai.backend.manager.api.gql.container_registry.resolver.mutation import (
     admin_create_container_registry_v2,
     admin_delete_container_registry_v2,
+    admin_partial_bulk_purge_container_registries_v2,
+    admin_purge_container_registry_v2,
     admin_update_container_registry_v2,
 )
-from .deployment import (
-    # Revision
-    activate_deployment_revision,
-    add_model_revision,
-    # Revision Preset
-    admin_create_deployment_revision_preset,
-    admin_delete_deployment_revision_preset,
+from ai.backend.manager.api.gql.container_registry.resolver.query import (
+    admin_container_registries_v2,
+)
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_field
+from ai.backend.manager.api.gql.deployment.resolver.access_token import (
+    create_access_token,
+    delete_access_token,
+    partial_bulk_purge_access_tokens,
+    purge_access_token,
+)
+from ai.backend.manager.api.gql.deployment.resolver.auto_scaling import (
+    create_auto_scaling_rule,
+    delete_auto_scaling_rule,
+    partial_bulk_purge_auto_scaling_rules,
+    partial_bulk_update_auto_scaling_rules,
+    purge_auto_scaling_rule,
+    update_auto_scaling_rule,
+)
+from ai.backend.manager.api.gql.deployment.resolver.deployment import (
     admin_deployments,
     admin_refresh_deployment_revisions,
-    admin_update_deployment_revision_preset,
-    # Access Token
-    create_access_token,
-    # Auto Scaling
-    create_auto_scaling_rule,
-    # Deployment
     create_model_deployment,
-    delete_access_token,
-    delete_auto_scaling_rule,
     delete_model_deployment,
     deployment,
-    deployment_revision_preset,
-    deployment_revision_presets,
     deployment_status_changed,
-    inference_runtime_config,
-    inference_runtime_configs,
     my_deployments,
     project_deployments,
-    # Replica
+    scoped_deployments,
+    sync_replicas,
+    update_model_deployment,
+)
+from ai.backend.manager.api.gql.deployment.resolver.policy import update_deployment_policy
+from ai.backend.manager.api.gql.deployment.resolver.replica import (
     replica,
     replica_status_changed,
     replicas,
+)
+from ai.backend.manager.api.gql.deployment.resolver.revision import (
+    activate_deployment_revision,
+    add_model_revision,
+    inference_runtime_config,
+    inference_runtime_configs,
     revision,
     revisions,
-    # Route
+)
+from ai.backend.manager.api.gql.deployment.resolver.revision_preset import (
+    admin_create_deployment_revision_preset,
+    admin_delete_deployment_revision_preset,
+    admin_update_deployment_revision_preset,
+    deployment_revision_preset,
+    deployment_revision_presets,
+    partial_bulk_purge_deployment_revision_presets,
+    partial_bulk_update_deployment_revision_presets,
+    purge_deployment_revision_preset,
+    update_deployment_revision_preset,
+)
+from ai.backend.manager.api.gql.deployment.resolver.route import (
     route,
     routes,
-    scoped_deployments,
-    sync_replicas,
-    update_auto_scaling_rule,
-    update_deployment_policy,
-    update_model_deployment,
     update_route_traffic_status,
 )
-from .domain import Domain as _DomainStub
-from .domain_v2 import (
+from ai.backend.manager.api.gql.domain_v2.resolver.mutation import (
     admin_create_domain_v2,
     admin_delete_domain_v2,
-    admin_domains_v2,
     admin_purge_domain_v2,
     admin_restore_domain_v2,
     admin_update_domain_v2,
+    delete_domain_v2,
+    partial_bulk_delete_domains_v2,
+    partial_bulk_restore_domains_v2,
+    partial_bulk_update_domains_v2,
+    restore_domain_v2,
+    update_domain_v2,
+)
+from ai.backend.manager.api.gql.domain_v2.resolver.query import (
+    admin_domains_v2,
     domain_v2,
     rg_domains_v2,
     scoped_domains_v2,
 )
-from .entity.resolver import entity_types
-from .entity_label.resolver import (
-    entity_labels,
+from ai.backend.manager.api.gql.entity.resolver.query import entity_types
+from ai.backend.manager.api.gql.entity_label.resolver.mutation import (
+    partial_bulk_purge_entity_label,
+    partial_bulk_purge_entity_labels,
+    partial_bulk_upsert_entity_label,
+    partial_bulk_upsert_entity_labels,
     purge_entity_label,
     upsert_entity_label,
 )
-from .entity_share import (
+from ai.backend.manager.api.gql.entity_label.resolver.query import entity_labels
+from ai.backend.manager.api.gql.entity_share.resolver import (
     accept_entity_share,
     cancel_entity_share,
     create_entity_share,
@@ -153,112 +193,128 @@ from .entity_share import (
     reject_entity_share,
     revoke_entity_share,
 )
-from .fair_share import (
+from ai.backend.manager.api.gql.extensions.exception_handler import GQLExceptionHandlerExtension
+from ai.backend.manager.api.gql.extensions.logging_ext import GQLLoggingExtension
+from ai.backend.manager.api.gql.extensions.max_aliases import GQLMaxAliasesExtension
+from ai.backend.manager.api.gql.extensions.metric import GQLMetricExtension
+from ai.backend.manager.api.gql.extensions.validation import GQLValidationExtension
+from ai.backend.manager.api.gql.fair_share.resolver.domain import (
     admin_bulk_upsert_domain_fair_share_weight,
-    admin_bulk_upsert_project_fair_share_weight,
-    admin_bulk_upsert_user_fair_share_weight,
     admin_domain_fair_share,
     admin_domain_fair_shares,
+    admin_upsert_domain_fair_share_weight,
+    atomic_bulk_upsert_domain_fair_share_weights,
+    bulk_upsert_domain_fair_share_weight,
+    domain_fair_share,
+    domain_fair_shares,
+    rg_domain_fair_share,
+    rg_domain_fair_shares,
+    upsert_domain_fair_share_weight,
+)
+from ai.backend.manager.api.gql.fair_share.resolver.project import (
+    admin_bulk_upsert_project_fair_share_weight,
     admin_project_fair_share,
     admin_project_fair_shares,
-    admin_upsert_domain_fair_share_weight,
     admin_upsert_project_fair_share_weight,
+    atomic_bulk_upsert_project_fair_share_weights,
+    bulk_upsert_project_fair_share_weight,
+    project_fair_share,
+    project_fair_shares,
+    rg_project_fair_share,
+    rg_project_fair_shares,
+    upsert_project_fair_share_weight,
+)
+from ai.backend.manager.api.gql.fair_share.resolver.user import (
+    admin_bulk_upsert_user_fair_share_weight,
     admin_upsert_user_fair_share_weight,
     admin_user_fair_share,
     admin_user_fair_shares,
-    bulk_upsert_domain_fair_share_weight,
-    bulk_upsert_project_fair_share_weight,
+    atomic_bulk_upsert_user_fair_share_weights,
     bulk_upsert_user_fair_share_weight,
-    domain_fair_share,
-    domain_fair_shares,
-    project_fair_share,
-    project_fair_shares,
-    rg_domain_fair_share,
-    rg_domain_fair_shares,
-    rg_project_fair_share,
-    rg_project_fair_shares,
     rg_user_fair_share,
     rg_user_fair_shares,
-    upsert_domain_fair_share_weight,
-    upsert_project_fair_share_weight,
     upsert_user_fair_share_weight,
     user_fair_share,
     user_fair_shares,
 )
-from .huggingface_registry import (
-    create_huggingface_registry,
-    delete_huggingface_registry,
-    huggingface_registries,
-    huggingface_registry,
-    update_huggingface_registry,
-)
-from .idle_checker import (
+from ai.backend.manager.api.gql.idle_checker.resolver import (
     admin_create_idle_checker,
     admin_idle_checkers,
+    admin_partial_bulk_purge_idle_checkers,
     admin_purge_idle_checker,
     admin_update_idle_checker,
 )
-from .idle_checker_assignment import (
+from ai.backend.manager.api.gql.idle_checker_assignment.resolver import (
     admin_create_idle_checker_assignment,
     admin_idle_checker_assignments,
+    partial_bulk_purge_idle_checker_assignments,
+    partial_bulk_update_idle_checker_assignments,
     purge_idle_checker_assignment,
     scoped_idle_checker_assignments,
     update_idle_checker_assignment,
 )
-from .image import (
+from ai.backend.manager.api.gql.image.resolver import (
     admin_image_aliases,
     admin_images_v2,
+    admin_scan_image,
     container_registry_images_v2,
+    delete_image,
     image_alias,
     image_scoped_aliases,
     image_v2,
+    my_images_v2,
+    partial_bulk_delete_images,
+    partial_bulk_restore_images,
+    partial_bulk_update_images,
+    restore_image,
     scoped_images_v2,
+    update_image,
 )
-from .image_federation import Image as _ImageStub
-from .kernel.resolver import admin_kernels_v2, kernel_v2, session_kernels_v2
-from .keypair import (
+from ai.backend.manager.api.gql.kernel.resolver.kernel import (
+    admin_kernels_v2,
+    kernel_v2,
+    session_kernels_v2,
+)
+from ai.backend.manager.api.gql.keypair.resolver.mutation import (
     admin_create_keypair_v2,
     admin_delete_keypair_v2,
     admin_delete_ssh_keypair_v2,
-    admin_keypair_v2,
-    admin_keypairs_v2,
     admin_register_ssh_keypair_v2,
-    admin_ssh_keypair_v2,
     admin_update_keypair_v2,
     issue_my_keypair,
-    my_keypairs,
     revoke_my_keypair,
     switch_my_main_access_key,
     update_my_keypair,
 )
-from .legacy_node_stubs import (
-    AgentNodeStub as _AgentNodeStub,
+from ai.backend.manager.api.gql.keypair.resolver.query import (
+    admin_keypair_v2,
+    admin_keypairs_v2,
+    admin_ssh_keypair_v2,
+    my_keypairs,
 )
-from .legacy_node_stubs import (
-    ContainerRegistryNodeStub as _ContainerRegistryNodeStub,
-)
-from .legacy_node_stubs import (
-    ModelCardStub as _ModelCardStub,
-)
-from .legacy_node_stubs import (
-    NetworkNodeStub as _NetworkNodeStub,
-)
-from .login_client_type import (
+from ai.backend.manager.api.gql.login_client_type.resolver import (
     admin_create_login_client_type,
     admin_delete_login_client_type,
     admin_update_login_client_type,
     login_client_type,
     login_client_types,
+    partial_bulk_purge_login_client_types,
+    partial_bulk_update_login_client_types,
+    purge_login_client_type,
+    update_login_client_type,
 )
-from .login_history import admin_login_history_v2, my_login_history_v2
-from .login_session import (
+from ai.backend.manager.api.gql.login_history.resolver.query import (
+    admin_login_history_v2,
+    my_login_history_v2,
+)
+from ai.backend.manager.api.gql.login_session.resolver.query import (
     admin_login_sessions_v2,
     admin_revoke_login_session,
     admin_unblock_user,
     my_login_sessions_v2,
     my_revoke_login_session,
 )
-from .model_card import (
+from ai.backend.manager.api.gql.model_card.resolver import (
     admin_bulk_delete_model_cards_v2,
     admin_create_model_card_v2,
     admin_delete_model_card_v2,
@@ -267,12 +323,16 @@ from .model_card import (
     deploy_model_card_v2,
     model_card_available_presets,
     model_card_v2,
+    my_model_cards_v2,
+    partial_bulk_purge_model_cards_v2,
+    partial_bulk_update_model_cards_v2,
     project_model_cards_v2,
+    purge_model_card_v2,
     scan_project_model_cards_v2,
     scoped_model_cards_v2,
+    update_model_card_v2,
 )
-from .node_field import node
-from .notification import (
+from ai.backend.manager.api.gql.notification.resolver import (
     admin_create_notification_channel,
     admin_create_notification_rule,
     admin_delete_notification_channel,
@@ -295,103 +355,121 @@ from .notification import (
     notification_rule_type_schema,
     notification_rule_types,
     notification_rules,
+    partial_bulk_purge_notification_channels,
+    partial_bulk_purge_notification_rules,
+    partial_bulk_update_notification_channels,
+    partial_bulk_update_notification_rules,
+    purge_notification_channel,
+    purge_notification_rule,
     update_notification_channel,
     update_notification_rule,
     validate_notification_channel,
     validate_notification_rule,
 )
-from .object_storage import (
-    create_object_storage,
-    delete_object_storage,
-    get_presigned_download_url,
-    get_presigned_upload_url,
-    object_storage,
-    object_storages,
-    update_object_storage,
-)
-from .project import Project as _ProjectStub
-from .project_v2 import (
+from ai.backend.manager.api.gql.project_v2.resolver.mutation import (
     admin_create_project_v2,
     admin_delete_project_v2,
-    admin_projects_v2,
     admin_purge_project_v2,
     admin_restore_project_v2,
     admin_update_project_v2,
+    delete_project_v2,
+    partial_bulk_delete_projects_v2,
+    partial_bulk_restore_projects_v2,
+    partial_bulk_update_projects_v2,
+    restore_project_v2,
+    unassign_users_from_project_v2,
+    update_project_v2,
+)
+from ai.backend.manager.api.gql.project_v2.resolver.query import (
+    admin_projects_v2,
     domain_projects_v2,
+    my_projects_v2,
     project_domain_v2,
     project_v2,
     scoped_projects_v2,
-    unassign_users_from_project_v2,
 )
-from .prometheus_query_preset import (
-    admin_create_prometheus_query_preset,
+from ai.backend.manager.api.gql.prometheus_query_preset.resolver.category_mutation import (
     admin_create_prometheus_query_preset_category,
-    admin_delete_prometheus_query_preset,
     admin_delete_prometheus_query_preset_category,
-    admin_modify_prometheus_query_preset,
-    admin_preview_prometheus_query_preset,
-    prometheus_query_preset,
+    partial_bulk_purge_prometheus_query_preset_categories,
+    purge_prometheus_query_preset_category,
+)
+from ai.backend.manager.api.gql.prometheus_query_preset.resolver.category_query import (
     prometheus_query_preset_categories,
     prometheus_query_preset_category,
+)
+from ai.backend.manager.api.gql.prometheus_query_preset.resolver.mutation import (
+    admin_create_prometheus_query_preset,
+    admin_delete_prometheus_query_preset,
+    admin_modify_prometheus_query_preset,
+    partial_bulk_purge_prometheus_query_presets,
+    partial_bulk_update_prometheus_query_presets,
+    purge_prometheus_query_preset,
+    update_prometheus_query_preset,
+)
+from ai.backend.manager.api.gql.prometheus_query_preset.resolver.query import (
+    admin_preview_prometheus_query_preset,
+    prometheus_query_preset,
     prometheus_query_preset_result,
     prometheus_query_presets,
 )
-from .rbac import (
-    admin_assign_role,
+from ai.backend.manager.api.gql.rbac.resolver.permission import (
     admin_bulk_add_role_permissions,
-    admin_bulk_assign_role,
     admin_bulk_remove_role_permissions,
-    admin_bulk_revoke_role,
     admin_create_permission,
-    admin_create_role,
     admin_delete_permission,
-    admin_delete_role,
     admin_permissions,
-    admin_purge_role,
     admin_replace_role_permissions,
+    admin_update_permission,
+    my_atomic_bulk_scope_permissions,
+    my_scope_permissions,
+    partial_bulk_add_role_permissions,
+    partial_bulk_remove_role_permissions,
+    purge_permission,
+    rbac_entity_operation_combinations,
+    rbac_permission_matrix,
+    rbac_scope_entity_combinations,
+    update_permission,
+)
+from ai.backend.manager.api.gql.rbac.resolver.role import (
+    admin_assign_role,
+    admin_bulk_assign_role,
+    admin_bulk_revoke_role,
+    admin_create_role,
+    admin_delete_role,
+    admin_purge_role,
     admin_revoke_role,
     admin_role,
     admin_role_assignments,
     admin_roles,
-    admin_update_permission,
     admin_update_role,
-    my_atomic_bulk_scope_permissions,
+    assign_role,
+    delete_role,
     my_roles,
     my_roles_v2,
-    my_scope_permissions,
+    partial_bulk_assign_roles,
+    partial_bulk_delete_roles,
+    partial_bulk_purge_roles,
+    partial_bulk_restore_roles,
+    partial_bulk_revoke_roles,
+    partial_bulk_update_roles,
     project_roles,
-    rbac_entity_operation_combinations,
-    rbac_permission_matrix,
-    rbac_scope_entity_combinations,
+    purge_role,
+    restore_role,
+    revoke_role,
+    update_role,
 )
-from .rbac.resolver.entity import admin_entities
-from .rbac.resolver.role_invitation import (
-    accept_role_invitation,
-    admin_cancel_role_invitation,
-    admin_role_invitations,
-    create_role_invitation,
-    my_role_invitations,
-    my_sent_role_invitations,
-    reject_role_invitation,
-    role_scoped_role_invitations,
-)
-from .reservoir_registry import (
-    create_reservoir_registry,
-    delete_reservoir_registry,
-    reservoir_registries,
-    reservoir_registry,
-    update_reservoir_registry,
-)
-from .resource_allocation import (
+from ai.backend.manager.api.gql.resource_allocation.resolver import (
     admin_domain_resource_allocation_v2,
     admin_effective_resource_allocation_v2,
     check_preset_availability_v2,
     effective_resource_allocation_v2,
+    my_concurrency,
     my_keypair_resource_allocation_v2,
     project_resource_allocation_v2,
     resource_group_resource_allocation_v2,
 )
-from .resource_group import (
+from ai.backend.manager.api.gql.resource_group.resolver import (
     admin_allowed_domains_for_resource_group_v2,
     admin_allowed_projects_for_resource_group_v2,
     admin_allowed_resource_groups_for_domain_v2,
@@ -406,94 +484,133 @@ from .resource_group import (
     admin_update_allowed_resource_groups_for_project_v2,
     admin_update_resource_group,
     admin_update_resource_group_fair_share_spec,
+    partial_bulk_purge_resource_groups,
+    partial_bulk_update_resource_groups,
+    purge_resource_group_v2,
     replace_resource_group_default_deployment_options,
     replace_resource_group_default_session_options,
     resource_groups,
     scoped_resource_groups,
+    update_resource_group,
     update_resource_group_fair_share_spec,
 )
-from .resource_group.federation import ResourceGroup as _ResourceGroupStub
-from .resource_policy_v2 import (
+from ai.backend.manager.api.gql.resource_policy_v2.resolver.mutation import (
     admin_create_keypair_resource_policy_v2,
     admin_create_project_resource_policy_v2,
     admin_create_user_resource_policy_v2,
     admin_delete_keypair_resource_policy_v2,
     admin_delete_project_resource_policy_v2,
     admin_delete_user_resource_policy_v2,
+    admin_update_keypair_resource_policy_v2,
+    admin_update_project_resource_policy_v2,
+    admin_update_user_resource_policy_v2,
+    partial_bulk_purge_keypair_resource_policies_v2,
+    partial_bulk_purge_project_resource_policies_v2,
+    partial_bulk_purge_user_resource_policies_v2,
+    partial_bulk_update_keypair_resource_policies_v2,
+    partial_bulk_update_project_resource_policies_v2,
+    partial_bulk_update_user_resource_policies_v2,
+    purge_keypair_resource_policy_v2,
+    purge_project_resource_policy_v2,
+    purge_user_resource_policy_v2,
+    update_keypair_resource_policy_v2,
+    update_project_resource_policy_v2,
+    update_user_resource_policy_v2,
+)
+from ai.backend.manager.api.gql.resource_policy_v2.resolver.query import (
     admin_keypair_resource_policies_v2,
     admin_keypair_resource_policy_v2,
     admin_project_resource_policies_v2,
     admin_project_resource_policy_v2,
-    admin_update_keypair_resource_policy_v2,
-    admin_update_project_resource_policy_v2,
-    admin_update_user_resource_policy_v2,
     admin_user_resource_policies_v2,
     admin_user_resource_policy_v2,
     my_keypair_resource_policy_v2,
     my_user_resource_policy_v2,
+    scoped_project_resource_policy_v2,
 )
-from .resource_preset import (
+from ai.backend.manager.api.gql.resource_preset.resolver import (
     admin_create_resource_preset_v2,
     admin_delete_resource_preset_v2,
     admin_resource_preset_v2,
     admin_resource_presets_v2,
     admin_update_resource_preset_v2,
+    partial_bulk_purge_resource_presets_v2,
+    partial_bulk_update_resource_presets_v2,
+    purge_resource_preset_v2,
+    update_resource_preset_v2,
 )
-from .resource_slot.resolver import (
-    admin_create_resource_slot_type,
-    admin_purge_resource_slot_type,
-    admin_update_resource_slot_type,
-    resource_slot_type,
-    resource_slot_types,
-)
-from .resource_usage import (
+from ai.backend.manager.api.gql.resource_usage.resolver.domain_usage import (
     admin_domain_usage_buckets,
-    admin_project_usage_buckets,
-    admin_user_usage_buckets,
     domain_usage_buckets,
+)
+from ai.backend.manager.api.gql.resource_usage.resolver.project_usage import (
+    admin_project_usage_buckets,
     project_usage_buckets,
+)
+from ai.backend.manager.api.gql.resource_usage.resolver.user_usage import (
+    admin_user_usage_buckets,
     user_usage_buckets,
 )
-from .retention_policy import (
+from ai.backend.manager.api.gql.retention_policy.resolver import (
     admin_create_retention_policy,
     admin_delete_retention_policy,
     admin_purge_retention_policy,
     admin_retention_policies,
     admin_retention_policy,
     admin_update_retention_policy,
+    partial_bulk_purge_retention_policies,
+    partial_bulk_update_retention_policies,
+    purge_retention_policy,
+    update_retention_policy,
 )
-from .role_preset import (
+from ai.backend.manager.api.gql.role_preset.resolver.mutation import (
     admin_bulk_add_role_preset_permissions,
     admin_bulk_remove_role_preset_permissions,
     admin_create_role_preset,
     admin_delete_role_presets,
     admin_purge_role_presets,
     admin_restore_role_presets,
+    admin_update_role_preset,
+    atomic_bulk_add_role_preset_permissions,
+    delete_role_preset,
+    partial_bulk_delete_role_presets,
+    partial_bulk_purge_role_presets,
+    partial_bulk_remove_role_preset_permissions,
+    partial_bulk_restore_role_presets,
+    partial_bulk_update_role_presets,
+    purge_role_preset,
+    restore_role_preset,
+    update_role_preset,
+)
+from ai.backend.manager.api.gql.role_preset.resolver.query import (
     admin_role_preset,
     admin_role_presets,
-    admin_update_role_preset,
 )
-from .runtime_variant import (
+from ai.backend.manager.api.gql.runtime_variant.resolver import (
     admin_create_runtime_variant,
     admin_delete_runtime_variant,
     admin_delete_runtime_variants,
     admin_update_runtime_variant,
+    partial_bulk_purge_runtime_variants,
+    partial_bulk_update_runtime_variants,
+    purge_runtime_variant,
     runtime_variant,
     runtime_variants,
+    update_runtime_variant,
 )
-from .runtime_variant_preset import (
+from ai.backend.manager.api.gql.runtime_variant_preset.resolver import (
     admin_create_runtime_variant_preset,
     admin_delete_runtime_variant_preset,
     admin_update_runtime_variant_preset,
+    partial_bulk_purge_runtime_variant_presets,
+    partial_bulk_update_runtime_variant_presets,
+    purge_runtime_variant_preset,
     runtime_variant_preset,
     runtime_variant_presets,
+    update_runtime_variant_preset,
 )
-from .scheduler import (
-    compute_schedule,
-    scheduling_events_by_session,
-)
-from .scheduling_handler import scheduling_handlers
-from .scheduling_history import (
+from ai.backend.manager.api.gql.scheduling_handler.resolver import scheduling_handlers
+from ai.backend.manager.api.gql.scheduling_history.resolver import (
     admin_deployment_histories,
     admin_kernel_scheduling_histories,
     admin_replica_group_histories,
@@ -508,26 +625,43 @@ from .scheduling_history import (
     session_scheduling_histories,
     session_scoped_scheduling_histories,
 )
-from .secret import admin_reencrypt_secrets, admin_secret_status
-from .service_catalog import admin_service_catalogs
-from .session.resolver import (
+from ai.backend.manager.api.gql.secret.resolver import admin_reencrypt_secrets, admin_secret_status
+from ai.backend.manager.api.gql.service_catalog.resolver import admin_service_catalogs
+from ai.backend.manager.api.gql.session.resolver.session import (
     admin_sessions_v2,
     enqueue_session,
     exclude_session_idle_checks,
     include_session_idle_checks,
+    my_sessions_v2,
+    partial_bulk_terminate_sessions_v2,
     project_sessions_v2,
     scoped_sessions_v2,
     session_v2,
     terminate_sessions_v2,
 )
-from .session_federation import Session as _SessionStub
-from .storage_host import my_storage_host_permissions
-from .storage_namespace import (
-    register_storage_namespace,
-    unregister_storage_namespace,
+from ai.backend.manager.api.gql.session_group.resolver import (
+    admin_session_groups,
+    create_session_group,
+    purge_session_group,
+    scoped_session_groups,
+    session_group,
+    update_session_group,
 )
-from .user import (
-    # Mutations
+from ai.backend.manager.api.gql.session_lifecycle_handler.resolver import (
+    admin_session_lifecycle_handlers,
+)
+from ai.backend.manager.api.gql.storage_volume.resolver import (
+    admin_storage_volumes,
+    delete_storage_volume,
+    purge_storage_volume,
+    restore_storage_volume,
+    storage_volume,
+    update_storage_volume,
+)
+from ai.backend.manager.api.gql.storage_volume_service_attachment.resolver import (
+    admin_storage_volume_service_attachments,
+)
+from ai.backend.manager.api.gql.user.resolver.mutation import (
     admin_bulk_create_users_v2,
     admin_bulk_create_users_with_keypair_v2,
     admin_bulk_purge_users_v2,
@@ -538,7 +672,10 @@ from .user import (
     admin_purge_user_v2,
     admin_restore_user_v2,
     admin_update_user_v2,
-    # Queries
+    update_my_allowed_client_ip,
+    update_user_v2,
+)
+from ai.backend.manager.api.gql.user.resolver.query import (
     admin_user_v2,
     admin_users_v2,
     domain_users_v2,
@@ -546,13 +683,8 @@ from .user import (
     my_user_v2,
     project_users_v2,
     scoped_users_v2,
-    update_my_allowed_client_ip,
-    update_user_v2,
 )
-from .user_federation import User as _UserStub
-from .vfolder import VFolder as _VFolderStub
-from .vfolder_v2 import (
-    admin_vfolders_v2,
+from ai.backend.manager.api.gql.vfolder_v2.resolver.mutation import (
     bulk_delete_vfolders_v2,
     bulk_purge_vfolders_v2,
     clone_vfolder_v2,
@@ -560,25 +692,119 @@ from .vfolder_v2 import (
     create_vfolder_v2,
     delete_vfolder_v2,
     deploy_vfolder_v2,
-    my_vfolders,
-    project_vfolders,
+    partial_bulk_delete_vfolders_v2,
+    partial_bulk_restore_vfolders_v2,
+    partial_bulk_update_vfolders_v2,
     purge_vfolder_v2,
     restore_vfolder_v2,
-    scoped_vfolders_v2,
     set_vfolder_mount_policy,
     unset_vfolder_mount_policy,
+    update_vfolder_v2,
     vfolder_create_download_session_v2,
     vfolder_create_upload_session_v2,
     vfolder_delete_files_v2,
     vfolder_list_files_v2,
     vfolder_mkdir_v2,
-    vfolder_mount_policies,
     vfolder_move_file_v2,
+)
+from ai.backend.manager.api.gql.vfolder_v2.resolver.query import (
+    admin_vfolders_v2,
+    my_vfolders,
+    project_vfolders,
+    scoped_vfolders_v2,
+    vfolder_mount_policies,
     vfolder_v2,
 )
+
+from .artifact_registry import default_artifact_registry
+from .background_task import background_task_events
+from .domain import Domain as _DomainStub
+from .huggingface_registry import (
+    create_huggingface_registry,
+    delete_huggingface_registry,
+    huggingface_registries,
+    huggingface_registry,
+    partial_bulk_purge_huggingface_registries,
+    partial_bulk_update_huggingface_registries,
+    purge_huggingface_registry,
+    update_huggingface_registry,
+)
+from .image_federation import Image as _ImageStub
+from .legacy_node_stubs import (
+    AgentNodeStub as _AgentNodeStub,
+)
+from .legacy_node_stubs import (
+    ContainerRegistryNodeStub as _ContainerRegistryNodeStub,
+)
+from .legacy_node_stubs import (
+    ModelCardStub as _ModelCardStub,
+)
+from .legacy_node_stubs import (
+    NetworkNodeStub as _NetworkNodeStub,
+)
+from .node_field import node, nodes
+from .object_storage import (
+    create_object_storage,
+    delete_object_storage,
+    get_presigned_download_url,
+    get_presigned_upload_url,
+    object_storage,
+    object_storages,
+    partial_bulk_purge_object_storages,
+    partial_bulk_update_object_storages,
+    purge_object_storage,
+    update_object_storage,
+)
+from .project import Project as _ProjectStub
+from .rbac.resolver.entity import admin_entities
+from .rbac.resolver.role_invitation import (
+    accept_role_invitation,
+    admin_cancel_role_invitation,
+    admin_role_invitations,
+    create_role_invitation,
+    my_role_invitations,
+    my_sent_role_invitations,
+    reject_role_invitation,
+    role_scoped_role_invitations,
+)
+from .reservoir_registry import (
+    create_reservoir_registry,
+    delete_reservoir_registry,
+    partial_bulk_purge_reservoir_registries,
+    partial_bulk_update_reservoir_registries,
+    purge_reservoir_registry,
+    reservoir_registries,
+    reservoir_registry,
+    update_reservoir_registry,
+)
+from .resource_group.federation import ResourceGroup as _ResourceGroupStub
+from .resource_slot.resolver import (
+    admin_create_resource_slot_type,
+    admin_purge_resource_slot_type,
+    admin_update_resource_slot_type,
+    partial_bulk_purge_resource_slot_types,
+    purge_resource_slot_type,
+    resource_slot_type,
+    resource_slot_types,
+)
+from .scheduler import (
+    compute_schedule,
+    scheduling_events_by_session,
+)
+from .session_federation import Session as _SessionStub
+from .storage_host import my_storage_host_permissions
+from .storage_namespace import (
+    register_storage_namespace,
+    unregister_storage_namespace,
+)
+from .user_federation import User as _UserStub
+from .vfolder import VFolder as _VFolderStub
 from .vfs_storage import (
     create_vfs_storage,
     delete_vfs_storage,
+    partial_bulk_purge_vfs_storages,
+    partial_bulk_update_vfs_storages,
+    purge_vfs_storage,
     update_vfs_storage,
     vfs_storage,
     vfs_storages,
@@ -587,8 +813,9 @@ from .vfs_storage import (
 
 @strawberry.type
 class Query:
-    # Relay Global Object Identification entry point (resolves any Node by global ID)
+    # Relay Global Object Identification entry points (resolve Nodes by global ID)
     node = node
+    nodes = nodes
     agent_stats = agent_stats
     agents_v2 = agents_v2
     admin_app_config_allow_list = admin_app_config_allow_list
@@ -628,12 +855,16 @@ class Query:
     scoped_resource_groups = scoped_resource_groups
     admin_resource_group_v2 = admin_resource_group_v2
     scheduling_handlers = scheduling_handlers
+    admin_session_lifecycle_handlers = admin_session_lifecycle_handlers
     compute_schedule = compute_schedule
     admin_allowed_resource_groups_for_domain_v2 = admin_allowed_resource_groups_for_domain_v2
     admin_allowed_resource_groups_for_project_v2 = admin_allowed_resource_groups_for_project_v2
     admin_allowed_domains_for_resource_group_v2 = admin_allowed_domains_for_resource_group_v2
     admin_allowed_projects_for_resource_group_v2 = admin_allowed_projects_for_resource_group_v2
     admin_service_catalogs = admin_service_catalogs
+    storage_volume = storage_volume
+    admin_storage_volumes = admin_storage_volumes
+    admin_storage_volume_service_attachments = admin_storage_volume_service_attachments
     admin_session_scheduling_histories = admin_session_scheduling_histories
     admin_kernel_scheduling_histories = admin_kernel_scheduling_histories
     admin_deployments = admin_deployments
@@ -655,6 +886,7 @@ class Query:
     admin_user_usage_buckets = admin_user_usage_buckets
     admin_images_v2 = admin_images_v2
     scoped_images_v2 = scoped_images_v2
+    my_images_v2 = my_images_v2
     admin_kernels_v2 = admin_kernels_v2
     admin_audit_logs_v2 = admin_audit_logs_v2
     scoped_audit_logs_v2 = scoped_audit_logs_v2
@@ -668,7 +900,11 @@ class Query:
     admin_sessions_v2 = admin_sessions_v2
     project_sessions_v2 = project_sessions_v2
     scoped_sessions_v2 = scoped_sessions_v2
+    my_sessions_v2 = my_sessions_v2
     session_v2 = session_v2
+    session_group = session_group
+    admin_session_groups = admin_session_groups
+    scoped_session_groups = scoped_session_groups
     project_deployments = project_deployments
     scoped_deployments = scoped_deployments
     my_deployments = my_deployments
@@ -776,6 +1012,7 @@ class Query:
     admin_projects_v2 = admin_projects_v2
     domain_projects_v2 = domain_projects_v2
     scoped_projects_v2 = scoped_projects_v2
+    my_projects_v2 = my_projects_v2
     project_domain_v2 = project_domain_v2
     # Resource Policy V2 APIs
     admin_keypair_resource_policy_v2 = admin_keypair_resource_policy_v2
@@ -786,6 +1023,7 @@ class Query:
     admin_project_resource_policies_v2 = admin_project_resource_policies_v2
     my_keypair_resource_policy_v2 = my_keypair_resource_policy_v2
     my_user_resource_policy_v2 = my_user_resource_policy_v2
+    scoped_project_resource_policy_v2 = scoped_project_resource_policy_v2
     # Storage Host APIs
     my_storage_host_permissions = my_storage_host_permissions
     # Resource Preset V2 APIs
@@ -817,6 +1055,7 @@ class Query:
     admin_model_cards_v2 = admin_model_cards_v2
     project_model_cards_v2 = project_model_cards_v2
     scoped_model_cards_v2 = scoped_model_cards_v2
+    my_model_cards_v2 = my_model_cards_v2
     model_card_v2 = model_card_v2
     model_card_available_presets = model_card_available_presets
     # Resource Allocation V2 APIs
@@ -827,6 +1066,7 @@ class Query:
     effective_resource_allocation_v2 = effective_resource_allocation_v2
     admin_effective_resource_allocation_v2 = admin_effective_resource_allocation_v2
     check_preset_availability_v2 = check_preset_availability_v2
+    my_concurrency = my_concurrency
     # VFolder APIs
     admin_vfolders_v2 = admin_vfolders_v2
     vfolder_v2 = vfolder_v2
@@ -838,21 +1078,41 @@ class Query:
 
 @strawberry.type
 class Mutation:
+    admin_scan_image = admin_scan_image
+    update_image = update_image
+    delete_image = delete_image
+    restore_image = restore_image
+    partial_bulk_update_images = partial_bulk_update_images
+    partial_bulk_delete_images = partial_bulk_delete_images
+    partial_bulk_restore_images = partial_bulk_restore_images
     admin_update_agent_resource_group = admin_update_agent_resource_group
     admin_create_idle_checker = admin_create_idle_checker
     admin_update_idle_checker = admin_update_idle_checker
     admin_purge_idle_checker = admin_purge_idle_checker
+    admin_partial_bulk_purge_idle_checkers = admin_partial_bulk_purge_idle_checkers
     admin_create_idle_checker_assignment = admin_create_idle_checker_assignment
     update_idle_checker_assignment = update_idle_checker_assignment
     purge_idle_checker_assignment = purge_idle_checker_assignment
+    partial_bulk_update_idle_checker_assignments = partial_bulk_update_idle_checker_assignments
+    partial_bulk_purge_idle_checker_assignments = partial_bulk_purge_idle_checker_assignments
     admin_create_resource_slot_type = admin_create_resource_slot_type
     admin_update_resource_slot_type = admin_update_resource_slot_type
     admin_purge_resource_slot_type = admin_purge_resource_slot_type
+    purge_resource_slot_type = purge_resource_slot_type
+    partial_bulk_purge_resource_slot_types = partial_bulk_purge_resource_slot_types
     admin_create_app_config_allow_list = admin_create_app_config_allow_list
     admin_purge_app_config_allow_list = admin_purge_app_config_allow_list
     admin_update_app_config_allow_list = admin_update_app_config_allow_list
     scoped_upsert_app_config_fragments = scoped_upsert_app_config_fragments
     my_upsert_app_config_fragments = my_upsert_app_config_fragments
+    update_app_config_allow_list = update_app_config_allow_list
+    purge_app_config_allow_list = purge_app_config_allow_list
+    partial_bulk_update_app_config_allow_lists = partial_bulk_update_app_config_allow_lists
+    partial_bulk_purge_app_config_allow_lists = partial_bulk_purge_app_config_allow_lists
+    scoped_atomic_bulk_upsert_app_config_fragments = scoped_atomic_bulk_upsert_app_config_fragments
+    my_atomic_bulk_upsert_app_config_fragments = my_atomic_bulk_upsert_app_config_fragments
+    purge_app_config_fragment = purge_app_config_fragment
+    partial_bulk_purge_app_config_fragments = partial_bulk_purge_app_config_fragments
     scan_artifacts = scan_artifacts
     scan_artifact_models = scan_artifact_models
     import_artifacts = import_artifacts
@@ -861,12 +1121,21 @@ class Mutation:
     update_artifact = update_artifact
     delete_artifacts = delete_artifacts
     restore_artifacts = restore_artifacts
+    delete_artifact = delete_artifact
+    restore_artifact = restore_artifact
+    partial_bulk_update_artifacts = partial_bulk_update_artifacts
+    partial_bulk_delete_artifacts = partial_bulk_delete_artifacts
+    partial_bulk_restore_artifacts = partial_bulk_restore_artifacts
     cleanup_artifact_revisions = cleanup_artifact_revisions
     cancel_import_artifact = cancel_import_artifact
     # Container Registry V2 APIs
     admin_create_container_registry_v2 = admin_create_container_registry_v2
     admin_update_container_registry_v2 = admin_update_container_registry_v2
     admin_delete_container_registry_v2 = admin_delete_container_registry_v2
+    admin_purge_container_registry_v2 = admin_purge_container_registry_v2
+    admin_partial_bulk_purge_container_registries_v2 = (
+        admin_partial_bulk_purge_container_registries_v2
+    )
     create_model_deployment = create_model_deployment
     update_model_deployment = update_model_deployment
     delete_model_deployment = delete_model_deployment
@@ -883,13 +1152,20 @@ class Mutation:
     admin_update_notification_rule = admin_update_notification_rule
     admin_delete_notification_rule = admin_delete_notification_rule
     admin_validate_notification_rule = admin_validate_notification_rule
+    # Notification
+    update_notification_channel = update_notification_channel
+    update_notification_rule = update_notification_rule
+    purge_notification_channel = purge_notification_channel
+    purge_notification_rule = purge_notification_rule
+    partial_bulk_update_notification_channels = partial_bulk_update_notification_channels
+    partial_bulk_purge_notification_channels = partial_bulk_purge_notification_channels
+    partial_bulk_update_notification_rules = partial_bulk_update_notification_rules
+    partial_bulk_purge_notification_rules = partial_bulk_purge_notification_rules
     # Notification - Legacy (deprecated)
     create_notification_channel = create_notification_channel
-    update_notification_channel = update_notification_channel
     delete_notification_channel = delete_notification_channel
     validate_notification_channel = validate_notification_channel
     create_notification_rule = create_notification_rule
-    update_notification_rule = update_notification_rule
     delete_notification_rule = delete_notification_rule
     validate_notification_rule = validate_notification_rule
     create_object_storage = create_object_storage
@@ -897,27 +1173,51 @@ class Mutation:
     create_auto_scaling_rule = create_auto_scaling_rule
     update_auto_scaling_rule = update_auto_scaling_rule
     delete_auto_scaling_rule = delete_auto_scaling_rule
+    purge_auto_scaling_rule = purge_auto_scaling_rule
+    partial_bulk_update_auto_scaling_rules = partial_bulk_update_auto_scaling_rules
+    partial_bulk_purge_auto_scaling_rules = partial_bulk_purge_auto_scaling_rules
     delete_object_storage = delete_object_storage
+    purge_object_storage = purge_object_storage
+    partial_bulk_update_object_storages = partial_bulk_update_object_storages
+    partial_bulk_purge_object_storages = partial_bulk_purge_object_storages
     create_vfs_storage = create_vfs_storage
     update_vfs_storage = update_vfs_storage
     delete_vfs_storage = delete_vfs_storage
+    purge_vfs_storage = purge_vfs_storage
+    partial_bulk_update_vfs_storages = partial_bulk_update_vfs_storages
+    partial_bulk_purge_vfs_storages = partial_bulk_purge_vfs_storages
     register_storage_namespace = register_storage_namespace
     unregister_storage_namespace = unregister_storage_namespace
     create_huggingface_registry = create_huggingface_registry
     update_huggingface_registry = update_huggingface_registry
     delete_huggingface_registry = delete_huggingface_registry
+    purge_huggingface_registry = purge_huggingface_registry
+    partial_bulk_update_huggingface_registries = partial_bulk_update_huggingface_registries
+    partial_bulk_purge_huggingface_registries = partial_bulk_purge_huggingface_registries
     create_reservoir_registry = create_reservoir_registry
     update_reservoir_registry = update_reservoir_registry
     delete_reservoir_registry = delete_reservoir_registry
+    purge_reservoir_registry = purge_reservoir_registry
+    partial_bulk_update_reservoir_registries = partial_bulk_update_reservoir_registries
+    partial_bulk_purge_reservoir_registries = partial_bulk_purge_reservoir_registries
     get_presigned_download_url = get_presigned_download_url
     get_presigned_upload_url = get_presigned_upload_url
     approve_artifact_revision = approve_artifact_revision
     reject_artifact_revision = reject_artifact_revision
     create_access_token = create_access_token
     delete_access_token = delete_access_token
+    purge_access_token = purge_access_token
+    partial_bulk_purge_access_tokens = partial_bulk_purge_access_tokens
     activate_deployment_revision = activate_deployment_revision
     update_route_traffic_status = update_route_traffic_status
-    # Fair Share - Admin APIs
+    # Fair Share
+    upsert_domain_fair_share_weight = upsert_domain_fair_share_weight
+    upsert_project_fair_share_weight = upsert_project_fair_share_weight
+    upsert_user_fair_share_weight = upsert_user_fair_share_weight
+    atomic_bulk_upsert_domain_fair_share_weights = atomic_bulk_upsert_domain_fair_share_weights
+    atomic_bulk_upsert_project_fair_share_weights = atomic_bulk_upsert_project_fair_share_weights
+    atomic_bulk_upsert_user_fair_share_weights = atomic_bulk_upsert_user_fair_share_weights
+    # Fair Share - Admin APIs (deprecated)
     admin_upsert_domain_fair_share_weight = admin_upsert_domain_fair_share_weight
     admin_upsert_project_fair_share_weight = admin_upsert_project_fair_share_weight
     admin_upsert_user_fair_share_weight = admin_upsert_user_fair_share_weight
@@ -925,9 +1225,6 @@ class Mutation:
     admin_bulk_upsert_project_fair_share_weight = admin_bulk_upsert_project_fair_share_weight
     admin_bulk_upsert_user_fair_share_weight = admin_bulk_upsert_user_fair_share_weight
     # Fair Share - Legacy (deprecated)
-    upsert_domain_fair_share_weight = upsert_domain_fair_share_weight
-    upsert_project_fair_share_weight = upsert_project_fair_share_weight
-    upsert_user_fair_share_weight = upsert_user_fair_share_weight
     bulk_upsert_domain_fair_share_weight = bulk_upsert_domain_fair_share_weight
     bulk_upsert_project_fair_share_weight = bulk_upsert_project_fair_share_weight
     bulk_upsert_user_fair_share_weight = bulk_upsert_user_fair_share_weight
@@ -936,6 +1233,10 @@ class Mutation:
     admin_update_resource_group = admin_update_resource_group
     admin_create_resource_group_v2 = admin_create_resource_group_v2
     admin_delete_resource_group_v2 = admin_delete_resource_group_v2
+    update_resource_group = update_resource_group
+    purge_resource_group_v2 = purge_resource_group_v2
+    partial_bulk_update_resource_groups = partial_bulk_update_resource_groups
+    partial_bulk_purge_resource_groups = partial_bulk_purge_resource_groups
     admin_update_allowed_resource_groups_for_domain_v2 = (
         admin_update_allowed_resource_groups_for_domain_v2
     )
@@ -960,12 +1261,24 @@ class Mutation:
     admin_delete_domain_v2 = admin_delete_domain_v2
     admin_restore_domain_v2 = admin_restore_domain_v2
     admin_purge_domain_v2 = admin_purge_domain_v2
+    update_domain_v2 = update_domain_v2
+    delete_domain_v2 = delete_domain_v2
+    restore_domain_v2 = restore_domain_v2
+    partial_bulk_update_domains_v2 = partial_bulk_update_domains_v2
+    partial_bulk_delete_domains_v2 = partial_bulk_delete_domains_v2
+    partial_bulk_restore_domains_v2 = partial_bulk_restore_domains_v2
     # Project V2 APIs
     admin_create_project_v2 = admin_create_project_v2
     admin_update_project_v2 = admin_update_project_v2
     admin_delete_project_v2 = admin_delete_project_v2
     admin_purge_project_v2 = admin_purge_project_v2
     admin_restore_project_v2 = admin_restore_project_v2
+    update_project_v2 = update_project_v2
+    delete_project_v2 = delete_project_v2
+    restore_project_v2 = restore_project_v2
+    partial_bulk_update_projects_v2 = partial_bulk_update_projects_v2
+    partial_bulk_delete_projects_v2 = partial_bulk_delete_projects_v2
+    partial_bulk_restore_projects_v2 = partial_bulk_restore_projects_v2
     unassign_users_from_project_v2 = unassign_users_from_project_v2
     # User V2 APIs
     admin_create_user_v2 = admin_create_user_v2
@@ -1001,9 +1314,21 @@ class Mutation:
     admin_create_prometheus_query_preset = admin_create_prometheus_query_preset
     admin_modify_prometheus_query_preset = admin_modify_prometheus_query_preset
     admin_delete_prometheus_query_preset = admin_delete_prometheus_query_preset
+    update_prometheus_query_preset = update_prometheus_query_preset
+    purge_prometheus_query_preset = purge_prometheus_query_preset
+    partial_bulk_update_prometheus_query_presets = partial_bulk_update_prometheus_query_presets
+    partial_bulk_purge_prometheus_query_presets = partial_bulk_purge_prometheus_query_presets
+    update_storage_volume = update_storage_volume
+    purge_storage_volume = purge_storage_volume
+    delete_storage_volume = delete_storage_volume
+    restore_storage_volume = restore_storage_volume
     # Prometheus Query Preset Category - Admin APIs
     admin_create_prometheus_query_preset_category = admin_create_prometheus_query_preset_category
     admin_delete_prometheus_query_preset_category = admin_delete_prometheus_query_preset_category
+    purge_prometheus_query_preset_category = purge_prometheus_query_preset_category
+    partial_bulk_purge_prometheus_query_preset_categories = (
+        partial_bulk_purge_prometheus_query_preset_categories
+    )
     # Role Preset - Admin APIs
     admin_create_role_preset = admin_create_role_preset
     admin_update_role_preset = admin_update_role_preset
@@ -1012,6 +1337,16 @@ class Mutation:
     admin_purge_role_presets = admin_purge_role_presets
     admin_bulk_add_role_preset_permissions = admin_bulk_add_role_preset_permissions
     admin_bulk_remove_role_preset_permissions = admin_bulk_remove_role_preset_permissions
+    update_role_preset = update_role_preset
+    delete_role_preset = delete_role_preset
+    restore_role_preset = restore_role_preset
+    purge_role_preset = purge_role_preset
+    partial_bulk_update_role_presets = partial_bulk_update_role_presets
+    partial_bulk_delete_role_presets = partial_bulk_delete_role_presets
+    partial_bulk_restore_role_presets = partial_bulk_restore_role_presets
+    partial_bulk_purge_role_presets = partial_bulk_purge_role_presets
+    atomic_bulk_add_role_preset_permissions = atomic_bulk_add_role_preset_permissions
+    partial_bulk_remove_role_preset_permissions = partial_bulk_remove_role_preset_permissions
     # RBAC Admin APIs
     admin_create_role = admin_create_role
     admin_update_role = admin_update_role
@@ -1027,6 +1362,22 @@ class Mutation:
     admin_bulk_add_role_permissions = admin_bulk_add_role_permissions
     admin_bulk_remove_role_permissions = admin_bulk_remove_role_permissions
     admin_replace_role_permissions = admin_replace_role_permissions
+    update_role = update_role
+    delete_role = delete_role
+    restore_role = restore_role
+    purge_role = purge_role
+    partial_bulk_update_roles = partial_bulk_update_roles
+    partial_bulk_delete_roles = partial_bulk_delete_roles
+    partial_bulk_restore_roles = partial_bulk_restore_roles
+    partial_bulk_purge_roles = partial_bulk_purge_roles
+    update_permission = update_permission
+    purge_permission = purge_permission
+    partial_bulk_add_role_permissions = partial_bulk_add_role_permissions
+    partial_bulk_remove_role_permissions = partial_bulk_remove_role_permissions
+    assign_role = assign_role
+    revoke_role = revoke_role
+    partial_bulk_assign_roles = partial_bulk_assign_roles
+    partial_bulk_revoke_roles = partial_bulk_revoke_roles
     create_role_invitation = create_role_invitation
     accept_role_invitation = accept_role_invitation
     reject_role_invitation = reject_role_invitation
@@ -1041,25 +1392,62 @@ class Mutation:
     admin_create_project_resource_policy_v2 = admin_create_project_resource_policy_v2
     admin_update_project_resource_policy_v2 = admin_update_project_resource_policy_v2
     admin_delete_project_resource_policy_v2 = admin_delete_project_resource_policy_v2
+    update_keypair_resource_policy_v2 = update_keypair_resource_policy_v2
+    purge_keypair_resource_policy_v2 = purge_keypair_resource_policy_v2
+    partial_bulk_update_keypair_resource_policies_v2 = (
+        partial_bulk_update_keypair_resource_policies_v2
+    )
+    partial_bulk_purge_keypair_resource_policies_v2 = (
+        partial_bulk_purge_keypair_resource_policies_v2
+    )
+    update_user_resource_policy_v2 = update_user_resource_policy_v2
+    purge_user_resource_policy_v2 = purge_user_resource_policy_v2
+    partial_bulk_update_user_resource_policies_v2 = partial_bulk_update_user_resource_policies_v2
+    partial_bulk_purge_user_resource_policies_v2 = partial_bulk_purge_user_resource_policies_v2
+    update_project_resource_policy_v2 = update_project_resource_policy_v2
+    purge_project_resource_policy_v2 = purge_project_resource_policy_v2
+    partial_bulk_update_project_resource_policies_v2 = (
+        partial_bulk_update_project_resource_policies_v2
+    )
+    partial_bulk_purge_project_resource_policies_v2 = (
+        partial_bulk_purge_project_resource_policies_v2
+    )
     # Resource Preset V2 APIs
     admin_create_resource_preset_v2 = admin_create_resource_preset_v2
     admin_update_resource_preset_v2 = admin_update_resource_preset_v2
     admin_delete_resource_preset_v2 = admin_delete_resource_preset_v2
+    update_resource_preset_v2 = update_resource_preset_v2
+    purge_resource_preset_v2 = purge_resource_preset_v2
+    partial_bulk_update_resource_presets_v2 = partial_bulk_update_resource_presets_v2
+    partial_bulk_purge_resource_presets_v2 = partial_bulk_purge_resource_presets_v2
     # Login Client Type mutations
     admin_create_login_client_type = admin_create_login_client_type
     admin_update_login_client_type = admin_update_login_client_type
     admin_delete_login_client_type = admin_delete_login_client_type
+    update_login_client_type = update_login_client_type
+    purge_login_client_type = purge_login_client_type
+    partial_bulk_update_login_client_types = partial_bulk_update_login_client_types
+    partial_bulk_purge_login_client_types = partial_bulk_purge_login_client_types
     # App Config Definition mutations
     admin_create_app_config_definition = admin_create_app_config_definition
     admin_purge_app_config_definition = admin_purge_app_config_definition
+    purge_app_config_definition = purge_app_config_definition
+    partial_bulk_purge_app_config_definitions = partial_bulk_purge_app_config_definitions
     # Runtime Variant mutations
     admin_create_runtime_variant = admin_create_runtime_variant
     admin_update_runtime_variant = admin_update_runtime_variant
     admin_delete_runtime_variant = admin_delete_runtime_variant
     admin_delete_runtime_variants = admin_delete_runtime_variants
+    update_runtime_variant = update_runtime_variant
+    purge_runtime_variant = purge_runtime_variant
+    partial_bulk_update_runtime_variants = partial_bulk_update_runtime_variants
+    partial_bulk_purge_runtime_variants = partial_bulk_purge_runtime_variants
     # Client IP Masking mutations
     admin_upsert_client_ip_masking_policy = admin_upsert_client_ip_masking_policy
     admin_purge_client_ip_masking_policy = admin_purge_client_ip_masking_policy
+    upsert_client_ip_masking_policy = upsert_client_ip_masking_policy
+    purge_client_ip_masking_policy = purge_client_ip_masking_policy
+    partial_bulk_purge_client_ip_masking_policies = partial_bulk_purge_client_ip_masking_policies
     # Retention Policy mutations
     admin_create_retention_policy = admin_create_retention_policy
     create_entity_share = create_entity_share
@@ -1071,19 +1459,37 @@ class Mutation:
     admin_update_retention_policy = admin_update_retention_policy
     admin_delete_retention_policy = admin_delete_retention_policy
     admin_purge_retention_policy = admin_purge_retention_policy
+    update_retention_policy = update_retention_policy
+    purge_retention_policy = purge_retention_policy
+    partial_bulk_update_retention_policies = partial_bulk_update_retention_policies
+    partial_bulk_purge_retention_policies = partial_bulk_purge_retention_policies
     # Runtime Variant Preset mutations
     admin_create_runtime_variant_preset = admin_create_runtime_variant_preset
     admin_update_runtime_variant_preset = admin_update_runtime_variant_preset
     admin_delete_runtime_variant_preset = admin_delete_runtime_variant_preset
+    update_runtime_variant_preset = update_runtime_variant_preset
+    purge_runtime_variant_preset = purge_runtime_variant_preset
+    partial_bulk_update_runtime_variant_presets = partial_bulk_update_runtime_variant_presets
+    partial_bulk_purge_runtime_variant_presets = partial_bulk_purge_runtime_variant_presets
     # Deployment Revision Preset mutations
     admin_create_deployment_revision_preset = admin_create_deployment_revision_preset
     admin_update_deployment_revision_preset = admin_update_deployment_revision_preset
     admin_delete_deployment_revision_preset = admin_delete_deployment_revision_preset
+    update_deployment_revision_preset = update_deployment_revision_preset
+    purge_deployment_revision_preset = purge_deployment_revision_preset
+    partial_bulk_update_deployment_revision_presets = (
+        partial_bulk_update_deployment_revision_presets
+    )
+    partial_bulk_purge_deployment_revision_presets = partial_bulk_purge_deployment_revision_presets
     # Model Card mutations
     admin_create_model_card_v2 = admin_create_model_card_v2
     admin_update_model_card_v2 = admin_update_model_card_v2
     admin_delete_model_card_v2 = admin_delete_model_card_v2
     admin_bulk_delete_model_cards_v2 = admin_bulk_delete_model_cards_v2
+    update_model_card_v2 = update_model_card_v2
+    purge_model_card_v2 = purge_model_card_v2
+    partial_bulk_update_model_cards_v2 = partial_bulk_update_model_cards_v2
+    partial_bulk_purge_model_cards_v2 = partial_bulk_purge_model_cards_v2
     scan_project_model_cards_v2 = scan_project_model_cards_v2
     deploy_model_card_v2 = deploy_model_card_v2
     # VFolder V2 mutations
@@ -1092,6 +1498,10 @@ class Mutation:
     delete_vfolder_v2 = delete_vfolder_v2
     purge_vfolder_v2 = purge_vfolder_v2
     restore_vfolder_v2 = restore_vfolder_v2
+    update_vfolder_v2 = update_vfolder_v2
+    partial_bulk_update_vfolders_v2 = partial_bulk_update_vfolders_v2
+    partial_bulk_delete_vfolders_v2 = partial_bulk_delete_vfolders_v2
+    partial_bulk_restore_vfolders_v2 = partial_bulk_restore_vfolders_v2
     set_vfolder_mount_policy = set_vfolder_mount_policy
     unset_vfolder_mount_policy = unset_vfolder_mount_policy
     deploy_vfolder_v2 = deploy_vfolder_v2
@@ -1107,11 +1517,20 @@ class Mutation:
     # Session V2 mutations
     enqueue_session = enqueue_session
     terminate_sessions_v2 = terminate_sessions_v2
+    partial_bulk_terminate_sessions_v2 = partial_bulk_terminate_sessions_v2
     exclude_session_idle_checks = exclude_session_idle_checks
     include_session_idle_checks = include_session_idle_checks
+    # Session Group mutations
+    update_session_group = update_session_group
+    create_session_group = create_session_group
+    purge_session_group = purge_session_group
     # Entity Label mutations
     upsert_entity_label = upsert_entity_label
+    partial_bulk_upsert_entity_labels = partial_bulk_upsert_entity_labels
     purge_entity_label = purge_entity_label
+    partial_bulk_purge_entity_labels = partial_bulk_purge_entity_labels
+    partial_bulk_upsert_entity_label = partial_bulk_upsert_entity_label
+    partial_bulk_purge_entity_label = partial_bulk_purge_entity_label
 
 
 @strawberry.type
@@ -1125,8 +1544,8 @@ class Subscription:
 
 
 # Per-request cost ceilings applied to every schema below.
-MAX_QUERY_DEPTH = 20
-MAX_ALIAS_COUNT = 20
+MAX_QUERY_DEPTH = 50
+MAX_ALIAS_COUNT = 50
 
 
 class CustomizedSchema(Schema):
@@ -1184,14 +1603,14 @@ schema = CustomizedSchema(
         GQLLoggingExtension,
         GQLMetricExtension,
         GQLValidationExtension,
-        QueryDepthLimiter(max_depth=MAX_QUERY_DEPTH),
-        MaxAliasesLimiter(max_alias_count=MAX_ALIAS_COUNT),
+        lambda: QueryDepthLimiter(max_depth=MAX_QUERY_DEPTH),
+        lambda: GQLMaxAliasesExtension(max_alias_count=MAX_ALIAS_COUNT),
         GQLExceptionHandlerExtension,
     ],
 )
 
 
-@gql_root_field(BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Returns 'pong'"))  # type: ignore[misc]
+@gql_root_field(BackendAIGQLMeta(added_version="26.9.0", description="Returns 'pong'"))  # type: ignore[misc]
 async def ping() -> str:
     return "pong"
 
@@ -1221,8 +1640,8 @@ public_schema = Schema(
         GQLLoggingExtension,
         GQLMetricExtension,
         GQLValidationExtension,
-        QueryDepthLimiter(max_depth=MAX_QUERY_DEPTH),
-        MaxAliasesLimiter(max_alias_count=MAX_ALIAS_COUNT),
+        lambda: QueryDepthLimiter(max_depth=MAX_QUERY_DEPTH),
+        lambda: GQLMaxAliasesExtension(max_alias_count=MAX_ALIAS_COUNT),
         GQLExceptionHandlerExtension,
     ],
 )

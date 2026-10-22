@@ -63,7 +63,7 @@ one place per domain.
 | `InvalidFieldPermission` | validates a requested field scope for both permission entries and entity shares, so it names no one row kind |
 | `VirtualEntityNotFound` | `data/entity/virtual_entity.py` declares an id alone, no `EntityType` |
 | `NotEnoughPermission`, `InsufficientPrivilege`, `ContainerRegistryWebhookAuthorizationFailed`, `ImageAccessForbiddenError` | an authorization denial about the caller, not about a row |
-| `InvalidCredentials`, `InvalidAuthParameters`, `AuthorizationFailed`, `OpenIDAuthenticationFailed` | the credentials are judged before a subject is settled, so no row is named |
+| `InvalidCredentials`, `InvalidAuthParameters`, `AuthorizationFailed` | the credentials are judged before a subject is settled, so no row is named |
 | `InvalidClientIPConfig` | the manager's own client-address configuration, not a row |
 | `PasswordExpired`, `LoginSessionExpiredError`, `LoginBlockedError`, `TooManyConcurrentLoginSessions` | a row is named, but what failed is the authentication — `ErrorOperation.AUTH`, which no `ActionOperationType` maps to |
 | `DeploymentDefinitionFileReadError` | a file inside a vfolder, which no row type declares |
@@ -75,7 +75,7 @@ one place per domain.
 | `ExportReportNotFound`, `InvalidExportFieldKeys` | a report is a `ReportDef` in a code-declared registry, not a row, and its field keys with it |
 | `RetentionCategoryNotSupportedError` | a `RetentionCategory` with no cleanup wired — a gap in this build, not in a row |
 | `QuotaScopeNotFoundError`, `StorageProxyNotFound` | neither quota scopes nor storage proxies declare a row kind |
-| the four `Dotfile*` errors | dotfiles are a msgpack blob in a `keypairs` column, not rows |
+| the four `Dotfile*` errors | dotfile paths and per-entity limits use these errors; users edit their default msgpack collection, while domains and projects retain msgpack columns |
 | `VFolderBadRequest`, `VFolderOperationFailed`, `VFolderCreationFailure` | they report the storage-proxy call rather than the row, under a `generic` operation |
 | `StorageProxyConnectionError`, `StorageProxyTimeoutError`, `UnexpectedStorageProxyResponseError` | the external call itself, under a `request` no `ActionOperationType` maps to |
 | `VFolderPermissionError`, `VFolderInvalidParameter`, `InsufficientStoragePermission` | an authorization denial about the caller, or a parameter refused before a row is reached |

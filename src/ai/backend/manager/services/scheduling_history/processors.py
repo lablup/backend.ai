@@ -31,11 +31,17 @@ from ai.backend.manager.services.scheduling_history.actions.bulk_get_deployment_
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_kernel_histories import (
     BulkGetKernelHistoriesAction,
 )
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_replica_group_histories import (
+    BulkGetReplicaGroupHistoriesAction,
+)
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_route_histories import (
     BulkGetRouteHistoriesAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_session_histories import (
     BulkGetSessionHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.global_search_replica_group_history import (
+    GlobalSearchReplicaGroupHistoryAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.lookup_owner import (
     LookupBulkDeploymentHistoryOwnerAction,
@@ -52,24 +58,39 @@ from ai.backend.manager.services.scheduling_history.actions.lookup_owner import 
 from ai.backend.manager.services.scheduling_history.actions.lookup_replica_deployment import (
     LookupReplicaDeploymentAction,
 )
-
-from .actions import (
-    GlobalSearchReplicaGroupHistoryAction,
+from ai.backend.manager.services.scheduling_history.actions.scoped_search_replica_group_history import (
     ScopedSearchReplicaGroupHistoryAction,
     ScopedSearchReplicaGroupHistoryActionResult,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_deployment_history import (
     SearchDeploymentHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_deployment_scoped_history import (
     SearchDeploymentScopedHistoryAction,
     SearchDeploymentScopedHistoryActionResult,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_kernel_history import (
     SearchKernelHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_kernel_scoped_history import (
     SearchKernelScopedHistoryAction,
     SearchKernelScopedHistoryActionResult,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_route_history import (
     SearchRouteHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_route_scoped_history import (
     SearchRouteScopedHistoryAction,
     SearchRouteScopedHistoryActionResult,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_session_history import (
     SearchSessionHistoryAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.search_session_scoped_history import (
     SearchSessionScopedHistoryAction,
     SearchSessionScopedHistoryActionResult,
 )
+
 from .service import SchedulingHistoryService
 
 
@@ -88,6 +109,9 @@ class SchedulingHistoryProcessors:
     ]
     bulk_get_route_histories: PartialBulkFieldActionProcessor[
         BulkGetRouteHistoriesAction, RouteHistoryData
+    ]
+    bulk_get_replica_group_histories: PartialBulkFieldActionProcessor[
+        BulkGetReplicaGroupHistoriesAction, ReplicaGroupHistoryData
     ]
 
     # Admin processors
@@ -177,6 +201,9 @@ class SchedulingHistoryProcessors:
         )
         self.bulk_get_route_histories = route_histories.partial_bulk_get_ops(
             BulkGetRouteHistoriesAction
+        )
+        self.bulk_get_replica_group_histories = replica_group_histories.partial_bulk_get_ops(
+            BulkGetReplicaGroupHistoriesAction
         )
 
         # Admin processors

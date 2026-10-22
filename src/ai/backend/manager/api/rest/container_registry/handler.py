@@ -30,7 +30,7 @@ from ai.backend.common.container_registry import (
 )
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.dto.manager.registry.request import HarborWebhookRequestModel
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
@@ -60,7 +60,7 @@ from ai.backend.manager.services.container_registry.actions.update_container_reg
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RegistryIdPath(BaseRequestModel):

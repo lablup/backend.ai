@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import os.path
 import uuid
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from pathlib import PurePosixPath
 from typing import Any, cast
 
@@ -25,10 +25,10 @@ from ai.backend.common.types import (
     VFolderMountRequest,
     VFolderUsageMode,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.project.types import ProjectType as DataProjectType
-from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
+from ai.backend.manager.data.vfolder.types import VFolderOperationStatus, VFolderOwnershipType
 from ai.backend.manager.defs import VFOLDER_DSTPATHS_MAP
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.storage import (
@@ -37,17 +37,13 @@ from ai.backend.manager.errors.storage import (
     VFolderOperationFailed,
     VFolderPermissionError,
 )
-from ai.backend.manager.models.project import groups as groups_table
+from ai.backend.manager.models.project.row import groups as groups_table
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.orders.condition import ConditionOrder
 from ai.backend.manager.models.user.queries import joined_project_ids_query
 from ai.backend.manager.models.vfolder.row import (
-    DEAD_VFOLDER_STATUSES,
     VFolderRow,
     VFolderUserMountPolicyRow,
-    check_overlapping_mounts,
-    ensure_host_permission_allowed,
-    is_mount_duplicate,
     vfolders,
 )
 from ai.backend.manager.models.vfolder.scopes import (
@@ -55,10 +51,11 @@ from ai.backend.manager.models.vfolder.scopes import (
     UserVFolderTarget,
 )
 from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
+from ai.backend.manager.repositories.vfolder.host_permission import ensure_host_permission_allowed
 from ai.backend.manager.repositories.vfolder.mount_policy import resolve_mount_policy
 from ai.backend.manager.types import UserScope
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = ("HeldPermissions", "prepare_vfolder_mounts", "query_reachable_vfolders")
 
@@ -86,6 +83,30 @@ def _normalize_mount_subpath(raw_subpath: str | None) -> str:
             f"The subpath '{candidate}' must not escape the vfolder root.",
         )
     return normed
+
+
+def check_overlapping_mounts(mounts: Iterable[str | PurePosixPath]) -> None:
+    for p1 in mounts:
+        for p2 in mounts:
+            _p1 = PurePosixPath(p1)
+            _p2 = PurePosixPath(p2)
+            if _p1 == _p2:
+                continue
+            if _p1.is_relative_to(_p2):
+                raise InvalidAPIParameters(
+                    f"VFolder path '{_p1}' overlaps with '{_p2}'",
+                )
+
+
+def is_mount_duplicate(
+    folder_id: VFolderID, subpath: PurePosixPath, mounts: Iterable[VFolderMount]
+) -> bool:
+    for mount in mounts:
+        if mount.vfid != folder_id:
+            continue
+        if subpath.is_relative_to(mount.vfsubpath) or mount.vfsubpath.is_relative_to(subpath):
+            return True
+    return False
 
 
 async def query_reachable_vfolders(
@@ -233,7 +254,9 @@ async def prepare_vfolder_mounts(
             extra_vf_conds,
             VFolderRow.id.in_(requested_vfolder_ids),
         )
-    extra_vf_conds = sa.and_(extra_vf_conds, VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES))
+    extra_vf_conds = sa.and_(
+        extra_vf_conds, VFolderRow.status.not_in(VFolderOperationStatus.dead())
+    )
     accessible_vfolders = await query_reachable_vfolders(
         conn, user_scope, extra_vf_conds, held_permissions
     )
@@ -294,8 +317,9 @@ async def prepare_vfolder_mounts(
             raise VFolderNotFound(f"VFolder {vfolder_name} is not found or accessible.")
         if vfolder["permission"] == VFolderMountPolicy.NONE:
             if vfolder["name"].startswith("."):
-                log.warning(
-                    "Skipping auto-mount VFolder '{}': it mounts to nobody", vfolder["name"]
+                log.trace(
+                    "auto-mount vfolder skipped, mount policy is none",
+                    vfolder_name=vfolder["name"],
                 )
                 continue
             raise VFolderPermissionError(f"VFolder {vfolder_name} is not permitted to be mounted.")
@@ -312,9 +336,9 @@ async def prepare_vfolder_mounts(
             )
         except InsufficientStoragePermission as e:
             if vfolder["name"].startswith("."):
-                log.warning(
-                    "Skipping auto-mount VFolder '{}' due to insufficient permission",
-                    vfolder["name"],
+                log.trace(
+                    "auto-mount vfolder skipped, insufficient permission",
+                    vfolder_name=vfolder["name"],
                 )
                 continue
             raise InsufficientStoragePermission(

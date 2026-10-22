@@ -12,7 +12,7 @@ from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.session.types import SessionData, SessionEntityData, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
@@ -109,6 +109,7 @@ class SessionStatusBatchUpdater(DataBatchUpdater[SessionRow, SessionEntityData])
 
         if self.to_status == SessionStatus.RUNNING:
             values["starts_at"] = self.status_changed_at
+            values["status_info"] = None
         elif self.to_status == SessionStatus.TERMINATED:
             values["terminated_at"] = self.status_changed_at
         elif self.to_status == SessionStatus.PENDING:

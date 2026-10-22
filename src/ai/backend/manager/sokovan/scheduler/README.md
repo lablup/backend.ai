@@ -733,7 +733,7 @@ The mark_kernel_terminated() method transitions the kernel to TERMINATED state. 
 async def mark_kernel_terminated(
     self,
     kernel_id: KernelId,
-    reason: str,
+    reason: KernelLifecycleEventReason,
     exit_code: Optional[int] = None,
 ) -> bool:
 ```

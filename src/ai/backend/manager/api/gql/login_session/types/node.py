@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, override
 from uuid import UUID
 
 import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.login_session import LoginSessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.v2.login_session.response import LoginSessionNode
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -50,13 +52,16 @@ class LoginSessionV2GQL(PydanticNodeMixin[LoginSessionNode]):
     id: NodeID[str] = gql_field(description="Unique identifier of the login session (UUID).")
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the login session.",
         ),
     )
 
     user_id: UUID = gql_field(description="UUID of the user who owns the session.")
-    access_key: str = gql_field(description="Access key associated with the session.")
+    access_key: str = gql_field(
+        description="Access key associated with the session.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `userId`.",
+    )
     status: LoginSessionStatusGQL = gql_field(description="Current status of the login session.")
     created_at: datetime = gql_field(description="Timestamp when the session was created.")
     last_accessed_at: datetime | None = gql_field(
@@ -83,6 +88,19 @@ class LoginSessionV2GQL(PydanticNodeMixin[LoginSessionNode]):
         | None
     ):
         return await info.context.data_loaders.user_loader.load(UserID(self.user_id))
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[LoginSessionV2GQL | None]:
+        return await info.context.data_loaders.login_session_loader.load_many([
+            LoginSessionID(UUID(nid)) for nid in node_ids
+        ])
 
 
 LoginSessionV2EdgeGQL = Edge[LoginSessionV2GQL]

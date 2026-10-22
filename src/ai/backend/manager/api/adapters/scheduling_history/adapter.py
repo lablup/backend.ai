@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.deployment_history import DeploymentHistoryID
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.data.entity.route_history import RouteHistoryID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_scheduling_history import SessionSchedulingHistoryID
@@ -73,7 +74,11 @@ from ai.backend.manager.data.session.types import (
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.replica_group_history.deprecated_search import (
     DeprecatedReplicaGroupHistoryConditions,
 )
@@ -125,6 +130,9 @@ from ai.backend.manager.services.scheduling_history.actions.bulk_get_deployment_
 )
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_kernel_histories import (
     BulkGetKernelHistoriesAction,
+)
+from ai.backend.manager.services.scheduling_history.actions.bulk_get_replica_group_histories import (
+    BulkGetReplicaGroupHistoriesAction,
 )
 from ai.backend.manager.services.scheduling_history.actions.bulk_get_route_histories import (
     BulkGetRouteHistoriesAction,
@@ -268,6 +276,20 @@ class SchedulingHistoryAdapter(BaseAdapter):
             self._route_data_to_dto,
         )
 
+    async def batch_load_replica_group_histories_by_ids(
+        self, ids: Sequence[ReplicaGroupHistoryID]
+    ) -> list[ReplicaGroupHistoryNode | Exception | None]:
+        """Batch load replica-group histories for DataLoader use, checked per deployment."""
+        if not ids:
+            return []
+        history_ids = [ReplicaGroupHistoryID(history_id) for history_id in ids]
+        return await self.batch_load_fields(
+            self._scheduling_history.bulk_get_replica_group_histories,
+            BulkGetReplicaGroupHistoriesAction(ids=history_ids),
+            history_ids,
+            self._replica_group_data_to_dto,
+        )
+
     # ========== Session History ==========
 
     async def admin_search_session_history(
@@ -328,6 +350,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         fields = SessionSchedulingHistorySearchableFields.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.field_id, fields.id.filter),
             *self.apply_uuid_filter(filter.session_id, fields.session_id.filter),
             *self.apply_string_filter(filter.phase, fields.phase.filter),
             *self._status_in(filter.from_status, fields.from_status.filter),
@@ -346,15 +369,16 @@ class SchedulingHistoryAdapter(BaseAdapter):
         if filter.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter.OR:
-                or_conds.extend(self._convert_session_filter(sub))
+                sub_conditions = self._convert_session_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter.NOT:
-                not_conds.extend(self._convert_session_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_session_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod
@@ -464,6 +488,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         fields = KernelSchedulingHistorySearchableFields.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.field_id, fields.id.filter),
             *self.apply_uuid_filter(filter.kernel_id, fields.kernel_id.filter),
             *self.apply_uuid_filter(filter.session_id, fields.session_id.filter),
             *self.apply_string_filter(filter.phase, fields.phase.filter),
@@ -483,15 +508,16 @@ class SchedulingHistoryAdapter(BaseAdapter):
         if filter.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter.OR:
-                or_conds.extend(self._convert_kernel_filter(sub))
+                sub_conditions = self._convert_kernel_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter.NOT:
-                not_conds.extend(self._convert_kernel_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_kernel_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod
@@ -579,6 +605,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         fields = DeploymentHistorySearchableFields.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.field_id, fields.id.filter),
             *self.apply_uuid_filter(filter.deployment_id, fields.deployment_id.filter),
             *self.apply_string_filter(filter.phase, fields.phase.filter),
             *self._status_in(filter.from_status, fields.from_status.filter),
@@ -597,15 +624,16 @@ class SchedulingHistoryAdapter(BaseAdapter):
         if filter.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter.OR:
-                or_conds.extend(self._convert_deployment_filter(sub))
+                sub_conditions = self._convert_deployment_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter.NOT:
-                not_conds.extend(self._convert_deployment_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_deployment_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod
@@ -697,6 +725,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         fields = ReplicaGroupHistorySearchableFields.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.field_id, fields.id.filter),
             *self.apply_uuid_filter(filter.deployment_id, fields.deployment_id.filter),
             *self.apply_string_filter(filter.phase, fields.phase.filter),
             *self._status_in(filter.from_status, fields.from_status.filter),
@@ -721,15 +750,16 @@ class SchedulingHistoryAdapter(BaseAdapter):
         if filter.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter.OR:
-                or_conds.extend(self._convert_replica_group_filter(sub))
+                sub_conditions = self._convert_replica_group_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter.NOT:
-                not_conds.extend(self._convert_replica_group_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_replica_group_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod
@@ -821,6 +851,7 @@ class SchedulingHistoryAdapter(BaseAdapter):
         fields = RouteHistorySearchableFields.own
         conditions = [
             *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.field_id, fields.id.filter),
             *self.apply_uuid_filter(filter.route_id, fields.route_id.filter),
             *self.apply_uuid_filter(filter.deployment_id, fields.deployment_id.filter),
             *self.apply_string_filter(filter.phase, fields.phase.filter),
@@ -838,15 +869,16 @@ class SchedulingHistoryAdapter(BaseAdapter):
         if filter.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter.OR:
-                or_conds.extend(self._convert_route_filter(sub))
+                sub_conditions = self._convert_route_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter.NOT:
-                not_conds.extend(self._convert_route_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_route_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod

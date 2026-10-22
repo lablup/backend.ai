@@ -8,12 +8,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, override
 
 from ai.backend.common.types import KernelId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .abc import AbstractKernelRegistryWriter
 from .types import KernelRegistrySaveMetadata
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 if TYPE_CHECKING:
     from ai.backend.agent.kernel import AbstractKernel
@@ -38,12 +38,12 @@ class PickleBasedKernelRegistryWriter(AbstractKernelRegistryWriter):
             with last_registry_file.open("wb") as f:
                 pickle.dump(dict(data), f)
             self._last_saved_time = now
-            log.debug("Saved kernel registry to {}", str(last_registry_file))
+            log.debug("kernel registry saved", registry_path=last_registry_file)
         except Exception as e:
             log.exception(
-                "Failed to save kernel registry to {} (error: {})",
-                str(last_registry_file),
-                str(e),
+                "kernel registry save failed",
+                registry_path=last_registry_file,
+                error_repr=repr(e),
             )
             try:
                 last_registry_file.unlink()

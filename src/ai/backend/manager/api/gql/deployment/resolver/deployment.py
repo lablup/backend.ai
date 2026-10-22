@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator
 from typing import Annotated
-from uuid import UUID
 
 import strawberry
 from strawberry import ID, Info
@@ -17,8 +16,10 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     ReplaceDeploymentOptionsInput,
     ScopedSearchDeploymentsInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor, resolve_global_id
+from ai.backend.common.dto.manager.v2.deployment.types import DeploymentScope
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+from ai.backend.common.exception import UnreachableError
+from ai.backend.manager.api.gql.base import encode_cursor, parse_uuid, resolve_entity_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -69,7 +70,7 @@ async def admin_deployments(
         DeploymentUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; deployments the caller cannot "
                 "read are left out."
             )
@@ -117,7 +118,7 @@ async def admin_deployments(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Page through the deployments the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."
@@ -131,7 +132,7 @@ async def scoped_deployments(
         DeploymentUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; deployments the caller cannot "
                 "read are left out."
             )
@@ -188,7 +189,7 @@ async def project_deployments(
         DeploymentUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; deployments the caller cannot "
                 "read are left out."
             )
@@ -246,7 +247,7 @@ async def my_deployments(
         DeploymentUsageGQL | None,
         strawberry.argument(
             description=(
-                f"Added in {NEXT_RELEASE_VERSION}. Uses narrowing the result. Each listed "
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
                 "entity must be readable by the caller; deployments the caller cannot "
                 "read are left out."
             )
@@ -264,8 +265,12 @@ async def my_deployments(
     """List deployments owned by the current user."""
     pydantic_filter = filter.to_pydantic() if filter else None
     pydantic_order = [o.to_pydantic() for o in order_by] if order_by else None
-    payload = await info.context.adapters.deployment.my_search(
-        AdminSearchDeploymentsInput(
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available")
+    payload = await info.context.adapters.deployment.scoped_search(
+        ScopedSearchDeploymentsInput(
+            scope=DeploymentScope(user=[UUIDScope(value=me.user_id)]),
             usage=usage.to_pydantic() if usage else None,
             filter=pydantic_filter,
             order=pydantic_order,
@@ -296,8 +301,8 @@ async def my_deployments(
 )  # type: ignore[misc]
 async def deployment(id: ID, info: Info[StrawberryGQLContext]) -> ModelDeployment | None:
     """Get a specific deployment by ID."""
-    _, deployment_id = resolve_global_id(id)
-    node = await info.context.adapters.deployment.get(DeploymentID(UUID(deployment_id)))
+    deployment_id = resolve_entity_id(id, DeploymentID)
+    node = await info.context.adapters.deployment.get(deployment_id)
     return ModelDeployment.from_pydantic(node)
 
 
@@ -322,7 +327,7 @@ async def update_model_deployment(
 ) -> UpdateDeploymentPayload | None:
     """Update an existing model deployment."""
     payload = await info.context.adapters.deployment.update(
-        input.to_pydantic(), DeploymentID(UUID(input.id))
+        input.to_pydantic(), DeploymentID(parse_uuid(input.id))
     )
     return UpdateDeploymentPayload(deployment=ModelDeployment.from_pydantic(payload.deployment))
 
@@ -332,8 +337,10 @@ async def delete_model_deployment(
     input: DeleteDeploymentInput, info: Info[StrawberryGQLContext]
 ) -> DeleteDeploymentPayload | None:
     """Delete a model deployment."""
-    await info.context.adapters.deployment.delete(input.to_pydantic())
-    return DeleteDeploymentPayload(id=input.id)
+    payload = await info.context.adapters.deployment.delete(input.to_pydantic())
+    return DeleteDeploymentPayload(
+        id=input.id, deployment=ModelDeployment.from_pydantic(payload.deployment)
+    )
 
 
 @gql_mutation(

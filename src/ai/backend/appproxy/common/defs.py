@@ -16,3 +16,7 @@ ERROR_TEMPLATE_NAME: Final[str] = "error.jinja2"
 
 AGENTID_COORDINATOR = AgentId("appproxy-coordinator")
 AGENTID_WORKER = AgentId("appproxy-worker")
+
+WORKER_SERVICE_GROUP: Final[str] = "appproxy-worker"
+WORKER_AUTHORITY_LABEL: Final[str] = "authority"
+WORKER_INGRESS_DELIVERY_MODE_LABEL: Final[str] = "ingress-delivery-mode"

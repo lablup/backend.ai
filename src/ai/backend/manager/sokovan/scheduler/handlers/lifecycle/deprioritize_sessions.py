@@ -8,8 +8,9 @@ from typing import override
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.defs.session import SESSION_PRIORITY_MIN
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AccessKey
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions, TransitionStatus
 from ai.backend.manager.defs import LockID
@@ -21,7 +22,7 @@ from ai.backend.manager.sokovan.scheduler.results import (
 )
 from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 # Amount to lower priority when deprioritizing
 DEPRIORITIZE_AMOUNT = 10
@@ -50,6 +51,11 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
     def name(cls) -> str:
         """Get the name of the handler."""
         return "deprioritize-sessions"
+
+    @classmethod
+    @override
+    def description(cls) -> str:
+        return "Lowers the priority of sessions past the scheduling retry limit and requeues them."
 
     @classmethod
     @override
@@ -121,11 +127,10 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
             session_ids, DEPRIORITIZE_AMOUNT, SESSION_PRIORITY_MIN
         )
 
-        log.info(
-            "Lowered priority by {} for {} sessions in resource group {}",
-            DEPRIORITIZE_AMOUNT,
-            len(sessions),
-            resource_group_id,
+        log.debug(
+            "session priority lowered",
+            priority_delta=DEPRIORITIZE_AMOUNT,
+            session_count=len(sessions),
         )
 
         # Mark all sessions as success for status transition to PENDING
@@ -135,7 +140,7 @@ class DeprioritizeSessionsLifecycleHandler(SessionLifecycleHandler):
                 SessionTransitionInfo(
                     session_id=session_info.identity.id,
                     from_status=session_info.lifecycle.status,
-                    reason="deprioritized-for-rescheduling",
+                    reason=KernelLifecycleEventReason.DEPRIORITIZED_FOR_RESCHEDULING,
                     creation_id=session_info.identity.creation_id,
                     access_key=AccessKey(session_info.metadata.access_key),
                 )

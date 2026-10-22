@@ -36,8 +36,10 @@ from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
 from ai.backend.manager.api.rest.app import build_root_app
-from ai.backend.manager.api.rest.middleware import build_auth_middleware, build_exception_middleware
+from ai.backend.manager.api.rest.middleware.auth import build_auth_middleware
+from ai.backend.manager.api.rest.middleware.exception import build_exception_middleware
 from ai.backend.manager.api.rest.setup import setup_api
+from ai.backend.manager.api.rest.shutdown import ServerDrainNotifier
 from ai.backend.manager.cli.context import CLIContext
 from ai.backend.manager.cli.dbschema import oneshot as cli_schema_oneshot
 from ai.backend.manager.cli.etcd import delete as cli_etcd_delete
@@ -52,23 +54,26 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.composer import DependencyInput, ManagerDependencyComposer
 from ai.backend.manager.models.base import pgsql_connect_opts
-from ai.backend.manager.models.domain import DomainRow, domains
+from ai.backend.manager.models.domain.row import DomainRow, domains
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageAliasRow, ImageRow
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.project import ProjectRow, association_groups_users
-from ai.backend.manager.models.resource_group import resource_groups, sgroups_for_domains
-from ai.backend.manager.models.resource_group.row import ResourceGroupOpts
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.keypair.row import keypairs
+from ai.backend.manager.models.project.row import ProjectRow, association_groups_users
+from ai.backend.manager.models.resource_group.row import (
+    resource_groups,
+    sgroups_for_domains,
+)
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
     keypair_resource_policies,
 )
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.session_template import SessionTemplateRow
-from ai.backend.manager.models.user import users
-from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_template.row import SessionTemplateRow
+from ai.backend.manager.models.user.row import users
+from ai.backend.manager.models.vfolder.row import vfolders
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.server import webapp_plugin_ctx
 from ai.backend.testutils.bootstrap import POSTGRES_MAINTENANCE_DB, POSTGRES_PASSWORD, POSTGRES_USER
@@ -348,8 +353,10 @@ def database(
     request: pytest.FixtureRequest, bootstrap_config: BootstrapConfig, test_db: str
 ) -> None:
     db_url = (
-        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/{POSTGRES_MAINTENANCE_DB}")
-        .with_port(bootstrap_config.db.addr.port)
+        yarl.URL(
+            f"postgresql+asyncpg://{bootstrap_config.db.addrs[0].host}/{POSTGRES_MAINTENANCE_DB}"
+        )
+        .with_port(bootstrap_config.db.addrs[0].port)
         .with_user(bootstrap_config.db.user)
     )
     if bootstrap_config.db.password is not None:
@@ -453,8 +460,8 @@ async def db_engine(
 ) -> AsyncIterator[SAEngine]:
     """Provide a function-scoped SQLAlchemy async engine connected to the test database."""
     db_url = (
-        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/{test_db}")
-        .with_port(bootstrap_config.db.addr.port)
+        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addrs[0].host}/{test_db}")
+        .with_port(bootstrap_config.db.addrs[0].port)
         .with_user(bootstrap_config.db.user)
     )
     if bootstrap_config.db.password is not None:
@@ -830,7 +837,7 @@ async def server_factory(
         )
 
         # Build and mount the API module tree
-        setup_api(root_app, r, 0)
+        setup_api(root_app, r, 0, drain_notifier=ServerDrainNotifier())
 
         # Plugin webapps
         await init_stack.enter_async_context(webapp_plugin_ctx(root_app, dep_resources=r, pidx=0))

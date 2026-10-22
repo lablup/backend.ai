@@ -4,6 +4,7 @@ import abc
 import asyncio
 import fcntl
 import logging
+import uuid
 from collections.abc import Mapping
 from io import IOBase
 from pathlib import Path
@@ -13,9 +14,6 @@ import trafaret as t
 from etcd_client import Client as EtcdClient
 from etcd_client import Communicator as EtcdCommunicator
 from etcd_client import EtcdLockOption
-from redis.asyncio import Redis
-from redis.asyncio.lock import Lock as AsyncRedisLock
-from redis.exceptions import LockError, LockNotOwnedError
 from tenacity import (
     AsyncRetrying,
     RetryError,
@@ -26,12 +24,12 @@ from tenacity import (
     wait_random,
 )
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.clients.valkey_client.valkey_lock.client import ValkeyLockClient
+from ai.backend.logging.structured import StructuredLogger
 
 from .etcd import AsyncEtcd
-from .types import RedisConnectionInfo
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class AbstractDistributedLock(metaclass=abc.ABCMeta):
@@ -83,7 +81,7 @@ class FileLock(AbstractDistributedLock):
         if self._file is not None:
             self._debug = False
             self.release()
-            log.debug("file lock implicitly released: {}", self._path)
+            log.debug("file lock implicitly released", lock_path=self._path)
 
     async def acquire(self) -> None:
         if self._file is not None:
@@ -108,7 +106,7 @@ class FileLock(AbstractDistributedLock):
                             self._watchdog_timer(ttl=self._lifetime),
                         )
                     if self._debug:
-                        log.debug("file lock acquired: {}", self._path)
+                        log.debug("file lock acquired", lock_path=self._path)
         except RetryError as e:
             raise TimeoutError(f"failed to lock file: {self._path}") from e
 
@@ -122,7 +120,7 @@ class FileLock(AbstractDistributedLock):
             fcntl.flock(self._file.fileno(), fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
-                log.debug("file lock explicitly released: {}", self._path)
+                log.debug("file lock explicitly released", lock_path=self._path)
         self._file.close()
         if self._remove_when_unlock:
             try:
@@ -149,7 +147,7 @@ class FileLock(AbstractDistributedLock):
             fcntl.flock(self._file.fileno(), fcntl.LOCK_UN)
             self._locked = False
             if self._debug:
-                log.debug("file lock implicitly released by watchdog: {}", self._path)
+                log.debug("file lock implicitly released by watchdog", lock_path=self._path)
 
     @property
     def is_locked(self) -> bool:
@@ -214,9 +212,9 @@ class EtcdLock(AbstractDistributedLock):
 
 class RedisLock(AbstractDistributedLock):
     debug: bool
-    _redis: Redis[Any]
-    _timeout: float | None
-    _lock: AsyncRedisLock | None
+    _client: ValkeyLockClient
+    _timeout: float
+    _token: str | None
 
     default_timeout = 9600
     default_lock_retry_interval = 1.0
@@ -231,7 +229,7 @@ class RedisLock(AbstractDistributedLock):
     def __init__(
         self,
         lock_name: str,
-        redis: RedisConnectionInfo,
+        client: ValkeyLockClient,
         *,
         timeout: float | None = None,
         lifetime: float | None = None,
@@ -240,7 +238,7 @@ class RedisLock(AbstractDistributedLock):
     ) -> None:
         super().__init__(lifetime=lifetime)
         self.lock_name = lock_name
-        self._redis = redis.client
+        self._client = client
         self._timeout = timeout if timeout is not None else self.default_timeout
         self._debug = debug
         self._lock_retry_interval = (
@@ -248,37 +246,32 @@ class RedisLock(AbstractDistributedLock):
             if lock_retry_interval is not None
             else self.default_lock_retry_interval
         )
+        self._token = None
 
     @override
     async def __aenter__(self) -> None:
-        self._lock = AsyncRedisLock(
-            self._redis,
-            self.lock_name,
-            blocking_timeout=self._timeout,
-            timeout=self._lifetime,
-            thread_local=False,
-            sleep=self._lock_retry_interval,
-        )
-        try:
-            await self._lock.__aenter__()
-        except LockError as e:
-            raise TimeoutError(str(e)) from e
+        token = uuid.uuid1().hex
+        lifetime_ms = int(self._lifetime * 1000) if self._lifetime else None
+        loop = asyncio.get_running_loop()
+        stop_trying_at = loop.time() + self._timeout
+        while not await self._client.acquire(self.lock_name, token, lifetime_ms):
+            if loop.time() + self._lock_retry_interval > stop_trying_at:
+                raise TimeoutError(
+                    f"Unable to acquire lock {self.lock_name} within {self._timeout}s"
+                )
+            await asyncio.sleep(self._lock_retry_interval)
+        self._token = token
         if self._debug:
-            log.debug("RedisLock.__aenter__(): lock acquired")
+            log.debug("redis lock acquired")
 
     @override
     async def __aexit__(self, *exc_info: Any) -> bool | None:
-        if self._lock is None:
+        if self._token is None:
             raise RuntimeError("Lock is not initialized")
-        try:
-            val = await self._lock.__aexit__(*exc_info)  # type: ignore[func-returns-value]
-        except LockNotOwnedError:
-            log.exception("Lock no longer owned. Skip.")
-            return True
-        except LockError:
-            log.exception("Already unlocked. Skip.")
+        token, self._token = self._token, None
+        if not await self._client.release(self.lock_name, token):
+            log.warning("redis lock no longer owned, skipped release", lock_name=self.lock_name)
             return True
         if self._debug:
-            log.debug("RedisLock.__aexit__(): lock released")
-
-        return val
+            log.debug("redis lock released")
+        return None

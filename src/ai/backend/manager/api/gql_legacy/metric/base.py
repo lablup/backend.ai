@@ -44,7 +44,7 @@ class ContainerUtilizationMetric(graphene.ObjectType):  # type: ignore[misc]
         description = "Added in 25.6.0."
 
     metric_name = graphene.String()
-    value_type = graphene.String(description="One of 'current', 'capacity'.")
+    value_type = graphene.String(description="One of 'current', 'capacity', 'pct'.")
     values = graphene.List(MetricResultValue)
 
     max_value = graphene.String(

@@ -30,7 +30,7 @@ from ai.backend.manager.api.gql.fair_share.types.common import (
 from ai.backend.manager.api.gql.fair_share.types.domain import DomainFairShareGQL
 from ai.backend.manager.api.gql.fair_share.types.project import ProjectFairShareGQL
 from ai.backend.manager.api.gql.fair_share.types.user import UserFairShareGQL
-from ai.backend.manager.data.fair_share import (
+from ai.backend.manager.data.fair_share.types import (
     FairShareSpec,
 )
 

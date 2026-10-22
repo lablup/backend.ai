@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.resource_allocation.types import PresetAvailabilityData
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
@@ -38,12 +38,16 @@ from ai.backend.manager.services.session.resource_allocation.actions.get_resourc
     GetResourceGroupUsageAction,
     GetResourceGroupUsageActionResult,
 )
+from ai.backend.manager.services.session.resource_allocation.actions.get_user_concurrency import (
+    GetUserConcurrencyAction,
+    GetUserConcurrencyActionResult,
+)
 from ai.backend.manager.services.session.resource_allocation.actions.resolve_keypair_context import (
     ResolveKeypairContextAction,
     ResolveKeypairContextActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourceAllocationService:
@@ -71,6 +75,15 @@ class ResourceAllocationService:
             access_key=ctx.access_key,
             resource_policy=ctx.resource_policy,
         )
+
+    async def get_user_concurrency(
+        self, action: GetUserConcurrencyAction
+    ) -> GetUserConcurrencyActionResult:
+        """Get the user's active regular and private session counts."""
+        concurrency = await self._resource_allocation_repository.get_user_concurrency(
+            action.user_id
+        )
+        return GetUserConcurrencyActionResult(concurrency=concurrency)
 
     async def get_keypair_usage(self, action: GetKeypairUsageAction) -> GetKeypairUsageActionResult:
         """Get keypair resource usage."""

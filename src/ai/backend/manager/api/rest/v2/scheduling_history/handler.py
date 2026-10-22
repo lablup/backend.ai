@@ -16,7 +16,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.request import (
     ScopedSearchKernelHistoriesInput,
     ScopedSearchReplicaGroupHistoriesInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import (
     DeploymentIdPathParam,
     RouteIdPathParam,
@@ -26,7 +26,7 @@ from ai.backend.manager.api.rest.v2.path_params import (
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.scheduling_history.adapter import SchedulingHistoryAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2SchedulingHistoryHandler:

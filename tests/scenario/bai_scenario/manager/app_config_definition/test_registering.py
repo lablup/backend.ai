@@ -31,11 +31,11 @@ from bai_scenario.components.app_config_definition import (
     TheNewDefinitionNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type RegisteringStep = Scenario[
-    SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
+    TestSeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
 ]
 
 FRESH = "fresh-config"
@@ -70,7 +70,10 @@ class Registering(When[ADefinitionAndACaller, AppConfigDefinitionAdapter, AppCon
 @dataclass(frozen=True)
 class TheSuperadminRegistersAName(
     Scenario[
-        SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
+        TestSeedingSession,
+        ADefinitionAndACaller,
+        AppConfigDefinitionAdapter,
+        AppConfigDefinitionNode,
     ]
 ):
     started: datetime
@@ -87,7 +90,7 @@ class TheSuperadminRegistersAName(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -104,7 +107,10 @@ class TheSuperadminRegistersAName(
 @dataclass(frozen=True)
 class ANameAlreadyRegisteredIsRefused(
     Scenario[
-        SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
+        TestSeedingSession,
+        ADefinitionAndACaller,
+        AppConfigDefinitionAdapter,
+        AppConfigDefinitionNode,
     ]
 ):
     @override
@@ -119,7 +125,7 @@ class ANameAlreadyRegisteredIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -136,7 +142,10 @@ class ANameAlreadyRegisteredIsRefused(
 @dataclass(frozen=True)
 class APlainUserMayNotRegister(
     Scenario[
-        SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
+        TestSeedingSession,
+        ADefinitionAndACaller,
+        AppConfigDefinitionAdapter,
+        AppConfigDefinitionNode,
     ]
 ):
     @override
@@ -148,7 +157,7 @@ class APlainUserMayNotRegister(
         return "일반 사용자가 설정 정의를 등록하려 하면, 슈퍼관리자 권한이 없어 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone()
 
     @override
@@ -165,7 +174,10 @@ class APlainUserMayNotRegister(
 @dataclass(frozen=True)
 class EnforcementOffChangesNothing(
     Scenario[
-        SeedingSession, ADefinitionAndACaller, AppConfigDefinitionAdapter, AppConfigDefinitionNode
+        TestSeedingSession,
+        ADefinitionAndACaller,
+        AppConfigDefinitionAdapter,
+        AppConfigDefinitionNode,
     ],
     Configured,
 ):
@@ -182,7 +194,7 @@ class EnforcementOffChangesNothing(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ADefinitionAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADefinitionAndACaller]:
         return ADefinitionAndSomeone()
 
     @override

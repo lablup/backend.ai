@@ -39,11 +39,13 @@ from ai.backend.manager.api.rest.v2.resource_allocation.registry import (
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
@@ -71,7 +73,6 @@ from ai.backend.manager.services.user.service import UserService
 def resource_allocation_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
-    valkey_clients: ValkeyClients,
     processor_registry: ProcessorRegistry[Any],
 ) -> ResourceAllocationProcessors:
     """Build real resource allocation processors with real DB and config."""
@@ -81,7 +82,6 @@ def resource_allocation_processors(
     )
     rp_repo = ResourcePresetRepository(
         db=database_engine,
-        valkey_stat=valkey_clients.stat,
         config_provider=config_provider,
         v2_ops_provider=ShareOpsProvider(database_engine),
     )
@@ -115,6 +115,7 @@ def user_processors(
             database_engine,
             V2DBOpsProvider(database_engine),
             ShareOpsProvider(database_engine),
+            ResourcePolicyOpsProvider(database_engine),
             KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ),
         scheduling_controller=AsyncMock(),
@@ -129,7 +130,7 @@ def domain_processors(
 ) -> DomainProcessors:
     """The adapter resolves a domain name to its id, so this runs against the DB."""
     service = DomainService(
-        repository=DomainRepository(database_engine, RelationOpsProvider(database_engine))
+        repository=DomainRepository(database_engine, DomainOpsProvider(database_engine))
     )
     return DomainProcessors(processor_registry.group(GroupMeta(DomainEntityType())), service)
 

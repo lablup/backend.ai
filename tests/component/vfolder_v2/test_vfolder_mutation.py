@@ -1,7 +1,7 @@
-"""Component tests for v2 VFolder RBAC-enforced delete, restore, and purge mutations via SDK.
+"""Component tests for v2 VFolder RBAC-enforced update, delete, restore, and purge mutations via SDK.
 
-Exercises delete, restore, and purge mutations through the real HTTP server +
-V2ClientRegistry SDK.
+Exercises update, delete, restore, and purge mutations, single and partial bulk, through the
+real HTTP server + V2ClientRegistry SDK.
 """
 
 from __future__ import annotations
@@ -24,9 +24,15 @@ from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.v2.vfolder.request import (
+    BulkDeleteVFoldersInput,
     CreateVFolderInScopeInput,
+    PartialBulkDeleteVFoldersInput,
+    PartialBulkRestoreVFoldersInput,
+    PartialBulkUpdateVFolderItemInput,
+    PartialBulkUpdateVFoldersInput,
     SetVFolderMountPolicyInput,
     UnsetVFolderMountPolicyInput,
+    UpdateVFolderInput,
 )
 from ai.backend.common.types import (
     QuotaScopeID,
@@ -50,14 +56,17 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
-from ai.backend.manager.models.project import groups
+from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.vfolder.row import vfolders
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -117,6 +126,7 @@ def vfolder_processors(
         database_engine,
         V2DBOpsProvider(database_engine),
         ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     config_provider = MagicMock()
@@ -331,7 +341,7 @@ async def project_vfolder(
 
 
 class TestDeleteVFolderRBAC:
-    """DELETE /v2/vfolders/{id} -- SingleEntityActionProcessor RBAC."""
+    """POST /v2/vfolders/{id}/delete -- SingleEntityActionProcessor RBAC."""
 
     async def test_superadmin_succeeds(
         self,
@@ -353,6 +363,80 @@ class TestRestoreVFolderRBAC:
         await admin_v2_registry.vfolder.delete(project_vfolder.id)
         payload = await admin_v2_registry.vfolder.restore(project_vfolder.id)
         assert payload.id == project_vfolder.id
+
+
+class TestUpdateVFolder:
+    """PATCH /v2/vfolders/{id} -- SingleEntityActionProcessor RBAC."""
+
+    async def test_superadmin_renames_and_sets_cloneable(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        project_vfolder: ProjectVFolderFixtureData,
+    ) -> None:
+        name = f"renamed-{secrets.token_hex(4)}"
+        payload = await admin_v2_registry.vfolder.update(
+            project_vfolder.id, UpdateVFolderInput(name=name, cloneable=True)
+        )
+        assert payload.vfolder.id == project_vfolder.id
+        assert payload.vfolder.metadata.name == name
+        assert payload.vfolder.metadata.cloneable is True
+
+
+class TestPartialBulkVFolders:
+    """POST /v2/vfolders/partial-bulk-{update,delete,restore} -- PartialBulkActionProcessor."""
+
+    async def test_update_answers_for_each_vfolder(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        project_vfolder: ProjectVFolderFixtureData,
+    ) -> None:
+        missing = uuid.uuid4()
+        payload = await admin_v2_registry.vfolder.partial_bulk_update(
+            PartialBulkUpdateVFoldersInput(
+                items=[
+                    PartialBulkUpdateVFolderItemInput(
+                        id=vfolder_id, input=UpdateVFolderInput(cloneable=True)
+                    )
+                    for vfolder_id in (project_vfolder.id, missing)
+                ]
+            )
+        )
+        assert [node.id for node in payload.successes] == [project_vfolder.id]
+        assert payload.successes[0].metadata.cloneable is True
+        assert [failure.id for failure in payload.failed] == [missing]
+
+    async def test_delete_then_restore(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        project_vfolder: ProjectVFolderFixtureData,
+    ) -> None:
+        missing = uuid.uuid4()
+        deleted = await admin_v2_registry.vfolder.partial_bulk_delete(
+            PartialBulkDeleteVFoldersInput(ids=[project_vfolder.id, missing])
+        )
+        assert [node.id for node in deleted.successes] == [project_vfolder.id]
+        assert deleted.successes[0].status == "delete-pending"
+        assert [failure.id for failure in deleted.failed] == [missing]
+
+        restored = await admin_v2_registry.vfolder.partial_bulk_restore(
+            PartialBulkRestoreVFoldersInput(ids=[project_vfolder.id])
+        )
+        assert [node.id for node in restored.successes] == [project_vfolder.id]
+        assert restored.successes[0].status == "ready"
+        assert restored.failed == []
+
+    async def test_deprecated_bulk_delete_matches_partial_bulk_delete(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        project_vfolder: ProjectVFolderFixtureData,
+    ) -> None:
+        missing = uuid.uuid4()
+        payload = await admin_v2_registry.vfolder.bulk_delete(
+            BulkDeleteVFoldersInput(ids=[project_vfolder.id, missing])
+        )
+        assert [node.id for node in payload.items] == [project_vfolder.id]
+        assert payload.deleted_count == 1
+        assert [failure.vfolder_id for failure in payload.failed] == [missing]
 
 
 class TestPurgeVFolderRBAC:

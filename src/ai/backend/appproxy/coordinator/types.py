@@ -30,7 +30,9 @@ from ai.backend.appproxy.common.events import (
     AppProxyWorkerCircuitAddedEvent,
 )
 from ai.backend.appproxy.common.types import ProxyProtocol, RouteInfo, SerializableCircuit
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
+from ai.backend.common.clients.valkey_client.valkey_lock.client import ValkeyLockClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.health_checker.probe import HealthProbe
@@ -42,8 +44,8 @@ from ai.backend.common.metrics.metric import (
     SystemMetricObserver,
 )
 from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
-from ai.backend.common.types import AgentId, BackendAISchema, RedisConnectionInfo
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.types import AgentId, BackendAISchema
+from ai.backend.logging.structured import StructuredLogger
 
 from .config import ServerConfig
 from .defs import LockID
@@ -54,7 +56,7 @@ from .models.worker import Worker
 if TYPE_CHECKING:
     from .services.endpoint import EndpointService
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class CoordinatorMetricRegistry:
@@ -76,7 +78,6 @@ class CoordinatorMetricRegistry:
         return cls._instance
 
     def to_prometheus(self) -> str:
-        self.system.observe()
         return generate_latest_multiprocess().decode("utf-8")
 
 
@@ -263,7 +264,7 @@ class CircuitManager:
                     else:
                         await self.unload_legacy_circuit(circuit)
             except Exception:
-                log.exception("Failed to unload circuit {}", circuit.id)
+                log.exception("failed to unload circuit", circuit_id=circuit.id)
             finally:
                 self._release_circuit_lock(circuit.id)
 
@@ -334,8 +335,7 @@ class CircuitManager:
                     existing = await self.traefik_etcd.get_prefix(services_prefix)
                 except Exception:
                     log.exception(
-                        "reconcile_traefik_etcd_state: failed to list etcd services at {}",
-                        services_prefix,
+                        "failed to list traefik etcd services", etcd_prefix=services_prefix
                     )
                     continue
 
@@ -372,19 +372,18 @@ class CircuitManager:
                             await self.traefik_etcd.delete_prefix(prefix)
                         except Exception:
                             log.exception(
-                                "reconcile_traefik_etcd_state: delete_prefix {} failed",
-                                prefix,
+                                "failed to delete stale traefik etcd prefix", etcd_prefix=prefix
                             )
                     log.info(
-                        "reconcile_traefik_etcd_state: dropped stale circuit {} from worker={} protocol={}",
-                        stale_id,
-                        worker.authority,
-                        protocol,
+                        "stale circuit dropped from traefik etcd",
+                        circuit_id=stale_id,
+                        worker_id=worker.authority,
+                        protocol_type=protocol,
                     )
                     dropped += 1
 
         if dropped:
-            log.info("reconcile_traefik_etcd_state: dropped {} stale circuit(s)", dropped)
+            log.debug("stale traefik etcd circuits dropped", circuit_count=dropped)
 
     async def unload_legacy_circuit(self, circuit: Circuit) -> None:
         event = AppProxyCircuitRemovedEvent(
@@ -404,8 +403,9 @@ class RootContext:
     core_event_dispatcher: EventDispatcher
     core_event_producer: EventProducer
 
+    sentinel_monitors: SentinelMonitorSet
     valkey_live: ValkeyLiveClient
-    redis_lock: RedisConnectionInfo
+    valkey_lock: ValkeyLockClient
     core_valkey_live: ValkeyLiveClient
     valkey_schedule: ValkeyScheduleClient
     local_config: ServerConfig

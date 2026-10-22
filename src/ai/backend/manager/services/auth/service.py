@@ -10,6 +10,7 @@ from typing import Any, cast
 from aiohttp import web
 from sqlalchemy import RowMapping
 
+from ai.backend.common import msgpack
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.clients.valkey_client.valkey_session.types import (
     LoginSessionData,
@@ -18,6 +19,7 @@ from ai.backend.common.clients.valkey_client.valkey_session.types import (
 )
 from ai.backend.common.contexts.client_ip import current_client_ip
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
@@ -27,7 +29,7 @@ from ai.backend.common.exception import (
 )
 from ai.backend.common.plugin.hook import ALL_COMPLETED, FIRST_COMPLETED, PASSED, HookPluginContext
 from ai.backend.common.types import AccessKey, SecretKey, SSHPrivateKey, SSHPublicKey
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
@@ -55,13 +57,13 @@ from ai.backend.manager.models.keypair.row import (
     generate_ssh_keypair,
 )
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
-from ai.backend.manager.models.user import (
+from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.row import (
     INACTIVE_USER_STATUSES,
     UserRole,
     UserStatus,
     compare_to_hashed_password,
 )
-from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.repositories.auth.db_source.db_source import ActiveSessionInfo
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.client_ip_masking.repository import (
@@ -123,7 +125,7 @@ from ai.backend.manager.services.auth.actions.upload_ssh_keypair import (
 )
 from ai.backend.manager.utils import check_if_requester_is_eligible_to_act_as_target_user
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 _FAILURE_MAP: dict[type[Exception], LoginAttemptResult] = {
     AuthorizationFailed: LoginAttemptResult.FAILED_INVALID_CREDENTIALS,
@@ -215,7 +217,11 @@ class AuthService:
         return await self._key_provider_pool.decrypt(keypair.secret_key, KEYPAIR_SECRET_KEY_CONTEXT)
 
     async def _keypair_hook_payload(self, keypair: KeyPairData) -> dict[str, object]:
-        """The keypair columns POST_AUTHORIZE hands to its plugins."""
+        """The legacy keypair payload, with user-owned dotfiles and bootstrap script."""
+        bootstrap_script = await self._user_repository.default_bootstrap_script(
+            UserID(keypair.user_id)
+        )
+        dotfiles = await self._user_repository.get_default_dotfiles(UserID(keypair.user_id))
         return {
             "access_key": keypair.access_key,
             "secret_key": await self._secret_key_of(keypair),
@@ -230,8 +236,13 @@ class AuthService:
             "ssh_private_key": keypair.ssh_private_key,
             "user": keypair.user_id,
             "resource_policy": keypair.resource_policy_name,
-            "dotfiles": keypair.dotfiles,
-            "bootstrap_script": keypair.bootstrap_script,
+            # Rows carry no aggregate size limit, so pack without DotfileEntries.pack()'s.
+            "dotfiles": msgpack.packb([
+                {"path": e.path, "perm": e.perm, "data": e.data} for e in dotfiles.entries
+            ]),
+            "bootstrap_script": (
+                bootstrap_script.script if bootstrap_script is not None else BootstrapScript.empty()
+            ),
         }
 
     async def authorize(self, action: AuthorizeAction) -> AuthorizeActionResult:
@@ -337,16 +348,22 @@ class AuthService:
             )
 
         # Cross-check active sessions with Valkey
+        session_data = await self._valkey_session_client.get_login_sessions([
+            session_info.session_token for session_info in active_sessions
+        ])
         live_sessions: list[ActiveSessionInfo] = []
-        for session_info in active_sessions:
-            if await self._valkey_session_client.get_login_session(session_info.session_token):
+        expired_tokens: list[str] = []
+        for session_info, data in zip(active_sessions, session_data, strict=True):
+            if data:
                 live_sessions.append(session_info)
             else:
-                await self._auth_repository.delete_login_session_by_token(
-                    session_info.session_token,
-                    LoginAttemptResult.EXPIRED,
-                    await self._recorded_client_ip(),
-                )
+                expired_tokens.append(session_info.session_token)
+        if expired_tokens:
+            await self._auth_repository.delete_login_sessions_by_tokens(
+                expired_tokens,
+                LoginAttemptResult.EXPIRED,
+                await self._recorded_client_ip(),
+            )
 
         return default_keypair, live_sessions
 
@@ -430,8 +447,7 @@ class AuthService:
         )
 
         if tokens_to_invalidate:
-            for token in tokens_to_invalidate:
-                await self._valkey_session_client.delete_login_session(token)
+            await self._valkey_session_client.delete_login_sessions(tokens_to_invalidate)
             await self._auth_repository.delete_login_sessions_by_tokens(
                 tokens_to_invalidate, LoginAttemptResult.EVICTED, await self._recorded_client_ip()
             )
@@ -486,7 +502,7 @@ class AuthService:
                 user_uuid, domain_name, result, client_ip=await self._recorded_client_ip()
             )
         except Exception:
-            log.warning("Failed to record login history: {} for user {}", result, user_uuid)
+            log.exception("login history record failed", login_result=result, user_id=user_uuid)
 
     async def signup(self, action: SignupAction) -> SignupActionResult:
         params = action.hook_params
@@ -651,10 +667,12 @@ class AuthService:
     async def update_password(self, action: UpdatePasswordAction) -> UpdatePasswordActionResult:
         domain_name = action.domain_name
         email = action.email
-        log_fmt = "AUTH.UPDATE_PASSWORD(d:{}, email:{})"
-        log_args = (domain_name, email)
         if action.new_password != action.new_password_confirm:
-            log.info(log_fmt + ": new password mismtach", *log_args)
+            log.trace(
+                "password update rejected, new password mismatch",
+                domain_name=domain_name,
+                user_email=email,
+            )
             return UpdatePasswordActionResult(
                 success=False,
                 message="new password mismatch",
@@ -666,7 +684,6 @@ class AuthService:
                 action.old_password,
             )
         except AuthorizationFailed as e:
-            log.info(log_fmt + ": old password mismatch", *log_args)
             raise AuthorizationFailed("Old password mismatch") from e
 
         # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]

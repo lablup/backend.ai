@@ -6,21 +6,26 @@ import uuid
 from collections.abc import Sequence
 
 from ai.backend.common.container_registry import AllowedGroupsModel
-from ai.backend.common.data.entity.container_registry import ContainerRegistryID
+from ai.backend.common.data.entity.container_registry import (
+    ContainerRegistryID,
+    ContainerRegistryName,
+    ContainerRegistryProjectName,
+)
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     AdminSearchContainerRegistriesInput,
     ContainerRegistryFilter,
     ContainerRegistryOrder,
     CreateContainerRegistryInput,
-    DeleteContainerRegistryInput,
+    PartialBulkPurgeContainerRegistriesInput,
     UpdateContainerRegistryInput,
 )
 from ai.backend.common.dto.manager.v2.container_registry.response import (
     AdminSearchContainerRegistriesPayload,
     ContainerRegistryNode,
     CreateContainerRegistryPayload,
-    DeleteContainerRegistryPayload,
+    PurgeContainerRegistryPayload,
     UpdateContainerRegistryPayload,
 )
 from ai.backend.common.dto.manager.v2.container_registry.types import (
@@ -28,12 +33,17 @@ from ai.backend.common.dto.manager.v2.container_registry.types import (
     ContainerRegistryTypeFilter,
     OrderDirection,
 )
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.container_registry.creators import (
     ContainerRegistryCreator,
     ContainerRegistryProjectCreator,
@@ -49,7 +59,7 @@ from ai.backend.manager.models.container_registry.searchable_fields import (
 from ai.backend.manager.models.container_registry.searchers import ContainerRegistrySearcher
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.services.container_registry.actions.bulk_get import (
     BulkGetContainerRegistriesAction,
 )
@@ -58,6 +68,12 @@ from ai.backend.manager.services.container_registry.actions.create_container_reg
 )
 from ai.backend.manager.services.container_registry.actions.delete_container_registry import (
     DeleteContainerRegistryAction,
+)
+from ai.backend.manager.services.container_registry.actions.lookup import (
+    LookupContainerRegistryAction,
+)
+from ai.backend.manager.services.container_registry.actions.partial_bulk_purge_container_registries import (
+    PartialBulkPurgeContainerRegistriesAction,
 )
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
@@ -264,16 +280,37 @@ class ContainerRegistryAdapter(BaseAdapter):
                 f"group_ids: {allowed_groups.remove}"
             )
 
-    async def admin_delete(
-        self,
-        input: DeleteContainerRegistryInput,
-    ) -> DeleteContainerRegistryPayload:
-        """Delete a container registry (superadmin only). This is a hard delete."""
-        purger = ContainerRegistryPurger(registry_id=ContainerRegistryID(input.id))
+    async def admin_purge(self, registry_id: ContainerRegistryID) -> PurgeContainerRegistryPayload:
+        """Purge a container registry (superadmin only)."""
         await self._container_registry.delete_container_registry.run(
-            DeleteContainerRegistryAction(purger=purger)
+            DeleteContainerRegistryAction(purger=ContainerRegistryPurger(registry_id=registry_id))
         )
-        return DeleteContainerRegistryPayload(id=input.id)
+        return PurgeContainerRegistryPayload(id=registry_id, entity_id=registry_id)
+
+    async def admin_partial_bulk_purge(
+        self, input: PartialBulkPurgeContainerRegistriesInput
+    ) -> PartialBulkPayload[ContainerRegistryNode]:
+        """Purge several container registries (superadmin only), answering for each one."""
+        result = await self._container_registry.partial_bulk_purge_container_registries.run(
+            PartialBulkPurgeContainerRegistriesAction(
+                ids=[ContainerRegistryID(registry_id) for registry_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[ContainerRegistryData]
+    ) -> PartialBulkPayload[ContainerRegistryNode]:
+        return PartialBulkPayload[ContainerRegistryNode](
+            successes=[
+                self._data_to_dto(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
 
     def build_querier(self, input: AdminSearchContainerRegistriesInput) -> BatchQuerier:
         """Build a BatchQuerier from the search input DTO.
@@ -300,6 +337,7 @@ class ContainerRegistryAdapter(BaseAdapter):
         fields = ContainerRegistrySearchableFields.own
         conditions: list[QueryCondition] = [
             *self.apply_string_filter(filter.registry_name, fields.registry_name.filter),
+            *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
         ]
         if filter.type is not None:
             conditions.extend(self._convert_type_filter(filter.type))
@@ -311,15 +349,16 @@ class ContainerRegistryAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod
@@ -378,3 +417,13 @@ class ContainerRegistryAdapter(BaseAdapter):
             is_global=data.is_global,
             extra=data.extra,
         )
+
+    async def lookup_by_name_and_registry_project(
+        self,
+        registry_name: ContainerRegistryName,
+        registry_project_name: ContainerRegistryProjectName | None,
+    ) -> ContainerRegistryID:
+        result = await self._container_registry.lookup_by_name_and_registry_project.run(
+            LookupContainerRegistryAction(registry_name, registry_project_name)
+        )
+        return result.entity_id()

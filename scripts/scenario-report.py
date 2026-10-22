@@ -17,6 +17,7 @@ uses to write the records. This file only reads the arguments and the files.
 from __future__ import annotations
 
 import argparse
+import difflib
 import pathlib
 import sys
 
@@ -54,8 +55,10 @@ def main() -> int:
         print(f"no such log: {', '.join(str(p) for p in missing)}", file=sys.stderr)
         return 1
 
-    sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "src"))
+    src = pathlib.Path(__file__).resolve().parent.parent / "src"
+    sys.path.insert(0, str(src))
     from ai.backend.testutils.scenario_report import (
+        AdapterWiring,
         JsonFormat,
         MarkdownFormat,
         Report,
@@ -76,7 +79,7 @@ def main() -> int:
     lines = [
         line for path in args.logs for line in path.read_text(encoding="utf8").splitlines()
     ]
-    report = Report.of(records_of(lines))
+    report = Report.of(records_of(lines), AdapterWiring(src / "ai" / "backend" / "manager"))
     if args.verify is not None:
         drifted = 0
         for component in report.components:
@@ -85,8 +88,16 @@ def main() -> int:
             if not written.exists():
                 print(f"{written}: not written yet", file=sys.stderr)
                 drifted += 1
-            elif written.read_text(encoding="utf8") != wanted:
+            elif (had := written.read_text(encoding="utf8")) != wanted:
                 print(f"{written}: no longer matches the run", file=sys.stderr)
+                sys.stderr.writelines(
+                    difflib.unified_diff(
+                        had.splitlines(keepends=True),
+                        wanted.splitlines(keepends=True),
+                        fromfile=f"{written} (committed)",
+                        tofile=f"{written} (this run)",
+                    )
+                )
                 drifted += 1
         if drifted:
             print(

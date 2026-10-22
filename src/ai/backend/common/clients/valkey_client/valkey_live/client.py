@@ -20,6 +20,7 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
@@ -31,9 +32,9 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.types import KernelId, SessionId, ValkeyTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Resilience instance for valkey_live layer
 valkey_live_resilience = Resilience(
@@ -80,6 +81,7 @@ class ValkeyLiveClient:
         *,
         db_id: int,
         human_readable_name: str,
+        sentinel_monitor: AbstractSentinelMonitor | None = None,
     ) -> Self:
         """
         Create a ValkeyLiveClient instance.
@@ -94,6 +96,7 @@ class ValkeyLiveClient:
             valkey_target=valkey_target,
             db_id=db_id,
             human_readable_name=human_readable_name,
+            sentinel_monitor=sentinel_monitor,
         )
         await client.connect()
         return cls(client=client)
@@ -104,7 +107,7 @@ class ValkeyLiveClient:
         Close the ValkeyLiveClient connection.
         """
         if self._closed:
-            log.debug("ValkeyLiveClient is already closed.")
+            log.debug("valkey live client already closed")
             return
         self._closed = True
         await self._client.disconnect()
@@ -262,7 +265,7 @@ class ValkeyLiveClient:
         :param values: Mapping of field names to new values.
         """
         if not values:
-            log.warning("No values provided to replace schedule data.")
+            log.warning("schedule data replace skipped with no values")
             return
 
         # Use batch to set all fields atomically

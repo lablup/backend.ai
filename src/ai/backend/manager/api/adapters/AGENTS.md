@@ -16,6 +16,40 @@
 - 권한이 있는 경우와 없는 경우를 짝으로 적는다. 한쪽만 적으면 권한을 과하게 줬는지 알 수
   없다.
 
+## 연산 이름
+
+- adapter 연산, processor 필드, service 메서드는 같은 이름을 쓴다.
+
+  | 대상 | 이름 |
+  |---|---|
+  | id 여럿 읽기 | `bulk_get_ids` |
+  | 자연 키 여럿 읽기 | `bulk_lookup_names`. 자연 키가 이름이 아니면 `bulk_lookup_<키>` |
+  | 자연 키 하나로 id 찾기 | `lookup_name`. 엔티티마다 자기 adapter가 내놓는다 |
+  | 전역 검색 | `global_search` |
+  | 스코프 검색 | `scoped_search` |
+  | 쓰기 | `create` / `update` / `delete` / `restore` / `purge` |
+
+- `admin_`을 붙이지 않는다.
+- adapter 연산, processor 필드, Action 이름에 `node`를 넣지 않는다.
+- DTO 이름, REST 경로와 핸들러 이름, GQL 필드 이름은 이 규칙으로 바꾸지 않는다.
+
+## 자기 엔티티의 processor만 받는다
+
+- adapter는 자기 엔티티의 processor만 받는다.
+- 자기 엔티티의 이름은 DTO가 이름을 싣는 연산 안에서 푼다.
+- 다른 엔티티의 이름은 adapter가 풀지 않는다. REST handler와 GQL resolver가 그 엔티티
+  adapter의 `lookup_name`을 먼저 부르고 id를 넘긴다.
+
+## adapter는 current_user()를 읽지 않는다
+
+- adapter는 `current_user()`를 읽지 않는다. scope를 입력으로 받는 연산(`scoped_search` 등)만
+  제공한다.
+- `my_*` 연산을 adapter에 두지 않는다.
+- 본인 대상 조회는 REST handler와 GQL resolver가 `current_user()`의 user id를 scope 값으로 넣어
+  adapter의 scoped 연산을 부른다.
+- 권한 판단은 validator가 요청 문맥의 `current_user()`로 한다. 권한 판단용 `UserInfo`를 adapter
+  인자로 넘기지 않는다.
+
 ## 응답 노드는 행의 식별자를 싣는다
 
 - `EntityData`에서 만든 응답 노드는 `entity_id`, `FieldData`에서 만든 노드는 `field_id`를 싣는다.

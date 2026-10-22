@@ -37,6 +37,9 @@ from ai.backend.manager.models.resource_usage_history.searchers import (
 )
 from ai.backend.manager.models.specs.creator import NestedFieldToCreate
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.resource_usage_history.db_source.db_source import (
+    ResourceUsageHistoryDBSource,
+)
 from ai.backend.manager.repositories.resource_usage_history.types import (
     DomainUsageBucketSearchResult,
     KernelUsageRecordSearchResult,
@@ -44,11 +47,9 @@ from ai.backend.manager.repositories.resource_usage_history.types import (
     UserUsageBucketSearchResult,
 )
 
-from .db_source import ResourceUsageHistoryDBSource
-
 if TYPE_CHECKING:
-    from ai.backend.manager.data.fair_share import UsageBucketAggregationResult
-    from ai.backend.manager.models.resource_usage_history import KernelUsageRecordRow
+    from ai.backend.manager.data.fair_share.types import UsageBucketAggregationResult
+    from ai.backend.manager.models.resource_usage_history.row import KernelUsageRecordRow
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 

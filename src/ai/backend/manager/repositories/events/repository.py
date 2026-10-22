@@ -1,7 +1,7 @@
 import uuid
 
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.events.db_source.db_source import EventsDBSource
 

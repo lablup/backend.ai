@@ -16,14 +16,14 @@ import pytest
 
 from ai.backend.common.types import AgentId, ClusterMode, SessionId
 from ai.backend.manager.errors.common import ServerMisconfiguredError
-from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.sokovan.recorder.pool import RecordPool
 from ai.backend.manager.sokovan.recorder.types import StepStatus
 from ai.backend.manager.sokovan.scheduler.hooks.status import (
     TerminatedHookDependencies,
     TerminatedTransitionHook,
 )
-from ai.backend.manager.sokovan.scheduler.recorder import SessionRecorderContext
+from ai.backend.manager.sokovan.scheduler.recorder.context import SessionRecorderContext
 
 
 class TestTerminatedTransitionHookNetworkCleanup:

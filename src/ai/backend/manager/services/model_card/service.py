@@ -5,25 +5,33 @@ from ruamel.yaml import YAML
 
 from ai.backend.common.config import ModelDefinition
 from ai.backend.common.data.entity.model_card import ModelCardID
+from ai.backend.common.exception import BackendAIError
 from ai.backend.common.types import VFolderID
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.v2.bulk.result import (
     PartialBulkEntityResult,
     PartialBulkResult,
 )
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
-from ai.backend.manager.data.model_card.types import ResourceRequirementEntry, VFolderScanData
+from ai.backend.manager.data.model_card.types import (
+    ModelCardData,
+    ResourceRequirementEntry,
+    VFolderScanData,
+)
 from ai.backend.manager.errors.resource import ModelCardNotFound
 from ai.backend.manager.errors.storage import ModelCardParseError
 from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.upserters import ModelCardScanUpserter
 from ai.backend.manager.repositories.model_card.repository import ModelCardRepository
-from ai.backend.manager.services.model_card.actions.bulk_delete import (
-    BulkDeleteModelCardAction,
-)
 from ai.backend.manager.services.model_card.actions.delete import (
     DeleteModelCardAction,
     DeleteModelCardActionResult,
+)
+from ai.backend.manager.services.model_card.actions.partial_bulk_purge_model_cards import (
+    PartialBulkPurgeModelCardsAction,
+)
+from ai.backend.manager.services.model_card.actions.partial_bulk_update_model_cards import (
+    PartialBulkUpdateModelCardsAction,
 )
 from ai.backend.manager.services.model_card.actions.scan import (
     ScanProjectModelCardsAction,
@@ -34,7 +42,7 @@ from ai.backend.manager.services.model_card.actions.update import (
     UpdateModelCardActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _is_unmanaged(path: str | None) -> bool:
@@ -61,18 +69,37 @@ class ModelCardService:
         deleted_id = await self._repository.delete(action.purger, action.options)
         return DeleteModelCardActionResult(id=deleted_id)
 
-    async def bulk_delete(
-        self, action: BulkDeleteModelCardAction
-    ) -> PartialBulkResult[ModelCardID]:
+    async def partial_bulk_update(
+        self, action: PartialBulkUpdateModelCardsAction
+    ) -> PartialBulkResult[ModelCardData]:
+        items: list[PartialBulkEntityResult[ModelCardData]] = []
+        for updater in action.updaters:
+            try:
+                data = await self._repository.update(updater)
+            except BackendAIError as e:
+                items.append(PartialBulkEntityResult[ModelCardData].failed(updater.card_id, e))
+                continue
+            items.append(
+                PartialBulkEntityResult[ModelCardData].succeeded(
+                    updater.card_id, data, description="updated"
+                )
+            )
+        return PartialBulkResult(items=items)
+
+    async def partial_bulk_purge(
+        self, action: PartialBulkPurgeModelCardsAction
+    ) -> PartialBulkResult[ModelCardData]:
         purgers = [ModelCardPurger(card_id=card_id) for card_id in action.ids]
         data = await self._repository.bulk_delete(purgers, action.options)
-        deleted = {ModelCardID(card_id) for card_id in data.successes}
+        purged = {ModelCardID(card.id): card for card in data.successes}
         errors = {ModelCardID(failure.card_id): failure.error for failure in data.failures}
         return PartialBulkResult(
             items=[
-                PartialBulkEntityResult[ModelCardID].succeeded(card_id, card_id)
-                if card_id in deleted
-                else PartialBulkEntityResult[ModelCardID].failed(
+                PartialBulkEntityResult[ModelCardData].succeeded(
+                    card_id, purged[card_id], description="purged"
+                )
+                if card_id in purged
+                else PartialBulkEntityResult[ModelCardData].failed(
                     card_id, errors.get(card_id, ModelCardNotFound())
                 )
                 for card_id in action.ids
@@ -167,7 +194,7 @@ class ModelCardService:
                 )
                 readme = readme_bytes.decode("utf-8")
             except Exception:
-                log.warning("Failed to fetch README from vfolder {}", vf.id)
+                log.warning("model card readme fetch failed", vfolder_id=vf.id, exc_info=True)
 
         min_resource: list[ResourceRequirementEntry] = []
         if metadata and metadata.min_resource:

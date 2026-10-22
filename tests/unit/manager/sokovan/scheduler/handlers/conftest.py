@@ -11,6 +11,7 @@ import pytest
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -684,7 +685,7 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
                     )
                     for k in s.kernel_infos
                 ],
-                user_uuid=s.session_info.metadata.user_uuid,
+                user_uuid=s.session_info.metadata.user_uuid or uuid4(),
                 user_email="test@example.com",
                 user_name="test-user",
                 environ={},
@@ -725,7 +726,7 @@ def terminating_session_data_factory() -> Callable[..., list[TerminatingSessionD
                 access_key=AccessKey(s.session_info.metadata.access_key),
                 creation_id=s.session_info.identity.creation_id,
                 status=s.session_info.lifecycle.status,
-                status_info="user-requested",
+                status_info=KernelLifecycleEventReason.USER_REQUESTED,
                 session_type=s.session_info.identity.session_type,
                 kernels=[
                     TerminatingKernelData(

@@ -25,9 +25,9 @@ from ai.backend.appproxy.worker.types import (
     RootContext,
 )
 from ai.backend.common.exception import BackendAIError
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TCircuitKeyType]):
@@ -47,11 +47,7 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
             return
         client_ip = request.remote
         if not client_ip or not validator.is_allowed(client_ip):
-            log.debug(
-                "rejecting client {} for circuit {} (not in allowed_client_ips)",
-                client_ip,
-                circuit.id,
-            )
+            log.trace("rejecting client {} (not in allowed_client_ips)", client_ip)
             raise ClientIPNotAllowed("E20011: Client address not allowed")
 
     def ensure_credential(self, request: web.Request, circuit: Circuit) -> None:
@@ -135,7 +131,7 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
             resp = await handler(request)
         except BackendAIError as ex:
             if ex.status_code == 500:
-                log.exception("Internal server error raised inside handlers")
+                log.exception("internal server error raised inside the proxy handler")
             accept = request.headers.get(hdrs.ACCEPT, MEDIA_TYPE_HTML)
             if mime_match(accept, MEDIA_TYPE_JSON, strict=True):
                 return web.json_response(

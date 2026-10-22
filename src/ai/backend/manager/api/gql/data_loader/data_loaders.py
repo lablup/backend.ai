@@ -19,27 +19,37 @@ from ai.backend.common.data.entity.app_config_fragment import (
     AppConfigFragmentEntityType,
     AppConfigFragmentID,
 )
+from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_registry import (
     ArtifactRegistryEntityType,
     ArtifactRegistryID,
 )
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
-from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.data.entity.audit_log import AuditLogID, AuditLogScopeID
+from ai.backend.common.data.entity.client_ip_masking import ClientIPMaskingPolicyID
 from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryEntityType,
     ContainerRegistryID,
 )
 from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.deployment_history import DeploymentHistoryID
+from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
+from ai.backend.common.data.entity.entity_label import EntityLabelID
+from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType, IdleCheckerID
 from ai.backend.common.data.entity.image import ImageEntityType, ImageID
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
+from ai.backend.common.data.entity.keypair import KeyPairID
+from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
+from ai.backend.common.data.entity.login_history import LoginHistoryID
+from ai.backend.common.data.entity.login_session import LoginSessionID
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.notification import (
     NotificationChannelEntityType,
     NotificationChannelID,
@@ -54,15 +64,27 @@ from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
 )
 from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
+from ai.backend.common.data.entity.resource_policy import (
+    KeyPairResourcePolicyUUID,
+    ProjectResourcePolicyUUID,
+    UserResourcePolicyUUID,
+)
+from ai.backend.common.data.entity.resource_preset import ResourcePresetID
+from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.data.entity.role import RoleEntityType, RoleID
+from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
+from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.route_history import RouteHistoryID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType, RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import (
     RuntimeVariantPresetEntityType,
     RuntimeVariantPresetID,
 )
+from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.session_scheduling_history import SessionSchedulingHistoryID
 from ai.backend.common.data.entity.storage_namespace import (
     StorageNamespaceEntityType,
@@ -88,11 +110,18 @@ if TYPE_CHECKING:
         AppConfigFragmentGQL,
     )
     from ai.backend.manager.api.gql.artifact.types import (  # pants: no-infer-dep
+        Artifact,
         ArtifactRevision,
     )
     from ai.backend.manager.api.gql.artifact_registry import ArtifactRegistry  # pants: no-infer-dep
     from ai.backend.manager.api.gql.audit_log.types.node import (  # pants: no-infer-dep
         AuditLogV2GQL,
+    )
+    from ai.backend.manager.api.gql.audit_log.types.scope_entry import (  # pants: no-infer-dep
+        AuditLogScopeEntryGQL,
+    )
+    from ai.backend.manager.api.gql.client_ip_masking.types import (  # pants: no-infer-dep
+        ClientIPMaskingPolicyGQL,
     )
     from ai.backend.manager.api.gql.container_registry.types import (  # pants: no-infer-dep
         ContainerRegistryGQL,
@@ -120,6 +149,12 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.deployment.types.route import Route  # pants: no-infer-dep
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.entity_label.types.node import (  # pants: no-infer-dep
+        EntityLabelGQL,
+    )
+    from ai.backend.manager.api.gql.entity_share.types import (  # pants: no-infer-dep
+        EntityShareGQL,
+    )
     from ai.backend.manager.api.gql.huggingface_registry import (  # pants: no-infer-dep
         HuggingFaceRegistry,
     )
@@ -131,6 +166,19 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.kernel.types import (  # pants: no-infer-dep
         KernelV2GQL,
         ResourceAllocationGQL,
+    )
+    from ai.backend.manager.api.gql.keypair.types.node import KeyPairGQL  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.login_client_type.types import (  # pants: no-infer-dep
+        LoginClientTypeGQL,
+    )
+    from ai.backend.manager.api.gql.login_history.types.node import (  # pants: no-infer-dep
+        LoginHistoryV2GQL,
+    )
+    from ai.backend.manager.api.gql.login_session.types.node import (  # pants: no-infer-dep
+        LoginSessionV2GQL,
+    )
+    from ai.backend.manager.api.gql.model_card.types import (  # pants: no-infer-dep
+        ModelCardGQL,
     )
     from ai.backend.manager.api.gql.notification.types import (  # pants: no-infer-dep
         NotificationChannel,
@@ -162,6 +210,23 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.resource_group.types import (  # pants: no-infer-dep
         ResourceGroupGQL,
     )
+    from ai.backend.manager.api.gql.resource_policy_v2.types.node import (  # pants: no-infer-dep
+        KeypairResourcePolicyV2GQL,
+        ProjectResourcePolicyV2GQL,
+        UserResourcePolicyV2GQL,
+    )
+    from ai.backend.manager.api.gql.resource_preset.types import (  # pants: no-infer-dep
+        ResourcePresetGQL,
+    )
+    from ai.backend.manager.api.gql.retention_policy.types import (  # pants: no-infer-dep
+        RetentionPolicyGQL,
+    )
+    from ai.backend.manager.api.gql.role_preset.types.node import (  # pants: no-infer-dep
+        RolePresetGQL,
+    )
+    from ai.backend.manager.api.gql.role_preset.types.permission import (  # pants: no-infer-dep
+        RolePermissionPresetGQL,
+    )
     from ai.backend.manager.api.gql.runtime_variant.types import (  # pants: no-infer-dep
         RuntimeVariantGQL,
     )
@@ -171,10 +236,17 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.scheduling_history.types import (  # pants: no-infer-dep
         DeploymentHistory,
         KernelSchedulingHistoryGQL,
+        ReplicaGroupHistoryGQL,
         RouteHistory,
         SessionSchedulingHistory,
     )
+    from ai.backend.manager.api.gql.service_catalog.types import (  # pants: no-infer-dep
+        ServiceCatalogGQL,
+    )
     from ai.backend.manager.api.gql.session.types import SessionV2GQL  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.session_group.types import (  # pants: no-infer-dep
+        SessionGroupGQL,
+    )
     from ai.backend.manager.api.gql.storage_namespace import (  # pants: no-infer-dep
         StorageNamespace,
     )
@@ -295,6 +367,27 @@ class DataLoaders:
             dtos = await adapter.batch_load_by_ids(ids)
             return [
                 dto if dto is None or isinstance(dto, Exception) else AL.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def audit_log_scope_entry_loader(
+        self,
+    ) -> DataLoader[AuditLogScopeID, AuditLogScopeEntryGQL | None]:
+        adapter = self._adapters.audit_log
+
+        async def load_fn(
+            ids: list[AuditLogScopeID],
+        ) -> list[AuditLogScopeEntryGQL | Exception | None]:
+            from ai.backend.manager.api.gql.audit_log.types.scope_entry import (  # pants: no-infer-dep
+                AuditLogScopeEntryGQL as ALS,
+            )
+
+            dtos = await adapter.batch_load_scopes_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else ALS.from_pydantic(dto)
                 for dto in dtos
             ]
 
@@ -559,6 +652,36 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
+    def artifact_loader(
+        self,
+    ) -> DataLoader[ArtifactID, Artifact | None]:
+        adapter = self._adapters.artifact
+
+        async def load_fn(ids: list[ArtifactID]) -> list[Artifact | Exception | None]:
+            from ai.backend.manager.api.gql.artifact.types import (  # pants: no-infer-dep
+                Artifact as A,
+            )
+            from ai.backend.manager.api.gql.artifact.types import (
+                get_registry_url,
+                to_artifact_gql_node,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            results: list[Artifact | Exception | None] = []
+            for dto in dtos:
+                if dto is None or isinstance(dto, Exception):
+                    results.append(dto)
+                    continue
+                registry_url = await get_registry_url(self, dto.registry_id, dto.registry_type)
+                source_url = await get_registry_url(
+                    self, dto.source_registry_id, dto.source_registry_type
+                )
+                results.append(A.from_pydantic(to_artifact_gql_node(dto, registry_url, source_url)))
+            return results
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
     def artifact_revision_loader(
         self,
     ) -> DataLoader[ArtifactRevisionID, ArtifactRevision | None]:
@@ -747,6 +870,25 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
+    def session_group_loader(
+        self,
+    ) -> DataLoader[SessionGroupID, SessionGroupGQL | None]:
+        adapter = self._adapters.session_group
+
+        async def load_fn(ids: list[SessionGroupID]) -> list[SessionGroupGQL | Exception | None]:
+            from ai.backend.manager.api.gql.session_group.types import (  # pants: no-infer-dep
+                SessionGroupGQL as SGG,
+            )
+
+            dtos = await adapter.bulk_get_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else SGG.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
     def session_resource_allocation_loader(
         self,
     ) -> DataLoader[SessionID, ResourceAllocationGQL]:
@@ -820,21 +962,22 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
-    def domain_loader(
+    def user_id_by_email_loader(self) -> DataLoader[str, UserID]:
+        adapter = self._adapters.user
+
+        async def load_fn(emails: list[str]) -> list[UserID | Exception]:
+            return await adapter.batch_lookup_by_emails(emails)
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def domain_id_by_name_loader(
         self,
-    ) -> DataLoader[str, DomainV2GQL | None]:
+    ) -> DataLoader[str, DomainID | None]:
         adapter = self._adapters.domain
 
-        async def load_fn(names: list[str]) -> list[DomainV2GQL | Exception | None]:
-            from ai.backend.manager.api.gql.domain_v2.types.node import (  # pants: no-infer-dep
-                DomainV2GQL as D,
-            )
-
-            dtos = await adapter.batch_load_by_names(names)
-            return [
-                dto if dto is None or isinstance(dto, Exception) else D.from_pydantic(dto)
-                for dto in dtos
-            ]
+        async def load_fn(names: list[str]) -> list[DomainID | None]:
+            return await adapter.bulk_lookup_names(names)
 
         return DataLoader(load_fn=load_fn)
 
@@ -849,7 +992,7 @@ class DataLoaders:
                 DomainV2GQL as D,
             )
 
-            dtos = await adapter.batch_load_by_ids(ids)
+            dtos = await adapter.bulk_get_ids(ids)
             return [
                 dto if dto is None or isinstance(dto, Exception) else D.from_pydantic(dto)
                 for dto in dtos
@@ -953,6 +1096,27 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
+    def deployment_policy_loader(
+        self,
+    ) -> DataLoader[DeploymentPolicyID, DeploymentPolicyGQL | None]:
+        adapter = self._adapters.deployment
+
+        async def load_fn(
+            ids: list[DeploymentPolicyID],
+        ) -> list[DeploymentPolicyGQL | Exception | None]:
+            from ai.backend.manager.api.gql.deployment.types.policy import (  # pants: no-infer-dep
+                DeploymentPolicyGQL as DP,
+            )
+
+            dtos = await adapter.batch_load_policies_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else DP.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
     def deployment_policy_by_endpoint_loader(
         self,
     ) -> DataLoader[DeploymentID, DeploymentPolicyGQL | None]:
@@ -1032,6 +1196,27 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
+    def replica_group_history_loader(
+        self,
+    ) -> DataLoader[ReplicaGroupHistoryID, ReplicaGroupHistoryGQL | None]:
+        adapter = self._adapters.scheduling_history
+
+        async def load_fn(
+            ids: list[ReplicaGroupHistoryID],
+        ) -> list[ReplicaGroupHistoryGQL | Exception | None]:
+            from ai.backend.manager.api.gql.scheduling_history.types import (  # pants: no-infer-dep
+                ReplicaGroupHistoryGQL as RGH,
+            )
+
+            dtos = await adapter.batch_load_replica_group_histories_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else RGH.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
     def route_history_loader(
         self,
     ) -> DataLoader[RouteHistoryID, RouteHistory | None]:
@@ -1063,6 +1248,365 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_roles_by_ids(ids)
             return [RG.from_pydantic(dto) if dto is not None else None for dto in dtos]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def keypair_resource_policy_id_by_name_loader(
+        self,
+    ) -> DataLoader[str, KeyPairResourcePolicyUUID | None]:
+        adapter = self._adapters.resource_policy
+
+        async def load_fn(names: list[str]) -> list[KeyPairResourcePolicyUUID | None]:
+            return await adapter.bulk_lookup_keypair_resource_policy_names(names)
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def keypair_resource_policy_by_id_loader(
+        self,
+    ) -> DataLoader[KeyPairResourcePolicyUUID, KeypairResourcePolicyV2GQL | None]:
+        adapter = self._adapters.resource_policy
+
+        async def load_fn(
+            ids: list[KeyPairResourcePolicyUUID],
+        ) -> list[KeypairResourcePolicyV2GQL | Exception | None]:
+            from ai.backend.manager.api.gql.resource_policy_v2.types.node import (  # pants: no-infer-dep
+                KeypairResourcePolicyV2GQL as KRP,
+            )
+
+            dtos = await adapter.bulk_get_keypair_resource_policy_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else KRP.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def project_resource_policy_id_by_name_loader(
+        self,
+    ) -> DataLoader[str, ProjectResourcePolicyUUID | None]:
+        adapter = self._adapters.resource_policy
+
+        async def load_fn(names: list[str]) -> list[ProjectResourcePolicyUUID | None]:
+            return await adapter.bulk_lookup_project_resource_policy_names(names)
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def project_resource_policy_by_id_loader(
+        self,
+    ) -> DataLoader[ProjectResourcePolicyUUID, ProjectResourcePolicyV2GQL | None]:
+        adapter = self._adapters.resource_policy
+
+        async def load_fn(
+            ids: list[ProjectResourcePolicyUUID],
+        ) -> list[ProjectResourcePolicyV2GQL | Exception | None]:
+            from ai.backend.manager.api.gql.resource_policy_v2.types.node import (  # pants: no-infer-dep
+                ProjectResourcePolicyV2GQL as PRP,
+            )
+
+            dtos = await adapter.bulk_get_project_resource_policy_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else PRP.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def user_resource_policy_id_by_name_loader(
+        self,
+    ) -> DataLoader[str, UserResourcePolicyUUID | None]:
+        adapter = self._adapters.resource_policy
+
+        async def load_fn(names: list[str]) -> list[UserResourcePolicyUUID | None]:
+            return await adapter.bulk_lookup_user_resource_policy_names(names)
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def user_resource_policy_by_id_loader(
+        self,
+    ) -> DataLoader[UserResourcePolicyUUID, UserResourcePolicyV2GQL | None]:
+        adapter = self._adapters.resource_policy
+
+        async def load_fn(
+            ids: list[UserResourcePolicyUUID],
+        ) -> list[UserResourcePolicyV2GQL | Exception | None]:
+            from ai.backend.manager.api.gql.resource_policy_v2.types.node import (  # pants: no-infer-dep
+                UserResourcePolicyV2GQL as URP,
+            )
+
+            dtos = await adapter.bulk_get_user_resource_policy_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else URP.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def role_permission_preset_loader(
+        self,
+    ) -> DataLoader[RolePermissionPresetID, RolePermissionPresetGQL | None]:
+        adapter = self._adapters.role_preset
+
+        async def load_fn(
+            ids: list[RolePermissionPresetID],
+        ) -> list[RolePermissionPresetGQL | Exception | None]:
+            from ai.backend.manager.api.gql.role_preset.types.permission import (  # pants: no-infer-dep
+                RolePermissionPresetGQL as RPP,
+            )
+
+            dtos = await adapter.batch_load_permissions_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else RPP.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def keypair_id_by_access_key_loader(
+        self,
+    ) -> DataLoader[str, KeyPairID | None]:
+        adapter = self._adapters.user
+
+        async def load_fn(access_keys: list[str]) -> list[KeyPairID | None]:
+            return await adapter.bulk_lookup_keypair_access_keys(access_keys)
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def keypair_by_id_loader(
+        self,
+    ) -> DataLoader[KeyPairID, KeyPairGQL | None]:
+        adapter = self._adapters.user
+
+        async def load_fn(
+            ids: list[KeyPairID],
+        ) -> list[KeyPairGQL | Exception | None]:
+            from ai.backend.manager.api.gql.keypair.types.node import (  # pants: no-infer-dep
+                KeyPairGQL as KP,
+            )
+
+            dtos = await adapter.bulk_get_keypair_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else KP.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def login_history_loader(
+        self,
+    ) -> DataLoader[LoginHistoryID, LoginHistoryV2GQL | None]:
+        adapter = self._adapters.login_history
+
+        async def load_fn(
+            ids: list[LoginHistoryID],
+        ) -> list[LoginHistoryV2GQL | Exception | None]:
+            from ai.backend.manager.api.gql.login_history.types.node import (  # pants: no-infer-dep
+                LoginHistoryV2GQL as LH,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else LH.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def login_session_loader(
+        self,
+    ) -> DataLoader[LoginSessionID, LoginSessionV2GQL | None]:
+        adapter = self._adapters.login_session
+
+        async def load_fn(
+            ids: list[LoginSessionID],
+        ) -> list[LoginSessionV2GQL | Exception | None]:
+            from ai.backend.manager.api.gql.login_session.types.node import (  # pants: no-infer-dep
+                LoginSessionV2GQL as LS,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else LS.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def role_preset_loader(
+        self,
+    ) -> DataLoader[RolePresetID, RolePresetGQL | None]:
+        adapter = self._adapters.role_preset
+
+        async def load_fn(
+            ids: list[RolePresetID],
+        ) -> list[RolePresetGQL | Exception | None]:
+            from ai.backend.manager.api.gql.role_preset.types.node import (  # pants: no-infer-dep
+                RolePresetGQL as RP,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else RP.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def client_ip_masking_policy_loader(
+        self,
+    ) -> DataLoader[ClientIPMaskingPolicyID, ClientIPMaskingPolicyGQL | None]:
+        adapter = self._adapters.client_ip_masking
+
+        async def load_fn(
+            ids: list[ClientIPMaskingPolicyID],
+        ) -> list[ClientIPMaskingPolicyGQL | Exception | None]:
+            from ai.backend.manager.api.gql.client_ip_masking.types import (  # pants: no-infer-dep
+                ClientIPMaskingPolicyGQL as CIP,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else CIP.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def entity_share_loader(
+        self,
+    ) -> DataLoader[EntityShareID, EntityShareGQL | None]:
+        adapter = self._adapters.entity_share
+
+        async def load_fn(
+            ids: list[EntityShareID],
+        ) -> list[EntityShareGQL | Exception | None]:
+            from ai.backend.manager.api.gql.entity_share.types import (  # pants: no-infer-dep
+                EntityShareGQL as ES,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else ES.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def login_client_type_loader(
+        self,
+    ) -> DataLoader[LoginClientTypeID, LoginClientTypeGQL | None]:
+        adapter = self._adapters.login_client_type
+
+        async def load_fn(
+            ids: list[LoginClientTypeID],
+        ) -> list[LoginClientTypeGQL | Exception | None]:
+            from ai.backend.manager.api.gql.login_client_type.types import (  # pants: no-infer-dep
+                LoginClientTypeGQL as LCT,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else LCT.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def model_card_loader(
+        self,
+    ) -> DataLoader[ModelCardID, ModelCardGQL | None]:
+        adapter = self._adapters.model_card
+
+        async def load_fn(
+            ids: list[ModelCardID],
+        ) -> list[ModelCardGQL | Exception | None]:
+            from ai.backend.manager.api.gql.model_card.types import (  # pants: no-infer-dep
+                ModelCardGQL as MC,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else MC.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def resource_preset_loader(
+        self,
+    ) -> DataLoader[ResourcePresetID, ResourcePresetGQL | None]:
+        adapter = self._adapters.resource_preset
+
+        async def load_fn(
+            ids: list[ResourcePresetID],
+        ) -> list[ResourcePresetGQL | Exception | None]:
+            from ai.backend.manager.api.gql.resource_preset.types import (  # pants: no-infer-dep
+                ResourcePresetGQL as RPS,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else RPS.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def retention_policy_loader(
+        self,
+    ) -> DataLoader[RetentionPolicyID, RetentionPolicyGQL | None]:
+        adapter = self._adapters.retention_policy
+
+        async def load_fn(
+            ids: list[RetentionPolicyID],
+        ) -> list[RetentionPolicyGQL | Exception | None]:
+            from ai.backend.manager.api.gql.retention_policy.types import (  # pants: no-infer-dep
+                RetentionPolicyGQL as RTP,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else RTP.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def service_catalog_loader(
+        self,
+    ) -> DataLoader[ServiceCatalogID, ServiceCatalogGQL | None]:
+        adapter = self._adapters.service_catalog
+
+        async def load_fn(
+            ids: list[ServiceCatalogID],
+        ) -> list[ServiceCatalogGQL | Exception | None]:
+            from ai.backend.manager.api.gql.service_catalog.types import (  # pants: no-infer-dep
+                ServiceCatalogGQL as SC,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else SC.from_pydantic(dto)
+                for dto in dtos
+            ]
 
         return DataLoader(load_fn=load_fn)
 
@@ -1185,6 +1729,23 @@ class DataLoaders:
             dtos = await adapter.batch_load_by_ids(ids)
             return [
                 dto if dto is None or isinstance(dto, Exception) else CG.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def entity_label_loader(self) -> DataLoader[EntityLabelID, EntityLabelGQL | None]:
+        adapter = self._adapters.entity_label
+
+        async def load_fn(ids: list[EntityLabelID]) -> list[EntityLabelGQL | Exception | None]:
+            from ai.backend.manager.api.gql.entity_label.types.node import (  # pants: no-infer-dep
+                EntityLabelGQL as EL,
+            )
+
+            dtos = await adapter.batch_load_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else EL.from_pydantic(dto)
                 for dto in dtos
             ]
 

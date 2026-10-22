@@ -15,6 +15,8 @@ from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
     BulkDeleteAutoScalingRulesInput,
     CreateAutoScalingRuleInput,
     DeleteAutoScalingRuleInput,
+    PartialBulkPurgeAutoScalingRulesInput,
+    PartialBulkUpdateAutoScalingRulesInput,
     UpdateAutoScalingRuleInput,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -28,6 +30,7 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     CreateDeploymentInput,
     DeleteAccessTokenInput,
     DeleteDeploymentInput,
+    PartialBulkPurgeAccessTokensInput,
     ReplaceDeploymentOptionsInput,
     ScopedSearchDeploymentsInput,
     SearchAccessTokensInput,
@@ -40,10 +43,12 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     UpdateRouteTrafficStatusInput,
     UpsertDeploymentPolicyInput,
 )
+from ai.backend.common.dto.manager.v2.deployment.types import DeploymentScope
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     SearchAllocatedResourceSlotsInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import (
     DeploymentIdPathParam,
     ProjectIdPathParam,
@@ -64,7 +69,7 @@ from ai.backend.manager.dto.context import UserContext
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2DeploymentHandler:
@@ -116,10 +121,24 @@ class V2DeploymentHandler:
 
     async def my_search(
         self,
+        user_ctx: UserContext,
         body: BodyParam[AdminSearchDeploymentsInput],
     ) -> APIResponse:
         """Search deployments owned by the current user."""
-        result = await self._adapter.my_search(body.parsed)
+        result = await self._adapter.scoped_search(
+            ScopedSearchDeploymentsInput(
+                scope=DeploymentScope(user=[UUIDScope(value=user_ctx.user_uuid)]),
+                usage=body.parsed.usage,
+                filter=body.parsed.filter,
+                order=body.parsed.order,
+                first=body.parsed.first,
+                after=body.parsed.after,
+                last=body.parsed.last,
+                before=body.parsed.before,
+                limit=body.parsed.limit,
+                offset=body.parsed.offset,
+            )
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def get(
@@ -336,19 +355,35 @@ class V2DeploymentHandler:
         result = await self._adapter.get_access_token(path.parsed.token_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def purge_access_token(
+        self,
+        path: PathParam[TokenIdPathParam],
+    ) -> APIResponse:
+        """Permanently remove an access token."""
+        result = await self._adapter.purge_access_token(path.parsed.token_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge_access_tokens(
+        self,
+        body: BodyParam[PartialBulkPurgeAccessTokensInput],
+    ) -> APIResponse:
+        """Permanently remove several access tokens, answering for each one."""
+        result = await self._adapter.partial_bulk_purge_access_tokens(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def delete_access_token(
         self,
         body: BodyParam[DeleteAccessTokenInput],
     ) -> APIResponse:
-        """Delete an access token."""
-        result = await self._adapter.delete_access_token(body.parsed)
+        """Deprecated. Use `DELETE /v2/deployments/access-tokens/{token_id}`."""
+        result = await self._adapter.purge_access_token(body.parsed.id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def bulk_delete_access_tokens(
         self,
         body: BodyParam[BulkDeleteAccessTokensInput],
     ) -> APIResponse:
-        """Bulk delete access tokens."""
+        """Deprecated. Use `POST /v2/deployments/access-tokens/partial-bulk-purge`."""
         result = await self._adapter.bulk_delete_access_tokens(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
@@ -387,23 +422,48 @@ class V2DeploymentHandler:
         path: PathParam[RuleIdPathParam],
         body: BodyParam[UpdateAutoScalingRuleInput],
     ) -> APIResponse:
-        """Update an auto-scaling rule."""
-        result = await self._adapter.update_rule(body.parsed)
+        """Update an auto-scaling rule. The path names the rule."""
+        merged = body.parsed.model_copy(update={"id": path.parsed.rule_id})
+        result = await self._adapter.update_rule(merged)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def purge_auto_scaling_rule(
+        self,
+        path: PathParam[RuleIdPathParam],
+    ) -> APIResponse:
+        """Permanently remove an auto-scaling rule."""
+        result = await self._adapter.purge_rule(path.parsed.rule_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update_auto_scaling_rules(
+        self,
+        body: BodyParam[PartialBulkUpdateAutoScalingRulesInput],
+    ) -> APIResponse:
+        """Update several auto-scaling rules, answering for each one."""
+        result = await self._adapter.partial_bulk_update_rules(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge_auto_scaling_rules(
+        self,
+        body: BodyParam[PartialBulkPurgeAutoScalingRulesInput],
+    ) -> APIResponse:
+        """Permanently remove several auto-scaling rules, answering for each one."""
+        result = await self._adapter.partial_bulk_purge_rules(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def delete_auto_scaling_rule(
         self,
         body: BodyParam[DeleteAutoScalingRuleInput],
     ) -> APIResponse:
-        """Delete an auto-scaling rule."""
-        result = await self._adapter.delete_rule(body.parsed)
+        """Deprecated. Use `DELETE /v2/deployments/auto-scaling-rules/{rule_id}`."""
+        result = await self._adapter.purge_rule(body.parsed.id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def bulk_delete_auto_scaling_rules(
         self,
         body: BodyParam[BulkDeleteAutoScalingRulesInput],
     ) -> APIResponse:
-        """Bulk delete auto-scaling rules."""
+        """Deprecated. Use `POST /v2/deployments/auto-scaling-rules/partial-bulk-purge`."""
         result = await self._adapter.bulk_delete_rules(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

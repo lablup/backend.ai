@@ -12,9 +12,9 @@ from typing import Any, Protocol, override
 import aiohttp
 from aiotools import cancel_and_wait
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ClientSessionFactory(Protocol):
@@ -134,8 +134,8 @@ class ClientPool:
                 del self._clients[key]
                 try:
                     await client.session.close()
-                except Exception as e:
-                    log.exception("Error closing client session: {}", e)
+                except Exception:
+                    log.exception("http client session close failed")
 
     def load_client_session(self, key: ClientKey) -> aiohttp.ClientSession:
         session = self._clients.get(key, None)

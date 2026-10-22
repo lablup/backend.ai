@@ -20,7 +20,7 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "dafe06a6c763"  # Part of: NEXT_RELEASE_VERSION
+revision = "dafe06a6c763"  # Part of: 26.9.0
 down_revision = "bf75b41e80ae"
 branch_labels = None
 depends_on = None
@@ -172,7 +172,8 @@ _CAP_ROSTER_EDGES: Final = sa.text(f"""
 """)
 
 # A personal project's creator is its one member. Every other member's edge is already in
-# the graph; `association_groups_users` stopped being written before that and is not read.
+# the graph; `association_groups_users` stopped being written before that, though a few
+# reads still remain.
 _ADD_PERSONAL_ROSTER_EDGES: Final = sa.text("""
     INSERT INTO entity_memberships (virtual_entity_id, member_entity_id, capped)
     SELECT p.id, u.id, TRUE

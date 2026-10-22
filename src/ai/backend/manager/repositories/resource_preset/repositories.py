@@ -15,7 +15,6 @@ class ResourcePresetRepositories:
         return cls(
             repository=ResourcePresetRepository(
                 args.db,
-                args.valkey_stat_client,
                 args.config_provider,
                 ShareOpsProvider(args.db),
             ),

@@ -12,14 +12,14 @@ from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.engine import CursorResult
-from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlalchemy.orm import aliased, selectinload
+from sqlalchemy.orm import aliased, contains_eager, selectinload, with_expression
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
@@ -46,7 +46,7 @@ from ai.backend.common.types import (
     SlotName,
     VFolderMountPolicy,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
@@ -80,6 +80,7 @@ from ai.backend.manager.data.deployment.types import (
     ReplicaGroupScalingStatus,
     ResourceGroupCleanupConfig,
     RevisionSearchResult,
+    RouteData,
     RouteHandlerCategory,
     RouteHealthStatus,
     RouteInfo,
@@ -121,16 +122,19 @@ from ai.backend.manager.errors.service import (
     NoUpdatesToApply,
 )
 from ai.backend.manager.errors.storage import VFolderNotFound
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.deployment_designated_agent.row import (
+    DeploymentDesignatedAgentRow,
+)
 from ai.backend.manager.models.deployment_policy.creators import DeploymentPolicyCreator
 from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_policy.searchable_fields import (
     DeploymentPolicySearchableFields,
 )
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.searchable_fields import (
     ModelRevisionSearchableFields,
 )
@@ -141,14 +145,14 @@ from ai.backend.manager.models.deployment_revision_preset.row import (
 from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
     DeploymentPresetSearchableFields,
 )
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import (
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.creators import DeploymentCreator
+from ai.backend.manager.models.endpoint.purgers import DeploymentPurger
+from ai.backend.manager.models.endpoint.row import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
     EndpointTokenRow,
 )
-from ai.backend.manager.models.endpoint.creators import DeploymentCreator
-from ai.backend.manager.models.endpoint.purgers import DeploymentPurger
 from ai.backend.manager.models.endpoint.searchable_fields import (
     AutoScalingRuleSearchableFields,
     DeploymentAccessTokenSearchableFields,
@@ -157,6 +161,7 @@ from ai.backend.manager.models.endpoint.searchers import (
     DeploymentAccessTokenSearcher,
     DeploymentIDSearcher,
     DeploymentInfoSearcher,
+    current_revision_id_subquery,
 )
 from ai.backend.manager.models.endpoint.updaters import (
     DeploymentRolloutClearUpdater,
@@ -164,21 +169,23 @@ from ai.backend.manager.models.endpoint.updaters import (
     EndpointLifecycleBatchUpdater,
     EndpointReplicaGroupUpdater,
 )
+from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchers import ReferenceImageSearcher
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.project import ProjectRow, groups
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import keypairs
+from ai.backend.manager.models.project.row import ProjectRow, groups
 from ai.backend.manager.models.replica_group.creators import ReplicaGroupCreator
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.replica_group.updaters import ReplicaGroupRevisionSwapUpdater
-from ai.backend.manager.models.resource_group import ResourceGroupRow, resource_groups
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow, resource_groups
 from ai.backend.manager.models.resource_slot.row import (
+    DeploymentRevisionResourceSlotRow,
     PresetResourceSlotRow,
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.resource_slot.searchers import RevisionResourceSlotSearcher
-from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.creators import ReplicaCreator
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 from ai.backend.manager.models.routing.searchers import RouteDataSearcher, RouteInfoSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater, ReplicaUpdater
@@ -187,7 +194,7 @@ from ai.backend.manager.models.runtime_variant.searchable_fields import (
     RuntimeVariantSearchableFields,
 )
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
-from ai.backend.manager.models.scheduling_history import (
+from ai.backend.manager.models.scheduling_history.row import (
     DeploymentHistoryRow,
     RouteHistoryRow,
 )
@@ -197,18 +204,17 @@ from ai.backend.manager.models.scheduling_history.searchable_fields import (
 from ai.backend.manager.models.scheduling_history.updaters import (
     DeploymentHistoryAttemptUpdater,
 )
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.specs.creator import FieldToCreate
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow, VFolderUserMountPolicyRow
-from ai.backend.manager.repositories.deployment.types import (
+from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
+from ai.backend.manager.repositories.deployment.types.endpoint import (
     DeploymentHistoryToCreate,
-    RouteData,
     RouteHistoryToCreate,
     RouteServiceDiscoveryInfo,
     RouteSessionInfo,
@@ -237,7 +243,7 @@ class _DeploymentUserResolution:
     access_key: AccessKey
 
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 # How many times a revision create re-picks its number after losing the race for it.
 _REVISION_NUMBER_ATTEMPTS = 3
@@ -359,7 +365,6 @@ class DeploymentDBSource:
             # placement policy of its replicas.
             primary_session_group = await w.create_entity(
                 SessionGroupCreator.for_replica_group(
-                    domain_name=deployment.metadata.domain,
                     project_id=ProjectID(deployment.metadata.project),
                     owner_user_id=UserID(deployment.metadata.session_owner),
                 )
@@ -450,8 +455,9 @@ class DeploymentDBSource:
                 sa.select(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
                 .options(
-                    selectinload(EndpointRow.primary_replica_group_row),
-                    selectinload(EndpointRow.target_replica_group_row),
+                    with_expression(
+                        EndpointRow.current_revision_id, current_revision_id_subquery()
+                    ),
                     selectinload(EndpointRow.deployment_policy),
                 )
             )
@@ -664,7 +670,7 @@ class DeploymentDBSource:
             query = (
                 sa.update(EndpointRow)
                 .where(EndpointRow.id == endpoint_id)
-                .values(lifecycle_stage=lifecycle)
+                .values(EndpointRow.lifecycle_values(lifecycle))
             )
             result = await db_sess.execute(query)
             updated = cast(CursorResult[Any], result).rowcount > 0
@@ -766,7 +772,7 @@ class DeploymentDBSource:
                         EndpointRow.lifecycle_stage.in_(prevoius_statuses),
                     )
                 )
-                .values(lifecycle_stage=new_status)
+                .values(EndpointRow.lifecycle_values(new_status))
             )
             await db_sess.execute(query)
 
@@ -876,7 +882,18 @@ class DeploymentDBSource:
             if not endpoint:
                 raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
 
-            row = EndpointAutoScalingRuleRow.from_creator(endpoint_id=endpoint_id, creator=creator)
+            row = EndpointAutoScalingRuleRow(
+                endpoint=endpoint_id,
+                metric_source=creator.condition.metric_source,
+                metric_name=creator.condition.metric_name,
+                min_threshold=creator.condition.scale_down_threshold,
+                max_threshold=creator.condition.scale_up_threshold,
+                step_size=creator.action.step_size,
+                cooldown_seconds=creator.action.cooldown_seconds,
+                min_replicas=creator.action.min_replicas,
+                max_replicas=creator.action.max_replicas,
+                prometheus_query_preset_id=creator.condition.prometheus_query_preset_id,
+            )
             db_sess.add(row)
             await db_sess.flush()
             return row.to_autoscaling_rule()
@@ -968,7 +985,18 @@ class DeploymentDBSource:
             if not endpoint:
                 raise EndpointNotFound(f"Endpoint {creator.model_deployment_id} not found")
 
-            row = EndpointAutoScalingRuleRow.from_model_deployment_creator(creator)
+            row = EndpointAutoScalingRuleRow(
+                endpoint=creator.model_deployment_id,
+                metric_source=creator.metric_source,
+                metric_name=creator.metric_name,
+                min_threshold=creator.min_threshold,
+                max_threshold=creator.max_threshold,
+                step_size=creator.step_size,
+                cooldown_seconds=creator.time_window,
+                min_replicas=creator.min_replicas,
+                max_replicas=creator.max_replicas,
+                prometheus_query_preset_id=creator.prometheus_query_preset_id,
+            )
             db_sess.add(row)
             await db_sess.flush()
             return AutoScalingRuleSearchableFields.own.to_data(row)
@@ -989,7 +1017,8 @@ class DeploymentDBSource:
             if not row:
                 raise AutoScalingRuleNotFound(f"Autoscaling rule {rule_id} not found")
 
-            row.apply_model_deployment_modifier(modifier)
+            for column_name, value in modifier.fields_to_update().items():
+                setattr(row, column_name, value)
             await db_sess.flush()
             return AutoScalingRuleSearchableFields.own.to_data(row)
 
@@ -1993,18 +2022,16 @@ class DeploymentDBSource:
                 db_sess, deployment_info
             )
 
-            revision_query = (
-                sa.select(DeploymentRevisionRow)
-                .where(DeploymentRevisionRow.id == revision_id)
-                .options(selectinload(DeploymentRevisionRow.image_row))
-            )
-            revision_result = await db_sess.execute(revision_query)
-            revision_row = revision_result.scalar_one_or_none()
-            if revision_row is None or revision_row.image_row is None:
+            revision_row = await db_sess.get(DeploymentRevisionRow, revision_id)
+            if revision_row is None or revision_row.image is None:
                 raise DeploymentHasNoTargetRevision(
                     f"Revision {revision_id} not found or has no image"
                 )
-            image_row = revision_row.image_row
+            image_row = await db_sess.get(ImageRow, revision_row.image)
+            if image_row is None:
+                raise ImageNotFound(
+                    f"Image {revision_row.image} of revision {revision_id} not found"
+                )
 
             # Resolve runtime variant preset values from revision
             resolved_presets: ResolvedPresetValues | None = None
@@ -2299,24 +2326,31 @@ class DeploymentDBSource:
 
         Returns exactly what is persisted on the active revision's
         ``model_definition`` — the merge result from variant baseline,
-        preset, yaml, and user overrides. ``_find_active_revision`` falls
-        back to ``deploying_revision`` while the initial rollout has not
-        completed, so AppProxy picks up the health-check config of the
-        spec being deployed. No vfolder re-reads at runtime.
+        preset, yaml, and user overrides. The active revision falls back to
+        the deploying revision while the initial rollout has not completed,
+        so AppProxy picks up the health-check config of the spec being
+        deployed. No vfolder re-reads at runtime.
         """
         async with self._begin_readonly_session_read_committed() as db_sess:
-            try:
-                endpoint = await EndpointRow.get(
-                    db_sess,
-                    endpoint_id,
-                    load_revisions=True,
+            endpoint = await db_sess.get(EndpointRow, endpoint_id)
+            if endpoint is None:
+                raise EndpointNotFound(str(endpoint_id))
+            current_revision_ids = sa.select(ReplicaGroupRow.current_revision_id).where(
+                ReplicaGroupRow.id == endpoint.primary_replica_group_id
+            )
+            # The current revision wins; the deploying one stands in until it is set.
+            model_definition = await db_sess.scalar(
+                sa.select(DeploymentRevisionRow.model_definition)
+                .where(
+                    DeploymentRevisionRow.id.in_(current_revision_ids)
+                    | (DeploymentRevisionRow.id == endpoint.deploying_revision_id)
                 )
-            except NoResultFound as e:
-                raise EndpointNotFound(str(endpoint_id)) from e
-            active_rev = endpoint._find_active_revision()
-            if active_rev is None or active_rev.model_definition is None:
+                .order_by(sa.case((DeploymentRevisionRow.id.in_(current_revision_ids), 0), else_=1))
+                .limit(1)
+            )
+            if model_definition is None:
                 return None
-            return active_rev.model_definition.health_check_config()
+            return model_definition.health_check_config()
 
     async def vfolder_mount_policy_inputs(
         self, user_id: UserID, vfolder_ids: Sequence[VFolderUUID]
@@ -2471,19 +2505,28 @@ class DeploymentDBSource:
     async def _fetch_latest_revision_row(
         session: SASession, endpoint_id: DeploymentID
     ) -> DeploymentRevisionRow:
+        latest_revision_id = (
+            sa.select(DeploymentRevisionRow.id)
+            .where(DeploymentRevisionRow.endpoint == endpoint_id)
+            .order_by(DeploymentRevisionRow.revision_number.desc())
+            .limit(1)
+            .scalar_subquery()
+        )
         row = (
-            await session.execute(
-                sa.select(DeploymentRevisionRow)
-                .where(DeploymentRevisionRow.endpoint == endpoint_id)
-                .order_by(DeploymentRevisionRow.revision_number.desc())
-                .limit(1)
-                .options(
-                    selectinload(DeploymentRevisionRow.resource_slot_rows),
-                    selectinload(DeploymentRevisionRow.runtime_variant_row),
-                    selectinload(DeploymentRevisionRow.image_row),
+            (
+                await session.execute(
+                    sa.select(DeploymentRevisionRow)
+                    .where(DeploymentRevisionRow.id == latest_revision_id)
+                    .outerjoin(
+                        DeploymentRevisionResourceSlotRow,
+                        DeploymentRevisionResourceSlotRow.revision_id == DeploymentRevisionRow.id,
+                    )
+                    .options(contains_eager(DeploymentRevisionRow.resource_slot_rows))
                 )
             )
-        ).scalar_one_or_none()
+            .unique()
+            .scalar_one_or_none()
+        )
         if row is None:
             raise DeploymentRevisionNotFound(f"No revisions exist for endpoint {endpoint_id}")
         return row
@@ -2729,6 +2772,56 @@ class DeploymentDBSource:
             stored: DeploymentOptions = row[0]
             return stored
 
+    async def replace_designated_agents(
+        self,
+        deployment_id: DeploymentID,
+        agent_uuids: set[AgentUUID],
+    ) -> None:
+        """Replace the agents a deployment designates with ``agent_uuids``.
+
+        Locks the deployment row so concurrent replaces run one after another.
+        """
+        async with self._begin_session_read_committed() as db_sess:
+            locked = await db_sess.scalar(
+                sa.select(EndpointRow.id).where(EndpointRow.id == deployment_id).with_for_update()
+            )
+            if locked is None:
+                raise EndpointNotFound(f"Endpoint {deployment_id} not found")
+            await db_sess.execute(
+                sa.delete(DeploymentDesignatedAgentRow).where(
+                    DeploymentDesignatedAgentRow.endpoint_id == deployment_id
+                )
+            )
+            if agent_uuids:
+                await db_sess.execute(
+                    sa.insert(DeploymentDesignatedAgentRow),
+                    [
+                        {"endpoint_id": deployment_id, "agent_uuid": agent_uuid}
+                        for agent_uuid in agent_uuids
+                    ],
+                )
+
+    async def fetch_designated_agents_by_deployment_ids(
+        self,
+        deployment_ids: set[DeploymentID],
+    ) -> Mapping[DeploymentID, list[AgentUUID]]:
+        """Fetch the designated agents of each deployment; one with none maps to ``[]``."""
+        if not deployment_ids:
+            return {}
+
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            query = sa.select(
+                DeploymentDesignatedAgentRow.endpoint_id,
+                DeploymentDesignatedAgentRow.agent_uuid,
+            ).where(DeploymentDesignatedAgentRow.endpoint_id.in_(deployment_ids))
+            result = await db_sess.execute(query)
+            agents_by_deployment: dict[DeploymentID, list[AgentUUID]] = {
+                deployment_id: [] for deployment_id in deployment_ids
+            }
+            for endpoint_id, agent_uuid in result:
+                agents_by_deployment[endpoint_id].append(agent_uuid)
+            return agents_by_deployment
+
     async def activate_revision(
         self,
         endpoint_id: DeploymentID,
@@ -2850,11 +2943,11 @@ class DeploymentDBSource:
             delete_result = await db_sess.execute(delete_query)
             deleted_count = len(delete_result.all())
             if deleted_count > 0:
-                log.info(
-                    "Pruned {} old revisions for deployment {} (limit={})",
-                    deleted_count,
-                    endpoint_id,
-                    revision_history_limit,
+                log.debug(
+                    "old deployment revisions pruned",
+                    deployment_id=endpoint_id,
+                    deleted_count=deleted_count,
+                    revision_history_limit=revision_history_limit,
                 )
             return deleted_count
 

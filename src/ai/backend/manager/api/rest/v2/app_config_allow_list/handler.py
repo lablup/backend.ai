@@ -10,11 +10,13 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.app_config_allow_list import AppConfigAllowListID
 from ai.backend.common.dto.manager.v2.app_config_allow_list.request import (
     CreateAppConfigAllowListInput,
+    PartialBulkPurgeAppConfigAllowListsInput,
+    PartialBulkUpdateAppConfigAllowListsInput,
     PurgeAppConfigAllowListInput,
     SearchAppConfigAllowListInput,
     UpdateAppConfigAllowListInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import AppConfigAllowListIdPathParam
 
 if TYPE_CHECKING:
@@ -22,7 +24,7 @@ if TYPE_CHECKING:
         AppConfigAllowListAdapter,
     )
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2AppConfigAllowListHandler:
@@ -57,22 +59,58 @@ class V2AppConfigAllowListHandler:
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def update(
+        self,
+        path: PathParam[AppConfigAllowListIdPathParam],
+        body: BodyParam[UpdateAppConfigAllowListInput],
+    ) -> APIResponse:
+        """Update an app config allow-list entry's rank by id."""
+        merged = body.parsed.model_copy(update={"id": path.parsed.app_config_allow_list_id})
+        result = await self._adapter.update(merged)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def purge(
+        self,
+        path: PathParam[AppConfigAllowListIdPathParam],
+    ) -> APIResponse:
+        """Purge an app config allow-list entry by id, with the fragments it admits."""
+        result = await self._adapter.purge(
+            PurgeAppConfigAllowListInput(id=path.parsed.app_config_allow_list_id)
+        )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update(
+        self,
+        body: BodyParam[PartialBulkUpdateAppConfigAllowListsInput],
+    ) -> APIResponse:
+        """Update several app config allow-list entries, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge(
+        self,
+        body: BodyParam[PartialBulkPurgeAppConfigAllowListsInput],
+    ) -> APIResponse:
+        """Purge several app config allow-list entries, answering for each one."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def admin_update(
         self,
         path: PathParam[AppConfigAllowListIdPathParam],
         body: BodyParam[UpdateAppConfigAllowListInput],
     ) -> APIResponse:
-        """Update an app config allow-list entry's rank by id (superadmin only)."""
+        """Deprecated. Use `PATCH /v2/app-config-allow-lists/{app_config_allow_list_id}`."""
         merged = body.parsed.model_copy(update={"id": path.parsed.app_config_allow_list_id})
-        result = await self._adapter.admin_update(merged)
+        result = await self._adapter.update(merged)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_purge(
         self,
         path: PathParam[AppConfigAllowListIdPathParam],
     ) -> APIResponse:
-        """Purge an app config allow-list entry by id (superadmin only)."""
-        result = await self._adapter.admin_purge(
+        """Deprecated. Use `DELETE /v2/app-config-allow-lists/{app_config_allow_list_id}`."""
+        result = await self._adapter.purge(
             PurgeAppConfigAllowListInput(id=path.parsed.app_config_allow_list_id)
         )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

@@ -16,7 +16,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
 )
 from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed, VFolderFilterStatusFailed
-from ai.backend.manager.models.session import DEAD_SESSION_STATUSES, SessionRow
+from ai.backend.manager.models.session.row import DEAD_SESSION_STATUSES, SessionRow
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.models.vfolder.row import VFolderRow

@@ -1,3 +1,4 @@
+import contextvars
 import logging
 import smtplib
 from concurrent.futures import ThreadPoolExecutor
@@ -5,7 +6,7 @@ from dataclasses import dataclass
 from email.mime.text import MIMEText
 from typing import Final, override
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.types import OperationStatus
 from ai.backend.manager.reporters.base import (
     AbstractReporter,
@@ -14,7 +15,7 @@ from ai.backend.manager.reporters.base import (
 )
 from ai.backend.manager.types import SMTPTriggerPolicy
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 _UNDEFINED_VALUE: Final[str] = "(undefined)"
@@ -39,7 +40,7 @@ class SMTPSender:
         self._executor = ThreadPoolExecutor(max_workers=self._config.max_workers)
 
     def send_email(self, subject: str, email_body: str) -> None:
-        self._executor.submit(self._send_email, subject, email_body)
+        self._executor.submit(contextvars.copy_context().run, self._send_email, subject, email_body)
 
     def _send_email(self, subject: str, email_body: str) -> None:
         message = MIMEText(email_body, "plain", "utf-8")
@@ -57,8 +58,8 @@ class SMTPSender:
                     from_addr=self._config.sender,
                     to_addrs=self._config.recipients,
                 )
-        except Exception as e:
-            log.error("Failed to send email: {}", e)
+        except Exception:
+            log.exception("email report send failed")
 
 
 class SMTPReporter(AbstractReporter):

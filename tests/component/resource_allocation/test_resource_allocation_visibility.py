@@ -50,7 +50,6 @@ from ai.backend.manager.api.rest.v2.resource_allocation.registry import (
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
-from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.resource_allocation.repository import (
@@ -149,7 +148,6 @@ class TestHideAgentsVisibility:
         self,
         database_engine: ExtendedAsyncSAEngine,
         config_provider_hide_agents: ManagerConfigProvider,
-        valkey_clients: ValkeyClients,
         processor_registry: ProcessorRegistry[Any],
     ) -> ResourceAllocationProcessors:
         ra_repo = ResourceAllocationRepository(
@@ -158,7 +156,6 @@ class TestHideAgentsVisibility:
         )
         rp_repo = ResourcePresetRepository(
             db=database_engine,
-            valkey_stat=valkey_clients.stat,
             config_provider=config_provider_hide_agents,
             v2_ops_provider=ShareOpsProvider(database_engine),
         )
@@ -286,7 +283,6 @@ class TestGroupResourceVisibility:
         self,
         database_engine: ExtendedAsyncSAEngine,
         config_provider_no_grv: ManagerConfigProvider,
-        valkey_clients: ValkeyClients,
         processor_registry: ProcessorRegistry[Any],
     ) -> ResourceAllocationProcessors:
         ra_repo = ResourceAllocationRepository(
@@ -295,7 +291,6 @@ class TestGroupResourceVisibility:
         )
         rp_repo = ResourcePresetRepository(
             db=database_engine,
-            valkey_stat=valkey_clients.stat,
             config_provider=config_provider_no_grv,
             v2_ops_provider=ShareOpsProvider(database_engine),
         )

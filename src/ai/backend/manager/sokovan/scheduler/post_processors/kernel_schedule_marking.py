@@ -5,16 +5,18 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, override
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 
 from .base import KernelPostProcessor, KernelPostProcessorContext
 
 if TYPE_CHECKING:
-    from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+    from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+        SchedulingController,
+    )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 # Mapping from target kernel status to next schedule type.
@@ -51,7 +53,7 @@ class KernelScheduleMarkingPostProcessor(KernelPostProcessor):
         # Mark all schedule types in batch
         await self._scheduling_controller.mark_scheduling_needed(list(schedule_types_to_mark))
         log.debug(
-            "Marked {} schedule type(s) for kernel status transitions to {}",
-            len(schedule_types_to_mark),
-            context.target_statuses,
+            "schedule types marked for kernel status transitions",
+            schedule_type_count=len(schedule_types_to_mark),
+            target_statuses=", ".join(sorted(status.name for status in context.target_statuses)),
         )

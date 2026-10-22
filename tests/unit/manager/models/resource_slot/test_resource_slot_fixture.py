@@ -12,11 +12,8 @@ from decimal import Decimal
 
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.manager.models.base import populate_fixture
-from ai.backend.manager.models.resource_slot import (
-    AgentResourceRow,
-    NumberFormat,
-    ResourceSlotTypeRow,
-)
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
+from ai.backend.manager.models.resource_slot.types import NumberFormat
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 

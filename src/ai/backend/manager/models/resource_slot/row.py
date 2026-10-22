@@ -154,6 +154,8 @@ class AgentResourceRow(LifecycleTimestampsMixin, Base):
         "used", sa.Numeric(precision=24, scale=6), nullable=False, server_default=sa.text("0")
     )
 
+    # Used for the rank sort in gql_legacy and AgentRow._resource_rows_by_rank.
+    # Delete it together with gql_legacy.
     slot_type_row: Mapped[ResourceSlotTypeRow] = relationship(
         "ResourceSlotTypeRow", foreign_keys=[slot_name], lazy="raise"
     )

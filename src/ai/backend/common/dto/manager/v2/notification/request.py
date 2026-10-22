@@ -10,7 +10,9 @@ from uuid import UUID
 from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
@@ -35,6 +37,12 @@ __all__ = (
     "NotificationRuleFilter",
     "NotificationRuleOrder",
     "NotificationRuleTypeFilter",
+    "PartialBulkPurgeNotificationChannelsInput",
+    "PartialBulkPurgeNotificationRulesInput",
+    "PartialBulkUpdateNotificationChannelItemInput",
+    "PartialBulkUpdateNotificationChannelsInput",
+    "PartialBulkUpdateNotificationRuleItemInput",
+    "PartialBulkUpdateNotificationRulesInput",
     "SearchNotificationChannelsInput",
     "SearchNotificationRulesInput",
     "SMTPAuthInputDTO",
@@ -140,6 +148,26 @@ class DeleteNotificationChannelInput(BaseRequestModel):
     id: UUID = Field(description="Channel ID to delete")
 
 
+class PartialBulkUpdateNotificationChannelItemInput(UpdateNotificationChannelInput):
+    """One notification channel of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the channel to update.")
+
+
+class PartialBulkUpdateNotificationChannelsInput(BaseRequestModel):
+    """Input for updating several notification channels, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateNotificationChannelItemInput] = Field(
+        description="The channels to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeNotificationChannelsInput(BaseRequestModel):
+    """Input for purging several notification channels, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the channels to purge.")
+
+
 class CreateNotificationRuleInput(BaseRequestModel):
     """Input for creating a notification rule."""
 
@@ -194,6 +222,26 @@ class DeleteNotificationRuleInput(BaseRequestModel):
     id: UUID = Field(description="Rule ID to delete")
 
 
+class PartialBulkUpdateNotificationRuleItemInput(UpdateNotificationRuleInput):
+    """One notification rule of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the rule to update.")
+
+
+class PartialBulkUpdateNotificationRulesInput(BaseRequestModel):
+    """Input for updating several notification rules, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateNotificationRuleItemInput] = Field(
+        description="The rules to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeNotificationRulesInput(BaseRequestModel):
+    """Input for purging several notification rules, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the rules to purge.")
+
+
 class ValidateNotificationChannelInput(BaseRequestModel):
     """Input for validating a notification channel by sending a test message."""
 
@@ -242,6 +290,10 @@ class NotificationChannelFilter(BaseRequestModel):
         default=None, description="Filter by channel type"
     )
     enabled: bool | None = Field(default=None, description="Filter by enabled status")
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by channel ID",
+    )
     AND: list[NotificationChannelFilter] | None = Field(
         default=None, description="Combine with AND logic"
     )
@@ -299,6 +351,10 @@ class NotificationRuleFilter(BaseRequestModel):
         default=None, description="Filter by rule type"
     )
     enabled: bool | None = Field(default=None, description="Filter by enabled status")
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by rule ID",
+    )
     AND: list[NotificationRuleFilter] | None = Field(
         default=None, description="Combine with AND logic"
     )

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.user import UserRow
-from ai.backend.manager.repositories.base import BatchQuerierResult
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.user.row import UserRow
+from ai.backend.manager.repositories.base.querier import BatchQuerierResult
 
 
 class RoleBatchQuerierResult(BatchQuerierResult[RoleRow]):

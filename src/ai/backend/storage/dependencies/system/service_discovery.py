@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
@@ -38,6 +39,7 @@ class ServiceDiscoveryInput:
     local_config: StorageProxyUnifiedConfig
     etcd: AsyncEtcd
     redis_config: RedisConfig
+    sentinel_monitors: SentinelMonitorSet
     event_producer: EventProducer
 
 
@@ -74,9 +76,13 @@ class ServiceDiscoveryProvider(
                 service_discovery = ETCDServiceDiscovery(ETCDServiceDiscoveryArgs(setup_input.etcd))
             case ServiceDiscoveryType.REDIS:
                 valkey_profile_target = setup_input.redis_config.to_valkey_profile_target()
+                live_valkey_target = valkey_profile_target.profile_target(RedisRole.LIVE)
                 service_discovery = await RedisServiceDiscovery.create(
                     args=RedisServiceDiscoveryArgs(
-                        valkey_target=valkey_profile_target.profile_target(RedisRole.LIVE)
+                        valkey_target=live_valkey_target,
+                        sentinel_monitor=setup_input.sentinel_monitors.monitor_for(
+                            live_valkey_target
+                        ),
                     )
                 )
 
@@ -93,7 +99,7 @@ class ServiceDiscoveryProvider(
         sd_loop = ServiceDiscoveryLoop(
             sd_type,
             service_discovery,
-            ServiceMetadata(
+            ServiceMetadata.for_endpoint(
                 display_name=f"storage-{local_config.storage_proxy.node_id}",
                 service_group="storage-proxy",
                 version=__version__,

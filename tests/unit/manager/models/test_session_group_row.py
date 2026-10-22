@@ -18,20 +18,23 @@ from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.errors.resource import ProjectNotFound
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.session_group.row import SessionGroupRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
@@ -193,6 +196,58 @@ class TestSessionGroupRow:
         assert row.project_id == scope.project_id
         assert row.owner_user_id == scope.owner_user_id
         assert row.deleted_at is None
+
+    async def test_creator_takes_the_domain_of_the_project_not_of_the_owner(
+        self, db: ExtendedAsyncSAEngine, scope: _OwnershipScope
+    ) -> None:
+        other_domain = DomainRow(id=DomainID(uuid.uuid4()), name=f"test-{uuid.uuid4().hex[:8]}")
+        async with db.begin_session() as sess:
+            sess.add(other_domain)
+            await sess.flush()
+            owner_policy = await sess.scalar(
+                sa.select(UserRow.resource_policy).where(UserRow.uuid == scope.owner_user_id)
+            )
+            outsider = UserRow(
+                uuid=uuid.uuid4(),
+                username=f"outsider-{uuid.uuid4().hex[:8]}",
+                email=f"outsider-{uuid.uuid4().hex[:8]}@example.com",
+                domain_name=other_domain.name,
+                resource_policy=owner_policy,
+                domain_id=other_domain.id,
+            )
+            sess.add(outsider)
+            await sess.flush()
+            creator = SessionGroupCreator(
+                project_id=scope.project_id,
+                owner_user_id=UserID(outsider.uuid),
+                placement_direction=SessionGroupPlacementDirection.PACK,
+                placement_enforcement=SessionGroupPlacementEnforcement.STRICT,
+            )
+            row = creator.build_row()
+            sess.add(row)
+            await sess.flush()
+            group_id = row.id
+
+        async with db.begin_readonly_session() as sess:
+            domain_id = await sess.scalar(
+                sa.select(SessionGroupRow.domain_id).where(SessionGroupRow.id == group_id)
+            )
+
+        assert domain_id == scope.domain_id
+
+    async def test_creating_in_a_missing_project_answers_project_not_found(
+        self, db: ExtendedAsyncSAEngine, scope: _OwnershipScope
+    ) -> None:
+        creator = SessionGroupCreator(
+            project_id=ProjectID(uuid.uuid4()),
+            owner_user_id=scope.owner_user_id,
+            placement_direction=SessionGroupPlacementDirection.PACK,
+            placement_enforcement=SessionGroupPlacementEnforcement.STRICT,
+        )
+
+        with pytest.raises(ProjectNotFound):
+            async with V2DBOpsProvider(db).write_ops() as w:
+                await w.create_entity(creator)
 
     async def test_session_defaults_to_no_group(
         self, db: ExtendedAsyncSAEngine, scope: _OwnershipScope

@@ -19,7 +19,7 @@ from ai.backend.manager.models.association_container_registries_groups.row impor
 )
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
-from ai.backend.manager.models.project import ProjectRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 
 __all__ = (
@@ -50,7 +50,7 @@ class ProjectContainerRegistryTarget(ContainerRegistryTarget):
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return ContainerRegistryRow.id.in_(
                 sa.select(AssociationContainerRegistriesGroupsRow.registry_id).where(
-                    AssociationContainerRegistriesGroupsRow.group_id == project_id
+                    AssociationContainerRegistriesGroupsRow.project_id == project_id
                 )
             )
 

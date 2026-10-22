@@ -40,7 +40,6 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     RollingUpdateStrategySpecInfo,
 )
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInfo
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import MountPermission
 
 __all__ = (
@@ -106,7 +105,7 @@ class RevisionNode(BaseResponseModel):
 
     id: UUID = Field(description="Revision ID")
     field_id: UUID = Field(
-        description=f"UUID of the revision. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the revision. Added in 26.9.0.",
     )
     deployment_id: UUID = Field(
         description=(
@@ -155,7 +154,7 @@ class DeploymentNode(BaseResponseModel):
 
     id: DeploymentID = Field(description="Deployment ID")
     entity_id: UUID = Field(
-        description=f"UUID of the deployment. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the deployment. Added in 26.9.0.",
     )
     metadata: DeploymentMetadataInfoDTO = Field(description="Deployment metadata")
     network_access: DeploymentNetworkAccessInfoDTO = Field(
@@ -193,7 +192,7 @@ class RouteNode(BaseResponseModel):
 
     id: UUID = Field(description="Route ID")
     field_id: UUID = Field(
-        description=f"UUID of the route. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the route. Added in 26.9.0.",
     )
     deployment_id: UUID = Field(description="Deployment ID")
     session_id: str | None = Field(default=None, description="Session ID")
@@ -222,6 +221,7 @@ class DeleteDeploymentPayload(BaseResponseModel):
     """Payload for deployment deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted deployment")
+    deployment: DeploymentNode = Field(description="The soft-deleted deployment. Added in 26.10.0.")
 
 
 class ActivateDeploymentPayload(BaseResponseModel):
@@ -281,7 +281,7 @@ class AccessTokenNode(BaseResponseModel):
 
     id: UUID = Field(description="Access token ID")
     field_id: UUID = Field(
-        description=f"UUID of the access token. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the access token. Added in 26.9.0.",
     )
     token: str = Field(description="Token value")
     expires_at: datetime | None = Field(default=None, description="Token expiration timestamp")
@@ -293,7 +293,7 @@ class AutoScalingRuleNode(BaseResponseModel):
 
     id: UUID = Field(description="Auto-scaling rule ID")
     field_id: UUID = Field(
-        description=f"UUID of the auto scaling rule. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the auto scaling rule. Added in 26.9.0.",
     )
     deployment_id: UUID = Field(description="Parent deployment ID")
     metric_source: str = Field(description="Metric source")
@@ -316,7 +316,7 @@ class DeploymentPolicyNode(BaseResponseModel):
 
     id: UUID = Field(description="Policy ID")
     field_id: UUID = Field(
-        description=f"UUID of the deployment policy. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the deployment policy. Added in 26.9.0.",
     )
     deployment_id: UUID = Field(description="Parent deployment ID")
     strategy_spec: RollingUpdateStrategySpecInfo | BlueGreenStrategySpecInfo = Field(
@@ -383,6 +383,7 @@ class DeleteAccessTokenPayload(BaseResponseModel):
     """Payload for access token deletion result."""
 
     id: UUID = Field(description="ID of the deleted access token")
+    field_id: UUID = Field(description="UUID of the deleted access token. Added in 26.10.0.")
 
 
 class BulkDeleteAccessTokensPayload(BaseResponseModel):
@@ -413,6 +414,7 @@ class DeleteAutoScalingRulePayload(BaseResponseModel):
     """Payload for auto-scaling rule deletion result."""
 
     id: UUID = Field(description="ID of the deleted auto-scaling rule")
+    field_id: UUID = Field(description="UUID of the deleted auto-scaling rule. Added in 26.10.0.")
 
 
 class BulkDeleteAutoScalingRulesPayload(BaseResponseModel):
@@ -456,7 +458,7 @@ class ReplicaNode(BaseResponseModel):
 
     id: UUID = Field(description="Replica ID")
     field_id: UUID = Field(
-        description=f"UUID of the replica. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the replica. Added in 26.9.0.",
     )
     deployment_id: UUID = Field(description="ID of the deployment this replica belongs to")
     revision_id: UUID = Field(description="Associated revision ID")

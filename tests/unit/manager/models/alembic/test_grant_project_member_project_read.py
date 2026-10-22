@@ -18,7 +18,7 @@ from ai.backend.manager.models.alembic.versions.a0f597deb5e5_grant_project_membe
     revoke,
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
@@ -51,6 +51,13 @@ async def db(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(database_connection, _TABLES):
+        async with database_connection.begin() as conn:
+            await conn.execute(
+                sa.text(
+                    "ALTER TABLE role_presets "
+                    "ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT false"
+                )
+            )
         yield database_connection
 
 
@@ -76,9 +83,7 @@ async def seeded(db: ExtendedAsyncSAEngine) -> _Fixture:
     async with db.begin_session() as session:
         for preset_id, name in ((_PRESET_UUID, "project_member"), (other_preset, "other")):
             session.add(
-                RolePresetRow(
-                    id=preset_id, name=name, scope_type=_PROJECT, auto_assign=True, deleted=False
-                )
+                RolePresetRow(id=preset_id, name=name, scope_type=_PROJECT, auto_assign=True)
             )
         await session.flush()
         session.add(

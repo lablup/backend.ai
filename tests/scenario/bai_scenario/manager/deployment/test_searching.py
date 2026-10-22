@@ -12,8 +12,13 @@ from typing import override
 import pytest
 
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.deployment.request import AdminSearchDeploymentsInput
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AdminSearchDeploymentsInput,
+    ScopedSearchDeploymentsInput,
+)
 from ai.backend.common.dto.manager.v2.deployment.response import AdminSearchDeploymentsPayload
+from ai.backend.common.dto.manager.v2.deployment.types import DeploymentScope
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.manager.api.adapters.deployment.adapter import DeploymentAdapter
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.auth import InsufficientPrivilege
@@ -37,12 +42,12 @@ from bai_scenario.components.deployment import (
     MineBesideAnothers,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchDeploymentsPayload
 type SearchingStep = Scenario[
-    SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched
+    TestSeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched
 ]
 
 
@@ -90,7 +95,7 @@ class SearchingMine(When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 
     @override
     def operation(self) -> str:
-        return "my_search"
+        return "scoped_search"
 
     @override
     def describe(self, laid: ManyDeploymentsAndACaller) -> str:
@@ -99,7 +104,11 @@ class SearchingMine(When[ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
     @override
     async def call(self, adapter: DeploymentAdapter, laid: ManyDeploymentsAndACaller) -> Searched:
         with ActingAs(laid.caller):
-            return await adapter.my_search(AdminSearchDeploymentsInput())
+            return await adapter.scoped_search(
+                ScopedSearchDeploymentsInput(
+                    scope=DeploymentScope(user=[UUIDScope(value=laid.caller.id)])
+                )
+            )
 
 
 @dataclass(frozen=True)
@@ -129,7 +138,7 @@ class EveryLaidDeploymentIsFound(Then[ManyDeploymentsAndACaller, Searched]):
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryOne(
-    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -140,7 +149,7 @@ class TheSuperadminCountsEveryOne(
         return "배포 셋이 있고 슈퍼관리자가 필터 없이 전체를 훑으면, 셋을 모두 센다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyDeploymentsAndACaller]:
         return ManyDeploymentsInThatPlace(role=UserRole.SUPERADMIN)
 
     @override
@@ -154,7 +163,7 @@ class TheSuperadminCountsEveryOne(
 
 @dataclass(frozen=True)
 class AGrantDoesNotOpenTheGlobalDoor(
-    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -168,7 +177,7 @@ class AGrantDoesNotOpenTheGlobalDoor(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyDeploymentsAndACaller]:
         return ManyDeploymentsInThatPlace(granted=(Permission.READ,))
 
     @override
@@ -182,7 +191,7 @@ class AGrantDoesNotOpenTheGlobalDoor(
 
 @dataclass(frozen=True)
 class OnlyThatProjectsOnesAreFound(
-    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -196,7 +205,7 @@ class OnlyThatProjectsOnesAreFound(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyDeploymentsAndACaller]:
         return DeploymentsInTwoProjects(granted=(Permission.READ,))
 
     @override
@@ -210,7 +219,7 @@ class OnlyThatProjectsOnesAreFound(
 
 @dataclass(frozen=True)
 class AProjectWithNoGrantIsRefused(
-    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -221,7 +230,7 @@ class AProjectWithNoGrantIsRefused(
         return "그 프로젝트에 읽기 권한이 없는 사용자가 프로젝트를 훑으면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyDeploymentsAndACaller]:
         return ManyDeploymentsInThatPlace()
 
     @override
@@ -235,7 +244,7 @@ class AProjectWithNoGrantIsRefused(
 
 @dataclass(frozen=True)
 class OnlyMyOwnAreFound(
-    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -249,7 +258,7 @@ class OnlyMyOwnAreFound(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyDeploymentsAndACaller]:
         return MineBesideAnothers(reads_own=True)
 
     @override
@@ -263,7 +272,7 @@ class OnlyMyOwnAreFound(
 
 @dataclass(frozen=True)
 class MyOwnNeedAGrantToo(
-    Scenario[SeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, ManyDeploymentsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -277,7 +286,7 @@ class MyOwnNeedAGrantToo(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyDeploymentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyDeploymentsAndACaller]:
         return MineBesideAnothers()
 
     @override

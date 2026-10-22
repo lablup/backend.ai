@@ -14,7 +14,7 @@ from ai.backend.common.data.notification import (
     NotificationRuleType,
     WebhookSpec,
 )
-from ai.backend.manager.data.notification import (
+from ai.backend.manager.data.notification.types import (
     NotificationChannelData,
     NotificationRuleData,
 )

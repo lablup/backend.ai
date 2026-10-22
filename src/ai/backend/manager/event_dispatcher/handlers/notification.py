@@ -4,11 +4,13 @@ import logging
 
 from ai.backend.common.data.notification import NotifiableMessage, NotificationRuleType
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.services.notification.actions import ProcessNotificationAction
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.services.notification.actions.process_notification import (
+    ProcessNotificationAction,
+)
 from ai.backend.manager.services.notification.service import NotificationService
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("NotificationEventHandler",)
 
@@ -43,27 +45,14 @@ class NotificationEventHandler:
             source: Event source identifier
             event: NotificationTriggeredEvent containing notification data
         """
-        log.info(
-            "Received notification event: {0} from {1}",
-            event.rule_type,
-            source,
-        )
+        log.trace("notification event received", rule_type=event.rule_type, source_name=source)
 
         # Validate notification_data against the rule type's schema
         rule_type = NotificationRuleType(event.rule_type)
-        try:
-            validated_data = NotifiableMessage.validate_notification_data(
-                rule_type=rule_type,
-                data=event.notification_data,
-            )
-        except Exception as e:
-            log.error(
-                "Failed to validate notification data for rule type {0}: {1}",
-                event.rule_type,
-                str(e),
-            )
-            # Re-raise to let the caller know validation failed
-            raise
+        validated_data = NotifiableMessage.validate_notification_data(
+            rule_type=rule_type,
+            data=event.notification_data,
+        )
 
         # Delegate to service for business logic
         # TODO(BA-7978): Move the logic out of the service and call repositories/clients directly.

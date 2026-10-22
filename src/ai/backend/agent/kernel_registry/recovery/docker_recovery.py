@@ -6,14 +6,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ai.backend.common.types import AgentId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .base_recovery import BaseKernelRegistryRecovery
 
 if TYPE_CHECKING:
     from ai.backend.agent.agent import AbstractAgent, AgentClass
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass

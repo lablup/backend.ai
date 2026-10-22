@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.query import (
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
     MountItemInput,
+    NonEmptyList,
     ResourceSlotEntryInput,
 )
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
@@ -58,6 +59,7 @@ __all__ = (
     "GetSessionLogsQuery",
     "ListFilesInput",
     "MountItemInput",
+    "PartialBulkTerminateSessionsInput",
     "RenameSessionInput",
     "ResourceOptsInput",
     "ResourceSlotEntryInput",
@@ -103,7 +105,14 @@ class SessionIdPathParam(BaseRequestModel):
 class SessionFilter(BaseRequestModel):
     """Filter criteria for session listing."""
 
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entity_id`.",
+        deprecated=True,
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by session ID."
+    )
     status: SessionStatusFilter | None = None
     name: StringFilter | None = None
     domain_name: StringFilter | None = None
@@ -140,7 +149,9 @@ class SessionFilter(BaseRequestModel):
         default=None, description="Filter by the resource group the session runs in"
     )
     access_key: StringFilter | None = Field(
-        default=None, description="Filter by the access key the session was created with"
+        default=None,
+        deprecated=True,
+        description=f"Filter by the access key the session was created with. Deprecated since {NEXT_RELEASE_VERSION}. Use `user_uuid`",
     )
     tag: StringFilter | None = Field(default=None, description="Filter by the user-supplied tag")
     use_host_network: bool | None = Field(
@@ -166,6 +177,12 @@ class SessionFilter(BaseRequestModel):
     )
     replica_id: UUIDFilter | None = Field(
         default=None, description="Filter by the deployment replica the session serves"
+    )
+    session_group_id: UUIDFilter | None = Field(
+        default=None, description="Filter by the session group the session belongs to"
+    )
+    requested_starts_at: DateTimeFilter | None = Field(
+        default=None, description="Filter by the reserved start time requested at creation"
     )
     AND: list[SessionFilter] | None = None
     OR: list[SessionFilter] | None = None
@@ -499,22 +516,25 @@ class TerminateSessionsInput(BaseRequestModel):
     forced: bool = Field(default=False, description="Force-terminate without waiting for cleanup.")
 
 
+class PartialBulkTerminateSessionsInput(BaseRequestModel):
+    """Input for terminating several sessions, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the sessions to terminate.")
+    forced: bool = Field(default=False, description="Force-terminate without waiting for cleanup.")
+
+
 class SessionIdleCheckTargetInput(BaseRequestModel):
     """One (checker, session) pair targeted by an idle-check exclusion or inclusion."""
 
-    checker_id: IdleCheckerID = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Idle checker UUID of the pair."
-    )
-    session_id: SessionID = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Session UUID of the pair."
-    )
+    checker_id: IdleCheckerID = Field(description="Added in 26.9.0. Idle checker UUID of the pair.")
+    session_id: SessionID = Field(description="Added in 26.9.0. Session UUID of the pair.")
 
 
 class ExcludeSessionIdleChecksInput(BaseRequestModel):
     """Input for excluding session pairs from idle checks."""
 
     targets: list[SessionIdleCheckTargetInput] = Field(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Checker-session pairs to exclude."
+        description="Added in 26.9.0. Checker-session pairs to exclude."
     )
 
 
@@ -523,7 +543,7 @@ class IncludeSessionIdleChecksInput(BaseRequestModel):
 
     targets: list[SessionIdleCheckTargetInput] = Field(
         description=(
-            f"Added in {NEXT_RELEASE_VERSION}. Checker-session pairs to include; "
+            "Added in 26.9.0. Checker-session pairs to include; "
             "checks start from the initial grace period."
         )
     )

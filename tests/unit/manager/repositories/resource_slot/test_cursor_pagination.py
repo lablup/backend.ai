@@ -32,24 +32,25 @@ from ai.backend.manager.data.resource_slot.types import (
     ResourceSlotTypeData,
 )
 from ai.backend.manager.errors.api import InvalidGraphQLParameters
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_slot import (
+from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -299,8 +300,18 @@ class TestResourceAllocationPagination:
         domain_id = DomainID(uuid.uuid4())
         resource_group_id = ResourceGroupID(uuid.uuid4())
         project_id = uuid.uuid4()
+        user_id = uuid.uuid4()
         async with database.begin_session() as db_sess:
             db_sess.add(DomainRow(id=domain_id, name="default"))
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name="default",
+                    max_vfolder_count=10,
+                    max_quota_scope_size=0,
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
             db_sess.add(
                 ProjectResourcePolicyRow(
                     name="default",
@@ -325,6 +336,16 @@ class TestResourceAllocationPagination:
                     id=project_id,
                     name="default",
                     domain_name="default",
+                    resource_policy="default",
+                )
+            )
+            db_sess.add(
+                UserRow(
+                    uuid=user_id,
+                    username="default",
+                    email="default@example.com",
+                    domain_name="default",
+                    domain_id=domain_id,
                     resource_policy="default",
                 )
             )
@@ -355,7 +376,7 @@ class TestResourceAllocationPagination:
                         group_id=project_id,
                         resource_group_id=resource_group_id,
                         scaling_group_name="default",
-                        user_uuid=uuid.uuid4(),
+                        user_uuid=user_id,
                     )
                 )
                 await db_sess.flush()
@@ -365,7 +386,7 @@ class TestResourceAllocationPagination:
                         session_id=session_id,
                         domain_name="default",
                         group_id=project_id,
-                        user_uuid=uuid.uuid4(),
+                        user_uuid=user_id,
                         status=KernelStatus.RUNNING,
                         repl_in_port=0,
                         repl_out_port=0,

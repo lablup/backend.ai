@@ -1,4 +1,3 @@
-import logging
 from typing import Any
 
 from ai.backend.common.dto.storage.response import (
@@ -7,12 +6,9 @@ from ai.backend.common.dto.storage.response import (
     VFSListFilesResponse,
 )
 from ai.backend.common.types import StreamReader
-from ai.backend.logging.utils import BraceStyleAdapter
 from ai.backend.storage.errors import StorageNotFoundError, StorageTypeInvalidError
 from ai.backend.storage.storages.storage_pool import StoragePool
 from ai.backend.storage.storages.vfs_storage import VFSStorage
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class VFSStorageService:

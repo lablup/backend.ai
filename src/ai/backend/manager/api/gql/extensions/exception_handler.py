@@ -15,9 +15,9 @@ from ai.backend.common.exception import (
     BackendAISchemaValidationFailed,
     ErrorCode,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _to_graphql_validation_error(e: ValidationError) -> GraphQLError:
@@ -48,18 +48,20 @@ class GQLExceptionHandlerExtension(SchemaExtension):
             result: object = _next(root, info, *args, **kwargs)
         except BackendAIError as e:
             if e.status_code // 100 == 4:
-                log.debug("GraphQL client error: {}", e)
+                log.trace(
+                    "graphql client error", error_code=str(e.error_code()), error_message=str(e)
+                )
             elif e.status_code // 100 == 5:
-                log.exception("GraphQL server error: {}", e)
+                log.exception("graphql server error", error_code=str(e.error_code()))
             raise GraphQLError(
                 message=str(e),
                 extensions={"code": str(e.error_code())},
             ) from e
         except ValidationError as e:
-            log.debug("GraphQL input validation error: {}", e)
+            log.trace("graphql input validation failed", error_message=str(e))
             raise _to_graphql_validation_error(e) from e
         except Exception as e:
-            log.exception("GraphQL unexpected error: {}", e)
+            log.exception("graphql unexpected error")
             raise GraphQLError(
                 message=str(e),
                 extensions={"code": str(ErrorCode.default())},
@@ -73,18 +75,20 @@ class GQLExceptionHandlerExtension(SchemaExtension):
             return await coro
         except BackendAIError as e:
             if e.status_code // 100 == 4:
-                log.debug("GraphQL client error: {}", e)
+                log.trace(
+                    "graphql client error", error_code=str(e.error_code()), error_message=str(e)
+                )
             elif e.status_code // 100 == 5:
-                log.exception("GraphQL server error: {}", e)
+                log.exception("graphql server error", error_code=str(e.error_code()))
             raise GraphQLError(
                 message=str(e),
                 extensions={"code": str(e.error_code())},
             ) from e
         except ValidationError as e:
-            log.debug("GraphQL input validation error: {}", e)
+            log.trace("graphql input validation failed", error_message=str(e))
             raise _to_graphql_validation_error(e) from e
         except Exception as e:
-            log.exception("GraphQL unexpected error: {}", e)
+            log.exception("graphql unexpected error")
             raise GraphQLError(
                 message=str(e),
                 extensions={"code": str(ErrorCode.default())},

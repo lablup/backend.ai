@@ -102,7 +102,7 @@ def delete(artifact_ids: str) -> None:
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.artifact.delete(
+            result = await registry.artifact.delete_artifacts(
                 DeleteArtifactsInput(artifact_ids=parsed_ids),
             )
             print_result(result)
@@ -129,7 +129,7 @@ def restore(artifact_ids: str) -> None:
     async def _run() -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
-            result = await registry.artifact.restore(
+            result = await registry.artifact.restore_artifacts(
                 RestoreArtifactsInput(artifact_ids=parsed_ids),
             )
             print_result(result)

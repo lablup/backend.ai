@@ -9,9 +9,9 @@ from typing import ParamSpec, TypeVar, override
 from ai.backend.common.metrics.metric import DomainType, LayerMetricObserver, LayerType
 from ai.backend.common.resilience.policy import Policy
 from ai.backend.common.resilience.resilience import get_current_operation
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -73,10 +73,10 @@ class MetricPolicy(Policy):
         # Get operation name from context
         operation = get_current_operation()
         if not operation:
-            log.warning("No operation name found in resilience context, using 'unknown'")
+            log.warning("resilience operation name missing, using unknown")
             operation = "unknown"
 
-        log.trace("Metric tracking for operation: {}", operation)
+        log.trace("resilience metric tracking", operation_name=operation)
         start = time.perf_counter()
 
         # Record operation triggered

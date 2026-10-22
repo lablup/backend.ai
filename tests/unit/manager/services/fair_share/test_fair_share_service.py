@@ -11,7 +11,7 @@ import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
-from ai.backend.manager.data.fair_share import (
+from ai.backend.manager.data.fair_share.types import (
     DomainFairShareData,
     DomainFairShareSearchResult,
     FairShareCalculationSnapshot,
@@ -32,15 +32,14 @@ from ai.backend.manager.models.fair_share.scopes import (
     UserFairShareTarget,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.fair_share import FairShareRepository
+from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareEntitySearchResult,
     ProjectFairShareEntitySearchResult,
     UserFairShareEntitySearchResult,
 )
-from ai.backend.manager.services.fair_share import (
-    FairShareService,
+from ai.backend.manager.services.fair_share.actions import (
     GetDomainFairShareAction,
     GetProjectFairShareAction,
     GetUserFairShareAction,
@@ -50,12 +49,11 @@ from ai.backend.manager.services.fair_share import (
     SearchRGDomainFairSharesAction,
     SearchRGProjectFairSharesAction,
     SearchRGUserFairSharesAction,
-)
-from ai.backend.manager.services.fair_share.actions import (
     UpsertDomainFairShareWeightAction,
     UpsertProjectFairShareWeightAction,
     UpsertUserFairShareWeightAction,
 )
+from ai.backend.manager.services.fair_share.service import FairShareService
 
 RESOURCE_GROUP_ID = ResourceGroupID(uuid.UUID("00000000-0000-0000-0000-000000000001"))
 

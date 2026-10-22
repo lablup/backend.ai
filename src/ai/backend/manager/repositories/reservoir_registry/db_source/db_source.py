@@ -8,9 +8,9 @@ from sqlalchemy.orm import selectinload
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
 from ai.backend.manager.errors.artifact_registry import ArtifactRegistryNotFoundError
-from ai.backend.manager.models.artifact import ArtifactRow
-from ai.backend.manager.models.artifact_registries import ArtifactRegistryRow
-from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
+from ai.backend.manager.models.artifact.row import ArtifactRow
+from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
+from ai.backend.manager.models.reservoir_registry.row import ReservoirRegistryRow
 from ai.backend.manager.models.reservoir_registry.searchable_fields import (
     ReservoirRegistrySearchableFields,
 )

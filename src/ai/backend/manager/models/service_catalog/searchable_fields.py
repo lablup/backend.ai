@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import override
 
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
@@ -145,6 +146,14 @@ class _ServiceCatalogOwnFields(RowDataConverter[ServiceCatalogRow, ServiceCatalo
     @override
     def to_data(self, row: ServiceCatalogRow) -> ServiceCatalogData:
         endpoints = ServiceCatalogEndpointSearchableFields.own
+        return self.to_data_with_endpoints(
+            row, [endpoints.to_data(endpoint) for endpoint in row.endpoints]
+        )
+
+    def to_data_with_endpoints(
+        self, row: ServiceCatalogRow, endpoints: Sequence[ServiceCatalogEndpointData]
+    ) -> ServiceCatalogData:
+        """Convert the row's own columns, taking the endpoints already read."""
         return ServiceCatalogData(
             id=ServiceCatalogID(self.id.read(row)),
             service_group=self.service_group.read(row),
@@ -157,7 +166,7 @@ class _ServiceCatalogOwnFields(RowDataConverter[ServiceCatalogRow, ServiceCatalo
             registered_at=self.registered_at.read(row),
             last_heartbeat=self.last_heartbeat.read(row),
             config_hash=self.config_hash.read(row),
-            endpoints=[endpoints.to_data(endpoint) for endpoint in row.endpoints],
+            endpoints=list(endpoints),
         )
 
 

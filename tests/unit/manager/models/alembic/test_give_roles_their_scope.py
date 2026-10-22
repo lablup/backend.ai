@@ -22,7 +22,7 @@ from ai.backend.manager.models.alembic.versions.a7d2c9e41b58_give_roles_their_sc
     backfill,
 )
 from ai.backend.manager.models.base import GUID
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow

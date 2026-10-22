@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
@@ -72,7 +72,7 @@ def _user(user_id: uuid.UUID, *, superadmin: bool = False) -> UserData:
 
 @pytest.fixture
 def as_requester(requester_id: uuid.UUID) -> Iterator[None]:
-    with with_user(_user(requester_id)):
+    with with_user_context(_user(requester_id)):
         yield
 
 
@@ -323,7 +323,7 @@ class TestSetMountPolicy:
             )
         )
 
-        with with_user(_user(uuid.uuid4(), superadmin=True)):
+        with with_user_context(_user(uuid.uuid4(), superadmin=True)):
             result = await service.set(
                 SetVFolderMountPolicyAction(
                     vfolder_uuid=VFolderUUID(folder_id),

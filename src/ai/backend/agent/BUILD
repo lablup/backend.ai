@@ -2,9 +2,9 @@ python_sources(
     name="src",
     sources=["**/*.py", "!watcher/**/*.py"],
     dependencies=[
-        "src/ai/backend/cli:src",  # not auto-inferred
         "src/ai/backend/runner:src",
         "src/ai/backend/helpers:src",
+        "//:reqs#backend.ai-krunner-alpine",  # not auto-inferred
         "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
     ],
@@ -14,9 +14,9 @@ python_sources(
     name="src-watcher",
     sources=["watcher/**/*.py"],
     dependencies=[
-        "src/ai/backend/cli:src",  # not auto-inferred
         "src/ai/backend/runner:src",
         "src/ai/backend/helpers:src",
+        "//:reqs#backend.ai-krunner-alpine",  # not auto-inferred
         "//:reqs#backend.ai-krunner-static-gnu",  # not auto-inferred
         ":resources",
     ],
@@ -44,6 +44,7 @@ python_distribution(
     dependencies=[
         ":src",
         ":src-watcher",
+        "src/ai/backend/cli:src",  # install requirement: provides the `backend.ai` console script
         "src/ai/backend/kernel:src",  # included only in binary dists
         "!!stubs/trafaret:stubs",
     ],

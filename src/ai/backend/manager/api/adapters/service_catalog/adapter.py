@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from functools import lru_cache
 from typing import assert_never
 
+from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.service_catalog.request import (
     AdminSearchServiceCatalogsInput,
@@ -27,13 +29,20 @@ from ai.backend.manager.data.service_catalog.types import (
     ServiceCatalogData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
 from ai.backend.manager.models.service_catalog.searchable_fields import (
     ServiceCatalogSearchableFields,
 )
 from ai.backend.manager.models.service_catalog.searchers import ServiceCatalogSearcher
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.services.service_catalog.actions.bulk_get import (
+    BulkGetServiceCatalogsAction,
+)
 from ai.backend.manager.services.service_catalog.actions.search import (
     SearchServiceCatalogsAction,
 )
@@ -55,6 +64,20 @@ class ServiceCatalogAdapter(BaseAdapter):
 
     def __init__(self, service_catalog: ServiceCatalogProcessors) -> None:
         self._service_catalog = service_catalog
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[ServiceCatalogID]
+    ) -> list[ServiceCatalogNode | Exception | None]:
+        """Batch load service catalog entries by id for DataLoader use, one answer per id."""
+        if not ids:
+            return []
+        result = await self._service_catalog.bulk_get.run(BulkGetServiceCatalogsAction(ids=ids))
+        return [
+            self._data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def admin_search(
         self,
@@ -106,21 +129,25 @@ class ServiceCatalogAdapter(BaseAdapter):
                 conditions.append(condition)
         if filter.status is not None:
             conditions.extend(self._convert_status_filter(filter.status))
+        conditions.extend(
+            self.apply_uuid_filter(filter.entity_id, ServiceCatalogSearchableFields.own.id.filter)
+        )
         if filter.AND:
             for sub in filter.AND:
                 conditions.extend(self._convert_filter(sub))
         if filter.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter.OR:
-                or_conds.extend(self._convert_filter(sub))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter.NOT:
-                not_conds.extend(self._convert_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_string_filter(self, sf: StringFilter) -> QueryCondition | None:

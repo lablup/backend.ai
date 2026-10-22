@@ -11,10 +11,10 @@ from ai.backend.common.data.entity.storage_namespace import (
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.actions.v2.ops.base import LookupEntityOpsAction
-from ai.backend.manager.models.storage_namespace import StorageNamespaceRow
 from ai.backend.manager.models.storage_namespace.lookups import (
     StorageNamespaceLookup,
 )
+from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 
 
 @dataclass(frozen=True)

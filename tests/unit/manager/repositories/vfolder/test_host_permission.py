@@ -1,0 +1,382 @@
+"""Tests for `get_allowed_vfolder_hosts_by_user` project-membership behavior.
+
+Only the membership filter, answered by the virtual entity graph, is verified.
+The function's domain-level and resource-policy-level merge behavior is not the
+focus of this test module.
+"""
+
+from __future__ import annotations
+
+import uuid
+from collections.abc import AsyncGenerator
+from uuid import UUID, uuid4
+
+import pytest
+
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.types import (
+    BinarySize,
+    ResourceSlot,
+    VFolderHostPermission,
+    VFolderHostPermissionMap,
+)
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
+    KeyPairResourcePolicyRow,
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+)
+from ai.backend.manager.models.user.row import (
+    PasswordHashAlgorithm,
+    UserRole,
+    UserRow,
+    UserStatus,
+)
+from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
+    EntityMembershipCapRow,
+)
+from ai.backend.manager.models.virtual_entity.entity_membership_field import (
+    EntityMembershipFieldRow,
+)
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.vfolder.host_permission import (
+    get_allowed_vfolder_hosts_by_user,
+)
+from ai.backend.testutils.db import with_tables
+from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
+
+HOST_A = "host-a"
+HOST_B = "host-b"
+HOST_C = "host-c"
+HOSTS_A: VFolderHostPermissionMap = VFolderHostPermissionMap({
+    HOST_A: {VFolderHostPermission.CREATE}
+})
+HOSTS_B: VFolderHostPermissionMap = VFolderHostPermissionMap({
+    HOST_B: {VFolderHostPermission.CREATE}
+})
+HOSTS_C: VFolderHostPermissionMap = VFolderHostPermissionMap({
+    HOST_C: {VFolderHostPermission.CREATE}
+})
+
+
+def _password() -> PasswordInfo:
+    return PasswordInfo(
+        password="dummy",
+        algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+        rounds=600_000,
+        salt_size=32,
+    )
+
+
+class TestGetAllowedVFolderHostsByUserMembership:
+    """Project-membership filter for `get_allowed_vfolder_hosts_by_user`.
+
+    Each test seeds a domain, two groups in that domain, and a regular user.
+    Membership is granted by enrolling the user in the project's virtual entity.
+    """
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                ResourceGroupRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                RoleRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                ProjectRow,
+                AgentRow,
+                VirtualEntityRow,
+                ScopeBindingRow,
+                EntityLabelRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                EntityMembershipFieldRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def domain_fixture(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[DomainFixtureData, None]:
+        domain_id = DomainID(uuid.uuid4())
+        name = f"test-domain-{uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as sess:
+            sess.add(
+                DomainRow(
+                    id=domain_id,
+                    name=name,
+                    description="",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts=VFolderHostPermissionMap(),
+                    allowed_docker_registries=[],
+                )
+            )
+            await sess.flush()
+        yield DomainFixtureData(domain_name=DomainName(name), domain_id=domain_id)
+
+    @pytest.fixture
+    async def project_resource_policy(
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> AsyncGenerator[str, None]:
+        policy_name = f"test-proj-policy-{uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as sess:
+            sess.add(
+                ProjectResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+                    max_network_count=5,
+                )
+            )
+            await sess.flush()
+        yield policy_name
+
+    @pytest.fixture
+    async def user_resource_policy(
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> AsyncGenerator[str, None]:
+        policy_name = f"test-user-policy-{uuid4().hex[:8]}"
+        async with db_with_cleanup.begin_session() as sess:
+            sess.add(
+                UserResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=10,
+                    max_quota_scope_size=BinarySize.finite_from_str("10GiB"),
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
+            await sess.flush()
+        yield policy_name
+
+    @pytest.fixture
+    async def regular_user(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_fixture: DomainFixtureData,
+        user_resource_policy: str,
+    ) -> AsyncGenerator[UUID, None]:
+        user_uuid = uuid4()
+        async with db_with_cleanup.begin_session() as sess:
+            sess.add(
+                UserRow(
+                    uuid=user_uuid,
+                    username=f"user_{user_uuid.hex[:8]}",
+                    email=f"user-{user_uuid.hex[:8]}@example.com",
+                    password=_password(),
+                    need_password_change=False,
+                    status=UserStatus.ACTIVE,
+                    status_info="active",
+                    domain_name=domain_fixture.domain_name,
+                    role=UserRole.USER,
+                    resource_policy=user_resource_policy,
+                    domain_id=domain_fixture.domain_id,
+                )
+            )
+            await sess.flush()
+        yield user_uuid
+
+    @pytest.fixture
+    async def group_a(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_fixture: DomainFixtureData,
+        project_resource_policy: str,
+    ) -> AsyncGenerator[UUID, None]:
+        gid = uuid4()
+        async with db_with_cleanup.begin_session() as sess:
+            sess.add(
+                ProjectRow(
+                    id=gid,
+                    name=f"group-a-{gid.hex[:8]}",
+                    domain_name=domain_fixture.domain_name,
+                    resource_policy=project_resource_policy,
+                    description="",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts=HOSTS_A,
+                    type=ProjectType.GENERAL,
+                )
+            )
+            await sess.flush()
+        yield gid
+
+    @pytest.fixture
+    async def group_b(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_fixture: DomainFixtureData,
+        project_resource_policy: str,
+    ) -> AsyncGenerator[UUID, None]:
+        gid = uuid4()
+        async with db_with_cleanup.begin_session() as sess:
+            sess.add(
+                ProjectRow(
+                    id=gid,
+                    name=f"group-b-{gid.hex[:8]}",
+                    domain_name=domain_fixture.domain_name,
+                    resource_policy=project_resource_policy,
+                    description="",
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts=HOSTS_B,
+                    type=ProjectType.GENERAL,
+                )
+            )
+            await sess.flush()
+        yield gid
+
+    @pytest.fixture
+    async def membership_in_group_a(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        regular_user: UUID,
+        group_a: UUID,
+    ) -> AsyncGenerator[None, None]:
+        """Enroll regular_user in group_a."""
+        async with db_with_cleanup.begin_session() as sess:
+            await VirtualEntitySeeder().enroll_user_in_project(sess, group_a, regular_user)
+            await sess.flush()
+        yield
+
+    @pytest.fixture
+    async def membership_in_group_b(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        regular_user: UUID,
+        group_b: UUID,
+    ) -> AsyncGenerator[None, None]:
+        """Enroll regular_user in group_b."""
+        async with db_with_cleanup.begin_session() as sess:
+            await VirtualEntitySeeder().enroll_user_in_project(sess, group_b, regular_user)
+            await sess.flush()
+        yield
+
+    async def test_member_groups_contribute_their_hosts(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_fixture: DomainFixtureData,
+        regular_user: UUID,
+        group_a: UUID,
+        group_b: UUID,
+        membership_in_group_a: None,
+        membership_in_group_b: None,
+    ) -> None:
+        """Without `group_id`, hosts from every group the user is a member of are merged."""
+        async with db_with_cleanup.begin_readonly() as conn:
+            result = await get_allowed_vfolder_hosts_by_user(
+                conn,
+                resource_policy={},
+                domain_name=domain_fixture.domain_name,
+                user_uuid=regular_user,
+            )
+
+        assert HOST_A in result
+        assert HOST_B in result
+
+    async def test_non_member_groups_do_not_contribute(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_fixture: DomainFixtureData,
+        regular_user: UUID,
+        group_a: UUID,
+        group_b: UUID,
+        membership_in_group_a: None,
+    ) -> None:
+        """Only groups with an ASE membership row are merged into the result."""
+        async with db_with_cleanup.begin_readonly() as conn:
+            result = await get_allowed_vfolder_hosts_by_user(
+                conn,
+                resource_policy={},
+                domain_name=domain_fixture.domain_name,
+                user_uuid=regular_user,
+            )
+
+        assert HOST_A in result
+        assert HOST_B not in result
+
+    async def test_group_id_filter_with_membership(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_fixture: DomainFixtureData,
+        regular_user: UUID,
+        group_a: UUID,
+        group_b: UUID,
+        membership_in_group_a: None,
+        membership_in_group_b: None,
+    ) -> None:
+        """`group_id` restricts merging to that single group when the user is a member."""
+        async with db_with_cleanup.begin_readonly() as conn:
+            result = await get_allowed_vfolder_hosts_by_user(
+                conn,
+                resource_policy={},
+                domain_name=domain_fixture.domain_name,
+                user_uuid=regular_user,
+                group_id=group_a,
+            )
+
+        assert HOST_A in result
+        assert HOST_B not in result
+
+    async def test_group_id_filter_without_membership(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_fixture: DomainFixtureData,
+        regular_user: UUID,
+        group_a: UUID,
+    ) -> None:
+        """`group_id` for a group the user is not a member of yields no group hosts."""
+        async with db_with_cleanup.begin_readonly() as conn:
+            result = await get_allowed_vfolder_hosts_by_user(
+                conn,
+                resource_policy={},
+                domain_name=domain_fixture.domain_name,
+                user_uuid=regular_user,
+                group_id=group_a,
+            )
+
+        assert HOST_A not in result
+
+    async def test_resource_policy_hosts_merge_independent_of_membership(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_fixture: DomainFixtureData,
+        regular_user: UUID,
+    ) -> None:
+        """Hosts from `resource_policy` are merged regardless of project membership.
+
+        Sanity check that the membership filter does not gate non-membership inputs.
+        """
+        async with db_with_cleanup.begin_readonly() as conn:
+            result = await get_allowed_vfolder_hosts_by_user(
+                conn,
+                resource_policy={"allowed_vfolder_hosts": HOSTS_C},
+                domain_name=domain_fixture.domain_name,
+                user_uuid=regular_user,
+            )
+
+        assert HOST_C in result

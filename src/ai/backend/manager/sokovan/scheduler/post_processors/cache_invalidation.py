@@ -6,14 +6,14 @@ import logging
 from typing import TYPE_CHECKING, override
 
 from ai.backend.common.types import AccessKey
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .base import PostProcessor, PostProcessorContext
 
 if TYPE_CHECKING:
     from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class CacheInvalidationPostProcessor(PostProcessor):
@@ -36,7 +36,4 @@ class CacheInvalidationPostProcessor(PostProcessor):
 
         if affected_keys:
             await self._repository.invalidate_kernel_related_cache(list(affected_keys))
-            log.debug(
-                "Invalidated kernel-related cache for {} access keys",
-                len(affected_keys),
-            )
+            log.debug("kernel-related cache invalidated", access_key_count=len(affected_keys))

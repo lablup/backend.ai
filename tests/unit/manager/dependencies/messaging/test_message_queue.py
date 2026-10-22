@@ -64,7 +64,7 @@ class TestMessageQueueDependency:
 
         config = _make_mock_config()
         dependency = MessageQueueDependency()
-        queue_input = MessageQueueInput(config=config)  # type: ignore[arg-type]
+        queue_input = MessageQueueInput(config=config, sentinel_monitors=MagicMock())  # type: ignore[arg-type]
 
         async with dependency.provide(queue_input) as queue:
             assert queue is mock_queue
@@ -90,7 +90,7 @@ class TestMessageQueueDependency:
 
         config = _make_mock_config()
         dependency = MessageQueueDependency()
-        queue_input = MessageQueueInput(config=config)  # type: ignore[arg-type]
+        queue_input = MessageQueueInput(config=config, sentinel_monitors=MagicMock())  # type: ignore[arg-type]
 
         with pytest.raises(RuntimeError):
             async with dependency.provide(queue_input) as queue:

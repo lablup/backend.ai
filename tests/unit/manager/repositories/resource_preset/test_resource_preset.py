@@ -14,17 +14,14 @@ from ai.backend.common.exception import ResourcePresetConflict
 from ai.backend.common.types import BinarySize, ResourceSlot
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.errors.resource import ResourcePresetNotFound
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.resource_preset.searchable_fields import (
     ResourcePresetSearchableFields,
 )
 from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
-from ai.backend.manager.repositories.resource_preset.cache_source.cache_source import (
-    ResourcePresetCacheSource,
-)
 from ai.backend.manager.repositories.resource_preset.db_source.db_source import (
     ResourcePresetDBSource,
 )
@@ -49,21 +46,8 @@ class TestResourcePresetRepository:
         return mock
 
     @pytest.fixture
-    def mock_cache_source(self) -> MagicMock:
-        """Create mocked cache source"""
-        mock = MagicMock(spec=ResourcePresetCacheSource)
-        # Set all async methods to return AsyncMock
-        mock.get_preset_by_id = AsyncMock(return_value=None)
-        mock.get_preset_by_name = AsyncMock(return_value=None)
-        mock.set_preset = AsyncMock()
-        mock.get_preset_list = AsyncMock(return_value=None)
-        mock.set_preset_list = AsyncMock()
-        mock.invalidate_preset = AsyncMock()
-        return mock
-
-    @pytest.fixture
     def resource_preset_repository(
-        self, mock_db_engine: MagicMock, mock_db_source: MagicMock, mock_cache_source: MagicMock
+        self, mock_db_engine: MagicMock, mock_db_source: MagicMock
     ) -> ResourcePresetRepository:
         """Create ResourcePresetRepository instance with mocked database"""
         mock_config_provider = MagicMock()
@@ -72,13 +56,11 @@ class TestResourcePresetRepository:
         )
         repo = ResourcePresetRepository(
             db=mock_db_engine,
-            valkey_stat=MagicMock(),
             config_provider=mock_config_provider,
             v2_ops_provider=ShareOpsProvider(mock_db_engine),
         )
         # Replace internal sources with mocks
         repo._db_source = mock_db_source
-        repo._cache_source = mock_cache_source
         return repo
 
     @pytest.fixture
@@ -143,37 +125,28 @@ class TestResourcePresetRepository:
         self,
         resource_preset_repository: ResourcePresetRepository,
         mock_db_source: MagicMock,
-        mock_cache_source: MagicMock,
         sample_preset_row: ResourcePresetRow,
     ) -> None:
         """Test successful preset retrieval by ID"""
         preset_id = sample_preset_row.id
         preset_data = ResourcePresetSearchableFields.own.to_data(sample_preset_row)
 
-        # Mock cache miss, then DB hit
-        mock_cache_source.get_preset_by_id = AsyncMock(return_value=None)
         mock_db_source.get_preset_by_id = AsyncMock(return_value=preset_data)
-        mock_cache_source.set_preset = AsyncMock()
 
         result = await resource_preset_repository.get_preset_by_id(preset_id)
 
         assert result.id == preset_id
         assert result.name == sample_preset_row.name
-        mock_cache_source.get_preset_by_id.assert_called_once_with(preset_id)
         mock_db_source.get_preset_by_id.assert_called_once_with(preset_id)
-        mock_cache_source.set_preset.assert_called_once_with(preset_data)
 
     async def test_get_preset_by_id_not_found(
         self,
         resource_preset_repository: ResourcePresetRepository,
         mock_db_source: MagicMock,
-        mock_cache_source: MagicMock,
     ) -> None:
         """Test preset retrieval by ID when not found"""
         preset_id = uuid.uuid4()
 
-        # Mock cache miss and DB raises exception
-        mock_cache_source.get_preset_by_id = AsyncMock(return_value=None)
         mock_db_source.get_preset_by_id = AsyncMock(side_effect=ResourcePresetNotFound())
 
         with pytest.raises(ResourcePresetNotFound):
@@ -183,37 +156,28 @@ class TestResourcePresetRepository:
         self,
         resource_preset_repository: ResourcePresetRepository,
         mock_db_source: MagicMock,
-        mock_cache_source: MagicMock,
         sample_preset_row: ResourcePresetRow,
     ) -> None:
         """Test successful preset retrieval by name"""
         preset_name = "test-preset"
         preset_data = ResourcePresetSearchableFields.own.to_data(sample_preset_row)
 
-        # Mock cache miss, then DB hit
-        mock_cache_source.get_preset_by_name = AsyncMock(return_value=None)
         mock_db_source.get_preset_by_name = AsyncMock(return_value=preset_data)
-        mock_cache_source.set_preset = AsyncMock()
 
         result = await resource_preset_repository.get_preset_by_name(preset_name)
 
         assert result.name == preset_name
         assert result.id == sample_preset_row.id
-        mock_cache_source.get_preset_by_name.assert_called_once_with(preset_name)
         mock_db_source.get_preset_by_name.assert_called_once_with(preset_name)
-        mock_cache_source.set_preset.assert_called_once_with(preset_data)
 
     async def test_get_preset_by_name_not_found(
         self,
         resource_preset_repository: ResourcePresetRepository,
         mock_db_source: MagicMock,
-        mock_cache_source: MagicMock,
     ) -> None:
         """Test preset retrieval by name when not found"""
         preset_name = "non-existent"
 
-        # Mock cache miss and DB raises exception
-        mock_cache_source.get_preset_by_name = AsyncMock(return_value=None)
         mock_db_source.get_preset_by_name = AsyncMock(side_effect=ResourcePresetNotFound())
 
         with pytest.raises(ResourcePresetNotFound):
@@ -223,7 +187,6 @@ class TestResourcePresetRepository:
         self,
         resource_preset_repository: ResourcePresetRepository,
         mock_db_source: MagicMock,
-        mock_cache_source: MagicMock,
         sample_preset_row: ResourcePresetRow,
     ) -> None:
         """Test preset retrieval by ID when both ID and name provided"""
@@ -243,7 +206,6 @@ class TestResourcePresetRepository:
         self,
         resource_preset_repository: ResourcePresetRepository,
         mock_db_source: MagicMock,
-        mock_cache_source: MagicMock,
         sample_preset_row: ResourcePresetRow,
     ) -> None:
         """Test preset retrieval by name only"""
@@ -276,7 +238,6 @@ class TestResourcePresetRepository:
         self,
         resource_preset_repository: ResourcePresetRepository,
         mock_db_source: MagicMock,
-        mock_cache_source: MagicMock,
         sample_preset_row: ResourcePresetRow,
     ) -> None:
         """Test successful preset modification"""
@@ -291,19 +252,16 @@ class TestResourcePresetRepository:
 
         # Mock modify operation
         mock_db_source.update_preset = AsyncMock(return_value=preset_data)
-        mock_cache_source.invalidate_preset = AsyncMock()
 
         result = await resource_preset_repository.modify_preset_validated(updater)
 
         assert result is not None
         mock_db_source.update_preset.assert_called_once_with(updater)
-        mock_cache_source.invalidate_preset.assert_called_once_with(preset_id, None)
 
     async def test_modify_preset_validated_not_found(
         self,
         resource_preset_repository: ResourcePresetRepository,
         mock_db_source: MagicMock,
-        mock_cache_source: MagicMock,
     ) -> None:
         """Test preset modification when preset not found"""
         preset_id = uuid.uuid4()
@@ -338,7 +296,6 @@ class TestResourcePresetRepository:
         self,
         resource_preset_repository: ResourcePresetRepository,
         mock_db_source: MagicMock,
-        mock_cache_source: MagicMock,
         sample_preset_row: ResourcePresetRow,
     ) -> None:
         """Test successful preset deletion by ID"""
@@ -347,20 +304,17 @@ class TestResourcePresetRepository:
 
         # Mock delete operation
         mock_db_source.delete_preset = AsyncMock(return_value=preset_data)
-        mock_cache_source.invalidate_preset = AsyncMock()
 
         result = await resource_preset_repository.delete_preset_validated(preset_id)
 
         assert result is not None
         assert isinstance(result, ResourcePresetData)
         mock_db_source.delete_preset.assert_called_once_with(preset_id)
-        mock_cache_source.invalidate_preset.assert_called_once_with(preset_id, None)
 
     async def test_delete_preset_validated_not_found(
         self,
         resource_preset_repository: ResourcePresetRepository,
         mock_db_source: MagicMock,
-        mock_cache_source: MagicMock,
     ) -> None:
         """Test preset deletion when preset not found"""
         preset_id = ResourcePresetID(uuid.uuid4())
@@ -375,7 +329,6 @@ class TestResourcePresetRepository:
         self,
         resource_preset_repository: ResourcePresetRepository,
         mock_db_source: MagicMock,
-        mock_cache_source: MagicMock,
     ) -> None:
         """Test listing all presets"""
         preset_list = [
@@ -389,24 +342,18 @@ class TestResourcePresetRepository:
             for i in range(3)
         ]
 
-        # Mock cache miss, then DB hit
-        mock_cache_source.get_preset_list = AsyncMock(return_value=None)
         mock_db_source.list_presets = AsyncMock(return_value=preset_list)
-        mock_cache_source.set_preset_list = AsyncMock()
 
         result = await resource_preset_repository.list_presets()
 
         assert len(result) == 3
         assert all(isinstance(p, ResourcePresetData) for p in result)
-        mock_cache_source.get_preset_list.assert_called_once_with(None)
         mock_db_source.list_presets.assert_called_once_with(None)
-        mock_cache_source.set_preset_list.assert_called_once_with(preset_list, None)
 
     async def test_list_presets_by_scaling_group(
         self,
         resource_preset_repository: ResourcePresetRepository,
         mock_db_source: MagicMock,
-        mock_cache_source: MagicMock,
     ) -> None:
         """Test listing presets filtered by scaling group"""
         resource_group = "gpu-cluster"
@@ -420,37 +367,26 @@ class TestResourcePresetRepository:
             )
         ]
 
-        # Mock cache miss, then DB hit
-        mock_cache_source.get_preset_list = AsyncMock(return_value=None)
         mock_db_source.list_presets = AsyncMock(return_value=preset_list)
-        mock_cache_source.set_preset_list = AsyncMock()
 
         result = await resource_preset_repository.list_presets(resource_group_name=resource_group)
 
         assert len(result) == 1
         assert result[0].resource_group_name == resource_group
-        mock_cache_source.get_preset_list.assert_called_once_with(resource_group)
         mock_db_source.list_presets.assert_called_once_with(resource_group)
-        mock_cache_source.set_preset_list.assert_called_once_with(preset_list, resource_group)
 
     async def test_list_presets_empty(
         self,
         resource_preset_repository: ResourcePresetRepository,
         mock_db_source: MagicMock,
-        mock_cache_source: MagicMock,
     ) -> None:
         """Test listing presets when none exist"""
-        # Mock cache miss, then DB returns empty list
-        mock_cache_source.get_preset_list = AsyncMock(return_value=None)
         mock_db_source.list_presets = AsyncMock(return_value=[])
-        mock_cache_source.set_preset_list = AsyncMock()
 
         result = await resource_preset_repository.list_presets()
 
         assert len(result) == 0
-        mock_cache_source.get_preset_list.assert_called_once_with(None)
         mock_db_source.list_presets.assert_called_once_with(None)
-        mock_cache_source.set_preset_list.assert_called_once_with([], None)
 
     async def test_repository_decorator_applied(
         self, resource_preset_repository: ResourcePresetRepository
@@ -475,32 +411,6 @@ class TestResourcePresetRepository:
 
 class TestResourcePresetDataModels:
     """Test cases for ResourcePresetData and related models"""
-
-    def test_resource_preset_data_conversion(self) -> None:
-        """Test ResourcePresetData to/from dataclass conversion"""
-        preset_data = ResourcePresetData(
-            id=ResourcePresetID(uuid.uuid4()),
-            name="test-preset",
-            resource_slots=ResourceSlot({"cpu": Decimal("4"), "mem": Decimal("8589934592")}),
-            shared_memory=BinarySize(1073741824),  # 1 GiB
-            resource_group_name="default",
-        )
-
-        # Test to_cache method
-        cache_data = preset_data.to_cache()
-        assert cache_data["id"] == str(preset_data.id)
-        assert cache_data["name"] == preset_data.name
-        assert cache_data["resource_slots"] == preset_data.resource_slots.to_json()
-        assert cache_data["shared_memory"] == str(preset_data.shared_memory)
-        assert cache_data["scaling_group_name"] == preset_data.resource_group_name
-
-        # Test from_cache method
-        restored = ResourcePresetData.from_cache(cache_data)
-        assert restored.id == preset_data.id
-        assert restored.name == preset_data.name
-        assert restored.resource_slots == preset_data.resource_slots
-        assert restored.shared_memory == preset_data.shared_memory
-        assert restored.resource_group_name == preset_data.resource_group_name
 
     def test_resource_slot_validation(self) -> None:
         """Test ResourceSlot validation and conversion"""

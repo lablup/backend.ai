@@ -9,9 +9,9 @@ from ai.backend.appproxy.common.types import (
 )
 from ai.backend.appproxy.worker.proxy.backend.base import BaseBackend
 from ai.backend.appproxy.worker.types import Circuit, RootContext
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass=ABCMeta):
@@ -29,10 +29,9 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
 
         key = self.get_circuit_key(circuit)
         self.circuits[key] = circuit
-        self.backends[key] = await self.initialize_backend(circuit, routes)
-        log.debug(
-            "circuit {} (app:{}, mode: {}) registered", circuit.id, circuit.app, circuit.app_mode
-        )
+        with with_log_context(circuit_id=circuit.id):
+            self.backends[key] = await self.initialize_backend(circuit, routes)
+            log.debug("circuit registered (app: {}, mode: {})", circuit.app, circuit.app_mode)
         metrics.circuit.observe_circuit_creation(protocol=circuit.protocol.name)
 
     async def update_circuit_route_info(
@@ -40,7 +39,7 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
     ) -> None:
         key = self.get_circuit_key(circuit)
         if key not in self.circuits:
-            log.warning("Tried to update an inactive slot: {}", key)
+            log.debug("skipped a route update for an inactive slot {}", key)
             return
         await self.update_backend(self.backends[key], new_routes)
         self.circuits[key].route_info = new_routes
@@ -49,12 +48,12 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
         metrics = self.root_context.metrics
         key = self.get_circuit_key(circuit)
         if key not in self.circuits:
-            log.warning("Tried to break an inactive slot: {}", key)
+            log.debug("skipped breaking an inactive slot {}", key)
             return
         try:
             await self.terminate_backend(self.backends[key])
         except Exception:
-            log.exception("Failed to terminate backend for circuit {}: {}", key)
+            log.exception("failed to terminate the circuit backend", circuit_id=circuit.id)
         finally:
             del self.backends[key]
             del self.circuits[key]

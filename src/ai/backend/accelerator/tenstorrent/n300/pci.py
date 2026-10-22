@@ -1,13 +1,14 @@
-import asyncio
 from collections.abc import AsyncIterator
 from pathlib import Path
+
+from ai.backend.common.asyncio import run_in_executor_with_context
 
 
 async def read_sysfs(path: Path, attr: str) -> str:
     def _blocking() -> str:
         return (path / attr).read_text().strip()
 
-    return await asyncio.get_running_loop().run_in_executor(None, _blocking)
+    return await run_in_executor_with_context(None, _blocking)
 
 
 async def lspci() -> AsyncIterator[dict[str, str | int]]:

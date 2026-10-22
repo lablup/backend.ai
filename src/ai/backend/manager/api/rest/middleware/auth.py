@@ -24,7 +24,7 @@ import logging
 import secrets
 import uuid
 from collections.abc import Awaitable, Callable, Iterable, Mapping
-from contextlib import ExitStack
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Final
@@ -38,7 +38,7 @@ from dateutil.parser import parse as dtparse
 from dateutil.tz import tzutc
 from sqlalchemy.orm import aliased, load_only
 
-from ai.backend.common.contexts.user import with_triggered_user, with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserData, UserRole
@@ -46,8 +46,7 @@ from ai.backend.common.exception import InvalidIpAddressValue
 from ai.backend.common.jwt.exceptions import JWTError
 from ai.backend.common.plugin.hook import FIRST_COMPLETED, PASSED
 from ai.backend.common.types import AccessKey, ReadableCIDR, SecretKey
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.logging.utils import with_log_context_fields
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.types import WebRequestHandler
 from ai.backend.manager.data.auth.types import AuthenticatedKeypair, AuthenticatedUser
 from ai.backend.manager.errors.auth import (
@@ -67,8 +66,7 @@ from ai.backend.manager.models.resource_policy.searchable_fields import (
     KeyPairResourcePolicySearchableFields,
     UserResourcePolicySearchableFields,
 )
-from ai.backend.manager.models.user import UserRow, UserStatus
-from ai.backend.manager.models.utils import execute_with_retry
+from ai.backend.manager.models.user.row import UserRow, UserStatus
 from ai.backend.manager.secret.pool import KeyProviderPool
 
 if TYPE_CHECKING:
@@ -77,7 +75,7 @@ if TYPE_CHECKING:
     from ai.backend.common.plugin.hook import HookPluginContext
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 TRUSTED_PROXY_NETWORKS_KEY: Final = "_trusted_proxy_networks"
 FORWARDED_URL_HEADER: Final = "X-Forwarded-URL"
@@ -423,9 +421,7 @@ def is_from_trusted_proxy(request: web.Request) -> bool:
 @functools.cache
 def _warn_forwarded_url_without_trusted_proxies() -> None:
     log.warning(
-        "Accepting the X-Forwarded-URL header without verifying its origin because "
-        "manager.trusted-proxies is not configured. Configure manager.trusted-proxies; "
-        "this fallback will be removed in a future release."
+        "x-forwarded-url accepted without origin check; configure manager.trusted-proxies",
     )
 
 
@@ -442,9 +438,9 @@ def _resolve_forwarded_url(request: web.Request) -> str | None:
         _warn_forwarded_url_without_trusted_proxies()
         return upstream_url
     if not is_from_trusted_proxy(request):
-        log.debug(
-            "ignored the X-Forwarded-URL header sent from an untrusted peer (peer:{})",
-            _peer_address(request),
+        log.trace(
+            "x-forwarded-url header from untrusted peer ignored",
+            peer_address=_peer_address(request),
         )
         return None
     return upstream_url
@@ -459,9 +455,9 @@ def _resolve_forwarded_prefix(request: web.Request) -> str | None:
     if raw_prefix is None:
         return None
     if not is_from_trusted_proxy(request):
-        log.debug(
-            "ignored the X-Forwarded-Prefix header sent from an untrusted peer (peer:{})",
-            _peer_address(request),
+        log.trace(
+            "x-forwarded-prefix header from untrusted peer ignored",
+            peer_address=_peer_address(request),
         )
         return None
     return raw_prefix.rstrip("/")
@@ -621,11 +617,13 @@ def _set_unauthenticated_state(request: web.Request) -> None:
     request["user"] = None
 
 
-#: Statuses whose owner may not authenticate: the account is gone or a purge is
-#: working through it. This is what keeps a soft-deleted user's keypairs from
-#: reaching the API — the delete no longer deactivates them.
+#: Statuses whose owner may not authenticate: the ones login rejects, plus a purge
+#: working through the account. Deactivating or deleting a user leaves its keypairs
+#: active, so this is what keeps them from reaching the API.
 _AUTH_DENIED_USER_STATUSES: Final = frozenset({
+    UserStatus.INACTIVE,
     UserStatus.DELETED,
+    UserStatus.BEFORE_VERIFICATION,
     *UserStatus.purge_in_progress(),
 })
 
@@ -638,12 +636,12 @@ class _AuthContext:
     keypair: AuthenticatedKeypair
 
 
-async def _query_auth_context_by_access_key(
+async def _query_auth_context(
     db: ExtendedAsyncSAEngine,
     key_provider_pool: KeyProviderPool,
-    access_key: str,
+    keypair_condition: sa.ColumnElement[bool],
 ) -> _AuthContext | None:
-    """Resolve an access key into the context an authenticated request carries.
+    """Resolve the keypair matching ``keypair_condition`` into the context a request carries.
 
     Only the columns that context carries are loaded, and the rows stay inside this session.
     """
@@ -688,9 +686,7 @@ async def _query_auth_context_by_access_key(
                     UserRow.allowed_client_ip,
                 ),
             )
-            .where(
-                (KeyPairRow.access_key == access_key) & (KeyPairRow.is_active.is_(True)),
-            )
+            .where(keypair_condition)
         )
         row = result.one_or_none()
         if row is None:
@@ -726,6 +722,31 @@ async def _query_auth_context_by_access_key(
         )
 
 
+async def _query_auth_context_by_access_key(
+    db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
+    access_key: str,
+) -> _AuthContext | None:
+    return await _query_auth_context(
+        db,
+        key_provider_pool,
+        (KeyPairRow.access_key == access_key) & (KeyPairRow.is_active.is_(True)),
+    )
+
+
+async def _query_auth_context_by_user_id(
+    db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
+    user_id: UserID,
+) -> _AuthContext | None:
+    """Resolve a user into the context of their default keypair."""
+    return await _query_auth_context(
+        db,
+        key_provider_pool,
+        (KeyPairRow.user == user_id) & KeyPairRow.is_default,
+    )
+
+
 async def _authenticate_via_jwt(
     db: ExtendedAsyncSAEngine,
     key_provider_pool: KeyProviderPool,
@@ -748,13 +769,12 @@ async def _authenticate_via_jwt(
             raise AuthorizationFailed("Access key not found in database")
         jwt_validator.validate_token(jwt_token, context.keypair.secret_key)
 
-        log.trace("JWT authentication succeeded for access_key={}", access_key)
+        log.trace("jwt authentication succeeded", access_key=access_key)
 
         await valkey_stat.increment_keypair_query_count(access_key)
         return context
 
     except JWTError as e:
-        log.warning("JWT authentication failed: {}", e)
         raise AuthorizationFailed(f"JWT validation failed: {e}") from e
 
 
@@ -818,66 +838,49 @@ async def _authenticate_via_hook(
     return context
 
 
-async def _load_user_data(db: ExtendedAsyncSAEngine, user_id: UserID) -> UserData:
-    """Load a user's ``UserData`` by UUID (impersonation target). Raises if not found."""
+async def _resolve_effective_context(
+    request: web.Request,
+    db: ExtendedAsyncSAEngine,
+    key_provider_pool: KeyProviderPool,
+    authenticated: _AuthContext,
+) -> _AuthContext:
+    """The context the request runs as: the caller's, or the X-BackendAI-Act-As target's.
 
-    async def _query() -> UserRow | None:
-        async with db.begin_readonly_session_read_committed() as session:
-            row: UserRow | None = await session.scalar(
-                sa.select(UserRow).where(UserRow.uuid == user_id)
-            )
-            return row
-
-    row = await execute_with_retry(_query)
-    if row is None:
-        raise UserNotFound("Impersonation target user not found")
-    if row.status in _AUTH_DENIED_USER_STATUSES:
-        raise AuthorizationFailed(f"Impersonation target user account is {row.status}")
-    return UserData(
-        user_id=row.uuid,
-        is_authorized=True,
-        is_admin=row.role in (UserRole.ADMIN, UserRole.SUPERADMIN),
-        is_superadmin=row.role == UserRole.SUPERADMIN,
-        role=row.role,
-        domain_name=row.domain_name,
-        domain_id=row.domain_id,
-    )
-
-
-async def _resolve_effective_user(
-    request: web.Request, db: ExtendedAsyncSAEngine, authenticated_user: UserData
-) -> UserData:
-    """The user the request runs as: the caller, or the X-BackendAI-Act-As target.
-
-    Without the header the caller is the effective user. With it, the caller must
-    be a super admin and the request runs as the target (fail-closed).
+    With the header, the caller must be a super admin and the target's default keypair is used.
     """
     raw_target = request.headers.get("X-BackendAI-Act-As")
     if not raw_target:
-        return authenticated_user
-    if not authenticated_user.is_superadmin:
+        return authenticated
+    if authenticated.user.role != UserRole.SUPERADMIN:
         raise InsufficientPrivilege("Only superadmin may use X-BackendAI-Act-As")
     try:
         target_user_id = UserID(uuid.UUID(raw_target))
     except ValueError as e:
         raise InvalidAuthParameters("X-BackendAI-Act-As must be a valid user UUID") from e
-    return await _load_user_data(db, target_user_id)
+    context = await _query_auth_context_by_user_id(db, key_provider_pool, target_user_id)
+    if context is None:
+        raise UserNotFound("Impersonation target user or its default keypair not found")
+    return context
+
+
+def _to_user_data(context: _AuthContext) -> UserData:
+    return UserData(
+        user_id=context.user.uuid,
+        is_authorized=True,
+        is_admin=context.keypair.is_admin,
+        is_superadmin=context.user.role == UserRole.SUPERADMIN,
+        role=context.user.role,
+        domain_name=context.user.domain_name,
+        domain_id=context.user.domain_id,
+    )
 
 
 def _setup_user_context(
     effective_user: UserData | None,
     trigger_user: UserData | None,
-) -> ExitStack:
+) -> AbstractContextManager[None]:
     """Push the already-resolved identities into the context (no I/O)."""
-    stack = ExitStack()
-
-    if effective_user is not None:
-        stack.enter_context(with_user(effective_user))
-        stack.enter_context(with_log_context_fields({"user_id": str(effective_user.user_id)}))
-    if trigger_user is not None:
-        stack.enter_context(with_triggered_user(trigger_user))
-
-    return stack
+    return with_user_context(effective_user, trigger_user)
 
 
 # ---------------------------------------------------------------------------
@@ -1014,35 +1017,21 @@ def build_auth_middleware(
                 request, db, key_provider_pool, valkey_stat, hook_plugin_ctx
             )
 
-        authenticated_user: UserData | None = None
-        if context is not None:
-            validate_ip(request, context.user.allowed_client_ip)
-            is_superadmin = context.user.role == UserRole.SUPERADMIN
-            request.update({
-                "is_authorized": True,
-                "is_admin": context.keypair.is_admin,
-                "is_superadmin": is_superadmin,
-                # Handlers still read these two as mappings.
-                "user": dataclasses.asdict(context.user),
-                "keypair": dataclasses.asdict(context.keypair),
-            })
-            authenticated_user = UserData(
-                user_id=context.user.uuid,
-                is_authorized=True,
-                is_admin=context.keypair.is_admin,
-                is_superadmin=is_superadmin,
-                role=context.user.role,
-                domain_name=context.user.domain_name,
-                domain_id=context.user.domain_id,
-            )
+        if context is None:
+            return await handler(request)
 
-        # The effective user may differ from the caller (impersonation); the DB is touched here.
-        effective_user = (
-            await _resolve_effective_user(request, db, authenticated_user)
-            if authenticated_user is not None
-            else None
-        )
-        with _setup_user_context(effective_user, authenticated_user):
+        validate_ip(request, context.user.allowed_client_ip)
+        effective = await _resolve_effective_context(request, db, key_provider_pool, context)
+        effective_user = _to_user_data(effective)
+        request.update({
+            "is_authorized": True,
+            "is_admin": effective_user.is_admin,
+            "is_superadmin": effective_user.is_superadmin,
+            # Handlers still read these two as mappings.
+            "user": dataclasses.asdict(effective.user),
+            "keypair": dataclasses.asdict(effective.keypair),
+        })
+        with _setup_user_context(effective_user, _to_user_data(context)):
             return await handler(request)
 
     return _middleware

@@ -15,14 +15,14 @@ from aiohttp import web
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.plugin.hook import HookHandler, HookPlugin, Reject
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.user.queriers import AuthorizingUserQuerier
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 
 from .config import OIDCHookConfig
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class OIDCHookPlugin(HookPlugin):
@@ -67,9 +67,7 @@ class OIDCHookPlugin(HookPlugin):
 
         stoken = params.get("stoken") or params.get("sToken") or request.cookies.get("sToken")
         if not stoken:
-            log.debug(
-                "AUTHORIZE_HOOK(openid): no sToken found in params or cookies. proceeded with normal auth steps"
-            )
+            log.debug("openid auth token not found, proceeding with normal auth")
             return None
         try:
             payload = jwt.decode(stoken, secret, algorithms=["HS256"])
@@ -80,7 +78,7 @@ class OIDCHookPlugin(HookPlugin):
         except (jwt.PyJWTError, KeyError, ValueError):
             raise Reject("Invalid authentication token") from None
 
-        log.debug("AUTHORIZE_HOOK(openid): auth token {}", stoken)
+        log.debug("openid auth token decoded", user_id=user_id)
 
         user = await auth_repository.query_user_data(AuthorizingUserQuerier(user_id))
         if user is None:
@@ -90,10 +88,7 @@ class OIDCHookPlugin(HookPlugin):
 
         if payload.get("force", False):
             await auth_repository.invalidate_active_login_sessions(user_id)
-            log.info(
-                "AUTHORIZE_HOOK(openid): force-invalidated existing login sessions for {}",
-                email,
-            )
+            log.trace("openid login sessions force-invalidated", user_email=email)
 
-        log.info("AUTHORIZE_HOOK(openid): {} authenticated by auth token", email)
+        log.trace("openid user authenticated by auth token", user_email=email)
         return user

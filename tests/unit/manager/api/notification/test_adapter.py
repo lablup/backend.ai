@@ -40,7 +40,7 @@ from ai.backend.manager.api.rest.notification.adapter import (
     NotificationChannelAdapter,
     NotificationRuleAdapter,
 )
-from ai.backend.manager.data.notification import (
+from ai.backend.manager.data.notification.types import (
     NotificationChannelData,
     NotificationRuleData,
 )

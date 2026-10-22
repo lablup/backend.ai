@@ -25,7 +25,7 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.network.types import NetworkData
-from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import (
     SessionLauncher,
     SessionLauncherArgs,

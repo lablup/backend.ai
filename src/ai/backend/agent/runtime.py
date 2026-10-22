@@ -16,6 +16,7 @@ from ai.backend.agent.resources import ComputerContext, ResourceAllocator
 from ai.backend.agent.tasks import CollectNodeStatTask, UpdateSlotsTask
 from ai.backend.agent.types import AgentBackend, get_agent_discovery
 from ai.backend.common.auth import PublicKey
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.cron import LocalCron
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.types import AgentId, DeviceName, SlotName
@@ -44,6 +45,7 @@ class AgentRuntime:
         stats_monitor: AgentStatsPluginContext,
         error_monitor: AgentErrorPluginContext,
         agent_public_key: PublicKey | None,
+        sentinel_monitors: SentinelMonitorSet,
     ) -> AgentRuntime:
         kernel_registry = KernelRegistry()
         resource_allocator = await ResourceAllocator.new(local_config, etcd)
@@ -79,6 +81,7 @@ class AgentRuntime:
                         computers,
                         slots,
                         agent_class,
+                        sentinel_monitors,
                     )
                 )
                 create_agent_tasks.append(create_agent_task)
@@ -128,6 +131,7 @@ class AgentRuntime:
         computers: Mapping[DeviceName, ComputerContext],
         slots: Mapping[SlotName, Decimal],
         agent_class: AgentClass,
+        sentinel_monitors: SentinelMonitorSet,
     ) -> AbstractAgent[Any, Any]:
         agent_kwargs = {
             "kernel_registry": kernel_registry,
@@ -137,6 +141,7 @@ class AgentRuntime:
             "computers": computers,
             "slots": slots,
             "agent_class": agent_class,
+            "sentinel_monitors": sentinel_monitors,
         }
 
         backend = local_config.agent_common.backend

@@ -5,7 +5,7 @@ from ai.backend.common.dto.storage.request import (
     PresignedDownloadObjectReq,
     PresignedUploadObjectReq,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData, ArtifactStatus
@@ -26,7 +26,7 @@ from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url
     GetUploadPresignedURLActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ObjectStorageService:
@@ -58,9 +58,8 @@ class ObjectStorageService:
         """
         Get a presigned download URL for an existing object storage.
         """
-        log.info(
-            "Getting presigned download URL for object storage, artifact_revision: {}",
-            action.artifact_revision_id,
+        log.trace(
+            "presigned download url requested", artifact_revision_id=action.artifact_revision_id
         )
 
         reservoir_config = self._config_provider.config.reservoir
@@ -111,9 +110,8 @@ class ObjectStorageService:
         """
         Get a presigned upload URL for an existing object storage.
         """
-        log.info(
-            "Getting presigned upload URL for object storage with artifact id: {}",
-            action.artifact_revision_id,
+        log.trace(
+            "presigned upload url requested", artifact_revision_id=action.artifact_revision_id
         )
 
         reservoir_config = self._config_provider.config.reservoir

@@ -14,11 +14,9 @@ from ai.backend.common.dto.manager.v2.group.response import (
     VFolderHostPermissionEntry,
 )
 from ai.backend.common.dto.manager.v2.group.types import ProjectType
-from ai.backend.manager.api.gql.project_v2.types import (
-    ProjectTypeEnum,
-    ProjectV2GQL,
-    VFolderHostPermissionEnum,
-)
+from ai.backend.manager.api.gql.common_types import VFolderHostPermissionEnum
+from ai.backend.manager.api.gql.project_v2.types.enums import ProjectTypeEnum
+from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 
 
 def _make_project_node(

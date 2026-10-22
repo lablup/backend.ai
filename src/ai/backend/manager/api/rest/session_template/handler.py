@@ -44,7 +44,7 @@ from ai.backend.common.dto.manager.template.response import (
     UpdateSessionTemplateResponse,
 )
 from ai.backend.common.json import load_json
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.services.project.actions.lookup import LookupProjectAction
@@ -69,7 +69,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.project.processors import ProjectProcessors
     from ai.backend.manager.services.template.processors import TemplateProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class SessionTemplateHandler:

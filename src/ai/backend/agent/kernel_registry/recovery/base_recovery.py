@@ -8,9 +8,9 @@ from ai.backend.agent.kernel_registry.loader.abc import AbstractKernelRegistryLo
 from ai.backend.agent.kernel_registry.writer.abc import AbstractKernelRegistryWriter
 from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.common.types import KernelId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class BaseKernelRegistryRecovery:

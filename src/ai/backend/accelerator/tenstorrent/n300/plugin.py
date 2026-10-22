@@ -51,12 +51,12 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 PREFIX = "tt-n300"
 VALID_CARD_TYPE = "n300"
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class TTn300Plugin(AbstractComputePlugin):
@@ -85,10 +85,12 @@ class TTn300Plugin(AbstractComputePlugin):
 
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
-            log.info("Tenstorrent acceleration is enabled.")
+            log.debug("detected devices:\n{}", pformat(detected_devices))
+            log.info(
+                "accelerator enabled", plugin_name=self.key, device_count=len(detected_devices)
+            )
         except ImportError:
-            log.warning("could not find Tenstorrent devices with VID 1eff.")
+            log.warning("accelerator disabled: no devices found", plugin_name=self.key)
             self.enabled = False
 
     async def list_devices(self) -> list[TTn300Device]:
@@ -110,7 +112,7 @@ class TTn300Plugin(AbstractComputePlugin):
             # right board should report 'N/A' instead of valid PCI bus ID
             if device_info["board_type"] not in VALID_CARD_TYPE or device_info["bus_id"] == "N/A":
                 continue
-            log.debug("Config: {}", device_info)
+            log.debug("device info: {}", device_info)
             pci_idx, bus, _dev_fn = device_info["bus_id"].split(":", maxsplit=3)
 
             pci_base_path = resolve_pci_sysfs_path(f"{pci_idx}:{bus}")
@@ -142,7 +144,7 @@ class TTn300Plugin(AbstractComputePlugin):
 
     async def available_slots(self) -> Mapping[SlotName, Decimal]:
         devices = await self.list_devices()
-        log.debug("available devices: {}", Decimal(len(devices)))
+        log.debug("available devices: {}", len(devices))
         return {
             self.slot_types[0][0]: Decimal(len(devices)),
         }

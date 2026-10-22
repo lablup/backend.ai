@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.global_entity import GlobalEntityID, GlobalEntityName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeEntityType
@@ -140,7 +140,7 @@ class TestTheGateIsStated:
             _run, validators=[RefusingGlobalActionValidator()]
         )
 
-        with with_user(_user(UserRole.SUPERADMIN)):
+        with with_user_context(_user(UserRole.SUPERADMIN)):
             with pytest.raises(InsufficientPrivilege):
                 await processor.run(_SearchAction())
 
@@ -150,7 +150,7 @@ class TestRoleBypasses:
         repository = _repository(Permission.NONE)
         processor = _processor(repository, _config_provider())
 
-        with with_user(_user(UserRole.SUPERADMIN)):
+        with with_user_context(_user(UserRole.SUPERADMIN)):
             assert isinstance(await processor.run(_SearchAction()), _Result)
 
         repository.governed_permissions.assert_not_awaited()
@@ -159,7 +159,7 @@ class TestRoleBypasses:
         repository = _repository(Permission.NONE)
         processor = _processor(repository, _config_provider())
 
-        with with_user(_user(UserRole.MONITOR)):
+        with with_user_context(_user(UserRole.MONITOR)):
             assert isinstance(await processor.run(_SearchAction()), _Result)
 
         repository.governed_permissions.assert_not_awaited()
@@ -169,7 +169,7 @@ class TestRoleBypasses:
     ) -> None:
         processor = _processor(_repository(Permission.NONE), _config_provider())
 
-        with with_user(_user(UserRole.MONITOR)):
+        with with_user_context(_user(UserRole.MONITOR)):
             with pytest.raises(InsufficientPrivilege):
                 await processor.run(_CreateAction())
 
@@ -178,7 +178,7 @@ class TestGlobalSingletonPermission:
     async def test_the_granted_user_passes(self, global_singleton: GlobalEntityID) -> None:
         processor = _processor(_repository(Permission.READ), _config_provider())
 
-        with with_user(_user()):
+        with with_user_context(_user()):
             assert isinstance(await processor.run(_SearchAction()), _Result)
 
     async def test_the_user_holding_nothing_is_refused(
@@ -186,14 +186,14 @@ class TestGlobalSingletonPermission:
     ) -> None:
         processor = _processor(_repository(Permission.NONE), _config_provider())
 
-        with with_user(_user()):
+        with with_user_context(_user()):
             with pytest.raises(InsufficientPrivilege):
                 await processor.run(_SearchAction())
 
     async def test_read_does_not_carry_a_write(self, global_singleton: GlobalEntityID) -> None:
         processor = _processor(_repository(Permission.READ), _config_provider())
 
-        with with_user(_user()):
+        with with_user_context(_user()):
             with pytest.raises(InsufficientPrivilege):
                 await processor.run(_CreateAction())
 
@@ -204,7 +204,7 @@ class TestGlobalSingletonPermission:
         processor = _processor(repository, _config_provider())
         user = _user()
 
-        with with_user(user):
+        with with_user_context(user):
             await processor.run(_SearchAction())
 
         (keys,) = repository.governed_permissions.await_args.args
@@ -232,7 +232,7 @@ class TestGlobalSingletonPermission:
         )
         processor = _processor(repository, _config_provider())
 
-        with with_user(_user()):
+        with with_user_context(_user()):
             with pytest.raises(InsufficientPrivilege):
                 await processor.run(_SearchAction())
 
@@ -243,14 +243,14 @@ class TestEnforcementOff:
             _repository(Permission.NONE), _config_provider(enforcement_enabled=False)
         )
 
-        with with_user(_user(UserRole.SUPERADMIN)):
+        with with_user_context(_user(UserRole.SUPERADMIN)):
             assert isinstance(await processor.run(_SearchAction()), _Result)
 
     async def test_everyone_else_is_refused_without_a_permission_read(self) -> None:
         repository = _repository(Permission.full())
         processor = _processor(repository, _config_provider(enforcement_enabled=False))
 
-        with with_user(_user()):
+        with with_user_context(_user()):
             with pytest.raises(InsufficientPrivilege):
                 await processor.run(_SearchAction())
 

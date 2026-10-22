@@ -16,9 +16,9 @@ from ai.backend.common.exception import (
     UnreachableError,
 )
 from ai.backend.common.resilience.policy import Policy
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -117,20 +117,18 @@ class RetryPolicy(Policy):
         for attempt in range(1, self._max_retries + 1):
             try:
                 return await next_call(*args, **kwargs)
-            except self._non_retryable_exceptions as e:
-                log.debug("non-retryable exception encountered: {}", e)
+            except self._non_retryable_exceptions:
                 raise
             except Exception as e:
                 last_exception = e
-                log.debug(
-                    "retryable exception encountered: {}, attempt {}/{}",
-                    e,
-                    attempt,
-                    self._max_retries,
-                )
 
                 # Wait before next retry (but not after the last attempt)
                 if attempt < self._max_retries:
+                    log.warning(
+                        "retryable call failed",
+                        attempt_count=attempt,
+                        max_retries=self._max_retries,
+                    )
                     delay = self._calculate_delay(attempt)
                     await asyncio.sleep(delay)
 

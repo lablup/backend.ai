@@ -3,17 +3,19 @@ from __future__ import annotations
 import functools
 import json
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager as actxmgr
 from typing import TYPE_CHECKING, Any
 
+import asyncpg
 import sqlalchemy as sa
 from sqlalchemy.engine import create_engine as _create_engine
-from yarl import URL
 
+from ai.backend.common.db.connector import PrimaryMemberConnector
+from ai.backend.common.db.invalidator import FailedBeginInvalidator
 from ai.backend.common.exception import DatabaseError
 from ai.backend.common.json import ExtendedJSONEncoder
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
@@ -21,16 +23,23 @@ if TYPE_CHECKING:
     from ai.backend.manager.config.bootstrap import BootstrapConfig
     from ai.backend.manager.config.unified import DatabaseConfig
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def create_async_engine(
     *args: Any,
     _txn_concurrency_threshold: int = 0,
     _lock_conn_timeout: int = 0,
+    async_creator: Callable[[], Awaitable[asyncpg.Connection]] | None = None,
     **kwargs: Any,
 ) -> ExtendedAsyncSAEngine:
     kwargs["future"] = True
+    sync_engine: sa.engine.Engine
+    if async_creator is not None:
+        # Same adaptation as sqlalchemy.ext.asyncio.create_async_engine(async_creator=...)
+        kwargs["creator"] = lambda: sync_engine.dialect.loaded_dbapi.connect(
+            async_creator_fn=async_creator
+        )
     sync_engine = _create_engine(*args, **kwargs)
     return ExtendedAsyncSAEngine(
         sync_engine,
@@ -44,15 +53,20 @@ async def connect_database(
     db_config: DatabaseConfig,
     isolation_level: str = "SERIALIZABLE",
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
-    db_url = (
-        URL(f"postgresql+asyncpg://{db_config.addr.host}/{db_config.name}")
-        .with_port(db_config.addr.port)
-        .with_user(db_config.user)
-    )
-    if db_config.password is not None:
-        db_url = db_url.with_password(db_config.password)
+    db_url = db_config.sqlalchemy_url()
+    members = [(addr.host, addr.port) for addr in db_config.addrs]
 
-    version_check_db = create_async_engine(str(db_url))
+    version_check_db = create_async_engine(
+        db_url,
+        async_creator=PrimaryMemberConnector(
+            members,
+            user=db_config.user,
+            password=db_config.password,
+            database=db_config.name,
+            connect_timeout=db_config.connect_timeout,
+            connect_kwargs={},
+        ).connect,
+    )
     async with version_check_db.begin() as conn:
         result = await conn.execute(sa.text("show server_version"))
         version_str = result.scalar()
@@ -64,8 +78,15 @@ async def connect_database(
     await version_check_db.dispose()
 
     db = create_async_engine(
-        str(db_url),
-        connect_args=pgsql_connect_opts,
+        db_url,
+        async_creator=PrimaryMemberConnector(
+            members,
+            user=db_config.user,
+            password=db_config.password,
+            database=db_config.name,
+            connect_timeout=db_config.connect_timeout,
+            connect_kwargs=pgsql_connect_opts,
+        ).connect,
         pool_size=db_config.pool_size,
         pool_recycle=db_config.pool_recycle,
         pool_pre_ping=db_config.pool_pre_ping,
@@ -79,6 +100,7 @@ async def connect_database(
         ),
         _lock_conn_timeout=int(db_config.lock_conn_timeout),
     )
+    FailedBeginInvalidator().listen(db.sync_engine)
     yield db
     await db.dispose()
 
@@ -87,5 +109,5 @@ async def vacuum_db(bootstrap_config: BootstrapConfig, vacuum_full: bool = False
     async with connect_database(bootstrap_config.db, isolation_level="AUTOCOMMIT") as db:
         async with db.begin() as conn:
             vacuum_sql = "VACUUM FULL" if vacuum_full else "VACUUM"
-            log.info("Performing {} operation...", vacuum_sql)
+            log.info("database vacuum started", vacuum_full=vacuum_full)
             await conn.exec_driver_sql(vacuum_sql)

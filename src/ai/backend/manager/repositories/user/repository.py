@@ -11,6 +11,7 @@ import msgpack
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.dotfile import DotfileID
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import BackendAIError
@@ -20,8 +21,10 @@ from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryAr
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import AccessKey, SlotName
 from ai.backend.common.utils import nmget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
+from ai.backend.manager.data.dotfile.types import DotfileData, DotfileEntries, DotfileEntry
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
@@ -30,25 +33,42 @@ from ai.backend.manager.data.user.types import (
     UserData,
     UserSearchResult,
 )
+from ai.backend.manager.errors.bootstrap_script import DefaultBootstrapScriptNotFound
+from ai.backend.manager.errors.storage import DotfileCreationFailed, DotfileNotFound
 from ai.backend.manager.errors.user import KeyPairNotFound
+from ai.backend.manager.models.bootstrap_script.queriers import BootstrapScriptQuerier
+from ai.backend.manager.models.bootstrap_script.updaters import DefaultBootstrapScriptUpdater
+from ai.backend.manager.models.dotfile.creators import DotfileEntryCreator
+from ai.backend.manager.models.dotfile.scopes import UserDotfileTarget
+from ai.backend.manager.models.dotfile.searchable_fields import DotfileSearchableFields
+from ai.backend.manager.models.dotfile.searchers import DotfileSearcher
+from ai.backend.manager.models.dotfile.updaters import (
+    DotfileDefaultClearUpdater,
+    DotfileDefaultSetUpdater,
+)
 from ai.backend.manager.models.keypair.creators import KeypairCreator
 from ai.backend.manager.models.keypair.purgers import NonDefaultKeypairPurger
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
 from ai.backend.manager.models.keypair.row import generate_keypair_data
 from ai.backend.manager.models.keypair.updaters import KeypairUpdater
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.user.creators import UserCreateSpec
-from ai.backend.manager.repositories.user.db_source import UserDBSource
+from ai.backend.manager.repositories.user.db_source.db_source import UserDBSource
 from ai.backend.manager.secret.pool import KeyProviderPool
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 user_repository_resilience = Resilience(
@@ -69,6 +89,7 @@ user_repository_resilience = Resilience(
 class UserRepository:
     _db_source: UserDBSource
     _v2_ops: V2DBOpsProvider
+    _policy_ops: ResourcePolicyOpsProvider
     _key_provider_pool: KeyProviderPool
 
     def __init__(
@@ -76,11 +97,35 @@ class UserRepository:
         db: ExtendedAsyncSAEngine,
         v2_ops_provider: V2DBOpsProvider,
         share_ops_provider: ShareOpsProvider,
+        policy_ops_provider: ResourcePolicyOpsProvider,
         key_provider_pool: KeyProviderPool,
     ) -> None:
-        self._db_source = UserDBSource(db, v2_ops_provider, share_ops_provider, key_provider_pool)
+        self._db_source = UserDBSource(
+            db, v2_ops_provider, share_ops_provider, policy_ops_provider, key_provider_pool
+        )
         self._v2_ops = v2_ops_provider
+        self._policy_ops = policy_ops_provider
         self._key_provider_pool = key_provider_pool
+
+    @user_repository_resilience.apply()
+    async def default_bootstrap_script(self, user_id: UserID) -> BootstrapScriptData | None:
+        async with self._v2_ops.read_ops() as r:
+            scripts = await r.query_owned_fields(
+                BootstrapScriptQuerier(entity_type=user_id.entity_type()), [user_id]
+            )
+            return scripts.get(user_id)
+
+    @user_repository_resilience.apply()
+    async def update_default_bootstrap_script(
+        self, updater: DefaultBootstrapScriptUpdater
+    ) -> BootstrapScriptData:
+        async with self._v2_ops.write_ops() as w:
+            updated = await w.batch_update_in_global(updater)
+        if not updated:
+            raise DefaultBootstrapScriptNotFound(
+                f"{updater.entity} has no default bootstrap script"
+            )
+        return updated[0]
 
     @user_repository_resilience.apply()
     async def default_access_key(self, user_id: UserID) -> AccessKey | None:
@@ -144,9 +189,9 @@ class UserRepository:
         return await self._db_source.update_user_by_uuid_validated(updater)
 
     @user_repository_resilience.apply()
-    async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> None:
+    async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> UserData:
         """Soft delete user by UUID, setting status to DELETED."""
-        await self._db_source.delete_user_by_uuid_validated(user_uuid)
+        return await self._db_source.delete_user_by_uuid_validated(user_uuid)
 
     @user_repository_resilience.apply()
     async def restore_user_by_uuid_validated(self, user_uuid: UUID) -> None:
@@ -256,7 +301,7 @@ class UserRepository:
     async def _create_keypair(
         self, user_id: UserID, creator: KeyPairCreator
     ) -> GeneratedKeyPairData:
-        async with self._v2_ops.write_ops() as w:
+        async with self._policy_ops.write_ops() as w:
             keypair = await w.create_field(
                 user_id,
                 KeypairCreator(
@@ -267,6 +312,7 @@ class UserRepository:
                     rate_limit=creator.rate_limit,
                 ),
             )
+            await w.restate_keypair_resource_policy_share(user_id)
         return GeneratedKeyPairData(keypair=keypair)
 
     @user_repository_resilience.apply()
@@ -277,20 +323,22 @@ class UserRepository:
     @user_repository_resilience.apply()
     async def purge_keypair(self, keypair_id: KeyPairID) -> KeyPairData:
         """Remove one keypair unless it is the key its user authorizes with."""
-        async with self._v2_ops.write_ops() as w:
+        async with self._policy_ops.write_ops() as w:
             data = await w.purge_field_entity(NonDefaultKeypairPurger(keypair_id=keypair_id))
             if data is None:
                 raise KeyPairNotFound(f"Keypair not found: {keypair_id}")
+            await w.restate_keypair_resource_policy_share(UserID(data.user_id))
             return data
 
     @user_repository_resilience.apply()
     async def update_keypair(self, updater: KeypairUpdater) -> KeyPairData:
         """Write one keypair's settings unless the write would deactivate the key its
         user authorizes with."""
-        async with self._v2_ops.write_ops() as w:
+        async with self._policy_ops.write_ops() as w:
             data = await w.update_data(updater)
             if data is None:
                 raise KeyPairNotFound(f"Keypair not found: {updater.target_id_value()}")
+            await w.restate_keypair_resource_policy_share(UserID(data.user_id))
             return data
 
     @user_repository_resilience.apply()
@@ -309,6 +357,56 @@ class UserRepository:
             if data is None:
                 raise KeyPairNotFound(f"Keypair not found: {updater.target_id_value()}")
             return data
+
+    @user_repository_resilience.apply()
+    async def get_default_dotfiles(self, user_id: UserID) -> DotfileEntries:
+        async with self._v2_ops.read_ops() as ops:
+            return await self._default_dotfiles(ops, user_id)
+
+    @user_repository_resilience.apply()
+    async def create_dotfile(self, creator: DotfileEntryCreator, max_count: int) -> DotfileData:
+        """Add a file unless the user already holds ``max_count``, variants included."""
+        async with self._v2_ops.write_ops() as ops:
+            owned = await ops.search_with_scopes(
+                [UserDotfileTarget(creator.owner)],
+                DotfileSearcher(pagination=OffsetPagination(limit=1), conditions=[], orders=[]),
+            )
+            if owned.total_count >= max_count:
+                raise DotfileCreationFailed("Dotfile creation limit reached")
+            return await ops.create_field(creator.owner, creator)
+
+    @user_repository_resilience.apply()
+    async def switch_default_dotfile(self, user_id: UserID, dotfile_id: DotfileID) -> DotfileData:
+        """Make one of the user's dotfiles the default of its path."""
+        scopes = [UserDotfileTarget(user_id)]
+        async with self._v2_ops.write_ops() as ops:
+            # The clear locks the path's rows, so a concurrent switch waits for this one.
+            await ops.batch_update_in_scopes(
+                scopes, DotfileDefaultClearUpdater(user_id=user_id, dotfile_id=dotfile_id)
+            )
+            switched = await ops.batch_update_in_scopes(
+                scopes, DotfileDefaultSetUpdater(dotfile_id=dotfile_id)
+            )
+            if not switched:
+                raise DotfileNotFound
+            return switched[0]
+
+    async def _default_dotfiles(self, ops: V2ReadOps, user_id: UserID) -> DotfileEntries:
+        result = await ops.search_with_scopes(
+            [UserDotfileTarget(user_id)],
+            DotfileSearcher(
+                pagination=NoPagination(),
+                conditions=[DotfileSearchableFields.own.is_default.filter.equals(True)],
+                # Migrated rows share created_at; id keeps their original order.
+                orders=[
+                    DotfileSearchableFields.own.created_at.order.apply(True),
+                    DotfileSearchableFields.own.field_id.order.apply(True),
+                ],
+            ),
+        )
+        return DotfileEntries(
+            tuple(DotfileEntry(row.path, row.perm, row.data) for row in result.items)
+        )
 
     @user_repository_resilience.apply()
     async def admin_get_keypair(self, access_key: str) -> KeyPairData:

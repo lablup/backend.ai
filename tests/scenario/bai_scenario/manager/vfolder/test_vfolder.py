@@ -9,14 +9,16 @@ from uuid import UUID
 
 import pytest
 
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     CreateVFolderInput,
-    SearchVFoldersInput,
+    ScopedSearchVFoldersInput,
 )
 from ai.backend.common.dto.manager.v2.vfolder.response import (
     SearchVFoldersPayload,
     VFolderNode,
 )
+from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -42,13 +44,13 @@ from bai_scenario.components.vfolder import (
     SomeoneWithNoGrant,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 MADE = "work"
 
 type Answer = VFolderNode | SearchVFoldersPayload
-type FolderStep = Scenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
+type FolderStep = Scenario[TestSeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
 
 
 @dataclass(frozen=True)
@@ -78,7 +80,7 @@ class ListingMyFolders(When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer])
 
     @override
     def operation(self) -> str:
-        return "my_search"
+        return "scoped_search"
 
     @override
     def describe(self, laid: AFolderMakerAndTheirDomain) -> str:
@@ -87,7 +89,11 @@ class ListingMyFolders(When[AFolderMakerAndTheirDomain, VFolderAdapter, Answer])
     @override
     async def call(self, adapter: VFolderAdapter, laid: AFolderMakerAndTheirDomain) -> Answer:
         with ActingAs(laid.caller):
-            return await adapter.my_search(SearchVFoldersInput())
+            return await adapter.scoped_search(
+                ScopedSearchVFoldersInput(
+                    scope=VFolderScope(user=[UUIDScope(value=laid.caller.id)])
+                )
+            )
 
 
 @dataclass(frozen=True)
@@ -139,7 +145,7 @@ class TheFolderBelongsToTheMaker(Then[AFolderMakerAndTheirDomain, Answer]):
 
 @dataclass(frozen=True)
 class AGrantedUserMakesAFolderOfTheirOwn(
-    Scenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
 ):
     started: datetime
 
@@ -155,7 +161,7 @@ class AGrantedUserMakesAFolderOfTheirOwn(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderMakerAndTheirDomain]:
+    def given(self) -> Given[TestSeedingSession, AFolderMakerAndTheirDomain]:
         return SomeoneWhoMayMakeFolders()
 
     @override
@@ -169,7 +175,7 @@ class AGrantedUserMakesAFolderOfTheirOwn(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotMakeAFolder(
-    Scenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -180,7 +186,7 @@ class AUserGrantedNothingMayNotMakeAFolder(
         return "아무 권한도 받지 않은 사용자가 폴더를 만들려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderMakerAndTheirDomain]:
+    def given(self) -> Given[TestSeedingSession, AFolderMakerAndTheirDomain]:
         return SomeoneWithNoGrant()
 
     @override
@@ -194,7 +200,7 @@ class AUserGrantedNothingMayNotMakeAFolder(
 
 @dataclass(frozen=True)
 class AUserWhoMadeNoFolderListsNone(
-    Scenario[SeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
+    Scenario[TestSeedingSession, AFolderMakerAndTheirDomain, VFolderAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -205,7 +211,7 @@ class AUserWhoMadeNoFolderListsNone(
         return "폴더를 하나도 만들지 않은 사용자가 자기 폴더를 조회하면, 답은 비어 있다"
 
     @override
-    def given(self) -> Given[SeedingSession, AFolderMakerAndTheirDomain]:
+    def given(self) -> Given[TestSeedingSession, AFolderMakerAndTheirDomain]:
         return SomeoneWhoMayMakeFolders()
 
     @override

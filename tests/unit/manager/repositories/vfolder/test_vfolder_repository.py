@@ -5,6 +5,7 @@ Tests the repository layer with real database operations.
 
 from __future__ import annotations
 
+import dataclasses
 import uuid
 from collections.abc import AsyncGenerator
 from pathlib import PurePosixPath
@@ -38,6 +39,7 @@ from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -52,52 +54,58 @@ from ai.backend.manager.errors.storage import (
     VFolderNotFound,
 )
 from ai.backend.manager.errors.user import KeyPairNotFound, UserNotFound
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
+    DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.resource_slot.row import (
     ModelCardResourceRequirementRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.session import SessionRow, SessionStatus
-from ai.backend.manager.models.user import (
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import (
     UserRole,
     UserRow,
     UserStatus,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import (
+from ai.backend.manager.models.vfolder.creators import (
+    PersonalVFolderCreator,
+    ProjectVFolderCreator,
+)
+from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     VFolderUserMountPolicyRow,
 )
-from ai.backend.manager.models.vfolder.creators import ProjectVFolderCreator
 from ai.backend.manager.models.vfolder.updaters import VFolderSoftDeleteUpdater
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -566,6 +574,120 @@ class TestVfolderRepository:
                 )
             )
 
+    def test_a_personal_folder_made_without_a_level_defaults_to_none(self) -> None:
+        owner = uuid.uuid4()
+        row = PersonalVFolderCreator(
+            name="personal",
+            domain_name="default",
+            quota_scope_id=f"user:{owner}",
+            host="local",
+            creator_id=owner,
+            user=UserID(owner),
+        ).build_row()
+
+        assert row.default_mount_permission == VFolderMountPolicy.NONE
+
+    async def test_a_project_folder_made_without_a_level_defaults_to_read_write(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_project_resource_policy_name: str,
+    ) -> None:
+        project = await _add_project(
+            db_with_cleanup, test_domain, test_project_resource_policy_name, ProjectType.GENERAL
+        )
+        creator = dataclasses.replace(
+            self._make_project_vfolder_creator(
+                domain_name=test_domain.domain_name,
+                group_id=project,
+                user_id=test_user,
+                usage_mode=VFolderUsageMode.GENERAL,
+            ),
+            default_mount_permission=None,
+        )
+
+        creation = await vfolder_repository.create_vfolder_with_permission(creator)
+
+        assert creation.vfolder.default_mount_permission == VFolderMountPolicy.READ_WRITE
+
+    async def test_a_model_store_folder_made_without_a_level_defaults_to_read_only(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_model_store_group: uuid.UUID,
+    ) -> None:
+        creator = dataclasses.replace(
+            self._make_project_vfolder_creator(
+                domain_name=test_domain.domain_name,
+                group_id=test_model_store_group,
+                user_id=test_user,
+            ),
+            default_mount_permission=None,
+        )
+
+        creation = await vfolder_repository.create_vfolder_with_permission(creator)
+
+        assert creation.vfolder.default_mount_permission == VFolderMountPolicy.READ_ONLY
+
+    async def test_a_named_level_becomes_the_default(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_user: uuid.UUID,
+        test_project_resource_policy_name: str,
+    ) -> None:
+        project = await _add_project(
+            db_with_cleanup, test_domain, test_project_resource_policy_name, ProjectType.GENERAL
+        )
+
+        creation = await vfolder_repository.create_vfolder_with_permission(
+            self._make_project_vfolder_creator(
+                domain_name=test_domain.domain_name,
+                group_id=project,
+                user_id=test_user,
+                usage_mode=VFolderUsageMode.GENERAL,
+                permission=VFolderMountPolicy.READ_ONLY,
+            )
+        )
+
+        assert creation.vfolder.default_mount_permission == VFolderMountPolicy.READ_ONLY
+
+
+async def _add_project(
+    db: ExtendedAsyncSAEngine,
+    domain: DomainFixtureData,
+    policy_name: str,
+    project_type: ProjectType,
+) -> uuid.UUID:
+    """A project with the virtual entity the real project-create path provisions."""
+    project_id = uuid.uuid4()
+    async with db.begin_session() as session:
+        session.add(
+            ProjectRow(
+                id=project_id,
+                name=f"project-{project_id.hex[:8]}",
+                domain_name=domain.domain_name,
+                is_active=True,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts={"local": ["create-vfolder"]},
+                resource_policy=policy_name,
+                type=project_type,
+            )
+        )
+        await session.flush()
+        session.add(
+            VirtualEntityRow(
+                id=uuid.uuid4(),
+                entity_type=ProjectEntityType(),
+                entity_id=ProjectID(project_id),
+            )
+        )
+    return project_id
+
 
 async def _set_project_folder_allowance(
     db: ExtendedAsyncSAEngine, policy_name: str, allowance: int
@@ -759,8 +881,6 @@ class TestVfolderRepositoryAllowedVfolderHosts:
 
         assert isinstance(result, VFolderHostPermissionMap)
 
-    # -- get_user_with_keypair_policy_vfolder_hosts --
-
     @pytest.fixture
     async def keypair_policy_with_hosts(
         self,
@@ -811,31 +931,6 @@ class TestVfolderRepositoryAllowedVfolderHosts:
             )
             await db_sess.flush()
         return test_user
-
-    async def test_get_user_with_keypair_policy_vfolder_hosts_success(
-        self,
-        vfolder_repository: VfolderRepository,
-        user_with_active_keypair: uuid.UUID,
-    ) -> None:
-        """Returns email/role and the merged allowed_vfolder_hosts from active keypairs."""
-        result = await vfolder_repository.get_user_with_keypair_policy_vfolder_hosts(
-            user_with_active_keypair
-        )
-        assert result.email == f"test-{user_with_active_keypair.hex[:8]}@example.com"
-        assert result.role == UserRole.USER
-        assert "local:volume1" in result.allowed_vfolder_hosts
-        assert result.allowed_vfolder_hosts["local:volume1"] == {
-            VFolderHostPermission.CREATE,
-            VFolderHostPermission.MODIFY,
-        }
-
-    async def test_get_user_with_keypair_policy_vfolder_hosts_user_not_found(
-        self,
-        vfolder_repository: VfolderRepository,
-    ) -> None:
-        """Unknown user UUID raises UserNotFound."""
-        with pytest.raises(UserNotFound):
-            await vfolder_repository.get_user_with_keypair_policy_vfolder_hosts(uuid.uuid4())
 
     # -- default keypair policy --
 

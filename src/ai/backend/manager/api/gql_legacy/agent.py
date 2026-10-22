@@ -18,7 +18,7 @@ from graphene.types.datetime import DateTime as GQLDateTime
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 
 from ai.backend.common.data.entity.domain import DomainName
-from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
@@ -26,29 +26,26 @@ from ai.backend.common.types import (
     AgentId,
     HardwareMetadata,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.bgtask.tasks.rescan_gpu_alloc_maps import RescanGPUAllocMapsManifest
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
-from ai.backend.manager.data.agent.types import AgentDetailData
+from ai.backend.manager.data.agent.types import AgentDetailData, AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.permission_defs import AgentPermission
-from ai.backend.manager.models.agent import (
-    AgentRow,
-    AgentStatus,
-    agents,
-)
+from ai.backend.manager.models.agent.row import AgentRow, agents
 from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
-from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
-from ai.backend.manager.models.project import AssocGroupUserRow, groups
+from ai.backend.manager.models.project.row import groups
 from ai.backend.manager.models.rbac import (
     ScopeType,
 )
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_slot import AgentResourceRow
-from ai.backend.manager.models.user import UserRole, users
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
+from ai.backend.manager.models.user.row import UserRole, users
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 from ai.backend.manager.repositories.agent.query import QueryConditions, QueryOrders
 from ai.backend.manager.services.agent.actions.bulk_load_permissions import (
     BulkLoadAgentPermissionsAction,
@@ -77,7 +74,7 @@ from .kernel import ComputeContainer, KernelConnection, KernelNode
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = (
     "Agent",
@@ -667,13 +664,14 @@ async def _query_domain_groups_by_ak(
     if row is None:
         raise ValueError(f"No user found for access_key: {access_key}")
     user_domain = domain_name if domain_name is not None else row.domain_name
+    membership = user_scope_membership_query(ProjectEntityType(), row.uuid).subquery()
     query = (
-        sa.select(AssocGroupUserRow.group_id)
-        .select_from(sa.join(AssocGroupUserRow, groups, AssocGroupUserRow.group_id == groups.c.id))
-        .where((AssocGroupUserRow.user_id == row.uuid) & (groups.c.domain_name == user_domain))
+        sa.select(membership.c.scope_id)
+        .select_from(sa.join(membership, groups, membership.c.scope_id == groups.c.id))
+        .where(groups.c.domain_name == user_domain)
     )
     rows = (await db_conn.execute(query)).fetchall()
-    group_ids = [ProjectID(group_row.group_id) for group_row in rows]
+    group_ids = [ProjectID(group_row.scope_id) for group_row in rows]
     return user_domain, UserID(row.uuid), group_ids
 
 
@@ -960,7 +958,7 @@ class RescanGPUAllocMaps(graphene.Mutation):  # type: ignore[misc]
         info: graphene.ResolveInfo,
         agent_id: str,
     ) -> RescanGPUAllocMaps:
-        log.info("rescanning GPU alloc maps for agent {}", agent_id)
+        log.trace("gpu alloc map rescan requested", agent_id=agent_id)
         graph_ctx: GraphQueryContext = info.context
 
         manifest = RescanGPUAllocMapsManifest(agent_id=AgentId(agent_id))

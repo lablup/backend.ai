@@ -10,7 +10,9 @@ from ai.backend.manager.sokovan.idle_check.sweep.types import (
     IdleCheckSweepResult,
 )
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerHandler
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 
 
 class IdleCheckSweepHandler(ReconcilerHandler[IdleCheckSweepReconcileInfo, IdleCheckSweepResult]):
@@ -27,7 +29,7 @@ class IdleCheckSweepHandler(ReconcilerHandler[IdleCheckSweepReconcileInfo, IdleC
         if session_ids:
             await self._scheduling_controller.mark_sessions_for_termination(
                 session_ids,
-                reason=KernelLifecycleEventReason.IDLE_TIMEOUT.value,
+                reason=KernelLifecycleEventReason.IDLE_TIMEOUT,
                 message="idle check timeout",
             )
         return IdleCheckSweepResult(session_ids=session_ids)

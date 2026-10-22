@@ -18,7 +18,7 @@ from pydantic import (
     model_validator,
 )
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from . import validators as tx
 from .etcd import AsyncEtcd, ConfigScopes
@@ -26,7 +26,7 @@ from .exception import BackendAIError, ConfigurationError, ModelDefinitionValida
 from .model_service_start_command_compat import resolve_model_service_start_command
 from .types import BackendAISchema, RedisHelperConfig, SchemaValidationFailureInfo
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = (
     "ConfigurationError",
@@ -70,9 +70,9 @@ class BaseConfigSchema(BackendAISchema):
         if extra:
             keys = sorted(extra)
             log.warning(
-                "Unknown config field(s) in {}: {}",
-                type(self).__name__,
-                ", ".join(keys),
+                "unknown config fields ignored",
+                config_type=type(self).__name__,
+                unknown_fields=", ".join(keys),
             )
         return self
 
@@ -95,13 +95,22 @@ class BaseConfigModel(BackendAISchema):
     )
 
 
+def _align_etcd_addr_and_addrs(etcd: dict[str, Any]) -> dict[str, Any]:
+    if etcd.get("addrs") is not None:
+        return {**etcd, "addr": etcd["addrs"]}
+    addr = etcd["addr"]
+    return {**etcd, "addrs": addr if isinstance(addr, list) else [addr]}
+
+
 etcd_config_iv = t.Dict({
     t.Key("etcd"): t.Dict({
         t.Key("namespace"): t.String,
         t.Key("addr", default=("127.0.0.1", 2379)): tx.HostPortPair | t.List(tx.HostPortPair),
+        t.Key("addrs", optional=True): t.List(tx.HostPortPair, min_length=1),
         t.Key("user", default=""): t.Null | t.String(allow_blank=True),
         t.Key("password", default=""): t.Null | t.String(allow_blank=True),
-    }).allow_extra("*"),
+    }).allow_extra("*")
+    & _align_etcd_addr_and_addrs,
 }).allow_extra("*")
 
 redis_helper_default_config: RedisHelperConfig = {

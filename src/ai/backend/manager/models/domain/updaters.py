@@ -26,7 +26,6 @@ class DomainUpdater(GuardedDataUpdater[DomainRow, DomainData]):
     domain_id: DomainID
     new_name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
-    is_active: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
     total_resource_slots: TriState[ResourceSlot] = field(default_factory=TriState[ResourceSlot].nop)
     allowed_vfolder_hosts: OptionalState[dict[str, list[str]]] = field(
         default_factory=OptionalState[dict[str, list[str]]].nop
@@ -67,7 +66,6 @@ class DomainUpdater(GuardedDataUpdater[DomainRow, DomainData]):
         self.new_name.update_dict(to_update, "name")
         self.dotfiles.update_dict(to_update, "dotfiles")
         self.description.update_dict(to_update, "description")
-        self.is_active.update_dict(to_update, "is_active")
         self.total_resource_slots.update_dict(to_update, "total_resource_slots")
         self.allowed_vfolder_hosts.update_dict(to_update, "allowed_vfolder_hosts")
         self.allowed_docker_registries.update_dict(to_update, "allowed_docker_registries")

@@ -15,8 +15,8 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.common.types import AgentId, ImageCanonical, ImageID
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.common.types import AgentId, ImageCanonical
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.agent.types import (
     AgentData,
@@ -24,15 +24,15 @@ from ai.backend.manager.data.agent.types import (
     AgentHeartbeatUpsert,
     UpsertResult,
 )
-from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.errors.agent import AgentNotFound
-from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.agent.lookups import AgentNameLookup
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater, AgentStatusUpdater
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.resource_slot import AgentResourceRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.resource_slot.upserters import AgentResourceUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.agent.cache_source.cache_source import AgentCacheSource
@@ -44,7 +44,7 @@ from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvid
 from ai.backend.manager.repositories.resource_preset.utils import suppress_with_log
 from ai.backend.manager.repositories.resource_slot.types import resource_slot_to_quantities
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 agent_repository_resilience = Resilience(
@@ -117,8 +117,7 @@ class AgentRepository:
             ImageIdentifier(canonical=img.canonical, architecture=img.architecture)
             for img in installed_image_info
         ]
-        images_data = await self._db_source.get_images_by_image_identifiers(image_identifiers)
-        image_ids: list[ImageID] = list(images_data.keys())
+        image_ids = await self._db_source.image_ids_by_identifiers(image_identifiers)
         with suppress_with_log(
             [Exception], message=f"Failed to cache agent: {agent_id} to images: {image_ids}"
         ):
@@ -231,15 +230,15 @@ class AgentRepository:
         self, agent_id: AgentId, scanned_images: Mapping[ImageCanonical, ScannedImage]
     ) -> None:
         digest_list = [image.digest for image in scanned_images.values()]
-        images: dict[ImageID, ImageDataWithDetails] = await self._db_source.get_images_by_digest(
-            digest_list
-        )
+        image_ids = await self._db_source.image_ids_by_digest(digest_list)
         with suppress_with_log(
             [Exception],
-            message=f"Failed to remove agent: {agent_id} from images: {list(images.keys())}",
+            message=f"Failed to remove agent: {agent_id} from images: {image_ids}",
         ):
-            await self._cache_source.remove_agent_from_images(agent_id, list(images.keys()))
+            await self._cache_source.remove_agent_from_images(agent_id, image_ids)
 
+    # Every caller is in api/gql_legacy/agent.py. Delete it together with gql_legacy;
+    # it is the only v1 reader of AgentRow.agent_resource_rows and resources_by_rank.
     @agent_repository_resilience.apply()
     async def list_data(
         self,

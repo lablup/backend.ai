@@ -11,7 +11,7 @@ from collections.abc import AsyncGenerator
 import pytest
 
 from ai.backend.common.data.entity.domain import DomainID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.types import (
@@ -25,15 +25,15 @@ from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow, VFolderUserMountPolicyRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -354,3 +354,35 @@ class TestInvitationGettersInviterFields:
         invitation_data, _ = results[0]
         assert invitation_data.inviter == normal_inviter.email
         assert invitation_data.inviter_username == normal_inviter.username
+
+    async def test_get_sent_invitations_returns_invitee_email_for_user_recipient(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        sample_domain: DomainFixtureData,
+        normal_inviter: UserRow,
+        invitee_user: UserRow,
+        repository: VfolderRepository,
+    ) -> None:
+        vfolder = await self._create_vfolder(
+            db_with_cleanup, domain_name=sample_domain.domain_name, owner=normal_inviter
+        )
+        async with db_with_cleanup.begin_session() as session:
+            session.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=invitee_user.uuid))
+            await session.flush()
+            session.add(
+                EntityShareRow(
+                    sharer_user_id=UserID(normal_inviter.uuid),
+                    recipient_entity_type=UserEntityType(),
+                    recipient_entity_id=invitee_user.uuid,
+                    target_entity_type=VFolderEntityType(),
+                    target_entity_id=vfolder.id,
+                    permission_cap=Permission.READ,
+                    status=EntityShareStatus.PENDING,
+                )
+            )
+
+        results = await repository.get_sent_invitations_for_user(UserID(normal_inviter.uuid))
+
+        assert len(results) == 1
+        invitation_data, _ = results[0]
+        assert invitation_data.invitee == invitee_user.email

@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
-from ai.backend.common.data.entity.role import RoleEntityType
+from ai.backend.common.data.entity.role import RoleEntityType, RoleID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
@@ -20,30 +20,31 @@ from ai.backend.manager.data.permission.role import (
 )
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.project.types import ProjectType
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -313,10 +314,14 @@ class TestRoleAssignment:
     ) -> None:
         """Revoking the only project-scoped role returns remaining_count=0."""
         await perm_db_source.assign_role(
-            UserRoleAssignmentInput(user_id=user_1, role_id=project_scoped_role)
+            UserRoleAssignmentInput(
+                user_id=UserID(user_1),
+                role_id=RoleID(project_scoped_role),
+                granted_by=UserID(user_1),
+            )
         )
         result = await perm_db_source.revoke_role(
-            UserRoleRevocationInput(user_id=user_1, role_id=project_scoped_role)
+            UserRoleRevocationInput(user_id=UserID(user_1), role_id=RoleID(project_scoped_role))
         )
 
         assert len(result.project_remaining_roles) == 1
@@ -333,13 +338,21 @@ class TestRoleAssignment:
     ) -> None:
         """Revoking one role when another exists returns remaining_count=1."""
         await perm_db_source.assign_role(
-            UserRoleAssignmentInput(user_id=user_1, role_id=project_scoped_role)
+            UserRoleAssignmentInput(
+                user_id=UserID(user_1),
+                role_id=RoleID(project_scoped_role),
+                granted_by=UserID(user_1),
+            )
         )
         await perm_db_source.assign_role(
-            UserRoleAssignmentInput(user_id=user_1, role_id=second_project_scoped_role)
+            UserRoleAssignmentInput(
+                user_id=UserID(user_1),
+                role_id=RoleID(second_project_scoped_role),
+                granted_by=UserID(user_1),
+            )
         )
         result = await perm_db_source.revoke_role(
-            UserRoleRevocationInput(user_id=user_1, role_id=project_scoped_role)
+            UserRoleRevocationInput(user_id=UserID(user_1), role_id=RoleID(project_scoped_role))
         )
 
         assert len(result.project_remaining_roles) == 1
@@ -354,12 +367,32 @@ class TestRoleAssignment:
     ) -> None:
         """Revoking a non-project-scoped role returns empty project_remaining."""
         await perm_db_source.assign_role(
-            UserRoleAssignmentInput(user_id=user_1, role_id=domain_role)
+            UserRoleAssignmentInput(
+                user_id=UserID(user_1), role_id=RoleID(domain_role), granted_by=UserID(user_1)
+            )
         )
         result = await perm_db_source.revoke_role(
-            UserRoleRevocationInput(user_id=user_1, role_id=domain_role)
+            UserRoleRevocationInput(user_id=UserID(user_1), role_id=RoleID(domain_role))
         )
         assert result.project_remaining_roles == []
+
+    # --- bulk_assign_role ---
+
+    async def test_bulk_assign_fails_only_the_user_the_grant_fails_for(
+        self,
+        perm_db_source: PermissionDBSource,
+        project_scoped_role: uuid.UUID,
+        user_1: uuid.UUID,
+    ) -> None:
+        """A user naming no user row fails alone; the others are still granted."""
+        missing_user = UserID(uuid.uuid4())
+
+        result = await perm_db_source.bulk_assign_role(
+            RoleID(project_scoped_role), [missing_user, UserID(user_1)], UserID(user_1)
+        )
+
+        assert [s.user_id for s in result.successes] == [user_1]
+        assert [f.user_id for f in result.failures] == [missing_user]
 
     # --- the project roster ---
 

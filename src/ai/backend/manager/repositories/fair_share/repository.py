@@ -17,7 +17,7 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.resilience.policies.retry import BackoffStrategy
-from ai.backend.manager.data.fair_share import (
+from ai.backend.manager.data.fair_share.types import (
     DomainFairShareData,
     DomainFairShareSearchResult,
     FairShareCalculationContext,
@@ -35,16 +35,15 @@ from ai.backend.manager.models.fair_share.scopes import (
     ProjectFairShareTarget,
     UserFairShareTarget,
 )
-from ai.backend.manager.repositories.base import (
+from ai.backend.manager.repositories.base.querier import (
     BatchQuerier,
 )
+from ai.backend.manager.repositories.fair_share.db_source.db_source import FairShareDBSource
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareEntitySearchResult,
     ProjectFairShareEntitySearchResult,
     UserFairShareEntitySearchResult,
 )
-
-from .db_source import FairShareDBSource
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

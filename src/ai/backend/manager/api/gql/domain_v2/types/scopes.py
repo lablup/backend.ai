@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from ai.backend.common.dto.manager.v2.domain.types import DomainScope
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import UUIDScopeGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -19,7 +18,7 @@ from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
             "Scope for the scoped domain query. Each list is OR'd internally, and every "
             "scope named is authorized before the read runs."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="DomainScope",
 )

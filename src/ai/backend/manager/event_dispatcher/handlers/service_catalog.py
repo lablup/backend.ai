@@ -19,14 +19,14 @@ from ai.backend.common.events.event_types.service_discovery.anycast import (
     ServiceRegisteredEvent,
 )
 from ai.backend.common.types import AgentId, ServiceCatalogStatus
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.service_catalog.creators import ServiceCatalogEndpointCreator
 from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
 from ai.backend.manager.models.service_catalog.upserters import ServiceCatalogUpserter
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.service_catalog.repository import ServiceCatalogRepository
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ServiceCatalogEventHandler:
@@ -69,9 +69,9 @@ class ServiceCatalogEventHandler:
             ],
         )
         log.debug(
-            "Upserted service catalog entry: {}/{}",
-            event.service_group,
-            event.instance_id,
+            "service catalog entry upserted",
+            service_group_name=event.service_group,
+            instance_id=event.instance_id,
         )
 
     async def handle_deregistered(
@@ -91,9 +91,9 @@ class ServiceCatalogEventHandler:
                 .values(status=ServiceCatalogStatus.DEREGISTERED)
             )
         log.debug(
-            "Deregistered service: {}/{}",
-            event.service_group,
-            event.instance_id,
+            "service deregistered",
+            service_group_name=event.service_group,
+            instance_id=event.instance_id,
         )
 
     async def handle_sweep_stale_services(
@@ -126,5 +126,5 @@ class ServiceCatalogEventHandler:
             )
             count = result.rowcount
         if count > 0:
-            log.info("Marked {} stale services as UNHEALTHY", count)
+            log.info("stale services marked unhealthy", service_count=count)
         return count

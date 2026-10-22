@@ -12,8 +12,10 @@ so by implementing :class:`EntityData`. The bulk shape is different again — th
 named the entities, so it answers for each one against that list.
 """
 
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, replace
 from typing import override
 
 from ai.backend.common.data.entity.types import (
@@ -22,6 +24,7 @@ from ai.backend.common.data.entity.types import (
     FieldData,
     FieldIdentifier,
 )
+from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupActionResult
 from ai.backend.manager.actions.v2.lookup.bulk_base import (
     BaseBulkLookupActionResult,
@@ -107,30 +110,71 @@ class LookupOpsResult[TEntityID: EntityIdentifier](BaseLookupActionResult):
 
 
 class BulkLookupOpsResult[TKey, TEntityID: EntityIdentifier](BaseBulkLookupActionResult):
-    """The id each key of a bulk lookup names, and which keys named nothing.
+    """The id each key of a bulk lookup names, and why each other key failed.
 
     A key that named nothing is one failed key, so the operation that follows can
     answer for it beside the rest rather than being refused as a whole.
     """
 
     _resolved: Mapping[TKey, TEntityID]
+    _failures: Mapping[TKey, Exception]
     _key_results: Sequence[BulkLookupKeyResult]
 
     def __init__(
         self,
         resolved: Mapping[TKey, TEntityID],
+        failures: Mapping[TKey, Exception],
         key_results: Sequence[BulkLookupKeyResult],
     ) -> None:
         self._resolved = resolved
+        self._failures = failures
         self._key_results = key_results
 
     @property
     def resolved(self) -> Mapping[TKey, TEntityID]:
         return self._resolved
 
+    @property
+    def failures(self) -> Mapping[TKey, Exception]:
+        return self._failures
+
     @override
     def key_results(self) -> Sequence[BulkLookupKeyResult]:
         return self._key_results
+
+    def refused(
+        self,
+        denied: Mapping[EntityIdentifier, Exception],
+        unresolvable: Callable[[], Exception],
+    ) -> BulkLookupOpsResult[TKey, TEntityID]:
+        """Every key that named nothing or an entity in ``denied`` fails with one error.
+
+        The record keeps the two causes apart.
+        """
+        resolved = {key: id_ for key, id_ in self._resolved.items() if id_ not in denied}
+        failed = [*self._failures, *(key for key in self._resolved if key not in resolved)]
+        key_results = [
+            self._denied_key_result(one, denied[one.entity_id])
+            if one.entity_id is not None and one.entity_id in denied
+            else one
+            for one in self._key_results
+        ]
+        return BulkLookupOpsResult(
+            resolved=resolved,
+            failures={key: unresolvable() for key in failed},
+            key_results=key_results,
+        )
+
+    def _denied_key_result(
+        self, one: BulkLookupKeyResult, denial: Exception
+    ) -> BulkLookupKeyResult:
+        status = ActionRunStatus.of_failure(denial, during_validation=True)
+        return replace(
+            one,
+            status=status.status,
+            description=status.description,
+            error_code=status.error_code,
+        )
 
 
 @dataclass

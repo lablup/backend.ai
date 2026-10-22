@@ -21,7 +21,7 @@ from ai.backend.common.dto.manager.scaling_group.response import (
     ScalingGroupItem,
     WsproxyVersionResponse,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.resource_group.scopes import (
     DomainResourceGroupTarget,
@@ -47,7 +47,7 @@ from ai.backend.manager.services.resource_group.actions.scoped_search import (
 )
 from ai.backend.manager.services.resource_group.processors import ResourceGroupProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourceGroupHandler:
@@ -81,7 +81,7 @@ class ResourceGroupHandler:
         ctx: UserContext,
     ) -> APIResponse:
         params = query.parsed
-        domain_lookup = await self._domain.lookup.run(
+        domain_lookup = await self._domain.lookup_name.run(
             LookupDomainAction(name=DomainName(ctx.user_domain))
         )
         targets: list[ResourceGroupTarget] = [
@@ -121,7 +121,7 @@ class ResourceGroupHandler:
     ) -> APIResponse:
         path_params = path.parsed
         query_params = query.parsed
-        domain_lookup = await self._domain.lookup.run(
+        domain_lookup = await self._domain.lookup_name.run(
             LookupDomainAction(name=DomainName(ctx.user_domain))
         )
         targets: list[ResourceGroupTarget] = [

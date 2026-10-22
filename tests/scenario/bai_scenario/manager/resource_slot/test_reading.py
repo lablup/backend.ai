@@ -19,13 +19,13 @@ from bai_scenario.components.resource_slot import (
     TheSlotTypeNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 UNKNOWN = "no-such-slot"
 
 type ReadingStep = Scenario[
-    SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode
+    TestSeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode
 ]
 
 
@@ -53,7 +53,7 @@ class ReadingByName(When[ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotT
 
 @dataclass(frozen=True)
 class AUserGrantedNothingReadsByName(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    Scenario[TestSeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -67,7 +67,7 @@ class AUserGrantedNothingReadsByName(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone()
 
     @override
@@ -81,7 +81,7 @@ class AUserGrantedNothingReadsByName(
 
 @dataclass(frozen=True)
 class ANameNothingAnswersToIsRefused(
-    Scenario[SeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
+    Scenario[TestSeedingSession, ASlotTypeAndACaller, ResourceSlotAdapter, ResourceSlotTypeNode]
 ):
     @override
     def summary(self) -> str:
@@ -95,7 +95,7 @@ class ANameNothingAnswersToIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ASlotTypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ASlotTypeAndACaller]:
         return ASlotTypeAndSomeone()
 
     @override

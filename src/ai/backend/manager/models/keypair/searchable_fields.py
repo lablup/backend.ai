@@ -18,18 +18,7 @@ from ai.backend.manager.models.specs.search.field import SearchableField
 
 
 class _KeyPairOwnFields(RowDataConverter[KeyPairRow, KeyPairData]):
-    """The keypair's own columns.
-
-    ``secret_key`` is a ``SecretColumn``, and ``ssh_private_key`` and
-    ``bootstrap_script`` hold values a repeated partial match would recover, so those
-    three keep both slots empty. ``dotfiles`` is a binary blob, which no comparison
-    orders. ``ssh_public_key`` is ``sa.Text`` with no index serving a partial match, so
-    both slots stay empty until a caller needs equality.
-
-    ``access_key`` is open: it is this row's own identifier and the response returns it,
-    so no filter recovers anything the caller was not already given. The access key
-    copied onto another table (``sessions.access_key``) stays closed.
-    """
+    """The keypair's own columns; secret values cannot be filtered or ordered."""
 
     field_id = SearchableField(
         KeyPairRow.id, UUIDConditions(KeyPairRow.id), ColumnOrder(KeyPairRow.id)
@@ -78,8 +67,6 @@ class _KeyPairOwnFields(RowDataConverter[KeyPairRow, KeyPairData]):
     )
     ssh_public_key = SearchableField(KeyPairRow.ssh_public_key, None, None)
     ssh_private_key = SearchableField(KeyPairRow.ssh_private_key, None, None)
-    dotfiles = SearchableField(KeyPairRow.dotfiles, None, None)
-    bootstrap_script = SearchableField(KeyPairRow.bootstrap_script, None, None)
     last_used = SearchableField(
         KeyPairRow.last_used,
         DateTimeConditions(KeyPairRow.last_used),
@@ -93,7 +80,6 @@ class _KeyPairOwnFields(RowDataConverter[KeyPairRow, KeyPairData]):
 
     @override
     def to_data(self, row: KeyPairRow) -> KeyPairData:
-        dotfiles = self.dotfiles.read(row)
         return KeyPairData(
             id=self.field_id.read(row),
             user_id=self.user_id.read(row),
@@ -108,8 +94,6 @@ class _KeyPairOwnFields(RowDataConverter[KeyPairRow, KeyPairData]):
             rate_limit=self.rate_limit.read(row),
             ssh_public_key=self.ssh_public_key.read(row),
             ssh_private_key=self.ssh_private_key.read(row),
-            dotfiles=dotfiles if dotfiles else b"\x90",
-            bootstrap_script=self.bootstrap_script.read(row),
             last_used=self.last_used.read(row),
             num_queries=self.num_queries.read(row),
         )

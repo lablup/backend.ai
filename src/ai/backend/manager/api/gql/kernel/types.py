@@ -26,6 +26,7 @@ from ai.backend.common.dto.manager.v2.kernel.response import (
 from ai.backend.common.dto.manager.v2.kernel.types import (
     KernelStatusFilter,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AgentId, KernelId, SessionTypes
 from ai.backend.manager.api.gql.base import OrderDirection, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
@@ -59,7 +60,6 @@ from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID
 from ai.backend.manager.api.gql.agent.types import AgentV2GQL
 from ai.backend.manager.api.gql.common.types import (
@@ -132,7 +132,15 @@ class KernelV2StatusFilterGQL(PydanticInputMixin[KernelStatusFilter]):
     name="KernelV2Filter",
 )
 class KernelV2FilterGQL(PydanticInputMixin[KernelFilter]):
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = gql_field(
+        description="Filter by kernel ID.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `fieldId`.",
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by kernel ID."),
+        default=None,
+    )
     status: KernelV2StatusFilterGQL | None = None
     session_id: UUIDFilter | None = None
 
@@ -207,7 +215,10 @@ class KernelV2ClusterInfoGQL:
 )
 class KernelV2UserInfoGQL:
     user_id: UUID | None = gql_field(description="The UUID of the user who owns this kernel.")
-    access_key: str | None = gql_field(description="The access key used to create this kernel.")
+    access_key: str | None = gql_field(
+        description="The access key used to create this kernel.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `userId`.",
+    )
     domain_name: str | None = gql_field(description="The domain this kernel belongs to.")
     group_id: UUID | None = gql_field(description="The group (project) ID this kernel belongs to.")
 
@@ -325,7 +336,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the kernel.",
         ),
     )
@@ -411,7 +422,12 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     async def domain(self, info: Info[StrawberryGQLContext]) -> DomainV2GQL | None:
         if self.user_info.domain_name is None:
             return None
-        return await info.context.data_loaders.domain_loader.load(self.user_info.domain_name)
+        domain_id = await info.context.data_loaders.domain_id_by_name_loader.load(
+            self.user_info.domain_name
+        )
+        if domain_id is None:
+            return None
+        return await info.context.data_loaders.domain_by_id_loader.load(domain_id)
 
     @gql_added_field(
         BackendAIGQLMeta(

@@ -157,6 +157,11 @@ class ServiceUnavailable(BackendAIError, web.HTTPServiceUnavailable):
         )
 
 
+class ManagerDraining(ServiceUnavailable):
+    error_type = "https://api.backend.ai/probs/manager-draining"
+    error_title = "The manager is shutting down."
+
+
 class ServerFrozen(BackendAIError, web.HTTPServiceUnavailable):
     error_type = "https://api.backend.ai/probs/server-frozen"
     error_title = "The server is frozen due to maintenance. Please try again later."

@@ -16,12 +16,13 @@ import pytest
 from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
-    BulkPurgeAppConfigFragmentInput,
+    PartialBulkPurgeAppConfigFragmentsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
-    BulkPurgeAppConfigFragmentPayload,
+    AppConfigFragmentNode,
     PurgeAppConfigFragmentPayload,
 )
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.manager.api.adapters.app_config_fragment.adapter import AppConfigFragmentAdapter
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
@@ -49,14 +50,16 @@ from bai_scenario.components.app_config_fragment import (
     Whose,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Purged = PurgeAppConfigFragmentPayload
-type PurgingStep = Scenario[SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, Purged]
-type BulkPurged = BulkPurgeAppConfigFragmentPayload
+type PurgingStep = Scenario[
+    TestSeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, Purged
+]
+type BulkPurged = PartialBulkPayload[AppConfigFragmentNode]
 type BulkStep = Scenario[
-    SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPurged
+    TestSeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPurged
 ]
 
 
@@ -90,7 +93,7 @@ class PurgingMany(When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPu
 
     @override
     def operation(self) -> str:
-        return "bulk_purge"
+        return "partial_bulk_purge"
 
     @override
     def describe(self, laid: SomeFragmentsAndACaller) -> str:
@@ -105,7 +108,9 @@ class PurgingMany(When[SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPu
     ) -> BulkPurged:
         asked = [*(one.id for one in laid.mine), laid.theirs.id, AppConfigFragmentID(uuid4())]
         with ActingAs(laid.caller):
-            return await adapter.bulk_purge(BulkPurgeAppConfigFragmentInput(ids=asked))
+            return await adapter.partial_bulk_purge(
+                PartialBulkPurgeAppConfigFragmentsInput(ids=asked)
+            )
 
 
 @dataclass(frozen=True)
@@ -139,8 +144,8 @@ class MineArePurgedTheRestFail(Then[SomeFragmentsAndACaller, BulkPurged]):
             return [Refused(NotEnoughPermission, answered.raised)]
         return [
             Held[list[UUID]](
-                "items",
-                list(payload.items),
+                "successes",
+                [node.id for node in payload.successes],
                 SameAs[list[UUID]]([one.id for one in laid.mine], "미리 만들어 둔 자기 조각들"),
             ),
             Same("failed", len(payload.failed), 2),
@@ -168,8 +173,8 @@ class BothArePurgedTheMissingFails(Then[SomeFragmentsAndACaller, BulkPurged]):
             return [Refused(NotEnoughPermission, answered.raised)]
         return [
             Held[list[UUID]](
-                "items",
-                list(payload.items),
+                "successes",
+                [node.id for node in payload.successes],
                 SameAs[list[UUID]](
                     [*(one.id for one in laid.mine), laid.theirs.id], "미리 만들어 둔 조각들"
                 ),
@@ -181,7 +186,7 @@ class BothArePurgedTheMissingFails(Then[SomeFragmentsAndACaller, BulkPurged]):
 
 @dataclass(frozen=True)
 class TheGrantedUserPurgesTheirOwn(
-    Scenario[SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, Purged]
+    Scenario[TestSeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -192,7 +197,7 @@ class TheGrantedUserPurgesTheirOwn(
         return "자기 조각 하나가 있고 자기 스코프에 삭제 권한을 받은 사용자가 삭제하면, 삭제한 id를 담은 응답이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AFragmentAndACaller]:
         return AFragmentAndSomeone(granted=(Permission.HARD_DELETE,))
 
     @override
@@ -206,7 +211,7 @@ class TheGrantedUserPurgesTheirOwn(
 
 @dataclass(frozen=True)
 class AnotherUsersFragmentIsRefused(
-    Scenario[SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, Purged]
+    Scenario[TestSeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -217,7 +222,7 @@ class AnotherUsersFragmentIsRefused(
         return "다른 사용자의 조각을 자기 스코프에만 삭제 권한을 받은 사용자가 삭제하면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AFragmentAndACaller]:
         return AFragmentAndSomeone(whose=Whose.ANOTHERS, granted=(Permission.HARD_DELETE,))
 
     @override
@@ -231,7 +236,7 @@ class AnotherUsersFragmentIsRefused(
 
 @dataclass(frozen=True)
 class ReadingIsNotEnoughToPurge(
-    Scenario[SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, Purged]
+    Scenario[TestSeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -242,7 +247,7 @@ class ReadingIsNotEnoughToPurge(
         return "자기 조각에 읽기 권한만 받은 사용자가 삭제하면, 권한 부족으로 거부된다. 삭제는 읽기와 다른 권한을 검사한다"
 
     @override
-    def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AFragmentAndACaller]:
         return AFragmentAndSomeone(granted=(Permission.READ,))
 
     @override
@@ -256,7 +261,7 @@ class ReadingIsNotEnoughToPurge(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFoundForASuperadmin(
-    Scenario[SeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, Purged]
+    Scenario[TestSeedingSession, AFragmentAndACaller, AppConfigFragmentAdapter, Purged]
 ):
     @override
     def summary(self) -> str:
@@ -267,7 +272,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
         return "슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AFragmentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AFragmentAndACaller]:
         return AFragmentAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -281,7 +286,7 @@ class AnUnknownIdIsNotFoundForASuperadmin(
 
 @dataclass(frozen=True)
 class MixedIdsArePurgedEach(
-    Scenario[SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPurged]
+    Scenario[TestSeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPurged]
 ):
     @override
     def summary(self) -> str:
@@ -296,7 +301,7 @@ class MixedIdsArePurgedEach(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, SomeFragmentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, SomeFragmentsAndACaller]:
         return SomeFragmentsAndSomeone(mine=2, granted=(Permission.HARD_DELETE,))
 
     @override
@@ -310,7 +315,7 @@ class MixedIdsArePurgedEach(
 
 @dataclass(frozen=True)
 class TheSuperadminPurgesBoth(
-    Scenario[SeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPurged]
+    Scenario[TestSeedingSession, SomeFragmentsAndACaller, AppConfigFragmentAdapter, BulkPurged]
 ):
     @override
     def summary(self) -> str:
@@ -321,7 +326,7 @@ class TheSuperadminPurgesBoth(
         return "슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, SomeFragmentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, SomeFragmentsAndACaller]:
         return SomeFragmentsAndSomeone(mine=1, role=UserRole.SUPERADMIN)
 
     @override

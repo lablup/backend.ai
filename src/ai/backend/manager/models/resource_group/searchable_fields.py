@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import override
 
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.manager.data.resource_group.types import (
     FairShareResourceGroupSpec,
@@ -19,6 +20,10 @@ from ai.backend.manager.data.resource_group.types import (
     SchedulerType,
 )
 from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.entity_label.searchable_fields import (
+    EntityLabelCorrelation,
+    EntityLabelSearchableFields,
+)
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
@@ -28,7 +33,7 @@ from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
-from ai.backend.manager.models.specs.search.field import SearchableField
+from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
 from ai.backend.manager.models.specs.search.usage import UsedByConditions
 
 
@@ -158,6 +163,15 @@ class _ResourceGroupOwnFields(RowDataConverter[ResourceGroupRow, ResourceGroupDa
         )
 
 
+class _ResourceGroupNestedFields:
+    """Rows of other tables the resource group owns: its labels."""
+
+    labels = NestedSearchableField(
+        EntityLabelSearchableFields.own,
+        EntityLabelCorrelation(ResourceGroupRow, ResourceGroupEntityType(), ResourceGroupRow.id),
+    )
+
+
 class _ResourceGroupUsage:
     """Uses between a resource group and other entities."""
 
@@ -185,4 +199,5 @@ class _ResourceGroupLinkedEntities:
 
 class ResourceGroupSearchableFields:
     own = _ResourceGroupOwnFields()
+    nested = _ResourceGroupNestedFields
     linked = _ResourceGroupLinkedEntities

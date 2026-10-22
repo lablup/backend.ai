@@ -21,7 +21,7 @@ from ai.backend.common.events.event_types.session.broadcast import SchedulingBro
 from ai.backend.common.events.hub.propagators.bypass import AsyncBypassPropagator
 from ai.backend.common.events.types import EventDomain
 from ai.backend.common.types import SessionId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.gql.common_types import (
     ResourceSlotEntryGQL,
     ResourceSlotEntryInputGQL,
@@ -43,7 +43,7 @@ from ai.backend.manager.errors.kernel import InvalidSessionId
 
 from .session_federation import Session
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @gql_enum(
@@ -128,7 +128,6 @@ async def scheduling_events_by_session(
     try:
         session_uuid = SessionId(uuid.UUID(session_id))
     except (ValueError, AttributeError) as e:
-        log.warning("Invalid session ID format: {}", session_id)
         raise InvalidSessionId(f"Invalid session ID format: {session_id}") from e
 
     # Reading a session's scheduling events is reading the session, so the same
@@ -148,7 +147,10 @@ async def scheduling_events_by_session(
                 try:
                     status_dto = SchedulingStatusDTO(event.status_transition)
                 except ValueError:
-                    log.warning("Unknown status transition: {}", event.status_transition)
+                    log.warning(
+                        "unknown scheduling status transition",
+                        status_transition=str(event.status_transition),
+                    )
                     status_dto = SchedulingStatusDTO.ERROR
                 dto = SchedulingBroadcastEventPayloadNode(
                     session_id=str(event.session_id),

@@ -29,9 +29,10 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.stream.repository import StreamRepository
@@ -97,7 +98,11 @@ async def session_processors(
     ``SessionRepository``); that is all the stream handler uses to normalize a
     UUID-shaped path reference to its canonical session name.
     """
-    repo = SessionRepository(database_engine, V2DBOpsProvider(database_engine))
+    repo = SessionRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(database_engine)),
+    )
     service = SessionService(
         SessionServiceArgs(
             agent_registry=AsyncMock(),

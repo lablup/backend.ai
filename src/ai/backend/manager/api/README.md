@@ -118,7 +118,7 @@ class DomainV2Handler:
         self,
         body: BodyParam[AdminSearchDomainsInput],
     ) -> APIResponse:
-        payload = await self._adapters.domain.admin_search(body.parsed)
+        payload = await self._adapters.domain.global_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
 ```
 

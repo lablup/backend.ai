@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import logging
 from decimal import Decimal
 from pprint import pprint
@@ -7,19 +8,21 @@ from typing import Any
 
 import click
 import sqlalchemy as sa
-from sqlalchemy.orm import selectinload
 from tabulate import tabulate
 
 from ai.backend.common.arch import CURRENT_ARCH
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.docker import validate_image_labels
 from ai.backend.common.exception import UnknownImageReference
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.container_registry.harbor import HarborRegistry_v2
 from ai.backend.manager.data.image.types import ImageData, ImageStatus
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.image import ImageAliasRow, ImageRow
+from ai.backend.manager.errors.image import ImageNotFound
+from ai.backend.manager.errors.repository import UniqueConstraintViolationError
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.purgers import ImagePurger
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
 from ai.backend.manager.models.image.searchers import (
     AliasedImageSearcher,
@@ -29,21 +32,12 @@ from ai.backend.manager.models.image.searchers import (
 )
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.db.engine import connect_database
 from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
-from .context import CLIContext, redis_ctx
+from .context import CLIContext, db_ctx, redis_ctx
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-def _register_image_cli_orm_cluster() -> None:
-    """Register ORM rows reachable only via string relationships so the CLI can configure mappers (kept minimal, not all models)."""
-    from ai.backend.manager.models.agent.row import AgentRow
-    from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
-
-    _ = (AgentRow, ResourceGroupForProjectRow)
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _canonical_searcher(canonical: str, architecture: str) -> ImageSearcher:
@@ -69,11 +63,9 @@ def _describe(image: ImageData) -> str:
 
 
 async def list_images(cli_ctx: CLIContext, short: bool, installed_only: bool) -> None:
-    _register_image_cli_orm_cluster()
     # Connect to postgreSQL DB
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(bootstrap_config.db) as db,
+        db_ctx(cli_ctx) as db,
         redis_ctx(cli_ctx) as redis_conn_set,
     ):
         displayed_items: list[tuple[Any, ...]] = []
@@ -125,53 +117,43 @@ async def list_images(cli_ctx: CLIContext, short: bool, installed_only: bool) ->
                         print(_describe(item))
             if short:
                 print(tabulate(displayed_items, tablefmt="plain"))
-        except Exception as e:
-            log.exception(f"An error occurred. Error: {e}")
+        except Exception:
+            log.exception("image command failed")
 
 
 async def inspect_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
-    _register_image_cli_orm_cluster()
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
-    async with connect_database(bootstrap_config.db) as db:
+    async with db_ctx(cli_ctx) as db:
         try:
-            image = await _first_image(
-                db, _reference_searcher(canonical_or_alias, architecture), canonical_or_alias
+            details = await ImageDBSource(db, V2DBOpsProvider(db)).search_image_details(
+                [], _reference_searcher(canonical_or_alias, architecture)
             )
-            async with db.begin_readonly_session() as session:
-                image_row = await session.get_one(
-                    ImageRow, image.id, options=[selectinload(ImageRow.aliases)]
-                )
-                pprint(await image_row.inspect())
+            if not details:
+                raise UnknownImageReference(canonical_or_alias)
+            pprint(dataclasses.asdict(details[0]))
         except UnknownImageReference:
-            log.exception("Image not found.")
-        except Exception as e:
-            log.exception(f"An error occurred. Error: {e}")
+            log.error("image not found", image_ref=canonical_or_alias)
+        except Exception:
+            log.exception("image command failed")
 
 
 async def forget_image(cli_ctx: CLIContext, canonical_or_alias: str, architecture: str) -> None:
-    _register_image_cli_orm_cluster()
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
-    async with connect_database(bootstrap_config.db) as db:
+    async with db_ctx(cli_ctx) as db:
         try:
             image = await _first_image(
                 db, _reference_searcher(canonical_or_alias, architecture), canonical_or_alias
             )
-            async with db.begin_session() as session:
-                image_row = await session.get_one(ImageRow, image.id)
-                await image_row.mark_as_deleted(session)
-        except UnknownImageReference:
-            log.exception("Image not found.")
-        except Exception as e:
-            log.exception(f"An error occurred. Error: {e}")
+            await ImageDBSource(db, V2DBOpsProvider(db)).mark_image_deleted_by_id(image.id)
+        except (UnknownImageReference, ImageNotFound):
+            log.error("image not found", image_ref=canonical_or_alias)
+        except Exception:
+            log.exception("image command failed")
 
 
 async def purge_image(
     cli_ctx: CLIContext, canonical_or_alias: str, architecture: str, remove_from_registry: bool
 ) -> None:
-    _register_image_cli_orm_cluster()
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(bootstrap_config.db) as db,
+        db_ctx(cli_ctx) as db,
         db.begin_session() as session,
     ):
         try:
@@ -193,9 +175,9 @@ async def purge_image(
                 await scanner.untag(image.image_ref)
 
         except UnknownImageReference:
-            log.exception("Image not found.")
-        except Exception as e:
-            log.exception(f"An error occurred. Error: {e}")
+            log.error("image not found", image_ref=canonical_or_alias)
+        except Exception:
+            log.exception("image command failed")
 
 
 async def set_image_resource_limit(
@@ -205,9 +187,7 @@ async def set_image_resource_limit(
     range_value: tuple[Decimal | None, Decimal | None],
     architecture: str,
 ) -> None:
-    _register_image_cli_orm_cluster()
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
-    async with connect_database(bootstrap_config.db) as db:
+    async with db_ctx(cli_ctx) as db:
         try:
             image = await _first_image(
                 db, _reference_searcher(canonical_or_alias, architecture), canonical_or_alias
@@ -216,9 +196,9 @@ async def set_image_resource_limit(
                 image_row = await session.get_one(ImageRow, image.id)
                 image_row.set_resource_limit(slot_type, range_value)
         except UnknownImageReference:
-            log.exception("Image not found.")
-        except Exception as e:
-            log.exception(f"An error occurred. Error: {e}")
+            log.error("image not found", image_ref=canonical_or_alias)
+        except Exception:
+            log.exception("image command failed")
 
 
 async def rescan_images(
@@ -226,56 +206,50 @@ async def rescan_images(
 ) -> None:
     if not registry_or_image:
         raise click.BadArgumentUsage("Please specify a valid registry or full image name.")
-    _register_image_cli_orm_cluster()
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(bootstrap_config.db) as db,
+        db_ctx(cli_ctx) as db,
     ):
         try:
             result = await ImageDBSource(db, V2DBOpsProvider(db)).rescan_images(
                 registry_or_image, project
             )
             for error in result.errors:
-                log.error(f"Failed to scan registries: {error}")
-        except Exception as e:
-            log.exception(f"Unknown error occurred. Error: {e}")
+                log.error("failed to scan registries", scan_error=str(error))
+        except Exception:
+            log.exception("image command failed")
 
 
 async def alias(cli_ctx: CLIContext, alias: str, target: str, architecture: str) -> None:
-    _register_image_cli_orm_cluster()
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
-    async with connect_database(bootstrap_config.db) as db:
+    async with db_ctx(cli_ctx) as db:
         try:
             image = await _first_image(db, _canonical_searcher(target, architecture), target)
-            async with db.begin_session() as session:
-                image_row = await session.get_one(ImageRow, image.id)
-                await ImageAliasRow.create(session, alias, image_row)
+            await ImageDBSource(db, V2DBOpsProvider(db)).insert_image_alias_by_id(
+                image.id, ImageAliasCreator(alias=alias)
+            )
         except UnknownImageReference:
-            log.exception("Image not found.")
-        except Exception as e:
-            log.exception(f"An error occurred. Error: {e}")
+            log.error("image not found", image_ref=target)
+        except UniqueConstraintViolationError:
+            log.error("image alias already exists", image_alias=alias)
+        except Exception:
+            log.exception("image command failed")
 
 
 async def dealias(cli_ctx: CLIContext, alias: str) -> None:
-    _register_image_cli_orm_cluster()
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(bootstrap_config.db) as db,
+        db_ctx(cli_ctx) as db,
         db.begin_session() as session,
     ):
         alias_row = await session.scalar(
             sa.select(ImageAliasRow).where(ImageAliasRow.alias == alias),
         )
         if alias_row is None:
-            log.exception("Alias not found.")
+            log.error("image alias not found", image_alias=alias)
             return
         await session.delete(alias_row)
 
 
 async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
-    _register_image_cli_orm_cluster()
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
-    async with connect_database(bootstrap_config.db) as db:
+    async with db_ctx(cli_ctx) as db:
         try:
             image = await _first_image(
                 db,
@@ -286,9 +260,9 @@ async def validate_image_alias(cli_ctx: CLIContext, alias: str) -> None:
                 print(f"{key:<40}: {value}")
 
         except UnknownImageReference:
-            log.error(f"No images were found with alias: {alias}")
-        except Exception as e:
-            log.exception(f"An error occurred. Error: {e}")
+            log.error("no images found with the alias", image_alias=alias)
+        except Exception:
+            log.exception("image command failed")
 
 
 def _resolve_architecture(current: bool, architecture: str | None) -> str:
@@ -303,10 +277,8 @@ def _resolve_architecture(current: bool, architecture: str | None) -> str:
 async def validate_image_canonical(
     cli_ctx: CLIContext, canonical: str, current: bool, architecture: str | None = None
 ) -> None:
-    _register_image_cli_orm_cluster()
-    bootstrap_config = await cli_ctx.get_bootstrap_config()
     async with (
-        connect_database(bootstrap_config.db) as db,
+        db_ctx(cli_ctx) as db,
         db.begin_readonly_session() as session,
     ):
         try:
@@ -335,7 +307,7 @@ async def validate_image_canonical(
                     for key, value in validate_image_labels(image_row.labels).items():
                         print(f"{key:<40}: {value}")
 
-        except UnknownImageReference as e:
-            log.error(f"{e}")
-        except Exception as e:
-            log.exception(f"An error occurred. Error: {e}")
+        except UnknownImageReference:
+            log.error("image not found", image_ref=canonical)
+        except Exception:
+            log.exception("image command failed")

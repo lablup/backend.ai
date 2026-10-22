@@ -23,6 +23,7 @@ from ai.backend.common.configs import (
 )
 from ai.backend.common.configs.jwt import SharedJWTConfig
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.endpoint_pool.strategy import EndpointSelectionPolicy
 from ai.backend.common.meta import (
     BackendAIConfigMeta,
     CompositeType,
@@ -33,7 +34,6 @@ from ai.backend.common.typed_validators import (
     CommaSeparatedStrList,
 )
 from ai.backend.logging.config import LoggingConfig
-from ai.backend.web.clients.endpoint_pool import EndpointSelectionPolicy
 
 
 class ServiceMode(enum.StrEnum):
@@ -1610,7 +1610,7 @@ class APIConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Consecutive probe (or caller-reported) failures required before an "
-                "endpoint flips from healthy to unhealthy."
+                "endpoint flips from healthy to unhealthy. A 503 probe excludes it immediately."
             ),
             added_version="26.4.4",
             example=ConfigExample(local="3", prod="3"),
@@ -2102,7 +2102,8 @@ class ApolloRouterConfig(BaseConfigSchema):
         BackendAIConfigMeta(
             description=(
                 "Consecutive probe (or caller-reported) failures required before an "
-                "Apollo Router endpoint flips from healthy to unhealthy."
+                "Apollo Router endpoint flips from healthy to unhealthy. "
+                "A 503 probe excludes it immediately."
             ),
             added_version="26.4.4",
             example=ConfigExample(local="3", prod="3"),

@@ -13,7 +13,7 @@ from ai.backend.common.dto.storage.request import (
     HuggingFaceRetrieveModelsReq,
     HuggingFaceScanModelsReq,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.artifact_registry.reservoir_client import ReservoirRegistryClient
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -97,7 +97,7 @@ from ai.backend.manager.services.artifact.actions.upsert_multi import (
 )
 from ai.backend.manager.types import OffsetBasedPaginationOptions, PaginationOptions
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ArtifactService:
@@ -222,20 +222,20 @@ class ArtifactService:
                         except ClientConnectorError as e:
                             retry_count += 1
                             log.warning(
-                                "Cannot connect to reservoir registry: {} (attempt {}/{}). Error: {}",
-                                registry_data.endpoint,
-                                retry_count,
-                                MAX_RETRIES,
-                                e,
+                                "reservoir registry connection failed, retrying",
+                                registry_endpoint=str(registry_data.endpoint),
+                                attempt_count=retry_count,
+                                max_retry_count=MAX_RETRIES,
+                                exc_info=e,
                             )
                             if retry_count < MAX_RETRIES:
                                 await asyncio.sleep(1)
 
                     if client_resp is None:
                         log.warning(
-                            "Failed to connect to reservoir registry after {} attempts: {}",
-                            MAX_RETRIES,
-                            registry_data.endpoint,
+                            "reservoir registry connection failed after retries",
+                            registry_endpoint=str(registry_data.endpoint),
+                            attempt_count=MAX_RETRIES,
                         )
                         raise ReservoirConnectionError()
 

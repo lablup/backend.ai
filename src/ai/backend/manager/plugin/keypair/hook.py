@@ -11,10 +11,10 @@ import trafaret as t
 from aiohttp import web
 from dateutil.parser import parse as dateutil_parse
 
-from ai.backend.common.logging_utils import BraceStyleAdapter
 from ai.backend.common.plugin.hook import HookHandler, HookPlugin, Reject
 from ai.backend.common.types import AccessKey
 from ai.backend.common.utils import nmget
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.auth import AuthorizationFailed, InvalidAuthParameters
 from ai.backend.manager.models.keypair.lookups import KeypairAccessKeyUserLookup
@@ -23,7 +23,7 @@ from ai.backend.manager.repositories.auth.repository import AuthRepository
 
 from .utils import deserialize_stoken
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 plugin_config_checker = t.Dict({
     t.Key("auth_token_name", default="sToken"): t.Null | t.String,
@@ -168,8 +168,11 @@ class KeypairAuthHookPlugin(HookPlugin):
                     user_id = signing_material.user_id
 
                 except Exception as e:
-                    log.error("AUTHORIZE_KEYPAIR_HOOK: invalid auth token {}", _mask_token(stoken))
-                    log.error(repr(e))
+                    log.trace(
+                        "keypair auth token rejected",
+                        auth_token_fingerprint=_mask_token(stoken),
+                        error_detail=repr(e),
+                    )
                     raise Reject("Invalid auth token") from None
 
         else:

@@ -8,7 +8,7 @@ from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.entity_share.request import (
@@ -58,6 +58,7 @@ from ai.backend.manager.services.entity_share.actions.answer import (
     RejectEntityShareAction,
     RevokeEntityShareAction,
 )
+from ai.backend.manager.services.entity_share.actions.bulk_get import BulkGetEntitySharesAction
 from ai.backend.manager.services.entity_share.actions.create import (
     CreateEntityShareAction,
 )
@@ -116,6 +117,20 @@ class EntityShareAdapter(BaseAdapter):
     async def get(self, share_id: EntityShareID) -> EntitySharePayload:
         result = await self._entity_share.get.run(GetEntityShareAction(share_id=share_id))
         return EntitySharePayload(share=self._to_node(result.data))
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[EntityShareID]
+    ) -> list[EntityShareNode | Exception | None]:
+        """Batch load entity shares by id for DataLoader use, one answer per id."""
+        if not ids:
+            return []
+        result = await self._entity_share.bulk_get.run(BulkGetEntitySharesAction(ids=ids))
+        return [
+            self._to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def accept(self, share_id: EntityShareID) -> EntitySharePayload:
         me = current_user()
@@ -286,7 +301,12 @@ class EntityShareAdapter(BaseAdapter):
 
     def _convert_filter(self, filter: EntityShareFilter) -> list[QueryCondition]:
         fields = EntityShareSearchableFields.own
-        conditions: list[QueryCondition] = []
+        conditions: list[QueryCondition] = [
+            *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
+            *self.apply_uuid_filter(filter.target_entity_id, fields.target_entity_id.filter),
+            *self.apply_uuid_filter(filter.recipient_entity_id, fields.recipient_entity_id.filter),
+            *self.apply_string_filter(filter.recipient_email, fields.recipient_email.filter),
+        ]
         if filter.status is not None:
             if filter.status.equals is not None:
                 conditions.append(
@@ -298,14 +318,6 @@ class EntityShareAdapter(BaseAdapter):
                         EntityShareStatus(status) for status in filter.status.in_
                     ])
                 )
-        if filter.recipient_email is not None and filter.recipient_email.equals is not None:
-            conditions.append(
-                fields.recipient_email.filter.equals(
-                    StringMatchSpec(
-                        filter.recipient_email.equals, case_insensitive=False, negated=False
-                    )
-                )
-            )
         return conditions
 
     def _convert_orders(self, orders: Sequence[EntityShareOrderBy]) -> list[QueryOrder]:
@@ -327,11 +339,14 @@ class EntityShareAdapter(BaseAdapter):
             id=data.id,
             entity_id=data.entity_id(),
             sharer_user_id=data.sharer_user_id,
+            recipient_entity_type=data.recipient.entity_type() if data.recipient else None,
+            recipient_entity_id=data.recipient,
             recipient_email=data.recipient_email,
             target_entity_type=data.target.entity_type(),
             target_entity_id=data.target,
             permissions=self._to_permission_dtos(data.permission_cap),
             status=EntityShareStatusDTO(data.status),
+            expires_at=data.expires_at,
             created_at=data.created_at,
             updated_at=data.updated_at,
         )

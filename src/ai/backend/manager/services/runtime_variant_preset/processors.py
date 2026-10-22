@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from ai.backend.manager.actions.registry.group import ProcessorGroup
+from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     CreatedEntityOpsResult,
@@ -15,6 +16,12 @@ from ai.backend.manager.services.runtime_variant_preset.actions.create import (
 )
 from ai.backend.manager.services.runtime_variant_preset.actions.get import (
     GetRuntimeVariantPresetAction,
+)
+from ai.backend.manager.services.runtime_variant_preset.actions.partial_bulk_purge import (
+    PartialBulkPurgeRuntimeVariantPresetsAction,
+)
+from ai.backend.manager.services.runtime_variant_preset.actions.partial_bulk_update import (
+    PartialBulkUpdateRuntimeVariantPresetsAction,
 )
 from ai.backend.manager.services.runtime_variant_preset.actions.purge import (
     PurgeRuntimeVariantPresetAction,
@@ -32,7 +39,7 @@ from ai.backend.manager.services.runtime_variant_preset.service import (
 
 
 class RuntimeVariantPresetProcessors:
-    """Everything but the update runs against ops; the update reads before it writes."""
+    """Everything but the updates runs against ops; the updates read before they write."""
 
     get: SingleEntityActionProcessor[
         GetRuntimeVariantPresetAction, EntityOpsResult[RuntimeVariantPresetData]
@@ -45,6 +52,12 @@ class RuntimeVariantPresetProcessors:
     ]
     purge: SingleEntityActionProcessor[
         PurgeRuntimeVariantPresetAction, EntityOpsResult[RuntimeVariantPresetData]
+    ]
+    partial_bulk_update: PartialBulkActionProcessor[
+        PartialBulkUpdateRuntimeVariantPresetsAction, RuntimeVariantPresetData
+    ]
+    partial_bulk_purge: PartialBulkActionProcessor[
+        PartialBulkPurgeRuntimeVariantPresetsAction, RuntimeVariantPresetData
     ]
     scoped_search: ScopeActionProcessor[
         ScopedSearchRuntimeVariantPresetsAction, ScopedBatchOpsResult[RuntimeVariantPresetData]
@@ -59,4 +72,10 @@ class RuntimeVariantPresetProcessors:
         self.global_create = group.global_create_ops(CreateRuntimeVariantPresetAction)
         self.update = group.single_entity(UpdateRuntimeVariantPresetAction, service.update)
         self.purge = group.entity_purge_ops(PurgeRuntimeVariantPresetAction)
+        self.partial_bulk_update = group.partial_bulk(
+            PartialBulkUpdateRuntimeVariantPresetsAction, service.partial_bulk_update
+        )
+        self.partial_bulk_purge = group.entity_partial_bulk_purge_ops(
+            PartialBulkPurgeRuntimeVariantPresetsAction
+        )
         self.scoped_search = group.scoped_search_ops(ScopedSearchRuntimeVariantPresetsAction)

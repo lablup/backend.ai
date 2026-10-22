@@ -9,8 +9,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Self,
-    TypedDict,
-    overload,
     override,
 )
 
@@ -22,25 +20,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
     Mapped,
     foreign,
-    joinedload,
     load_only,
     mapped_column,
     relationship,
     selectinload,
 )
-from sqlalchemy.orm.strategy_options import _AbstractLoad
 from sqlalchemy.sql.expression import SQLColumnExpression
 
-from ai.backend.common import msgpack
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.permission.permission_defs import ProjectPermission
 from ai.backend.manager.data.project.types import ProjectStatus, ProjectType
-from ai.backend.manager.defs import RESERVED_DOTFILES
-from ai.backend.manager.errors.resource import ProjectNotFound
-from ai.backend.manager.models.association_container_registries_groups import (
+from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.base import (
@@ -65,37 +58,26 @@ from ai.backend.manager.models.rbac import (
     required_permission,
 )
 from ai.backend.manager.models.rbac.context import ClientContext
-from ai.backend.manager.models.types import (
-    QueryCondition,
-    QueryOption,
-    load_related_field,
-)
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_txn_retry
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.rbac import ContainerRegistryScope
-    from ai.backend.manager.models.resource_group import ResourceGroupForProjectRow
-    from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+    from ai.backend.manager.models.resource_group.row import ResourceGroupForProjectRow
+    from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _get_association_container_registries_groups_join_condition() -> sa.ColumnElement[bool]:
-    return ProjectRow.id == foreign(AssociationContainerRegistriesGroupsRow.group_id)
+    return ProjectRow.id == foreign(AssociationContainerRegistriesGroupsRow.project_id)
 
 
 __all__: Sequence[str] = (
     "MAXIMUM_DOTFILE_SIZE",
     "AssocGroupUserRow",
-    "ProjectDotfile",
     "ProjectRow",
     "ProjectType",
     "association_groups_users",
     "groups",
-    "query_group_domain",
-    "query_group_dotfiles",
-    "resolve_group_name_or_id",
-    "verify_dotfile_name",
 )
 
 MAXIMUM_DOTFILE_SIZE = 64 * 1024  # 61 KiB
@@ -225,11 +207,17 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
     )
 
     # Relationships (defined with deferred join conditions to avoid circular imports)
+    # Only ResourceGroupPermissionContextBuilder in resource_group/row.py (legacy RBAC)
+    # reads this. Delete it together with the legacy RBAC cleanup.
     sgroup_for_groups_rows: Mapped[list[ResourceGroupForProjectRow]] = relationship(
         "ResourceGroupForProjectRow"
     )
-    users: Mapped[list[AssocGroupUserRow]] = relationship("AssocGroupUserRow")
+    # Read by gql_legacy (network.py, resource_policy.py, vfolder.py), ProjectRow.get and
+    # the vfolder repository. Delete it once the vfolder repository joins
+    # ProjectResourcePolicyRow directly and gql_legacy is cleaned up.
     resource_policy_row: Mapped[ProjectResourcePolicyRow] = relationship("ProjectResourcePolicyRow")
+    # Only ProjectPermissionContext in this file (legacy RBAC) reads this. Delete it
+    # together with the legacy RBAC cleanup.
     association_container_registries_groups_rows: Mapped[
         list[AssociationContainerRegistriesGroupsRow]
     ] = relationship(
@@ -245,6 +233,8 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
     def scope_name_expr(cls) -> SQLColumnExpression[str]:
         return cls.name
 
+    # Only CreateNetwork in gql_legacy's network.py calls this. Delete it together
+    # with the gql_legacy cleanup.
     @classmethod
     async def get(
         cls,
@@ -261,86 +251,14 @@ class ProjectRow(LifecycleTimestampsMixin, Base):
 
         return row
 
-    @classmethod
-    def load_resource_policy(cls) -> _AbstractLoad:
-        return joinedload(ProjectRow.resource_policy_row)
-
-    @classmethod
-    async def query_by_condition(
-        cls,
-        conditions: Sequence[QueryCondition],
-        options: Sequence[QueryOption] = tuple(),
-        *,
-        db: ExtendedAsyncSAEngine,
-    ) -> Sequence[ProjectRow]:
-        """
-        Args:
-            condition: QueryCondition.
-            options: A sequence of query options.
-            db: Database engine.
-        Returns:
-            A list of ProjectRow instances that match the condition.
-        Raises:
-            EmptySQLCondition: If the condition is empty.
-        """
-        query_stmt = sa.select(ProjectRow)
-        for cond in conditions:
-            query_stmt = cond(query_stmt)
-
-        for option in options:
-            query_stmt = option(query_stmt)
-
-        async def fetch(db_session: AsyncSession) -> Sequence[ProjectRow]:
-            return (await db_session.scalars(query_stmt)).all()
-
-        async with db.connect() as db_conn:
-            return await execute_with_txn_retry(
-                fetch,
-                db.begin_readonly_session,
-                db_conn,
-            )
-
-    @classmethod
-    async def get_by_id_with_policies(
-        cls,
-        project_id: uuid.UUID,
-        *,
-        db: ExtendedAsyncSAEngine,
-    ) -> ProjectRow:
-        """
-        Query a project by its ID with related resource policies.
-        Args:
-            project_id: The ID of the project.
-            db: Database engine.
-        Returns:
-            The ProjectRow instance that matches the project ID.
-        Raises:
-            ProjectNotFound: If the project not found.
-        """
-        rows = await cls.query_by_condition(
-            [by_id(project_id)],
-            [load_related_field(cls.load_resource_policy())],
-            db=db,
-        )
-        if not rows:
-            raise ProjectNotFound(f"Project with id {project_id} not found")
-        return rows[0]
-
 
 # NOTE: Deprecated legacy table reference for backward compatibility.
 # Use ProjectRow class directly for new code.
 groups = ProjectRow.__table__
 
 
-def by_id(project_id: uuid.UUID) -> QueryCondition:
-    def _by_id(
-        query_stmt: sa.sql.Select[Any],
-    ) -> sa.sql.Select[Any]:
-        return query_stmt.where(ProjectRow.id == project_id)
-
-    return _by_id
-
-
+# Everything below serves the legacy RBAC path alone: api/gql_legacy/group.py calls
+# get_permission_ctx, which is the way in. Delete the whole block together with gql_legacy.
 @dataclass
 class ProjectModel(RBACModel[ProjectPermission]):
     id: uuid.UUID
@@ -415,107 +333,6 @@ class ProjectModel(RBACModel[ProjectPermission]):
             _container_registry=row.container_registry,
             _permissions=frozenset(permissions),
         )
-
-
-def _build_group_query(
-    cond: sa.sql.expression.ColumnElement[bool], domain_name: str
-) -> sa.sql.Select[Any]:
-    return (
-        sa.select(groups.c.id)
-        .select_from(groups)
-        .where(
-            cond & (groups.c.domain_name == domain_name),
-        )
-    )
-
-
-async def resolve_group_name_or_id(
-    db_conn: SAConnection,
-    domain_name: str,
-    value: str | uuid.UUID,
-) -> uuid.UUID | None:
-    match value:
-        case uuid.UUID():
-            cond = groups.c.id == value
-        case str():
-            # Try to parse as UUID first
-            # If successful, query by ID; otherwise treat as group name
-            try:
-                parsed_uuid = uuid.UUID(value)
-                cond = groups.c.id == parsed_uuid
-            except ValueError:
-                cond = groups.c.name == value
-        case _:
-            raise TypeError("unexpected type for group_name_or_id")
-    query = _build_group_query(cond, domain_name)
-    result: uuid.UUID | None = await db_conn.scalar(query)
-    return result
-
-
-@overload
-async def resolve_groups(
-    db_conn: SAConnection,
-    domain_name: str,
-    values: Iterable[uuid.UUID],
-) -> Sequence[uuid.UUID]: ...
-
-
-@overload
-async def resolve_groups(
-    db_conn: SAConnection,
-    domain_name: str,
-    values: Iterable[str],
-) -> Sequence[uuid.UUID]: ...
-
-
-async def resolve_groups(
-    db_conn: SAConnection,
-    domain_name: str,
-    values: Iterable[uuid.UUID] | Iterable[str],
-) -> Sequence[uuid.UUID]:
-    listed_val = [*values]
-    match listed_val:
-        case [uuid.UUID(), *_]:
-            query = _build_group_query((groups.c.id.in_(listed_val)), domain_name)
-        case [str(), *_]:
-            query = _build_group_query((groups.c.name.in_(listed_val)), domain_name)
-        case []:
-            return []
-        case _:
-            raise TypeError("unexpected type for group_name_or_id")
-
-    rows = (await db_conn.execute(query)).fetchall()
-    return [row.id for row in rows]
-
-
-class ProjectDotfile(TypedDict):
-    data: str
-    path: str
-    perm: str
-
-
-async def query_group_dotfiles(
-    db_conn: SAConnection,
-    group_id: GUID[uuid.UUID] | uuid.UUID,
-) -> tuple[list[ProjectDotfile], int]:
-    query = sa.select(groups.c.dotfiles).select_from(groups).where(groups.c.id == group_id)
-    packed_dotfile = await db_conn.scalar(query)
-    if packed_dotfile is None:
-        return [], MAXIMUM_DOTFILE_SIZE
-    rows = msgpack.unpackb(packed_dotfile)
-    return rows, MAXIMUM_DOTFILE_SIZE - len(packed_dotfile)
-
-
-async def query_group_domain(
-    db_conn: SAConnection,
-    group_id: GUID[uuid.UUID] | uuid.UUID,
-) -> str | None:
-    query = sa.select(groups.c.domain_name).select_from(groups).where(groups.c.id == group_id)
-    return await db_conn.scalar(query)
-
-
-def verify_dotfile_name(dotfile: str) -> bool:
-    return dotfile not in RESERVED_DOTFILES
 
 
 ALL_PROJECT_PERMISSIONS = frozenset([perm for perm in ProjectPermission])
@@ -624,7 +441,7 @@ class ProjectPermissionContextBuilder(
         self,
         ctx: ClientContext,
     ) -> ProjectPermissionContext:
-        from ai.backend.manager.models.domain import DomainRow
+        from ai.backend.manager.models.domain.row import DomainRow
 
         perm_ctx = ProjectPermissionContext()
         _domain_query_stmt = sa.select(DomainRow).options(load_only(DomainRow.name))
@@ -703,6 +520,7 @@ class ProjectPermissionContextBuilder(
         return MEMBER_PERMISSIONS
 
 
+# Called only by api/gql_legacy/group.py.
 async def get_permission_ctx(
     db_conn: SAConnection,
     ctx: ClientContext,

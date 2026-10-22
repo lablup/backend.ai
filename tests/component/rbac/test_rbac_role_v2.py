@@ -13,10 +13,12 @@ from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.data.entity.role import RoleEntityType
-from ai.backend.common.data.entity.user import UserEntityType
+from ai.backend.common.data.entity.role import RoleEntityType, RoleID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AssignRoleInput,
+    BulkAssignRoleInput,
+    BulkRevokeRoleInput,
     RevokeRoleInput,
     SearchRoleAssignmentsInput,
 )
@@ -162,8 +164,8 @@ class TestAssignRoleV2:
     ) -> None:
         result = await admin_v2_registry.rbac.assign_role(
             AssignRoleInput(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
         assert isinstance(result, RoleAssignmentNode)
@@ -173,8 +175,8 @@ class TestAssignRoleV2:
         # Clean up
         await admin_v2_registry.rbac.revoke_role(
             RevokeRoleInput(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
 
@@ -188,8 +190,8 @@ class TestAssignRoleV2:
         with pytest.raises(PermissionDeniedError):
             await user_v2_registry.rbac.assign_role(
                 AssignRoleInput(
-                    user_id=regular_user_fixture.user_uuid,
-                    role_id=target_role.role.id,
+                    user_id=UserID(regular_user_fixture.user_uuid),
+                    role_id=RoleID(target_role.role.id),
                 )
             )
 
@@ -207,15 +209,15 @@ class TestRevokeRoleV2:
         # Assign first
         await admin_v2_registry.rbac.assign_role(
             AssignRoleInput(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
         # Revoke
         result = await admin_v2_registry.rbac.revoke_role(
             RevokeRoleInput(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
         assert isinstance(result, RoleAssignmentNode)
@@ -232,10 +234,77 @@ class TestRevokeRoleV2:
         with pytest.raises(PermissionDeniedError):
             await user_v2_registry.rbac.revoke_role(
                 RevokeRoleInput(
-                    user_id=regular_user_fixture.user_uuid,
-                    role_id=target_role.role.id,
+                    user_id=UserID(regular_user_fixture.user_uuid),
+                    role_id=RoleID(target_role.role.id),
                 )
             )
+
+
+class TestAssignmentRecordV2:
+    """The granting user is stored, and assign and revoke answer with the stored row."""
+
+    async def test_assign_and_revoke_answer_with_the_stored_row(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        target_role: CreateRoleResponse,
+        admin_user_fixture: UserFixtureData,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        assigned = await admin_v2_registry.rbac.assign_role(
+            AssignRoleInput(
+                user_id=UserID(regular_user_fixture.user_uuid), role_id=RoleID(target_role.role.id)
+            )
+        )
+        revoked = await admin_v2_registry.rbac.revoke_role(
+            RevokeRoleInput(
+                user_id=UserID(regular_user_fixture.user_uuid), role_id=RoleID(target_role.role.id)
+            )
+        )
+
+        assert assigned.granted_by == admin_user_fixture.user_uuid
+        assert revoked == assigned
+
+    async def test_bulk_assign_reports_a_user_already_holding_the_role(
+        self,
+        admin_v2_registry: V2ClientRegistry,
+        admin_registry: BackendAIClientRegistry,
+        target_role: CreateRoleResponse,
+        admin_user_fixture: UserFixtureData,
+        regular_user_fixture: UserFixtureData,
+    ) -> None:
+        held = await admin_v2_registry.rbac.assign_role(
+            AssignRoleInput(
+                user_id=UserID(regular_user_fixture.user_uuid), role_id=RoleID(target_role.role.id)
+            )
+        )
+        bulk_assigned = await admin_v2_registry.rbac.bulk_assign_role(
+            BulkAssignRoleInput(
+                role_id=RoleID(target_role.role.id),
+                user_ids=[
+                    UserID(admin_user_fixture.user_uuid),
+                    UserID(regular_user_fixture.user_uuid),
+                ],
+            )
+        )
+        bulk_revoked = await admin_v2_registry.rbac.bulk_revoke_role(
+            BulkRevokeRoleInput(
+                role_id=RoleID(target_role.role.id),
+                user_ids=[
+                    UserID(admin_user_fixture.user_uuid),
+                    UserID(regular_user_fixture.user_uuid),
+                ],
+            )
+        )
+
+        assert [a.user_id for a in bulk_assigned.assigned] == [admin_user_fixture.user_uuid]
+        assert bulk_assigned.assigned[0].granted_by == admin_user_fixture.user_uuid
+        assert [f.user_id for f in bulk_assigned.failed] == [regular_user_fixture.user_uuid]
+        revoked_by_user = {r.user_id: r for r in bulk_revoked.revoked}
+        assert revoked_by_user == {
+            admin_user_fixture.user_uuid: bulk_assigned.assigned[0],
+            regular_user_fixture.user_uuid: held,
+        }
 
 
 class TestMySearchAssignmentsV2:
@@ -252,8 +321,8 @@ class TestMySearchAssignmentsV2:
         # Admin assigns a role to the regular user
         await admin_v2_registry.rbac.assign_role(
             AssignRoleInput(
-                user_id=regular_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(regular_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
         try:
@@ -268,8 +337,8 @@ class TestMySearchAssignmentsV2:
             # Clean up
             await admin_v2_registry.rbac.revoke_role(
                 RevokeRoleInput(
-                    user_id=regular_user_fixture.user_uuid,
-                    role_id=target_role.role.id,
+                    user_id=UserID(regular_user_fixture.user_uuid),
+                    role_id=RoleID(target_role.role.id),
                 )
             )
 
@@ -285,8 +354,8 @@ class TestMySearchAssignmentsV2:
         # Admin assigns a role to the admin user (not the regular user)
         await admin_v2_registry.rbac.assign_role(
             AssignRoleInput(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
         try:
@@ -297,8 +366,8 @@ class TestMySearchAssignmentsV2:
             # Clean up
             await admin_v2_registry.rbac.revoke_role(
                 RevokeRoleInput(
-                    user_id=admin_user_fixture.user_uuid,
-                    role_id=target_role.role.id,
+                    user_id=UserID(admin_user_fixture.user_uuid),
+                    role_id=RoleID(target_role.role.id),
                 )
             )
 

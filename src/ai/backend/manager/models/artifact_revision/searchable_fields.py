@@ -8,7 +8,7 @@ from typing import override
 from ai.backend.common.data.artifact.types import VerificationStepResult
 from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.artifact.types import (
     ArtifactRemoteStatus,
     ArtifactRevisionData,
@@ -27,7 +27,7 @@ from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
 from ai.backend.manager.models.specs.search.field import SearchableField
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class _ArtifactRevisionOwnFields(RowDataConverter[ArtifactRevisionRow, ArtifactRevisionData]):
@@ -111,9 +111,9 @@ class _ArtifactRevisionOwnFields(RowDataConverter[ArtifactRevisionRow, ArtifactR
             return VerificationStepResult.model_validate(raw)
         except Exception as e:
             log.warning(
-                "Failed to validate verification_result for ArtifactRevisionRow id={}: {}",
-                row.id,
-                e,
+                "artifact revision verification result invalid",
+                artifact_revision_id=row.id,
+                exc_info=e,
             )
             return None
 

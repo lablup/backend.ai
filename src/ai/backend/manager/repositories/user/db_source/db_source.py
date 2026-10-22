@@ -22,7 +22,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.types import AccessKey, VFolderID
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
@@ -30,12 +30,18 @@ from ai.backend.manager.data.keypair.types import (
     KeyPairCreator,
     KeyPairData,
 )
+from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.user.types import (
     BulkUserCreateResultData,
     BulkUserUpdateResultData,
     UserCreateResultData,
     UserData,
     UserSearchResult,
+)
+from ai.backend.manager.data.vfolder.types import (
+    VFolderStatusSet,
+    VFolderStorageTarget,
+    vfolder_status_map,
 )
 from ai.backend.manager.errors.keypair import NoDefaultKeypairResourcePolicy
 from ai.backend.manager.errors.resource import PersonalProjectNotFound
@@ -48,15 +54,17 @@ from ai.backend.manager.errors.user import (
     UserNotFound,
     UserPurgeInProgress,
 )
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
+from ai.backend.manager.models.bootstrap_script.purgers import BootstrapScriptPurger
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.purgers import UserEndpointPurger
+from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.entity_share.purgers import EntitySharePendingOfferBatchPurger
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.entity_share.updaters import EntityShareRevokeUpdater
-from ai.backend.manager.models.kernel import (
+from ai.backend.manager.models.kernel.row import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     RESOURCE_USAGE_KERNEL_STATUSES,
+    KernelRow,
     kernels,
 )
 from ai.backend.manager.models.keypair.row import (
@@ -66,19 +74,22 @@ from ai.backend.manager.models.keypair.row import (
 )
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
-from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_policy.row import (
+    KeyPairResourcePolicyRow,
+    UserResourcePolicyRow,
+)
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
-from ai.backend.manager.models.session import (
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.session.row import (
     AGENT_RESOURCE_OCCUPYING_SESSION_STATUSES,
-    QueryCondition,
-    QueryOption,
+    DEAD_SESSION_STATUSES,
     SessionRow,
     by_status,
     by_user_id,
 )
-from ai.backend.manager.models.types import join_by_related_field
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus, users
+from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.types import QueryCondition, QueryOption, join_by_related_field
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.purgers import (
     UserErrorLogPurger,
@@ -87,18 +98,19 @@ from ai.backend.manager.models.user.purgers import (
     UserPurger,
     UserSessionGroupPurger,
 )
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import (
-    VFolderDeletionInfo,
+from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
-    VFolderStatusSet,
-    vfolder_status_map,
     vfolders,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import (
@@ -109,7 +121,7 @@ from ai.backend.manager.repositories.user.creators import UserCreateSpec
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 from ai.backend.manager.secret.pool import KeyProviderPool
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class UserDBSource:
@@ -118,6 +130,7 @@ class UserDBSource:
     _db: ExtendedAsyncSAEngine
     _v2_ops: V2DBOpsProvider
     _share_ops: ShareOpsProvider
+    _policy_ops: ResourcePolicyOpsProvider
     _user_ops_provider: UserOpsProvider
     _key_provider_pool: KeyProviderPool
 
@@ -126,11 +139,13 @@ class UserDBSource:
         db: ExtendedAsyncSAEngine,
         v2_ops_provider: V2DBOpsProvider,
         share_ops_provider: ShareOpsProvider,
+        policy_ops_provider: ResourcePolicyOpsProvider,
         key_provider_pool: KeyProviderPool,
     ) -> None:
         self._db = db
         self._v2_ops = v2_ops_provider
         self._share_ops = share_ops_provider
+        self._policy_ops = policy_ops_provider
         self._user_ops_provider = UserOpsProvider(db)
         self._key_provider_pool = key_provider_pool
 
@@ -235,7 +250,7 @@ class UserDBSource:
                             )
                         )
                 except Exception as e:
-                    log.warning("Failed to create user {}: {}", item.creator.email, str(e))
+                    log.trace("user creation failed: {}", e, user_email=item.creator.email)
                     failures.append(BulkCreateFailure(index=idx, exception=e))
 
         return BulkUserCreateResultData(successes=successes, failures=failures)
@@ -264,7 +279,7 @@ class UserDBSource:
                         updated_user = await self._update_single_user_validated(session, item)
                         successes.append(updated_user)
                 except Exception as e:
-                    log.warning("Failed to update user {}: {}", item.user_id, str(e))
+                    log.trace("user update failed: {}", e, target_user_id=item.user_id)
                     failures.append(BulkUpdateFailure(index=idx, exception=e))
 
         return BulkUserUpdateResultData(successes=successes, failures=failures)
@@ -280,8 +295,7 @@ class UserDBSource:
 
         # Get current user data for validation (by UUID)
         current_user = await self._get_user_by_uuid_with_session(session, user_id)
-        if current_user.status in UserStatus.purge_in_progress():
-            raise UserPurgeInProgress(f"User is being purged: {user_id}")
+        await self._raise_failing_guard(session, updater)
 
         # Check if new username is already taken by another user
         new_username = updater.username.optional_value()
@@ -317,11 +331,15 @@ class UserDBSource:
         if status is not None and status != current_user.status:
             to_update["status_info"] = "admin-requested"
         update_query = (
-            sa.update(users).where(users.c.uuid == user_id).values(to_update).returning(users)
+            sa.update(users)
+            .where(users.c.uuid == user_id, *[g.condition() for g in updater.guard_checks()])
+            .values(to_update)
+            .returning(users)
         )
         result = await session.execute(update_query)
         updated_user = result.first()
         if not updated_user:
+            await self._raise_failing_guard(session, updater)
             raise UserModificationFailure("Failed to update user")
 
         # Handle role changes
@@ -336,30 +354,47 @@ class UserDBSource:
             await self._sync_user_project_memberships(
                 updated_user.uuid, updated_user.domain_name, group_ids
             )
+        await self._restate_user_policy_shares(UserID(updated_user.uuid))
         return UserData.from_row(updated_user)
+
+    async def _raise_failing_guard(self, session: SASession, updater: UserUpdater) -> None:
+        """Raise the first guard of ``updater`` the user's current row fails."""
+        guards = updater.guard_checks()
+        stmt = sa.select(*[g.condition().label(f"guard_{i}") for i, g in enumerate(guards)]).where(
+            users.c.uuid == updater.user_id
+        )
+        row = (await session.execute(stmt)).mappings().first()
+        if row is None:
+            return
+        for i, guard in enumerate(guards):
+            if not row[f"guard_{i}"]:
+                raise guard.error
 
     async def update_user_by_uuid_validated(self, updater: UserUpdater) -> UserData:
         """Update user by UUID with validation and handle role/group changes."""
         async with self._db.begin_session() as session:
             return await self._update_single_user_validated(session, updater)
 
-    async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> None:
+    async def delete_user_by_uuid_validated(self, user_uuid: UUID) -> UserData:
         """Soft delete a user by UUID, setting status to DELETED.
 
         The user's keypairs are left active: what keeps a deleted account out of the
         API is the status gate the auth middleware applies.
         """
-        async with self._db.begin() as conn:
-            result = await conn.execute(
-                sa.update(users)
+        async with self._db.begin_session() as session:
+            result = await session.execute(
+                sa.update(UserRow)
                 .values(status=UserStatus.DELETED, status_info="admin-requested")
                 .where(
-                    (users.c.uuid == user_uuid)
-                    & users.c.status.not_in(UserStatus.purge_in_progress())
+                    (UserRow.uuid == user_uuid)
+                    & UserRow.status.not_in(UserStatus.purge_in_progress())
                 )
+                .returning(UserRow)
             )
-            if result.rowcount == 0:
-                await self._raise_missing_or_purging(conn, user_uuid)
+            deleted_user = result.scalars().one_or_none()
+            if deleted_user is None:
+                await self._raise_missing_or_purging(await session.connection(), user_uuid)
+            return UserSearchableFields.own.to_data(deleted_user)
 
     async def restore_user_by_uuid_validated(self, user_uuid: UUID) -> None:
         """Restore a soft-deleted user by UUID, setting status back to ACTIVE."""
@@ -394,6 +429,7 @@ class UserDBSource:
         async with self._v2_ops.write_ops() as w:
             await w.batch_purge_field_entities(user_id, UserErrorLogPurger())
             await w.batch_purge_field_entities(user_id, UserKeyPairPurger())
+            await w.batch_purge_field_entities(user_id, BootstrapScriptPurger())
             await w.batch_purge_field_entities(user_id, UserGroupAssociationPurger())
             # Placement groups the user still owns: their deployments were either
             # delegated (the groups moved with them) or deleted by now.
@@ -450,9 +486,66 @@ class UserDBSource:
                 raise KeyPairNotFound(
                     f"User {target_user_uuid} has no default keypair to delegate endpoints to."
                 )
-            await EndpointRow.delegate_endpoint_ownership(
+            await self._delegate_endpoint_ownership(
                 session, user_uuid, UserID(target_user_uuid), default_access_key
             )
+
+    async def _delegate_endpoint_ownership(
+        self,
+        session: SASession,
+        owner_user_uuid: UUID,
+        target_user_uuid: UserID,
+        target_access_key: AccessKey,
+    ) -> None:
+        endpoint_ids = sa.select(EndpointRow.id).where(
+            (EndpointRow.session_owner == owner_user_uuid)
+            & (EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED)
+        )
+        # The placement groups of the delegated replica groups follow their
+        # members: a group's members all belong to its owner (BEP-1064).
+        await session.execute(
+            sa.update(SessionGroupRow)
+            .where(
+                SessionGroupRow.id.in_(
+                    sa.select(ReplicaGroupRow.session_group_id).where(
+                        ReplicaGroupRow.deployment_id.in_(endpoint_ids)
+                    )
+                )
+            )
+            .values(owner_user_id=target_user_uuid)
+        )
+        await session.execute(
+            sa.update(EndpointTokenRow)
+            .where(EndpointTokenRow.endpoint.in_(endpoint_ids))
+            .values(session_owner=target_user_uuid)
+        )
+        await session.execute(
+            sa.update(RoutingRow)
+            .where(RoutingRow.endpoint.in_(endpoint_ids))
+            .values(session_owner=target_user_uuid)
+        )
+        live_session_ids = sa.select(SessionRow.id).where(
+            SessionRow.id.in_(
+                sa.select(RoutingRow.session).where(RoutingRow.endpoint.in_(endpoint_ids))
+            )
+            & SessionRow.status.not_in(DEAD_SESSION_STATUSES)
+        )
+        await session.execute(
+            sa.update(KernelRow)
+            .where(KernelRow.session_id.in_(live_session_ids))
+            .values(user_uuid=target_user_uuid, access_key=target_access_key)
+        )
+        await session.execute(
+            sa.update(SessionRow)
+            .where(SessionRow.id.in_(live_session_ids))
+            .values(user_uuid=target_user_uuid, access_key=target_access_key)
+        )
+        # Last, since the statements above select the endpoints by their owner.
+        await session.execute(
+            sa.update(EndpointRow)
+            .where(EndpointRow.id.in_(endpoint_ids))
+            .values(session_owner=target_user_uuid)
+        )
 
     async def delete_endpoints(
         self,
@@ -509,7 +602,7 @@ class UserDBSource:
         """
         Delete user's all virtual folders as well as their physical data.
         """
-        target_vfs: list[VFolderDeletionInfo] = []
+        target_vfs: list[VFolderStorageTarget] = []
         async with self._db.begin_session() as db_session:
             result = await db_session.scalars(
                 sa.select(VFolderRow).where(
@@ -522,7 +615,7 @@ class UserDBSource:
             rows = result.fetchall()
             for vf in rows:
                 target_vfs.append(
-                    VFolderDeletionInfo(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
+                    VFolderStorageTarget(VFolderID.from_row(vf), vf.host, vf.unmanaged_path)
                 )
 
         storage_ptask_group = aiotools.PersistentTaskGroup()
@@ -707,6 +800,19 @@ class UserDBSource:
             await w.replace_user_projects(
                 UserID(user_uuid), domain_name, [ProjectID(UUID(gid)) for gid in group_ids]
             )
+
+    async def _restate_user_policy_shares(self, user_id: UserID) -> None:
+        """Lend the user the user and keypair policies they are now subject to — the
+        write above may have moved either one."""
+        async with self._policy_ops.write_ops() as w:
+            await w.restate_user_resource_policy_share(user_id)
+            await w.restate_keypair_resource_policy_share(user_id)
+
+    async def _restate_keypair_policy_share(self, user_id: UserID) -> None:
+        """Lend the user the keypair policy the key they now authorize with is subject
+        to."""
+        async with self._policy_ops.write_ops() as w:
+            await w.restate_keypair_resource_policy_share(user_id)
 
     async def _get_user_uuid_by_email_with_conn(self, conn: AsyncConnection, email: str) -> UUID:
         """Get user UUID by email using an existing connection."""
@@ -928,6 +1034,7 @@ class UserDBSource:
                 raise KeyPairForbidden("Cannot set an inactive keypair as the default access key.")
 
             await self._switch_default_keypair(session, user_id, access_key)
+        await self._restate_keypair_policy_share(user_id)
 
     async def keypair(self, keypair_id: KeyPairID) -> KeyPairData:
         """Read one keypair by its id."""

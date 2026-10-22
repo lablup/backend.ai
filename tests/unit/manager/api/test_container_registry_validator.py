@@ -5,7 +5,7 @@ from ai.backend.manager.errors.container_registry import (
     InvalidContainerRegistryProject,
     InvalidContainerRegistryURL,
 )
-from ai.backend.manager.models.container_registry import (
+from ai.backend.manager.models.container_registry.row import (
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )

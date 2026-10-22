@@ -6,11 +6,12 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Self
 
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import VolumeID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.config.unified import StorageProxyUnifiedConfig, VolumeInfoConfig
 from ai.backend.storage.errors import InvalidVolumeError
 from ai.backend.storage.types import VolumeInfo
@@ -19,26 +20,27 @@ from ai.backend.storage.watcher import WatcherClient
 from .abc import AbstractVolume
 from .noop import init_noop_volume
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-def _parse_volume_id(raw_key: str) -> VolumeID | None:
+def _parse_volume_id(volume_name: StorageVolumeName) -> VolumeID | None:
     try:
-        return VolumeID(uuid.UUID(raw_key))
-    except (ValueError, TypeError):
+        return VolumeID(uuid.UUID(volume_name))
+    except ValueError:
         return None
 
 
-def _volume_key(raw_key: str) -> str:
-    volume_id = _parse_volume_id(raw_key)
-    return raw_key if volume_id is None else str(volume_id)
-
-
 class VolumePool:
-    _volumes: Mapping[str, AbstractVolume]
+    _volumes: Mapping[StorageVolumeName, AbstractVolume]
+    _volumes_by_id: Mapping[VolumeID, AbstractVolume]
 
-    def __init__(self, volumes: Mapping[str, AbstractVolume]) -> None:
+    def __init__(self, volumes: Mapping[StorageVolumeName, AbstractVolume]) -> None:
         self._volumes = volumes
+        self._volumes_by_id = {
+            volume_id: volume
+            for name, volume in volumes.items()
+            if (volume_id := _parse_volume_id(name)) is not None
+        }
 
     @classmethod
     async def create(
@@ -50,9 +52,9 @@ class VolumePool:
         backends: Mapping[str, type[AbstractVolume]],
         watcher: WatcherClient | None = None,
     ) -> Self:
-        volumes: dict[str, AbstractVolume] = {}
-        for raw_volume_id, config in local_config.volume.items():
-            volumes[_volume_key(raw_volume_id)] = await cls._init_volume(
+        volumes: dict[StorageVolumeName, AbstractVolume] = {}
+        for volume_name, config in local_config.volume.items():
+            volumes[volume_name] = await cls._init_volume(
                 config,
                 backends[config.backend],
                 local_config,
@@ -61,7 +63,9 @@ class VolumePool:
                 event_producer,
                 watcher,
             )
-        volumes[NOOP_STORAGE_VOLUME_NAME] = init_noop_volume(etcd, event_dispatcher, event_producer)
+        volumes[StorageVolumeName(NOOP_STORAGE_VOLUME_NAME)] = init_noop_volume(
+            etcd, event_dispatcher, event_producer
+        )
         return cls(volumes=volumes)
 
     @classmethod
@@ -91,24 +95,27 @@ class VolumePool:
         for volume in self._volumes.values():
             await volume.shutdown()
 
-    def list_volumes(self) -> Mapping[str, VolumeInfo]:
+    def list_volumes(self) -> Mapping[StorageVolumeName, VolumeInfo]:
         return {
-            key: volume.info()
-            for key, volume in self._volumes.items()
-            if _parse_volume_id(key) is not None
+            name: volume.info()
+            for name, volume in self._volumes.items()
+            if name != NOOP_STORAGE_VOLUME_NAME
         }
+
+    def list_volumes_by_id(self) -> Mapping[VolumeID, VolumeInfo]:
+        return {volume_id: volume.info() for volume_id, volume in self._volumes_by_id.items()}
 
     def get_volume_info(self, volume_id: VolumeID) -> VolumeInfo:
         return self.get_volume(volume_id).info()
 
     def get_volume(self, volume_id: VolumeID) -> AbstractVolume:
         try:
-            return self._volumes[str(volume_id)]
+            return self._volumes_by_id[volume_id]
         except KeyError as e:
             raise InvalidVolumeError(f"Volume not found: {volume_id}") from e
 
-    def get_volume_by_name(self, name: str) -> AbstractVolume:
+    def get_volume_by_name(self, volume_name: StorageVolumeName) -> AbstractVolume:
         try:
-            return self._volumes[_volume_key(name)]
+            return self._volumes[volume_name]
         except KeyError as e:
-            raise InvalidVolumeError(name) from e
+            raise InvalidVolumeError(volume_name) from e

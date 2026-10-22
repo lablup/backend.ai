@@ -42,7 +42,6 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ReplicaOrderField,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
@@ -205,22 +204,22 @@ class ReplicaFilter(PydanticInputMixin[ReplicaFilterDTO]):
     traffic_status: TrafficStatusFilter | None = None
     created_at: DateTimeFilter | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Filter by replica creation datetime.",
         ),
         default=None,
     )
 
     field_id: UUIDFilter | None = gql_added_field(
-        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by replica ID."),
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by replica ID."),
         default=None,
     )
     session_id: UUIDFilter | None = gql_added_field(
-        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by session ID."),
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by session ID."),
         default=None,
     )
     revision_id: UUIDFilter | None = gql_added_field(
-        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by revision ID."),
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by revision ID."),
         default=None,
     )
     AND: list[Self] | None = None
@@ -246,7 +245,7 @@ class ModelReplica(PydanticNodeMixin[ReplicaNodeDTO]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the replica.",
         ),
     )

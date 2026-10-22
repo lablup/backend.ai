@@ -20,15 +20,14 @@ from ai.backend.manager.data.resource_slot.types import (
     ReconciliationResult,
     ResourceOccupancy,
 )
-from ai.backend.manager.models.resource_slot import (
+from ai.backend.manager.models.resource_slot.row import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.resource_slot.searchable_fields import (
     AgentResourceSearchableFields,
 )
-
-from .db_source import ResourceSlotDBSource
+from ai.backend.manager.repositories.resource_slot.db_source.db_source import ResourceSlotDBSource
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

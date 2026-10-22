@@ -43,7 +43,7 @@ class TheDomainNode(Then[ADomainAndACaller, DomainNode]):
 | 자리 | 무엇 |
 |---|---|
 | `bai_scenario/manager/<컴포넌트>/` | 시나리오 표와, 어댑터를 조립하는 conftest |
-| `bai_scenario/seeds/` | 행 하나를 뜻하는 seed 클래스와 `Seeder` |
+| `bai_scenario/seeds/` | 행 하나를 뜻하는 seed 클래스와 `TestSeeder` |
 | `bai_scenario/components/` | 표가 쓰는 어휘 — 시나리오 타입, 자주 쓰는 묶음 |
 | `bai_scenario/runner/` | 시나리오 실행과 검사, 픽스처로 심는 자리 |
 | `bai_scenario/setup/` | 공용 셋업이 무엇을 만드는지 확인하는 테스트 |

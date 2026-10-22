@@ -31,10 +31,10 @@ from ai.backend.common.dto.manager.resource.response import (
     RawListResponse,
     WatcherDataResponse,
 )
-from ai.backend.common.types import AccessKey, AgentId
+from ai.backend.common.types import AgentId
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.dto.context import RequestCtx, UserContext
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.resource_preset.scopes import (
     PublicResourcePresetTarget,
     ResourceGroupResourcePresetTarget,
@@ -73,7 +73,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.resource_preset.processors import ResourcePresetProcessors
     from ai.backend.manager.services.user.processors import UserProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourceHandler:
@@ -136,15 +136,11 @@ class ResourceHandler:
         self,
         body: BodyParam[CheckPresetsRequest],
         ctx: UserContext,
-        req: RequestCtx,
     ) -> APIResponse:
         params = body.parsed
-        resource_policy = req.request["keypair"]["resource_policy"]
         result = await self._resource_preset.check_presets.run(
             CheckResourcePresetsAction(
                 targets=await self._preset_targets(params.scaling_group),
-                access_key=AccessKey(ctx.access_key),
-                resource_policy=resource_policy,
                 domain_name=ctx.user_domain,
                 user_id=ctx.user_uuid,
                 group=params.group,

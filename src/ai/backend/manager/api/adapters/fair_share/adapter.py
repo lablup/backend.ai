@@ -66,7 +66,11 @@ from ai.backend.manager.data.fair_share.types import (
 )
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.fair_share.deprecated_search import (
     DeprecatedDomainFairShareFields,
     DeprecatedProjectFairShareFields,
@@ -251,11 +255,11 @@ class FairShareAdapter(BaseAdapter):
             domain_fair_share=self._domain_data_to_dto(result.data)
         )
 
-    async def bulk_upsert_domain(
+    async def atomic_bulk_upsert_domain(
         self,
         input: BulkUpsertDomainFairShareWeightInput,
     ) -> BulkUpsertDomainFairShareWeightPayload:
-        """Bulk upsert domain fair share weights."""
+        """Upsert several domain fair share weights in one transaction."""
         resource_group_id_result = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(input.resource_group_name))
         )
@@ -376,11 +380,11 @@ class FairShareAdapter(BaseAdapter):
             project_fair_share=self._project_data_to_dto(result.data)
         )
 
-    async def bulk_upsert_project(
+    async def atomic_bulk_upsert_project(
         self,
         input: BulkUpsertProjectFairShareWeightInput,
     ) -> BulkUpsertProjectFairShareWeightPayload:
-        """Bulk upsert project fair share weights."""
+        """Upsert several project fair share weights in one transaction."""
         resource_group_id_result = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(input.resource_group_name))
         )
@@ -505,11 +509,11 @@ class FairShareAdapter(BaseAdapter):
         )
         return UpsertUserFairShareWeightPayload(user_fair_share=self._user_data_to_dto(result.data))
 
-    async def bulk_upsert_user(
+    async def atomic_bulk_upsert_user(
         self,
         input: BulkUpsertUserFairShareWeightInput,
     ) -> BulkUpsertUserFairShareWeightPayload:
-        """Bulk upsert user fair share weights."""
+        """Upsert several user fair share weights in one transaction."""
         resource_group_id_result = await self._resource_group.lookup.run(
             LookupResourceGroupAction(name=ResourceGroupName(input.resource_group_name))
         )
@@ -556,15 +560,16 @@ class FairShareAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_domain_filter(sub_filter))
+                sub_conditions = self._convert_domain_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_domain_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_domain_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_domain_filter_rg(self, filter: DomainFairShareFilter) -> list[QueryCondition]:
@@ -591,15 +596,16 @@ class FairShareAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_domain_filter_rg(sub_filter))
+                sub_conditions = self._convert_domain_filter_rg(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_domain_filter_rg(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_domain_filter_rg(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_domain_orders(self, orders: list[DomainFairShareOrder]) -> list[QueryOrder]:
@@ -663,15 +669,16 @@ class FairShareAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_project_filter(sub_filter))
+                sub_conditions = self._convert_project_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_project_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_project_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_project_filter_rg(self, filter: ProjectFairShareFilter) -> list[QueryCondition]:
@@ -701,15 +708,16 @@ class FairShareAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_project_filter_rg(sub_filter))
+                sub_conditions = self._convert_project_filter_rg(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_project_filter_rg(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_project_filter_rg(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_project_orders(self, orders: list[ProjectFairShareOrder]) -> list[QueryOrder]:
@@ -783,15 +791,16 @@ class FairShareAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_user_filter(sub_filter))
+                sub_conditions = self._convert_user_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_user_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_user_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_user_filter_rg(self, filter: UserFairShareFilter) -> list[QueryCondition]:
@@ -824,15 +833,16 @@ class FairShareAdapter(BaseAdapter):
         if filter.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_conditions.extend(self._convert_user_filter_rg(sub_filter))
+                sub_conditions = self._convert_user_filter_rg(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_conditions.extend(self._convert_user_filter_rg(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_user_filter_rg(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_user_orders(self, orders: list[UserFairShareOrder]) -> list[QueryOrder]:

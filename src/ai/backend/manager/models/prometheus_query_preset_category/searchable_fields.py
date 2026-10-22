@@ -7,7 +7,7 @@ from typing import override
 from ai.backend.common.data.entity.prometheus_query_preset_category import (
     PrometheusQueryPresetCategoryID,
 )
-from ai.backend.manager.data.prometheus_query_preset_category import (
+from ai.backend.manager.data.prometheus_query_preset_category.types import (
     PrometheusQueryPresetCategoryData,
 )
 from ai.backend.manager.models.prometheus_query_preset_category.row import (

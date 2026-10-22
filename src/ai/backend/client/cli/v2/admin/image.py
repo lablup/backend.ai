@@ -7,7 +7,10 @@ import asyncio
 import click
 
 from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerm,
     create_v2_registry,
+    entity_label_filter_options,
+    entity_label_relations,
     load_v2_config,
     parse_order_options,
     print_result,
@@ -35,6 +38,7 @@ def image() -> None:
     default=None,
     help="Filter images by architecture (contains).",
 )
+@entity_label_filter_options
 @click.option(
     "--order-by",
     multiple=True,
@@ -47,6 +51,7 @@ def search(
     status: str | None,
     architecture: str | None,
     order_by: tuple[str, ...],
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search images with admin scope."""
     from ai.backend.common.dto.manager.query import StringFilter
@@ -59,8 +64,9 @@ def search(
     from ai.backend.common.dto.manager.v2.image.types import ImageOrderField, ImageStatusType
 
     # Build filter only if any filter option is provided
+    relations = entity_label_relations(label)
     filter_dto: ImageFilterInputDTO | None = None
-    if any(opt is not None for opt in (name_contains, status, architecture)):
+    if relations or any(opt is not None for opt in (name_contains, status, architecture)):
         filter_dto = ImageFilterInputDTO(
             name=StringFilter(contains=name_contains) if name_contains is not None else None,
             status=(
@@ -71,6 +77,7 @@ def search(
             architecture=(
                 StringFilter(contains=architecture) if architecture is not None else None
             ),
+            AND=[ImageFilterInputDTO(labels=rel) for rel in relations] or None,
         )
 
     # Build order only if --order-by is provided

@@ -1,8 +1,4 @@
-"""지정한 에이전트의 자원 검색 — 지정한 에이전트마다 권한을 검사하고, 하나라도 못 읽으면 전체를 거부한다.
-
-에이전트가 보고한 슬롯을 미리 만들어 두는 seed가 아직 없어, 보고된 슬롯이 집계되는 시나리오는
-여기 없다.
-"""
+"""지정한 에이전트의 자원 검색 — 지정한 에이전트마다 권한을 검사하고, 하나라도 못 읽으면 전체를 거부한다."""
 
 from __future__ import annotations
 
@@ -26,20 +22,29 @@ from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Configured, Given, Scenario, Then, When
 from bai_scenario.components.agent_resource import (
+    AgentsReportingSlots,
     AnAgentAndACaller,
     AnAgentAndSomeone,
+    Reported,
+    ReportedSlotsAndACaller,
+    TheReportedSlots,
     TwoAgentsAndACaller,
     TwoAgentsAndSomeoneReadingOne,
 )
 from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchAgentResourcesPayload
-type OneAgentStep = Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
-type TwoAgentsStep = Scenario[SeedingSession, TwoAgentsAndACaller, ResourceSlotAdapter, Searched]
+type OneAgentStep = Scenario[TestSeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
+type TwoAgentsStep = Scenario[
+    TestSeedingSession, TwoAgentsAndACaller, ResourceSlotAdapter, Searched
+]
+type ReportedSlotsStep = Scenario[
+    TestSeedingSession, ReportedSlotsAndACaller, ResourceSlotAdapter, Searched
+]
 
 
 @dataclass(frozen=True)
@@ -95,8 +100,60 @@ class SearchingBothAgents(When[TwoAgentsAndACaller, ResourceSlotAdapter, Searche
 
 
 @dataclass(frozen=True)
+class SearchingTheReportingAgent(When[ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]):
+    """슬롯을 보고한 에이전트 하나를 지정해 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "scoped_search_agent_resources"
+
+    @override
+    def describe(self, laid: ReportedSlotsAndACaller) -> str:
+        return f"{laid.caller.username}이 {laid.agents[0].agent_id} 에이전트를 지정해 조회"
+
+    @override
+    async def call(self, adapter: ResourceSlotAdapter, laid: ReportedSlotsAndACaller) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.scoped_search_agent_resources(
+                ScopedSearchAgentResourcesInput(
+                    scope=AgentResourceScope(agent=[UUIDScope(value=laid.agents[0].agent_uuid)])
+                )
+            )
+
+
+@dataclass(frozen=True)
+class AUserReadingAgentsInTheGroupFindsEverySlot(
+    Scenario[TestSeedingSession, ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-user-reading-agents-in-the-group-finds-every-slot-the-agent-reports"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "리소스 그룹의 에이전트를 읽을 수 있는 사용자가 슬롯 둘을 보고한 에이전트를 지정해 "
+            "조회하면 그 에이전트가 보고한 슬롯이 모두 반환된다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ReportedSlotsAndACaller]:
+        return AgentsReportingSlots(agents=1, slots=2, role=UserRole.USER, granted=True)
+
+    @override
+    def when(self) -> When[ReportedSlotsAndACaller, ResourceSlotAdapter, Searched]:
+        return SearchingTheReportingAgent()
+
+    @override
+    def then(self) -> Then[ReportedSlotsAndACaller, Searched]:
+        return TheReportedSlots(
+            rows=(Reported(agent=0, slot=0), Reported(agent=0, slot=1)), in_order=False
+        )
+
+
+@dataclass(frozen=True)
 class AUserReadingAgentsInTheGroupSearchesTheAgent(
-    Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -110,7 +167,7 @@ class AUserReadingAgentsInTheGroupSearchesTheAgent(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnAgentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAgentAndACaller]:
         return AnAgentAndSomeone(granted=True)
 
     @override
@@ -124,7 +181,7 @@ class AUserReadingAgentsInTheGroupSearchesTheAgent(
 
 @dataclass(frozen=True)
 class TheSuperadminSearchesTheAgent(
-    Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -135,7 +192,7 @@ class TheSuperadminSearchesTheAgent(
         return "슈퍼관리자가 아직 슬롯을 보고하지 않은 에이전트를 지정해 조회하면 응답이 비어 있다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnAgentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAgentAndACaller]:
         return AnAgentAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -149,7 +206,7 @@ class TheSuperadminSearchesTheAgent(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearchTheAgent(
-    Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -160,7 +217,7 @@ class AUserGrantedNothingMayNotSearchTheAgent(
         return "아무 권한도 없는 사용자가 에이전트를 지정해 조회하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnAgentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAgentAndACaller]:
         return AnAgentAndSomeone()
 
     @override
@@ -174,7 +231,7 @@ class AUserGrantedNothingMayNotSearchTheAgent(
 
 @dataclass(frozen=True)
 class OneAgentTheCallerMayNotReadRefusesTheWholeSearch(
-    Scenario[SeedingSession, TwoAgentsAndACaller, ResourceSlotAdapter, Searched]
+    Scenario[TestSeedingSession, TwoAgentsAndACaller, ResourceSlotAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -188,7 +245,7 @@ class OneAgentTheCallerMayNotReadRefusesTheWholeSearch(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, TwoAgentsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, TwoAgentsAndACaller]:
         return TwoAgentsAndSomeoneReadingOne()
 
     @override
@@ -202,7 +259,7 @@ class OneAgentTheCallerMayNotReadRefusesTheWholeSearch(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneSearchTheAgent(
-    Scenario[SeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched], Configured
+    Scenario[TestSeedingSession, AnAgentAndACaller, ResourceSlotAdapter, Searched], Configured
 ):
     @override
     def summary(self) -> str:
@@ -217,7 +274,7 @@ class EnforcementOffLetsAnyoneSearchTheAgent(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AnAgentAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AnAgentAndACaller]:
         return AnAgentAndSomeone()
 
     @override
@@ -241,6 +298,11 @@ TWO_AGENTS: list[TwoAgentsStep] = [
 ]
 
 
+REPORTED_SLOTS: list[ReportedSlotsStep] = [
+    AUserReadingAgentsInTheGroupFindsEverySlot(),
+]
+
+
 @pytest.mark.parametrize("scenario", ONE_AGENT, ids=lambda s: s.summary())
 async def test_scoped_searching_one_agent(
     scenario: OneAgentStep, adapter: ResourceSlotAdapter, engine: ExtendedAsyncSAEngine
@@ -251,5 +313,12 @@ async def test_scoped_searching_one_agent(
 @pytest.mark.parametrize("scenario", TWO_AGENTS, ids=lambda s: s.summary())
 async def test_scoped_searching_two_agents(
     scenario: TwoAgentsStep, adapter: ResourceSlotAdapter, engine: ExtendedAsyncSAEngine
+) -> None:
+    await run_scenario(scenario, adapter, engine)
+
+
+@pytest.mark.parametrize("scenario", REPORTED_SLOTS, ids=lambda s: s.summary())
+async def test_scoped_searching_reported_slots(
+    scenario: ReportedSlotsStep, adapter: ResourceSlotAdapter, engine: ExtendedAsyncSAEngine
 ) -> None:
     await run_scenario(scenario, adapter, engine)

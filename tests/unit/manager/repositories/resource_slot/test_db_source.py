@@ -15,26 +15,29 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_slot import (
+from ai.backend.manager.models.resource_slot.row import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.resource_slot.db_source import ResourceSlotDBSource
+from ai.backend.manager.repositories.resource_slot.db_source.db_source import ResourceSlotDBSource
 from ai.backend.testutils.db import with_tables
+
+_USER_ID = uuid4()
 
 
 class TestSlotTypes:
@@ -137,6 +140,27 @@ class TestAggregation:
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
+                UserResourcePolicyRow(
+                    name="default",
+                    max_vfolder_count=10,
+                    max_quota_scope_size=0,
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                UserRow(
+                    uuid=_USER_ID,
+                    username="test-user",
+                    email="test-user@example.com",
+                    domain_name=domain_name,
+                    domain_id=domain_id,
+                    resource_policy="default",
+                )
+            )
+        async with db.begin_session() as db_sess:
+            db_sess.add(
                 AgentRow(
                     id=agent_id,
                     status=AgentStatus.ALIVE,
@@ -181,7 +205,7 @@ class TestAggregation:
                     group_id=project_id,
                     resource_group_id=resource_group_id,
                     scaling_group_name="test-sg",
-                    user_uuid=uuid4(),
+                    user_uuid=_USER_ID,
                 )
             )
             await db_sess.flush()
@@ -191,7 +215,7 @@ class TestAggregation:
                     session_id=session_id,
                     domain_name=domain_name,
                     group_id=project_id,
-                    user_uuid=uuid4(),
+                    user_uuid=_USER_ID,
                     status=status,
                     repl_in_port=0,
                     repl_out_port=0,
@@ -520,6 +544,27 @@ class TestComputeActualAgentResourceUsage:
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
+                UserResourcePolicyRow(
+                    name="default",
+                    max_vfolder_count=10,
+                    max_quota_scope_size=0,
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                UserRow(
+                    uuid=_USER_ID,
+                    username="test-user",
+                    email="test-user@example.com",
+                    domain_name=domain_name,
+                    domain_id=domain_id,
+                    resource_policy="default",
+                )
+            )
+        async with db.begin_session() as db_sess:
+            db_sess.add(
                 AgentRow(
                     id=agent_id,
                     status=AgentStatus.ALIVE,
@@ -559,7 +604,7 @@ class TestComputeActualAgentResourceUsage:
                     group_id=project_id,
                     resource_group_id=resource_group_id,
                     scaling_group_name="test-sg",
-                    user_uuid=uuid4(),
+                    user_uuid=_USER_ID,
                 )
             )
             await db_sess.flush()
@@ -569,7 +614,7 @@ class TestComputeActualAgentResourceUsage:
                     session_id=session_id,
                     domain_name=domain_name,
                     group_id=project_id,
-                    user_uuid=uuid4(),
+                    user_uuid=_USER_ID,
                     status=status,
                     repl_in_port=0,
                     repl_out_port=0,

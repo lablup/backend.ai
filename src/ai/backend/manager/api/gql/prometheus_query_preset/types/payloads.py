@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from uuid import UUID
 
+import strawberry
+
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     DeleteQueryDefinitionPayload as DeleteQueryDefinitionPayloadDTO,
 )
@@ -18,6 +20,7 @@ from ai.backend.common.dto.manager.v2.prometheus_query_preset.types import (
     MetricValueInfo,
     QueryDefinitionOptionsInfo,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_field,
@@ -102,3 +105,16 @@ class QueryDefinitionResultGQL(PydanticOutputMixin[QueryDefinitionResultInfoDTO]
 )
 class DeleteQueryDefinitionPayload(PydanticOutputMixin[DeleteQueryDefinitionPayloadDTO]):
     id: UUID = gql_field(description="Deleted query definition ID.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for query definition purge.",
+    ),
+    model=DeleteQueryDefinitionPayloadDTO,
+    name="PurgeQueryDefinitionPayload",
+)
+class PurgeQueryDefinitionPayload(PydanticOutputMixin[DeleteQueryDefinitionPayloadDTO]):
+    purged_id: strawberry.ID = gql_field(description="Global ID of the purged query definition.")
+    entity_id: UUID = gql_field(description="UUID of the purged query definition.")

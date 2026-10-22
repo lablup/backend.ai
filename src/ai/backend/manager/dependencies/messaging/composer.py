@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.fetcher import EventFetcher
@@ -26,6 +27,7 @@ class MessagingInput:
     """
 
     config: ManagerUnifiedConfig
+    sentinel_monitors: SentinelMonitorSet
 
 
 @dataclass
@@ -81,7 +83,9 @@ class MessagingComposer(DependencyComposer[MessagingInput, MessagingResources]):
         # Initialize message queue (config dependency)
         message_queue = await stack.enter_dependency(
             MessageQueueDependency(),
-            MessageQueueInput(config=setup_input.config),
+            MessageQueueInput(
+                config=setup_input.config, sentinel_monitors=setup_input.sentinel_monitors
+            ),
         )
 
         # Initialize event fetcher (message_queue dependency)

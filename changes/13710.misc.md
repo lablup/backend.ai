@@ -1,0 +1,1 @@
+Build and push the seven service images in a single `docker buildx bake` run wiring the shared base image in as a bake target, with a drift check between `docker-bake.hcl` and the `list-dockerfiles.sh` publishing registry

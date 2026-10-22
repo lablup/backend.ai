@@ -6,7 +6,7 @@ from typing import override
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 
 from .base import TemplateAction
 from .create_task_template import TaskTemplateItemInput

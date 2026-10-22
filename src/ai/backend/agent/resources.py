@@ -3,8 +3,6 @@ from __future__ import annotations
 import asyncio
 import copy
 import logging
-import pprint
-import textwrap
 from abc import ABCMeta, abstractmethod
 from collections import defaultdict
 from collections.abc import (
@@ -40,6 +38,7 @@ from ai.backend.agent.errors.resources import (
     InvalidResourceConfigError,
     ResourceOverAllocatedError,
 )
+from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.json import dump_json_str, load_json
 from ai.backend.common.plugin import AbstractPlugin, BasePluginContext
@@ -59,7 +58,7 @@ from ai.backend.common.types import (
     SlotTypes,
     aobject,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 # Expose legacy import names for plugins
 from .affinity_map import AffinityHint, AffinityMap, AffinityPolicy
@@ -82,7 +81,7 @@ if TYPE_CHECKING:
 type DeviceAllocation = Mapping[SlotName, Mapping[DeviceId, Decimal]]
 type DeviceCapacityMap = Mapping[tuple[SlotName, DeviceId], Decimal]
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 known_slot_types: Mapping[SlotName, SlotTypes] = {}
 _GPU_ALLOC_RATIO_PRECISION = Decimal("0.0001")
 
@@ -238,9 +237,8 @@ class KernelResourceSpec:
                             alloc = Decimal(raw_alloc)
                     except KeyError as e:
                         log.warning(
-                            "A previously launched container has "
-                            "unknown slot type: {}. Ignoring it.",
-                            e.args[0],
+                            "unknown slot type in existing container ignored",
+                            slot_name=str(e.args[0]),
                         )
                         continue
                     per_device_alloc[dev_id] = alloc
@@ -589,7 +587,7 @@ class ResourceAllocator(aobject):
             try:
                 await computer.instance.cleanup()
             except Exception:
-                log.exception("Failed to clean up computer instance:")
+                log.exception("compute plugin cleanup failed")
 
     def get_computers(self, agent_id: AgentId) -> ComputersMap:
         if agent_id not in self.agent_computers:
@@ -617,10 +615,10 @@ class ResourceAllocator(aobject):
                 )
                 usable_capacity = Decimal(mem_usable)
                 log.debug(
-                    "usable-mem: {:m}, reserved-mem: {:m} after {:m} alignment",
-                    BinarySize(mem_usable),
-                    BinarySize(mem_reserved),
-                    BinarySize(mem_align),
+                    "usable memory calculated",
+                    usable_mem_bytes=int(mem_usable),
+                    reserved_mem_bytes=int(mem_reserved),
+                    mem_align_bytes=int(mem_align),
                 )
             else:
                 usable_capacity = max(
@@ -895,7 +893,6 @@ async def scan_resource_usage_per_slot(
     ``/home/config/resource.txt`` files in the kernel containers managed by this agent.
     """
     slot_allocs: dict[SlotName, Decimal] = defaultdict(lambda: Decimal(0))
-    loop = asyncio.get_running_loop()
 
     def _read_kernel_resource_spec(path: Path) -> None:
         nonlocal slot_allocs
@@ -914,7 +911,7 @@ async def scan_resource_usage_per_slot(
 
     async with asyncio.TaskGroup() as tg:
         for kernel_id in kernel_ids:
-            fut = loop.run_in_executor(
+            fut = run_in_executor_with_context(
                 None,
                 _read_kernel_resource_spec,
                 scratch_root / str(kernel_id) / "config" / "resource.txt",
@@ -951,12 +948,11 @@ def _normalize_device_alloc(
         # The device is no longer in the alloc map (e.g. removed or masked),
         # so the ratio is unknown and the raw amount is reported as-is.
         log.warning(
-            "scan_gpu_alloc_map(): no capacity found, reporting the raw allocation "
-            "(slot:{}, device:{}, capacity:{!r}, alloc:{})",
-            slot_name,
-            device_id,
-            capacity,
-            alloc,
+            "gpu alloc capacity not found, reporting raw allocation",
+            slot_name=str(slot_name),
+            device_id=device_id,
+            capacity=capacity,
+            alloc=alloc,
         )
         return alloc
     return alloc / capacity
@@ -977,8 +973,7 @@ async def scan_gpu_alloc_map(
         alloc_map: dict[DeviceId, Decimal] = defaultdict(lambda: Decimal(0))
 
         try:
-            loop = asyncio.get_running_loop()
-            content = await loop.run_in_executor(None, path.read_text)
+            content = await run_in_executor_with_context(None, path.read_text)
             resource_spec = KernelResourceSpec.read_from_string(content)
 
             if cuda := resource_spec.allocations.get(DeviceName("cuda")):
@@ -1011,9 +1006,7 @@ async def scan_gpu_alloc_map(
             alloc_map = await task
         except Exception as e:
             kernel_id = getattr(e, "kernel_id", "(unknown)")
-            log.error(
-                f"GPU alloc map scanning for kernel_id '{kernel_id}' resulted in exception: {e}"
-            )
+            log.error("gpu alloc map scan failed", exc_info=e, kernel_id=str(kernel_id))
             break
 
         for device_id, alloc in alloc_map.items():
@@ -1081,26 +1074,21 @@ def allocate(
                         context_tag=dev_name,
                     )
                 log.debug(
-                    "allocated {} for device {}",
-                    resource_spec.allocations[dev_name],
-                    dev_name,
+                    "device resource allocated",
+                    device_name=dev_name,
+                    allocation=str(resource_spec.allocations[dev_name]),
                 )
                 hint_devices: list[AbstractComputeDevice] = []
                 for slot_name, per_device_alloc in resource_spec.allocations[dev_name].items():
                     hint_devices.extend(device_id_map[k] for k in per_device_alloc.keys())
                 affinity_hint = AffinityHint(hint_devices, affinity_map, affinity_hint.policy)
             except ResourceError as e:  # including InsufficientResource
-                alloc_failure_log_fmt = "\n".join([
-                    "resource allocation failed: {0}",
-                    "(before allocation) device-specific slots ({1}):\n{2}",
-                    "(before allocation) allocation map ({1}):\n{3}",
-                ])
-                log.info(
-                    alloc_failure_log_fmt,
-                    e,
-                    dev_name,
-                    textwrap.indent(pprint.pformat(dict(device_specific_slots)), "  "),
-                    textwrap.indent(pprint.pformat(dict(current_dev_alloc_maps[dev_name])), "  "),
+                log.trace(
+                    "resource allocation failed",
+                    error_repr=repr(e),
+                    device_name=dev_name,
+                    device_slots=str(dict(device_specific_slots)),
+                    alloc_map=str(dict(current_dev_alloc_maps[dev_name])),
                 )
                 raise
     except ResourceError:

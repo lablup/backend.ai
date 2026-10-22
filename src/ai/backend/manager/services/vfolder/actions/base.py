@@ -23,12 +23,12 @@ from ai.backend.manager.actions.v2.lookup.base import (
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
-from ai.backend.manager.data.vfolder.types import VFolderData
-from ai.backend.manager.models.user import UserRole
-from ai.backend.manager.models.vfolder import (
+from ai.backend.manager.data.vfolder.types import (
+    VFolderData,
     VFolderOwnershipType,
     VFolderStatusSet,
 )
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.services.vfolder.types import (
     VFolderUsageInfo,
@@ -133,6 +133,7 @@ class UpdateVFolderAttributeAction(VFolderAction):
 @dataclass
 class UpdateVFolderAttributeActionResult:
     vfolder_uuid: uuid.UUID
+    vfolder: VFolderData
 
 
 @dataclass
@@ -279,7 +280,7 @@ class CloneVFolderAction(VFolderAction):
     target_quota_scope_id: QuotaScopeID | None
     cloneable: bool
     usage_mode: VFolderUsageMode
-    mount_permission: VFolderMountPolicy
+    mount_permission: VFolderMountPolicy | None
 
     @override
     @classmethod
@@ -300,7 +301,7 @@ class CloneVFolderActionResult:
     target_vfolder_name: str
     target_vfolder_host: str
     usage_mode: VFolderUsageMode
-    mount_permission: VFolderMountPolicy
+    mount_permission: VFolderMountPolicy | None
     creator_email: str
     ownership_type: VFolderOwnershipType
     owner_user_uuid: uuid.UUID | None

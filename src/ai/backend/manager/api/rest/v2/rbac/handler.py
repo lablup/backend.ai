@@ -19,6 +19,10 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     CreateRoleInput,
     DeletePermissionInput,
     DeleteRoleInput,
+    PartialBulkDeleteRolesInput,
+    PartialBulkPurgeRolesInput,
+    PartialBulkRestoreRolesInput,
+    PartialBulkUpdateRolesInput,
     PurgeRoleInput,
     ReplaceRolePermissionsInput,
     RevokeRoleInput,
@@ -33,7 +37,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     ScopeEntityOperationCombinationInfo,
     SearchRoleAssignmentsPayload,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import ProjectIdPathParam, RoleIdPathParam
 from ai.backend.manager.models.rbac_models.role.scopes import (
     ScopedRoleTarget,
@@ -42,7 +46,7 @@ from ai.backend.manager.models.rbac_models.role.scopes import (
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class PermissionMatrixPayload(
@@ -132,17 +136,73 @@ class V2RBACHandler:
 
     async def delete_role(
         self,
-        body: BodyParam[DeleteRoleInput],
+        path: PathParam[RoleIdPathParam],
     ) -> APIResponse:
         """Soft-delete a role (marks status as DELETED)."""
-        result = await self._adapter.delete(body.parsed.id)
+        result = await self._adapter.delete(path.parsed.role_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def restore_role(
+        self,
+        path: PathParam[RoleIdPathParam],
+    ) -> APIResponse:
+        """Restore a soft-deleted role (marks status as ACTIVE)."""
+        result = await self._adapter.restore(path.parsed.role_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def purge_role(
         self,
-        body: BodyParam[PurgeRoleInput],
+        path: PathParam[RoleIdPathParam],
     ) -> APIResponse:
         """Hard-delete a role from the database."""
+        result = await self._adapter.purge(path.parsed.role_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update_roles(
+        self,
+        body: BodyParam[PartialBulkUpdateRolesInput],
+    ) -> APIResponse:
+        """Update several roles, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_delete_roles(
+        self,
+        body: BodyParam[PartialBulkDeleteRolesInput],
+    ) -> APIResponse:
+        """Soft-delete several roles, answering for each one."""
+        result = await self._adapter.partial_bulk_delete(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_restore_roles(
+        self,
+        body: BodyParam[PartialBulkRestoreRolesInput],
+    ) -> APIResponse:
+        """Restore several soft-deleted roles, answering for each one."""
+        result = await self._adapter.partial_bulk_restore(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge_roles(
+        self,
+        body: BodyParam[PartialBulkPurgeRolesInput],
+    ) -> APIResponse:
+        """Permanently remove several roles, answering for each one."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_delete_role(
+        self,
+        body: BodyParam[DeleteRoleInput],
+    ) -> APIResponse:
+        """Deprecated. Use `POST /v2/rbac/roles/{role_id}/delete`."""
+        result = await self._adapter.delete(body.parsed.id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_purge_role(
+        self,
+        body: BodyParam[PurgeRoleInput],
+    ) -> APIResponse:
+        """Deprecated. Use `DELETE /v2/rbac/roles/{role_id}`."""
         result = await self._adapter.purge(body.parsed.id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
@@ -183,7 +243,7 @@ class V2RBACHandler:
         body: BodyParam[DeletePermissionInput],
     ) -> APIResponse:
         """Hard-delete a scoped permission."""
-        result = await self._adapter.delete_permission(body.parsed.id)
+        result = await self._adapter.purge_permission(body.parsed.id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     # -------------------------------------------------------- Bulk role permissions

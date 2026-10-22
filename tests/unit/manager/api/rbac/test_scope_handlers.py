@@ -18,7 +18,7 @@ from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.api.rest.rbac.handler import RBACHandler
 from ai.backend.manager.dto.context import UserContext
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.permission_contoller.actions.get_scope_types import (
     PublicGetScopeTypesActionResult,
 )

@@ -26,7 +26,7 @@ from ai.backend.manager.data.prometheus_query_preset.types import (
 )
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.prometheus_query_preset.db_source import (
+from ai.backend.manager.repositories.prometheus_query_preset.db_source.db_source import (
     PrometheusQueryPresetDBSource,
 )
 
@@ -333,8 +333,12 @@ class TestSessionUtilizationMetrics:
             query: {session_id: Decimal("5")},
             missing_query: {},
         }
-        assert "Prometheus query preset not found; skipping utilization query" in caplog.text
-        assert str(missing_query.preset_id) in caplog.text
+        records = [
+            r
+            for r in caplog.records
+            if r.getMessage() == "utilization query preset not found, query skipped"
+        ]
+        assert [r.__dict__["log_tag_preset_id"] for r in records] == [str(missing_query.preset_id)]
         prometheus_client.execute_preset.assert_awaited_once()
 
     @pytest.mark.parametrize(
@@ -428,7 +432,7 @@ class TestSessionUtilizationMetrics:
         )
 
         assert result == {query: {}}
-        assert "none matched the requested sessions" in caplog.text
+        assert "utilization query series matched no requested session" in caplog.text
 
     @pytest.mark.parametrize(
         "query_kwargs",
@@ -453,7 +457,7 @@ class TestSessionUtilizationMetrics:
         )
 
         assert result == {query: {}}
-        assert "labels not allowed by preset" in caplog.text
+        assert "utilization query labels not allowed by preset" in caplog.text
         prometheus_client.execute_preset.assert_not_awaited()
 
     async def test_empty_preset_allow_lists_allow_any_labels(

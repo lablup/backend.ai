@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import uuid
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 
@@ -7,7 +8,10 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
-from ai.backend.common.data.entity.service_catalog import ServiceCatalogEntityType
+from ai.backend.common.data.entity.service_catalog import (
+    ServiceCatalogEntityType,
+    ServiceCatalogID,
+)
 from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.models.service_catalog.creators import ServiceCatalogEndpointCreator
@@ -131,3 +135,86 @@ class TestServiceCatalogRepositoryRegister:
         assert roles == ["main"]
         assert nodes == 1
         assert version == "2"
+
+
+class TestServiceCatalogRepositoryBulkGet:
+    @pytest.fixture
+    async def db_with_tables(
+        self,
+        global_entity_ids: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            global_entity_ids,
+            [
+                ServiceCatalogRow,
+                ServiceCatalogEndpointRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                EntityMembershipCapRow,
+                ScopeBindingRow,
+            ],
+        ):
+            yield global_entity_ids
+
+    @pytest.fixture
+    def repository(self, db_with_tables: ExtendedAsyncSAEngine) -> ServiceCatalogRepository:
+        return ServiceCatalogRepository(V2DBOpsProvider(db_with_tables))
+
+    def _upserter(self, instance_id: str) -> ServiceCatalogUpserter:
+        return ServiceCatalogUpserter(
+            service_group="manager",
+            instance_id=instance_id,
+            display_name=instance_id,
+            version="1",
+            labels={},
+            startup_time=datetime(2026, 1, 15, tzinfo=UTC),
+            config_hash="abc",
+        )
+
+    def _endpoint(self, role: str) -> ServiceCatalogEndpointCreator:
+        return ServiceCatalogEndpointCreator(
+            role=role,
+            scope="private",
+            address="10.0.0.1",
+            port=8080,
+            protocol="grpc",
+            metadata={},
+        )
+
+    @pytest.fixture
+    async def two_endpoint_service(self, repository: ServiceCatalogRepository) -> ServiceCatalogID:
+        return await repository.register(
+            self._upserter("mgr-001"), [self._endpoint("main"), self._endpoint("health")]
+        )
+
+    @pytest.fixture
+    async def one_endpoint_service(self, repository: ServiceCatalogRepository) -> ServiceCatalogID:
+        return await repository.register(self._upserter("mgr-002"), [self._endpoint("main")])
+
+    async def test_each_named_service_carries_its_own_endpoints(
+        self,
+        repository: ServiceCatalogRepository,
+        two_endpoint_service: ServiceCatalogID,
+        one_endpoint_service: ServiceCatalogID,
+    ) -> None:
+        found = await repository.bulk_get([two_endpoint_service, one_endpoint_service])
+
+        roles = {
+            service_id: sorted(endpoint.role for endpoint in data.endpoints)
+            for service_id, data in found.items()
+        }
+        assert roles == {
+            two_endpoint_service: ["health", "main"],
+            one_endpoint_service: ["main"],
+        }
+
+    async def test_an_unknown_id_is_absent(
+        self,
+        repository: ServiceCatalogRepository,
+        one_endpoint_service: ServiceCatalogID,
+    ) -> None:
+        missing = ServiceCatalogID(uuid.uuid4())
+
+        found = await repository.bulk_get([one_endpoint_service, missing])
+
+        assert set(found) == {one_endpoint_service}

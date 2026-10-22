@@ -11,7 +11,8 @@ from ai.backend.common.data.entity.app_config_definition import AppConfigDefinit
 from ai.backend.common.dto.manager.v2.app_config_definition.request import (
     SearchAppConfigDefinitionsInput,
 )
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -28,6 +29,8 @@ from .types import (
     AppConfigDefinitionOrderByGQL,
     CreateAppConfigDefinitionInputGQL,
     CreateAppConfigDefinitionPayloadGQL,
+    PartialBulkAppConfigDefinitionsPayloadGQL,
+    PartialBulkPurgeAppConfigDefinitionsInputGQL,
     PurgeAppConfigDefinitionInputGQL,
     PurgeAppConfigDefinitionPayloadGQL,
 )
@@ -119,14 +122,54 @@ async def admin_create_app_config_definition(
 
 @gql_mutation(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Purge an app config definition by id, with the allow-list entries and fragments "
+            "under it."
+        ),
+    )
+)
+async def purge_app_config_definition(
+    info: Info[StrawberryGQLContext],
+    input: PurgeAppConfigDefinitionInputGQL,
+) -> PurgeAppConfigDefinitionPayloadGQL:
+    payload = await info.context.adapters.app_config_definition.purge(input.to_pydantic())
+    return PurgeAppConfigDefinitionPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(AppConfigDefinitionGQL, payload.entity_id)}
+    )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Purge several app config definitions, answering for each one.",
+    )
+)
+async def partial_bulk_purge_app_config_definitions(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeAppConfigDefinitionsInputGQL,
+) -> PartialBulkAppConfigDefinitionsPayloadGQL:
+    payload = await info.context.adapters.app_config_definition.partial_bulk_purge(
+        input.to_pydantic()
+    )
+    return PartialBulkAppConfigDefinitionsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
         added_version="26.7.0",
         description="Purge an app config definition by id (super admin only).",
-    )
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeAppConfigDefinition`."
+    ),
 )
 async def admin_purge_app_config_definition(
     info: Info[StrawberryGQLContext],
     input: PurgeAppConfigDefinitionInputGQL,
 ) -> PurgeAppConfigDefinitionPayloadGQL | None:
     check_admin_only()
-    payload = await info.context.adapters.app_config_definition.admin_purge(input.to_pydantic())
-    return PurgeAppConfigDefinitionPayloadGQL.from_pydantic(payload)
+    payload = await info.context.adapters.app_config_definition.purge(input.to_pydantic())
+    return PurgeAppConfigDefinitionPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(AppConfigDefinitionGQL, payload.entity_id)}
+    )

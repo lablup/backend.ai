@@ -45,9 +45,10 @@ class V2RelationWriteOps(V2WriteOps):
         and READ on the scope added to what the target holds of it. Answers per pair, in
         the order given, whether the link was written.
 
-        A pair already linked, switched off or not, is left as it stands and answered
-        ``False`` — naming one twice is not something a caller has to avoid. Every other
-        integrity failure is the spec's to map.
+        A pair already linked, switched off or not, keeps its row and is answered
+        ``False`` — naming one twice is not something a caller has to avoid. Its graph
+        reads are registered again, idempotently. Every other integrity failure is the
+        spec's to map.
 
         Both entities are already in the graph: a node is written when the entity is
         created, so one missing is a broken state and not something a relation repairs.
@@ -60,8 +61,7 @@ class V2RelationWriteOps(V2WriteOps):
             )
             for scope, target in pairs
         ]
-        linked = [pair for pair, is_new in zip(pairs, written, strict=True) if is_new]
-        for scope, target in linked:
+        for scope, target in pairs:
             await self._govern([scope], target, cap=Permission.READ)
             await self._widen_share(target, scope, {Permission.READ: None})
         return written
@@ -106,6 +106,34 @@ class V2RelationWriteOps(V2WriteOps):
         """Switch each pair back on, answering as :meth:`delete_relations` does."""
         return [await self._switch_relation(updater, scope, target) for scope, target in pairs]
 
+    async def atomic_insert_relations_if_absent[
+        TScope: EntityIdentifier,
+        TTarget: EntityIdentifier,
+        TRow: Base,
+    ](
+        self,
+        upserter: RelationUpserter[TScope, TTarget, TRow],
+        pairs: Sequence[tuple[TScope, TTarget]],
+    ) -> list[bool]:
+        """Link each pair as :meth:`create_relations` does, leaving the row of a pair
+        already linked as it stands. Answers per pair, in the order given, whether its
+        row was inserted. All or nothing.
+
+        The graph reads are registered for every pair, idempotently.
+        """
+        inserted: list[bool] = []
+        for scope, target in pairs:
+            row = await self._insert_row_if_absent(
+                upserter.row_class(),
+                upserter.index_elements(),
+                upserter.build_insert_values(scope, target),
+                upserter.integrity_error_checks(),
+            )
+            await self._govern([scope], target, cap=Permission.READ)
+            await self._widen_share(target, scope, {Permission.READ: None})
+            inserted.append(row is not None)
+        return inserted
+
     async def partial_upsert_relations[
         TScope: EntityIdentifier,
         TTarget: EntityIdentifier,
@@ -119,22 +147,37 @@ class V2RelationWriteOps(V2WriteOps):
         stand yet, so one refusing pair leaves the rest written and answers with why.
 
         The graph reads are registered for every pair, idempotently: a pair written
-        again is already governed and already shared.
+        again is already governed and already shared. A pair already standing with no
+        update values to take is left as it stands and answered ``written`` false.
         """
+        update_values = upserter.build_update_values()
         results: list[RelationWriteResult] = []
         for scope, target in pairs:
             try:
                 async with self._sess.begin_nested():
-                    await self._upsert_row_returning(
-                        upserter.row_class(),
-                        upserter.index_elements(),
-                        upserter.build_insert_values(scope, target),
-                        upserter.build_update_values(),
-                        upserter.integrity_error_checks(),
-                    )
+                    insert_values = upserter.build_insert_values(scope, target)
+                    if update_values:
+                        await self._upsert_row_returning(
+                            upserter.row_class(),
+                            upserter.index_elements(),
+                            insert_values,
+                            update_values,
+                            upserter.integrity_error_checks(),
+                        )
+                        written = True
+                    else:
+                        written = (
+                            await self._insert_row_if_absent(
+                                upserter.row_class(),
+                                upserter.index_elements(),
+                                insert_values,
+                                upserter.integrity_error_checks(),
+                            )
+                            is not None
+                        )
                     await self._govern([scope], target, cap=Permission.READ)
                     await self._widen_share(target, scope, {Permission.READ: None})
-                results.append(RelationWriteResult(scope=scope, target=target, written=True))
+                results.append(RelationWriteResult(scope=scope, target=target, written=written))
             except Exception as e:
                 results.append(
                     RelationWriteResult(scope=scope, target=target, written=False, error=e)

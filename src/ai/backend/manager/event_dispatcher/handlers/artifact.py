@@ -15,7 +15,7 @@ from ai.backend.common.events.event_types.notification import NotificationTrigge
 from ai.backend.common.types import (
     AgentId,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactStatus
 from ai.backend.manager.errors.artifact_registry import InvalidArtifactRegistryTypeError
@@ -26,7 +26,7 @@ from ai.backend.manager.repositories.reservoir_registry.repository import (
     ReservoirRegistryRepository,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ArtifactEventHandler:
@@ -127,16 +127,15 @@ class ArtifactEventHandler:
             )
             await self._event_producer.anycast_event(event)
             log.debug(
-                "Produced artifact download notification for artifact {} revision {}",
-                artifact_id,
-                version,
+                "artifact download notification produced",
+                artifact_id=artifact_id,
+                artifact_version=version,
             )
-        except Exception as e:
-            log.error(
-                "Failed to produce artifact download notification for artifact {} revision {}: {}",
-                artifact_id,
-                version,
-                e,
+        except Exception:
+            log.exception(
+                "artifact download notification failed",
+                artifact_id=artifact_id,
+                artifact_version=version,
             )
 
     async def handle_model_import_done(
@@ -176,7 +175,7 @@ class ArtifactEventHandler:
         )
 
         if event.success is False:
-            log.warning("Model import failed: {} revision: {}", event.model_id, event.revision)
+            log.trace("model import failed", model_id=event.model_id, model_revision=event.revision)
             await self._artifact_repository.update_artifact_revision_status(
                 revision.id, ArtifactStatus.FAILED
             )
@@ -221,12 +220,8 @@ class ArtifactEventHandler:
                 await self._artifact_repository.update_artifact_revision_status(
                     revision.id, final_status
                 )
-        except Exception as model_error:
-            log.error(
-                "Failed to process imported model update: {} - {}",
-                event.model_id,
-                model_error,
-            )
+        except Exception:
+            log.exception("imported model update failed", model_id=event.model_id)
             final_status = ArtifactStatus.FAILED
 
         # Produce notification for successful download
@@ -293,15 +288,11 @@ class ArtifactEventHandler:
             )
 
             log.trace(
-                "Updated metadata for model: {} revision: {} in artifact: {} (size: {} bytes)",
-                model_info.model_id,
-                model_info.revision,
-                artifact.id,
-                model_info.size,
+                "model metadata updated",
+                model_id=model_info.model_id,
+                model_revision=model_info.revision,
+                artifact_id=artifact.id,
+                size_bytes=model_info.size,
             )
-        except Exception as model_error:
-            log.error(
-                "Failed to process metadata update for model: {} - {}",
-                model_info.model_id,
-                model_error,
-            )
+        except Exception:
+            log.exception("model metadata update failed", model_id=model_info.model_id)

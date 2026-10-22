@@ -6,7 +6,8 @@ What these tests pin down:
   node, which owns and governs itself, and is owned and governed by each
   ``created_in`` scope; a role-managed create does the same and
   provisions preset roles; a purge tears the same things down
-  symmetrically; an upsert keeps the scope provisioned idempotently.
+  symmetrically; an upsert keeps the scope provisioned idempotently; an insert if
+  absent leaves a row already there as it stands and provisions it all the same.
 - The plain path never touches roles, even when matching presets exist — the
   role-managed path (typed against the combined spec) is what provisions the
   roles the scope type's active presets call for. A preset without a name
@@ -50,16 +51,16 @@ from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import VirtualEntityNotFound
 from ai.backend.manager.errors.repository import RepositoryIntegrityError
 from ai.backend.manager.models.base import GUID, Base
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 from ai.backend.manager.models.specs.creator import (
     DanglingFieldCreator,
     EntityCreator,
@@ -69,7 +70,7 @@ from ai.backend.manager.models.specs.creator import (
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.upserter import EntityUpserter
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -387,7 +388,6 @@ async def _add_presets(database: ExtendedAsyncSAEngine) -> None:
             name=_PRESET_NAME,
             scope_type=ProjectEntityType(),
             auto_assign=True,
-            deleted=False,
         )
         sess.add(preset_row)
         await sess.flush()
@@ -404,7 +404,6 @@ async def _add_presets(database: ExtendedAsyncSAEngine) -> None:
                 role_name_template="{{ scope.name }}-member",
                 scope_type=ProjectEntityType(),
                 auto_assign=False,
-                deleted=False,
             )
         )
 
@@ -1114,5 +1113,57 @@ class TestEntityUpsert:
                 _Upserter(name="a", parents=(parent_id,)),
                 _Upserter(name="b", parents=(uuid.uuid4(),)),
             ])
+
+        assert await _row_count(database) == 0
+
+
+@pytest.fixture
+def provider(database: ExtendedAsyncSAEngine) -> V2DBOpsProvider:
+    return V2DBOpsProvider(database)
+
+
+class TestEntityInsertIfAbsent:
+    async def test_insert_provisions_scope_and_memberships(
+        self, database: ExtendedAsyncSAEngine, provider: V2DBOpsProvider, parent_id: UUID
+    ) -> None:
+        async with provider.write_ops() as w:
+            result = await w.insert_entity_if_absent(_Upserter(name="a", parents=(parent_id,)))
+
+        assert result.inserted
+        assert await _virtual_entity_id(database, result.entity_id) is not None
+        assert await _self_membership_exists(database, result.entity_id)
+        assert await _parent_membership_entity_ids(database, parent_id) == {result.entity_id}
+
+    async def test_a_row_already_there_is_left_as_it_stands(
+        self,
+        database: ExtendedAsyncSAEngine,
+        repository: OpsRepository[_EntityData],
+        provider: V2DBOpsProvider,
+        parent_id: UUID,
+    ) -> None:
+        first = await repository.upsert_entity(
+            _Upserter(name="a", note="kept", parents=(parent_id,))
+        )
+
+        async with provider.write_ops() as w:
+            result = await w.insert_entity_if_absent(
+                _Upserter(name="a", note="ignored", parents=(parent_id,))
+            )
+
+        assert (result.entity_id, result.inserted) == (first.id, False)
+        assert await _row_count(database) == 1
+        async with database.begin_readonly_session() as sess:
+            note = await sess.scalar(sa.select(EntityLifecycleTestRow.note))
+        assert note == "kept"
+
+    async def test_atomic_insert_is_all_or_nothing(
+        self, database: ExtendedAsyncSAEngine, provider: V2DBOpsProvider, parent_id: UUID
+    ) -> None:
+        with pytest.raises(VirtualEntityNotFound):
+            async with provider.write_ops() as w:
+                await w.atomic_insert_entities_if_absent([
+                    _Upserter(name="a", parents=(parent_id,)),
+                    _Upserter(name="b", parents=(uuid.uuid4(),)),
+                ])
 
         assert await _row_count(database) == 0

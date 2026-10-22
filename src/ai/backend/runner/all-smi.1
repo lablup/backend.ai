@@ -1,4 +1,4 @@
-.TH ALL-SMI 1 "September 2026" "all-smi 0.26.3" "User Commands"
+.TH ALL-SMI 1 "October 20, 2026" "all-smi 0.28.1" "User Commands"
 .SH NAME
 all-smi \- Command-line utility for monitoring GPU hardware
 .SH SYNOPSIS
@@ -20,7 +20,7 @@ all-smi \- Command-line utility for monitoring GPU hardware
 .B all-smi
 is a comprehensive hardware monitoring tool that provides real-time information about GPU/NPU utilization,
 memory usage, temperature, power consumption, chassis-level metrics, and other system information. It supports various hardware platforms
-including NVIDIA GPUs, AMD GPUs, Apple Silicon, NVIDIA Jetson, Intel Arc/Iris Xe client GPUs, Google Cloud TPUs, Tenstorrent NPUs, Rebellions NPUs, and Furiosa NPUs.
+including NVIDIA GPUs, AMD GPUs, Apple Silicon, NVIDIA Jetson, Intel Arc/Iris Xe client GPUs, Google Cloud TPUs, Tenstorrent NPUs, Rebellions NPUs, Furiosa NPUs, and AWS Neuron (Trainium/Inferentia) devices.
 Chassis monitoring provides node-level power consumption tracking (CPU+GPU+ANE), thermal pressure monitoring (Apple Silicon),
 and BMC sensor integration for inlet/outlet temperatures and fan speeds on server systems.
 
@@ -87,6 +87,9 @@ Display version information
 .B \-i, \-\-interval \fISECONDS\fR
 The interval in seconds at which to update the hardware information.
 Default: 1 second (Apple Silicon) or 2 seconds (others)
+.TP
+.B \-\-hide\-storage
+Hide storage rows in the TUI while continuing to collect storage data.
 .SS View Mode Options (Remote Monitoring)
 .TP
 .B \-\-hosts \fIURL\fR...
@@ -110,6 +113,9 @@ If not specified, uses adaptive interval based on node count:
 .IP \(bu 3
 101+ remote nodes: 6 seconds
 .RE
+.TP
+.B \-\-hide\-storage
+Hide storage rows in the TUI while continuing to collect storage data. This also applies to replay; API metrics, snapshots, and recordings remain unchanged.
 .SS API Mode Options
 .TP
 .B \-p, \-\-port \fIPORT\fR
@@ -491,14 +497,20 @@ Native support for M1/M2/M3/M4 series with Metal API integration, ANE power moni
 .B NVIDIA Jetson
 Tegra-specific metrics with DLA (Deep Learning Accelerator) support
 .TP
+.B NVIDIA RTX Spark N1X
+Windows on ARM64 SoC with a Blackwell GPU; the NPU is shown as a DLA gauge on the GPU row and exported as all_smi_dla_* metrics
+.TP
 .B Google Cloud TPUs
 Support for TPU v2-v7/Ironwood architectures, HBM memory tracking, and integration with libtpu/JAX workflows
 .TP
 .B Tenstorrent NPUs
 Support for Wormhole and Blackhole architectures with multiple temperature sensors and clock domains
 .TP
+.B AWS Neuron
+Support for Trainium and Inferentia devices: one row per NeuronCore, device HBM and PCI topology from neuron-ls, per-core memory from the neuron driver sysfs tree, and best-effort per-core utilization from neuron-monitor while a Neuron runtime is attached
+.TP
 .B Rebellions NPUs
-Support for ATOM, ATOM+, and ATOM Max variants with PCIe Gen4 interface
+Support for the ATOM line (ATOM, ATOM+, ATOM Max) and its successor REBEL line (REBEL100) with PCIe Gen5 x16 interfaces. An ATOM Max card has four dies that share one power reading; it is counted once, on the lowest\-numbered die of the card, and the other dies show the card value in parentheses and export no power series
 .TP
 .B Furiosa NPUs
 Support for RNGD architecture with 8-core NPUs and PE utilization tracking
@@ -571,6 +583,9 @@ Access metrics via Unix socket:
 Monitor local hardware with custom interval:
 .B all-smi local --interval 5
 .TP
+Hide storage rows in the local TUI:
+.B all-smi local --hide-storage
+.TP
 Monitor remote hosts (requires API endpoints):
 .B all-smi view --hosts http://node1:9090 http://node2:9090
 .TP
@@ -585,6 +600,9 @@ Monitor hosts from file:
 .TP
 Monitor remote cluster with custom interval:
 .B all-smi view --hostfile hosts.csv --interval 10
+.TP
+Hide storage rows on remote host tabs:
+.B all-smi view --hosts http://node1:9090 --hide-storage
 .SH FILES
 .TP
 .I hosts.csv

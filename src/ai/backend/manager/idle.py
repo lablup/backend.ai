@@ -40,6 +40,7 @@ from sqlalchemy.engine import Row
 import ai.backend.common.validators as tx
 from ai.backend.common import msgpack
 from ai.backend.common import typed_validators as tv
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.config import BaseConfigModel, config_key_to_snake_case
@@ -65,19 +66,19 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.common.utils import nmget
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.models.kernel.row import LIVE_STATUS, kernels
+from ai.backend.manager.models.keypair.row import keypairs
+from ai.backend.manager.models.resource_policy.row import keypair_resource_policies
+from ai.backend.manager.models.user.row import users
 
 from .defs import DEFAULT_ROLE, LockID
 from .errors.kernel import IdlePolicyNotFound
-from .models.kernel import LIVE_STATUS, kernels
-from .models.keypair import keypairs
-from .models.resource_policy import keypair_resource_policies
 from .models.resource_slot.aggregates import (
     kernel_requested_slots_expr,
     kernel_used_slots_expr,
 )
-from .models.user import users
 from .types import DistributedLockFactory
 
 if TYPE_CHECKING:
@@ -87,7 +88,7 @@ if TYPE_CHECKING:
 
     from .models.utils import ExtendedAsyncSAEngine as SAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 DEFAULT_CHECK_INTERVAL: Final = 15.0
 # idle checker's remaining time should be -1 when the remaining time is negative
@@ -258,7 +259,7 @@ class IdleCheckerHost:
         return result.first()
 
     async def do_idle_check(self) -> None:
-        log.debug("do_idle_check(): triggered")
+        log.debug("idle check triggered")
         # A missing policy is cached as None so that an orphaned access key is
         # queried and warned about only once per cycle.
         policy_cache: dict[AccessKey | None, Row[Any] | None] = {}
@@ -292,51 +293,57 @@ class IdleCheckerHost:
             result = await conn.execute(query)
             rows = result.fetchall()
             for kernel in rows:
-                grace_period_end = await self._grace_period_checker.get_grace_period_end(kernel)
-                # The idle policy is resolved through the user's default keypair
-                # instead of the kernel's own access key, which may be left
-                # orphaned by a keypair deletion.
-                default_access_key = cast(AccessKey | None, kernel.default_access_key)
-                if default_access_key not in policy_cache:
-                    policy = (
-                        await self._fetch_idle_policy(conn, default_access_key)
-                        if default_access_key is not None
-                        else None
-                    )
+                with with_log_context(session_id=kernel.session_id, kernel_id=kernel.id):
+                    grace_period_end = await self._grace_period_checker.get_grace_period_end(kernel)
+                    # The idle policy is resolved through the user's default keypair
+                    # instead of the kernel's own access key, which may be left
+                    # orphaned by a keypair deletion.
+                    default_access_key = cast(AccessKey | None, kernel.default_access_key)
+                    if default_access_key not in policy_cache:
+                        policy = (
+                            await self._fetch_idle_policy(conn, default_access_key)
+                            if default_access_key is not None
+                            else None
+                        )
+                        if policy is None:
+                            log.warning(
+                                "idle policy not found, skipping its kernels in this cycle",
+                                access_key=default_access_key,
+                            )
+                        policy_cache[default_access_key] = policy
+                    policy = policy_cache[default_access_key]
                     if policy is None:
-                        log.warning(
-                            "idle policy not found for default_access_key={}; "
-                            "skipping its kernels in this cycle",
-                            default_access_key,
-                        )
-                    policy_cache[default_access_key] = policy
-                policy = policy_cache[default_access_key]
-                if policy is None:
-                    continue
+                        continue
 
-                check_tasks = [
-                    checker.check_idleness(kernel, conn, policy, grace_period_end=grace_period_end)
-                    for checker in self._checkers
-                ]
-                check_results = await aiotools.gather_safe(check_tasks)
-                terminated = False
-                for checker, check_result in zip(self._checkers, check_results, strict=True):
-                    if isinstance(check_result, BaseExceptionGroup):
-                        errors.extend(check_result.exceptions)
-                        continue
-                    if isinstance(check_result, BaseException):
-                        # mark to be destroyed afterwards
-                        errors.append(check_result)
-                        continue
-                    if not check_result:
-                        log.info(
-                            "The {} idle checker triggered termination of s:{}",
-                            checker.name,
-                            kernel.session_id,
+                    check_tasks = [
+                        checker.check_idleness(
+                            kernel, conn, policy, grace_period_end=grace_period_end
                         )
-                        if not terminated:
-                            terminated = True
-                            await checker.callback_idle_session(kernel.session_id)
+                        for checker in self._checkers
+                    ]
+                    check_results = await aiotools.gather_safe(check_tasks)
+                    terminated = False
+                    for checker, check_result in zip(self._checkers, check_results, strict=True):
+                        if isinstance(check_result, BaseException):
+                            log.warning(
+                                "idle checker failed",
+                                exc_info=check_result,
+                                checker_name=checker.name,
+                            )
+                            if isinstance(check_result, BaseExceptionGroup):
+                                errors.extend(check_result.exceptions)
+                            else:
+                                # mark to be destroyed afterwards
+                                errors.append(check_result)
+                            continue
+                        if not check_result:
+                            log.info(
+                                "idle checker triggered session termination",
+                                checker_name=checker.name,
+                            )
+                            if not terminated:
+                                terminated = True
+                                await checker.callback_idle_session(kernel.session_id)
         if errors:
             raise IdleCheckerError("idle checker(s) raise errors", errors)
 
@@ -489,10 +496,7 @@ class NewUserGracePeriodChecker(AbstractIdleCheckReporter):
             else None
         )
 
-        log.info(
-            "NewUserGracePeriodChecker: default period = {} seconds",
-            _grace_period,
-        )
+        log.info("new user grace period checker configured", grace_period_sec=_grace_period)
 
     @override
     async def get_extra_info(
@@ -601,8 +605,8 @@ class NetworkTimeoutIdleChecker(BaseIdleChecker):
         config = self._config_iv.check(raw_config)
         self.idle_timeout = config["threshold"] or DEFAULT_NETWORK_CHECKER_IDLE_TIMEOUT
         log.info(
-            "NetworkTimeoutIdleChecker: default idle_timeout = {0:,} seconds",
-            self.idle_timeout.total_seconds(),
+            "network timeout idle checker configured",
+            idle_timeout_sec=self.idle_timeout.total_seconds(),
         )
 
     @override
@@ -854,10 +858,10 @@ class UtilizationIdleChecker(BaseIdleChecker):
             f"{k}({threshold.average})," for k, threshold in self.resource_thresholds.items()
         ])
         log.info(
-            'UtilizationIdleChecker(%): {} thresholds-check-operator("{}"), time-window({}s)',
-            thresholds_log,
-            self.thresholds_check_operator,
-            self.time_window.total_seconds(),
+            "utilization idle checker configured",
+            resource_thresholds=thresholds_log,
+            thresholds_check_operator=self.thresholds_check_operator,
+            time_window_sec=self.time_window.total_seconds(),
         )
 
     @classmethod
@@ -1070,11 +1074,11 @@ class UtilizationIdleChecker(BaseIdleChecker):
         else:  # "and" operation is the default
             check_result = any(sufficiently_utilized.values())
         if not check_result:
-            log.info(
-                "utilization timeout: {} ({}, {})",
-                session_id,
-                avg_utils,
-                self.thresholds_check_operator,
+            log.debug(
+                "utilization timeout",
+                session_id=session_id,
+                average_utilization=str(avg_utils),
+                thresholds_check_operator=self.thresholds_check_operator,
             )
         return check_result
 
@@ -1102,8 +1106,8 @@ class UtilizationIdleChecker(BaseIdleChecker):
                 raw_live_stat = await self._valkey_stat_client.get_kernel_statistics(str(kernel_id))
                 if raw_live_stat is None:
                     log.warning(
-                        "Utilization data not found or failed to fetch utilization data. Skip idle check (k:{})",
-                        kernel_id,
+                        "kernel utilization data not found, skipping idle check",
+                        kernel_id=kernel_id,
                     )
                     continue
                 live_stat = raw_live_stat
@@ -1138,8 +1142,11 @@ class UtilizationIdleChecker(BaseIdleChecker):
                     result[resource] = None
             return result
         except Exception as e:
-            _msg = f"Unable to collect utilization for idleness check (kernels:{kernel_ids})"
-            log.warning(_msg, exc_info=e)
+            log.warning(
+                "kernel utilization collection failed for idle check",
+                exc_info=e,
+                kernel_ids=", ".join(map(str, kernel_ids)),
+            )
             return None
 
     @override
@@ -1164,6 +1171,7 @@ async def init_idle_checkers(
     config_provider: ManagerConfigProvider,
     event_producer: EventProducer,
     lock_factory: DistributedLockFactory,
+    sentinel_monitors: SentinelMonitorSet,
 ) -> IdleCheckerHost:
     """
     Create an instance of session idleness checker
@@ -1171,15 +1179,19 @@ async def init_idle_checkers(
     """
     # Create ValkeyLiveClient for dependency injection
     valkey_profile_target = config_provider.config.redis.to_valkey_profile_target()
+    live_valkey_target = valkey_profile_target.profile_target(RedisRole.LIVE)
+    stat_valkey_target = valkey_profile_target.profile_target(RedisRole.STATISTICS)
     valkey_live = await ValkeyLiveClient.create(
-        valkey_profile_target.profile_target(RedisRole.LIVE),
+        live_valkey_target,
         human_readable_name="idle.live",
         db_id=REDIS_LIVE_DB,
+        sentinel_monitor=sentinel_monitors.monitor_for(live_valkey_target),
     )
     valkey_stat = await ValkeyStatClient.create(
-        valkey_profile_target.profile_target(RedisRole.STATISTICS),
+        stat_valkey_target,
         human_readable_name="idle.stat",
         db_id=REDIS_STATISTICS_DB,
+        sentinel_monitor=sentinel_monitors.monitor_for(stat_valkey_target),
     )
     checker_host = IdleCheckerHost(
         db,
@@ -1194,16 +1206,16 @@ async def init_idle_checkers(
         checker_host._valkey_live,
         checker_host._valkey_stat,
     )
-    log.info("Initializing idle checker: user_initial_grace_period, session_lifetime")
+    log.info("idle checker initializing", checker_name="session_lifetime")
     checker_host.add_checker(SessionLifetimeChecker(checker_init_args))  # enabled by default
     raw_enabled_checker_name = config_provider.config.idle.enabled
     enabled_checker_names = [name.strip() for name in raw_enabled_checker_name.split(",")]
     for checker_name in enabled_checker_names:
         checker_cls = checker_registry.get(checker_name, None)
         if checker_cls is None:
-            log.warning("ignoring an unknown idle checker name: {}", checker_name)
+            log.warning("unknown idle checker name ignored", checker_name=checker_name)
             continue
-        log.info("Initializing idle checker: {}", checker_name)
+        log.info("idle checker initializing", checker_name=checker_name)
         checker_instance = checker_cls(checker_init_args)
         checker_host.add_checker(checker_instance)
     return checker_host

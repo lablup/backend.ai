@@ -12,13 +12,13 @@ from ai.backend.common.dto.internal.health import (
     ComponentConnectivityStatus,
     ConnectivityCheckResponse,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .abc import ServiceHealthChecker
 from .exceptions import HealthCheckerAlreadyRegistered
 from .types import AllServicesHealth, ProbeKind, ServiceGroup, ServiceHealth
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -62,21 +62,21 @@ class HealthProbe:
 
     async def start(self) -> None:
         if self._running:
-            log.warning("Health probe is already running")
+            log.warning("health probe already running")
             return
         self._running = True
         self._loop_task = asyncio.create_task(self._run_loop())
-        log.info("Started health probe")
+        log.info("health probe started")
 
     async def stop(self) -> None:
         if not self._running:
-            log.warning("Health probe is not running")
+            log.warning("health probe not running")
             return
         self._running = False
         if self._loop_task:
             await cancel_and_wait(self._loop_task)
             self._loop_task = None
-        log.info("Stopped health probe")
+        log.info("health probe stopped")
 
     async def register_liveness(self, checker: ServiceHealthChecker) -> None:
         self._register(checker, ProbeKind.LIVENESS)
@@ -131,28 +131,52 @@ class HealthProbe:
         for checker, result_or_exc in zip(snapshot, results_or_exc, strict=True):
             service_group = checker.target_service_group
             if isinstance(result_or_exc, BaseException):
-                log.error("Unexpected error checking {}: {}", service_group, result_or_exc)
+                log.error(
+                    "health check raised unexpectedly",
+                    exc_info=result_or_exc,
+                    service_group=service_group,
+                )
                 continue
             results[service_group] = result_or_exc
+            self._log_transitions(service_group, result_or_exc)
 
         self._results.update(results)
         return AllServicesHealth(results=results)
 
+    def _log_transitions(self, service_group: ServiceGroup, current: ServiceHealth) -> None:
+        previous = self._results.get(service_group)
+        for component_id, status in current.results.items():
+            prev_status = previous.results.get(component_id) if previous is not None else None
+            was_healthy = prev_status is None or prev_status.is_healthy
+            if was_healthy and not status.is_healthy:
+                log.warning(
+                    "component became unhealthy",
+                    service_group=service_group,
+                    component_id=component_id,
+                    reason=status.error_message,
+                )
+            elif not was_healthy and status.is_healthy:
+                log.info(
+                    "component recovered",
+                    service_group=service_group,
+                    component_id=component_id,
+                )
+
     async def _run_loop(self) -> None:
-        log.debug("Health probe loop started (check interval: {}s)", self._options.check_interval)
+        log.debug("health probe loop started", check_interval_sec=self._options.check_interval)
         try:
             while self._running:
                 try:
                     await self.check_all()
-                except Exception as e:
-                    log.error("Error in health probe loop: {}", e, exc_info=True)
+                except Exception:
+                    log.exception("health probe loop iteration failed")
                 finally:
                     await asyncio.sleep(self._options.check_interval)
         except asyncio.CancelledError:
-            log.debug("Health probe loop cancelled")
+            log.debug("health probe loop cancelled")
             raise
         finally:
-            log.debug("Health probe loop stopped")
+            log.debug("health probe loop stopped")
 
     async def _check_single(
         self,
@@ -162,13 +186,15 @@ class HealthProbe:
     ) -> ServiceHealth:
         try:
             result = await asyncio.wait_for(checker.check_service(), timeout=checker.timeout)
-            log.debug("Health check succeeded for {}", service_group)
+            log.trace("health check succeeded", service_group=service_group)
             return result
         except TimeoutError:
-            log.warning("Health check timed out for {} after {}s", service_group, checker.timeout)
+            log.warning(
+                "health check timed out", service_group=service_group, timeout_sec=checker.timeout
+            )
             return ServiceHealth(results={})
-        except Exception as e:
-            log.error("Health check failed for {}: {}", service_group, e, exc_info=True)
+        except Exception:
+            log.exception("health check failed", service_group=service_group)
             return ServiceHealth(results={})
 
     async def get_connectivity_status(self) -> ConnectivityCheckResponse:

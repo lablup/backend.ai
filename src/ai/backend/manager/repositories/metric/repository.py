@@ -19,7 +19,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import KernelId, SessionId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.prometheus.metric_types import (
     ContainerMetricOptionalLabel,
@@ -28,7 +28,7 @@ from ai.backend.manager.clients.prometheus.metric_types import (
 )
 from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset, regex_union
 from ai.backend.manager.data.idle_checker.types import SessionUtilizationQuery
-from ai.backend.manager.data.prometheus_query_preset import PrometheusQueryPresetData
+from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
     PrometheusQueryPresetSearchableFields,
 )
@@ -38,11 +38,11 @@ from ai.backend.manager.models.prometheus_query_preset.searchers import (
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.prometheus_query_preset.db_source import (
+from ai.backend.manager.repositories.prometheus_query_preset.db_source.db_source import (
     PrometheusQueryPresetDBSource,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 metric_repository_resilience = Resilience(
     policies=[
@@ -96,7 +96,7 @@ class MetricRepository:
         try:
             return await self._prometheus_client.fetch_container_live_stats(kernel_ids)
         except (PrometheusConnectionError, FailedToGetMetric) as e:
-            log.warning("Failed to query metrics for kernel live stats: {!r}", e)
+            log.warning("kernel live stat query failed", kernel_count=len(kernel_ids), exc_info=e)
             return KernelLiveStatBatchResult.empty(kernel_ids)
 
     async def query_session_utilization_metrics(
@@ -135,9 +135,9 @@ class MetricRepository:
         for query, session_ids in queries.items():
             preset = presets_by_id.get(query.preset_id)
             if preset is None:
-                log.error(
-                    "Prometheus query preset not found; skipping utilization query: ID - {}",
-                    query.preset_id,
+                log.warning(
+                    "utilization query preset not found, query skipped",
+                    preset_id=query.preset_id,
                 )
                 values_by_query[query] = {}
                 continue
@@ -171,10 +171,10 @@ class MetricRepository:
     ) -> Mapping[SessionId, Decimal]:
         invalid_labels = self._invalid_labels(preset, query)
         if invalid_labels:
-            log.error(
-                "Utilization query labels not allowed by preset {}; skipping: {}",
-                preset.id,
-                sorted(invalid_labels),
+            log.warning(
+                "utilization query labels not allowed by preset, query skipped",
+                preset_id=preset.id,
+                label_names=", ".join(sorted(invalid_labels)),
             )
             return {}
         filter_labels: dict[str, LabelMatcher] = {
@@ -198,11 +198,7 @@ class MetricRepository:
                 time=evaluation_time.isoformat(),
             )
         except (PrometheusConnectionError, FailedToGetMetric, InvalidMetricPresetTemplate) as e:
-            log.warning(
-                "Utilization query failed for preset {}: {}",
-                preset.id,
-                e,
-            )
+            log.warning("utilization query failed", preset_id=preset.id, exc_info=e)
             return {}
         requested_session_ids = set(session_ids)
         values: dict[SessionId, Decimal] = {}
@@ -222,9 +218,8 @@ class MetricRepository:
             values[session_id] = value if existing is None else max(existing, value)
         if not values and response.data.result:
             log.warning(
-                "Utilization query for preset {} returned {} series but none matched the "
-                "requested sessions; check that group_labels include 'session_id'",
-                preset.id,
-                len(response.data.result),
+                "utilization query series matched no requested session",
+                preset_id=preset.id,
+                series_count=len(response.data.result),
             )
         return values

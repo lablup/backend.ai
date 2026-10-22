@@ -22,14 +22,14 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
 )
 from ai.backend.manager.api.adapters.fair_share.adapter import FairShareAdapter
 from ai.backend.manager.models.clauses import QueryOrder
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.fair_share.row import (
     DomainFairShareRow,
     ProjectFairShareRow,
     UserFairShareRow,
 )
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.user.row import UserRow
 
 _DIRECTIONS = [(OrderDirection.ASC, True), (OrderDirection.DESC, False)]
 

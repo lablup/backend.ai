@@ -9,8 +9,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.data.error_log.types import ErrorLogData
-
-from .db_source import ErrorLogDBSource
+from ai.backend.manager.repositories.error_log.db_source.db_source import ErrorLogDBSource
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine

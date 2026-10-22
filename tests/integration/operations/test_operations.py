@@ -5,9 +5,7 @@ import pytest
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common.dto.manager.operations import (
     AppendErrorLogRequest,
-    GetAnnouncementResponse,
     ListErrorLogsResponse,
-    UpdateAnnouncementRequest,
 )
 from ai.backend.common.dto.manager.operations.types import ErrorLogSeverity
 
@@ -46,45 +44,3 @@ class TestErrorLogLifecycle:
         cleared_log = next((log for log in list_result2.logs if log.log_id == log_id), None)
         assert cleared_log is not None
         assert cleared_log.is_cleared is True
-
-
-@pytest.mark.integration
-class TestAnnouncementLifecycle:
-    async def test_get_update_get_disable_get(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        """get (empty) → enable → get → disable (message retained) → get → clear → get."""
-        # 1. Get default (should be disabled)
-        result = await admin_registry.operations.get_announcement()
-        assert isinstance(result, GetAnnouncementResponse)
-        assert result.enabled is False
-        assert result.message == ""
-
-        # 2. Enable announcement
-        await admin_registry.operations.update_announcement(
-            UpdateAnnouncementRequest(enabled=True, message="Maintenance at 10 PM")
-        )
-
-        # 3. Verify enabled
-        result = await admin_registry.operations.get_announcement()
-        assert result.enabled is True
-        assert result.message == "Maintenance at 10 PM"
-
-        # 4. Disable announcement (only hidden; the message is retained)
-        await admin_registry.operations.update_announcement(
-            UpdateAnnouncementRequest(enabled=False)
-        )
-
-        # 5. Verify disabled but message retained
-        result = await admin_registry.operations.get_announcement()
-        assert result.enabled is False
-        assert result.message == "Maintenance at 10 PM"
-
-        # 6. Clear the stored message explicitly and verify
-        await admin_registry.operations.update_announcement(
-            UpdateAnnouncementRequest(enabled=False, message="")
-        )
-        result = await admin_registry.operations.get_announcement()
-        assert result.enabled is False
-        assert result.message == ""

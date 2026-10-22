@@ -317,7 +317,10 @@ class KernelExecutionSpec(_OptionsBaseModel):
             "repository resolves each entry to a typed ``VFolderMount`` "
             "and stamps the result onto ``KernelSpec.vfolder_mounts`` "
             "— per-kernel override (task #33) is expressible by "
-            "emitting different entries per kernel group."
+            "emitting different entries per kernel group. "
+            "``ResolveVFolderMountsRule`` writes the resolved entries "
+            "back here before expansion, so a stored group holds them "
+            "rather than the request."
         ),
     )
     startup_command: str | None = Field(
@@ -376,6 +379,13 @@ class KernelGroup(_OptionsBaseModel):
     )
     execution_spec: KernelExecutionSpec = Field(
         description="Resolved execution spec shared by every replica.",
+    )
+    preopen_ports: list[int] = Field(
+        default_factory=list,
+        description=(
+            "Ports every replica of this group exposes without an "
+            "explicit service start. Copied onto each expanded kernel."
+        ),
     )
     failure_policy: FailurePolicy = Field(
         default=FailurePolicy.STRICT,

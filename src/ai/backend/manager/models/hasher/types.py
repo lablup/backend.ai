@@ -10,10 +10,10 @@ from typing import Any, Final, override
 
 from sqlalchemy.types import VARCHAR, TypeDecorator
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 HASH_DELIMITER: Final[str] = "$"
 

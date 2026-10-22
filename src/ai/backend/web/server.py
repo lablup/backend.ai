@@ -33,6 +33,7 @@ import aiohttp_cors
 import aiotools
 import click
 import jinja2
+import jwt
 import tomli
 import uvloop
 from aiohttp import web
@@ -41,12 +42,14 @@ from yarl import URL
 
 from ai.backend.client.config import APIConfig
 from ai.backend.client.exceptions import BackendAPIError, BackendClientError
+from ai.backend.client.request import Request
 from ai.backend.client.session import AsyncSession as APISession
 from ai.backend.client.v2.auth import NoAuth
 from ai.backend.client.v2.config import ClientConfig as V2ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
 from ai.backend.common import config
 from ai.backend.common.clients.http_client.client_pool import ClientPool
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import ValkeyRateLimitClient
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, REDIS_STATISTICS_DB, RedisRole
@@ -62,10 +65,16 @@ from ai.backend.common.dto.manager.auth.types import (
     RequireTwoFactorAuthResponse,
     RequireTwoFactorRegistrationResponse,
 )
+from ai.backend.common.endpoint_pool.exceptions import NoHealthyEndpointError
+from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
+from ai.backend.common.endpoint_pool.strategy import build_endpoint_selection_strategy
+from ai.backend.common.endpoint_pool.types import AcquiredEndpoint, EndpointPoolSpec
+from ai.backend.common.exception import MalformedRequestBody
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.health_checker.types import ComponentId
 from ai.backend.common.middlewares.exception import general_exception_middleware
+from ai.backend.common.middlewares.request_id import request_id_middleware
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.web.session import (
@@ -76,28 +85,36 @@ from ai.backend.common.web.session import (
 )
 from ai.backend.common.web.session import setup as setup_session
 from ai.backend.common.web.session.redis_storage import RedisStorage
-from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging import Logger, LogLevel
+from ai.backend.logging.otel import (
+    LegacyOtelLogging,
+    OpenTelemetrySpec,
+    apply_otel_tracer,
+    build_otel_server_middleware,
+    instrument_aiohttp_client,
+)
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging.structured_otel import StructuredOtelLogging
 from ai.backend.web.clients.apollo_router_pool import (
     ApolloRouterEndpointsHealthChecker,
     ApolloRouterPoolGateHealthChecker,
-)
-from ai.backend.web.clients.endpoint_pool import (
-    AcquiredEndpoint,
-    EndpointPoolSpec,
-    HealthyEndpointPool,
-    build_endpoint_selection_strategy,
 )
 from ai.backend.web.clients.manager_pool import (
     ManagerEndpointsHealthChecker,
     ManagerPoolGateHealthChecker,
 )
 from ai.backend.web.config.unified import EventLoopType, ServiceMode, WebServerUnifiedConfig
+from ai.backend.web.errors import ManagerConnectionUnavailable
 from ai.backend.web.ratelimit import manager_proxy_rate_limited
 from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_policy_middleware
 
 from . import __version__, user_agent
-from .auth import build_forwarding_headers, fill_forwarding_hdrs_to_api_session, get_client_ip
+from .auth import (
+    build_forwarding_headers,
+    fill_forwarding_hdrs_to_api_session,
+    get_api_session,
+    get_client_ip,
+)
 from .errors import (
     AlreadyLoggedInError,
     InvalidAPIConfigurationError,
@@ -120,7 +137,7 @@ from .proxy import (
 from .stats import WebStats, track_active_handlers, view_stats
 from .template import toml_scalar
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 PROXIED_HTTP_METHODS: Final = ("HEAD", "GET", "PUT", "POST", "PATCH", "DELETE")
 
@@ -243,7 +260,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         text = await request.text()
         creds = json.loads(text)
     except json.JSONDecodeError as e:
-        log.error("Login: JSON decoding error: {}", e)
+        log.trace("login request body is not valid JSON: {}", e)
         creds = {}
 
     for param in ("username", "current_password", "new_password"):
@@ -273,17 +290,19 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
                 extra_headers=build_forwarding_headers(request),
             )
         result["password_changed_at"] = resp.password_changed_at
-        log.info(
-            "UPDATE_PASSWORD_NO_AUTH: Authorization succeeded for (email:{}, ip:{})",
+        log.trace(
+            "password update succeeded (email: {}, ip: {})",
             creds["username"],
             client_ip,
         )
+    except NoHealthyEndpointError as e:
+        raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         raise ProxyTargetUnreachableError(str(e)) from e
     except BackendAPIError as e:
-        log.info(
-            "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
+        log.trace(
+            "password update failed (email: {}, ip: {}): {}",
             creds["username"],
             client_ip,
             e,
@@ -293,6 +312,7 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
             "title": e.data.get("title"),
             "details": e.data.get("msg"),
         }
+        return web.json_response(result, status=e.status)
     return web.json_response(result)
 
 
@@ -385,7 +405,7 @@ async def login_handler(request: web.Request) -> web.Response:
     try:
         creds = json.loads(request["payload"])
     except json.JSONDecodeError as e:
-        log.error("Login: JSON decoding error: {}", e)
+        log.trace("login request body is not valid JSON: {}", e)
         creds = {}
     if "username" not in creds or not creds["username"]:
         raise web.HTTPBadRequest(
@@ -447,8 +467,8 @@ async def login_handler(request: web.Request) -> web.Response:
         login_fail_count = 0
     last_login_attempt = login_time
     if login_fail_count >= ALLOWED_FAIL_COUNT:
-        log.info(
-            "LOGIN_HANDLER: Too many consecutive login fails (email:{}, count:{}, ip:{})",
+        log.trace(
+            "login blocked after consecutive failures (email: {}, count: {}, ip: {})",
             creds["username"],
             login_fail_count,
             client_ip,
@@ -500,8 +520,8 @@ async def login_handler(request: web.Request) -> web.Response:
                 result["data"] = public_return  # store public info from token
                 login_fail_count = 0
                 await _set_login_history(last_login_attempt, login_fail_count)
-                log.info(
-                    "LOGIN_HANDLER: Authorization succeeded for (email:{}, ip:{})",
+                log.trace(
+                    "login succeeded (email: {}, ip: {})",
                     creds["username"],
                     client_ip,
                 )
@@ -526,12 +546,14 @@ async def login_handler(request: web.Request) -> web.Response:
                 raise UnexpectedAuthResponseError(
                     f"Unexpected auth result type: {type(auth_result)}"
                 )
+    except NoHealthyEndpointError as e:
+        raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
         # This is error, not failed login, so we should not update login history.
         raise ProxyTargetUnreachableError(str(e)) from e
     except BackendAPIError as e:
-        log.info(
-            "LOGIN_HANDLER: Authorization failed (email:{}, ip:{}) - {}",
+        log.trace(
+            "login failed (email: {}, ip: {}): {}",
             creds["username"],
             client_ip,
             e,
@@ -555,25 +577,24 @@ async def logout_handler(request: web.Request) -> web.Response:
     stats.active_logout_handlers.add(asyncio.current_task())
     session = await get_session(request)
     session_token = session.identity
-    session.invalidate()
 
-    # Invalidate login session in Manager DB
-    if session_token:
-        config = cast(WebServerUnifiedConfig, request.app["config"])
+    # The manager authenticates /auth/logout, so sign it with the session's keypair
+    # before invalidating the session drops that keypair.
+    if session_token and session.get("authenticated", False):
         manager_pool = cast(HealthyEndpointPool, request.app["manager_pool"])
         try:
             async with manager_pool.acquire() as acquired:
-                async with aiohttp.ClientSession() as http_session:
-                    await http_session.post(
-                        f"{acquired.endpoint}/auth/logout",
-                        json={"session_token": session_token},
-                        ssl=config.api.ssl_verify,
-                    )
+                api_session = await get_api_session(request, acquired)
+                async with api_session:
+                    fill_forwarding_hdrs_to_api_session(request, api_session)
+                    rqst = Request("POST", "/auth/logout")
+                    rqst.set_json({"session_token": session_token})
+                    async with rqst.fetch():
+                        pass
         except Exception:
-            log.exception(
-                "Failed to invalidate login session in Manager DB (token={})", session_token
-            )
+            log.warning("failed to invalidate the login session on the manager", exc_info=True)
 
+    session.invalidate()
     return web.Response()
 
 
@@ -652,6 +673,15 @@ async def webserver_healthcheck(request: web.Request) -> web.Response:
     return web.json_response(result)
 
 
+def _claimed_user_id(auth_token: str) -> uuid.UUID | None:
+    try:
+        # Skip signature verification only to read the claimed user ID for logging.
+        payload = jwt.decode(auth_token, options={"verify_signature": False})
+        return uuid.UUID(payload["user"])
+    except (jwt.PyJWTError, KeyError, ValueError, TypeError, AttributeError):
+        return None
+
+
 async def token_login_handler(request: web.Request) -> web.Response:
     config = cast(WebServerUnifiedConfig, request.app["config"])
     stats: WebStats = request.app["stats"]
@@ -663,7 +693,11 @@ async def token_login_handler(request: web.Request) -> web.Response:
         raise AlreadyLoggedInError()
 
     # Check if auth token is delivered via request body or cookie.
-    rqst_data: dict[str, Any] = await request.json()
+    try:
+        rqst_data: dict[str, Any] = await request.json()
+    except json.JSONDecodeError as e:
+        log.trace("token login request body is not valid JSON: {}", e)
+        raise MalformedRequestBody() from e
     auth_token_name = config.api.auth_token_name
     auth_token = rqst_data.get(auth_token_name)
     if not auth_token:
@@ -741,10 +775,14 @@ async def token_login_handler(request: web.Request) -> web.Response:
         session["token"] = stored_token  # store full token
         result["authenticated"] = True
         result["data"] = public_return  # store public info from token
+    except NoHealthyEndpointError as e:
+        raise ManagerConnectionUnavailable(extra_msg=e.extra_msg) from e
     except BackendClientError as e:
         raise ProxyTargetUnreachableError(str(e)) from e
     except BackendAPIError as e:
-        log.info("Authorization failed for token {}: {}", auth_token, e)
+        log.trace(
+            "token login failed", status=e.status, claimed_user_id=_claimed_user_id(auth_token)
+        )
         result["authenticated"] = False
         result["data"] = {
             "type": e.data.get("type"),
@@ -799,40 +837,47 @@ async def redis_ctx(
 
     valkey_profile_target = config.session.redis.to_valkey_profile_target()
     valkey_target = valkey_profile_target.profile_target(RedisRole.STATISTICS)
-
-    # Create ValkeySessionClient for session management
-    valkey_session_client = await ValkeySessionClient.create(
-        valkey_target=valkey_target,
-        db_id=REDIS_STATISTICS_DB,  # Use default database for session storage
-        human_readable_name="web.session",
-    )
-    # Keep app["redis"] key for compatibility
-    app["redis"] = valkey_session_client
-
-    valkey_rate_limit_client = await ValkeyRateLimitClient.create(
-        valkey_target=valkey_profile_target.profile_target(RedisRole.RATE_LIMIT),
-        db_id=REDIS_RATE_LIMIT_DB,
-        human_readable_name="web.ratelimit",
-    )
-    app["valkey_rate_limit"] = valkey_rate_limit_client
-
-    if pidx == 0 and config.session.flush_on_startup:
-        await valkey_session_client.flush_all_sessions()
-        log.info("flushed session storage.")
-
-    if config.session.login_session_extension_sec is None:
-        config.session.login_session_extension_sec = config.session.max_age
-    redis_storage = RedisStorage(
-        valkey_session_client,
-        max_age=config.session.max_age,
-        secure=config.security.cookie_secure,
-    )
-    setup_session(app, redis_storage)
+    rate_limit_valkey_target = valkey_profile_target.profile_target(RedisRole.RATE_LIMIT)
+    sentinel_monitors = SentinelMonitorSet(valkey_profile_target.targets())
+    await sentinel_monitors.start()
     try:
-        yield
+        # Create ValkeySessionClient for session management
+        valkey_session_client = await ValkeySessionClient.create(
+            valkey_target=valkey_target,
+            db_id=REDIS_STATISTICS_DB,  # Use default database for session storage
+            human_readable_name="web.session",
+            sentinel_monitor=sentinel_monitors.monitor_for(valkey_target),
+        )
+        # Keep app["redis"] key for compatibility
+        app["redis"] = valkey_session_client
+
+        valkey_rate_limit_client = await ValkeyRateLimitClient.create(
+            valkey_target=rate_limit_valkey_target,
+            db_id=REDIS_RATE_LIMIT_DB,
+            human_readable_name="web.ratelimit",
+            sentinel_monitor=sentinel_monitors.monitor_for(rate_limit_valkey_target),
+        )
+        app["valkey_rate_limit"] = valkey_rate_limit_client
+
+        if pidx == 0 and config.session.flush_on_startup:
+            await valkey_session_client.flush_all_sessions()
+            log.info("session storage flushed")
+
+        if config.session.login_session_extension_sec is None:
+            config.session.login_session_extension_sec = config.session.max_age
+        redis_storage = RedisStorage(
+            valkey_session_client,
+            max_age=config.session.max_age,
+            secure=config.security.cookie_secure,
+        )
+        setup_session(app, redis_storage)
+        try:
+            yield
+        finally:
+            await valkey_rate_limit_client.close()
+            await valkey_session_client.close()
     finally:
-        await valkey_rate_limit_client.close()
-        await valkey_session_client.close()
+        await sentinel_monitors.close()
 
 
 @asynccontextmanager
@@ -1152,7 +1197,9 @@ async def service_discovery_ctx(config: WebServerUnifiedConfig) -> AsyncGenerato
             max_queue_size=config.otel.max_queue_size,
             max_export_batch_size=config.otel.max_export_batch_size,
         )
-        BraceStyleAdapter.apply_otel(otel_spec)
+        LegacyOtelLogging(otel_spec).attach()
+        apply_otel_tracer(otel_spec)
+        StructuredOtelLogging(otel_spec).attach(config.logging.pkg_ns.keys())
     yield
 
 
@@ -1168,12 +1215,18 @@ async def server_main(
     try:
         app = web.Application(
             middlewares=[
+                request_id_middleware,
                 decrypt_payload,
                 track_active_handlers,
                 security_policy_middleware,
                 general_exception_middleware,
             ],
         )
+        if config.otel.enabled:
+            instrument_aiohttp_client()
+            app.middlewares.insert(
+                0, build_otel_server_middleware(untraced_handlers={console_handler, static_handler})
+            )
         app["config"] = config
         app["stats"] = WebStats()
         app["client_pool"] = await web_init_stack.enter_async_context(client_ctx(config, app))
@@ -1223,14 +1276,14 @@ async def server_main(
 
         await web_init_stack.enter_async_context(webapp_ctx(config, app))
         await web_init_stack.enter_async_context(service_discovery_ctx(config))
-        log.info("Started the web gateway service.")
+        log.info("started the web gateway service")
     except Exception:
-        log.exception("Server initialization failure; triggering shutdown...")
+        log.exception("server initialization failed; triggering shutdown")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
     try:
         yield
     finally:
-        log.info("shutting down...")
+        log.info("shutting down")
         await web_init_stack.__aexit__(None, None, None)
 
 
@@ -1298,20 +1351,23 @@ def main(
                 setproctitle(
                     f"backend.ai: webserver {server_config.service.ip}:{server_config.service.port}"
                 )
-                log.info("Backend.AI Web Server {0}", __version__)
-                log.info("runtime: {0}", sys.prefix)
+                log.info("Backend.AI Web Server starting", version=__version__)
+                log.info("runtime environment", runtime_path=sys.prefix)
 
                 log_config = logging.getLogger("ai.backend.web.config")
                 if log_level == LogLevel.DEBUG:
                     log_config.debug("debug mode enabled.")
                     print("== Web Server configuration ==")
                     pprint(server_config.model_dump())
-                log.info("serving at {0}:{1}", server_config.service.ip, server_config.service.port)
+                log.info(
+                    "serving",
+                    service_addr=f"{server_config.service.ip}:{server_config.service.port}",
+                )
                 runner: Callable[..., Any]
                 match server_config.webserver.event_loop:
                     case EventLoopType.UVLOOP:
                         runner = uvloop.run
-                        log.info("Using uvloop as the event loop backend")
+                        log.info("using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
                 try:
@@ -1322,7 +1378,7 @@ def main(
                         runner=runner,
                     )
                 finally:
-                    log.info("terminated.")
+                    log.info("terminated")
         finally:
             if server_config.webserver.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!

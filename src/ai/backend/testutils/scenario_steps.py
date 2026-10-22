@@ -13,7 +13,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, override
+from typing import Any, ClassVar, override
 from uuid import UUID
 
 
@@ -151,12 +151,15 @@ class Held[V](Verdict):
 class Refused(Verdict):
     """이 이름으로 거부되어야 한다."""
 
+    PREFIX: ClassVar[str] = "거부: "
+    """레포트가 이 말머리로 거부를 기대한 행을 가려낸다."""
+
     expected: type[BaseException]
     raised: BaseException | None
 
     @override
     def told(self) -> Told:
-        says = f"거부: {self.expected.__name__}"
+        says = f"{self.PREFIX}{self.expected.__name__}"
         if self.raised is None:
             return Told(says, problems=(f"{says} 이어야 하는데 답이 왔다",))
         if not isinstance(self.raised, self.expected):

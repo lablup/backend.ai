@@ -25,12 +25,12 @@ from bai_scenario.components.prometheus_query_preset import (
     TheBatchAnswersInOrder,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Loaded = list[PresetNodeAnswer]
 type LoadingStep = Scenario[
-    SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded
+    TestSeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded
 ]
 
 
@@ -79,7 +79,7 @@ class LoadingNothing(When[ManyPresetsAndACaller, PrometheusQueryPresetAdapter, L
 
 @dataclass(frozen=True)
 class TheLaidAndTheUnknownComeBackInOrder(
-    Scenario[SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -93,7 +93,7 @@ class TheLaidAndTheUnknownComeBackInOrder(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
         return ManyPresetsAndSomeone(besides=1)
 
     @override
@@ -107,7 +107,7 @@ class TheLaidAndTheUnknownComeBackInOrder(
 
 @dataclass(frozen=True)
 class AnEmptyListAnswersNothing(
-    Scenario[SeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, PrometheusQueryPresetAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -118,7 +118,7 @@ class AnEmptyListAnswersNothing(
         return "프리셋이 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
         return ManyPresetsAndSomeone(besides=0)
 
     @override

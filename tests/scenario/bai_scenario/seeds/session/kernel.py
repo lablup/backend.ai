@@ -20,12 +20,12 @@ from ai.backend.manager.data.session.spec import KernelSpec
 from ai.backend.manager.data.session.types import SessionEntityData
 from ai.backend.manager.models.kernel.creators import KernelCreator
 from ai.backend.manager.models.resource_slot.creators import KernelResourceAllocationCreator
-from bai_scenario.seeds.seeder import SeedFieldWithNestedRows
+from bai_scenario.seeds.seeder import TestSeedFieldWithNestedRows
 from bai_scenario.seeds.session.session import session_spec
 
 
 @dataclass(frozen=True)
-class SeedKernelOf(SeedFieldWithNestedRows[SessionEntityData, KernelInfo]):
+class TestSeedKernelOf(TestSeedFieldWithNestedRows[SessionEntityData, KernelInfo]):
     """The main kernel of the session, with what it asked for in each slot written under it.
 
     The session and the image are values earlier rows answered. The kernel waits as
@@ -47,8 +47,12 @@ class SeedKernelOf(SeedFieldWithNestedRows[SessionEntityData, KernelInfo]):
 
     @override
     def field(self) -> KernelCreator:
-        if self.session.name is None or self.session.access_key is None:
-            raise LookupError("the session was laid without a name or an access key")
+        if (
+            self.session.name is None
+            or self.session.access_key is None
+            or self.session.user_uuid is None
+        ):
+            raise LookupError("the session was laid without a name, an access key or an owner")
         kernel_spec = KernelSpec(
             cluster_role="main",
             cluster_idx=1,

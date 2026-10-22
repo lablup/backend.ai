@@ -10,6 +10,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.object_storage.types import (
     ObjectStorageOrderField,
     OrderDirection,
@@ -24,6 +25,8 @@ __all__ = (
     "GetPresignedUploadURLInput",
     "ObjectStorageFilter",
     "ObjectStorageOrder",
+    "PartialBulkPurgeObjectStoragesInput",
+    "PartialBulkUpdateObjectStoragesInput",
     "UpdateObjectStorageInput",
 )
 
@@ -76,6 +79,20 @@ class DeleteObjectStorageInput(BaseRequestModel):
     """Input for deleting an object storage."""
 
     id: UUID = Field(description="Object storage ID to delete")
+
+
+class PartialBulkUpdateObjectStoragesInput(BaseRequestModel):
+    """Input for updating several object storages, each answered for separately."""
+
+    items: NonEmptyList[UpdateObjectStorageInput] = Field(
+        description="The object storages to update, each with its ID and fields."
+    )
+
+
+class PartialBulkPurgeObjectStoragesInput(BaseRequestModel):
+    """Input for permanently purging several object storages, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the object storages to purge.")
 
 
 class GetPresignedUploadURLInput(BaseRequestModel):

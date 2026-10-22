@@ -11,7 +11,6 @@ from ai.backend.common.dependencies import DependencyProvider
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.health_checker import ServiceHealthChecker
 from ai.backend.common.health_checker.checkers.etcd import EtcdHealthChecker
-from ai.backend.common.types import HostPortPair
 
 
 class EtcdProvider(DependencyProvider[ServerConfig, TraefikEtcd | None]):
@@ -37,21 +36,13 @@ class EtcdProvider(DependencyProvider[ServerConfig, TraefikEtcd | None]):
             if traefik_config.etcd.password:
                 creds = {"password": traefik_config.etcd.password}
 
-            # Handle addr as either single HostPortPair or list
-            addr = traefik_config.etcd.addr
-            if isinstance(addr, list):
-                # Use first address from the list
-                host_port = addr[0]
-            else:
-                host_port = addr
-
-            traefik_etcd = TraefikEtcd(
-                HostPortPair(host_port.host, host_port.port),
+            async with TraefikEtcd(
+                [addr.to_legacy() for addr in traefik_config.etcd.addrs],
                 traefik_config.etcd.namespace,
                 {ConfigScopes.GLOBAL: ""},
                 credentials=creds,
-            )
-            yield traefik_etcd
+            ) as traefik_etcd:
+                yield traefik_etcd
         else:
             yield None
 

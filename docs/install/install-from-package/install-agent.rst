@@ -287,7 +287,7 @@ Then, create a systemd service file at
    KillMode=process
    KillSignal=SIGINT
    PrivateTmp=false
-   Restart=on-failure
+   Restart=always
    RestartSec=10
    LimitNOFILE=5242880
    LimitNPROC=131072
@@ -311,7 +311,7 @@ And for Watcher at ``/etc/systemd/system/backendai-watcher.service``:
    KillMode=process
    KillSignal=SIGTERM
    PrivateTmp=false
-   Restart=on-failure
+   Restart=always
    RestartSec=5
 
    [Install]

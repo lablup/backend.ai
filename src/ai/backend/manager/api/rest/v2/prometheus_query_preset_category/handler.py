@@ -7,12 +7,16 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.prometheus_query_preset_category import (
+    PrometheusQueryPresetCategoryID,
+)
 from ai.backend.common.dto.manager.v2.prometheus_query_preset_category.request import (
     CreateCategoryInput,
     DeleteCategoryInput,
+    PartialBulkPurgeQueryPresetCategoriesInput,
     SearchCategoriesInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import CategoryIdPathParam
 
 if TYPE_CHECKING:
@@ -20,7 +24,7 @@ if TYPE_CHECKING:
         PrometheusQueryPresetCategoryAdapter,
     )
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2PrometheusQueryPresetCategoryHandler:
@@ -57,10 +61,26 @@ class V2PrometheusQueryPresetCategoryHandler:
         result = await self._adapter.get(path.parsed.category_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def purge(
+        self,
+        path: PathParam[CategoryIdPathParam],
+    ) -> APIResponse:
+        """Permanently remove a category."""
+        result = await self._adapter.purge(PrometheusQueryPresetCategoryID(path.parsed.category_id))
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge(
+        self,
+        body: BodyParam[PartialBulkPurgeQueryPresetCategoriesInput],
+    ) -> APIResponse:
+        """Permanently remove several categories, answering for each one."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def delete(
         self,
         body: BodyParam[DeleteCategoryInput],
     ) -> APIResponse:
-        """Delete a category by ID."""
-        result = await self._adapter.delete(body.parsed)
+        """Deprecated. Use `DELETE /v2/prometheus-query-preset-categories/{category_id}`."""
+        result = await self._adapter.purge(PrometheusQueryPresetCategoryID(body.parsed.id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

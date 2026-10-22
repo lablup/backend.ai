@@ -25,14 +25,14 @@ from ai.backend.common.types import (
     KernelId,
     SessionId,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .abc import BackendAIClient
 
 if TYPE_CHECKING:
     from .peer import PeerInvoker
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 agent_client_resilience = Resilience(
     policies=[
@@ -104,9 +104,9 @@ class AgentClient(BackendAIClient):
                 await self._peer.__aexit__(None, None, None)
             except Exception as exit_exc:
                 log.debug(
-                    "agent {} peer __aexit__ raised during connect cleanup: {}",
-                    self._agent_id,
-                    exit_exc,
+                    "agent peer exit failed during connect cleanup",
+                    agent_id=self._agent_id,
+                    error=str(exit_exc),
                 )
             raise
 
@@ -123,9 +123,9 @@ class AgentClient(BackendAIClient):
             await self._peer.__aexit__(None, None, None)
         except Exception as e:
             log.debug(
-                "agent {} peer __aexit__ raised during close: {}",
-                self._agent_id,
-                e,
+                "agent peer exit failed during close",
+                agent_id=self._agent_id,
+                error=str(e),
             )
 
     async def ping(self) -> str:

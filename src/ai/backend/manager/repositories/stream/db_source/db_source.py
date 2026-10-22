@@ -4,8 +4,8 @@ from sqlalchemy.orm import joinedload, noload, selectinload
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 

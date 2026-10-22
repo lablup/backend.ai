@@ -15,7 +15,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image_alias import ImageAliasID
@@ -30,6 +30,8 @@ from ai.backend.manager.data.image.types import (
     ImageData,
     ImageLabelsData,
     ImageResourcesData,
+    ImageStatus,
+    ImageType,
     RescanImagesResult,
     ResourceLimitInput,
 )
@@ -38,13 +40,12 @@ from ai.backend.manager.errors.image import (
     ImageAliasNotFound,
     ImageNotFound,
 )
-from ai.backend.manager.models.image import ImageStatus, ImageType
 from ai.backend.manager.models.image.creators import ImageAliasCreator
 from ai.backend.manager.models.image.scopes import VisibleImageTarget
 from ai.backend.manager.models.image.searchers import ImageSearcher
 from ai.backend.manager.models.image.updaters import ImageUpdate
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageAction,
@@ -324,7 +325,7 @@ class TestForgetImage(ImageServiceBaseFixtures):
             architecture=image_data.architecture,
         )
 
-        with with_user(superadmin_user_data):
+        with with_user_context(superadmin_user_data):
             result = await image_service.forget_image(action)
 
         assert result.image.status == ImageStatus.DELETED
@@ -348,7 +349,7 @@ class TestForgetImage(ImageServiceBaseFixtures):
             architecture=image_data.architecture,
         )
 
-        with with_user(regular_user_data):
+        with with_user_context(regular_user_data):
             result = await image_service.forget_image(action)
 
         assert result.image.status == ImageStatus.DELETED
@@ -371,7 +372,7 @@ class TestForgetImage(ImageServiceBaseFixtures):
             architecture=image_data.architecture,
         )
 
-        with with_user(regular_user_data):
+        with with_user_context(regular_user_data):
             with pytest.raises(ImageAccessForbiddenError):
                 await image_service.forget_image(action)
 
@@ -389,7 +390,7 @@ class TestForgetImage(ImageServiceBaseFixtures):
             architecture="x86_64",
         )
 
-        with with_user(superadmin_user_data):
+        with with_user_context(superadmin_user_data):
             with pytest.raises(ImageNotFound):
                 await image_service.forget_image(action)
 
@@ -410,7 +411,7 @@ class TestForgetImageById(ImageServiceBaseFixtures):
 
         action = ForgetImageByIdAction(image_id=image_data.id)
 
-        with with_user(superadmin_user_data):
+        with with_user_context(superadmin_user_data):
             result = await image_service.forget_image_by_id(action)
 
         assert result.image.status == ImageStatus.DELETED
@@ -430,7 +431,7 @@ class TestForgetImageById(ImageServiceBaseFixtures):
 
         action = ForgetImageByIdAction(image_id=image_data.id)
 
-        with with_user(regular_user_data):
+        with with_user_context(regular_user_data):
             result = await image_service.forget_image_by_id(action)
 
         assert result.image.status == ImageStatus.DELETED
@@ -449,7 +450,7 @@ class TestForgetImageById(ImageServiceBaseFixtures):
 
         action = ForgetImageByIdAction(image_id=image_data.id)
 
-        with with_user(regular_user_data):
+        with with_user_context(regular_user_data):
             with pytest.raises(ImageAccessForbiddenError):
                 await image_service.forget_image_by_id(action)
 
@@ -464,7 +465,7 @@ class TestForgetImageById(ImageServiceBaseFixtures):
 
         action = ForgetImageByIdAction(image_id=ImageID(uuid.uuid4()))
 
-        with with_user(superadmin_user_data):
+        with with_user_context(superadmin_user_data):
             with pytest.raises(ImageNotFound):
                 await image_service.forget_image_by_id(action)
 
@@ -601,7 +602,7 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
 
         action = PurgeImageByIdAction(image_id=image_data.id)
 
-        with with_user(superadmin_user_data):
+        with with_user_context(superadmin_user_data):
             result = await image_service.purge_image_by_id(action)
 
         assert result.image == image_data
@@ -620,7 +621,7 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
 
         action = PurgeImageByIdAction(image_id=image_data.id)
 
-        with with_user(regular_user_data):
+        with with_user_context(regular_user_data):
             result = await image_service.purge_image_by_id(action)
 
         assert result.image == image_data
@@ -639,7 +640,7 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
 
         action = PurgeImageByIdAction(image_id=image_data.id)
 
-        with with_user(regular_user_data):
+        with with_user_context(regular_user_data):
             with pytest.raises(ImageAccessForbiddenError):
                 await image_service.purge_image_by_id(action)
 
@@ -654,7 +655,7 @@ class TestPurgeImageById(ImageServiceBaseFixtures):
 
         action = PurgeImageByIdAction(image_id=ImageID(uuid.uuid4()))
 
-        with with_user(superadmin_user_data):
+        with with_user_context(superadmin_user_data):
             with pytest.raises(ImageNotFound):
                 await image_service.purge_image_by_id(action)
 
@@ -768,7 +769,7 @@ class TestUntagImageFromRegistry(ImageServiceBaseFixtures):
             image_id=image_data.id,
         )
 
-        with with_user(superadmin_user_data):
+        with with_user_context(superadmin_user_data):
             result = await image_service.untag_image_from_registry(action)
 
         assert result.image == image_data
@@ -789,7 +790,7 @@ class TestUntagImageFromRegistry(ImageServiceBaseFixtures):
             image_id=image_data.id,
         )
 
-        with with_user(regular_user_data):
+        with with_user_context(regular_user_data):
             result = await image_service.untag_image_from_registry(action)
 
         assert result.image == image_data
@@ -810,7 +811,7 @@ class TestUntagImageFromRegistry(ImageServiceBaseFixtures):
             image_id=image_data.id,
         )
 
-        with with_user(regular_user_data):
+        with with_user_context(regular_user_data):
             with pytest.raises(ImageAccessForbiddenError):
                 await image_service.untag_image_from_registry(action)
 
@@ -827,9 +828,18 @@ class TestUntagImageFromRegistry(ImageServiceBaseFixtures):
             image_id=ImageID(uuid.uuid4()),
         )
 
-        with with_user(superadmin_user_data):
+        with with_user_context(superadmin_user_data):
             with pytest.raises(ImageNotFound):
                 await image_service.untag_image_from_registry(action)
+
+
+class TestUntagImageFromRegistryAction:
+    """Checked against the image it names, not the global scope."""
+
+    def test_untagging_is_checked_against_the_image_it_names(self) -> None:
+        image_id = ImageID(uuid.uuid4())
+
+        assert UntagImageFromRegistryAction(image_id=image_id).entity_id() == image_id
 
 
 class TestClearImageCustomResourceLimit(ImageServiceBaseFixtures):
@@ -1051,7 +1061,7 @@ class TestPreloadImage(ImageServiceBaseFixtures):
 
 
 class TestScanImage(ImageServiceBaseFixtures):
-    """Tests for ImageService.scan_image"""
+    """Tests for ImageService.scan_already_registered_image"""
 
     async def test_scan_image_success(
         self,
@@ -1069,7 +1079,7 @@ class TestScanImage(ImageServiceBaseFixtures):
             architecture=image_data.architecture,
         )
 
-        result = await image_service.scan_image(action)
+        result = await image_service.scan_already_registered_image(action)
 
         assert result.image == image_data
         assert result.errors == []
@@ -1094,7 +1104,7 @@ class TestScanImage(ImageServiceBaseFixtures):
             architecture=image_data.architecture,
         )
 
-        result = await image_service.scan_image(action)
+        result = await image_service.scan_already_registered_image(action)
 
         assert result.image == image_data
         assert result.errors == scan_errors
@@ -1113,7 +1123,7 @@ class TestScanImage(ImageServiceBaseFixtures):
         )
 
         with pytest.raises(ImageNotFound):
-            await image_service.scan_image(action)
+            await image_service.scan_already_registered_image(action)
 
 
 class TestGetImageInstalledAgents(ImageServiceBaseFixtures):
@@ -1188,7 +1198,7 @@ class TestSearchImagesWithInstallStatus(ImageServiceBaseFixtures):
     ) -> None:
         mock_image_repository.search_images_with_install_status = AsyncMock(return_value=[])
 
-        with with_user(superadmin_user_data):
+        with with_user_context(superadmin_user_data):
             await image_service.search_images_with_install_status(
                 self._action(superadmin_user_data.user_id)
             )
@@ -1205,7 +1215,7 @@ class TestSearchImagesWithInstallStatus(ImageServiceBaseFixtures):
         mock_image_repository.search_images_with_install_status = AsyncMock(return_value=[])
         action = self._action(regular_user_data.user_id)
 
-        with with_user(regular_user_data):
+        with with_user_context(regular_user_data):
             await image_service.search_images_with_install_status(action)
 
         scopes, _searcher = mock_image_repository.search_images_with_install_status.call_args.args

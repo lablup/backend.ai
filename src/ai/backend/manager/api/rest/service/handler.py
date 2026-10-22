@@ -61,7 +61,7 @@ from ai.backend.common.types import (
     MountPermission,
     RuntimeVariant,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.creator import DeploymentCreationDraft
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -148,7 +148,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.auth.processors import AuthProcessors
     from ai.backend.manager.services.deployment.processors import DeploymentProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _serve_info_from_dto(dto: ServiceInfo, runtime_variant_name: RuntimeVariant) -> ServeInfoModel:

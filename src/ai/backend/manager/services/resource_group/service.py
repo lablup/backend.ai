@@ -5,13 +5,13 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from ai.backend.common.types import ResourceSlot
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
 from ai.backend.manager.errors.common import ObjectNotFound
 from ai.backend.manager.errors.fair_share import InvalidResourceWeightError
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
-from ai.backend.manager.repositories.resource_group import ResourceGroupRepository
+from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 
 if TYPE_CHECKING:
     from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
@@ -69,7 +69,7 @@ from ai.backend.manager.services.resource_group.actions.update_fair_share_spec i
 )
 from ai.backend.manager.types import TriState
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 WSPROXY_V1_VERSION = "v1"
 

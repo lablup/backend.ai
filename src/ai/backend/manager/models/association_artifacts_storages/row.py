@@ -9,10 +9,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.base import GUID, Base
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = ("AssociationArtifactsStorageRow",)
 
