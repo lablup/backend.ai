@@ -8,6 +8,8 @@ Test Scenarios:
 - SC-CO-014 ~ SC-CO-019: StatusTransition
 - SC-CO-019b: status_info cleared on RUNNING transition (BA-4841 regression)
 - SC-CO-019c: START's success transition leaves a session that moved on
+- SC-CO-019d: START's failure transitions skip a session claimed again
+- SC-CO-019e: kernel reset only for the sessions a transition moved
 - SC-CO-020 ~ SC-CO-025: PostProcessors
 - SC-CO-026: concurrent START passes
 """
@@ -20,7 +22,7 @@ from collections import defaultdict
 from contextlib import nullcontext
 from datetime import datetime, timedelta
 from typing import Any, override
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, call, patch
 from uuid import uuid4
 
 import pytest
@@ -1156,6 +1158,104 @@ class TestScheduleCoordinatorStatusTransition:
         assert {SessionStatus.RUNNING, SessionStatus.TERMINATING} <= set(
             captured_updater.except_statuses
         )
+
+    @pytest.mark.parametrize("moved", [False, True], ids=["claimed-again", "still-prepared"])
+    @pytest.mark.parametrize("outcome", [SchedulingResult.EXPIRED, SchedulingResult.GIVE_UP])
+    async def test_start_failure_moves_only_a_session_still_prepared(
+        self,
+        mock_coordinator: MagicMock,
+        outcome: SchedulingResult,
+        moved: bool,
+    ) -> None:
+        """SC-CO-019d: START's expired/give_up transitions skip a session claimed again.
+
+        Given: A failed START session whose claim was released, then maybe claimed again
+        When: Apply transition is called with START's expired or give_up transition
+        Then: Only a session still PREPARED is moved, and only its kernels are reset
+        """
+        # Arrange
+        session_info = _create_session_transition_info(
+            session_id=SessionId(uuid4()), from_status=SessionStatus.PREPARED
+        )
+        transitions = StartSessionsLifecycleHandler.status_transitions()
+        transition = (
+            transitions.expired if outcome == SchedulingResult.EXPIRED else transitions.give_up
+        )
+        assert transition is not None
+
+        captured_updater = None
+
+        async def capture_update_with_history(updater: Any, histories: Any) -> list[SessionId]:
+            nonlocal captured_updater
+            captured_updater = updater
+            # A session claimed again is CREATING, so the updater leaves it alone.
+            return [session_info.session_id] if moved else []
+
+        mock_coordinator._repository.update_with_history = capture_update_with_history
+        mock_coordinator._apply_kernel_pending_resets = AsyncMock()
+
+        # Act
+        transitioned = await ScheduleCoordinator._apply_transition(
+            mock_coordinator,
+            handler_name=StartSessionsLifecycleHandler.name(),
+            session_infos=[session_info],
+            transition=transition,
+            scheduling_result=outcome,
+            records={},
+            status_changed_at=datetime.now(tzutc()),
+        )
+
+        # Assert
+        assert isinstance(captured_updater, SessionStatusBatchUpdater)
+        assert SessionStatus.PREPARED not in captured_updater.except_statuses
+        assert SessionStatus.CREATING in captured_updater.except_statuses
+        assert transitioned == ([session_info] if moved else [])
+        # Only expired goes to PENDING; give_up resets no kernels here.
+        expected_resets = (
+            [call([session_info.session_id])]
+            if moved and transition.kernel == KernelStatus.PENDING
+            else []
+        )
+        assert mock_coordinator._apply_kernel_pending_resets.await_args_list == expected_resets
+
+    async def test_kernel_reset_only_for_moved_sessions(
+        self,
+        mock_coordinator: MagicMock,
+    ) -> None:
+        """SC-CO-019e: A guarded PENDING transition resets the kernels of moved sessions only.
+
+        Given: Two sessions transitioning to PENDING, one of them left alone by the guard
+        When: Apply transition is called
+        Then: Only the moved session's kernels are reset
+        """
+        # Arrange
+        moved_info = _create_session_transition_info(session_id=SessionId(uuid4()))
+        skipped_info = _create_session_transition_info(session_id=SessionId(uuid4()))
+        transition = TransitionStatus(
+            session=SessionStatus.PENDING,
+            kernel=KernelStatus.PENDING,
+            except_session_statuses=frozenset({SessionStatus.CREATING}),
+        )
+        mock_coordinator._repository.update_with_history = AsyncMock(
+            return_value=[moved_info.session_id]
+        )
+        mock_coordinator._apply_kernel_pending_resets = AsyncMock()
+
+        # Act
+        await ScheduleCoordinator._apply_transition(
+            mock_coordinator,
+            handler_name="test_handler",
+            session_infos=[moved_info, skipped_info],
+            transition=transition,
+            scheduling_result=SchedulingResult.EXPIRED,
+            records={},
+            status_changed_at=datetime.now(tzutc()),
+        )
+
+        # Assert
+        mock_coordinator._apply_kernel_pending_resets.assert_awaited_once_with([
+            moved_info.session_id
+        ])
 
 
 # =============================================================================

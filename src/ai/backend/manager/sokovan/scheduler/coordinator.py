@@ -1262,7 +1262,8 @@ class ScheduleCoordinator:
         Returns:
             The session infos whose session was moved; without a session status in the
             transition, all of them. A session left alone by
-            ``transition.except_session_statuses`` gets no history row and is left out.
+            ``transition.except_session_statuses`` gets no history row and no kernel
+            reset, and is left out.
         """
         if not session_infos:
             return []
@@ -1299,10 +1300,20 @@ class ScheduleCoordinator:
                 to_status=transition.session,
                 scheduling_result=scheduling_result,
             )
+            skipped_ids = [sid for sid in session_ids if sid not in updated_ids]
+            if skipped_ids:
+                log.info(
+                    "sessions left in their status by the transition guard",
+                    session_ids=", ".join(str(sid) for sid in skipped_ids),
+                    to_status=transition.session,
+                    scheduling_result=scheduling_result,
+                )
             session_infos = [info for info in session_infos if info.session_id in updated_ids]
+            session_ids = [info.session_id for info in session_infos]
 
-        # Kernel status reset if transitioning to PENDING
-        if transition.kernel == KernelStatus.PENDING:
+        # Kernel status reset if transitioning to PENDING, for the sessions moved only:
+        # a session the guard left alone may have its kernels in creation elsewhere.
+        if transition.kernel == KernelStatus.PENDING and session_ids:
             await self._apply_kernel_pending_resets(session_ids)
         return session_infos
 

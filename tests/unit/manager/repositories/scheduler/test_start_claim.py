@@ -25,7 +25,11 @@ from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AccessKey, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
+from ai.backend.manager.data.session.types import (
+    SchedulingResult,
+    SessionStatus,
+    TransitionStatus,
+)
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.scheduling_history.creators import SessionSchedulingHistoryCreator
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
@@ -72,6 +76,11 @@ async def _start_history_count(db: ExtendedAsyncSAEngine, session_id: SessionId)
             )
         )
     return cast(int, count)
+
+
+def _start_failure_transition(outcome: SchedulingResult) -> TransitionStatus | None:
+    transitions = StartSessionsLifecycleHandler.status_transitions()
+    return transitions.expired if outcome == SchedulingResult.EXPIRED else transitions.give_up
 
 
 async def _set_session_status(
@@ -239,11 +248,14 @@ class TestClaimSessionsForStart:
         assert await _session_status(db_with_cleanup, session_id) == SessionStatus.TERMINATING
         assert await _kernel_statuses(db_with_cleanup, session_id) == [KernelStatus.CREATING]
 
-    async def _apply_start_success(
-        self, db_source: ScheduleDBSource, session_id: SessionId
+    async def _apply_start_transition(
+        self,
+        db_source: ScheduleDBSource,
+        session_id: SessionId,
+        transition: TransitionStatus | None,
+        scheduling_result: SchedulingResult,
     ) -> list[SessionId]:
-        """Apply START's success transition the way the coordinator does."""
-        transition = StartSessionsLifecycleHandler.status_transitions().success
+        """Apply one of START's transitions the way the coordinator does."""
         assert transition is not None and transition.session is not None
         updater = SessionStatusBatchUpdater(
             session_ids=[session_id],
@@ -255,13 +267,23 @@ class TestClaimSessionsForStart:
             session_id=SessionID(session_id),
             creator=SessionSchedulingHistoryCreator(
                 phase=StartSessionsLifecycleHandler.name(),
-                result=SchedulingResult.SUCCESS,
-                message="start-sessions success",
+                result=scheduling_result,
+                message=f"start-sessions {scheduling_result.value.lower()}",
                 from_status=SessionStatus.PREPARED,
                 to_status=transition.session,
             ),
         )
         return await db_source.update_with_history(updater, [history])
+
+    async def _apply_start_success(
+        self, db_source: ScheduleDBSource, session_id: SessionId
+    ) -> list[SessionId]:
+        return await self._apply_start_transition(
+            db_source,
+            session_id,
+            StartSessionsLifecycleHandler.status_transitions().success,
+            SchedulingResult.SUCCESS,
+        )
 
     async def test_start_success_records_a_claimed_session(
         self,
@@ -295,4 +317,49 @@ class TestClaimSessionsForStart:
 
         assert await self._apply_start_success(db_source, session_id) == []
         assert await _session_status(db_with_cleanup, session_id) == moved_to
+        assert await _start_history_count(db_with_cleanup, session_id) == 0
+
+    @pytest.mark.parametrize(
+        "outcome",
+        [SchedulingResult.EXPIRED, SchedulingResult.GIVE_UP],
+    )
+    async def test_start_failure_moves_a_session_still_prepared(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        db_source: ScheduleDBSource,
+        create_session: Callable[..., Awaitable[SessionId]],
+        outcome: SchedulingResult,
+    ) -> None:
+        """A failed session whose claim was released moves to the failure status as before."""
+        session_id = await create_session()
+        transition = _start_failure_transition(outcome)
+        assert transition is not None
+
+        moved = await self._apply_start_transition(db_source, session_id, transition, outcome)
+
+        assert moved == [session_id]
+        assert await _session_status(db_with_cleanup, session_id) == transition.session
+        assert await _start_history_count(db_with_cleanup, session_id) == 1
+
+    @pytest.mark.parametrize(
+        "outcome",
+        [SchedulingResult.EXPIRED, SchedulingResult.GIVE_UP],
+    )
+    async def test_start_failure_leaves_a_session_claimed_again(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        db_source: ScheduleDBSource,
+        create_session: Callable[..., Awaitable[SessionId]],
+        outcome: SchedulingResult,
+    ) -> None:
+        """A failed session that another pass claimed again after its release is left to that pass."""
+        session_id = await create_session()
+        await db_source.claim_sessions_for_start([session_id], _CLAIM_REASON)
+
+        moved = await self._apply_start_transition(
+            db_source, session_id, _start_failure_transition(outcome), outcome
+        )
+
+        assert moved == []
+        assert await _session_status(db_with_cleanup, session_id) == SessionStatus.CREATING
         assert await _start_history_count(db_with_cleanup, session_id) == 0
