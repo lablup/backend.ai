@@ -43,6 +43,11 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
+<<<<<<< HEAD
+=======
+from ai.backend.manager.errors.auth import InsufficientPrivilege
+from ai.backend.manager.errors.user import UserModificationBadRequest
+>>>>>>> 6c4973b09 (fix(BA-8671): clear need_password_change when a user changes their own password (#15979))
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
@@ -378,7 +383,24 @@ async def update_user_v2(
     me = current_user()
     if me is None:
         raise UnreachableError("User context is not available")
+<<<<<<< HEAD
     payload = await ctx.adapters.user.modify_user_by_id(me.user_id, input.to_pydantic())
+=======
+    dto = input.to_pydantic()
+    if not me.is_superadmin:
+        restricted = dto.model_fields_set - SELF_EDITABLE_USER_FIELDS
+        if restricted:
+            raise InsufficientPrivilege(
+                f"Cannot update these fields on your own account: {', '.join(sorted(restricted))}"
+            )
+    if isinstance(dto.password, str):
+        if dto.need_password_change is True:
+            raise UserModificationBadRequest(
+                "need_password_change cannot be true when changing your own password"
+            )
+        dto = dto.model_copy(update={"need_password_change": False})
+    payload = await ctx.adapters.user.update_user_by_id(me.user_id, dto)
+>>>>>>> 6c4973b09 (fix(BA-8671): clear need_password_change when a user changes their own password (#15979))
     return UpdateUserPayloadGQL.from_pydantic(payload)
 
 
