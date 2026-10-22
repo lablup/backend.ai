@@ -51,6 +51,11 @@ class TerminateSessionsLifecycleHandler(SessionLifecycleHandler):
 
     @classmethod
     @override
+    def description(cls) -> str:
+        return "Terminates the kernels of sessions marked for termination."
+
+    @classmethod
+    @override
     def target_statuses(cls) -> list[SessionStatus]:
         """Sessions in TERMINATING state."""
         return [SessionStatus.TERMINATING]

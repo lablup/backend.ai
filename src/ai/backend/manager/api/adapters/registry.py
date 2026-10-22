@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -70,6 +71,9 @@ from ai.backend.manager.api.adapters.secret.adapter import SecretAdapter
 from ai.backend.manager.api.adapters.service_catalog.adapter import ServiceCatalogAdapter
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.api.adapters.session_group.adapter import SessionGroupAdapter
+from ai.backend.manager.api.adapters.session_lifecycle_handler.adapter import (
+    SessionLifecycleHandlerAdapter,
+)
 from ai.backend.manager.api.adapters.storage_host.adapter import StorageHostAdapter
 from ai.backend.manager.api.adapters.storage_namespace.adapter import StorageNamespaceAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
@@ -84,6 +88,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.processors import Processors
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
     from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
+    from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 
 
 class Adapters:
@@ -144,6 +149,7 @@ class Adapters:
         service_catalog: ServiceCatalogAdapter,
         session: SessionAdapter,
         session_group: SessionGroupAdapter,
+        session_lifecycle_handler: SessionLifecycleHandlerAdapter,
         storage_host: StorageHostAdapter,
         storage_namespace: StorageNamespaceAdapter,
         user: UserAdapter,
@@ -199,6 +205,7 @@ class Adapters:
         self.service_catalog = service_catalog
         self.session = session
         self.session_group = session_group
+        self.session_lifecycle_handler = session_lifecycle_handler
         self.storage_host = storage_host
         self.storage_namespace = storage_namespace
         self.user = user
@@ -215,6 +222,7 @@ class Adapters:
         key_provider_pool: KeyProviderPool,
         deployment_coordinator: DeploymentCoordinator,
         schedule_coordinator: ScheduleCoordinator,
+        session_lifecycle_handlers: Sequence[SessionLifecycleHandler],
         config_provider: ManagerConfigProvider | None = None,
     ) -> Adapters:
         """Factory that hands each adapter the processors it uses.
@@ -312,6 +320,9 @@ class Adapters:
             service_catalog=ServiceCatalogAdapter(processors.service_catalog),
             session=SessionAdapter(processors.session, processors.idle_checker),
             session_group=SessionGroupAdapter(processors.session_group),
+            session_lifecycle_handler=SessionLifecycleHandlerAdapter(
+                sorted(session_lifecycle_handlers, key=lambda handler: handler.name())
+            ),
             storage_host=StorageHostAdapter(processors.vfolder),
             storage_namespace=StorageNamespaceAdapter(processors.storage_namespace),
             user=UserAdapter(processors.user, processors.domain, auth_config, key_provider_pool),

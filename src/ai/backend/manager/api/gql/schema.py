@@ -645,6 +645,9 @@ from ai.backend.manager.api.gql.session_group.resolver import (
     session_group,
     update_session_group,
 )
+from ai.backend.manager.api.gql.session_lifecycle_handler.resolver import (
+    admin_session_lifecycle_handlers,
+)
 from ai.backend.manager.api.gql.storage_volume.resolver import (
     admin_storage_volumes,
     delete_storage_volume,
@@ -850,6 +853,7 @@ class Query:
     scoped_resource_groups = scoped_resource_groups
     admin_resource_group_v2 = admin_resource_group_v2
     scheduling_handlers = scheduling_handlers
+    admin_session_lifecycle_handlers = admin_session_lifecycle_handlers
     compute_schedule = compute_schedule
     admin_allowed_resource_groups_for_domain_v2 = admin_allowed_resource_groups_for_domain_v2
     admin_allowed_resource_groups_for_project_v2 = admin_allowed_resource_groups_for_project_v2
