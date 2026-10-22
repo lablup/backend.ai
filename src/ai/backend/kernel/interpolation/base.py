@@ -2,7 +2,8 @@ import enum
 import re
 from abc import ABC, abstractmethod
 from collections.abc import Iterator, Mapping
-from typing import Any, Self
+from dataclasses import dataclass
+from typing import Any
 
 from ai.backend.kernel.exception import InvalidServiceDefinition
 from ai.backend.kernel.interpolation.types import InterpolationOption
@@ -13,43 +14,43 @@ class TokenType(enum.Enum):
     EXPR = enum.auto()
 
 
-class AbstractServiceInterpolator(ABC):
-    _variables: Mapping[str, Any]
+class BaseServiceInterpolator(ABC):
+    """Stateless; one instance per syntax is shared, and each call passes its own values."""
 
-    def __init__(self, variables: Mapping[str, Any]) -> None:
-        self._variables = variables
-
-    @classmethod
     @abstractmethod
-    def from_option(cls, variables: Mapping[str, Any], option: InterpolationOption) -> Self:
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def pattern(self) -> re.Pattern[str]:
+    def pattern(self, option: InterpolationOption) -> re.Pattern[str]:
         """Matches one variable reference; its non-empty named group is the expression."""
         raise NotImplementedError
 
-    def apply(self, parts: list[str]) -> list[str]:
-        return [self._interpolate(part) for part in parts]
+    def apply(
+        self, parts: list[str], variables: Mapping[str, Any], option: InterpolationOption
+    ) -> list[str]:
+        pattern = self.pattern(option)
+        return [self._interpolate(part, pattern, variables) for part in parts]
 
-    def render(self, value: str) -> str:
+    def render(self, value: str, variables: Mapping[str, Any], option: InterpolationOption) -> str:
         """Interpolate one pre-start action argument."""
-        return self._interpolate(value)
+        return self._interpolate(value, self.pattern(option), variables)
 
-    def _interpolate(self, part: str) -> str:
+    def _value_error_hint(self) -> str:
+        return ""
+
+    def _interpolate(
+        self, part: str, pattern: re.Pattern[str], variables: Mapping[str, Any]
+    ) -> str:
         tokens = []
-        for token_type, token in self._tokenize(part):
+        for token_type, token in self._tokenize(part, pattern):
             match token_type:
                 case TokenType.TEXT:
                     tokens.append(token)
                 case TokenType.EXPR:
-                    tokens.append(self._evaluate(part, token))
+                    tokens.append(self._evaluate(part, token, variables))
         return "".join(tokens)
 
-    def _tokenize(self, s: str) -> Iterator[tuple[TokenType, str]]:
+    @staticmethod
+    def _tokenize(s: str, pattern: re.Pattern[str]) -> Iterator[tuple[TokenType, str]]:
         last_index = 0
-        for match in self.pattern.finditer(s):
+        for match in pattern.finditer(s):
             start, end = match.span()
             if last_index < start:
                 yield TokenType.TEXT, s[last_index:start]
@@ -58,16 +59,29 @@ class AbstractServiceInterpolator(ABC):
         if last_index < len(s):
             yield TokenType.TEXT, s[last_index:]
 
-    def _evaluate(self, part: str, expr: str) -> str:
+    def _evaluate(self, part: str, expr: str, variables: Mapping[str, Any]) -> str:
         try:
-            return ("{" + expr + "}").format_map(self._variables)
+            return ("{" + expr + "}").format_map(variables)
         except (KeyError, IndexError) as e:
             raise InvalidServiceDefinition(
                 f"Cannot interpolate service argument {part!r}: undefined template variable {e}."
             ) from e
         except ValueError as e:
             raise InvalidServiceDefinition(
-                f"Cannot interpolate service argument {part!r}: {e}. "
-                "Literal braces (e.g. JSON like vLLM '--hf-overrides') "
-                "are not supported."
+                f"Cannot interpolate service argument {part!r}: {e}.{self._value_error_hint()}"
             ) from e
+
+
+@dataclass(frozen=True)
+class BoundInterpolator:
+    """A shared interpolator with the values of one service start, handed to pre-start actions."""
+
+    interpolator: BaseServiceInterpolator
+    variables: Mapping[str, Any]
+    option: InterpolationOption
+
+    def apply(self, parts: list[str]) -> list[str]:
+        return self.interpolator.apply(parts, self.variables, self.option)
+
+    def render(self, value: str) -> str:
+        return self.interpolator.render(value, self.variables, self.option)

@@ -1,30 +1,23 @@
+import functools
 import re
-from collections.abc import Mapping
-from typing import Any, Self, override
+from typing import override
 
 from ai.backend.kernel.exception import InvalidServiceDefinition
-from ai.backend.kernel.interpolation.base import AbstractServiceInterpolator
+from ai.backend.kernel.interpolation.base import BaseServiceInterpolator
 from ai.backend.kernel.interpolation.types import InterpolationOption
 
 
-class DelimiterInterpolator(AbstractServiceInterpolator):
+class DelimiterInterpolator(BaseServiceInterpolator):
     """Only ``<start> var <end>`` is filled; every other character, braces included, stays."""
 
-    _pattern: re.Pattern[str]
-
-    def __init__(self, variables: Mapping[str, Any], start: str, end: str) -> None:
-        super().__init__(variables)
-        self._pattern = re.compile(rf"{re.escape(start)}\s*(?P<expr>.*?)\s*{re.escape(end)}")
-
     @override
-    @classmethod
-    def from_option(cls, variables: Mapping[str, Any], option: InterpolationOption) -> Self:
+    def pattern(self, option: InterpolationOption) -> re.Pattern[str]:
         delimiter = option.get("delimiter")
         if delimiter is None:
             raise InvalidServiceDefinition("delimiter interpolation requires a delimiter")
-        return cls(variables, delimiter["start"], delimiter["end"])
+        return self._compile(delimiter["start"], delimiter["end"])
 
-    @property
-    @override
-    def pattern(self) -> re.Pattern[str]:
-        return self._pattern
+    @staticmethod
+    @functools.cache
+    def _compile(start: str, end: str) -> re.Pattern[str]:
+        return re.compile(rf"{re.escape(start)}\s*(?P<expr>.*?)\s*{re.escape(end)}")
