@@ -28,6 +28,7 @@ from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchSessionGroupsInput",
+    "CreateSessionGroupInput",
     "PurgeSessionGroupInput",
     "ScopedSearchSessionGroupsInput",
     "SessionGroupFilter",
@@ -151,3 +152,15 @@ class UpdateSessionGroupInput(BaseRequestModel):
                 "UpdateSessionGroupInput requires 'placement_direction' or 'placement_enforcement'"
             )
         return self
+
+
+class CreateSessionGroupInput(BaseRequestModel):
+    """Input for creating a session group in a project; the caller becomes its owner."""
+
+    project_id: UUID = Field(description="ID of the project the session group is created in.")
+    placement_direction: SessionGroupPlacementDirectionEnum = Field(
+        description="How the member sessions sit relative to each other, per agent.",
+    )
+    placement_enforcement: SessionGroupPlacementEnforcementEnum = Field(
+        description="How hard the placement direction is enforced.",
+    )
