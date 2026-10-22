@@ -21612,6 +21612,11 @@ type Query
   """
   checkPresetAvailabilityV2(input: CheckPresetAvailabilityV2Input!): CheckPresetAvailabilityPayloadV2 @join__field(graph: STRAWBERRY)
 
+  """
+  Added in 26.10.0. Get the number of sessions the current user is running.
+  """
+  myConcurrency: UserConcurrency! @join__field(graph: STRAWBERRY)
+
   """Added in 26.4.2. Search all virtual folders (superadmin only)."""
   adminVfoldersV2(
     """
@@ -29440,6 +29445,22 @@ type User implements Item
   """
   container_gids: [Int]
   groups: [UserGroup]
+}
+
+"""Added in 26.10.0. Number of sessions a user is running."""
+type UserConcurrency
+  @join__type(graph: STRAWBERRY)
+{
+  """User UUID."""
+  userId: UUID!
+
+  """
+  Number of interactive, batch and inference sessions the user is running.
+  """
+  sessionCount: Int!
+
+  """Number of system sessions, such as SFTP sessions, the user is running."""
+  privateSessionCount: Int!
 }
 
 """Added in 24.03.0"""

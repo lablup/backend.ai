@@ -62,5 +62,11 @@ def register_v2_resource_allocation_routes(
         handler.check_preset_availability,
         middlewares=[auth_required],
     )
+    registry.add(
+        "GET",
+        "/my/concurrency",
+        handler.my_concurrency,
+        middlewares=[auth_required],
+    )
 
     return registry
