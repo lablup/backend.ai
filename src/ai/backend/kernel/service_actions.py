@@ -6,14 +6,14 @@ from asyncio import create_subprocess_exec, subprocess
 from collections.abc import Iterable, MutableMapping
 from pathlib import Path
 
-from .interpolation.base import AbstractServiceInterpolator
+from .interpolation.base import BoundInterpolator
 from .logging import BraceStyleAdapter
 
 logger = BraceStyleAdapter(logging.getLogger())
 
 
 async def write_file(
-    interpolator: AbstractServiceInterpolator,
+    interpolator: BoundInterpolator,
     filename: str,
     body: Iterable[str],
     mode: str = "644",
@@ -32,7 +32,7 @@ async def write_file(
 
 
 async def write_tempfile(
-    interpolator: AbstractServiceInterpolator,
+    interpolator: BoundInterpolator,
     body: Iterable[str],
     mode: str = "644",
 ) -> str | None:
@@ -49,7 +49,7 @@ async def write_tempfile(
 
 
 async def run_command(
-    interpolator: AbstractServiceInterpolator,
+    interpolator: BoundInterpolator,
     command: Iterable[str],
     echo: bool = False,
 ) -> MutableMapping[str, str] | None:
@@ -68,14 +68,14 @@ async def run_command(
 
 
 async def mkdir(
-    interpolator: AbstractServiceInterpolator,
+    interpolator: BoundInterpolator,
     path: str,
 ) -> None:
     Path(interpolator.render(path)).mkdir(parents=True, exist_ok=True)
 
 
 async def log(
-    interpolator: AbstractServiceInterpolator,
+    interpolator: BoundInterpolator,
     message: str,
     debug: bool = False,
 ) -> None:

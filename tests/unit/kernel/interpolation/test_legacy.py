@@ -10,7 +10,7 @@ class TestLegacyInterpolator:
             "host": "99.99.99.99",
             "ports": [11001, 11002],
         }
-        ret = LegacyInterpolator(variables).apply(command)
+        ret = LegacyInterpolator().apply(command, variables, {"mode": "legacy"})
 
         assert ret[0] == "bash"  # unchanged
         assert ret[1] == "-c"  # unchanged
@@ -22,7 +22,7 @@ class TestLegacyInterpolator:
             "host": "99.99.99.99",
             "ports": [11001, 11002],
         }
-        ret = LegacyInterpolator(variables).apply(command)
+        ret = LegacyInterpolator().apply(command, variables, {"mode": "legacy"})
 
         assert ret[0] == "bash"  # unchanged
         assert ret[1] == "-c"  # unchanged
@@ -31,7 +31,7 @@ class TestLegacyInterpolator:
     def test_skip_shell_envvar_simple(self) -> None:
         command = ["bash", "-c", 'echo "kernel_id = $BACKENDAI_KERNEL_ID"']
         variables: dict[str, Any] = {}
-        ret = LegacyInterpolator(variables).apply(command)
+        ret = LegacyInterpolator().apply(command, variables, {"mode": "legacy"})
 
         assert ret[0] == "bash"  # unchanged
         assert ret[1] == "-c"  # unchanged
@@ -40,7 +40,7 @@ class TestLegacyInterpolator:
     def test_skip_shell_envvar_braced(self) -> None:
         command = ["bash", "-c", 'echo "kernel_id = ${BACKENDAI_KERNEL_ID/aaa/${magic}}"']
         variables: dict[str, Any] = {}
-        ret = LegacyInterpolator(variables).apply(command)
+        ret = LegacyInterpolator().apply(command, variables, {"mode": "legacy"})
 
         assert ret[0] == "bash"  # unchanged
         assert ret[1] == "-c"  # unchanged
@@ -56,7 +56,7 @@ class TestLegacyInterpolator:
             "host": "99.99.99.99",
             "ports": [11001, 11002],
         }
-        ret = LegacyInterpolator(variables).apply(command)
+        ret = LegacyInterpolator().apply(command, variables, {"mode": "legacy"})
 
         assert ret[0] == "bash"  # unchanged
         assert ret[1] == "-c"  # unchanged
