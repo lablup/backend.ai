@@ -126,7 +126,9 @@ from ai.backend.manager.data.session.options import (
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import verify_vfolder_name
 from ai.backend.manager.models.agent.row import AgentRow, agents
-from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
+from ai.backend.manager.models.bootstrap_script_revision.queriers import (
+    CurrentDefaultRevisionQuerier,
+)
 from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.searchers import (
@@ -624,16 +626,12 @@ class AgentRegistry:
             if not user_row:
                 raise UserNotFound(f"User with UUID {user_scope.user_uuid} not found.")
             if not bootstrap_script:
-                bootstrap_script = (
-                    await db_session.scalar(
-                        sa.select(BootstrapScriptRow.script).where(
-                            BootstrapScriptRow.entity_type == UserEntityType(),
-                            BootstrapScriptRow.entity_id == user_scope.user_uuid,
-                            BootstrapScriptRow.is_default,
-                        )
-                    )
-                    or ""
+                revision = await db_session.scalar(
+                    CurrentDefaultRevisionQuerier(
+                        UserEntityType(), user_scope.user_uuid
+                    ).build_select()
                 )
+                bootstrap_script = revision.script if revision is not None else ""
 
         public_sgroup_only = session_type not in PRIVATE_SESSION_TYPES
         if dry_run:

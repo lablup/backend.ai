@@ -126,10 +126,12 @@ class UserConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         access_key = AccessKey(ctx.access_key)
+        owner_user_id = await self._lookup_keypair_owner(access_key)
         await self._user.update_default_bootstrap_script.run(
             UpdateDefaultBootstrapScriptAction(
-                user_id=await self._lookup_keypair_owner(access_key),
+                user_id=owner_user_id,
                 script=BootstrapScript(normalize_newlines(body.parsed.script).strip()),
+                creator_id=owner_user_id,
             )
         )
         return APIResponse.build(HTTPStatus.OK, UpdateBootstrapScriptResponse())

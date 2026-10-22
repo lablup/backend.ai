@@ -11,6 +11,7 @@ import msgpack
 from dateutil.tz import tzutc
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.dotfile import DotfileID
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
@@ -23,7 +24,7 @@ from ai.backend.common.types import AccessKey, SlotName
 from ai.backend.common.utils import nmget
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
-from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
+from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptRevisionData
 from ai.backend.manager.data.dotfile.types import DotfileData, DotfileEntries, DotfileEntry
 from ai.backend.manager.data.keypair.types import GeneratedKeyPairData, KeyPairCreator, KeyPairData
 from ai.backend.manager.data.user.types import (
@@ -33,11 +34,8 @@ from ai.backend.manager.data.user.types import (
     UserData,
     UserSearchResult,
 )
-from ai.backend.manager.errors.bootstrap_script import DefaultBootstrapScriptNotFound
 from ai.backend.manager.errors.storage import DotfileCreationFailed, DotfileNotFound
 from ai.backend.manager.errors.user import KeyPairNotFound
-from ai.backend.manager.models.bootstrap_script.queriers import BootstrapScriptQuerier
-from ai.backend.manager.models.bootstrap_script.updaters import DefaultBootstrapScriptUpdater
 from ai.backend.manager.models.dotfile.creators import DotfileEntryCreator
 from ai.backend.manager.models.dotfile.scopes import UserDotfileTarget
 from ai.backend.manager.models.dotfile.searchable_fields import DotfileSearchableFields
@@ -108,24 +106,16 @@ class UserRepository:
         self._key_provider_pool = key_provider_pool
 
     @user_repository_resilience.apply()
-    async def default_bootstrap_script(self, user_id: UserID) -> BootstrapScriptData | None:
-        async with self._v2_ops.read_ops() as r:
-            scripts = await r.query_owned_fields(
-                BootstrapScriptQuerier(entity_type=user_id.entity_type()), [user_id]
-            )
-            return scripts.get(user_id)
+    async def default_bootstrap_script(self, user_id: UserID) -> BootstrapScriptRevisionData | None:
+        return await self._db_source.current_default_bootstrap_script(user_id)
 
     @user_repository_resilience.apply()
     async def update_default_bootstrap_script(
-        self, updater: DefaultBootstrapScriptUpdater
-    ) -> BootstrapScriptData:
-        async with self._v2_ops.write_ops() as w:
-            updated = await w.batch_update_in_global(updater)
-        if not updated:
-            raise DefaultBootstrapScriptNotFound(
-                f"{updater.entity} has no default bootstrap script"
-            )
-        return updated[0]
+        self, user_id: UserID, script: BootstrapScript, creator_id: UserID | None
+    ) -> BootstrapScriptRevisionData:
+        return await self._db_source.add_default_bootstrap_script_revision(
+            user_id, script, creator_id
+        )
 
     @user_repository_resilience.apply()
     async def default_access_key(self, user_id: UserID) -> AccessKey | None:

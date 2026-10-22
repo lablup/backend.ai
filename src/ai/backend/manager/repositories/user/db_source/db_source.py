@@ -16,6 +16,7 @@ from sqlalchemy.orm import load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import ProjectID
@@ -24,6 +25,7 @@ from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptRevisionData
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.keypair.types import (
@@ -43,6 +45,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderStorageTarget,
     vfolder_status_map,
 )
+from ai.backend.manager.errors.bootstrap_script import DefaultBootstrapScriptNotFound
 from ai.backend.manager.errors.keypair import NoDefaultKeypairResourcePolicy
 from ai.backend.manager.errors.resource import PersonalProjectNotFound
 from ai.backend.manager.errors.user import (
@@ -55,6 +58,14 @@ from ai.backend.manager.errors.user import (
     UserPurgeInProgress,
 )
 from ai.backend.manager.models.bootstrap_script.purgers import BootstrapScriptPurger
+from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
+from ai.backend.manager.models.bootstrap_script_revision.queriers import (
+    CurrentDefaultRevisionQuerier,
+)
+from ai.backend.manager.models.bootstrap_script_revision.row import BootstrapScriptRevisionRow
+from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
+    BootstrapScriptRevisionSearchableFields,
+)
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.purgers import UserEndpointPurger
 from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
@@ -148,6 +159,48 @@ class UserDBSource:
         self._policy_ops = policy_ops_provider
         self._user_ops_provider = UserOpsProvider(db)
         self._key_provider_pool = key_provider_pool
+
+    async def current_default_bootstrap_script(
+        self, user_id: UserID
+    ) -> BootstrapScriptRevisionData | None:
+        async with self._db.begin_readonly_session_read_committed() as db_session:
+            row = await db_session.scalar(
+                CurrentDefaultRevisionQuerier(user_id.entity_type(), user_id).build_select()
+            )
+            return BootstrapScriptRevisionSearchableFields.own.to_data(row) if row else None
+
+    async def add_default_bootstrap_script_revision(
+        self, user_id: UserID, script: BootstrapScript, creator_id: UserID | None
+    ) -> BootstrapScriptRevisionData:
+        """Append the next revision to the user's live default script, locking it so
+        concurrent writes take consecutive numbers."""
+        async with self._db.begin_session() as db_session:
+            script_id = await db_session.scalar(
+                sa.select(BootstrapScriptRow.id)
+                .where(
+                    BootstrapScriptRow.entity_type == user_id.entity_type(),
+                    BootstrapScriptRow.entity_id == user_id,
+                    BootstrapScriptRow.is_default,
+                    BootstrapScriptRow.deleted_at.is_(None),
+                )
+                .with_for_update()
+            )
+            if script_id is None:
+                raise DefaultBootstrapScriptNotFound(f"{user_id} has no default bootstrap script")
+            revision = BootstrapScriptRevisionRow(
+                script_id=script_id,
+                revision_number=sa.select(
+                    sa.func.coalesce(sa.func.max(BootstrapScriptRevisionRow.revision_number), 0) + 1
+                )
+                .where(BootstrapScriptRevisionRow.script_id == script_id)
+                .scalar_subquery(),
+                script=script,
+                creator_id=creator_id,
+            )
+            db_session.add(revision)
+            await db_session.flush()
+            await db_session.refresh(revision)
+            return BootstrapScriptRevisionSearchableFields.own.to_data(revision)
 
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
         """

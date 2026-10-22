@@ -16,7 +16,6 @@ from ai.backend.manager.data.user.types import (
     UserInfoContext,
 )
 from ai.backend.manager.errors.user import UserPurgeFailure
-from ai.backend.manager.models.bootstrap_script.updaters import DefaultBootstrapScriptUpdater
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.user.actions.admin_month_stats import (
@@ -370,15 +369,15 @@ class UserService:
     async def get_default_bootstrap_script(
         self, action: GetDefaultBootstrapScriptAction
     ) -> GetDefaultBootstrapScriptActionResult:
-        script = await self._user_repository.default_bootstrap_script(action.user_id)
+        revision = await self._user_repository.default_bootstrap_script(action.user_id)
         return GetDefaultBootstrapScriptActionResult(
-            script=script.script if script is not None else BootstrapScript.empty()
+            script=revision.script if revision is not None else BootstrapScript.empty()
         )
 
     async def update_default_bootstrap_script(
         self, action: UpdateDefaultBootstrapScriptAction
     ) -> UpdateDefaultBootstrapScriptActionResult:
         await self._user_repository.update_default_bootstrap_script(
-            DefaultBootstrapScriptUpdater(entity=action.user_id, script=action.script)
+            action.user_id, action.script, action.creator_id
         )
         return UpdateDefaultBootstrapScriptActionResult()

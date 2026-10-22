@@ -14,6 +14,7 @@ sources:
   - src/ai/backend/manager/models/keypair
   - src/ai/backend/manager/models/user
   - src/ai/backend/manager/models/bootstrap_script
+  - src/ai/backend/manager/models/bootstrap_script_revision
 generated:
   by: claude-code/opus-5
   at: 2026-08-19
@@ -35,8 +36,9 @@ row is a change to that user.
 
 ## Bootstrap scripts and dotfiles
 
-- `bootstrap_scripts` holds scripts per `(entity_type, entity_id)`; at most one per entity is `is_default`.
-- The API and session creation use the user's default script. Reading one that is missing answers an empty script; updating it answers not found.
+- `bootstrap_scripts` holds scripts per `(entity_type, entity_id)`; at most one live script (`deleted_at IS NULL`) per entity is `is_default`.
+- A script's content lives in `bootstrap_script_revisions`, which only ever gain rows: an update appends the next `revision_number` with the requester as `creator_id`, and the latest revision is the current content.
+- The API and session creation use the latest revision of the user's live default script. Reading one that is missing answers an empty script; updating it answers not found.
 - `dotfiles` stores one file per row with `entity_type`, `entity_id`, `path`, `perm`, `data`, and `is_default`. Each entity has at most one default row per path; user APIs and sessions use these rows.
 - `(entity_type, entity_id)` references `virtual_entities` with `ON DELETE CASCADE`. Creating for an entity with no node fails, and a row created while its owner is purged goes with the node.
 - Project and domain dotfiles remain in their existing columns.
