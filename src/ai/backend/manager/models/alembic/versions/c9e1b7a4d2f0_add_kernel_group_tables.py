@@ -5,7 +5,7 @@ A kernel group is one role of a session. Existing rows are not backfilled here:
 write sets it on new rows.
 
 Revision ID: c9e1b7a4d2f0
-Revises: fa2dfd48c169
+Revises: 3b8e1d6c9a47
 Create Date: 2026-10-20
 
 """
@@ -17,7 +17,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "c9e1b7a4d2f0"
-down_revision = "fa2dfd48c169"
+down_revision = "3b8e1d6c9a47"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
