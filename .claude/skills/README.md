@@ -31,6 +31,7 @@ For finding/defining exceptions, see `src/ai/backend/manager/errors/AGENTS.md`.
 | Skill | Purpose |
 |-------|---------|
 | `/db-migrate` | Inspect & apply migrations (status, upgrade/downgrade) |
+| `/merge-alembic-heads` | Add the empty merge migration when main has 2+ alembic heads |
 
 ## Local Development & CLI
 
