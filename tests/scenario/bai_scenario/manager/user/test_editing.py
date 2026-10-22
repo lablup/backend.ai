@@ -265,15 +265,10 @@ class SomeoneEditingAnother(Given[Any, AnEdit]):
 
     @override
     async def lay(self, seeding: Any) -> AnEdit:
-<<<<<<< HEAD
         domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        target = await seeding.within(SomeoneOf(domain))
-=======
-        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         target = await seeding.within(
             SomeoneOf(domain, need_password_change=self.target_needs_password_change)
         )
->>>>>>> 6c4973b0 (fix(BA-8671): clear need_password_change when a user changes their own password (#15979))
         others = [await seeding.within(SomeoneOf(domain)) for _ in range(self.others)]
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         observer = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
@@ -310,7 +305,7 @@ class SomeoneEditingThemselves(Given[Any, AnEdit]):
 
     @override
     async def lay(self, seeding: Any) -> AnEdit:
-        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
         me = await seeding.within(SomeoneOf(domain, need_password_change=True))
         observer = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
         await seeding.within(AGrant.on_user(me, me, Permission.UPDATE, Permission.READ))
@@ -706,11 +701,8 @@ class AGrantedUserChangesOnlyTheFullName(Scenario[SeedingSession, AnEdit, UserAd
 
 
 @dataclass(frozen=True)
-<<<<<<< HEAD
-class AUserGrantedNothingMayNotEditAnother(Scenario[SeedingSession, AnEdit, UserAdapter, Answer]):
-=======
 class AnotherUsersNewPasswordLeavesTheRequirement(
-    Scenario[TestSeedingSession, AnEdit, UserAdapter, Answer]
+    Scenario[SeedingSession, AnEdit, UserAdapter, Answer]
 ):
     started: datetime
 
@@ -726,7 +718,7 @@ class AnotherUsersNewPasswordLeavesTheRequirement(
         )
 
     @override
-    def given(self) -> Given[TestSeedingSession, AnEdit]:
+    def given(self) -> Given[SeedingSession, AnEdit]:
         return SomeoneEditingAnother(
             on_target=(Permission.UPDATE, Permission.READ), target_needs_password_change=True
         )
@@ -741,7 +733,7 @@ class AnotherUsersNewPasswordLeavesTheRequirement(
 
 
 @dataclass(frozen=True)
-class OwnNewPasswordLiftsTheRequirement(Scenario[TestSeedingSession, AnEdit, UserAdapter, Answer]):
+class OwnNewPasswordLiftsTheRequirement(Scenario[SeedingSession, AnEdit, UserAdapter, Answer]):
     started: datetime
 
     @override
@@ -756,7 +748,7 @@ class OwnNewPasswordLiftsTheRequirement(Scenario[TestSeedingSession, AnEdit, Use
         )
 
     @override
-    def given(self) -> Given[TestSeedingSession, AnEdit]:
+    def given(self) -> Given[SeedingSession, AnEdit]:
         return SomeoneEditingThemselves()
 
     @override
@@ -769,10 +761,7 @@ class OwnNewPasswordLiftsTheRequirement(Scenario[TestSeedingSession, AnEdit, Use
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingMayNotEditAnother(
-    Scenario[TestSeedingSession, AnEdit, UserAdapter, Answer]
-):
->>>>>>> 6c4973b0 (fix(BA-8671): clear need_password_change when a user changes their own password (#15979))
+class AUserGrantedNothingMayNotEditAnother(Scenario[SeedingSession, AnEdit, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "a-user-granted-nothing-may-not-edit-another-user"

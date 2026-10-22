@@ -119,7 +119,7 @@ class TestUpdateUserV2:
     async def test_own_password_change_clears_need_password_change(
         self, mock_info: MagicMock, role: UserRole
     ) -> None:
-        with with_user_context(_user(role)):
+        with with_user(_user(role)):
             await cast(Any, update_user_v2).base_resolver(
                 mock_info, UpdateUserV2InputGQL(password="new-password")
             )
@@ -130,7 +130,7 @@ class TestUpdateUserV2:
     async def test_update_without_password_leaves_need_password_change(
         self, mock_info: MagicMock
     ) -> None:
-        with with_user_context(_user(UserRole.USER)):
+        with with_user(_user(UserRole.USER)):
             await cast(Any, update_user_v2).base_resolver(
                 mock_info, UpdateUserV2InputGQL(full_name="New Name")
             )
@@ -141,7 +141,7 @@ class TestUpdateUserV2:
         self, mock_info: MagicMock
     ) -> None:
         with (
-            with_user_context(_user(UserRole.SUPERADMIN)),
+            with_user(_user(UserRole.SUPERADMIN)),
             pytest.raises(UserModificationBadRequest),
         ):
             await cast(Any, update_user_v2).base_resolver(
