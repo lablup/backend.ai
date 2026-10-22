@@ -9,6 +9,7 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.dto.manager.v2.session_group.request import (
     AdminSearchSessionGroupsInput,
+    CreateSessionGroupInput,
     PurgeSessionGroupInput,
     ScopedSearchSessionGroupsInput,
     UpdateSessionGroupInput,
@@ -20,10 +21,18 @@ if TYPE_CHECKING:
 
 
 class V2SessionGroupHandler:
-    """REST v2 handler for session group reads, the placement policy update and the purge."""
+    """REST v2 handler for session group reads, the creation, the placement policy update and the purge."""
 
     def __init__(self, *, adapter: SessionGroupAdapter) -> None:
         self._adapter = adapter
+
+    async def create(
+        self,
+        body: BodyParam[CreateSessionGroupInput],
+    ) -> APIResponse:
+        """Create a session group in a project, owned by the caller."""
+        result = await self._adapter.create(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 
     async def get(
         self,
