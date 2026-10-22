@@ -392,6 +392,61 @@ Then
 - 거부된다
   - 거부: UserModificationBadRequest
 
+#### [another-users-new-password-leaves-the-password-change-requirement](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+
+대상 사용자 스코프에서 UPDATE와 READ를 받은 다른 사용자가 비밀번호 변경을 요구받는 사용자에게 새 비밀번호만 주면, 요구가 남은 노드가 온다
+
+Given
+
+- 도메인 하나와 대상 사용자, 사용자 0명 더, 부르는 user 한 명, 부르는 사람은 대상 사용자 스코프에서 UPDATE, READ를 받았다, 대상 사용자는 비밀번호 변경을 요구받는다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다, 비밀번호 변경을 요구받는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-3: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-3: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 UPDATE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-2이 user-1의 비밀번호만 바꿈
+
+Then
+
+- 비밀번호 변경 요구가 남은 사용자 전체가 온다
+  - id: 심은 사용자와 같다
+  - basic_info.username = 'user-1'
+  - basic_info.email = 'user-1@scenario.local'
+  - basic_info.full_name = None
+  - basic_info.description = None
+  - basic_info.integration_name = None
+  - status.status = 'active'
+  - status.status_info = None
+  - status.need_password_change = True
+  - organization.domain_name = 'home-1'
+  - organization.role = 'user'
+  - organization.resource_policy = 'user-policy-1'
+  - organization.main_access_key: 그 사용자의 기본 키가 채워져 있다
+  - security.allowed_client_ip = None
+  - security.totp_activated = False
+  - security.totp_activated_at = None
+  - security.sudo_session_enabled = False
+  - container.container_uid = None
+  - container.container_main_gid = None
+  - container.container_gids = None
+  - timestamps.created_at: 이 실행이 쓴 시각
+  - timestamps.modified_at: 이 실행이 쓴 시각
+
 #### [naming-a-default-key-in-an-edit-moves-the-default-to-it](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
 
 권한 받은 사용자가 대상 사용자의 다른 키를 기본 키로 주면, 수정이 반영된 뒤 기본 키가 옮겨간 노드가 온다
@@ -509,6 +564,58 @@ Then
   - 뒤이은 프로젝트 검색.pagination.total = 1
   - 뒤이은 프로젝트 검색.pagination.offset = 0
   - 뒤이은 프로젝트 검색.pagination.limit = 50
+
+#### [setting-ones-own-new-password-lifts-the-password-change-requirement](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+
+비밀번호 변경을 요구받는 사용자가 자기 사용자 스코프에서 UPDATE와 READ를 받고, 새 비밀번호와 요구 해제를 함께 주면, 요구가 풀린 노드가 온다
+
+Given
+
+- 도메인 하나와 비밀번호 변경을 요구받는 사용자 한 명, 그 사용자는 자기 사용자 스코프에서 UPDATE, READ를 받았다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다, 비밀번호 변경을 요구받는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 UPDATE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 UPDATE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.update_user_by_id — user-1이 자기 비밀번호를 바꾸며 비밀번호 변경 요구를 풂
+
+Then
+
+- 비밀번호 변경 요구가 풀린 사용자 전체가 온다
+  - id: 심은 사용자와 같다
+  - basic_info.username = 'user-1'
+  - basic_info.email = 'user-1@scenario.local'
+  - basic_info.full_name = None
+  - basic_info.description = None
+  - basic_info.integration_name = None
+  - status.status = 'active'
+  - status.status_info = None
+  - status.need_password_change = False
+  - organization.domain_name = 'home-1'
+  - organization.role = 'user'
+  - organization.resource_policy = 'user-policy-1'
+  - organization.main_access_key: 그 사용자의 기본 키가 채워져 있다
+  - security.allowed_client_ip = None
+  - security.totp_activated = False
+  - security.totp_activated_at = None
+  - security.sudo_session_enabled = False
+  - container.container_uid = None
+  - container.container_main_gid = None
+  - container.container_gids = None
+  - timestamps.created_at: 이 실행이 쓴 시각
+  - timestamps.modified_at: 이 실행이 쓴 시각
 
 #### [the-superadmin-bulk-edit-answers-the-updated-and-the-failed-apart](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
 

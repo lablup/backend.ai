@@ -252,6 +252,7 @@ class SomeoneOf(SeedNest[Laid[UserData]]):
     domain: Laid[DomainData]
     role: UserRole = UserRole.USER
     vfolder_hosts: Sequence[str] = ()
+    need_password_change: bool = False
 
     @override
     def kind(self) -> str:
@@ -262,7 +263,12 @@ class SomeoneOf(SeedNest[Laid[UserData]]):
         seed.once(SeedProjectPolicy())
         policy = seed.creating(SeedUserPolicy())
         key_policy = seed.creating(SeedKeypairPolicy(vfolder_hosts=self.vfolder_hosts))
-        return seed.provisioning(SeedUserOf(role=self.role), self.domain, policy, key_policy)
+        return seed.provisioning(
+            SeedUserOf(role=self.role, need_password_change=self.need_password_change),
+            self.domain,
+            policy,
+            key_policy,
+        )
 
 
 @dataclass(frozen=True)
