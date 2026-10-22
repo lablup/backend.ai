@@ -25,9 +25,8 @@ import attrs
 
 from . import service_actions
 from .exception import DisallowedArgument, DisallowedEnvironment, InvalidServiceDefinition
-from .interpolation.base import BoundInterpolator
-from .interpolation.registry import INTERPOLATORS
-from .interpolation.types import InterpolationMode, InterpolationOption
+from .interpolation.interpolator import LEGACY_DELIMITERS, ServiceInterpolator
+from .interpolation.types import InterpolationOption
 from .logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger())
@@ -109,9 +108,8 @@ class ServiceParser:
         service = self.services[service_name]
         if service.noop:
             return [], {}
-        option = opts.get("interpolation") or InterpolationOption(mode=InterpolationMode.LEGACY)
-        mode = InterpolationMode(option["mode"])
-        interpolator = BoundInterpolator(INTERPOLATORS[mode], self.variables, option)
+        option = opts.get("interpolation") or InterpolationOption(delimiters=LEGACY_DELIMITERS)
+        interpolator = ServiceInterpolator(self.variables, option["delimiters"])
 
         for action in service.prestart_actions:
             try:

@@ -1,13 +1,8 @@
-import enum
-from typing import NotRequired, TypedDict
+from collections.abc import Sequence
+from typing import TypedDict
 
 
-class InterpolationMode(enum.StrEnum):
-    LEGACY = "legacy"
-    DELIMITER = "delimiter"
-
-
-class InterpolationDelimiterOption(TypedDict):
+class InterpolationDelimiter(TypedDict):
     start: str
     end: str
 
@@ -15,6 +10,4 @@ class InterpolationDelimiterOption(TypedDict):
 class InterpolationOption(TypedDict):
     """The ``interpolation`` entry of a service start's options."""
 
-    # A raw ``InterpolationMode`` value; ``ServiceParser`` converts it with ``InterpolationMode(...)``.
-    mode: str
-    delimiter: NotRequired[InterpolationDelimiterOption | None]
+    delimiters: Sequence[InterpolationDelimiter]
