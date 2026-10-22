@@ -36698,6 +36698,32 @@
         "title": "SessionGroupPlacementEnforcementEnum",
         "type": "string"
       },
+      "CreateSessionGroupInput": {
+        "description": "Input for creating a session group in a project; the caller becomes its owner.",
+        "properties": {
+          "project_id": {
+            "description": "ID of the project the session group is created in.",
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "placement_direction": {
+            "$ref": "#/components/schemas/SessionGroupPlacementDirectionEnum",
+            "description": "How the member sessions sit relative to each other, per agent."
+          },
+          "placement_enforcement": {
+            "$ref": "#/components/schemas/SessionGroupPlacementEnforcementEnum",
+            "description": "How hard the placement direction is enforced."
+          }
+        },
+        "required": [
+          "project_id",
+          "placement_direction",
+          "placement_enforcement"
+        ],
+        "title": "CreateSessionGroupInput",
+        "type": "object"
+      },
       "UpdateSessionGroupInput": {
         "description": "Input for changing a session group's placement policy.\n\nAt least one of the two fields must be given.",
         "properties": {
@@ -64615,6 +64641,35 @@
         },
         "parameters": [],
         "description": "Deprecated. Use `POST /v2/sessions/partial-bulk-terminate`.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/session-groups": {
+      "post": {
+        "operationId": "v2/session-groups.create",
+        "tags": [
+          "v2/session-groups"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSessionGroupInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Create a session group in a project, owned by the caller.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/session-groups/{session_group_id}": {

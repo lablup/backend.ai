@@ -5542,6 +5542,30 @@ input CreateScalingGroupInput
   use_host_network: Boolean = false
 }
 
+"""
+Added in 26.10.0. Input for creating a session group in a project. The caller becomes its owner.
+"""
+input CreateSessionGroupInput
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the project the session group is created in."""
+  projectId: UUID!
+
+  """How the member sessions sit relative to each other, per agent."""
+  placementDirection: SessionGroupPlacementDirection!
+
+  """How hard the placement direction is enforced."""
+  placementEnforcement: SessionGroupPlacementEnforcement!
+}
+
+"""Added in 26.10.0. Payload for a session group creation."""
+type CreateSessionGroupPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The created session group."""
+  sessionGroup: SessionGroup!
+}
+
 """Added in 26.4.2. Session types allowed for user-initiated creation."""
 enum CreateSessionType
   @join__type(graph: STRAWBERRY)
@@ -15651,6 +15675,11 @@ type Mutation
   Added in 26.10.0. Change a session group's placement direction and enforcement. Members placed afterwards follow the new policy; a group a deployment's replica group holds is refused as in use.
   """
   updateSessionGroup(input: UpdateSessionGroupInput!): UpdateSessionGroupPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Create a session group in a project. The caller becomes its owner; the caller needs the session group create permission on the project.
+  """
+  createSessionGroup(input: CreateSessionGroupInput!): CreateSessionGroupPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.10.0. Permanently remove a session group. Its member sessions remain with their group cleared. A group a deployment's replica group references is refused as in use.
