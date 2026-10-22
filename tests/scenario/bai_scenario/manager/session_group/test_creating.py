@@ -104,7 +104,7 @@ class TheCreatedGroupNode(Then[Laid, SessionGroupNode]):
 
 
 @dataclass(frozen=True)
-class AProjectMemberCreates(
+class AUserGrantedCreateCreates(
     Scenario[TestSeedingSession, Laid, SessionGroupAdapter, SessionGroupNode]
 ):
     started: datetime
@@ -190,7 +190,7 @@ class AnOutsiderMayNotCreate(
 
 
 SCENARIOS: list[CreatingStep] = [
-    AProjectMemberCreates(started=datetime.now(UTC)),
+    AUserGrantedCreateCreates(started=datetime.now(UTC)),
     AReaderMayNotCreate(),
     AnOutsiderMayNotCreate(),
 ]
@@ -242,7 +242,7 @@ async def what_is_left(engine: ExtendedAsyncSAEngine) -> WhatIsLeft:
 def expected_left(scenario: CreatingStep) -> WhatIsLeft:
     """만든 행만 세션 그룹 하나와 그 노드를 남기고, 그 노드는 프로젝트와 만든 사람 아래에 든다."""
     match scenario:
-        case AProjectMemberCreates():
+        case AUserGrantedCreateCreates():
             return WhatIsLeft(groups=1, group_nodes=1, under_a_project=1, under_a_user=1)
         case _:
             return WhatIsLeft(groups=0, group_nodes=0, under_a_project=0, under_a_user=0)
