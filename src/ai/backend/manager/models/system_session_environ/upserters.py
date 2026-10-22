@@ -52,7 +52,10 @@ class SystemSessionEnvironUpserter(
     def created_in(self, row: SystemSessionEnvironRow) -> Collection[EntityIdentifier]:
         match SystemSessionEnvironScopeType.of_owner(self.owner):
             case SystemSessionEnvironScopeType.PUBLIC:
-                return (global_entity_id(GlobalEntityName.GLOBAL), self.owner)
+                return (
+                    global_entity_id(GlobalEntityName.GLOBAL),
+                    global_entity_id(GlobalEntityName.PUBLIC),
+                )
             case SystemSessionEnvironScopeType.DOMAIN | SystemSessionEnvironScopeType.PROJECT:
                 return (self.owner,)
 
