@@ -61,6 +61,7 @@ from ai.backend.manager.data.session.spec import (
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.errors.agent import AgentNotFound
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.agent.row import AgentRow
@@ -517,7 +518,7 @@ class TestEnqueueSessionSchedulingHistory:
                 )
             )
 
-    async def test_enqueue_writes_a_row_per_designated_agent_still_in_agents(
+    async def test_enqueue_writes_a_row_per_designated_agent(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_domain: DomainFixtureData,
@@ -543,7 +544,7 @@ class TestEnqueueSessionSchedulingHistory:
             user_uuid=test_user_uuid,
             access_key=test_access_key,
             image_id=test_image_id,
-            designated_agents=(registered_agent_id, AgentId("i-not-registered")),
+            designated_agents=(registered_agent_id,),
         )
 
         await db_source.enqueue_session_from_spec(spec)
@@ -564,6 +565,53 @@ class TestEnqueueSessionSchedulingHistory:
                 .all()
             )
         assert list(designated) == [registered_agent_id]
+
+    @pytest.mark.parametrize(
+        "with_registered",
+        [False, True],
+        ids=["only-unknown", "unknown-with-registered"],
+    )
+    async def test_enqueue_refuses_an_unknown_designated_agent_and_writes_no_session(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_scaling_group_name: str,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        test_access_key: AccessKey,
+        test_image_id: ImageID,
+        registered_agent_id: AgentId,
+        enrolled_scopes: None,
+        resource_slot_types: None,
+        with_registered: bool,
+    ) -> None:
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        session_id = SessionID(uuid.uuid4())
+        unknown = AgentId("i-not-registered")
+        spec = self._spec(
+            session_id=session_id,
+            domain=test_domain,
+            resource_group_id=await self._resource_group_id(
+                db_with_cleanup, test_scaling_group_name
+            ),
+            resource_group_name=test_scaling_group_name,
+            project_id=test_group_id,
+            user_uuid=test_user_uuid,
+            access_key=test_access_key,
+            image_id=test_image_id,
+            designated_agents=(registered_agent_id, unknown) if with_registered else (unknown,),
+        )
+
+        with pytest.raises(AgentNotFound):
+            await db_source.enqueue_session_from_spec(spec)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            stored = await db_sess.scalar(
+                sa.select(sa.func.count())
+                .select_from(SessionRow)
+                .where(SessionRow.id == session_id)
+            )
+        assert stored == 0
 
     async def test_enqueue_writes_the_session_its_kernels_and_the_history(
         self,
