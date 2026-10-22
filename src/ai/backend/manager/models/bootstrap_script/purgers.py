@@ -6,6 +6,9 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
 from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
+from ai.backend.manager.models.bootstrap_script.searchable_fields import (
+    BootstrapScriptSearchableFields,
+)
 from ai.backend.manager.models.specs.purger import FieldBatchPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
@@ -26,4 +29,4 @@ class BootstrapScriptPurger(
 
     @override
     def to_data(self, row: BootstrapScriptRow) -> BootstrapScriptData:
-        return row.to_data()
+        return BootstrapScriptSearchableFields.own.to_data(row)

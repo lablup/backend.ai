@@ -6,6 +6,9 @@ from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
 from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
+from ai.backend.manager.models.bootstrap_script.searchable_fields import (
+    BootstrapScriptSearchableFields,
+)
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater
@@ -42,4 +45,4 @@ class DefaultBootstrapScriptUpdater(DataBatchUpdater[BootstrapScriptRow, Bootstr
 
     @override
     def to_data(self, row: BootstrapScriptRow) -> BootstrapScriptData:
-        return row.to_data()
+        return BootstrapScriptSearchableFields.own.to_data(row)
