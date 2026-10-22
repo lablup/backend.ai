@@ -17,6 +17,8 @@ from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
+from ai.backend.manager.errors.repository import ForeignKeyViolationError, NotNullViolationError
+from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
@@ -48,7 +50,16 @@ class SessionGroupCreator(EntityCreator[SessionGroupRow, SessionGroupData]):
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
+        # A missing project leaves the domain subquery empty before its own FK is checked.
+        missing_project = ProjectNotFound(f"Project {self.project_id} not found")
+        return (
+            IntegrityErrorCheck(violation_type=NotNullViolationError, error=missing_project),
+            IntegrityErrorCheck(
+                violation_type=ForeignKeyViolationError,
+                error=missing_project,
+                constraint_name="fk_session_groups_project_id_groups",
+            ),
+        )
 
     @override
     def build_row(self) -> SessionGroupRow:

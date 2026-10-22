@@ -18,6 +18,7 @@ from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
+from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
@@ -33,6 +34,7 @@ from ai.backend.manager.models.session_group.creators import SessionGroupCreator
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 
 
@@ -232,6 +234,20 @@ class TestSessionGroupRow:
             )
 
         assert domain_id == scope.domain_id
+
+    async def test_creating_in_a_missing_project_answers_project_not_found(
+        self, db: ExtendedAsyncSAEngine, scope: _OwnershipScope
+    ) -> None:
+        creator = SessionGroupCreator(
+            project_id=ProjectID(uuid.uuid4()),
+            owner_user_id=scope.owner_user_id,
+            placement_direction=SessionGroupPlacementDirection.PACK,
+            placement_enforcement=SessionGroupPlacementEnforcement.STRICT,
+        )
+
+        with pytest.raises(ProjectNotFound):
+            async with V2DBOpsProvider(db).write_ops() as w:
+                await w.create_entity(creator)
 
     async def test_session_defaults_to_no_group(
         self, db: ExtendedAsyncSAEngine, scope: _OwnershipScope
