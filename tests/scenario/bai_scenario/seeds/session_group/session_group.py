@@ -50,7 +50,6 @@ class TestSeedSessionGroup(TestSeedRowFromTwo[ProjectData, UserData, SessionGrou
     @override
     def seed(self, name: str, first: ProjectData, second: UserData) -> SessionGroupCreator:
         return SessionGroupCreator(
-            domain_name=first.domain_name,
             project_id=ProjectID(first.id),
             owner_user_id=UserID(second.id),
             placement_direction=SessionGroupPlacementDirection.PACK,
@@ -80,7 +79,6 @@ class TestSeedDeploymentSessionGroup(TestSeedRowFrom[DeploymentInfo, SessionGrou
     @override
     def seed(self, name: str, source: DeploymentInfo) -> SessionGroupCreator:
         return SessionGroupCreator.for_replica_group(
-            domain_name=source.metadata.domain,
             project_id=ProjectID(source.metadata.project),
             owner_user_id=UserID(source.metadata.session_owner),
         )

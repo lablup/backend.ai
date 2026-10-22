@@ -1,9 +1,9 @@
 ---
 name: session-group-service-shapes
 type: decision-table
-description: session_group knowledge - why the reads by id keep a service while the two searches, the update and the purge run against ops, how a deployment's group is left out of every user read and refused by the update and the purge, why the bulk read is partial
+description: session_group knowledge - why the reads by id keep a service while the two searches, the creation, the update and the purge run against ops, how a deployment's group is left out of every user read and refused by the update and the purge, why the bulk read is partial
 scope: src/ai/backend/manager/services/session_group
-keywords: [GetSessionGroupAction, BulkGetSessionGroupsAction, GlobalSearchSessionGroupsAction, ScopedSearchSessionGroupsAction, UpdateSessionGroupAction, SessionGroupUpdater, GuardCheck, PurgeSessionGroupAction, SessionGroupPurger, SessionGroupService, OpsRepository, SessionGroupTarget, replica_groups, partial_bulk, single_entity]
+keywords: [GetSessionGroupAction, BulkGetSessionGroupsAction, GlobalSearchSessionGroupsAction, ScopedSearchSessionGroupsAction, CreateSessionGroupAction, SessionGroupCreator, UpdateSessionGroupAction, SessionGroupUpdater, GuardCheck, PurgeSessionGroupAction, SessionGroupPurger, SessionGroupService, OpsRepository, SessionGroupTarget, replica_groups, partial_bulk, single_entity]
 sources:
   - src/ai/backend/manager/services/session_group
   - src/ai/backend/manager/repositories/ops/repository.py
@@ -13,7 +13,7 @@ generated:
   at: 2026-10-15
 updated:
   by: claude-code/opus-5.5
-  at: 2026-10-21
+  at: 2026-10-22
 status: draft
 ---
 
@@ -76,6 +76,14 @@ shape, operation, gate and backing.
 - Groups marked deleted are left out unless the top-level filter names `deleted_at`; one
   inside `AND`/`OR`/`NOT` does not lift it. That default is the adapter's, as
   `role_preset` does it.
+
+## The creation runs against ops
+
+- `create` is wired through `entity_create_ops` with no service method. The action's
+  scope target is the project, so the gate is session_group CREATE on that project.
+- The caller becomes the owner, and the row joins its project and its owner. The domain
+  is the project's, resolved by the insert, so a caller from another domain cannot put
+  the group in its own.
 
 ## The purge runs against ops
 

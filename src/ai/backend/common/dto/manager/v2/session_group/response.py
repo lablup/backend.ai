@@ -18,6 +18,7 @@ from ai.backend.common.dto.manager.v2.session_group.types import (
 
 __all__ = (
     "AdminSearchSessionGroupsPayload",
+    "CreateSessionGroupPayload",
     "PurgeSessionGroupPayload",
     "SessionGroupNode",
     "UpdateSessionGroupPayload",
@@ -65,3 +66,9 @@ class UpdateSessionGroupPayload(BaseResponseModel):
     """Payload for a session group update."""
 
     session_group: SessionGroupNode = Field(description="The updated session group.")
+
+
+class CreateSessionGroupPayload(BaseResponseModel):
+    """Payload for a session group creation."""
+
+    session_group: SessionGroupNode = Field(description="The created session group.")

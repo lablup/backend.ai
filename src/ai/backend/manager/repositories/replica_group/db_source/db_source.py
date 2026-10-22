@@ -311,7 +311,6 @@ class ReplicaGroupDBSource:
                     # session group, inheriting the endpoint's ownership scope.
                     session_group = await w.create_entity(
                         SessionGroupCreator.for_replica_group(
-                            domain_name=context.domain_name,
                             project_id=context.project_id,
                             owner_user_id=context.session_owner_id,
                         )

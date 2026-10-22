@@ -65,7 +65,6 @@ class TestSeedSessionGroup(TestSeedRowFromTwo[ProjectData, UserData, SessionGrou
     @override
     def seed(self, name: str, first: ProjectData, second: UserData) -> SessionGroupCreator:
         return SessionGroupCreator.for_replica_group(
-            domain_name=first.domain_name,
             project_id=ProjectID(first.id),
             owner_user_id=UserID(second.id),
         )

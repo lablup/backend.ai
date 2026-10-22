@@ -641,6 +641,7 @@ from ai.backend.manager.api.gql.session.resolver.session import (
 )
 from ai.backend.manager.api.gql.session_group.resolver import (
     admin_session_groups,
+    create_session_group,
     purge_session_group,
     scoped_session_groups,
     session_group,
@@ -1521,6 +1522,7 @@ class Mutation:
     include_session_idle_checks = include_session_idle_checks
     # Session Group mutations
     update_session_group = update_session_group
+    create_session_group = create_session_group
     purge_session_group = purge_session_group
     # Entity Label mutations
     upsert_entity_label = upsert_entity_label

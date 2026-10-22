@@ -20,6 +20,7 @@ def register_v2_session_group_routes(
     """Register all REST v2 session group routes and return the sub-registry."""
     registry = RouteRegistry.create("session-groups", route_deps.cors_options)
 
+    registry.add("POST", "", handler.create, middlewares=[auth_required])
     registry.add("GET", "/{session_group_id}", handler.get, middlewares=[auth_required])
     registry.add("PATCH", "/{session_group_id}", handler.update, middlewares=[auth_required])
     registry.add("POST", "/search", handler.admin_search, middlewares=[superadmin_required])

@@ -17,7 +17,10 @@ from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
+from ai.backend.manager.errors.repository import ForeignKeyViolationError, NotNullViolationError
+from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
 from ai.backend.manager.models.specs.creator import EntityCreator
@@ -26,17 +29,12 @@ from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
 @dataclass
 class SessionGroupCreator(EntityCreator[SessionGroupRow, SessionGroupData]):
-    """A placement group owned by one user within a domain and project.
+    """A placement group owned by one user within a project.
 
-    The ownership scope is taken as the domain *name* because the creating
-    entities (an endpoint, a replica group) carry the name rather than the id;
-    the id is resolved by the insert itself.
-
-    It joins its project and its owner, as a session does: admission is the
-    owner's, visibility the project's.
+    Its domain is the project's, resolved by the insert itself. It joins its project and
+    its owner, as a session does: admission is the owner's, visibility the project's.
     """
 
-    domain_name: str
     project_id: ProjectID
     owner_user_id: UserID
     placement_direction: SessionGroupPlacementDirection
@@ -52,13 +50,23 @@ class SessionGroupCreator(EntityCreator[SessionGroupRow, SessionGroupData]):
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
+        # A missing project leaves the domain subquery empty before its own FK is checked.
+        missing_project = ProjectNotFound(f"Project {self.project_id} not found")
+        return (
+            IntegrityErrorCheck(violation_type=NotNullViolationError, error=missing_project),
+            IntegrityErrorCheck(
+                violation_type=ForeignKeyViolationError,
+                error=missing_project,
+                constraint_name="fk_session_groups_project_id_groups",
+            ),
+        )
 
     @override
     def build_row(self) -> SessionGroupRow:
         return SessionGroupRow(
             domain_id=sa.select(DomainRow.id)
-            .where(DomainRow.name == self.domain_name)
+            .join(ProjectRow, ProjectRow.domain_name == DomainRow.name)
+            .where(ProjectRow.id == self.project_id)
             .scalar_subquery(),
             project_id=self.project_id,
             owner_user_id=self.owner_user_id,
@@ -73,14 +81,12 @@ class SessionGroupCreator(EntityCreator[SessionGroupRow, SessionGroupData]):
     @classmethod
     def for_replica_group(
         cls,
-        domain_name: str,
         project_id: ProjectID,
         owner_user_id: UserID,
     ) -> SessionGroupCreator:
         """Build the group a replica group owns: replicas spread across agents
         where possible, without a full agent stopping a rollout."""
         return cls(
-            domain_name=domain_name,
             project_id=project_id,
             owner_user_id=owner_user_id,
             placement_direction=SessionGroupPlacementDirection.SPREAD,

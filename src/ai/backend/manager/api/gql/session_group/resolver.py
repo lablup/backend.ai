@@ -23,6 +23,8 @@ from ai.backend.manager.api.gql.decorators import (
     gql_root_field,
 )
 from ai.backend.manager.api.gql.session_group.types import (
+    CreateSessionGroupInputGQL,
+    CreateSessionGroupPayloadGQL,
     PurgeSessionGroupInputGQL,
     PurgeSessionGroupPayloadGQL,
     SessionGroupConnectionGQL,
@@ -145,6 +147,23 @@ async def update_session_group(
 ) -> UpdateSessionGroupPayloadGQL | None:
     payload = await info.context.adapters.session_group.update(input.to_pydantic())
     return UpdateSessionGroupPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Create a session group in a project. The caller becomes its owner; the caller "
+            "needs the session group create permission on the project."
+        ),
+    )
+)
+async def create_session_group(
+    info: Info[StrawberryGQLContext],
+    input: CreateSessionGroupInputGQL,
+) -> CreateSessionGroupPayloadGQL | None:
+    payload = await info.context.adapters.session_group.create(input.to_pydantic())
+    return CreateSessionGroupPayloadGQL.from_pydantic(payload)
 
 
 @gql_mutation(
