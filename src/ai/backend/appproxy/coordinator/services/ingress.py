@@ -13,7 +13,7 @@ from ai.backend.appproxy.common.defs import (
 )
 from ai.backend.appproxy.common.types import IngressDeliveryMode
 from ai.backend.appproxy.coordinator.clients.worker.client import AppProxyWorkerClient
-from ai.backend.appproxy.coordinator.errors.ingress import ApiDeliveryWorkerPushFailedError
+from ai.backend.appproxy.coordinator.errors.ingress import IngressPushFailedError
 from ai.backend.appproxy.coordinator.ingress.traefik import TraefikIngressWriter
 from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientPool
 from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressAuthority, IngressKey
@@ -44,13 +44,15 @@ class IngressService:
 
     async def upsert(self, ingresses: Sequence[Ingress]) -> None:
         if self._traefik_writer is not None:
-            await asyncio.gather(*(self._traefik_writer.upsert(ingress) for ingress in ingresses))
+            await self._await_every_push([
+                self._traefik_writer.upsert(ingress) for ingress in ingresses
+            ])
         else:
             await self._push_upsert(ingresses)
 
     async def remove(self, keys: Sequence[IngressKey]) -> None:
         if self._traefik_writer is not None:
-            await asyncio.gather(*(self._traefik_writer.remove(key) for key in keys))
+            await self._await_every_push([self._traefik_writer.remove(key) for key in keys])
         else:
             await self._push_remove(keys)
 
@@ -81,7 +83,7 @@ class IngressService:
         results = await asyncio.gather(*push_tasks, return_exceptions=True)
         failures = [result for result in results if isinstance(result, BaseException)]
         if failures:
-            raise ApiDeliveryWorkerPushFailedError(
+            raise IngressPushFailedError(
                 extra_data={
                     "failures": [
                         failure.body_dict
@@ -90,7 +92,7 @@ class IngressService:
                         for failure in failures
                     ]
                 },
-            ) from BaseExceptionGroup("api-delivery worker pushes failed", failures)
+            ) from BaseExceptionGroup("ingress pushes failed", failures)
 
     def _worker_client(self, addr: HostPortPair) -> AppProxyWorkerClient:
         session = self._client_pool.load_client_session(
