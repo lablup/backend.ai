@@ -52,55 +52,35 @@ class TestModelServiceStringCommand:
 
 _JSON_ARG = """'{"method":"mtp","num_speculative_tokens":3}'"""
 _JINJA_OPTS: ServiceOptions = {
-    "interpolation": {"mode": "delimiter", "delimiter": {"start": "{{", "end": "}}"}},
+    "interpolation": {"delimiters": [{"start": "{{", "end": "}}"}]},
 }
 
 
-class TestServiceParserInterpolatorSelection:
+class TestServiceParserInterpolation:
     @pytest.fixture
-    def service_parser(self) -> ServiceParser:
-        service_parser = ServiceParser({"runtime_path": "/usr/bin/python3"})
-        service_parser.services["app"] = ServiceDefinition(command=["{runtime_path}"])
-        return service_parser
+    def service_parser(self, tmp_path: Path) -> ServiceParser:
+        return ServiceParser({"runtime_path": "/usr/bin/python3", "out_dir": str(tmp_path)})
 
     @pytest.mark.parametrize(
-        ("opts", "expected"),
+        ("opts", "command", "expected"),
         [
-            pytest.param({}, "/usr/bin/python3", id="unset"),
-            pytest.param(_JINJA_OPTS, "{runtime_path}", id="delimiter"),
+            pytest.param({}, "{runtime_path}", "/usr/bin/python3", id="unset-uses-legacy"),
+            pytest.param(
+                _JINJA_OPTS, "{runtime_path}", "{runtime_path}", id="delimiter-skips-legacy"
+            ),
+            pytest.param(_JINJA_OPTS, "{{ runtime_path }}", "/usr/bin/python3", id="delimiter"),
         ],
     )
-    async def test_selects_interpolator_from_options(
-        self, service_parser: ServiceParser, opts: ServiceOptions, expected: str
+    async def test_command(
+        self, service_parser: ServiceParser, opts: ServiceOptions, command: str, expected: str
     ) -> None:
+        service_parser.services["app"] = ServiceDefinition(command=[command])
+
         cmdargs, _ = await service_parser.start_service("app", set(), opts)
 
         assert cmdargs == [expected]
 
-
-class TestDelimiterServiceParser:
-    @pytest.fixture
-    def service_parser(self, tmp_path: Path) -> ServiceParser:
-        service_parser = ServiceParser({
-            "runtime_path": "/usr/bin/python3",
-            "out_dir": str(tmp_path),
-        })
-        service_parser.services["prestart"] = ServiceDefinition(
-            command=["true"],
-            prestart_actions=[
-                {
-                    "action": "write_file",
-                    "args": {
-                        "filename": "{{ out_dir }}/cfg.json",
-                        "body": ['{"python": "{{ runtime_path }}", "port": {port}}'],
-                    },
-                    "ref": None,
-                },
-            ],
-        )
-        return service_parser
-
-    async def test_model_service_fills_only_delimited_variables(
+    async def test_model_service_keeps_json_in_delimiter_mode(
         self, service_parser: ServiceParser
     ) -> None:
         service_parser.add_model_service(
@@ -116,42 +96,45 @@ class TestDelimiterServiceParser:
 
         assert cmdargs == ["/bin/bash", "-c", f"exec /usr/bin/python3 server.py {_JSON_ARG}"]
 
-    async def test_prestart_args_use_delimiter(
-        self, service_parser: ServiceParser, tmp_path: Path
+    @pytest.mark.parametrize(
+        ("opts", "filename", "line", "expected"),
+        [
+            pytest.param(
+                {},
+                "{out_dir}/cfg",
+                "c.settings = {{'python': '{runtime_path}'}}",
+                "c.settings = {'python': '/usr/bin/python3'}\n",
+                id="legacy",
+            ),
+            pytest.param(
+                _JINJA_OPTS,
+                "{{ out_dir }}/cfg",
+                '{"python": "{{ runtime_path }}", "port": {port}}',
+                '{"python": "/usr/bin/python3", "port": {port}}\n',
+                id="delimiter",
+            ),
+        ],
+    )
+    async def test_prestart_args(
+        self,
+        service_parser: ServiceParser,
+        tmp_path: Path,
+        opts: ServiceOptions,
+        filename: str,
+        line: str,
+        expected: str,
     ) -> None:
-        await service_parser.start_service("prestart", set(), _JINJA_OPTS)
-
-        assert (tmp_path / "cfg.json").read_text() == (
-            '{"python": "/usr/bin/python3", "port": {port}}\n'
-        )
-
-
-class TestLegacyServiceParser:
-    @pytest.fixture
-    def service_parser(self, tmp_path: Path) -> ServiceParser:
-        service_parser = ServiceParser({
-            "runtime_path": "/usr/bin/python3",
-            "out_dir": str(tmp_path),
-        })
-        service_parser.services["prestart"] = ServiceDefinition(
-            command=["{runtime_path}", "-m", "app"],
+        service_parser.services["app"] = ServiceDefinition(
+            command=["true"],
             prestart_actions=[
                 {
                     "action": "write_file",
-                    "args": {
-                        "filename": "{out_dir}/cfg.py",
-                        "body": ["c.settings = {{'python': '{runtime_path}'}}"],
-                    },
+                    "args": {"filename": filename, "body": [line]},
                     "ref": None,
                 },
             ],
         )
-        return service_parser
 
-    async def test_command_and_prestart_args_keep_legacy_syntax(
-        self, service_parser: ServiceParser, tmp_path: Path
-    ) -> None:
-        cmdargs, _ = await service_parser.start_service("prestart", set(), {})
+        await service_parser.start_service("app", set(), opts)
 
-        assert cmdargs == ["/usr/bin/python3", "-m", "app"]
-        assert (tmp_path / "cfg.py").read_text() == "c.settings = {'python': '/usr/bin/python3'}\n"
+        assert (tmp_path / "cfg").read_text() == expected
