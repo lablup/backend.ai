@@ -19,10 +19,7 @@ from ai.backend.manager.api.rest.admin.registry import register_admin_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.user.row import users
-from ai.backend.manager.secret.pool import KeyProviderPool
-from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 
 if TYPE_CHECKING:
@@ -93,7 +90,6 @@ async def _password_state(db_engine: SAEngine, user: UserFixtureData) -> sa.Row[
 def server_module_registries(
     route_deps: RouteDeps,
     user_processors: UserProcessors,
-    domain_processors: DomainProcessors,
     config_provider: ManagerConfigProvider,
 ) -> list[RouteRegistry]:
     """Register the strawberry GQL endpoint with a real user adapter."""
@@ -101,10 +97,7 @@ def server_module_registries(
     mock_gql_deps.processors.user = user_processors
     mock_gql_deps.config_provider = config_provider
     mock_gql_deps.adapters.user = UserAdapter(
-        user_processors,
-        domain_processors,
-        auth_config=config_provider.config.auth,
-        key_provider_pool=KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
+        mock_gql_deps.processors, auth_config=config_provider.config.auth
     )
     return [
         register_admin_routes(
@@ -112,7 +105,6 @@ def server_module_registries(
                 gql_schema=MagicMock(),
                 gql_deps=mock_gql_deps,
                 strawberry_schema=strawberry_schema,
-                public_strawberry_schema=MagicMock(),
             ),
             route_deps,
             sub_registries=[],
