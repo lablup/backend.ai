@@ -772,27 +772,31 @@ class TestStartSessionsLifecycleHandler:
         mock_launcher.start_sessions_for_handler.assert_awaited_once()
         assert sorted(len(result.successes) for result in results) == [0, 1]
 
+    @pytest.mark.parametrize(
+        "error",
+        [RuntimeError("session query failed"), asyncio.CancelledError()],
+        ids=["error", "cancelled"],
+    )
     async def test_failure_before_launch_returns_the_claim(
         self,
         handler: StartSessionsLifecycleHandler,
         mock_launcher: AsyncMock,
         mock_repository: AsyncMock,
         prepared_session: SessionWithKernels,
+        error: BaseException,
     ) -> None:
         """SC-ST-007: A pass that fails before the launch hands the session back to START.
 
         Given: A claimed PREPARED session
-        When: The pass fails before asking the agents to create its kernels
+        When: The pass fails or is cancelled before asking the agents to create its kernels
         Then: The claim is released, so the session is PREPARED for the next pass
         """
         # Arrange
         session_id = prepared_session.session_info.identity.id
-        mock_repository.search_sessions_with_kernels_and_user.side_effect = RuntimeError(
-            "session query failed"
-        )
+        mock_repository.search_sessions_with_kernels_and_user.side_effect = error
 
         # Act & Assert
-        with pytest.raises(RuntimeError, match="session query failed"):
+        with pytest.raises(type(error)):
             await handler.execute(ResourceGroupID(uuid.uuid4()), [prepared_session])
 
         mock_launcher.start_sessions_for_handler.assert_not_awaited()

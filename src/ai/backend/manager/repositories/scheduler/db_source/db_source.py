@@ -3336,6 +3336,8 @@ class ScheduleDBSource:
         reason: str,
         now: datetime,
     ) -> int:
+        """Move the PREPARED kernels of the sessions to CREATING inside the caller's
+        transaction. Returns the number of kernels updated."""
         stmt = (
             sa.update(KernelRow)
             .where(
@@ -3368,7 +3370,8 @@ class ScheduleDBSource:
         CREATING in one transaction. The conditional session update is the claim: a
         second pass claiming the same session waits for the first one's row lock, then
         finds the session CREATING and leaves it out. The coordinator's own CREATING
-        transition after the pass then records the history.
+        transition after the pass then records the history. A deadlock with another
+        multi-session update rolls the claim back whole, and the claim is retried.
 
         :param session_ids: IDs of the PREPARED sessions the pass fetched
         :param reason: The reason recorded on the claimed kernels
@@ -4222,22 +4225,27 @@ class ScheduleDBSource:
         self,
         updater: SessionStatusBatchUpdater,
         histories: Sequence[SessionHistoryToCreate],
-    ) -> int:
+    ) -> list[SessionId]:
         """Move the sessions the updater selects and record each transition, in one
         transaction. A repeated transition is counted onto the session's latest
-        history row instead of inserting another.
+        history row instead of inserting another. A session the updater leaves alone
+        (``except_statuses``) gets no history row.
 
-        Returns the number of sessions updated.
+        Returns the IDs of the sessions updated.
         """
         async with self._reconcile_ops.write_ops() as w:
-            updated = await w.apply_batch_transition(
+            updated = await w.batch_update_in_global(updater)
+            updated_ids = [SessionId(data.id) for data in updated]
+            updated_id_set = set(updated_ids)
+            await w.apply_batch_transition(
                 BatchReconcileTransition(
-                    histories=self._to_field_creations(histories),
+                    histories=self._to_field_creations([
+                        history for history in histories if history.session_id in updated_id_set
+                    ]),
                     owner_column=SessionSchedulingHistoryRow.session_id,
-                    status_updater=updater,
                 )
             )
-            return len(updated)
+            return updated_ids
 
     async def create_scheduling_history(
         self,
