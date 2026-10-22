@@ -12,7 +12,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship, selectinload
 from yarl import URL
 
 from ai.backend.appproxy.common.client_ip import ClientIPValidator
-from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
 from ai.backend.appproxy.common.errors import ObjectNotFound, UnsupportedProtocol
 from ai.backend.appproxy.common.types import (
     AppMode,
@@ -26,6 +25,7 @@ from ai.backend.appproxy.coordinator.errors import (
     InvalidCircuitConfigError,
     MissingTraefikConfigError,
 )
+from ai.backend.appproxy.coordinator.traefik_config import TraefikConfigBuilder
 from ai.backend.common.types import RuntimeVariant
 
 from .base import (
@@ -304,20 +304,19 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                 # encoded into the router's ClientIP match rule: connections from
                 # other sources match no router and are dropped. Falls back to
                 # accepting any source when unrestricted.
-                ranges = self._ip_validator.ranges
-                if ranges:
-                    return "ClientIP(" + ", ".join(f"`{cidr}`" for cidr in ranges) + ")"
-                return "ClientIP(`0.0.0.0/0`)"
+                return TraefikConfigBuilder.client_ip_rule(self._ip_validator.ranges)
             case _:
                 match self.frontend_mode:
                     case FrontendMode.PORT:
-                        return f"Host(`{self.worker_row.hostname}`)"
+                        return TraefikConfigBuilder.host_rule(self.worker_row.hostname)
                     case FrontendMode.WILDCARD_DOMAIN:
                         if not self.subdomain:
                             raise InvalidCircuitConfigError(
                                 "Subdomain is required for wildcard domain frontend mode"
                             )
-                        return f"Host(`{self.subdomain}{self.worker_row.wildcard_domain}`)"
+                        return TraefikConfigBuilder.host_rule(
+                            f"{self.subdomain}{self.worker_row.wildcard_domain}"
+                        )
                     case _:
                         raise ValueError(
                             f"Invalid frontend mode for traefik setup: {self.frontend_mode}"
@@ -327,11 +326,11 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
     def traefik_entrypoint(self) -> str:
         match self.frontend_mode:
             case FrontendMode.WILDCARD_DOMAIN:
-                return "domainproxy"
+                return TraefikConfigBuilder.domain_entrypoint()
             case FrontendMode.PORT:
                 if not self.port:
                     raise InvalidCircuitConfigError("Port is required for port frontend mode")
-                return f"portproxy_{self.port}"
+                return TraefikConfigBuilder.port_entrypoint(self.port)
             case _:
                 raise ValueError(f"Invalid frontend mode for traefik setup: {self.frontend_mode}")
 
@@ -341,7 +340,7 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
             case ProxyProtocol.HTTP:
                 # The ipAllowList middleware must precede the auth plugins so that
                 # disallowed clients are rejected before any credential handling.
-                middlewares = ["CORSHeaders"]
+                middlewares = [TraefikConfigBuilder.CORS_HEADERS_MIDDLEWARE]
                 ranges = self._ip_validator.ranges
                 if ranges:
                     middlewares.append(f"bai_ipallowlist_{self.id}")
@@ -349,22 +348,20 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                     f"bai_appproxy_plugin_{self.id}",
                     f"bai_appproxy_plugin_{self.id}_go",
                 ]
-                base = {
-                    "rule": self.traefik_rule,
-                    "service": f"bai_service_{self.id}",
-                    "entrypoints": [self.traefik_entrypoint],
-                    "middlewares": middlewares,
+                return {
+                    f"bai_router_{self.id}": TraefikConfigBuilder.http_router(
+                        self.traefik_rule,
+                        f"bai_service_{self.id}",
+                        self.traefik_entrypoint,
+                        middlewares,
+                        tls=self.worker_row.tls_listen,
+                    ),
                 }
-                if self.worker_row.tls_listen:
-                    base["tls"] = ""
-                return {f"bai_router_{self.id}": base}
             case ProxyProtocol.TCP:
                 return {
-                    f"bai_router_{self.id}": {
-                        "rule": self.traefik_rule,
-                        "service": f"bai_service_{self.id}",
-                        "entrypoints": [self.traefik_entrypoint],
-                    },
+                    f"bai_router_{self.id}": TraefikConfigBuilder.tcp_router(
+                        self.traefik_rule, f"bai_service_{self.id}", self.traefik_entrypoint
+                    ),
                 }
         return {}
 
@@ -400,7 +397,7 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
         # so that Traefik probes kernels directly and ejects unhealthy replicas
         # without the coordinator polling them itself. Applied once at the
         # loadBalancer level (not per-route) now that we have a flat structure.
-        health_check_block: dict[str, Any] | None = None
+        health_check_block: dict[str, str] | None = None
         if (
             self.app_mode == AppMode.INFERENCE
             and self.endpoint_row is not None
@@ -414,34 +411,19 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                 "timeout": f"{int(hc.max_wait_time)}s",
             }
 
+        servers = [(r.current_kernel_host, r.kernel_port) for r in routes]
         match self.protocol:
             case ProxyProtocol.HTTP:
-                load_balancer: dict[str, Any] = {
-                    "servers": [
-                        {"url": f"http://{r.current_kernel_host}:{r.kernel_port}/"} for r in routes
-                    ],
-                }
-                if health_check_block is not None:
-                    load_balancer["healthCheck"] = health_check_block
                 return {
-                    f"bai_service_{self.id}": {
-                        "loadBalancer": load_balancer,
-                    },
+                    f"bai_service_{self.id}": TraefikConfigBuilder.http_service(
+                        servers, health_check_block
+                    ),
                 }
             case ProxyProtocol.TCP:
                 # Traefik TCP services use a different healthCheck syntax; skip
                 # directive injection here and rely on the coordinator's existing
                 # behaviour for TCP circuits (follow-up PR will add TCP support).
-                return {
-                    f"bai_service_{self.id}": {
-                        "loadBalancer": {
-                            "servers": [
-                                {"address": f"{r.current_kernel_host}:{r.kernel_port}"}
-                                for r in routes
-                            ],
-                        },
-                    },
-                }
+                return {f"bai_service_{self.id}": TraefikConfigBuilder.tcp_service(servers)}
         return {}
 
     def get_traefik_middlewares(self, local_config: ServerConfig) -> dict[str, Any]:
@@ -450,27 +432,17 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                 traefik_config = local_config.proxy_coordinator.traefik
                 if not traefik_config:
                     raise MissingTraefikConfigError("Traefik configuration is required")
+                builder = TraefikConfigBuilder(
+                    traefik_config,
+                    jwt_secret=local_config.secrets.jwt_secret,
+                    permit_hash_secret=local_config.permit_hash.secret.decode(),
+                )
 
                 middlewares: dict[str, Any] = {
-                    "CORSHeaders": {
-                        "headers": {
-                            "accessControlAllowHeaders": "*",
-                            "accessControlAllowOriginList": ["*"],
-                        },
-                    },
-                    f"bai_appproxy_plugin_{self.id}": {
-                        "plugin": {
-                            "appproxy-traefik-plugin": {
-                                # Etcd cannot represent bool or None so we're going to just dump the whole JSON
-                                "circuit": SerializableCircuit(
-                                    **self.dump_model()
-                                ).model_dump_json(),
-                                "jwt_secret": local_config.secrets.jwt_secret,
-                                "permit_hash_secret": local_config.permit_hash.secret.decode(),
-                                "permit_cookie_name": PERMIT_COOKIE_NAME,
-                            },
-                        }
-                    },
+                    TraefikConfigBuilder.CORS_HEADERS_MIDDLEWARE: builder.cors_headers(),
+                    f"bai_appproxy_plugin_{self.id}": builder.auth_plugin(
+                        "circuit", SerializableCircuit(**self.dump_model()).model_dump_json()
+                    ),
                     f"bai_appproxy_plugin_{self.id}_go": {
                         "plugin": {
                             "appproxy-traefik-plugin-go": {
@@ -483,23 +455,6 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                 }
                 ranges = self._ip_validator.ranges
                 if ranges:
-                    # ipAllowList matches against the IP Traefik selects per its
-                    # ipStrategy. Without a strategy Traefik uses the direct
-                    # connection address (correct when Traefik is directly
-                    # exposed); behind a load balancer, client_ip_strategy must
-                    # be configured so the real client IP is read from
-                    # X-Forwarded-For instead of the balancer's address.
-                    ip_allowlist: dict[str, Any] = {"sourceRange": ranges}
-                    strategy = traefik_config.client_ip_strategy
-                    if strategy is not None:
-                        if strategy.depth is not None:
-                            ip_allowlist["ipStrategy"] = {"depth": strategy.depth}
-                        elif strategy.excluded_ips:
-                            ip_allowlist["ipStrategy"] = {
-                                "excludedIPs": [str(net) for net in strategy.excluded_ips],
-                            }
-                    middlewares[f"bai_ipallowlist_{self.id}"] = {
-                        "ipAllowList": ip_allowlist,
-                    }
+                    middlewares[f"bai_ipallowlist_{self.id}"] = builder.ip_allowlist(ranges)
                 return middlewares
         return {}
