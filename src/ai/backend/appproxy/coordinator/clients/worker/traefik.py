@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from typing import Any, Final
+from collections.abc import Sequence
+from typing import Any, Final, override
 
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
 from ai.backend.appproxy.common.etcd import TraefikEtcd, convert_to_etcd_dict
+from ai.backend.appproxy.coordinator.clients.worker.base import BaseWorkerClient
 from ai.backend.appproxy.coordinator.config import TraefikConfig
 from ai.backend.appproxy.coordinator.errors.ingress import (
     TraefikIngressRevisionConflictError,
@@ -22,7 +24,7 @@ from ai.backend.common.etcd import NestedStrKeyedMapping
 _REVISION_ROOT: Final[str] = "ingress_revisions"
 
 
-class TraefikIngressWriter:
+class TraefikWorkerClient(BaseWorkerClient):
     """Writes each ingress to Traefik etcd as one set of subtrees, replaced by the same or a newer
     revision. The revision is kept in etcd and guards the replacement transaction."""
 
@@ -46,30 +48,44 @@ class TraefikIngressWriter:
         self._jwt_secret = jwt_secret
         self._permit_hash_secret = permit_hash_secret
 
-    async def upsert(self, ingress: Ingress) -> None:
-        """Rejects an ingress older than the revision etcd holds, as an api-delivery worker does."""
-        worker = await self._workers.get_traefik_worker(ingress.authority)
+    @override
+    async def upsert(self, ingresses: Sequence[Ingress]) -> None:
+        """Writes nothing if any ingress is older than the revision etcd holds, as an api-delivery
+        worker does. Each ingress is then written in its own transaction to stay within etcd's
+        per-transaction operation limit."""
+        workers = {
+            authority: await self._workers.get_traefik_worker(authority)
+            for authority in {ingress.authority for ingress in ingresses}
+        }
+        held_revisions = [
+            await self._etcd.get(_revision_key(ingress.key())) for ingress in ingresses
+        ]
+        for ingress, held in zip(ingresses, held_revisions, strict=True):
+            _check_not_older(ingress, held)
+        for ingress, held in zip(ingresses, held_revisions, strict=True):
+            await self._write(ingress, workers[ingress.authority], held)
+
+    @override
+    async def remove(self, keys: Sequence[IngressKey]) -> None:
+        for key in keys:
+            replacements: dict[str, NestedStrKeyedMapping] = {
+                prefix: {} for prefix in _ingress_prefixes(key)
+            }
+            replacements[_revision_prefix(key)] = {}
+            await self._etcd.atomic_replace_prefixes(replacements)
+
+    async def _write(self, ingress: Ingress, worker: TraefikWorker, held: str | None) -> None:
         key = ingress.key()
-        revision_key = f"{_revision_prefix(key)}/revision"
+        revision_key = _revision_key(key)
         while True:
-            held = await self._etcd.get(revision_key)
-            if held is not None and int(held) > ingress.revision:
-                raise TraefikIngressRevisionConflictError(
-                    f"frontend {key.frontend_key} holds revision {held}, got {ingress.revision}"
-                )
             replacements = self._subtrees(ingress, worker)
             replacements[_revision_prefix(key)] = {"revision": str(ingress.revision)}
             if await self._etcd.compare_and_replace_prefixes(
                 replacements, guards={revision_key: held}
             ):
                 return
-
-    async def remove(self, key: IngressKey) -> None:
-        replacements: dict[str, NestedStrKeyedMapping] = {
-            prefix: {} for prefix in _ingress_prefixes(key)
-        }
-        replacements[_revision_prefix(key)] = {}
-        await self._etcd.atomic_replace_prefixes(replacements)
+            held = await self._etcd.get(revision_key)
+            _check_not_older(ingress, held)
 
     def _subtrees(
         self, ingress: Ingress, worker: TraefikWorker
@@ -191,6 +207,18 @@ def _ingress_prefixes(key: IngressKey) -> list[str]:
 
 def _revision_prefix(key: IngressKey) -> str:
     return f"{_REVISION_ROOT}/worker_{key.authority}/{key.frontend_key}"
+
+
+def _revision_key(key: IngressKey) -> str:
+    return f"{_revision_prefix(key)}/revision"
+
+
+def _check_not_older(ingress: Ingress, held: str | None) -> None:
+    if held is not None and int(held) > ingress.revision:
+        raise TraefikIngressRevisionConflictError(
+            f"frontend {ingress.frontend.key()} holds revision {held}, got {ingress.revision}",
+            extra_data={"authority": ingress.authority, "frontend_key": ingress.frontend.key()},
+        )
 
 
 def _entrypoint(ingress: Ingress) -> str:

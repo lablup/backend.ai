@@ -16,13 +16,13 @@ from ai.backend.appproxy.common.defs import (
     WORKER_SERVICE_GROUP,
 )
 from ai.backend.appproxy.common.types import IngressDeliveryMode
+from ai.backend.appproxy.coordinator.clients.worker.traefik import TraefikWorkerClient
 from ai.backend.appproxy.coordinator.errors.ingress import (
     ApiDeliveryWorkerServerError,
     ApiDeliveryWorkerUnreachableError,
     IngressPushFailedError,
     TraefikWildcardDomainMissingError,
 )
-from ai.backend.appproxy.coordinator.ingress.traefik import TraefikIngressWriter
 from ai.backend.appproxy.coordinator.services.ingress import IngressService
 from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.dto.appproxy.v2.ingress.request import (
@@ -234,17 +234,20 @@ def slow_traefik_write_finished() -> asyncio.Event:
 
 
 @pytest.fixture
-def traefik_writer(slow_traefik_write_finished: asyncio.Event) -> AsyncMock:
-    async def fail_worker_1_and_finish_others_late(target: Ingress | IngressKey) -> None:
-        if target.authority == "worker-1":
-            raise TraefikWildcardDomainMissingError(extra_data={"authority": target.authority})
+def traefik_client(slow_traefik_write_finished: asyncio.Event) -> AsyncMock:
+    async def fail_worker_1_and_finish_others_late(
+        targets: list[Ingress] | list[IngressKey],
+    ) -> None:
+        authority = targets[0].authority
+        if authority == "worker-1":
+            raise TraefikWildcardDomainMissingError(extra_data={"authority": authority})
         await asyncio.sleep(0.05)
         slow_traefik_write_finished.set()
 
-    traefik_writer = AsyncMock(spec=TraefikIngressWriter)
-    traefik_writer.upsert.side_effect = fail_worker_1_and_finish_others_late
-    traefik_writer.remove.side_effect = fail_worker_1_and_finish_others_late
-    return traefik_writer
+    traefik_client = AsyncMock(spec=TraefikWorkerClient)
+    traefik_client.upsert.side_effect = fail_worker_1_and_finish_others_late
+    traefik_client.remove.side_effect = fail_worker_1_and_finish_others_late
+    return traefik_client
 
 
 @pytest.fixture
@@ -252,16 +255,16 @@ def traefik_service(
     service_discovery: AsyncMock,
     client_pool: Mock,
     secrets: SecretConfig,
-    traefik_writer: AsyncMock,
+    traefik_client: AsyncMock,
 ) -> IngressService:
-    return IngressService(service_discovery, client_pool, secrets, traefik_writer=traefik_writer)
+    return IngressService(service_discovery, client_pool, secrets, traefik_client=traefik_client)
 
 
 @pytest.fixture
 def service(
     service_discovery: AsyncMock, client_pool: Mock, secrets: SecretConfig
 ) -> IngressService:
-    return IngressService(service_discovery, client_pool, secrets, traefik_writer=None)
+    return IngressService(service_discovery, client_pool, secrets, traefik_client=None)
 
 
 class TestIngressService:
@@ -341,7 +344,7 @@ class TestIngressService:
         worker_sessions: dict[str, MagicMock],
         worker_1_ingress: Ingress,
     ) -> None:
-        service = IngressService(empty_service_discovery, client_pool, secrets, traefik_writer=None)
+        service = IngressService(empty_service_discovery, client_pool, secrets, traefik_client=None)
         await service.upsert([worker_1_ingress])
         for session in worker_sessions.values():
             session.post.assert_not_called()

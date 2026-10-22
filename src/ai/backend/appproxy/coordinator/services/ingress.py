@@ -12,9 +12,10 @@ from ai.backend.appproxy.common.defs import (
     WORKER_SERVICE_GROUP,
 )
 from ai.backend.appproxy.common.types import IngressDeliveryMode
+from ai.backend.appproxy.coordinator.clients.worker.base import BaseWorkerClient
 from ai.backend.appproxy.coordinator.clients.worker.client import AppProxyWorkerClient
+from ai.backend.appproxy.coordinator.clients.worker.traefik import TraefikWorkerClient
 from ai.backend.appproxy.coordinator.errors.ingress import IngressPushFailedError
-from ai.backend.appproxy.coordinator.ingress.traefik import TraefikIngressWriter
 from ai.backend.common.clients.http_client.client_pool import ClientKey, ClientPool
 from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressAuthority, IngressKey
 from ai.backend.common.exception import BackendAIError
@@ -22,61 +23,58 @@ from ai.backend.common.service_discovery.service_discovery import ServiceDiscove
 
 
 class IngressService:
-    """Writes ingresses to Traefik etcd when Traefik is enabled, and otherwise pushes them to
-    every api-delivery worker node of their authority. The coordinator keeps none of them."""
+    """Sends ingresses to the worker clients of their authority: Traefik when it is enabled,
+    otherwise every api-delivery worker node. The coordinator keeps none of them."""
 
     _service_discovery: ServiceDiscovery
     _client_pool: ClientPool
     _secrets: SecretConfig
-    _traefik_writer: TraefikIngressWriter | None
+    _traefik_client: TraefikWorkerClient | None
 
     def __init__(
         self,
         service_discovery: ServiceDiscovery,
         client_pool: ClientPool,
         secrets: SecretConfig,
-        traefik_writer: TraefikIngressWriter | None,
+        traefik_client: TraefikWorkerClient | None,
     ) -> None:
         self._service_discovery = service_discovery
         self._client_pool = client_pool
         self._secrets = secrets
-        self._traefik_writer = traefik_writer
+        self._traefik_client = traefik_client
 
     async def upsert(self, ingresses: Sequence[Ingress]) -> None:
-        if self._traefik_writer is not None:
-            await self._await_every_push([
-                self._traefik_writer.upsert(ingress) for ingress in ingresses
-            ])
-        else:
-            await self._push_upsert(ingresses)
-
-    async def remove(self, keys: Sequence[IngressKey]) -> None:
-        if self._traefik_writer is not None:
-            await self._await_every_push([self._traefik_writer.remove(key) for key in keys])
-        else:
-            await self._push_remove(keys)
-
-    async def _push_upsert(self, ingresses: Sequence[Ingress]) -> None:
         by_authority: defaultdict[IngressAuthority, list[Ingress]] = defaultdict(list)
         for ingress in ingresses:
             by_authority[ingress.authority].append(ingress)
-        worker_addrs = await self._api_delivery_worker_addrs(by_authority.keys())
+        worker_clients = await self._worker_clients(by_authority.keys())
         await self._await_every_push([
-            self._worker_client(addr).upsert(by_authority[authority])
-            for authority, addrs in worker_addrs.items()
-            for addr in addrs
+            client.upsert(by_authority[authority])
+            for authority, clients in worker_clients.items()
+            for client in clients
         ])
 
-    async def _push_remove(self, keys: Sequence[IngressKey]) -> None:
+    async def remove(self, keys: Sequence[IngressKey]) -> None:
         by_authority: defaultdict[IngressAuthority, list[IngressKey]] = defaultdict(list)
         for key in keys:
             by_authority[key.authority].append(key)
-        worker_addrs = await self._api_delivery_worker_addrs(by_authority.keys())
+        worker_clients = await self._worker_clients(by_authority.keys())
         await self._await_every_push([
-            self._worker_client(addr).remove(by_authority[authority])
-            for authority, addrs in worker_addrs.items()
-            for addr in addrs
+            client.remove(by_authority[authority])
+            for authority, clients in worker_clients.items()
+            for client in clients
         ])
+
+    async def _worker_clients(
+        self, authorities: Iterable[IngressAuthority]
+    ) -> dict[IngressAuthority, list[BaseWorkerClient]]:
+        if self._traefik_client is not None:
+            return {authority: [self._traefik_client] for authority in authorities}
+        worker_addrs = await self._api_delivery_worker_addrs(authorities)
+        return {
+            authority: [self._worker_client(addr) for addr in addrs]
+            for authority, addrs in worker_addrs.items()
+        }
 
     async def _await_every_push(self, push_tasks: Sequence[Coroutine[Any, Any, None]]) -> None:
         # Raising before every push settles would let a late push undo the caller's next request.
