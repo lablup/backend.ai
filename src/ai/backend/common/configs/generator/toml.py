@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+import re
 import textwrap
 from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ai.backend.common.configs.inspector import ConfigInspector, FieldSchema
+from ai.backend.common.exception import InvalidConfigError
 from ai.backend.common.meta import CompositeType, ConfigEnvironment, ConfigExample
 from ai.backend.common.types import BackendAISchema
 
@@ -17,10 +19,34 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 __all__ = (
+    "ConfigTemplateArgMissing",
     "TOMLGenerator",
     "generate_sample_toml",
     "generate_halfstack_toml",
 )
+
+# Marks a template argument while lines are built, so escaping leaves it alone.
+_ARG_START, _ARG_END = "\ue000", "\ue001"
+_ARG_PATTERN = re.compile(f"{_ARG_START}(\\w+){_ARG_END}")
+_JINJA_MARKER = re.compile(r"\{[{%#]")
+
+
+class ConfigTemplateArgMissing(InvalidConfigError):
+    """A DICT config field of tables has no ``template_arg`` to name its key in the sample template."""
+
+    def __init__(self, field_path: str) -> None:
+        suggested = field_path.rsplit(".", 1)[-1].replace("-", "_") + "_name"
+        super().__init__(
+            f"Cannot generate the sample template: '{field_path}' is a dict of tables, "
+            "so its entry key needs a template argument. "
+            f'Add template_arg="{suggested}" to the field\'s BackendAIConfigMeta.'
+        )
+
+
+def _to_template(text: str) -> str:
+    """Escape text that Jinja would read as syntax, then turn argument marks into variables."""
+    escaped = _JINJA_MARKER.sub(lambda m: "{{ '" + m.group(0) + "' }}", text)
+    return _ARG_PATTERN.sub(lambda m: "{{ " + m.group(1) + " }}", escaped)
 
 
 class TOMLGenerator:
@@ -72,7 +98,7 @@ class TOMLGenerator:
         """
         schema = self._inspector.extract(model)
         lines = self._generate_schema(schema, path=[])
-        return "\n".join(lines)
+        return _to_template("\n".join(lines))
 
     def generate_to_file(
         self,
@@ -92,7 +118,7 @@ class TOMLGenerator:
 
         with output.open("w", encoding="utf-8") as f:
             if header:
-                f.write(self._wrap_comment(header, ""))
+                f.write(_to_template(self._wrap_comment(header, "")))
                 f.write("\n\n")
             f.write(content)
             f.write("\n")
@@ -231,19 +257,23 @@ class TOMLGenerator:
                 hint = field.doc.deprecation_hint or ""
                 lines.append(f"{indent}# DEPRECATED in {field.doc.deprecated_version}: {hint}")
 
-        # For DICT composite type, add a placeholder key
-        if field.type_info.composite_type == CompositeType.DICT:
-            section_path = path + [key, "<name>"]
-            lines.append(
-                f"{indent}# Replace <name> with your actual key (e.g., 'default', 'local')"
-            )
-        else:
-            section_path = path + [key]
+        # A DICT of tables keys each entry by a template argument, filled at render time;
+        # a DICT of plain values takes `key = value` lines, so it only gets a commented example.
+        is_dict = field.type_info.composite_type == CompositeType.DICT
+        section_path = path + [key]
+        if is_dict and field.children:
+            template_arg = field.type_info.template_arg
+            if template_arg is None:
+                raise ConfigTemplateArgMissing(".".join(section_path))
+            section_path.append(f"{_ARG_START}{template_arg}{_ARG_END}")
+            lines.append(f"{indent}# Set `{template_arg}` when rendering this template")
 
         # Section header - sections are NOT prefixed with ## even if optional
         # Only leaf fields get the ## prefix for optional status
         section_name = ".".join(section_path)
         lines.append(f"{indent}[{section_name}]")
+        if is_dict and not field.children:
+            lines.append(f'{self._get_indent(len(path) + 1)}## key = "value"')
 
         # Child fields
         if field.children:
@@ -336,7 +366,7 @@ class TOMLGenerator:
 
         Priority: example value > default value > None (placeholder)
 
-        Example values are preferred for sample.toml generation.
+        Example values are preferred for sample template generation.
         Since example values are strings, they are converted to proper types
         based on the field's type information.
 
@@ -350,7 +380,7 @@ class TOMLGenerator:
         if field.type_info.secret and self._config.mask_secrets:
             return self._config.secret_placeholder
 
-        # Use example value first (preferred for sample.toml)
+        # Use example value first (preferred for the sample template)
         if field.doc.example is not None:
             example_str = self._get_example_value(field.doc.example)
             # Convert string example to proper type
@@ -577,7 +607,7 @@ def generate_sample_toml(
     output_path: str | Path | None = None,
     header: str | None = None,
 ) -> str:
-    """Generate sample.toml with LOCAL (dev) environment examples.
+    """Generate the sample template with LOCAL (dev) environment examples.
 
     Convenience function for generating development configuration samples.
 

@@ -164,9 +164,11 @@ class ConfigInspector:
         # Check if secret and composite type (only for BackendAIConfigMeta)
         secret = False
         composite_type: CompositeType | None = None
+        template_arg: str | None = None
         if isinstance(meta, BackendAIConfigMeta):
             secret = meta.secret
             composite_type = meta.composite
+            template_arg = meta.template_arg
 
         return FieldTypeInfo(
             type_name=type_name,
@@ -174,6 +176,7 @@ class ConfigInspector:
             required=required,
             secret=secret,
             composite_type=composite_type,
+            template_arg=template_arg,
         )
 
     def _get_type_name(self, annotation: type | None) -> str:

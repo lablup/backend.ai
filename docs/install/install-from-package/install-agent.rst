@@ -82,7 +82,7 @@ Local configuration
 
 Backend.AI Agent uses a TOML file (``agent.toml``) to configure local
 service. Refer to the
-`agent.toml sample file <https://github.com/lablup/backend.ai/blob/main/configs/agent/sample.toml>`_
+`agent.toml sample template <https://github.com/lablup/backend.ai/blob/main/configs/agent/sample.toml.j2>`_
 for a detailed description of each section and item. A configuration example
 would be:
 

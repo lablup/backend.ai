@@ -15,6 +15,7 @@ from ai.backend.common.configs.generator import (
     GeneratorConfig,
     TOMLGenerator,
 )
+from ai.backend.common.configs.generator.cli import render
 from ai.backend.common.meta import ConfigEnvironment
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.web.config.unified import WebServerUnifiedConfig
@@ -40,8 +41,8 @@ def cli() -> None:
         writable=True,
         path_type=pathlib.Path,
     ),
-    default="./configs/webserver/sample.toml",
-    help="Output path for the generated sample configuration file. (default: sample.toml)",
+    default="./configs/webserver/sample.toml.j2",
+    help="Output path for the generated sample template. (default: sample.toml.j2)",
 )
 @click.option(
     "-e",
@@ -69,7 +70,7 @@ def generate_sample(
     unmask_secrets: bool,
 ) -> None:
     """
-    Generate a sample configuration file from the WebServerUnifiedConfig schema.
+    Generate a sample configuration template from the WebServerUnifiedConfig schema.
 
     This command creates a TOML configuration file with environment-specific examples
     (local or prod), proper secret masking, and comprehensive documentation from
@@ -90,7 +91,8 @@ def generate_sample(
     header_comment = f"""
 Backend.AI Web Server Configuration ({env.upper()} Environment)
 
-This is a sample configuration file for the Backend.AI Web Server.
+This is a sample configuration template for the Backend.AI Web Server.
+Write a configuration file with `./backend.ai web config render -t <template> -a NAME=VALUE -o <output>`.
 All configuration options are documented with their descriptions,
 default values, and environment-specific examples.
 
@@ -110,6 +112,8 @@ Generated using BackendAIConfigMeta annotations.
     except Exception as e:
         raise click.ClickException(f"Failed to generate sample configuration: {e}") from e
 
+
+cli.add_command(render)
 
 if __name__ == "__main__":
     cli()
