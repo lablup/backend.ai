@@ -253,6 +253,17 @@ class AbstractKVStore(ABC):
         pass
 
     @abstractmethod
+    async def compare_and_replace_prefixes(
+        self,
+        replacements: Mapping[str, NestedStrKeyedMapping],
+        *,
+        guards: Mapping[str, str | None],
+        scope: ConfigScopes = ConfigScopes.GLOBAL,
+        scope_prefix_map: Mapping[ConfigScopes, str] | None = None,
+    ) -> bool:
+        pass
+
+    @abstractmethod
     async def delete_if_value(
         self,
         key: str,
@@ -648,6 +659,7 @@ class AsyncEtcd(AbstractKVStore):
 
         await self._request(_replace)
 
+    @override
     async def compare_and_replace_prefixes(
         self,
         replacements: Mapping[str, NestedStrKeyedMapping],
