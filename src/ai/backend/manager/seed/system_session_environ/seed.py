@@ -7,11 +7,11 @@ from pydantic import Field, model_validator
 
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironScopeID
-from ai.backend.common.data.environ.types import ENVIRON_KEY_PATTERN
 from ai.backend.common.data.system_session_environ.types import (
     SystemSessionEnvironScopeType,
     SystemSessionEnvironValueSource,
 )
+from ai.backend.manager.data.environ.types import ENVIRON_KEY_PATTERN
 from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.models.system_session_environ.upserters import (
     SystemSessionEnvironUpserter,

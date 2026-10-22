@@ -5,7 +5,7 @@ their domain or project, and its admins manage them. Write the grants to the pre
 every role made from them.
 
 Revision ID: bf07cae92d86
-Revises: fa2dfd48c169
+Revises: d5d3ddd91ae1
 Create Date: 2026-10-21
 
 """
@@ -22,7 +22,7 @@ from ai.backend.manager.cli.role_fixture import _identify
 
 # revision identifiers, used by Alembic.
 revision = "bf07cae92d86"  # Part of: NEXT_RELEASE_VERSION
-down_revision = "fa2dfd48c169"
+down_revision = "d5d3ddd91ae1"
 branch_labels = None
 depends_on = None
 

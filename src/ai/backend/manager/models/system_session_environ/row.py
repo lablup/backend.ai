@@ -7,7 +7,6 @@ from ai.backend.common.data.entity.system_session_environ import (
     SystemSessionEnvironID,
     SystemSessionEnvironScopeID,
 )
-from ai.backend.common.data.environ.types import ENVIRON_KEY_PATTERN
 from ai.backend.common.data.system_session_environ.types import (
     SystemSessionEnvironScopeType,
     SystemSessionEnvironValueSource,
