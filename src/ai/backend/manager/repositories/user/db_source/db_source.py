@@ -22,6 +22,7 @@ from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -58,13 +59,17 @@ from ai.backend.manager.errors.user import (
     UserPurgeInProgress,
 )
 from ai.backend.manager.models.bootstrap_script.purgers import BootstrapScriptPurger
-from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
-from ai.backend.manager.models.bootstrap_script_revision.queriers import (
-    CurrentDefaultRevisionQuerier,
+from ai.backend.manager.models.bootstrap_script.searchable_fields import (
+    BootstrapScriptSearchableFields,
 )
-from ai.backend.manager.models.bootstrap_script_revision.row import BootstrapScriptRevisionRow
+from ai.backend.manager.models.bootstrap_script_revision.creators import (
+    BootstrapScriptRevisionCreator,
+)
 from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
     BootstrapScriptRevisionSearchableFields,
+)
+from ai.backend.manager.models.bootstrap_script_revision.searchers import (
+    BootstrapScriptRevisionSearcher,
 )
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.purgers import UserEndpointPurger
@@ -100,6 +105,7 @@ from ai.backend.manager.models.session.row import (
     by_user_id,
 )
 from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.types import QueryCondition, QueryOption, join_by_related_field
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.purgers import (
@@ -119,6 +125,7 @@ from ai.backend.manager.models.vfolder.row import (
     vfolders,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
@@ -163,44 +170,47 @@ class UserDBSource:
     async def current_default_bootstrap_script(
         self, user_id: UserID
     ) -> BootstrapScriptRevisionData | None:
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            row = await db_session.scalar(
-                CurrentDefaultRevisionQuerier(user_id.entity_type(), user_id).build_select()
-            )
-            return BootstrapScriptRevisionSearchableFields.own.to_data(row) if row else None
+        async with self._v2_ops.read_ops() as r:
+            return await self._current_default_revision(r, user_id)
 
     async def add_default_bootstrap_script_revision(
         self, user_id: UserID, script: BootstrapScript, creator_id: UserID | None
-    ) -> BootstrapScriptRevisionData:
-        """Append the next revision to the user's live default script, locking it so
-        concurrent writes take consecutive numbers."""
-        async with self._db.begin_session() as db_session:
-            script_id = await db_session.scalar(
-                sa.select(BootstrapScriptRow.id)
-                .where(
-                    BootstrapScriptRow.entity_type == user_id.entity_type(),
-                    BootstrapScriptRow.entity_id == user_id,
-                    BootstrapScriptRow.is_default,
-                    BootstrapScriptRow.deleted_at.is_(None),
-                )
-                .with_for_update()
-            )
-            if script_id is None:
+    ) -> None:
+        """Append the next revision to the user's live default script. A concurrent write
+        that takes the same number fails on the unique constraint."""
+        async with self._v2_ops.write_ops() as w:
+            current = await self._current_default_revision(w, user_id)
+            if current is None:
                 raise DefaultBootstrapScriptNotFound(f"{user_id} has no default bootstrap script")
-            revision = BootstrapScriptRevisionRow(
-                script_id=script_id,
-                revision_number=sa.select(
-                    sa.func.coalesce(sa.func.max(BootstrapScriptRevisionRow.revision_number), 0) + 1
+            await w.create_dangling_field(
+                BootstrapScriptRevisionCreator(
+                    script_id=current.script_id,
+                    revision_number=current.revision_number + 1,
+                    script=script,
+                    creator_id=creator_id,
                 )
-                .where(BootstrapScriptRevisionRow.script_id == script_id)
-                .scalar_subquery(),
-                script=script,
-                creator_id=creator_id,
             )
-            db_session.add(revision)
-            await db_session.flush()
-            await db_session.refresh(revision)
-            return BootstrapScriptRevisionSearchableFields.own.to_data(revision)
+
+    async def _current_default_revision(
+        self, ops: V2ReadOps, user_id: UserID
+    ) -> BootstrapScriptRevisionData | None:
+        script = BootstrapScriptSearchableFields.own
+        revision = BootstrapScriptRevisionSearchableFields.own
+        result = await ops.search_in_global(
+            BootstrapScriptRevisionSearcher(
+                pagination=OffsetPagination(limit=1),
+                conditions=[
+                    script.entity_type.filter.equals(
+                        StringMatchSpec(UserEntityType(), case_insensitive=False, negated=False)
+                    ),
+                    script.entity_id.filter.equals(UUIDEqualMatchSpec(user_id, negated=False)),
+                    script.is_default.filter.equals(True),
+                    script.deleted_at.filter.is_null(),
+                ],
+                orders=[revision.revision_number.order.apply(ascending=False)],
+            )
+        )
+        return result.items[0] if result.items else None
 
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
         """

@@ -17,7 +17,7 @@ class BootstrapScriptData(FieldData):
 
 
 @dataclass(frozen=True)
-class BootstrapScriptRevisionData:
+class BootstrapScriptRevisionData(FieldData):
     """One write of a bootstrap script's content; the latest one is the current content."""
 
     id: BootstrapScriptRevisionID

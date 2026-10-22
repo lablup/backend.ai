@@ -110,12 +110,10 @@ class UserRepository:
         return await self._db_source.current_default_bootstrap_script(user_id)
 
     @user_repository_resilience.apply()
-    async def update_default_bootstrap_script(
+    async def add_default_bootstrap_script_revision(
         self, user_id: UserID, script: BootstrapScript, creator_id: UserID | None
-    ) -> BootstrapScriptRevisionData:
-        return await self._db_source.add_default_bootstrap_script_revision(
-            user_id, script, creator_id
-        )
+    ) -> None:
+        await self._db_source.add_default_bootstrap_script_revision(user_id, script, creator_id)
 
     @user_repository_resilience.apply()
     async def default_access_key(self, user_id: UserID) -> AccessKey | None:

@@ -377,7 +377,7 @@ class UserService:
     async def update_default_bootstrap_script(
         self, action: UpdateDefaultBootstrapScriptAction
     ) -> UpdateDefaultBootstrapScriptActionResult:
-        await self._user_repository.update_default_bootstrap_script(
+        await self._user_repository.add_default_bootstrap_script_revision(
             action.user_id, action.script, action.creator_id
         )
         return UpdateDefaultBootstrapScriptActionResult()
