@@ -160,7 +160,7 @@ class TestHTTPProxyLogging:
             record
             for record in _worker_records(caplog, TRACE_LEVEL)
             if record.levelno == TRACE_LEVEL
-            and record.getMessage().startswith("app refused the connection")
+            and record.getMessage().startswith("app is unreachable")
         ]
         assert len(traces) == 1
         assert traces[0].__dict__["log_tag_circuit_id"] == str(CIRCUIT_ID)
