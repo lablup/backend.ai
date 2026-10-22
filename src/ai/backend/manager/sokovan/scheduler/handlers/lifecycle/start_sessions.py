@@ -83,14 +83,18 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
 
         - success: Session/kernel → CREATING (already set by the claim; a session that
           moved on during the pass, e.g. promoted to RUNNING or terminated, keeps its status)
-        - need_retry: None (keeps the current status; a session reported as a failure
-          must have its claim released first, or it stays CREATING and no pass retries it)
+        - need_retry: None (keeps the current status)
         - expired: Session/kernel → PENDING (re-scheduling after timeout —
           a different agent or a later slot may succeed)
         - give_up: Session/kernel → TERMINATING (retry budget exhausted —
           repeatedly failing to start a kernel signals a persistent
           problem with the kernel spec or environment; we surface the
           failure rather than rescheduling indefinitely)
+
+        A START handler that reports failures must release their claim first
+        (``release_sessions_for_start``), or they stay CREATING and no pass retries them.
+        expired and give_up only move a session still PREPARED: one that another pass
+        claimed again after the release is CREATING and belongs to that pass.
         """
         return StatusTransitions(
             success=TransitionStatus(
@@ -102,10 +106,12 @@ class StartSessionsLifecycleHandler(SessionLifecycleHandler):
             expired=TransitionStatus(
                 session=SessionStatus.PENDING,
                 kernel=KernelStatus.PENDING,
+                except_session_statuses=frozenset(SessionStatus) - {SessionStatus.PREPARED},
             ),
             give_up=TransitionStatus(
                 session=SessionStatus.TERMINATING,
                 kernel=KernelStatus.TERMINATING,
+                except_session_statuses=frozenset(SessionStatus) - {SessionStatus.PREPARED},
             ),
         )
 
