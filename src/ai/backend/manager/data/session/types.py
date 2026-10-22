@@ -511,10 +511,13 @@ class TransitionStatus:
     Attributes:
         session: Target session status, None means no change
         kernel: Target kernel status, None means no change
+        except_session_statuses: Sessions already in one of these statuses keep it, for a
+            session that may move on while the handler runs
     """
 
     session: SessionStatus | None = None
     kernel: KernelStatus | None = None
+    except_session_statuses: frozenset[SessionStatus] = frozenset()
 
 
 @dataclass(frozen=True)

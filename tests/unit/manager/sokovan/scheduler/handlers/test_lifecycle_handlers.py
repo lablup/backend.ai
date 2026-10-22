@@ -5,12 +5,13 @@ Based on BEP-1033 test scenarios for handler-level testing.
 Test Scenarios:
 - SC-SS-001 ~ SC-SS-005: ScheduleSessionsLifecycleHandler
 - SC-CP-001 ~ SC-CP-006: CheckPreconditionLifecycleHandler
-- SC-ST-001 ~ SC-ST-005: StartSessionsLifecycleHandler
+- SC-ST-001 ~ SC-ST-007: StartSessionsLifecycleHandler
 - SC-TE-001 ~ SC-TE-005: TerminateSessionsLifecycleHandler
 """
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import Callable
 from unittest.mock import AsyncMock, MagicMock
@@ -18,6 +19,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.types import SessionId
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.check_precondition import (
     CheckPreconditionLifecycleHandler,
@@ -568,7 +570,7 @@ class TestCheckPreconditionLifecycleHandler:
 
 
 # =============================================================================
-# StartSessionsLifecycleHandler Tests (SC-ST-001 ~ SC-ST-005)
+# StartSessionsLifecycleHandler Tests (SC-ST-001 ~ SC-ST-007)
 # =============================================================================
 
 
@@ -731,6 +733,70 @@ class TestStartSessionsLifecycleHandler:
         # Assert
         assert len(result.successes) == 1
         assert result.successes[0].session_id == prepared_session.session_info.identity.id
+
+    async def test_racing_passes_launch_a_session_once(
+        self,
+        handler: StartSessionsLifecycleHandler,
+        mock_launcher: AsyncMock,
+        mock_repository: AsyncMock,
+        prepared_session: SessionWithKernels,
+        sessions_for_start_factory: Callable[..., SessionsForStartWithImages],
+    ) -> None:
+        """SC-ST-006: Two passes racing for one PREPARED session launch it once.
+
+        Given: Two START passes that both fetched the same PREPARED session
+        When: Both execute concurrently and only one wins the claim
+        Then: The launcher is called once, and only the winner reports the session
+        """
+        # Arrange
+        claimed: set[SessionId] = set()
+
+        async def claim(session_ids: list[SessionId], _reason: str) -> set[SessionId]:
+            await asyncio.sleep(0)
+            won = set(session_ids) - claimed
+            claimed.update(won)
+            return won
+
+        mock_repository.claim_sessions_for_start.side_effect = claim
+        mock_repository.search_sessions_with_kernels_and_user.return_value = (
+            sessions_for_start_factory([prepared_session])
+        )
+
+        # Act
+        results = await asyncio.gather(
+            handler.execute(ResourceGroupID(uuid.uuid4()), [prepared_session]),
+            handler.execute(ResourceGroupID(uuid.uuid4()), [prepared_session]),
+        )
+
+        # Assert
+        mock_launcher.start_sessions_for_handler.assert_awaited_once()
+        assert sorted(len(result.successes) for result in results) == [0, 1]
+
+    async def test_failure_before_launch_returns_the_claim(
+        self,
+        handler: StartSessionsLifecycleHandler,
+        mock_launcher: AsyncMock,
+        mock_repository: AsyncMock,
+        prepared_session: SessionWithKernels,
+    ) -> None:
+        """SC-ST-007: A pass that fails before the launch hands the session back to START.
+
+        Given: A claimed PREPARED session
+        When: The pass fails before asking the agents to create its kernels
+        Then: The claim is released, so the session is PREPARED for the next pass
+        """
+        # Arrange
+        session_id = prepared_session.session_info.identity.id
+        mock_repository.search_sessions_with_kernels_and_user.side_effect = RuntimeError(
+            "session query failed"
+        )
+
+        # Act & Assert
+        with pytest.raises(RuntimeError, match="session query failed"):
+            await handler.execute(ResourceGroupID(uuid.uuid4()), [prepared_session])
+
+        mock_launcher.start_sessions_for_handler.assert_not_awaited()
+        mock_repository.release_sessions_for_start.assert_awaited_once_with([session_id])
 
 
 # =============================================================================

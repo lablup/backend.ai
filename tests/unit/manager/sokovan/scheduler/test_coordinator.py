@@ -7,15 +7,19 @@ Test Scenarios:
 - SC-CO-009 ~ SC-CO-013: HookExecution
 - SC-CO-014 ~ SC-CO-019: StatusTransition
 - SC-CO-019b: status_info cleared on RUNNING transition (BA-4841 regression)
+- SC-CO-019c: START's success transition leaves a session that moved on
 - SC-CO-020 ~ SC-CO-025: PostProcessors
+- SC-CO-026: concurrent START passes
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections import defaultdict
 from contextlib import nullcontext
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, override
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -24,6 +28,7 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.lock import AbstractDistributedLock
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.options import HandlerOptions
@@ -33,12 +38,16 @@ from ai.backend.manager.data.session.types import (
     StatusTransitions,
     TransitionStatus,
 )
+from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.sokovan.scheduler.coordinator import (
     FailureClassificationResult,
     HookExecutionResult,
     ScheduleCoordinator,
+)
+from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.start_sessions import (
+    StartSessionsLifecycleHandler,
 )
 from ai.backend.manager.sokovan.scheduler.post_processors.base import PostProcessorContext
 from ai.backend.manager.sokovan.scheduler.recorder.context import SessionRecorderContext
@@ -49,7 +58,7 @@ from ai.backend.manager.sokovan.scheduler.results import (
     SessionTransitionInfo,
 )
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
-from ai.backend.manager.views.sokovan.lifecycle import LastPhase
+from ai.backend.manager.views.sokovan.lifecycle import LastPhase, SessionsForStartWithImages
 
 # =============================================================================
 # Test Fixtures
@@ -1096,6 +1105,52 @@ class TestScheduleCoordinatorStatusTransition:
         assert "status_info" in built
         assert built["status_info"] is None
 
+    async def test_start_success_leaves_a_session_that_moved_on(
+        self,
+        mock_coordinator: MagicMock,
+    ) -> None:
+        """SC-CO-019c: START's CREATING transition only writes a session still CREATING.
+
+        Given: START's success transition (the claim already set the session CREATING)
+        When: Apply transition is called after the session may have been promoted
+        Then: The updater leaves every status other than CREATING alone
+        """
+        # Arrange
+        session_info = _create_session_transition_info(
+            session_id=SessionId(uuid4()), from_status=SessionStatus.PREPARED
+        )
+        transition = StartSessionsLifecycleHandler.status_transitions().success
+        assert transition is not None
+
+        captured_updater = None
+
+        async def capture_update_with_history(updater: Any, histories: Any) -> int:
+            nonlocal captured_updater
+            captured_updater = updater
+            return 1
+
+        mock_coordinator._repository.update_with_history = capture_update_with_history
+        mock_coordinator._apply_kernel_pending_resets = AsyncMock()
+
+        # Act
+        await ScheduleCoordinator._apply_transition(
+            mock_coordinator,
+            handler_name=StartSessionsLifecycleHandler.name(),
+            session_infos=[session_info],
+            transition=transition,
+            scheduling_result=SchedulingResult.SUCCESS,
+            records={},
+            status_changed_at=datetime.now(tzutc()),
+        )
+
+        # Assert
+        assert isinstance(captured_updater, SessionStatusBatchUpdater)
+        assert captured_updater.to_status == SessionStatus.CREATING
+        assert SessionStatus.CREATING not in captured_updater.except_statuses
+        assert {SessionStatus.RUNNING, SessionStatus.TERMINATING} <= set(
+            captured_updater.except_statuses
+        )
+
 
 # =============================================================================
 # TestScheduleCoordinatorPostProcessors Tests (SC-CO-020 ~ SC-CO-025)
@@ -1477,3 +1532,110 @@ class TestScheduleCoordinatorFaultLogging:
             await coordinator._process_lifecycle_handler_schedule(ScheduleType.SCHEDULE, handler)
 
         assert self._error_records(caplog) == []
+
+
+# =============================================================================
+# TestScheduleCoordinatorConcurrentStart Tests (SC-CO-026)
+# =============================================================================
+
+
+class _ProcessLocalLock(AbstractDistributedLock):
+    """A stand-in for the distributed lock: one asyncio.Lock per lock id, held for the pass."""
+
+    def __init__(self, lock: asyncio.Lock) -> None:
+        super().__init__()
+        self._lock = lock
+
+    @override
+    async def __aenter__(self) -> None:
+        await self._lock.acquire()
+
+    @override
+    async def __aexit__(self, *exc_info: Any) -> None:
+        self._lock.release()
+
+
+class TestScheduleCoordinatorConcurrentStart:
+    """A START pass does not wait for another pass's create_kernels."""
+
+    @pytest.fixture
+    def resource_group_id(self) -> ResourceGroupID:
+        return ResourceGroupID(uuid4())
+
+    @pytest.fixture
+    def repository(self, resource_group_id: ResourceGroupID) -> AsyncMock:
+        repository = AsyncMock()
+        repository.get_all_resource_groups.return_value = [resource_group_id]
+        repository.claim_sessions_for_start.side_effect = lambda session_ids, _reason: set(
+            session_ids
+        )
+        repository.search_sessions_with_kernels_and_user.return_value = SessionsForStartWithImages(
+            sessions=[], image_configs={}
+        )
+        return repository
+
+    @pytest.fixture
+    def coordinator(self, repository: AsyncMock) -> ScheduleCoordinator:
+        coordinator = ScheduleCoordinator.__new__(ScheduleCoordinator)
+        coordinator._repository = repository
+        coordinator._config_provider = MagicMock()
+        coordinator._operation_metrics = MagicMock()
+        coordinator._operation_metrics.measure_operation.return_value = nullcontext()
+        coordinator._post_processors = []
+        locks: defaultdict[LockID, asyncio.Lock] = defaultdict(asyncio.Lock)
+
+        def lock_factory(lock_id: LockID, lifetime_hint: float) -> AbstractDistributedLock:
+            return _ProcessLocalLock(locks[lock_id])
+
+        coordinator._lock_factory = lock_factory
+        return coordinator
+
+    async def test_start_pass_does_not_wait_for_a_slow_create(
+        self,
+        coordinator: ScheduleCoordinator,
+        repository: AsyncMock,
+    ) -> None:
+        """SC-CO-026: A second START pass runs while the first one's create_kernels is in flight.
+
+        Given: A START pass whose create_kernels for session A is blocked
+        When: Another START pass picks up session B, which reached PREPARED later
+        Then: Session B is launched without waiting for session A's create_kernels
+        """
+        slow_create_entered = asyncio.Event()
+        slow_create_released = asyncio.Event()
+
+        async def start_sessions(*_: Any) -> None:
+            if not slow_create_entered.is_set():
+                slow_create_entered.set()
+                await slow_create_released.wait()
+
+        launcher = AsyncMock()
+        launcher.start_sessions_for_handler.side_effect = start_sessions
+        handler = StartSessionsLifecycleHandler(launcher=launcher, repository=repository)
+        sessions_per_pass = [
+            [_create_session_with_kernels(SessionId(uuid4()), status=SessionStatus.PREPARED)],
+            [_create_session_with_kernels(SessionId(uuid4()), status=SessionStatus.PREPARED)],
+        ]
+
+        async def process_resource_group(
+            handler: StartSessionsLifecycleHandler,
+            _schedule_type: ScheduleType,
+            resource_group_id: ResourceGroupID,
+        ) -> None:
+            await handler.execute(resource_group_id, sessions_per_pass.pop(0))
+
+        with patch.object(coordinator, "_process_resource_group", process_resource_group):
+            slow_pass = asyncio.create_task(
+                coordinator._process_lifecycle_handler_schedule(ScheduleType.START, handler)
+            )
+            await slow_create_entered.wait()
+            try:
+                await asyncio.wait_for(
+                    coordinator._process_lifecycle_handler_schedule(ScheduleType.START, handler),
+                    timeout=1.0,
+                )
+                assert launcher.start_sessions_for_handler.await_count == 2
+                assert not slow_pass.done()
+            finally:
+                slow_create_released.set()
+                await slow_pass
