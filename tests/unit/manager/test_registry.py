@@ -24,6 +24,7 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -531,3 +532,85 @@ class TestSessionTerminatedError:
         assert err.extra_msg is not None
         assert "secret-tb" not in err.extra_msg
         assert "i-a" not in err.extra_msg
+
+
+class TestReadCreatedSession:
+    """Tests for the result of a blocking create once the session has reached RUNNING."""
+
+    @pytest.fixture
+    def session_id(self) -> SessionId:
+        return SessionId(uuid.uuid4())
+
+    def _make_registry(
+        self,
+        kernel_status: KernelStatus,
+        status_data: dict[str, Any] | None,
+        service_ports: list[dict[str, Any]] | None = None,
+    ) -> MagicMock:
+        registry = MagicMock(spec=AgentRegistry)
+        registry._read_created_session = AgentRegistry._read_created_session.__get__(
+            registry, AgentRegistry
+        )
+        mock_row = MagicMock()
+        mock_row.status = kernel_status
+        mock_row.status_data = status_data
+        mock_row.service_ports = service_ports or []
+        mock_result = MagicMock()
+        mock_result.first.return_value = mock_row
+        mock_db_session = AsyncMock()
+        mock_db_session.execute = AsyncMock(return_value=mock_result)
+        mock_db_ctx = MagicMock()
+        mock_db_ctx.__aenter__ = AsyncMock(return_value=mock_db_session)
+        mock_db_ctx.__aexit__ = AsyncMock(return_value=False)
+        registry.db = MagicMock()
+        registry.db.begin_readonly_session = MagicMock(return_value=mock_db_ctx)
+        return registry
+
+    async def test_kernel_failed_to_start_with_stored_error_raises_error_naming_it(
+        self, session_id: SessionId
+    ) -> None:
+        registry = self._make_registry(
+            KernelStatus.TERMINATED,
+            {"error": {"error": {"name": "SessionMismatch", "repr": "refused"}}},
+        )
+        with patch("ai.backend.manager.registry.asyncio.sleep", AsyncMock()):
+            with pytest.raises(SessionNotFound) as exc_info:
+                await registry._read_created_session(session_id, {"servicePorts": []})
+        assert exc_info.value.extra_msg == (
+            "Session terminated during startup: SessionMismatch: refused"
+        )
+
+    async def test_kernel_ended_without_stored_error_reports_status(
+        self, session_id: SessionId
+    ) -> None:
+        registry = self._make_registry(KernelStatus.TERMINATED, {})
+        resp: dict[str, Any] = {"servicePorts": []}
+        with patch("ai.backend.manager.registry.asyncio.sleep", AsyncMock()):
+            await registry._read_created_session(session_id, resp)
+        assert resp["status"] == "TERMINATED"
+
+    async def test_running_kernel_reports_service_ports(self, session_id: SessionId) -> None:
+        registry = self._make_registry(
+            KernelStatus.RUNNING,
+            {"error": {"name": "Leftover", "repr": "from a retry"}},
+            [
+                {
+                    "name": "http",
+                    "protocol": "http",
+                    "container_ports": [8000],
+                    "url_template": "http://x",
+                }
+            ],
+        )
+        resp: dict[str, Any] = {"servicePorts": []}
+        with patch("ai.backend.manager.registry.asyncio.sleep", AsyncMock()):
+            await registry._read_created_session(session_id, resp)
+        assert resp["status"] == "RUNNING"
+        assert resp["servicePorts"] == [
+            {
+                "name": "http",
+                "protocol": "http",
+                "ports": [8000],
+                "url_template": "http://x",
+            }
+        ]
