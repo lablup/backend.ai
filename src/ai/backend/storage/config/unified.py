@@ -1661,6 +1661,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             composite=CompositeType.DICT,
+            template_arg="volume_name",
         ),
     ]
     debug: Annotated[
@@ -1763,6 +1764,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             composite=CompositeType.DICT,
+            template_arg="artifact_storage_name",
         ),
     ]
     artifact_registries: Annotated[
@@ -1780,6 +1782,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
             ),
             added_version="25.12.0",
             composite=CompositeType.DICT,
+            template_arg="artifact_registry_name",
         ),
     ]
     reservoir_client: Annotated[

@@ -1,6 +1,8 @@
 # Backend.AI Web Server Configuration (PROD Environment)
 #
-# This is a sample configuration file for the Backend.AI Web Server.
+# This is a sample configuration template for the Backend.AI Web Server.
+# Write a configuration file with `./backend.ai web config render -t <template>
+# -a NAME=VALUE -o <output>`.
 # All configuration options are documented with their descriptions,
 # default values, and environment-specific examples.
 #
@@ -225,7 +227,7 @@
   # (None) to skip CSP headers entirely. Any directive that lists the "'nonce'"
   # keyword opts in to a per-request nonce: the webserver replaces the keyword
   # with "'nonce-<random>'" and renders the same value into index.html (the
-  # {{nonce}} placeholders / globalThis.baiNonce). A directive that also lists
+  # {{ '{{' }}nonce}} placeholders / globalThis.baiNonce). A directive that also lists
   # "'unsafe-inline'" keeps that source and drops the nonce (a browser ignores
   # "'unsafe-inline'" when a nonce is present); other unsafe-* keywords may
   # coexist with the nonce.
@@ -792,8 +794,8 @@
 
   # Additional labels for service categorization and filtering.
   # Added in 26.3.0
-  # Replace <name> with your actual key (e.g., 'default', 'local')
-  [service-discovery.extra-labels.<name>]
+  [service-discovery.extra-labels]
+    ## key = "value"
 
   # List of endpoints exposed by this service instance.
   # Added in 26.3.0
@@ -817,8 +819,8 @@
 
     # Additional metadata for the endpoint.
     # Added in 26.3.0
-    # Replace <name> with your actual key (e.g., 'default', 'local')
-    [service-discovery.endpoints.metadata.<name>]
+    [service-discovery.endpoints.metadata]
+      ## key = "value"
 
 # Apollo Router GraphQL gateway configuration for federated schemas.
 # Added in 25.12.0

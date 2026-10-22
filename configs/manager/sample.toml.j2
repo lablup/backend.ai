@@ -1,6 +1,8 @@
 # Backend.AI Manager Configuration (PROD Environment)
 #
-# This is a sample configuration file for the Backend.AI Manager.
+# This is a sample configuration template for the Backend.AI Manager.
+# Write a configuration file with `./backend.ai mgr config render -t <template>
+# -a NAME=VALUE -o <output>`.
 # All configuration options are documented with their descriptions,
 # default values, and environment-specific examples.
 #
@@ -1070,8 +1072,8 @@
 
   # Additional labels for service categorization and filtering.
   # Added in 26.3.0
-  # Replace <name> with your actual key (e.g., 'default', 'local')
-  [service-discovery.extra-labels.<name>]
+  [service-discovery.extra-labels]
+    ## key = "value"
 
   # List of endpoints exposed by this service instance.
   # Added in 26.3.0
@@ -1095,8 +1097,8 @@
 
     # Additional metadata for the endpoint.
     # Added in 26.3.0
-    # Replace <name> with your actual key (e.g., 'default', 'local')
-    [service-discovery.endpoints.metadata.<name>]
+    [service-discovery.endpoints.metadata]
+      ## key = "value"
 
 # Default artifact registry configuration. Specifies the default model registry
 # for artifact operations. When configured, enables model artifact management

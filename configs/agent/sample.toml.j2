@@ -1,6 +1,8 @@
 # Backend.AI Agent Configuration (PROD Environment)
 #
-# This is a sample configuration file for the Backend.AI Agent.
+# This is a sample configuration template for the Backend.AI Agent.
+# Write a configuration file with `./backend.ai ag config render -t <template>
+# -a NAME=VALUE -o <output>`.
 # All configuration options are documented with their descriptions,
 # default values, and environment-specific examples.
 #
@@ -665,8 +667,8 @@
 
   # Additional labels for service categorization and filtering.
   # Added in 26.3.0
-  # Replace <name> with your actual key (e.g., 'default', 'local')
-  [service-discovery.extra-labels.<name>]
+  [service-discovery.extra-labels]
+    ## key = "value"
 
   # List of endpoints exposed by this service instance.
   # Added in 26.3.0
@@ -690,8 +692,8 @@
 
     # Additional metadata for the endpoint.
     # Added in 26.3.0
-    # Replace <name> with your actual key (e.g., 'default', 'local')
-    [service-discovery.endpoints.metadata.<name>]
+    [service-discovery.endpoints.metadata]
+      ## key = "value"
 
 # Debug and development configuration for the agent. Enables features like
 # asynchronous debugging, memory leak detection, and core dump collection.

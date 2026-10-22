@@ -1,9 +1,9 @@
 ---
 name: configs-generated-vs-hand
 type: reference
-description: the dual configuration sources (TOML files and etcd) and their division of roles, the four kinds of files under configs (only sample.toml is generated), the checklist for adding a config key, load order and hot reload
+description: the dual configuration sources (TOML files and etcd) and their division of roles, the four kinds of files under configs (only the sample.toml.j2 template is generated), the checklist for adding a config key, load order and hot reload
 scope: configs
-keywords: [sample.toml, halfstack.toml, BackendAIConfigMeta, generate-sample, etcd, unified.py, added_version]
+keywords: [sample.toml.j2, template_arg, config render, halfstack.toml, BackendAIConfigMeta, generate-sample, etcd, unified.py, added_version]
 sources:
   - src/ai/backend/common/meta/meta.py
   - src/ai/backend/manager/config
@@ -15,7 +15,7 @@ status: stable
 
 # configs/ — Knowledge
 
-> Rules: `AGENTS.md` in the same directory (sample.toml is a generated file — do not edit directly).
+> Rules: `AGENTS.md` in the same directory (sample.toml.j2 is a generated template — do not edit directly).
 
 ## Why this directory exists
 
@@ -37,12 +37,13 @@ two sources — files and etcd — and what to update when adding a key.
 
 | Kind | Examples | Maintenance |
 |---|---|---|
-| Generated schema view | `{component}/sample.toml` | Regenerated via `generate-sample` |
+| Generated schema template | `{component}/sample.toml.j2` | Regenerated via `generate-sample`; filled into a configuration file via `config render` |
 | Local development templates | `halfstack.toml`, `ci.toml`, `halfstack.alembic.ini`, `sample.conf` | Manual |
 | etcd seed JSON | `manager/sample.etcd.*.json` | Manual |
 | Third-party infrastructure | prometheus, loki, tempo, grafana, traefik, systemd, graphql | Manual |
 
-- There is no CI check that regenerates/diffs `sample.toml` — drift is caught only in review.
+- There is no CI check that regenerates/diffs `sample.toml.j2` — drift is caught only in review.
+- The template does not parse as TOML while a template argument is unfilled, so an unfilled sample cannot pass for a configuration. `config render` fails on a missing argument and checks that the result parses as TOML; it does not validate values, because validating creates the directories some path fields name.
 
 ## Load order
 
@@ -54,6 +55,6 @@ two sources — files and etcd — and what to update when adding a key.
 ## Checklist for adding a config key
 
 1. Add the field with `BackendAIConfigMeta` to the component's `config/unified.py` — `description` and `added_version` are required (the version becomes the `# Added in X.Y.Z` comment).
-2. Regenerate: `./backend.ai {component} config generate-sample --overwrite`
+2. Regenerate: `./backend.ai {component} config generate-sample --overwrite --unmask-secrets`. A new DICT field of tables also needs `template_arg`.
 3. If local development needs a value, update `halfstack.toml`/`ci.toml` manually — these are not generated.
 4. For an etcd-based key, update the etcd tree docstring in `unified.py` and the corresponding `sample.etcd.*.json`.
