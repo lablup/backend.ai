@@ -191,6 +191,42 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 SESSION_NAME_LEN_LIMIT = 10
 DEFAULT_WAIT_TIMEOUT_SECONDS = 60
+SESSION_TERMINATED_REASON_LIMIT = 512
+
+
+def _stored_error_reason(status_data: Mapping[str, Any] | None) -> str:
+    """Describe the error stored in a session or kernel status data, or return an empty string."""
+    # `update_session_error_info` stores the error one level deeper than `mark_session_cancelled`.
+    error = (status_data or {}).get("error") or {}
+    error = error.get("error") or error
+    extra = ""
+    if collection := error.get("collection"):
+        error, extra = (
+            collection[0],
+            f" (+{len(collection) - 1} more)" if len(collection) > 1 else "",
+        )
+    name, detail = error.get("name"), error.get("repr")
+    reason = (
+        detail
+        if detail and name and detail.startswith(name)
+        else ": ".join(part for part in (name, detail) if part)
+    )
+    if not reason:
+        return ""
+    reason = " ".join(f"{reason}{extra}".split())
+    if len(reason) > SESSION_TERMINATED_REASON_LIMIT:
+        reason = reason[: SESSION_TERMINATED_REASON_LIMIT - 1] + "\u2026"
+    return reason
+
+
+def _session_terminated_error(
+    status_data: Mapping[str, Any] | None, phase: str = "scheduling"
+) -> SessionNotFound:
+    """Build the error for a session that terminated before it ran, naming the stored reason."""
+    message = f"Session terminated during {phase}"
+    if reason := _stored_error_reason(status_data):
+        message += f": {reason}"
+    return SessionNotFound(message)
 
 
 class AgentRegistry:
@@ -427,12 +463,20 @@ class AgentRegistry:
                                 str(SessionStatus.TERMINATED),
                                 str(SessionStatus.CANCELLED),
                             ):
-                                raise SessionNotFound("Session terminated during scheduling")
+                                async with self.db.begin_readonly_session() as db_session:
+                                    status_data = await db_session.scalar(
+                                        sa.select(SessionRow.status_data).where(
+                                            SessionRow.id == session_id
+                                        )
+                                    )
+                                raise _session_terminated_error(status_data)
             except TimeoutError as e:
                 if max_wait > 0:
                     raise e
                 async with self.db.begin_readonly_session() as db_session:
-                    query = sa.select(SessionRow.status).where(SessionRow.id == session_id)
+                    query = sa.select(SessionRow.status, SessionRow.status_data).where(
+                        SessionRow.id == session_id
+                    )
                     result = await db_session.execute(query)
                     row = result.first()
 
@@ -442,7 +486,45 @@ class AgentRegistry:
                     if row.status == SessionStatus.RUNNING:
                         return
                     if row.status in (SessionStatus.TERMINATED, SessionStatus.CANCELLED):
-                        raise SessionNotFound("Session terminated during scheduling") from e
+                        raise _session_terminated_error(row.status_data) from e
+
+    async def _read_created_session(
+        self,
+        session_id: SessionId,
+        resp: MutableMapping[str, Any],
+    ) -> None:
+        await asyncio.sleep(0.5)
+        async with self.db.begin_readonly_session() as db_session:
+            query = sa.select(
+                KernelRow.status, KernelRow.status_data, KernelRow.service_ports
+            ).where((KernelRow.session_id == session_id) & (KernelRow.cluster_role == DEFAULT_ROLE))
+            result = await db_session.execute(query)
+            row = result.first()
+        if row is None:
+            raise SessionNotFound(f"Session kernel not found: {session_id}")
+        if row.status == KernelStatus.RUNNING:
+            resp["status"] = "RUNNING"
+            for item in row.service_ports:
+                response_dict = {
+                    "name": item["name"],
+                    "protocol": item["protocol"],
+                    "ports": item["container_ports"],
+                }
+                if "url_template" in item.keys():
+                    response_dict["url_template"] = item["url_template"]
+                if "allowed_arguments" in item.keys():
+                    response_dict["allowed_arguments"] = item["allowed_arguments"]
+                if "allowed_envs" in item.keys():
+                    response_dict["allowed_envs"] = item["allowed_envs"]
+                resp["servicePorts"].append(response_dict)
+        elif row.status in (KernelStatus.TERMINATED, KernelStatus.CANCELLED) and (
+            _stored_error_reason(row.status_data)
+        ):
+            # Name the error stored on the kernel itself: the session's copy is not reset when the
+            # session is rescheduled, so it can be left over from an earlier attempt.
+            raise _session_terminated_error(row.status_data, "startup")
+        else:
+            resp["status"] = row.status.name
 
     async def create_session(
         self,
@@ -710,33 +792,7 @@ class AgentRegistry:
                 except TimeoutError:
                     resp["status"] = "TIMEOUT"
                 else:
-                    await asyncio.sleep(0.5)
-                    async with self.db.begin_readonly_session() as db_session:
-                        query = sa.select(KernelRow.status, KernelRow.service_ports).where(
-                            (KernelRow.session_id == session_id)
-                            & (KernelRow.cluster_role == DEFAULT_ROLE)
-                        )
-                        result = await db_session.execute(query)
-                        row = result.first()
-                    if row is None:
-                        raise SessionNotFound(f"Session kernel not found: {session_id}")
-                    if row.status == KernelStatus.RUNNING:
-                        resp["status"] = "RUNNING"
-                        for item in row.service_ports:
-                            response_dict = {
-                                "name": item["name"],
-                                "protocol": item["protocol"],
-                                "ports": item["container_ports"],
-                            }
-                            if "url_template" in item.keys():
-                                response_dict["url_template"] = item["url_template"]
-                            if "allowed_arguments" in item.keys():
-                                response_dict["allowed_arguments"] = item["allowed_arguments"]
-                            if "allowed_envs" in item.keys():
-                                response_dict["allowed_envs"] = item["allowed_envs"]
-                            resp["servicePorts"].append(response_dict)
-                    else:
-                        resp["status"] = row.status.name
+                    await self._read_created_session(session_id, resp)
                 finally:
                     # Always unregister propagator
                     self._event_hub.unregister_event_propagator(propagator.id())
