@@ -320,7 +320,9 @@ class Adapters:
             service_catalog=ServiceCatalogAdapter(processors.service_catalog),
             session=SessionAdapter(processors.session, processors.idle_checker),
             session_group=SessionGroupAdapter(processors.session_group),
-            session_lifecycle_handler=SessionLifecycleHandlerAdapter(session_lifecycle_handlers),
+            session_lifecycle_handler=SessionLifecycleHandlerAdapter(
+                sorted(session_lifecycle_handlers, key=lambda handler: handler.name())
+            ),
             storage_host=StorageHostAdapter(processors.vfolder),
             storage_namespace=StorageNamespaceAdapter(processors.storage_namespace),
             user=UserAdapter(processors.user, processors.domain, auth_config, key_provider_pool),

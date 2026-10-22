@@ -1,4 +1,4 @@
-"""세션 처리기 목록 조회 — 코디네이터에 등록된 처리기를 이름 순으로 돌려준다."""
+"""세션 처리기 목록 조회 — 코디네이터에 등록된 처리기를 그대로 돌려준다."""
 
 from __future__ import annotations
 
@@ -15,9 +15,6 @@ from ai.backend.manager.api.adapters.session_lifecycle_handler.adapter import (
     SessionLifecycleHandlerAdapter,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.check_precondition import (
-    CheckPreconditionLifecycleHandler,
-)
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.terminate_sessions import (
     TerminateSessionsLifecycleHandler,
 )
@@ -40,12 +37,12 @@ type ListingStep = Scenario[
 
 
 @dataclass(frozen=True)
-class TheTerminatorAndThePreconditionCheckAreRegistered(Given[TestSeedingSession, None]):
-    """adapter가 받는 처리기는 conftest가 세션 종료, 사전 조건 검사 순으로 정한다. 심을 행은 없다."""
+class TheTerminatorIsRegistered(Given[TestSeedingSession, None]):
+    """adapter가 받는 처리기는 conftest가 세션 종료 처리기 하나로 정한다. 심을 행은 없다."""
 
     @override
     def describe(self) -> str:
-        return "코디네이터에 세션 종료 처리기와 사전 조건 검사 처리기가 이 순서로 등록되어 있다"
+        return "코디네이터에 세션 종료 처리기가 등록되어 있다"
 
     @override
     async def lay(self, seeding: TestSeedingSession) -> None:
@@ -84,12 +81,10 @@ class Listing(When[None, SessionLifecycleHandlerAdapter, list[SessionLifecycleHa
 
 
 @dataclass(frozen=True)
-class ThePreconditionCheckIsListedBeforeTheTerminator(
-    Then[None, list[SessionLifecycleHandlerNode]]
-):
+class TheTerminatorIsListed(Then[None, list[SessionLifecycleHandlerNode]]):
     @override
     def says(self) -> str:
-        return "사전 조건 검사 처리기, 세션 종료 처리기 순으로 각자의 이름과 클래스 설명의 첫 줄로 반환된다"
+        return "세션 종료 처리기 하나가 그 이름과 클래스 설명의 첫 줄로 반환된다"
 
     @override
     def look(
@@ -103,17 +98,11 @@ class ThePreconditionCheckIsListedBeforeTheTerminator(
                 answered.response,
                 [
                     SessionLifecycleHandlerNode(
-                        name=CheckPreconditionLifecycleHandler.name(),
-                        description=inspect.cleandoc(
-                            CheckPreconditionLifecycleHandler.__doc__ or ""
-                        ).partition("\n")[0],
-                    ),
-                    SessionLifecycleHandlerNode(
                         name=TerminateSessionsLifecycleHandler.name(),
                         description=inspect.cleandoc(
                             TerminateSessionsLifecycleHandler.__doc__ or ""
                         ).partition("\n")[0],
-                    ),
+                    )
                 ],
             )
         ]
@@ -135,24 +124,22 @@ class NothingIsListed(Then[None, list[SessionLifecycleHandlerNode]]):
 
 
 @dataclass(frozen=True)
-class RegisteredHandlersAreListedInNameOrder(
+class TheRegisteredHandlerIsListed(
     Scenario[
         TestSeedingSession, None, SessionLifecycleHandlerAdapter, list[SessionLifecycleHandlerNode]
     ]
 ):
     @override
     def summary(self) -> str:
-        return "registered-handlers-are-listed-in-name-order"
+        return "the-registered-handler-is-listed"
 
     @override
     def describe(self) -> str:
-        return (
-            "코디네이터에 등록된 처리기가 이름 순으로, 각자의 이름과 클래스 설명의 첫 줄로 반환된다"
-        )
+        return "코디네이터에 등록된 처리기가 그 이름과 클래스 설명의 첫 줄로 반환된다"
 
     @override
     def given(self) -> Given[TestSeedingSession, None]:
-        return TheTerminatorAndThePreconditionCheckAreRegistered()
+        return TheTerminatorIsRegistered()
 
     @override
     def when(
@@ -162,7 +149,7 @@ class RegisteredHandlersAreListedInNameOrder(
 
     @override
     def then(self) -> Then[None, list[SessionLifecycleHandlerNode]]:
-        return ThePreconditionCheckIsListedBeforeTheTerminator()
+        return TheTerminatorIsListed()
 
 
 @dataclass(frozen=True)
@@ -196,7 +183,7 @@ class NoRegisteredHandlerListsNothing(
 
 @pytest.mark.parametrize(
     "scenario",
-    [RegisteredHandlersAreListedInNameOrder()],
+    [TheRegisteredHandlerIsListed()],
     ids=lambda scenario: scenario.summary(),
 )
 async def test_listing(
