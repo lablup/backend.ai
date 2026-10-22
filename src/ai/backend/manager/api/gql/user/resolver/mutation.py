@@ -43,6 +43,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 from ai.backend.manager.config.unified import AuthConfig
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.errors.user import UserModificationBadRequest
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user import UserRole
 from ai.backend.manager.repositories.base.creator import Creator
@@ -378,7 +379,14 @@ async def update_user_v2(
     me = current_user()
     if me is None:
         raise UnreachableError("User context is not available")
-    payload = await ctx.adapters.user.modify_user_by_id(me.user_id, input.to_pydantic())
+    dto = input.to_pydantic()
+    if dto.password is not None:
+        if dto.need_password_change is True:
+            raise UserModificationBadRequest(
+                "need_password_change cannot be true when changing your own password"
+            )
+        dto = dto.model_copy(update={"need_password_change": False})
+    payload = await ctx.adapters.user.modify_user_by_id(me.user_id, dto)
     return UpdateUserPayloadGQL.from_pydantic(payload)
 
 
