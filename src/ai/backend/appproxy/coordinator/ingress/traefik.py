@@ -5,7 +5,10 @@ from typing import Any, Final
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
 from ai.backend.appproxy.common.etcd import TraefikEtcd, convert_to_etcd_dict
 from ai.backend.appproxy.coordinator.config import TraefikConfig
-from ai.backend.appproxy.coordinator.errors.ingress import TraefikWildcardDomainMissingError
+from ai.backend.appproxy.coordinator.errors.ingress import (
+    TraefikIngressRevisionConflictError,
+    TraefikWildcardDomainMissingError,
+)
 from ai.backend.appproxy.coordinator.repositories.worker import TraefikWorker, WorkerRepository
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
     Ingress,
@@ -20,7 +23,7 @@ _REVISION_ROOT: Final[str] = "ingress_revisions"
 
 
 class TraefikIngressWriter:
-    """Writes each ingress to Traefik etcd as one set of subtrees, replaced only by a newer
+    """Writes each ingress to Traefik etcd as one set of subtrees, replaced by the same or a newer
     revision. The revision is kept in etcd and guards the replacement transaction."""
 
     _etcd: TraefikEtcd
@@ -44,14 +47,16 @@ class TraefikIngressWriter:
         self._permit_hash_secret = permit_hash_secret
 
     async def upsert(self, ingress: Ingress) -> None:
-        """Skips an ingress whose revision etcd already holds or exceeds."""
+        """Rejects an ingress older than the revision etcd holds, as an api-delivery worker does."""
         worker = await self._workers.get_traefik_worker(ingress.authority)
         key = ingress.key()
         revision_key = f"{_revision_prefix(key)}/revision"
         while True:
             held = await self._etcd.get(revision_key)
-            if held is not None and int(held) >= ingress.revision:
-                return
+            if held is not None and int(held) > ingress.revision:
+                raise TraefikIngressRevisionConflictError(
+                    f"frontend {key.frontend_key} holds revision {held}, got {ingress.revision}"
+                )
             replacements = self._subtrees(ingress, worker)
             replacements[_revision_prefix(key)] = {"revision": str(ingress.revision)}
             if await self._etcd.compare_and_replace_prefixes(

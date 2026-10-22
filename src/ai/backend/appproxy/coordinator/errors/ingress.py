@@ -75,6 +75,23 @@ class IngressPushFailedError(BackendAIError, web.HTTPBadGateway):
         )
 
 
+class TraefikIngressRevisionConflictError(BackendAIError, web.HTTPConflict):
+    """Raised when an upsert carries a revision older than the one Traefik etcd holds."""
+
+    error_type = (
+        "https://api.backend.ai/probs/appproxy-coordinator/traefik-ingress-revision-conflict"
+    )
+    error_title = "Ingress revision is older than the one Traefik etcd holds."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.UPSERT,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class TraefikWildcardDomainMissingError(BackendAIError, web.HTTPInternalServerError):
     """Raised when a wildcard ingress targets a worker registered without a wildcard domain."""
 
