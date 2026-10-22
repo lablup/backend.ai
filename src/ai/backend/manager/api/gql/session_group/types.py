@@ -13,6 +13,9 @@ from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.dto.manager.v2.session_group.request import (
+    CreateSessionGroupInput as CreateSessionGroupInputDTO,
+)
+from ai.backend.common.dto.manager.v2.session_group.request import (
     PurgeSessionGroupInput as PurgeSessionGroupInputDTO,
 )
 from ai.backend.common.dto.manager.v2.session_group.request import (
@@ -29,6 +32,9 @@ from ai.backend.common.dto.manager.v2.session_group.request import (
 )
 from ai.backend.common.dto.manager.v2.session_group.request import (
     UpdateSessionGroupInput as UpdateSessionGroupInputDTO,
+)
+from ai.backend.common.dto.manager.v2.session_group.response import (
+    CreateSessionGroupPayload as CreateSessionGroupPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.session_group.response import (
     PurgeSessionGroupPayload as PurgeSessionGroupPayloadDTO,
@@ -76,6 +82,8 @@ from ai.backend.manager.api.gql.pydantic_compat import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
+    "CreateSessionGroupInputGQL",
+    "CreateSessionGroupPayloadGQL",
     "PurgeSessionGroupInputGQL",
     "PurgeSessionGroupPayloadGQL",
     "SessionGroupConnectionGQL",
@@ -321,6 +329,35 @@ class UpdateSessionGroupInputGQL(PydanticInputMixin[UpdateSessionGroupInputDTO])
     placement_enforcement: SessionGroupPlacementEnforcementGQL | None = gql_field(
         description="New placement enforcement. Omit to leave unchanged.", default=UNSET
     )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for creating a session group in a project. The caller becomes its owner.",
+    ),
+    name="CreateSessionGroupInput",
+)
+class CreateSessionGroupInputGQL(PydanticInputMixin[CreateSessionGroupInputDTO]):
+    project_id: UUID = gql_field(description="ID of the project the session group is created in.")
+    placement_direction: SessionGroupPlacementDirectionGQL = gql_field(
+        description="How the member sessions sit relative to each other, per agent."
+    )
+    placement_enforcement: SessionGroupPlacementEnforcementGQL = gql_field(
+        description="How hard the placement direction is enforced."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for a session group creation.",
+    ),
+    model=CreateSessionGroupPayloadDTO,
+    name="CreateSessionGroupPayload",
+)
+class CreateSessionGroupPayloadGQL(PydanticOutputMixin[CreateSessionGroupPayloadDTO]):
+    session_group: SessionGroupGQL = gql_field(description="The created session group.")
 
 
 @gql_pydantic_input(
