@@ -5,6 +5,7 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from ai.backend.appproxy.common.config import PermitHashConfig, SecretConfig
 from ai.backend.appproxy.common.defs import (
     WORKER_AUTHORITY_LABEL,
     WORKER_HOSTNAME_LABEL,
@@ -18,6 +19,7 @@ from ai.backend.appproxy.coordinator.clients.worker.traefik import (
 )
 from ai.backend.appproxy.coordinator.clients.worker.traefik_routing_config import (
     TraefikRoutingConfigFactory,
+    TraefikRoutingConfigFactoryArgs,
 )
 from ai.backend.appproxy.coordinator.config import TraefikConfig
 from ai.backend.appproxy.coordinator.errors.ingress import TraefikIngressRevisionConflictError
@@ -123,9 +125,11 @@ def worker_service_discovery() -> AsyncMock:
 @pytest.fixture
 def routing_config_factory() -> TraefikRoutingConfigFactory:
     return TraefikRoutingConfigFactory(
-        Mock(spec=TraefikConfig, client_ip_strategy=None),
-        jwt_secret="jwt-secret",
-        permit_hash_secret="permit-hash-secret",
+        TraefikRoutingConfigFactoryArgs(
+            traefik_config=Mock(spec=TraefikConfig, client_ip_strategy=None),
+            secrets=Mock(spec=SecretConfig, jwt_secret="jwt-secret"),
+            permit_hash=Mock(spec=PermitHashConfig, secret=b"permit-hash-secret"),
+        )
     )
 
 

@@ -12,6 +12,7 @@ from ai.backend.appproxy.coordinator.clients.worker.traefik import (
 )
 from ai.backend.appproxy.coordinator.clients.worker.traefik_routing_config import (
     TraefikRoutingConfigFactory,
+    TraefikRoutingConfigFactoryArgs,
 )
 from ai.backend.appproxy.coordinator.config import ServerConfig
 from ai.backend.appproxy.coordinator.errors.config import MissingTraefikConfigError
@@ -52,9 +53,11 @@ class TraefikWorkerClientProvider(
                     etcd=setup_input.traefik_etcd,
                     worker_service_discovery=setup_input.worker_service_discovery,
                     routing_config_factory=TraefikRoutingConfigFactory(
-                        traefik_config,
-                        jwt_secret=setup_input.config.secrets.jwt_secret,
-                        permit_hash_secret=setup_input.config.permit_hash.secret.decode(),
+                        TraefikRoutingConfigFactoryArgs(
+                            traefik_config=traefik_config,
+                            secrets=setup_input.config.secrets,
+                            permit_hash=setup_input.config.permit_hash,
+                        )
                     ),
                 )
             )
