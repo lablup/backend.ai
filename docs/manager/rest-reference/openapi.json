@@ -40265,6 +40265,461 @@
         "title": "BulkDeleteVFoldersInput",
         "type": "object"
       },
+      "CreateVFolderAutoMountInput": {
+        "description": "Input for auto-mounting a vfolder into every session created in a project.\n\nThe vfolder must belong to that project; for a personal project, that is the\nowner's personal vfolders.",
+        "properties": {
+          "project_id": {
+            "description": "ID of the project the vfolder is auto-mounted in.",
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          },
+          "vfolder_id": {
+            "description": "ID of the vfolder to auto-mount.",
+            "format": "uuid",
+            "title": "Vfolder Id",
+            "type": "string"
+          },
+          "mount_destination": {
+            "description": "Path in the session container the vfolder is mounted at.",
+            "minLength": 1,
+            "title": "Mount Destination",
+            "type": "string"
+          },
+          "subpath": {
+            "default": ".",
+            "description": "Path inside the vfolder that is mounted.",
+            "title": "Subpath",
+            "type": "string"
+          },
+          "mount_permission": {
+            "$ref": "#/components/schemas/MountPermission",
+            "description": "Permission the vfolder is mounted with."
+          }
+        },
+        "required": [
+          "project_id",
+          "vfolder_id",
+          "mount_destination",
+          "mount_permission"
+        ],
+        "title": "CreateVFolderAutoMountInput",
+        "type": "object"
+      },
+      "VFolderAutoMountFilter": {
+        "description": "Filter for vfolder auto-mounts.\n\nAuto-mounts marked deleted are left out unless the top-level filter gives ``deleted_at``.\nA ``deleted_at`` inside ``AND``/``OR``/``NOT`` does not lift that default.",
+        "properties": {
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by auto-mount ID."
+          },
+          "project_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by project ID."
+          },
+          "vfolder_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by vfolder ID."
+          },
+          "mount_destination": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by mount destination."
+          },
+          "mount_permission": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderAutoMountPermissionFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by mount permission."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by creation time."
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by last update time."
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NullableDateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by deletion time. Setting it on the top-level filter includes the auto-mounts marked deleted; inside AND, OR or NOT it does not."
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderAutoMountFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "AND logical combinator.",
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderAutoMountFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "OR logical combinator.",
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderAutoMountFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "NOT logical combinator.",
+            "title": "Not"
+          }
+        },
+        "title": "VFolderAutoMountFilter",
+        "type": "object"
+      },
+      "VFolderAutoMountOrder": {
+        "description": "Order specification for vfolder auto-mounts.",
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/VFolderAutoMountOrderField",
+            "description": "Field to order by."
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "ASC",
+            "description": "Order direction."
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "VFolderAutoMountOrder",
+        "type": "object"
+      },
+      "VFolderAutoMountOrderField": {
+        "description": "Fields available for ordering vfolder auto-mounts.",
+        "enum": [
+          "mount_destination",
+          "created_at",
+          "updated_at",
+          "deleted_at"
+        ],
+        "title": "VFolderAutoMountOrderField",
+        "type": "string"
+      },
+      "VFolderAutoMountPermissionFilter": {
+        "description": "Filter for the permission a vfolder is auto-mounted with.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MountPermission"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MountPermission"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MountPermission"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/MountPermission"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "VFolderAutoMountPermissionFilter",
+        "type": "object"
+      },
+      "VFolderAutoMountScope": {
+        "description": "Scope for the scoped vfolder auto-mount query; the items are OR'd.",
+        "properties": {
+          "project": {
+            "description": "Projects whose auto-mounts are being read. A personal project included.",
+            "items": {
+              "$ref": "#/components/schemas/UUIDScope"
+            },
+            "title": "Project",
+            "type": "array"
+          }
+        },
+        "required": [
+          "project"
+        ],
+        "title": "VFolderAutoMountScope",
+        "type": "object"
+      },
+      "ScopedSearchVFolderAutoMountsInput": {
+        "description": "Input for searching vfolder auto-mounts within scopes.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/VFolderAutoMountScope",
+            "description": "Scope (OR across all items)."
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderAutoMountFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderAutoMountOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip.",
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchVFolderAutoMountsInput",
+        "type": "object"
+      },
+      "UpdateVFolderAutoMountInput": {
+        "description": "Input for changing where and how an auto-mounted vfolder is mounted.\n\nAt least one of the three fields must be given.",
+        "properties": {
+          "id": {
+            "description": "ID of the auto-mount to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "mount_destination": {
+            "description": "New path in the session container. Omit to leave unchanged.",
+            "minLength": 1,
+            "title": "Mount Destination",
+            "type": "string"
+          },
+          "subpath": {
+            "description": "New path inside the vfolder. Omit to leave unchanged.",
+            "title": "Subpath",
+            "type": "string"
+          },
+          "mount_permission": {
+            "$ref": "#/components/schemas/MountPermission",
+            "description": "New mount permission. Omit to leave unchanged.",
+            "title": "Mount Permission"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "UpdateVFolderAutoMountInput",
+        "type": "object"
+      },
       "CreateVFSStorageInput": {
         "description": "Input for creating a VFS storage.",
         "properties": {
@@ -66736,6 +67191,131 @@
         },
         "parameters": [],
         "description": "Deprecated. Use `POST /v2/vfolders/partial-bulk-delete`.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfolder-auto-mounts": {
+      "post": {
+        "operationId": "v2/vfolder-auto-mounts.create",
+        "tags": [
+          "v2/vfolder-auto-mounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateVFolderAutoMountInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Auto-mount a vfolder of a project into every session created in it.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfolder-auto-mounts/scoped/search": {
+      "post": {
+        "operationId": "v2/vfolder-auto-mounts.scoped_search",
+        "tags": [
+          "v2/vfolder-auto-mounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchVFolderAutoMountsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the auto-mounts of the named projects, combined with OR.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfolder-auto-mounts/{vfolder_auto_mount_id}": {
+      "patch": {
+        "operationId": "v2/vfolder-auto-mounts.update",
+        "tags": [
+          "v2/vfolder-auto-mounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateVFolderAutoMountInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "vfolder_auto_mount_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Change an auto-mount's destination, subpath or permission.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/vfolder-auto-mounts/{vfolder_auto_mount_id}/delete": {
+      "post": {
+        "operationId": "v2/vfolder-auto-mounts.delete",
+        "tags": [
+          "v2/vfolder-auto-mounts"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "vfolder_auto_mount_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Mark an auto-mount deleted.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/vfs-storages": {
