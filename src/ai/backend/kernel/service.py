@@ -6,14 +6,11 @@ See more details at `the documentation about adding new kernel images
 <https://docs.backend.ai/en/latest/dev/adding-kernels.html#service-ports>`_.
 """
 
-import enum
 import json
 import logging
-import re
 import shlex
 from collections.abc import (
     Collection,
-    Iterator,
     Mapping,
     MutableMapping,
     Sequence,
@@ -28,6 +25,8 @@ import attrs
 
 from . import service_actions
 from .exception import DisallowedArgument, DisallowedEnvironment, InvalidServiceDefinition
+from .interpolation.interpolator import LEGACY_DELIMITERS, ServiceInterpolator
+from .interpolation.types import InterpolationOption
 from .logging import BraceStyleAdapter
 
 log = BraceStyleAdapter(logging.getLogger())
@@ -35,7 +34,7 @@ log = BraceStyleAdapter(logging.getLogger())
 
 class Action(TypedDict):
     action: str
-    args: Mapping[str, str]
+    args: Mapping[str, str | list[str] | bool]
     ref: str | None
 
 
@@ -50,6 +49,12 @@ class ServiceDefinition:
     allowed_envs: list[str] = attrs.Factory(list)
     allowed_arguments: list[str] = attrs.Factory(list)
     default_arguments: Mapping[str, None | str | list[str]] = attrs.Factory(dict)
+
+
+class ServiceOptions(TypedDict, total=False):
+    arguments: Mapping[str, str | list[str]]
+    envs: Mapping[str, str]
+    interpolation: InterpolationOption | None
 
 
 class ServiceParser:
@@ -96,13 +101,15 @@ class ServiceParser:
         self,
         service_name: str,
         frozen_envs: Collection[str],
-        opts: Mapping[str, Any],
+        opts: ServiceOptions,
     ) -> tuple[Sequence[str] | None, Mapping[str, str]]:
         if service_name not in self.services.keys():
             return None, {}
         service = self.services[service_name]
         if service.noop:
             return [], {}
+        option = opts.get("interpolation") or InterpolationOption(delimiters=LEGACY_DELIMITERS)
+        interpolator = ServiceInterpolator(self.variables, option["delimiters"])
 
         for action in service.prestart_actions:
             try:
@@ -111,7 +118,7 @@ class ServiceParser:
                 raise InvalidServiceDefinition(
                     f"Service-def for {service_name} used invalid action: {action['action']}"
                 ) from e
-            ret = await action_impl(self.variables, **action["args"])
+            ret = await action_impl(interpolator, **action["args"])
             if (ref := action.get("ref")) is not None:
                 self.variables[ref] = ret
 
@@ -140,7 +147,7 @@ class ServiceParser:
                 cmdargs.append(arg_value)
             elif isinstance(arg_value, list):
                 cmdargs += arg_value
-        cmdargs = ServiceArgumentInterpolator.apply(cmdargs, self.variables)
+        cmdargs = interpolator.apply(cmdargs)
 
         if "envs" in opts.keys() and opts["envs"]:
             for env_name, env_value in opts["envs"].items():
@@ -154,10 +161,7 @@ class ServiceParser:
                     )
                 env[env_name] = env_value
         for env_name, env_value in service.env.items():
-            env_name, env_value = ServiceArgumentInterpolator.apply(
-                [env_name, env_value],
-                self.variables,
-            )
+            env_name, env_value = interpolator.apply([env_name, env_value])
             env[env_name] = env_value
 
         return cmdargs, env
@@ -182,58 +186,3 @@ class ServiceParser:
             for service_name in self.services.keys():
                 apps.append(_format(service_name))
         return apps
-
-
-class TokenType(enum.Enum):
-    TEXT = enum.auto()
-    EXPR = enum.auto()
-
-
-class ServiceArgumentInterpolator:
-    @classmethod
-    def apply(cls, parts: list[str], variables: Mapping[str, Any]) -> list[str]:
-        patterns = r"""
-            (\${{\s*(?P<expr1>.*?)\s*}}) |     # ${{ ... }} (github-style)
-            ((?<![${]){\s*(?P<expr2>.*?)\s*})  # {...} (python-style)
-        """
-
-        def tokenize(s: str) -> Iterator[tuple[TokenType, str]]:
-            last_index = 0
-            for match in re.finditer(patterns, s, re.VERBOSE):
-                start, end = match.span()
-                # characters between tokens
-                if last_index < start:
-                    yield TokenType.TEXT, s[last_index:start]
-                # the matched expression
-                if (token := match.group("expr1")) is not None or (
-                    token := match.group("expr2")
-                ) is not None:
-                    yield TokenType.EXPR, token
-                last_index = end
-            # the rest of string
-            if last_index < len(s):
-                yield TokenType.TEXT, s[last_index:]
-
-        processed_parts = []
-        for part in parts:
-            tokens = []
-            for token_type, token in tokenize(part):
-                match token_type:
-                    case TokenType.TEXT:
-                        tokens.append(token)
-                    case TokenType.EXPR:
-                        try:
-                            tokens.append(("{" + token + "}").format_map(variables))
-                        except (KeyError, IndexError) as e:
-                            raise InvalidServiceDefinition(
-                                f"Cannot interpolate service argument {part!r}: "
-                                f"undefined template variable {e}."
-                            ) from e
-                        except ValueError as e:
-                            raise InvalidServiceDefinition(
-                                f"Cannot interpolate service argument {part!r}: {e}. "
-                                "Literal braces (e.g. JSON like vLLM '--hf-overrides') "
-                                "are not supported."
-                            ) from e
-            processed_parts.append("".join(tokens))
-        return processed_parts
