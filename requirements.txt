@@ -26,6 +26,7 @@ boto3~=1.35
 cachetools~=5.5.0
 callosum~=1.0.3
 cattrs~=24.1.1
+certifi>=2026.10.19
 click~=8.3.3
 coloredlogs~=15.0
 colorama>=0.4.6
