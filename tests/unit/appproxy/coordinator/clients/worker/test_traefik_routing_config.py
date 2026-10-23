@@ -9,6 +9,7 @@ import pytest
 
 from ai.backend.appproxy.coordinator.clients.worker.traefik_routing_config import (
     TraefikRoutingConfigFactory,
+    TraefikWorker,
 )
 from ai.backend.appproxy.coordinator.config import ClientIPStrategyConfig, TraefikConfig
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
@@ -49,6 +50,20 @@ def routing_config_factory(case: _ClientIPStrategyCase) -> TraefikRoutingConfigF
         jwt_secret="jwt-secret",
         permit_hash_secret="permit-hash-secret",
     )
+
+
+@pytest.fixture
+def routing_config_factory_without_client_ip_strategy() -> TraefikRoutingConfigFactory:
+    return TraefikRoutingConfigFactory(
+        Mock(spec=TraefikConfig, client_ip_strategy=None),
+        jwt_secret="jwt-secret",
+        permit_hash_secret="permit-hash-secret",
+    )
+
+
+@pytest.fixture
+def worker() -> TraefikWorker:
+    return TraefikWorker(hostname="worker-1.example.com", wildcard_domain=None, tls_listen=False)
 
 
 @pytest.fixture
@@ -124,11 +139,12 @@ class TestTraefikRoutingConfigFactory:
         case: _ClientIPStrategyCase,
         routing_config_factory: TraefikRoutingConfigFactory,
         http_ingress_allowing_one_network: Ingress,
+        worker: TraefikWorker,
     ) -> None:
-        middleware_configs = routing_config_factory.http_middleware_configs(
-            http_ingress_allowing_one_network
+        object_configs = routing_config_factory.object_configs_by_etcd_key(
+            http_ingress_allowing_one_network, worker
         )
-        ip_allowlist = middleware_configs[
+        ip_allowlist = object_configs[
             "worker_worker-1/http/middlewares/bai_ingress_10205_ipallowlist"
         ]["ipAllowList"]
         assert ip_allowlist.get("ipStrategy") == case.expected_ip_strategy
@@ -147,8 +163,16 @@ class TestTraefikRoutingConfigFactory:
         ids=lambda case: case.name,
     )
     def test_tcp_router_rule_matches_the_allowed_client_ips(
-        self, case: _ClientIPRuleCase, tcp_ingress: Ingress
+        self,
+        case: _ClientIPRuleCase,
+        routing_config_factory_without_client_ip_strategy: TraefikRoutingConfigFactory,
+        tcp_ingress: Ingress,
+        worker: TraefikWorker,
     ) -> None:
-        assert TraefikRoutingConfigFactory.tcp_router_config(tcp_ingress)["rule"] == (
-            case.expected_rule
+        object_configs = (
+            routing_config_factory_without_client_ip_strategy.object_configs_by_etcd_key(
+                tcp_ingress, worker
+            )
         )
+        router_config = object_configs["worker_worker-1/tcp/routers/bai_ingress_10205_router"]
+        assert router_config["rule"] == case.expected_rule

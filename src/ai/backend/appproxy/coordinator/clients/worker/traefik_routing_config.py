@@ -47,20 +47,41 @@ class TraefikRoutingConfigFactory:
     def object_etcd_keys(cls, ingress_key: IngressKey) -> list[str]:
         """Every object key an ingress can own, for clearing the ones it no longer has."""
         return [
-            cls.router_etcd_key(ingress_key, IngressProtocol.HTTP),
-            cls.service_etcd_key(ingress_key, IngressProtocol.HTTP),
+            cls._router_etcd_key(ingress_key, IngressProtocol.HTTP),
+            cls._service_etcd_key(ingress_key, IngressProtocol.HTTP),
             cls._http_middleware_etcd_key(
                 ingress_key.authority, cls._ip_allowlist_middleware_name(ingress_key)
             ),
             cls._http_middleware_etcd_key(
                 ingress_key.authority, cls._auth_plugin_middleware_name(ingress_key)
             ),
-            cls.router_etcd_key(ingress_key, IngressProtocol.TCP),
-            cls.service_etcd_key(ingress_key, IngressProtocol.TCP),
+            cls._router_etcd_key(ingress_key, IngressProtocol.TCP),
+            cls._service_etcd_key(ingress_key, IngressProtocol.TCP),
         ]
 
+    def object_configs_by_etcd_key(
+        self, ingress: Ingress, worker: TraefikWorker
+    ) -> dict[str, dict[str, Any]]:
+        """The config of every Traefik object the ingress uses, by the etcd key Traefik reads."""
+        ingress_key = ingress.key()
+        frontend_protocol = ingress.frontend.protocol
+        router_etcd_key = self._router_etcd_key(ingress_key, frontend_protocol)
+        service_etcd_key = self._service_etcd_key(ingress_key, frontend_protocol)
+        match frontend_protocol:
+            case IngressProtocol.TCP:
+                return {
+                    router_etcd_key: self._tcp_router_config(ingress),
+                    service_etcd_key: self._tcp_service_config(ingress.backend),
+                }
+            case IngressProtocol.HTTP | IngressProtocol.HTTP2:
+                return {
+                    router_etcd_key: self._http_router_config(ingress, worker),
+                    service_etcd_key: self._http_service_config(ingress.backend),
+                    **self._http_middleware_configs(ingress),
+                }
+
     @classmethod
-    def router_etcd_key(cls, ingress_key: IngressKey, protocol: IngressProtocol) -> str:
+    def _router_etcd_key(cls, ingress_key: IngressKey, protocol: IngressProtocol) -> str:
         traefik_protocol_key = cls._traefik_protocol_key(protocol)
         return (
             f"worker_{ingress_key.authority}/{traefik_protocol_key}/routers/"
@@ -68,7 +89,7 @@ class TraefikRoutingConfigFactory:
         )
 
     @classmethod
-    def service_etcd_key(cls, ingress_key: IngressKey, protocol: IngressProtocol) -> str:
+    def _service_etcd_key(cls, ingress_key: IngressKey, protocol: IngressProtocol) -> str:
         traefik_protocol_key = cls._traefik_protocol_key(protocol)
         return (
             f"worker_{ingress_key.authority}/{traefik_protocol_key}/services/"
@@ -76,7 +97,7 @@ class TraefikRoutingConfigFactory:
         )
 
     @classmethod
-    def http_router_config(cls, ingress: Ingress, worker: TraefikWorker) -> dict[str, Any]:
+    def _http_router_config(cls, ingress: Ingress, worker: TraefikWorker) -> dict[str, Any]:
         ingress_key = ingress.key()
         # The ipAllowList middleware must precede the auth plugin so that disallowed
         # clients are rejected before any credential handling.
@@ -95,15 +116,14 @@ class TraefikRoutingConfigFactory:
         return router_config
 
     @classmethod
-    def tcp_router_config(cls, ingress: Ingress) -> dict[str, Any]:
+    def _tcp_router_config(cls, ingress: Ingress) -> dict[str, Any]:
         return {
             "rule": cls._client_ip_rule(ingress.access),
             "service": cls._service_name(ingress.key()),
             "entrypoints": [cls._entrypoint_name(ingress.frontend)],
         }
 
-    def http_middleware_configs(self, ingress: Ingress) -> dict[str, dict[str, Any]]:
-        """The configs of the middlewares the HTTP router of the ingress uses, by etcd key."""
+    def _http_middleware_configs(self, ingress: Ingress) -> dict[str, dict[str, Any]]:
         ingress_key = ingress.key()
         cors_headers_etcd_key = self._http_middleware_etcd_key(
             ingress.authority, self._CORS_HEADERS_MIDDLEWARE_NAME
@@ -128,26 +148,6 @@ class TraefikRoutingConfigFactory:
         )
         middleware_configs[auth_plugin_etcd_key] = self._auth_plugin_middleware_config(ingress)
         return middleware_configs
-
-    @classmethod
-    def http_service_config(cls, backend: IngressBackend) -> dict[str, Any]:
-        servers = [
-            {"url": f"http://{target.host}:{target.port}/"}
-            for target in cls._targets_receiving_traffic(backend)
-        ]
-        if not servers:
-            return {}
-        return {"loadBalancer": {"servers": servers}}
-
-    @classmethod
-    def tcp_service_config(cls, backend: IngressBackend) -> dict[str, Any]:
-        servers = [
-            {"address": f"{target.host}:{target.port}"}
-            for target in cls._targets_receiving_traffic(backend)
-        ]
-        if not servers:
-            return {}
-        return {"loadBalancer": {"servers": servers}}
 
     def _ip_allowlist_middleware_config(self, access: IngressAccess) -> dict[str, Any]:
         ip_allowlist: dict[str, Any] = {
@@ -175,6 +175,26 @@ class TraefikRoutingConfigFactory:
                 },
             },
         }
+
+    @classmethod
+    def _http_service_config(cls, backend: IngressBackend) -> dict[str, Any]:
+        servers = [
+            {"url": f"http://{target.host}:{target.port}/"}
+            for target in cls._targets_receiving_traffic(backend)
+        ]
+        if not servers:
+            return {}
+        return {"loadBalancer": {"servers": servers}}
+
+    @classmethod
+    def _tcp_service_config(cls, backend: IngressBackend) -> dict[str, Any]:
+        servers = [
+            {"address": f"{target.host}:{target.port}"}
+            for target in cls._targets_receiving_traffic(backend)
+        ]
+        if not servers:
+            return {}
+        return {"loadBalancer": {"servers": servers}}
 
     # Frontend keys hold no '_', so no object name of one ingress is a prefix of another's.
     @staticmethod

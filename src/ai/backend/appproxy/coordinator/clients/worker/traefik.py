@@ -26,7 +26,6 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
     Ingress,
     IngressAuthority,
     IngressKey,
-    IngressProtocol,
 )
 from ai.backend.common.etcd import NestedStrKeyedMapping
 from ai.backend.common.service_discovery.service_discovery import ServiceDiscovery
@@ -145,33 +144,14 @@ class TraefikWorkerClient(BaseWorkerClient):
     def _generate_ingress_subtree(
         self, ingress: Ingress, worker: TraefikWorker
     ) -> dict[str, NestedStrKeyedMapping]:
-        ingress_key = ingress.key()
-        frontend_protocol = ingress.frontend.protocol
         routing_config_factory = self._routing_config_factory
         # Every object key of the ingress is listed so a protocol or middleware it no longer has
         # is cleared in the same transaction.
         subtrees: dict[str, NestedStrKeyedMapping] = {
             object_etcd_key: {}
-            for object_etcd_key in routing_config_factory.object_etcd_keys(ingress_key)
+            for object_etcd_key in routing_config_factory.object_etcd_keys(ingress.key())
         }
-        router_etcd_key = routing_config_factory.router_etcd_key(ingress_key, frontend_protocol)
-        service_etcd_key = routing_config_factory.service_etcd_key(ingress_key, frontend_protocol)
-        match frontend_protocol:
-            case IngressProtocol.TCP:
-                subtrees[router_etcd_key] = convert_to_etcd_dict(
-                    routing_config_factory.tcp_router_config(ingress)
-                )
-                subtrees[service_etcd_key] = convert_to_etcd_dict(
-                    routing_config_factory.tcp_service_config(ingress.backend)
-                )
-            case IngressProtocol.HTTP | IngressProtocol.HTTP2:
-                subtrees[router_etcd_key] = convert_to_etcd_dict(
-                    routing_config_factory.http_router_config(ingress, worker)
-                )
-                subtrees[service_etcd_key] = convert_to_etcd_dict(
-                    routing_config_factory.http_service_config(ingress.backend)
-                )
-                middleware_configs = routing_config_factory.http_middleware_configs(ingress)
-                for middleware_etcd_key, middleware_config in middleware_configs.items():
-                    subtrees[middleware_etcd_key] = convert_to_etcd_dict(middleware_config)
+        object_configs = routing_config_factory.object_configs_by_etcd_key(ingress, worker)
+        for object_etcd_key, object_config in object_configs.items():
+            subtrees[object_etcd_key] = convert_to_etcd_dict(object_config)
         return subtrees
