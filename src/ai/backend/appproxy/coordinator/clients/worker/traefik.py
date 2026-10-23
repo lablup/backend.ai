@@ -83,11 +83,12 @@ class TraefikWorkerClient(BaseWorkerClient):
     @override
     async def remove(self, keys: Sequence[IngressKey]) -> None:
         for ingress_key in keys:
-            routing_config_etcd_keys = self._routing_config_factory.routing_config_etcd_keys(
-                ingress_key
+            all_routing_config_etcd_keys = (
+                self._routing_config_factory.all_routing_config_etcd_keys(ingress_key)
             )
             replacements: dict[str, NestedStrKeyedMapping] = {
-                routing_config_etcd_key: {} for routing_config_etcd_key in routing_config_etcd_keys
+                routing_config_etcd_key: {}
+                for routing_config_etcd_key in all_routing_config_etcd_keys
             }
             replacements[self._revision_prefix(ingress_key)] = {}
             await self._etcd.atomic_replace_prefixes(replacements)
@@ -152,7 +153,7 @@ class TraefikWorkerClient(BaseWorkerClient):
         # longer has is cleared in the same transaction.
         subtrees: dict[str, NestedStrKeyedMapping] = {
             routing_config_etcd_key: {}
-            for routing_config_etcd_key in routing_config_factory.routing_config_etcd_keys(
+            for routing_config_etcd_key in routing_config_factory.all_routing_config_etcd_keys(
                 ingress.key()
             )
         }
