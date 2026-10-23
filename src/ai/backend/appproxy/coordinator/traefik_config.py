@@ -8,10 +8,10 @@ from ai.backend.appproxy.coordinator.config import ClientIPStrategyConfig, Traef
 
 
 class TraefikConfigBuilder:
-    """Builds the Traefik router, middleware and service bodies that circuits and ingresses share.
+    """Builds the Traefik router, middleware and service configs that circuits and ingresses share.
     Object names stay with each caller."""
 
-    CORS_HEADERS_MIDDLEWARE: Final[str] = "CORSHeaders"
+    CORS_HEADERS_MIDDLEWARE_NAME: Final[str] = "CORSHeaders"
 
     _client_ip_strategy: ClientIPStrategyConfig | None
     _jwt_secret: str
@@ -36,15 +36,15 @@ class TraefikConfigBuilder:
         return "ClientIP(" + ", ".join(f"`{cidr}`" for cidr in ranges) + ")"
 
     @staticmethod
-    def port_entrypoint(port: int) -> str:
+    def port_entrypoint_name(port: int) -> str:
         return f"portproxy_{port}"
 
     @staticmethod
-    def domain_entrypoint() -> str:
+    def domain_entrypoint_name() -> str:
         return "domainproxy"
 
     @staticmethod
-    def http_router(
+    def http_router_config(
         rule: str, service: str, entrypoint: str, middlewares: Sequence[str], *, tls: bool
     ) -> dict[str, Any]:
         router: dict[str, Any] = {
@@ -58,11 +58,11 @@ class TraefikConfigBuilder:
         return router
 
     @staticmethod
-    def tcp_router(rule: str, service: str, entrypoint: str) -> dict[str, Any]:
+    def tcp_router_config(rule: str, service: str, entrypoint: str) -> dict[str, Any]:
         return {"rule": rule, "service": service, "entrypoints": [entrypoint]}
 
     @staticmethod
-    def cors_headers() -> dict[str, Any]:
+    def cors_headers_middleware_config() -> dict[str, Any]:
         return {
             "headers": {
                 "accessControlAllowHeaders": "*",
@@ -70,7 +70,7 @@ class TraefikConfigBuilder:
             },
         }
 
-    def ip_allowlist(self, ranges: Sequence[str]) -> dict[str, Any]:
+    def ip_allowlist_middleware_config(self, ranges: Sequence[str]) -> dict[str, Any]:
         # Without a strategy Traefik matches the direct connection address; behind a load
         # balancer the strategy makes it read the client address from X-Forwarded-For.
         ip_allowlist: dict[str, Any] = {"sourceRange": list(ranges)}
@@ -84,7 +84,7 @@ class TraefikConfigBuilder:
                 }
         return {"ipAllowList": ip_allowlist}
 
-    def auth_plugin(self, payload_name: str, payload_json: str) -> dict[str, Any]:
+    def auth_plugin_middleware_config(self, payload_name: str, payload_json: str) -> dict[str, Any]:
         return {
             "plugin": {
                 "appproxy-traefik-plugin": {
@@ -98,7 +98,7 @@ class TraefikConfigBuilder:
         }
 
     @staticmethod
-    def http_service(
+    def http_service_config(
         servers: Sequence[tuple[str, int]], health_check: Mapping[str, str] | None = None
     ) -> dict[str, Any]:
         if not servers:
@@ -111,7 +111,7 @@ class TraefikConfigBuilder:
         return {"loadBalancer": load_balancer}
 
     @staticmethod
-    def tcp_service(servers: Sequence[tuple[str, int]]) -> dict[str, Any]:
+    def tcp_service_config(servers: Sequence[tuple[str, int]]) -> dict[str, Any]:
         if not servers:
             return {}
         return {

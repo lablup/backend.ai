@@ -57,7 +57,7 @@ class TestTraefikConfigBuilder:
     def test_ip_allowlist_reads_the_client_ip_strategy(
         self, case: _ClientIPStrategyCase, builder: TraefikConfigBuilder
     ) -> None:
-        ip_allowlist = builder.ip_allowlist(["192.168.0.0/24"])["ipAllowList"]
+        ip_allowlist = builder.ip_allowlist_middleware_config(["192.168.0.0/24"])["ipAllowList"]
         assert ip_allowlist.get("ipStrategy") == case.expected_ip_strategy
         assert ip_allowlist["sourceRange"] == ["192.168.0.0/24"]
 
