@@ -11,7 +11,7 @@ from ai.backend.appproxy.common.defs import (
     WORKER_TLS_LISTEN_LABEL,
     WORKER_WILDCARD_DOMAIN_LABEL,
 )
-from ai.backend.appproxy.common.errors import ObjectNotFound
+from ai.backend.appproxy.common.errors.service import WorkerNotFound
 from ai.backend.appproxy.common.etcd import TraefikEtcd, convert_to_etcd_dict
 from ai.backend.appproxy.coordinator.clients.worker.base import BaseWorkerClient
 from ai.backend.appproxy.coordinator.clients.worker.traefik_routing_config import (
@@ -132,7 +132,7 @@ class TraefikWorkerClient(BaseWorkerClient):
         for authority in authorities:
             worker_labels = labels_by_authority.get(authority)
             if worker_labels is None:
-                raise ObjectNotFound(object_name="worker")
+                raise WorkerNotFound(extra_data={"authority": authority})
             traefik_worker_by_authority[authority] = TraefikWorker(
                 hostname=worker_labels[WORKER_HOSTNAME_LABEL],
                 wildcard_domain=worker_labels.get(WORKER_WILDCARD_DOMAIN_LABEL),
