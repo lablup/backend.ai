@@ -10,7 +10,6 @@ import pytest
 from ai.backend.appproxy.coordinator.clients.worker.traefik_routing_config import (
     TraefikRoutingConfigFactory,
 )
-from ai.backend.appproxy.coordinator.clients.worker.types import WorkerFrontendSettings
 from ai.backend.appproxy.coordinator.config import ClientIPStrategyConfig, TraefikConfig
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
     Ingress,
@@ -58,13 +57,6 @@ def routing_config_factory_without_client_ip_strategy() -> TraefikRoutingConfigF
         Mock(spec=TraefikConfig, client_ip_strategy=None),
         jwt_secret="jwt-secret",
         permit_hash_secret="permit-hash-secret",
-    )
-
-
-@pytest.fixture
-def worker_frontend_settings() -> WorkerFrontendSettings:
-    return WorkerFrontendSettings(
-        hostname="worker-1.example.com", wildcard_domain=None, tls_listen=False
     )
 
 
@@ -141,10 +133,12 @@ class TestTraefikRoutingConfigFactory:
         case: _ClientIPStrategyCase,
         routing_config_factory: TraefikRoutingConfigFactory,
         http_ingress_allowing_one_network: Ingress,
-        worker_frontend_settings: WorkerFrontendSettings,
     ) -> None:
         routing_configs = routing_config_factory.routing_configs_by_etcd_key(
-            http_ingress_allowing_one_network, worker_frontend_settings
+            http_ingress_allowing_one_network,
+            hostname="worker-1.example.com",
+            wildcard_domain=None,
+            tls_listen=False,
         )
         ip_allowlist = routing_configs[
             "worker_worker-1/http/middlewares/bai_ingress_10205_ipallowlist"
@@ -169,11 +163,10 @@ class TestTraefikRoutingConfigFactory:
         case: _ClientIPRuleCase,
         routing_config_factory_without_client_ip_strategy: TraefikRoutingConfigFactory,
         tcp_ingress: Ingress,
-        worker_frontend_settings: WorkerFrontendSettings,
     ) -> None:
         routing_configs = (
             routing_config_factory_without_client_ip_strategy.routing_configs_by_etcd_key(
-                tcp_ingress, worker_frontend_settings
+                tcp_ingress, hostname="worker-1.example.com", wildcard_domain=None, tls_listen=False
             )
         )
         router_config = routing_configs["worker_worker-1/tcp/routers/bai_ingress_10205_router"]

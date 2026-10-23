@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final, override
 
@@ -17,7 +17,6 @@ from ai.backend.appproxy.coordinator.clients.worker.base import BaseWorkerClient
 from ai.backend.appproxy.coordinator.clients.worker.traefik_routing_config import (
     TraefikRoutingConfigFactory,
 )
-from ai.backend.appproxy.coordinator.clients.worker.types import WorkerFrontendSettings
 from ai.backend.appproxy.coordinator.errors.ingress import (
     TraefikIngressConcurrentWriteError,
     TraefikIngressRevisionConflictError,
@@ -60,7 +59,7 @@ class TraefikWorkerClient(BaseWorkerClient):
         """Writes nothing if any ingress is older than the revision etcd holds, as an api-delivery
         worker does. Each ingress is then written in its own transaction to stay within etcd's
         per-transaction operation limit."""
-        worker_frontend_settings_by_authority = await self._worker_frontend_settings_by_authority({
+        worker_service_labels_by_authority = await self._worker_service_labels_by_authority({
             ingress.authority for ingress in ingresses
         })
         held_revisions = [
@@ -78,7 +77,7 @@ class TraefikWorkerClient(BaseWorkerClient):
                 )
         for ingress, held_revision in zip(ingresses, held_revisions, strict=True):
             await self._write(
-                ingress, worker_frontend_settings_by_authority[ingress.authority], held_revision
+                ingress, worker_service_labels_by_authority[ingress.authority], held_revision
             )
 
     @override
@@ -96,11 +95,11 @@ class TraefikWorkerClient(BaseWorkerClient):
     async def _write(
         self,
         ingress: Ingress,
-        worker_frontend_settings: WorkerFrontendSettings,
+        worker_service_labels: Mapping[str, str],
         held_revision: str | None,
     ) -> None:
         ingress_key = ingress.key()
-        replacements = self._generate_ingress_subtree(ingress, worker_frontend_settings)
+        replacements = self._generate_ingress_subtree(ingress, worker_service_labels)
         replacements[self._revision_prefix(ingress_key)] = {"revision": str(ingress.revision)}
         if not await self._etcd.compare_and_replace_prefixes(
             replacements, guards={self._revision_key(ingress_key): held_revision}
@@ -114,9 +113,9 @@ class TraefikWorkerClient(BaseWorkerClient):
                 },
             )
 
-    async def _worker_frontend_settings_by_authority(
+    async def _worker_service_labels_by_authority(
         self, authorities: Iterable[IngressAuthority]
-    ) -> dict[IngressAuthority, WorkerFrontendSettings]:
+    ) -> dict[IngressAuthority, Mapping[str, str]]:
         try:
             worker_services = await self._worker_service_discovery.get_service_group(
                 WORKER_SERVICE_GROUP
@@ -131,17 +130,13 @@ class TraefikWorkerClient(BaseWorkerClient):
             if WORKER_AUTHORITY_LABEL in worker_service.labels
             and WORKER_HOSTNAME_LABEL in worker_service.labels
         }
-        worker_frontend_settings_by_authority: dict[IngressAuthority, WorkerFrontendSettings] = {}
+        worker_service_labels_by_authority: dict[IngressAuthority, Mapping[str, str]] = {}
         for authority in authorities:
-            worker_labels = labels_by_authority.get(authority)
-            if worker_labels is None:
+            worker_service_labels = labels_by_authority.get(authority)
+            if worker_service_labels is None:
                 raise WorkerNotFound(extra_data={"authority": authority})
-            worker_frontend_settings_by_authority[authority] = WorkerFrontendSettings(
-                hostname=worker_labels[WORKER_HOSTNAME_LABEL],
-                wildcard_domain=worker_labels.get(WORKER_WILDCARD_DOMAIN_LABEL),
-                tls_listen=worker_labels.get(WORKER_TLS_LISTEN_LABEL) == "true",
-            )
-        return worker_frontend_settings_by_authority
+            worker_service_labels_by_authority[authority] = worker_service_labels
+        return worker_service_labels_by_authority
 
     def _revision_prefix(self, ingress_key: IngressKey) -> str:
         return f"{_REVISION_ROOT}/worker_{ingress_key.authority}/{ingress_key.frontend_key}"
@@ -150,7 +145,7 @@ class TraefikWorkerClient(BaseWorkerClient):
         return f"{self._revision_prefix(ingress_key)}/revision"
 
     def _generate_ingress_subtree(
-        self, ingress: Ingress, worker_frontend_settings: WorkerFrontendSettings
+        self, ingress: Ingress, worker_service_labels: Mapping[str, str]
     ) -> dict[str, NestedStrKeyedMapping]:
         routing_config_factory = self._routing_config_factory
         # Every routing config key of the ingress is listed so a protocol or middleware it no
@@ -161,8 +156,11 @@ class TraefikWorkerClient(BaseWorkerClient):
                 ingress.key()
             )
         }
+        hostname = worker_service_labels[WORKER_HOSTNAME_LABEL]
+        wildcard_domain = worker_service_labels.get(WORKER_WILDCARD_DOMAIN_LABEL)
+        tls_listen = worker_service_labels.get(WORKER_TLS_LISTEN_LABEL) == "true"
         routing_configs = routing_config_factory.routing_configs_by_etcd_key(
-            ingress, worker_frontend_settings
+            ingress, hostname=hostname, wildcard_domain=wildcard_domain, tls_listen=tls_listen
         )
         for routing_config_etcd_key, routing_config in routing_configs.items():
             subtrees[routing_config_etcd_key] = convert_to_etcd_dict(routing_config)
