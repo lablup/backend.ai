@@ -7,8 +7,10 @@ from unittest.mock import Mock
 
 import pytest
 
+from ai.backend.appproxy.common.config import PermitHashConfig, SecretConfig
 from ai.backend.appproxy.coordinator.clients.worker.traefik_routing_config import (
     TraefikRoutingConfigFactory,
+    TraefikRoutingConfigFactoryArgs,
 )
 from ai.backend.appproxy.coordinator.config import ClientIPStrategyConfig, TraefikConfig
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
@@ -45,18 +47,22 @@ class _ClientIPRuleCase:
 @pytest.fixture
 def routing_config_factory(case: _ClientIPStrategyCase) -> TraefikRoutingConfigFactory:
     return TraefikRoutingConfigFactory(
-        Mock(spec=TraefikConfig, client_ip_strategy=case.strategy),
-        jwt_secret="jwt-secret",
-        permit_hash_secret="permit-hash-secret",
+        TraefikRoutingConfigFactoryArgs(
+            traefik_config=Mock(spec=TraefikConfig, client_ip_strategy=case.strategy),
+            secrets=Mock(spec=SecretConfig, jwt_secret="jwt-secret"),
+            permit_hash=Mock(spec=PermitHashConfig, secret=b"permit-hash-secret"),
+        )
     )
 
 
 @pytest.fixture
 def routing_config_factory_without_client_ip_strategy() -> TraefikRoutingConfigFactory:
     return TraefikRoutingConfigFactory(
-        Mock(spec=TraefikConfig, client_ip_strategy=None),
-        jwt_secret="jwt-secret",
-        permit_hash_secret="permit-hash-secret",
+        TraefikRoutingConfigFactoryArgs(
+            traefik_config=Mock(spec=TraefikConfig, client_ip_strategy=None),
+            secrets=Mock(spec=SecretConfig, jwt_secret="jwt-secret"),
+            permit_hash=Mock(spec=PermitHashConfig, secret=b"permit-hash-secret"),
+        )
     )
 
 

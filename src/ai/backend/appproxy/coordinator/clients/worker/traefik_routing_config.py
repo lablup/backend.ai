@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any, Final
 
+from ai.backend.appproxy.common.config import PermitHashConfig, SecretConfig
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
 from ai.backend.appproxy.coordinator.config import TraefikConfig
 from ai.backend.appproxy.coordinator.errors.ingress import TraefikWildcardDomainMissingError
@@ -20,20 +22,25 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
 _CORS_HEADERS_MIDDLEWARE_NAME: Final[str] = "CORSHeaders"
 
 
+@dataclass(frozen=True)
+class TraefikRoutingConfigFactoryArgs:
+    traefik_config: TraefikConfig
+    secrets: SecretConfig
+    permit_hash: PermitHashConfig
+
+
 class TraefikRoutingConfigFactory:
     """Builds the Traefik router, middleware and service configs of an ingress and the etcd keys
     Traefik reads them from."""
 
     _traefik_config: TraefikConfig
-    _jwt_secret: str
-    _permit_hash_secret: str
+    _secrets: SecretConfig
+    _permit_hash: PermitHashConfig
 
-    def __init__(
-        self, traefik_config: TraefikConfig, *, jwt_secret: str, permit_hash_secret: str
-    ) -> None:
-        self._traefik_config = traefik_config
-        self._jwt_secret = jwt_secret
-        self._permit_hash_secret = permit_hash_secret
+    def __init__(self, args: TraefikRoutingConfigFactoryArgs) -> None:
+        self._traefik_config = args.traefik_config
+        self._secrets = args.secrets
+        self._permit_hash = args.permit_hash
 
     @classmethod
     def routing_config_etcd_keys(cls, ingress_key: IngressKey) -> list[str]:
@@ -169,8 +176,8 @@ class TraefikRoutingConfigFactory:
                 "appproxy-traefik-plugin": {
                     # etcd holds strings only, so the ingress travels as one JSON value.
                     "ingress": ingress.model_dump_json(),
-                    "jwt_secret": self._jwt_secret,
-                    "permit_hash_secret": self._permit_hash_secret,
+                    "jwt_secret": self._secrets.jwt_secret,
+                    "permit_hash_secret": self._permit_hash.secret.decode(),
                     "permit_cookie_name": PERMIT_COOKIE_NAME,
                 },
             },
