@@ -280,9 +280,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.system_session_environ.processors import (
         SystemSessionEnvironProcessors,
     )
-    from ai.backend.manager.services.system_session_environ.service import (
-        SystemSessionEnvironService,
-    )
     from ai.backend.manager.services.template.processors import (
         TemplateProcessors,
     )
@@ -390,7 +387,6 @@ class Services:
     session_group: SessionGroupService
     manager_admin: ManagerAdminService
     secret: SecretService
-    system_session_environ: SystemSessionEnvironService
     prometheus_query_preset: PrometheusQueryPresetService
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService
