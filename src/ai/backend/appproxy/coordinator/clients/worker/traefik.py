@@ -1,31 +1,41 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Final, override
 
+from ai.backend.appproxy.common.defs import (
+    WORKER_AUTHORITY_LABEL,
+    WORKER_HOSTNAME_LABEL,
+    WORKER_SERVICE_GROUP,
+    WORKER_TLS_LISTEN_LABEL,
+    WORKER_WILDCARD_DOMAIN_LABEL,
+)
+from ai.backend.appproxy.common.errors import ObjectNotFound
 from ai.backend.appproxy.common.etcd import TraefikEtcd, convert_to_etcd_dict
 from ai.backend.appproxy.coordinator.clients.worker.base import BaseWorkerClient
 from ai.backend.appproxy.coordinator.clients.worker.traefik_routing_config import (
     TraefikRoutingConfigFactory,
+    TraefikWorker,
 )
 from ai.backend.appproxy.coordinator.errors.ingress import (
     TraefikIngressConcurrentWriteError,
     TraefikIngressRevisionConflictError,
 )
-from ai.backend.appproxy.coordinator.repositories.worker import TraefikWorker, WorkerRepository
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
     Ingress,
+    IngressAuthority,
     IngressKey,
     IngressProtocol,
 )
 from ai.backend.common.etcd import NestedStrKeyedMapping
+from ai.backend.common.service_discovery.service_discovery import ServiceDiscovery
 
 
 @dataclass(frozen=True)
 class TraefikWorkerClientArgs:
     etcd: TraefikEtcd
-    worker_repository: WorkerRepository
+    service_discovery: ServiceDiscovery
     routing_config_factory: TraefikRoutingConfigFactory
 
 
@@ -38,12 +48,12 @@ class TraefikWorkerClient(BaseWorkerClient):
     _REVISION_ROOT: Final[str] = "ingress_revisions"
 
     _etcd: TraefikEtcd
-    _worker_repository: WorkerRepository
+    _service_discovery: ServiceDiscovery
     _routing_config_factory: TraefikRoutingConfigFactory
 
     def __init__(self, args: TraefikWorkerClientArgs) -> None:
         self._etcd = args.etcd
-        self._worker_repository = args.worker_repository
+        self._service_discovery = args.service_discovery
         self._routing_config_factory = args.routing_config_factory
 
     @override
@@ -51,10 +61,9 @@ class TraefikWorkerClient(BaseWorkerClient):
         """Writes nothing if any ingress is older than the revision etcd holds, as an api-delivery
         worker does. Each ingress is then written in its own transaction to stay within etcd's
         per-transaction operation limit."""
-        traefik_worker_by_authority = {
-            authority: await self._worker_repository.get_traefik_worker(authority)
-            for authority in {ingress.authority for ingress in ingresses}
-        }
+        traefik_worker_by_authority = await self._traefik_worker_by_authority({
+            ingress.authority for ingress in ingresses
+        })
         held_revisions = [
             await self._etcd.get(self._revision_key(ingress.key())) for ingress in ingresses
         ]
@@ -99,6 +108,33 @@ class TraefikWorkerClient(BaseWorkerClient):
                     "frontend_key": ingress.frontend.key(),
                 },
             )
+
+    async def _traefik_worker_by_authority(
+        self, authorities: Iterable[IngressAuthority]
+    ) -> dict[IngressAuthority, TraefikWorker]:
+        try:
+            worker_services = await self._service_discovery.get_service_group(WORKER_SERVICE_GROUP)
+        except ValueError:
+            # RedisServiceDiscovery raises ValueError for a group with no registered service.
+            worker_services = []
+        # A worker that registers no hostname label predates the Traefik labels.
+        labels_by_authority = {
+            worker_service.labels[WORKER_AUTHORITY_LABEL]: worker_service.labels
+            for worker_service in worker_services
+            if WORKER_AUTHORITY_LABEL in worker_service.labels
+            and WORKER_HOSTNAME_LABEL in worker_service.labels
+        }
+        traefik_worker_by_authority: dict[IngressAuthority, TraefikWorker] = {}
+        for authority in authorities:
+            worker_labels = labels_by_authority.get(authority)
+            if worker_labels is None:
+                raise ObjectNotFound(object_name="worker")
+            traefik_worker_by_authority[authority] = TraefikWorker(
+                hostname=worker_labels[WORKER_HOSTNAME_LABEL],
+                wildcard_domain=worker_labels.get(WORKER_WILDCARD_DOMAIN_LABEL),
+                tls_listen=worker_labels.get(WORKER_TLS_LISTEN_LABEL) == "true",
+            )
+        return traefik_worker_by_authority
 
     def _revision_prefix(self, ingress_key: IngressKey) -> str:
         return f"{self._REVISION_ROOT}/worker_{ingress_key.authority}/{ingress_key.frontend_key}"

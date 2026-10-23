@@ -5,6 +5,12 @@ from unittest.mock import AsyncMock, Mock
 
 import pytest
 
+from ai.backend.appproxy.common.defs import (
+    WORKER_AUTHORITY_LABEL,
+    WORKER_HOSTNAME_LABEL,
+    WORKER_SERVICE_GROUP,
+    WORKER_TLS_LISTEN_LABEL,
+)
 from ai.backend.appproxy.common.etcd import TraefikEtcd
 from ai.backend.appproxy.coordinator.clients.worker.traefik import (
     TraefikWorkerClient,
@@ -15,7 +21,6 @@ from ai.backend.appproxy.coordinator.clients.worker.traefik_routing_config impor
 )
 from ai.backend.appproxy.coordinator.config import TraefikConfig
 from ai.backend.appproxy.coordinator.errors.ingress import TraefikIngressRevisionConflictError
-from ai.backend.appproxy.coordinator.repositories.worker import TraefikWorker, WorkerRepository
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
     Ingress,
     IngressAccess,
@@ -30,6 +35,11 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
     IngressTargetGroup,
     IngressTargetGroupID,
     PortFrontend,
+)
+from ai.backend.common.service_discovery.service_discovery import (
+    ServiceDiscovery,
+    ServiceEndpoint,
+    ServiceMetadata,
 )
 
 
@@ -87,12 +97,27 @@ def etcd_holding_a_newer_revision_of_10206() -> AsyncMock:
 
 
 @pytest.fixture
-def worker_repository() -> AsyncMock:
-    worker_repository = AsyncMock(spec=WorkerRepository)
-    worker_repository.get_traefik_worker.return_value = TraefikWorker(
-        hostname="worker-1.example.com", wildcard_domain=None, tls_listen=False
-    )
-    return worker_repository
+def worker_service_discovery() -> AsyncMock:
+    worker_service_discovery = AsyncMock(spec=ServiceDiscovery)
+    worker_service_discovery.get_service_group.return_value = [
+        ServiceMetadata.for_endpoint(
+            display_name="appproxy-worker-worker-1",
+            service_group=WORKER_SERVICE_GROUP,
+            version="test",
+            endpoint=ServiceEndpoint(
+                address="127.0.0.1",
+                port=10201,
+                protocol="http",
+                prometheus_address="127.0.0.1:10201",
+            ),
+            labels={
+                WORKER_AUTHORITY_LABEL: "worker-1",
+                WORKER_HOSTNAME_LABEL: "worker-1.example.com",
+                WORKER_TLS_LISTEN_LABEL: "false",
+            },
+        )
+    ]
+    return worker_service_discovery
 
 
 @pytest.fixture
@@ -107,13 +132,13 @@ def routing_config_factory() -> TraefikRoutingConfigFactory:
 @pytest.fixture
 def client(
     traefik_etcd: AsyncMock,
-    worker_repository: AsyncMock,
+    worker_service_discovery: AsyncMock,
     routing_config_factory: TraefikRoutingConfigFactory,
 ) -> TraefikWorkerClient:
     return TraefikWorkerClient(
         TraefikWorkerClientArgs(
             etcd=traefik_etcd,
-            worker_repository=worker_repository,
+            service_discovery=worker_service_discovery,
             routing_config_factory=routing_config_factory,
         )
     )
@@ -122,13 +147,13 @@ def client(
 @pytest.fixture
 def client_on_etcd_holding_10206(
     etcd_holding_a_newer_revision_of_10206: AsyncMock,
-    worker_repository: AsyncMock,
+    worker_service_discovery: AsyncMock,
     routing_config_factory: TraefikRoutingConfigFactory,
 ) -> TraefikWorkerClient:
     return TraefikWorkerClient(
         TraefikWorkerClientArgs(
             etcd=etcd_holding_a_newer_revision_of_10206,
-            worker_repository=worker_repository,
+            service_discovery=worker_service_discovery,
             routing_config_factory=routing_config_factory,
         )
     )

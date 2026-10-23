@@ -90,7 +90,6 @@ from ai.backend.appproxy.coordinator.clients.worker.traefik_routing_config impor
     TraefikRoutingConfigFactory,
 )
 from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
-from ai.backend.appproxy.coordinator.repositories.worker import WorkerRepository
 from ai.backend.appproxy.coordinator.services.ingress import IngressService
 from ai.backend.common.clients.http_client.client_pool import (
     ClientPool,
@@ -945,7 +944,7 @@ async def ingress_service_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         traefik_client = TraefikWorkerClient(
             TraefikWorkerClientArgs(
                 etcd=root_ctx.traefik_etcd,
-                worker_repository=WorkerRepository(root_ctx.db),
+                service_discovery=root_ctx.worker_service_discovery,
                 routing_config_factory=TraefikRoutingConfigFactory(
                     traefik_config,
                     jwt_secret=root_ctx.local_config.secrets.jwt_secret,
