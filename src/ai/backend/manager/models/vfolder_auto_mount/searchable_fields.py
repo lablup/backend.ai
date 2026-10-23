@@ -57,6 +57,11 @@ class _VFolderAutoMountOwnFields(RowDataConverter[VFolderAutoMountRow, VFolderAu
         DateTimeConditions(VFolderAutoMountRow.created_at),
         ColumnOrder(VFolderAutoMountRow.created_at),
     )
+    updated_at = SearchableField(
+        VFolderAutoMountRow.updated_at,
+        DateTimeConditions(VFolderAutoMountRow.updated_at),
+        ColumnOrder(VFolderAutoMountRow.updated_at),
+    )
     deleted_at = SearchableField(
         VFolderAutoMountRow.deleted_at,
         DateTimeConditions(VFolderAutoMountRow.deleted_at),
@@ -73,6 +78,7 @@ class _VFolderAutoMountOwnFields(RowDataConverter[VFolderAutoMountRow, VFolderAu
             subpath=self.subpath.read(row),
             mount_permission=self.mount_permission.read(row),
             created_at=self.created_at.read(row),
+            updated_at=self.updated_at.read(row),
             deleted_at=self.deleted_at.read(row),
         )
 

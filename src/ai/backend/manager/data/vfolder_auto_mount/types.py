@@ -27,6 +27,7 @@ class VFolderAutoMountData(EntityData):
     subpath: str
     mount_permission: VFolderMountPermission
     created_at: datetime
+    updated_at: datetime
     deleted_at: datetime | None
 
     @override
