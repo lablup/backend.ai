@@ -18,12 +18,12 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
     IngressTarget,
 )
 
-_CORS_HEADERS_MIDDLEWARE_NAME: Final[str] = "CORSHeaders"
-
 
 class TraefikRoutingConfigFactory:
     """Builds the Traefik router, middleware and service configs of an ingress and the etcd keys
     Traefik reads them from."""
+
+    _CORS_HEADERS_MIDDLEWARE_NAME: Final[str] = "CORSHeaders"
 
     _client_ip_strategy: ClientIPStrategyConfig | None
     _jwt_secret: str
@@ -42,64 +42,67 @@ class TraefikRoutingConfigFactory:
         return [
             cls.router_etcd_key(ingress_key, IngressProtocol.HTTP),
             cls.service_etcd_key(ingress_key, IngressProtocol.HTTP),
-            _http_middleware_etcd_key(
-                ingress_key.authority, _ip_allowlist_middleware_name(ingress_key)
+            cls._http_middleware_etcd_key(
+                ingress_key.authority, cls._ip_allowlist_middleware_name(ingress_key)
             ),
-            _http_middleware_etcd_key(
-                ingress_key.authority, _auth_plugin_middleware_name(ingress_key)
+            cls._http_middleware_etcd_key(
+                ingress_key.authority, cls._auth_plugin_middleware_name(ingress_key)
             ),
             cls.router_etcd_key(ingress_key, IngressProtocol.TCP),
             cls.service_etcd_key(ingress_key, IngressProtocol.TCP),
         ]
 
-    @staticmethod
-    def router_etcd_key(ingress_key: IngressKey, protocol: IngressProtocol) -> str:
-        traefik_protocol_key = _traefik_protocol_key(protocol)
+    @classmethod
+    def router_etcd_key(cls, ingress_key: IngressKey, protocol: IngressProtocol) -> str:
+        traefik_protocol_key = cls._traefik_protocol_key(protocol)
         return (
             f"worker_{ingress_key.authority}/{traefik_protocol_key}/routers/"
-            f"{_router_name(ingress_key)}"
+            f"{cls._router_name(ingress_key)}"
         )
 
-    @staticmethod
-    def service_etcd_key(ingress_key: IngressKey, protocol: IngressProtocol) -> str:
-        traefik_protocol_key = _traefik_protocol_key(protocol)
+    @classmethod
+    def service_etcd_key(cls, ingress_key: IngressKey, protocol: IngressProtocol) -> str:
+        traefik_protocol_key = cls._traefik_protocol_key(protocol)
         return (
             f"worker_{ingress_key.authority}/{traefik_protocol_key}/services/"
-            f"{_service_name(ingress_key)}"
+            f"{cls._service_name(ingress_key)}"
         )
 
-    @staticmethod
-    def http_router_config(ingress: Ingress, worker: TraefikWorker) -> dict[str, Any]:
+    @classmethod
+    def http_router_config(cls, ingress: Ingress, worker: TraefikWorker) -> dict[str, Any]:
         ingress_key = ingress.key()
         # The ipAllowList middleware must precede the auth plugin so that disallowed
         # clients are rejected before any credential handling.
-        middleware_names = [_CORS_HEADERS_MIDDLEWARE_NAME]
+        middleware_names = [cls._CORS_HEADERS_MIDDLEWARE_NAME]
         if ingress.access.allowed_client_ips:
-            middleware_names.append(_ip_allowlist_middleware_name(ingress_key))
-        middleware_names.append(_auth_plugin_middleware_name(ingress_key))
+            middleware_names.append(cls._ip_allowlist_middleware_name(ingress_key))
+        middleware_names.append(cls._auth_plugin_middleware_name(ingress_key))
         router_config: dict[str, Any] = {
-            "rule": _host_rule(ingress, worker),
-            "service": _service_name(ingress_key),
-            "entrypoints": [_entrypoint_name(ingress.frontend)],
+            "rule": cls._host_rule(ingress, worker),
+            "service": cls._service_name(ingress_key),
+            "entrypoints": [cls._entrypoint_name(ingress.frontend)],
             "middlewares": middleware_names,
         }
         if worker.tls_listen:
             router_config["tls"] = ""
         return router_config
 
-    @staticmethod
-    def tcp_router_config(ingress: Ingress) -> dict[str, Any]:
+    @classmethod
+    def tcp_router_config(cls, ingress: Ingress) -> dict[str, Any]:
         return {
-            "rule": _client_ip_rule(ingress.access),
-            "service": _service_name(ingress.key()),
-            "entrypoints": [_entrypoint_name(ingress.frontend)],
+            "rule": cls._client_ip_rule(ingress.access),
+            "service": cls._service_name(ingress.key()),
+            "entrypoints": [cls._entrypoint_name(ingress.frontend)],
         }
 
     def http_middleware_configs(self, ingress: Ingress) -> dict[str, dict[str, Any]]:
         """The configs of the middlewares the HTTP router of the ingress uses, by etcd key."""
         ingress_key = ingress.key()
+        cors_headers_etcd_key = self._http_middleware_etcd_key(
+            ingress.authority, self._CORS_HEADERS_MIDDLEWARE_NAME
+        )
         middleware_configs: dict[str, dict[str, Any]] = {
-            _http_middleware_etcd_key(ingress.authority, _CORS_HEADERS_MIDDLEWARE_NAME): {
+            cors_headers_etcd_key: {
                 "headers": {
                     "accessControlAllowHeaders": "*",
                     "accessControlAllowOriginList": ["*"],
@@ -107,33 +110,33 @@ class TraefikRoutingConfigFactory:
             },
         }
         if ingress.access.allowed_client_ips:
-            ip_allowlist_etcd_key = _http_middleware_etcd_key(
-                ingress.authority, _ip_allowlist_middleware_name(ingress_key)
+            ip_allowlist_etcd_key = self._http_middleware_etcd_key(
+                ingress.authority, self._ip_allowlist_middleware_name(ingress_key)
             )
             middleware_configs[ip_allowlist_etcd_key] = self._ip_allowlist_middleware_config(
                 ingress.access
             )
-        auth_plugin_etcd_key = _http_middleware_etcd_key(
-            ingress.authority, _auth_plugin_middleware_name(ingress_key)
+        auth_plugin_etcd_key = self._http_middleware_etcd_key(
+            ingress.authority, self._auth_plugin_middleware_name(ingress_key)
         )
         middleware_configs[auth_plugin_etcd_key] = self._auth_plugin_middleware_config(ingress)
         return middleware_configs
 
-    @staticmethod
-    def http_service_config(backend: IngressBackend) -> dict[str, Any]:
+    @classmethod
+    def http_service_config(cls, backend: IngressBackend) -> dict[str, Any]:
         servers = [
             {"url": f"http://{target.host}:{target.port}/"}
-            for target in _targets_receiving_traffic(backend)
+            for target in cls._targets_receiving_traffic(backend)
         ]
         if not servers:
             return {}
         return {"loadBalancer": {"servers": servers}}
 
-    @staticmethod
-    def tcp_service_config(backend: IngressBackend) -> dict[str, Any]:
+    @classmethod
+    def tcp_service_config(cls, backend: IngressBackend) -> dict[str, Any]:
         servers = [
             {"address": f"{target.host}:{target.port}"}
-            for target in _targets_receiving_traffic(backend)
+            for target in cls._targets_receiving_traffic(backend)
         ]
         if not servers:
             return {}
@@ -166,63 +169,68 @@ class TraefikRoutingConfigFactory:
             },
         }
 
+    # Frontend keys hold no '_', so no object name of one ingress is a prefix of another's.
+    @staticmethod
+    def _router_name(ingress_key: IngressKey) -> str:
+        return f"bai_ingress_{ingress_key.frontend_key}_router"
 
-# Frontend keys hold no '_', so no object name of one ingress is a prefix of another's.
-def _router_name(ingress_key: IngressKey) -> str:
-    return f"bai_ingress_{ingress_key.frontend_key}_router"
+    @staticmethod
+    def _service_name(ingress_key: IngressKey) -> str:
+        return f"bai_ingress_{ingress_key.frontend_key}_service"
 
+    @staticmethod
+    def _ip_allowlist_middleware_name(ingress_key: IngressKey) -> str:
+        return f"bai_ingress_{ingress_key.frontend_key}_ipallowlist"
 
-def _service_name(ingress_key: IngressKey) -> str:
-    return f"bai_ingress_{ingress_key.frontend_key}_service"
+    @staticmethod
+    def _auth_plugin_middleware_name(ingress_key: IngressKey) -> str:
+        return f"bai_ingress_{ingress_key.frontend_key}_auth"
 
+    @staticmethod
+    def _traefik_protocol_key(protocol: IngressProtocol) -> str:
+        # Traefik keeps HTTP/2 routing under its http configuration.
+        match protocol:
+            case IngressProtocol.HTTP | IngressProtocol.HTTP2:
+                return "http"
+            case IngressProtocol.TCP:
+                return "tcp"
 
-def _ip_allowlist_middleware_name(ingress_key: IngressKey) -> str:
-    return f"bai_ingress_{ingress_key.frontend_key}_ipallowlist"
+    @staticmethod
+    def _http_middleware_etcd_key(authority: IngressAuthority, middleware_name: str) -> str:
+        return f"worker_{authority}/http/middlewares/{middleware_name}"
 
+    @staticmethod
+    def _host_rule(ingress: Ingress, worker: TraefikWorker) -> str:
+        match ingress.frontend.kind:
+            case IngressFrontendKind.PORT:
+                return f"Host(`{worker.hostname}`)"
+            case IngressFrontendKind.WILDCARD:
+                if worker.wildcard_domain is None:
+                    raise TraefikWildcardDomainMissingError(
+                        extra_data={"authority": ingress.authority}
+                    )
+                return f"Host(`{ingress.frontend.key()}{worker.wildcard_domain}`)"
 
-def _auth_plugin_middleware_name(ingress_key: IngressKey) -> str:
-    return f"bai_ingress_{ingress_key.frontend_key}_auth"
+    @staticmethod
+    def _client_ip_rule(access: IngressAccess) -> str:
+        allowed_client_ip_ranges = [str(network) for network in access.allowed_client_ips]
+        if not allowed_client_ip_ranges:
+            return "ClientIP(`0.0.0.0/0`)"
+        return "ClientIP(" + ", ".join(f"`{cidr}`" for cidr in allowed_client_ip_ranges) + ")"
 
+    @staticmethod
+    def _entrypoint_name(frontend: IngressFrontend) -> str:
+        match frontend.kind:
+            case IngressFrontendKind.PORT:
+                return f"portproxy_{frontend.key()}"
+            case IngressFrontendKind.WILDCARD:
+                return "domainproxy"
 
-def _traefik_protocol_key(protocol: IngressProtocol) -> str:
-    # Traefik keeps HTTP/2 routing under its http configuration.
-    match protocol:
-        case IngressProtocol.HTTP | IngressProtocol.HTTP2:
-            return "http"
-        case IngressProtocol.TCP:
-            return "tcp"
-
-
-def _http_middleware_etcd_key(authority: IngressAuthority, middleware_name: str) -> str:
-    return f"worker_{authority}/http/middlewares/{middleware_name}"
-
-
-def _host_rule(ingress: Ingress, worker: TraefikWorker) -> str:
-    match ingress.frontend.kind:
-        case IngressFrontendKind.PORT:
-            return f"Host(`{worker.hostname}`)"
-        case IngressFrontendKind.WILDCARD:
-            if worker.wildcard_domain is None:
-                raise TraefikWildcardDomainMissingError(extra_data={"authority": ingress.authority})
-            return f"Host(`{ingress.frontend.key()}{worker.wildcard_domain}`)"
-
-
-def _client_ip_rule(access: IngressAccess) -> str:
-    allowed_client_ip_ranges = [str(network) for network in access.allowed_client_ips]
-    if not allowed_client_ip_ranges:
-        return "ClientIP(`0.0.0.0/0`)"
-    return "ClientIP(" + ", ".join(f"`{cidr}`" for cidr in allowed_client_ip_ranges) + ")"
-
-
-def _entrypoint_name(frontend: IngressFrontend) -> str:
-    match frontend.kind:
-        case IngressFrontendKind.PORT:
-            return f"portproxy_{frontend.key()}"
-        case IngressFrontendKind.WILDCARD:
-            return "domainproxy"
-
-
-def _targets_receiving_traffic(backend: IngressBackend) -> list[IngressTarget]:
-    return [
-        target for group in backend.target_groups if group.weight > 0 for target in group.targets
-    ]
+    @staticmethod
+    def _targets_receiving_traffic(backend: IngressBackend) -> list[IngressTarget]:
+        return [
+            target
+            for group in backend.target_groups
+            if group.weight > 0
+            for target in group.targets
+        ]

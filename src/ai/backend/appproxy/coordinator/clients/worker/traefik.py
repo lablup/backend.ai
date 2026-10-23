@@ -21,9 +21,6 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
 )
 from ai.backend.common.etcd import NestedStrKeyedMapping
 
-# Outside every worker_{authority} root key, so Traefik never reads it.
-_REVISION_ROOT: Final[str] = "ingress_revisions"
-
 
 @dataclass(frozen=True)
 class TraefikWorkerClientArgs:
@@ -36,6 +33,9 @@ class TraefikWorkerClient(BaseWorkerClient):
     """Writes each ingress to Traefik etcd as one set of subtrees, replaced by the same or a newer
     revision. The revision is kept in etcd and guards the replacement transaction; a write that
     another write to the same frontend beats fails instead of retrying."""
+
+    # Outside every worker_{authority} root key, so Traefik never reads it.
+    _REVISION_ROOT: Final[str] = "ingress_revisions"
 
     _etcd: TraefikEtcd
     _worker_repository: WorkerRepository
@@ -101,7 +101,7 @@ class TraefikWorkerClient(BaseWorkerClient):
             )
 
     def _revision_prefix(self, ingress_key: IngressKey) -> str:
-        return f"{_REVISION_ROOT}/worker_{ingress_key.authority}/{ingress_key.frontend_key}"
+        return f"{self._REVISION_ROOT}/worker_{ingress_key.authority}/{ingress_key.frontend_key}"
 
     def _revision_key(self, ingress_key: IngressKey) -> str:
         return f"{self._revision_prefix(ingress_key)}/revision"
