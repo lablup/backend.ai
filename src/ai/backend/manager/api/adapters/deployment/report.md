@@ -2,7 +2,7 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/deployment/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/deployment/adapter.py)
 
-시나리오: 미완 33 / 47
+시나리오: 미완 34 / 48
 
 - ops 로 구성 (22)
   - admin_search — 대표 성공 ✓ · 대표 실패 ✓
@@ -29,10 +29,11 @@
   - search_rules — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
 - ops + 직접 구현 (1)
   - get_current_revision — 성공 없음 · 실패 있음 1 (get_ops, single_entity) — SCENARIO-GAP
-- 직접 구현 (24)
+- 직접 구현 (25)
   - activate_revision — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
   - add_revision — 성공 있음 4 · 실패 있음 7 (single_entity)
   - admin_refresh_deployment_revisions — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
+  - batch_load_designated_agents — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
   - bulk_delete_access_tokens — 성공 없음 · 실패 없음 (partial_bulk_field) — SCENARIO-GAP
   - bulk_delete_rules — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
   - create — 성공 있음 3 · 실패 있음 2 (scope)

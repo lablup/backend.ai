@@ -188,6 +188,7 @@ from ai.backend.manager.data.deployment.types import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.agent.types import AgentV2Connection
     from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
     from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
@@ -699,6 +700,43 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
                 start_cursor=edges[0].cursor if edges else None,
                 end_cursor=edges[-1].cursor if edges else None,
             ),
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The agents this deployment designates for its route sessions.",
+        )
+    )  # type: ignore[misc]
+    async def designated_agents(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[AgentV2Connection, strawberry.lazy("ai.backend.manager.api.gql.agent.types")]
+        | None
+    ):
+        from ai.backend.manager.api.gql.agent.types import (
+            AgentV2Connection,
+            AgentV2Edge,
+        )
+
+        agent_uuids = await info.context.data_loaders.deployment_designated_agents_loader.load(
+            DeploymentID(UUID(str(self.id)))
+        )
+        agents = await info.context.data_loaders.agent_by_uuid_loader.load_many(agent_uuids)
+        edges = [
+            AgentV2Edge(node=agent, cursor=encode_cursor(str(agent.entity_id)))
+            for agent in agents
+            if agent is not None
+        ]
+        return AgentV2Connection(
+            edges=edges,
+            page_info=PageInfo(
+                has_next_page=False,
+                has_previous_page=False,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=len(edges),
         )
 
     @gql_added_field(
