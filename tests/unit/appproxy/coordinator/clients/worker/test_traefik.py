@@ -6,7 +6,13 @@ from unittest.mock import AsyncMock, Mock
 import pytest
 
 from ai.backend.appproxy.common.etcd import TraefikEtcd
-from ai.backend.appproxy.coordinator.clients.worker.traefik import TraefikWorkerClient
+from ai.backend.appproxy.coordinator.clients.worker.traefik import (
+    TraefikWorkerClient,
+    TraefikWorkerClientArgs,
+)
+from ai.backend.appproxy.coordinator.clients.worker.traefik_routing_config import (
+    TraefikRoutingConfigFactory,
+)
 from ai.backend.appproxy.coordinator.config import TraefikConfig
 from ai.backend.appproxy.coordinator.errors.ingress import TraefikIngressRevisionConflictError
 from ai.backend.appproxy.coordinator.repositories.worker import TraefikWorker, WorkerRepository
@@ -90,26 +96,41 @@ def worker_repository() -> AsyncMock:
 
 
 @pytest.fixture
-def client(traefik_etcd: AsyncMock, worker_repository: AsyncMock) -> TraefikWorkerClient:
-    return TraefikWorkerClient(
-        traefik_etcd,
-        worker_repository,
-        Mock(spec=TraefikConfig),
+def routing_config_factory() -> TraefikRoutingConfigFactory:
+    return TraefikRoutingConfigFactory(
+        Mock(spec=TraefikConfig, client_ip_strategy=None),
         jwt_secret="jwt-secret",
         permit_hash_secret="permit-hash-secret",
     )
 
 
 @pytest.fixture
-def client_on_etcd_holding_10206(
-    etcd_holding_a_newer_revision_of_10206: AsyncMock, worker_repository: AsyncMock
+def client(
+    traefik_etcd: AsyncMock,
+    worker_repository: AsyncMock,
+    routing_config_factory: TraefikRoutingConfigFactory,
 ) -> TraefikWorkerClient:
     return TraefikWorkerClient(
-        etcd_holding_a_newer_revision_of_10206,
-        worker_repository,
-        Mock(spec=TraefikConfig),
-        jwt_secret="jwt-secret",
-        permit_hash_secret="permit-hash-secret",
+        TraefikWorkerClientArgs(
+            etcd=traefik_etcd,
+            workers=worker_repository,
+            routing_config_factory=routing_config_factory,
+        )
+    )
+
+
+@pytest.fixture
+def client_on_etcd_holding_10206(
+    etcd_holding_a_newer_revision_of_10206: AsyncMock,
+    worker_repository: AsyncMock,
+    routing_config_factory: TraefikRoutingConfigFactory,
+) -> TraefikWorkerClient:
+    return TraefikWorkerClient(
+        TraefikWorkerClientArgs(
+            etcd=etcd_holding_a_newer_revision_of_10206,
+            workers=worker_repository,
+            routing_config_factory=routing_config_factory,
+        )
     )
 
 
