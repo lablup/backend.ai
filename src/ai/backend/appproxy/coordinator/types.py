@@ -56,6 +56,7 @@ from .models.utils import ExtendedAsyncSAEngine
 from .models.worker import Worker
 
 if TYPE_CHECKING:
+    from ai.backend.appproxy.coordinator.clients.worker.traefik import TraefikWorkerClient
     from ai.backend.appproxy.coordinator.services.ingress import IngressService
 
     from .services.endpoint import EndpointService
@@ -419,6 +420,7 @@ class RootContext:
     circuit_manager: CircuitManager
     endpoint_service: EndpointService
     worker_client_pool: ClientPool
+    traefik_worker_client: TraefikWorkerClient | None
     ingress_service: IngressService
     worker_service_discovery: ServiceDiscovery
 
