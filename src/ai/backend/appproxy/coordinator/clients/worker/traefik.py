@@ -16,8 +16,8 @@ from ai.backend.appproxy.common.etcd import TraefikEtcd, convert_to_etcd_dict
 from ai.backend.appproxy.coordinator.clients.worker.base import BaseWorkerClient
 from ai.backend.appproxy.coordinator.clients.worker.traefik_routing_config import (
     TraefikRoutingConfigFactory,
-    TraefikWorker,
 )
+from ai.backend.appproxy.coordinator.clients.worker.types import TraefikWorker
 from ai.backend.appproxy.coordinator.errors.ingress import (
     TraefikIngressConcurrentWriteError,
     TraefikIngressRevisionConflictError,
