@@ -8,10 +8,10 @@ import pytest
 
 from ai.backend.appproxy.common.config import PermitHashConfig, SecretConfig
 from ai.backend.appproxy.coordinator.clients.worker.traefik_routing_config import (
-    TraefikIpAllowListMiddlewareConfig,
+    IpAllowListMiddlewareConfig,
+    TcpRouterConfig,
     TraefikRoutingConfigFactory,
     TraefikRoutingConfigFactoryArgs,
-    TraefikTcpRouterConfig,
 )
 from ai.backend.appproxy.coordinator.config import ClientIPStrategyConfig, TraefikConfig
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
@@ -35,7 +35,7 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
 class _ClientIPStrategyCase:
     name: str
     strategy: ClientIPStrategyConfig | None
-    expected_ip_allowlist_middleware_config: TraefikIpAllowListMiddlewareConfig
+    expected_ip_allowlist_middleware_config: IpAllowListMiddlewareConfig
 
 
 @dataclass(frozen=True)
@@ -193,7 +193,7 @@ class TestTraefikRoutingConfigFactory:
         )
         assert routing_configs[
             "worker_worker-1/tcp/routers/bai_ingress_10205_router"
-        ] == TraefikTcpRouterConfig(
+        ] == TcpRouterConfig(
             rule=case.expected_rule,
             service="bai_ingress_10205_service",
             entrypoints=["portproxy_10205"],

@@ -22,7 +22,7 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
 _CORS_HEADERS_MIDDLEWARE_NAME: Final[str] = "CORSHeaders"
 
 
-class TraefikHttpRouterConfig(TypedDict):
+class HttpRouterConfig(TypedDict):
     rule: str
     service: str
     entrypoints: list[str]
@@ -30,88 +30,82 @@ class TraefikHttpRouterConfig(TypedDict):
     tls: NotRequired[str]
 
 
-class TraefikTcpRouterConfig(TypedDict):
+class TcpRouterConfig(TypedDict):
     rule: str
     service: str
     entrypoints: list[str]
 
 
-class TraefikHttpServer(TypedDict):
+class HttpServer(TypedDict):
     url: str
 
 
-class TraefikHttpLoadBalancer(TypedDict):
-    servers: list[TraefikHttpServer]
+class HttpLoadBalancer(TypedDict):
+    servers: list[HttpServer]
 
 
-class TraefikHttpServiceConfig(TypedDict):
+class HttpServiceConfig(TypedDict):
     # Left out when no target receives traffic, which clears the service.
-    loadBalancer: NotRequired[TraefikHttpLoadBalancer]
+    loadBalancer: NotRequired[HttpLoadBalancer]
 
 
-class TraefikTcpServer(TypedDict):
+class TcpServer(TypedDict):
     address: str
 
 
-class TraefikTcpLoadBalancer(TypedDict):
-    servers: list[TraefikTcpServer]
+class TcpLoadBalancer(TypedDict):
+    servers: list[TcpServer]
 
 
-class TraefikTcpServiceConfig(TypedDict):
+class TcpServiceConfig(TypedDict):
     # Left out when no target receives traffic, which clears the service.
-    loadBalancer: NotRequired[TraefikTcpLoadBalancer]
+    loadBalancer: NotRequired[TcpLoadBalancer]
 
 
-class TraefikCorsHeaders(TypedDict):
+class CorsHeaders(TypedDict):
     accessControlAllowHeaders: str
     accessControlAllowOriginList: list[str]
 
 
-class TraefikCorsHeadersMiddlewareConfig(TypedDict):
-    headers: TraefikCorsHeaders
+class CorsHeadersMiddlewareConfig(TypedDict):
+    headers: CorsHeaders
 
 
-class TraefikIpStrategy(TypedDict, total=False):
+class IpStrategy(TypedDict, total=False):
     depth: int
     excludedIPs: list[str]
 
 
-class TraefikIpAllowList(TypedDict):
+class IpAllowList(TypedDict):
     sourceRange: list[str]
-    ipStrategy: NotRequired[TraefikIpStrategy]
+    ipStrategy: NotRequired[IpStrategy]
 
 
-class TraefikIpAllowListMiddlewareConfig(TypedDict):
-    ipAllowList: TraefikIpAllowList
+class IpAllowListMiddlewareConfig(TypedDict):
+    ipAllowList: IpAllowList
 
 
-class TraefikAuthPluginOptions(TypedDict):
+class AuthPluginOptions(TypedDict):
     ingress: str
     jwt_secret: str
     permit_hash_secret: str
     permit_cookie_name: str
 
 
-TraefikAuthPluginOptionsByName = TypedDict(
-    "TraefikAuthPluginOptionsByName", {"appproxy-traefik-plugin": TraefikAuthPluginOptions}
+AuthPluginOptionsByName = TypedDict(
+    "AuthPluginOptionsByName", {"appproxy-traefik-plugin": AuthPluginOptions}
 )
 
 
-class TraefikAuthPluginMiddlewareConfig(TypedDict):
-    plugin: TraefikAuthPluginOptionsByName
+class AuthPluginMiddlewareConfig(TypedDict):
+    plugin: AuthPluginOptionsByName
 
 
-type TraefikHttpMiddlewareConfig = (
-    TraefikCorsHeadersMiddlewareConfig
-    | TraefikIpAllowListMiddlewareConfig
-    | TraefikAuthPluginMiddlewareConfig
+type HttpMiddlewareConfig = (
+    CorsHeadersMiddlewareConfig | IpAllowListMiddlewareConfig | AuthPluginMiddlewareConfig
 )
-type TraefikRoutingConfig = (
-    TraefikHttpRouterConfig
-    | TraefikTcpRouterConfig
-    | TraefikHttpServiceConfig
-    | TraefikTcpServiceConfig
-    | TraefikHttpMiddlewareConfig
+type RoutingConfig = (
+    HttpRouterConfig | TcpRouterConfig | HttpServiceConfig | TcpServiceConfig | HttpMiddlewareConfig
 )
 
 
@@ -153,7 +147,7 @@ class TraefikRoutingConfigFactory:
 
     def routing_configs_by_etcd_key(
         self, ingress: Ingress, *, hostname: str, wildcard_domain: str | None, tls_listen: bool
-    ) -> dict[str, TraefikRoutingConfig]:
+    ) -> dict[str, RoutingConfig]:
         """Router, service and middleware configs of the ingress, by the etcd key Traefik reads."""
         ingress_key = ingress.key()
         frontend_protocol = ingress.frontend.protocol
@@ -197,7 +191,7 @@ class TraefikRoutingConfigFactory:
     @classmethod
     def _http_router_config(
         cls, ingress: Ingress, *, host_rule: str, tls_listen: bool
-    ) -> TraefikHttpRouterConfig:
+    ) -> HttpRouterConfig:
         ingress_key = ingress.key()
         # The ipAllowList middleware must precede the auth plugin so that disallowed
         # clients are rejected before any credential handling.
@@ -205,7 +199,7 @@ class TraefikRoutingConfigFactory:
         if ingress.access.allowed_client_ips:
             middleware_names.append(cls._ip_allowlist_middleware_name(ingress_key))
         middleware_names.append(cls._auth_plugin_middleware_name(ingress_key))
-        router_config: TraefikHttpRouterConfig = {
+        router_config: HttpRouterConfig = {
             "rule": host_rule,
             "service": cls._service_name(ingress_key),
             "entrypoints": [cls._entrypoint_name(ingress.frontend)],
@@ -216,19 +210,19 @@ class TraefikRoutingConfigFactory:
         return router_config
 
     @classmethod
-    def _tcp_router_config(cls, ingress: Ingress) -> TraefikTcpRouterConfig:
+    def _tcp_router_config(cls, ingress: Ingress) -> TcpRouterConfig:
         return {
             "rule": cls._client_ip_rule(ingress.access),
             "service": cls._service_name(ingress.key()),
             "entrypoints": [cls._entrypoint_name(ingress.frontend)],
         }
 
-    def _http_middleware_configs(self, ingress: Ingress) -> dict[str, TraefikHttpMiddlewareConfig]:
+    def _http_middleware_configs(self, ingress: Ingress) -> dict[str, HttpMiddlewareConfig]:
         ingress_key = ingress.key()
         cors_headers_etcd_key = self._http_middleware_etcd_key(
             ingress.authority, _CORS_HEADERS_MIDDLEWARE_NAME
         )
-        middleware_configs: dict[str, TraefikHttpMiddlewareConfig] = {
+        middleware_configs: dict[str, HttpMiddlewareConfig] = {
             cors_headers_etcd_key: {
                 "headers": {
                     "accessControlAllowHeaders": "*",
@@ -249,10 +243,8 @@ class TraefikRoutingConfigFactory:
         middleware_configs[auth_plugin_etcd_key] = self._auth_plugin_middleware_config(ingress)
         return middleware_configs
 
-    def _ip_allowlist_middleware_config(
-        self, access: IngressAccess
-    ) -> TraefikIpAllowListMiddlewareConfig:
-        ip_allowlist: TraefikIpAllowList = {
+    def _ip_allowlist_middleware_config(self, access: IngressAccess) -> IpAllowListMiddlewareConfig:
+        ip_allowlist: IpAllowList = {
             "sourceRange": [str(network) for network in access.allowed_client_ips],
         }
         client_ip_strategy = self._traefik_config.client_ip_strategy
@@ -265,7 +257,7 @@ class TraefikRoutingConfigFactory:
                 }
         return {"ipAllowList": ip_allowlist}
 
-    def _auth_plugin_middleware_config(self, ingress: Ingress) -> TraefikAuthPluginMiddlewareConfig:
+    def _auth_plugin_middleware_config(self, ingress: Ingress) -> AuthPluginMiddlewareConfig:
         return {
             "plugin": {
                 "appproxy-traefik-plugin": {
@@ -279,8 +271,8 @@ class TraefikRoutingConfigFactory:
         }
 
     @classmethod
-    def _http_service_config(cls, backend: IngressBackend) -> TraefikHttpServiceConfig:
-        servers: list[TraefikHttpServer] = [
+    def _http_service_config(cls, backend: IngressBackend) -> HttpServiceConfig:
+        servers: list[HttpServer] = [
             {"url": f"http://{target.host}:{target.port}/"}
             for target in cls._targets_receiving_traffic(backend)
         ]
@@ -289,8 +281,8 @@ class TraefikRoutingConfigFactory:
         return {"loadBalancer": {"servers": servers}}
 
     @classmethod
-    def _tcp_service_config(cls, backend: IngressBackend) -> TraefikTcpServiceConfig:
-        servers: list[TraefikTcpServer] = [
+    def _tcp_service_config(cls, backend: IngressBackend) -> TcpServiceConfig:
+        servers: list[TcpServer] = [
             {"address": f"{target.host}:{target.port}"}
             for target in cls._targets_receiving_traffic(backend)
         ]
