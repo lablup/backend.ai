@@ -60,11 +60,11 @@ class ApiDeliveryWorkerServerError(BackendAIError, web.HTTPBadGateway):
         )
 
 
-class ApiDeliveryWorkerPushFailedError(BackendAIError, web.HTTPBadGateway):
-    """Raised after every push has settled when any api-delivery worker push failed."""
+class IngressPushFailedError(BackendAIError, web.HTTPBadGateway):
+    """Raised after every push has settled when any push to a worker or to Traefik etcd failed."""
 
-    error_type = "https://api.backend.ai/probs/appproxy-coordinator/api-delivery-worker-push-failed"
-    error_title = "Pushes to api-delivery workers failed."
+    error_type = "https://api.backend.ai/probs/appproxy-coordinator/ingress-push-failed"
+    error_title = "Ingress pushes failed."
 
     @override
     def error_code(self) -> ErrorCode:
@@ -72,4 +72,54 @@ class ApiDeliveryWorkerPushFailedError(BackendAIError, web.HTTPBadGateway):
             domain=ErrorDomain.APPPROXY,
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class TraefikIngressConcurrentWriteError(BackendAIError, web.HTTPConflict):
+    """Raised when another write to the same frontend commits between the revision check and
+    this upsert's write. Resending the ingress applies it or reports a newer revision."""
+
+    error_type = (
+        "https://api.backend.ai/probs/appproxy-coordinator/traefik-ingress-concurrent-write"
+    )
+    error_title = "Another write to the ingress frontend committed first."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.UPSERT,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class TraefikIngressRevisionConflictError(BackendAIError, web.HTTPConflict):
+    """Raised when an upsert carries a revision older than the one Traefik etcd holds."""
+
+    error_type = (
+        "https://api.backend.ai/probs/appproxy-coordinator/traefik-ingress-revision-conflict"
+    )
+    error_title = "Ingress revision is older than the one Traefik etcd holds."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.UPSERT,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
+class TraefikWildcardDomainMissingError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a wildcard ingress targets a worker registered without a wildcard domain."""
+
+    error_type = "https://api.backend.ai/probs/appproxy-coordinator/traefik-wildcard-domain-missing"
+    error_title = "The worker has no wildcard domain to route a wildcard ingress."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.UPSERT,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )

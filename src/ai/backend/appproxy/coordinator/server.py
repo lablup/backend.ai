@@ -32,7 +32,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, cast
 from uuid import UUID
 
-import aiohttp
 import aiohttp_cors
 import aiohttp_jinja2
 import aiomonitor
@@ -82,12 +81,12 @@ from ai.backend.appproxy.common.utils import (
     ensure_json_serializable,
     mime_match,
 )
+from ai.backend.appproxy.coordinator.dependencies.components.composer import (
+    ComponentsComposer,
+    ComponentsInput,
+)
 from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
 from ai.backend.appproxy.coordinator.services.ingress import IngressService
-from ai.backend.common.clients.http_client.client_pool import (
-    ClientPool,
-    tcp_client_session_factory,
-)
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
@@ -95,6 +94,7 @@ from ai.backend.common.clients.valkey_client.valkey_lock.client import ValkeyLoc
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.contexts.request_id import with_request_context
 from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK, RedisRole
+from ai.backend.common.dependencies.stacks.builder import DependencyBuilderStack
 from ai.backend.common.dto.appproxy_coordinator.v2.status.types import AppProxyStatusResponse
 from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -914,15 +914,19 @@ async def endpoint_service_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @asynccontextmanager
-async def worker_client_pool_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    client_timeout = aiohttp.ClientTimeout(total=30.0, connect=10.0)
-    root_ctx.worker_client_pool = ClientPool(
-        functools.partial(tcp_client_session_factory, timeout=client_timeout),
-    )
-    try:
+async def components_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    async with DependencyBuilderStack() as dependency_stack:
+        components = await dependency_stack.enter_composer(
+            ComponentsComposer(),
+            ComponentsInput(
+                config=root_ctx.local_config,
+                traefik_etcd=root_ctx.traefik_etcd,
+                worker_service_discovery=root_ctx.worker_service_discovery,
+            ),
+        )
+        root_ctx.worker_client_pool = components.worker_client_pool
+        root_ctx.traefik_worker_client = components.traefik_worker_client
         yield
-    finally:
-        await root_ctx.worker_client_pool.close()
 
 
 @asynccontextmanager
@@ -931,6 +935,7 @@ async def ingress_service_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         root_ctx.worker_service_discovery,
         root_ctx.worker_client_pool,
         root_ctx.local_config.secrets,
+        root_ctx.traefik_worker_client,
     )
     yield
 
@@ -1144,7 +1149,7 @@ def build_root_app(
             unused_port_collection_ctx,
             event_handler_ctx,
             service_discovery_ctx,
-            worker_client_pool_ctx,
+            components_ctx,
             ingress_service_ctx,
         ]
     shutdown_context_instances = []

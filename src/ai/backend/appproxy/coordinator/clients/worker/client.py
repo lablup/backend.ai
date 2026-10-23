@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import override
 
 import aiohttp
 from aiohttp import hdrs
 
 from ai.backend.appproxy.common.config import HostPortPair, SecretConfig
+from ai.backend.appproxy.coordinator.clients.worker.base import BaseWorkerClient
 from ai.backend.appproxy.coordinator.errors.ingress import (
     ApiDeliveryWorkerRejectedError,
     ApiDeliveryWorkerServerError,
@@ -21,7 +23,7 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import Ingress, IngressKey
 _TOKEN_HEADER = "X-BackendAI-Token"
 
 
-class AppProxyWorkerClient:
+class AppProxyWorkerClient(BaseWorkerClient):
     """Sends ingress pushes to the API port of one worker node."""
 
     _session: aiohttp.ClientSession
@@ -35,9 +37,11 @@ class AppProxyWorkerClient:
         self._addr = addr
         self._secrets = secrets
 
+    @override
     async def upsert(self, ingresses: Sequence[Ingress]) -> None:
         await self._post("/v2/ingress/upsert", IngressUpsertRequest(ingresses=list(ingresses)))
 
+    @override
     async def remove(self, keys: Sequence[IngressKey]) -> None:
         await self._post("/v2/ingress/remove", IngressRemoveRequest(keys=list(keys)))
 

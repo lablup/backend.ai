@@ -46,8 +46,11 @@ from ai.backend.appproxy.common.defs import (
     MEDIA_TYPE_HTML,
     MEDIA_TYPE_JSON,
     WORKER_AUTHORITY_LABEL,
+    WORKER_HOSTNAME_LABEL,
     WORKER_INGRESS_DELIVERY_MODE_LABEL,
     WORKER_SERVICE_GROUP,
+    WORKER_TLS_LISTEN_LABEL,
+    WORKER_WILDCARD_DOMAIN_LABEL,
 )
 from ai.backend.appproxy.common.errors import (
     CoordinatorConnectionError,
@@ -595,6 +598,33 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     announce_addr = root_ctx.local_config.proxy_worker.announce_addr
     if announce_addr is None:
         raise MissingAnnounceAddressError("Announce address is not configured")
+    proxy_worker_config = root_ctx.local_config.proxy_worker
+    wildcard_domain: str | None = None
+    match proxy_worker_config.frontend_mode:
+        case FrontendServerMode.WILDCARD_DOMAIN:
+            if proxy_worker_config.wildcard_domain is not None:
+                wildcard_domain = proxy_worker_config.wildcard_domain.domain
+        case FrontendServerMode.TRAEFIK:
+            traefik_config = proxy_worker_config.traefik
+            if (
+                traefik_config is not None
+                and traefik_config.frontend_mode == FrontendMode.WILDCARD_DOMAIN
+                and traefik_config.wildcard_domain is not None
+            ):
+                wildcard_domain = traefik_config.wildcard_domain.domain
+        case FrontendServerMode.PORT:
+            pass
+    service_discovery_labels = {
+        WORKER_AUTHORITY_LABEL: proxy_worker_config.authority,
+        WORKER_INGRESS_DELIVERY_MODE_LABEL: proxy_worker_config.ingress.delivery_mode,
+        # Read by the coordinator to build the Traefik router rules of this worker's ingresses.
+        WORKER_HOSTNAME_LABEL: (
+            proxy_worker_config.api_advertised_addr or proxy_worker_config.api_bind_addr
+        ).host,
+        WORKER_TLS_LISTEN_LABEL: str(proxy_worker_config.tls_listen).lower(),
+    }
+    if wildcard_domain is not None:
+        service_discovery_labels[WORKER_WILDCARD_DOMAIN_LABEL] = wildcard_domain
     sd_loop = ServiceDiscoveryLoop(
         sd_type,
         service_discovery,
@@ -609,10 +639,7 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 # It can be separated into an internal-purpose port later.
                 prometheus_address=str(announce_addr),
             ),
-            labels={
-                WORKER_AUTHORITY_LABEL: root_ctx.local_config.proxy_worker.authority,
-                WORKER_INGRESS_DELIVERY_MODE_LABEL: root_ctx.local_config.proxy_worker.ingress.delivery_mode,
-            },
+            labels=service_discovery_labels,
         ),
     )
 

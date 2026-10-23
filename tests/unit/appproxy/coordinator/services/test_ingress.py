@@ -16,10 +16,12 @@ from ai.backend.appproxy.common.defs import (
     WORKER_SERVICE_GROUP,
 )
 from ai.backend.appproxy.common.types import IngressDeliveryMode
+from ai.backend.appproxy.coordinator.clients.worker.traefik import TraefikWorkerClient
 from ai.backend.appproxy.coordinator.errors.ingress import (
-    ApiDeliveryWorkerPushFailedError,
     ApiDeliveryWorkerServerError,
     ApiDeliveryWorkerUnreachableError,
+    IngressPushFailedError,
+    TraefikWildcardDomainMissingError,
 )
 from ai.backend.appproxy.coordinator.services.ingress import IngressService
 from ai.backend.common.clients.http_client.client_pool import ClientPool
@@ -59,6 +61,12 @@ WORKER_2_NODE = "10.0.1.1:10201"
 class _PushOperationCase:
     name: str
     push: Callable[[IngressService, Ingress], Awaitable[None]]
+
+
+@dataclass(frozen=True)
+class _TraefikWriteCase:
+    name: str
+    write: Callable[[IngressService, list[Ingress]], Awaitable[None]]
 
 
 @dataclass(frozen=True)
@@ -147,22 +155,22 @@ def unannounced_ingress(public_access: IngressAccess, backend: IngressBackend) -
 
 
 @pytest.fixture
-def service_discovery() -> AsyncMock:
-    service_discovery = AsyncMock(spec=ServiceDiscovery)
-    service_discovery.get_service_group.return_value = [
+def worker_service_discovery() -> AsyncMock:
+    worker_service_discovery = AsyncMock(spec=ServiceDiscovery)
+    worker_service_discovery.get_service_group.return_value = [
         _node("worker-1", IngressDeliveryMode.API, WORKER_1_NODE_A),
         _node("worker-1", IngressDeliveryMode.API, WORKER_1_NODE_B),
         _node("worker-1", IngressDeliveryMode.REDIS, WORKER_1_REDIS_NODE),
         _node("worker-2", IngressDeliveryMode.API, WORKER_2_NODE),
     ]
-    return service_discovery
+    return worker_service_discovery
 
 
 @pytest.fixture
-def empty_service_discovery() -> AsyncMock:
-    service_discovery = AsyncMock(spec=ServiceDiscovery)
-    service_discovery.get_service_group.side_effect = ValueError("No services found")
-    return service_discovery
+def empty_worker_service_discovery() -> AsyncMock:
+    worker_service_discovery = AsyncMock(spec=ServiceDiscovery)
+    worker_service_discovery.get_service_group.side_effect = ValueError("No services found")
+    return worker_service_discovery
 
 
 @pytest.fixture
@@ -221,10 +229,44 @@ def client_pool(worker_sessions: dict[str, MagicMock]) -> Mock:
 
 
 @pytest.fixture
-def service(
-    service_discovery: AsyncMock, client_pool: Mock, secrets: SecretConfig
+def slow_traefik_write_finished() -> asyncio.Event:
+    return asyncio.Event()
+
+
+@pytest.fixture
+def traefik_client(slow_traefik_write_finished: asyncio.Event) -> AsyncMock:
+    async def fail_worker_1_and_finish_others_late(
+        targets: list[Ingress] | list[IngressKey],
+    ) -> None:
+        authority = targets[0].authority
+        if authority == "worker-1":
+            raise TraefikWildcardDomainMissingError(extra_data={"authority": authority})
+        await asyncio.sleep(0.05)
+        slow_traefik_write_finished.set()
+
+    traefik_client = AsyncMock(spec=TraefikWorkerClient)
+    traefik_client.upsert.side_effect = fail_worker_1_and_finish_others_late
+    traefik_client.remove.side_effect = fail_worker_1_and_finish_others_late
+    return traefik_client
+
+
+@pytest.fixture
+def traefik_service(
+    worker_service_discovery: AsyncMock,
+    client_pool: Mock,
+    secrets: SecretConfig,
+    traefik_client: AsyncMock,
 ) -> IngressService:
-    return IngressService(service_discovery, client_pool, secrets)
+    return IngressService(
+        worker_service_discovery, client_pool, secrets, traefik_client=traefik_client
+    )
+
+
+@pytest.fixture
+def service(
+    worker_service_discovery: AsyncMock, client_pool: Mock, secrets: SecretConfig
+) -> IngressService:
+    return IngressService(worker_service_discovery, client_pool, secrets, traefik_client=None)
 
 
 class TestIngressService:
@@ -298,13 +340,15 @@ class TestIngressService:
 
     async def test_no_registered_worker_pushes_nothing(
         self,
-        empty_service_discovery: AsyncMock,
+        empty_worker_service_discovery: AsyncMock,
         client_pool: Mock,
         secrets: SecretConfig,
         worker_sessions: dict[str, MagicMock],
         worker_1_ingress: Ingress,
     ) -> None:
-        service = IngressService(empty_service_discovery, client_pool, secrets)
+        service = IngressService(
+            empty_worker_service_discovery, client_pool, secrets, traefik_client=None
+        )
         await service.upsert([worker_1_ingress])
         for session in worker_sessions.values():
             session.post.assert_not_called()
@@ -329,7 +373,7 @@ class TestIngressService:
         slow_node_finished: asyncio.Event,
         worker_1_ingress: Ingress,
     ) -> None:
-        with pytest.raises(ApiDeliveryWorkerPushFailedError):
+        with pytest.raises(IngressPushFailedError):
             await case.push(service, worker_1_ingress)
         assert slow_node_finished.is_set()
 
@@ -352,7 +396,7 @@ class TestIngressService:
         server_error_node: dict[str, MagicMock],
         worker_1_ingress: Ingress,
     ) -> None:
-        with pytest.raises(ApiDeliveryWorkerPushFailedError) as exc_info:
+        with pytest.raises(IngressPushFailedError) as exc_info:
             await case.push(service, worker_1_ingress)
         extra_data = exc_info.value.extra_data
         assert extra_data is not None
@@ -370,3 +414,30 @@ class TestIngressService:
                 error_type=ApiDeliveryWorkerServerError.error_type,
             ),
         ]
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _TraefikWriteCase(
+                name="upsert", write=lambda service, ingresses: service.upsert(ingresses)
+            ),
+            _TraefikWriteCase(
+                name="remove",
+                write=lambda service, ingresses: service.remove([
+                    ingress.key() for ingress in ingresses
+                ]),
+            ),
+        ],
+        ids=lambda case: case.name,
+    )
+    async def test_failed_traefik_write_fails_after_every_write_finishes(
+        self,
+        case: _TraefikWriteCase,
+        traefik_service: IngressService,
+        slow_traefik_write_finished: asyncio.Event,
+        worker_1_ingress: Ingress,
+        worker_2_ingress: Ingress,
+    ) -> None:
+        with pytest.raises(IngressPushFailedError):
+            await case.write(traefik_service, [worker_1_ingress, worker_2_ingress])
+        assert slow_traefik_write_finished.is_set()
