@@ -130,7 +130,9 @@ GQL types are thin wrappers over the v2 DTOs (`common/dto/manager/v2/`).
 
 ## Error handling & nullable schema
 
-- For queries/resolvers that may not find an object, declare the return type as **nullable** (`T | None`).
+- Any field that runs through a resolver declares a **nullable** return type (`T | None`): root `Query` / `Mutation` fields
+  and computed fields on Node / Connection / Payload types.
+  See `README.md` "Nullable Return Types".
 - Do NOT catch domain exceptions (`NotFound`, etc.) in the fetcher just to return `None` — propagate the exception.
   Per the Relay spec, only `resolve_nodes` may return `Iterable[Self | None]`.
 
