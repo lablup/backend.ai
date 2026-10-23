@@ -43,7 +43,7 @@ class TraefikRoutingConfigFactory:
         self._permit_hash = args.permit_hash
 
     @classmethod
-    def routing_config_etcd_keys(cls, ingress_key: IngressKey) -> list[str]:
+    def all_routing_config_etcd_keys(cls, ingress_key: IngressKey) -> list[str]:
         """Every routing config key an ingress can own, for clearing the ones it no longer has."""
         return [
             cls._router_etcd_key(ingress_key, IngressProtocol.HTTP),
