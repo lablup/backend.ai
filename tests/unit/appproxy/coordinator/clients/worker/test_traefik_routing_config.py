@@ -9,8 +9,8 @@ import pytest
 
 from ai.backend.appproxy.coordinator.clients.worker.traefik_routing_config import (
     TraefikRoutingConfigFactory,
-    TraefikWorker,
 )
+from ai.backend.appproxy.coordinator.clients.worker.types import TraefikWorker
 from ai.backend.appproxy.coordinator.config import ClientIPStrategyConfig, TraefikConfig
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
     Ingress,

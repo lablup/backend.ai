@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Final
 
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
+from ai.backend.appproxy.coordinator.clients.worker.types import TraefikWorker
 from ai.backend.appproxy.coordinator.config import TraefikConfig
 from ai.backend.appproxy.coordinator.errors.ingress import TraefikWildcardDomainMissingError
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
@@ -19,13 +19,6 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
 )
 
 _CORS_HEADERS_MIDDLEWARE_NAME: Final[str] = "CORSHeaders"
-
-
-@dataclass(frozen=True)
-class TraefikWorker:
-    hostname: str
-    wildcard_domain: str | None
-    tls_listen: bool
 
 
 class TraefikRoutingConfigFactory:
