@@ -343,19 +343,6 @@ type AdminRegisterSSHKeypairPayload
 }
 
 """
-Added in 26.10.0. Input for reading the system session environ a session in a domain and project receives.
-"""
-input AdminResolveSystemSessionEnvironInput
-  @join__type(graph: STRAWBERRY)
-{
-  """The domain the session belongs to."""
-  domainId: UUID!
-
-  """The project the session belongs to."""
-  projectId: UUID!
-}
-
-"""
 Added in 26.9.0. Which key each stored secret sits on, across every encrypted column.
 """
 type AdminSecretStatusPayload
@@ -20624,9 +20611,9 @@ type Query
   schedulingHandlers: [SchedulingHandlerNode!] @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.10.0. Read the system session environ rows a session in a domain and project receives, one per key (superadmin only).
+  Added in 26.10.0. Search every system session environ row at every scope, disabled ones included (superadmin only).
   """
-  adminResolveSystemSessionEnviron(input: AdminResolveSystemSessionEnvironInput!): ResolveSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
+  adminSystemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.10.0. List all registered session lifecycle handlers (superadmin only). The returned ``name`` values are valid keys for ``DefaultSessionOptionsInfo.handlerOptions.byHandler``.
@@ -22539,18 +22526,6 @@ type ReservoirRegistryEdge
 
   """The item at the end of the edge"""
   node: ReservoirRegistry!
-}
-
-"""
-Added in 26.10.0. The rows a session in a domain and project receives, one per key.
-"""
-type ResolveSystemSessionEnvironPayload
-  @join__type(graph: STRAWBERRY)
-{
-  """
-  Per key the enabled row at the most specific scope: project, domain, then public.
-  """
-  items: [SystemSessionEnvironNode!]!
 }
 
 """Added in 26.2.0. Resource allocation with requested and used slots."""
@@ -27465,11 +27440,15 @@ type SyncReplicaPayload
 }
 
 """
-Added in 26.10.0. A system session environ row: the value it injects under its key at its scope.
+Added in 26.10.0. A system session environ row: the value of a starting session it injects under its key into every session of its scope.
 """
-type SystemSessionEnvironNode
+type SystemSessionEnviron implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
   @join__type(graph: STRAWBERRY)
 {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
   """The id of the row."""
   entityId: UUID!
 
@@ -27481,6 +27460,94 @@ type SystemSessionEnvironNode
 
   """The scope the row is bound to."""
   scope: SystemSessionEnvironScopeInfo!
+
+  """
+  Whether the row is injected. A disabled row still hides the same key at a broader scope.
+  """
+  enabled: Boolean!
+
+  """When the row was created."""
+  createdAt: DateTime!
+
+  """When the row was last changed."""
+  updatedAt: DateTime!
+}
+
+"""
+Added in 26.10.0. Paginated connection for system session environ rows.
+"""
+type SystemSessionEnvironConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [SystemSessionEnvironEdge!]!
+
+  """Total number of rows matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type SystemSessionEnvironEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: SystemSessionEnviron!
+}
+
+"""Added in 26.10.0. Filter for system session environ rows."""
+input SystemSessionEnvironFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by the row's id."""
+  entityId: UUIDFilter = null
+
+  """Filter by the environment variable name."""
+  key: StringFilter = null
+
+  """Filter by which value of the starting session is injected."""
+  valueSource: SystemSessionEnvironValueSourceFilter = null
+
+  """Filter by the kind of scope the row is bound to."""
+  scopeType: SystemSessionEnvironScopeTypeFilter = null
+
+  """Filter by the id of the public entity, the domain or the project."""
+  scopeId: UUIDFilter = null
+
+  """Filter by the enabled flag."""
+  enabled: Boolean = null
+}
+
+"""
+Added in 26.10.0. One ordering rule for a system session environ search.
+"""
+input SystemSessionEnvironOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: SystemSessionEnvironOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.10.0. Fields available for ordering system session environ rows.
+"""
+enum SystemSessionEnvironOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  KEY @join__enumValue(graph: STRAWBERRY)
+  VALUE_SOURCE @join__enumValue(graph: STRAWBERRY)
+  SCOPE_TYPE @join__enumValue(graph: STRAWBERRY)
+  ENABLED @join__enumValue(graph: STRAWBERRY)
+  CREATED_AT @join__enumValue(graph: STRAWBERRY)
+  UPDATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.10.0. The scope a system session environ row is bound to."""
@@ -27508,6 +27575,25 @@ enum SystemSessionEnvironScopeType
 }
 
 """
+Added in 26.10.0. Filter for the scope type with equality and membership operators.
+"""
+input SystemSessionEnvironScopeTypeFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Exact match."""
+  equals: SystemSessionEnvironScopeType = null
+
+  """Match any of the provided values."""
+  in: [SystemSessionEnvironScopeType!] = null
+
+  """Exclude an exact match."""
+  notEquals: SystemSessionEnvironScopeType = null
+
+  """Exclude any of the provided values."""
+  notIn: [SystemSessionEnvironScopeType!] = null
+}
+
+"""
 Added in 26.10.0. Which value of a starting session a system session environ row injects.
 """
 enum SystemSessionEnvironValueSource
@@ -27523,6 +27609,25 @@ enum SystemSessionEnvironValueSource
   USER_EMAIL @join__enumValue(graph: STRAWBERRY)
   USER_NAME @join__enumValue(graph: STRAWBERRY)
   ACCESS_KEY @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.10.0. Filter for the injected value with equality and membership operators.
+"""
+input SystemSessionEnvironValueSourceFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Exact match."""
+  equals: SystemSessionEnvironValueSource = null
+
+  """Match any of the provided values."""
+  in: [SystemSessionEnvironValueSource!] = null
+
+  """Exclude an exact match."""
+  notEquals: SystemSessionEnvironValueSource = null
+
+  """Exclude any of the provided values."""
+  notIn: [SystemSessionEnvironValueSource!] = null
 }
 
 """Added in 26.4.2. Payload returned after terminating sessions."""

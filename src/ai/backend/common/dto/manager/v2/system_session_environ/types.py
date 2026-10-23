@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
+
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
@@ -12,10 +14,20 @@ from ai.backend.common.data.system_session_environ.types import (
 )
 
 __all__ = (
+    "SystemSessionEnvironOrderField",
     "SystemSessionEnvironScopeInfo",
     "SystemSessionEnvironScopeType",
     "SystemSessionEnvironValueSource",
 )
+
+
+class SystemSessionEnvironOrderField(StrEnum):
+    KEY = "key"
+    VALUE_SOURCE = "value_source"
+    SCOPE_TYPE = "scope_type"
+    ENABLED = "enabled"
+    CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
 
 
 class SystemSessionEnvironScopeInfo(BaseResponseModel):

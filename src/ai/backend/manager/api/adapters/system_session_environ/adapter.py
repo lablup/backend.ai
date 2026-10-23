@@ -5,21 +5,45 @@ Shared between the GraphQL resolvers and REST v2 handlers.
 
 from __future__ import annotations
 
-from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironScopeID
+from collections.abc import Sequence
+from typing import assert_never
+
+from ai.backend.common.data.entity.system_session_environ import (
+    SystemSessionEnvironID,
+    SystemSessionEnvironScopeID,
+)
+from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
-    AdminResolveSystemSessionEnvironInput,
+    AdminSearchSystemSessionEnvironsInput,
+    SystemSessionEnvironFilter,
+    SystemSessionEnvironOrder,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
-    ResolveSystemSessionEnvironPayload,
+    AdminSearchSystemSessionEnvironsPayload,
     SystemSessionEnvironNode,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
+    SystemSessionEnvironOrderField,
     SystemSessionEnvironScopeInfo,
     SystemSessionEnvironScopeType,
 )
+from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.services.system_session_environ.actions.global_resolve import (
-    GlobalResolveSystemSessionEnvironAction,
+from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
+from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
+from ai.backend.manager.models.system_session_environ.searchable_fields import (
+    SystemSessionEnvironSearchableFields,
+)
+from ai.backend.manager.models.system_session_environ.searchers import (
+    SystemSessionEnvironSearcher,
+)
+from ai.backend.manager.services.system_session_environ.actions.bulk_get import (
+    BulkGetSystemSessionEnvironsAction,
+)
+from ai.backend.manager.services.system_session_environ.actions.global_search import (
+    GlobalSearchSystemSessionEnvironsAction,
 )
 from ai.backend.manager.services.system_session_environ.processors import (
     SystemSessionEnvironProcessors,
@@ -27,35 +51,108 @@ from ai.backend.manager.services.system_session_environ.processors import (
 
 __all__ = ("SystemSessionEnvironAdapter",)
 
+_SYSTEM_SESSION_ENVIRON_PAGINATION_SPEC = PaginationSpec(
+    forward_order=SystemSessionEnvironSearchableFields.own.key.order.apply(ascending=True),
+    cursor_column=SystemSessionEnvironRow.id,
+)
+
 
 class SystemSessionEnvironAdapter(BaseAdapter):
-    """Adapter for system session environ operations."""
+    """Adapter for the system session environ search and the reads by id."""
 
     _system_session_environ: SystemSessionEnvironProcessors
 
     def __init__(self, system_session_environ: SystemSessionEnvironProcessors) -> None:
         self._system_session_environ = system_session_environ
 
-    async def global_resolve(
-        self, input: AdminResolveSystemSessionEnvironInput
-    ) -> ResolveSystemSessionEnvironPayload:
-        """Read the rows a session in the domain and project receives, one per key."""
-        result = await self._system_session_environ.global_resolve.run(
-            GlobalResolveSystemSessionEnvironAction(
-                domain_id=input.domain_id, project_id=input.project_id
+    async def global_search(
+        self, input: AdminSearchSystemSessionEnvironsInput
+    ) -> AdminSearchSystemSessionEnvironsPayload:
+        """Search every system session environ row, at every scope (superadmin)."""
+        searcher = self._build_searcher(
+            SystemSessionEnvironSearcher,
+            conditions=self._convert_filter(input.filter) if input.filter else [],
+            orders=self._convert_orders(input.order) if input.order else [],
+            pagination_spec=_SYSTEM_SESSION_ENVIRON_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+        result = await self._system_session_environ.global_search.run(
+            GlobalSearchSystemSessionEnvironsAction(
+                searcher=GlobalSearcher(used_by=(), searcher=searcher)
             )
         )
-        return ResolveSystemSessionEnvironPayload(
-            items=[
-                SystemSessionEnvironNode(
-                    entity_id=row.id,
-                    key=row.key,
-                    value_source=row.value_source,
-                    scope=SystemSessionEnvironScopeInfo(
-                        scope_type=SystemSessionEnvironScopeType.of_owner(row.scope_id),
-                        scope_id=SystemSessionEnvironScopeID(row.scope_id),
-                    ),
-                )
-                for row in result.effective_rows
-            ]
+        return AdminSearchSystemSessionEnvironsPayload(
+            items=[self._data_to_node(environ) for environ in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def bulk_get_ids(
+        self, ids: Sequence[SystemSessionEnvironID]
+    ) -> list[SystemSessionEnvironNode | Exception | None]:
+        """Batch load system session environ rows by id for DataLoader use, one answer per id."""
+        if not ids:
+            return []
+        result = await self._system_session_environ.bulk_get_ids.run(
+            BulkGetSystemSessionEnvironsAction(ids=list(ids))
+        )
+        return [
+            self._data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
+
+    def _convert_filter(self, filter: SystemSessionEnvironFilter) -> list[QueryCondition]:
+        fields = SystemSessionEnvironSearchableFields.own
+        return [
+            *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
+            *self.apply_string_filter(filter.key, fields.key.filter),
+            *self.apply_enum_filter(filter.value_source, fields.value_source.filter),
+            *self.apply_enum_filter(filter.scope_type, fields.scope_type.filter),
+            *self.apply_uuid_filter(filter.scope_id, fields.scope_id.filter),
+            *self.apply_bool_filter(filter.enabled, fields.enabled.filter),
+        ]
+
+    def _convert_orders(self, orders: list[SystemSessionEnvironOrder]) -> list[QueryOrder]:
+        return [self._convert_order(order) for order in orders]
+
+    def _convert_order(self, order: SystemSessionEnvironOrder) -> QueryOrder:
+        fields = SystemSessionEnvironSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case SystemSessionEnvironOrderField.KEY:
+                return fields.key.order.apply(ascending)
+            case SystemSessionEnvironOrderField.VALUE_SOURCE:
+                return fields.value_source.order.apply(ascending)
+            case SystemSessionEnvironOrderField.SCOPE_TYPE:
+                return fields.scope_type.order.apply(ascending)
+            case SystemSessionEnvironOrderField.ENABLED:
+                return fields.enabled.order.apply(ascending)
+            case SystemSessionEnvironOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case SystemSessionEnvironOrderField.UPDATED_AT:
+                return fields.updated_at.order.apply(ascending)
+            case _:
+                assert_never(order.field)
+
+    @staticmethod
+    def _data_to_node(environ: SystemSessionEnvironData) -> SystemSessionEnvironNode:
+        return SystemSessionEnvironNode(
+            entity_id=environ.id,
+            key=environ.key,
+            value_source=environ.value_source,
+            scope=SystemSessionEnvironScopeInfo(
+                scope_type=SystemSessionEnvironScopeType.of_owner(environ.scope_id),
+                scope_id=SystemSessionEnvironScopeID(environ.scope_id),
+            ),
+            enabled=environ.enabled,
+            created_at=environ.created_at,
+            updated_at=environ.updated_at,
         )
