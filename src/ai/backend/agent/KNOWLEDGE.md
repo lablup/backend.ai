@@ -44,7 +44,7 @@ allocation, status collection/reporting — all happens here.
 
 ## State must survive restarts
 
-- The kernel registry is persisted via pickle snapshots plus container-label mirroring and recovered at boot (`kernel_registry/recovery/`).
+- The docker agent persists each kernel's recovery record in its scratch config directory and rebuilds the kernel registry from those records at boot (`kernel_registry/recovery/`). The kubernetes agent has no persistent registry and starts empty.
 - Any new field that must survive restarts has to be added to the recovery data, not just the in-memory object.
 
 ## The watcher is a separate privileged process

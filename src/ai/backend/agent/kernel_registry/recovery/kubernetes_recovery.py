@@ -1,13 +1,10 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
-from pathlib import Path
 from typing import Self
 
-from ai.backend.agent.kernel_registry.loader.pickle import PickleBasedKernelRegistryLoader
-from ai.backend.agent.kernel_registry.writer.pickle import PickleBasedKernelRegistryWriter
-from ai.backend.common.types import AgentId
+from ai.backend.agent.kernel_registry.loader.noop import NoopKernelRegistryLoader
+from ai.backend.agent.kernel_registry.writer.noop import NoopKernelRegistryWriter
 from ai.backend.logging.structured import StructuredLogger
 
 from .base_recovery import BaseKernelRegistryRecovery
@@ -15,26 +12,14 @@ from .base_recovery import BaseKernelRegistryRecovery
 log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
-@dataclass
-class KubernetesKernelRegistryRecoveryArgs:
-    scratch_root: Path
-    ipc_base_path: Path
-    var_base_path: Path
-    agent_id: AgentId
-    local_instance_id: str
-
-
 class KubernetesKernelRegistryRecovery(BaseKernelRegistryRecovery):
-    @classmethod
-    def create(cls, args: KubernetesKernelRegistryRecoveryArgs) -> Self:
-        registry_file_name = f"last_registry.{args.agent_id}.dat"
-        legacy_registry_file_path = args.ipc_base_path / registry_file_name
-        last_registry_file_path = args.var_base_path / registry_file_name
+    """
+    The kubernetes agent has no persistent kernel registry yet, so it starts empty.
+    """
 
+    @classmethod
+    def create(cls) -> Self:
         return cls(
-            loader=PickleBasedKernelRegistryLoader(
-                last_registry_file_path,
-                legacy_registry_file_path,
-            ),
-            writers=[PickleBasedKernelRegistryWriter(last_registry_file_path)],
+            loader=NoopKernelRegistryLoader(),
+            writers=[NoopKernelRegistryWriter()],
         )
