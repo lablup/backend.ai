@@ -18,6 +18,8 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
     IngressTarget,
 )
 
+_CORS_HEADERS_MIDDLEWARE_NAME: Final[str] = "CORSHeaders"
+
 
 @dataclass(frozen=True)
 class TraefikWorker:
@@ -29,8 +31,6 @@ class TraefikWorker:
 class TraefikRoutingConfigFactory:
     """Builds the Traefik router, middleware and service configs of an ingress and the etcd keys
     Traefik reads them from."""
-
-    _CORS_HEADERS_MIDDLEWARE_NAME: Final[str] = "CORSHeaders"
 
     _client_ip_strategy: ClientIPStrategyConfig | None
     _jwt_secret: str
@@ -101,7 +101,7 @@ class TraefikRoutingConfigFactory:
         ingress_key = ingress.key()
         # The ipAllowList middleware must precede the auth plugin so that disallowed
         # clients are rejected before any credential handling.
-        middleware_names = [cls._CORS_HEADERS_MIDDLEWARE_NAME]
+        middleware_names = [_CORS_HEADERS_MIDDLEWARE_NAME]
         if ingress.access.allowed_client_ips:
             middleware_names.append(cls._ip_allowlist_middleware_name(ingress_key))
         middleware_names.append(cls._auth_plugin_middleware_name(ingress_key))
@@ -126,7 +126,7 @@ class TraefikRoutingConfigFactory:
     def _http_middleware_configs(self, ingress: Ingress) -> dict[str, dict[str, Any]]:
         ingress_key = ingress.key()
         cors_headers_etcd_key = self._http_middleware_etcd_key(
-            ingress.authority, self._CORS_HEADERS_MIDDLEWARE_NAME
+            ingress.authority, _CORS_HEADERS_MIDDLEWARE_NAME
         )
         middleware_configs: dict[str, dict[str, Any]] = {
             cors_headers_etcd_key: {
