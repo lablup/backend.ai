@@ -277,6 +277,12 @@ if TYPE_CHECKING:
         StreamProcessors,
     )
     from ai.backend.manager.services.stream.service import StreamService
+    from ai.backend.manager.services.system_session_environ.processors import (
+        SystemSessionEnvironProcessors,
+    )
+    from ai.backend.manager.services.system_session_environ.service import (
+        SystemSessionEnvironService,
+    )
     from ai.backend.manager.services.template.processors import (
         TemplateProcessors,
     )
@@ -384,6 +390,7 @@ class Services:
     session_group: SessionGroupService
     manager_admin: ManagerAdminService
     secret: SecretService
+    system_session_environ: SystemSessionEnvironService
     prometheus_query_preset: PrometheusQueryPresetService
     resource_preset: ResourcePresetService
     resource_slot: ResourceSlotService
@@ -454,6 +461,7 @@ class Processors:
     keypair_resource_policy: KeypairResourcePolicyProcessors
     manager_admin: ManagerAdminProcessors
     secret: SecretProcessors
+    system_session_environ: SystemSessionEnvironProcessors
     user_resource_policy: UserResourcePolicyProcessors
     project_resource_policy: ProjectResourcePolicyProcessors
     prometheus_query_preset: PrometheusQueryPresetProcessors

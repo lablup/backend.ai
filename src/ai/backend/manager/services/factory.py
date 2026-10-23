@@ -59,6 +59,7 @@ from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.session_group import SessionGroupEntityType
 from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
+from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironEntityType
 from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.usage_bucket import (
     DomainUsageBucketFieldType,
@@ -270,6 +271,12 @@ from ai.backend.manager.services.session_group.service import SessionGroupServic
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
 from ai.backend.manager.services.stream.processors import StreamProcessors
 from ai.backend.manager.services.stream.service import StreamService
+from ai.backend.manager.services.system_session_environ.processors import (
+    SystemSessionEnvironProcessors,
+)
+from ai.backend.manager.services.system_session_environ.service import (
+    SystemSessionEnvironService,
+)
 from ai.backend.manager.services.template.processors import TemplateProcessors
 from ai.backend.manager.services.template.service import TemplateService
 from ai.backend.manager.services.user.processors import UserProcessors
@@ -392,6 +399,9 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             )
         ),
         secret=SecretService(repositories.secret.repository),
+        system_session_environ=SystemSessionEnvironService(
+            repositories.system_session_environ.repository
+        ),
         manager_admin=ManagerAdminService(
             repository=repositories.manager_admin.repository,
             config_provider=args.config_provider,
@@ -717,6 +727,10 @@ def create_processors(
         secret=SecretProcessors(
             system_groups.dangling_field_group(FieldGroupMeta(SecretFieldType()), SecretFieldData),
             services.secret,
+        ),
+        system_session_environ=SystemSessionEnvironProcessors(
+            session_groups.group(GroupMeta(SystemSessionEnvironEntityType())),
+            services.system_session_environ,
         ),
         user_resource_policy=UserResourcePolicyProcessors(
             resource_policy_groups.group(GroupMeta(UserResourcePolicyEntityType()))
