@@ -43,15 +43,30 @@ class TraefikConfigBuilder:
     def domain_entrypoint_name() -> str:
         return "domainproxy"
 
-    @staticmethod
+    @classmethod
     def http_router_config(
-        rule: str, service: str, entrypoint: str, middlewares: Sequence[str], *, tls: bool
+        cls,
+        rule: str,
+        service: str,
+        entrypoint: str,
+        *,
+        ip_allowlist_middleware_name: str | None,
+        auth_plugin_middleware_name: str,
+        middlewares_after_auth: Sequence[str] = (),
+        tls: bool,
     ) -> dict[str, Any]:
+        # The ipAllowList middleware must precede the auth plugin so that disallowed
+        # clients are rejected before any credential handling.
+        middlewares = [cls.CORS_HEADERS_MIDDLEWARE_NAME]
+        if ip_allowlist_middleware_name is not None:
+            middlewares.append(ip_allowlist_middleware_name)
+        middlewares.append(auth_plugin_middleware_name)
+        middlewares.extend(middlewares_after_auth)
         router: dict[str, Any] = {
             "rule": rule,
             "service": service,
             "entrypoints": [entrypoint],
-            "middlewares": list(middlewares),
+            "middlewares": middlewares,
         }
         if tls:
             router["tls"] = ""

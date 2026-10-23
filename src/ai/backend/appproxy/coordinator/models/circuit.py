@@ -338,22 +338,17 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
     def traefik_routers(self) -> dict[str, Any]:
         match self.protocol:
             case ProxyProtocol.HTTP:
-                # The ipAllowList middleware must precede the auth plugins so that
-                # disallowed clients are rejected before any credential handling.
-                middlewares = [TraefikConfigBuilder.CORS_HEADERS_MIDDLEWARE_NAME]
-                ranges = self._ip_validator.ranges
-                if ranges:
-                    middlewares.append(f"bai_ipallowlist_{self.id}")
-                middlewares += [
-                    f"bai_appproxy_plugin_{self.id}",
-                    f"bai_appproxy_plugin_{self.id}_go",
-                ]
+                ip_allowlist_middleware_name = (
+                    f"bai_ipallowlist_{self.id}" if self._ip_validator.ranges else None
+                )
                 return {
                     f"bai_router_{self.id}": TraefikConfigBuilder.http_router_config(
                         self.traefik_rule,
                         f"bai_service_{self.id}",
                         self.traefik_entrypoint,
-                        middlewares,
+                        ip_allowlist_middleware_name=ip_allowlist_middleware_name,
+                        auth_plugin_middleware_name=f"bai_appproxy_plugin_{self.id}",
+                        middlewares_after_auth=[f"bai_appproxy_plugin_{self.id}_go"],
                         tls=self.worker_row.tls_listen,
                     ),
                 }
