@@ -630,6 +630,32 @@ class TestEnqueueActionBuilding:
         assert action.resource.cluster_mode == ClusterMode.MULTI_NODE
         assert action.resource.cluster_size == 4
 
+    async def test_enqueue_with_session_group(
+        self,
+        adapter: SessionAdapter,
+        mock_processors: MagicMock,
+    ) -> None:
+        """The named session group should be carried on the action."""
+        session_group_id = uuid4()
+        dto = EnqueueSessionInput(
+            session_name="grouped-session",
+            session_type=CreateSessionTypeEnum.INTERACTIVE,
+            image_id=uuid4(),
+            resource_entries=[ResourceSlotEntryInput(resource_type="cpu", quantity="1")],
+            project_id=uuid4(),
+            session_group_id=session_group_id,
+        )
+        await adapter.enqueue(
+            dto,
+            user_id=uuid4(),
+            user_role="user",
+            access_key="TESTKEY",
+            domain_name="default",
+            group_id=dto.project_id,
+        )
+        action = mock_processors.session.enqueue_session.run.call_args[0][0]
+        assert action.session_group_id == session_group_id
+
     async def test_enqueue_with_agent_selection_policy(
         self,
         adapter: SessionAdapter,

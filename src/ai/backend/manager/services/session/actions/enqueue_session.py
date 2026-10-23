@@ -9,6 +9,7 @@ from typing import override
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.types import AccessKey, ClusterMode, MountInfoEntry, SessionTypes
@@ -97,6 +98,7 @@ class EnqueueSessionAction(SessionScopeAction):
 
     tag: str | None = None
     callback_url: str | None = None
+    session_group_id: SessionGroupID | None = None
 
     user_id: uuid.UUID = field(default_factory=lambda: uuid.UUID(int=0))
     user_role: UserRole = UserRole.USER
