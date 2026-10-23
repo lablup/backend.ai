@@ -48,10 +48,14 @@ class TraefikRoutingConfigFactory:
         frontend = ingress.frontend
         match frontend.protocol:
             case IngressProtocol.TCP:
-                ranges = [str(network) for network in ingress.access.allowed_client_ips]
-                if not ranges:
+                allowed_client_ip_ranges = [
+                    str(network) for network in ingress.access.allowed_client_ips
+                ]
+                if not allowed_client_ip_ranges:
                     return "ClientIP(`0.0.0.0/0`)"
-                return "ClientIP(" + ", ".join(f"`{cidr}`" for cidr in ranges) + ")"
+                return (
+                    "ClientIP(" + ", ".join(f"`{cidr}`" for cidr in allowed_client_ip_ranges) + ")"
+                )
             case IngressProtocol.HTTP | IngressProtocol.HTTP2:
                 match frontend.kind:
                     case IngressFrontendKind.PORT:
@@ -115,13 +119,13 @@ class TraefikRoutingConfigFactory:
         ip_allowlist: dict[str, Any] = {
             "sourceRange": [str(network) for network in access.allowed_client_ips],
         }
-        strategy = self._client_ip_strategy
-        if strategy is not None:
-            if strategy.depth is not None:
-                ip_allowlist["ipStrategy"] = {"depth": strategy.depth}
-            elif strategy.excluded_ips:
+        client_ip_strategy = self._client_ip_strategy
+        if client_ip_strategy is not None:
+            if client_ip_strategy.depth is not None:
+                ip_allowlist["ipStrategy"] = {"depth": client_ip_strategy.depth}
+            elif client_ip_strategy.excluded_ips:
                 ip_allowlist["ipStrategy"] = {
-                    "excludedIPs": [str(network) for network in strategy.excluded_ips],
+                    "excludedIPs": [str(network) for network in client_ip_strategy.excluded_ips],
                 }
         return {"ipAllowList": ip_allowlist}
 

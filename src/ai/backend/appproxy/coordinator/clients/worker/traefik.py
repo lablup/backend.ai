@@ -47,138 +47,163 @@ class TraefikWorkerClient(BaseWorkerClient):
         """Writes nothing if any ingress is older than the revision etcd holds, as an api-delivery
         worker does. Each ingress is then written in its own transaction to stay within etcd's
         per-transaction operation limit."""
-        workers = {
+        traefik_worker_by_authority = {
             authority: await self._worker_repository.get_traefik_worker(authority)
             for authority in {ingress.authority for ingress in ingresses}
         }
         held_revisions = [
             await self._etcd.get(self._revision_key(ingress.key())) for ingress in ingresses
         ]
-        for ingress, held in zip(ingresses, held_revisions, strict=True):
-            if held is not None and int(held) > ingress.revision:
+        for ingress, held_revision in zip(ingresses, held_revisions, strict=True):
+            if held_revision is not None and int(held_revision) > ingress.revision:
                 raise TraefikIngressRevisionConflictError(
-                    f"frontend {ingress.frontend.key()} holds revision {held}, got {ingress.revision}",
+                    f"frontend {ingress.frontend.key()} holds revision {held_revision}, "
+                    f"got {ingress.revision}",
                     extra_data={
                         "authority": ingress.authority,
                         "frontend_key": ingress.frontend.key(),
                     },
                 )
-        for ingress, held in zip(ingresses, held_revisions, strict=True):
-            await self._write(ingress, workers[ingress.authority], held)
+        for ingress, held_revision in zip(ingresses, held_revisions, strict=True):
+            await self._write(
+                ingress, traefik_worker_by_authority[ingress.authority], held_revision
+            )
 
     @override
     async def remove(self, keys: Sequence[IngressKey]) -> None:
-        for key in keys:
+        for ingress_key in keys:
             replacements: dict[str, NestedStrKeyedMapping] = {
-                prefix: {} for prefix in _ingress_prefixes(key)
+                ingress_etcd_prefix: {}
+                for ingress_etcd_prefix in _ingress_etcd_prefixes(ingress_key)
             }
-            replacements[self._revision_prefix(key)] = {}
+            replacements[self._revision_prefix(ingress_key)] = {}
             await self._etcd.atomic_replace_prefixes(replacements)
 
-    async def _write(self, ingress: Ingress, worker: TraefikWorker, held: str | None) -> None:
-        key = ingress.key()
-        revision_key = self._revision_key(key)
+    async def _write(
+        self, ingress: Ingress, worker: TraefikWorker, held_revision: str | None
+    ) -> None:
+        ingress_key = ingress.key()
+        revision_key = self._revision_key(ingress_key)
         while True:
             replacements = self._generate_ingress_subtree(ingress, worker)
-            replacements[self._revision_prefix(key)] = {"revision": str(ingress.revision)}
+            replacements[self._revision_prefix(ingress_key)] = {"revision": str(ingress.revision)}
             if await self._etcd.compare_and_replace_prefixes(
-                replacements, guards={revision_key: held}
+                replacements, guards={revision_key: held_revision}
             ):
                 return
-            held = await self._etcd.get(revision_key)
-            if held is not None and int(held) > ingress.revision:
+            held_revision = await self._etcd.get(revision_key)
+            if held_revision is not None and int(held_revision) > ingress.revision:
                 raise TraefikIngressRevisionConflictError(
-                    f"frontend {ingress.frontend.key()} holds revision {held}, got {ingress.revision}",
+                    f"frontend {ingress.frontend.key()} holds revision {held_revision}, "
+                    f"got {ingress.revision}",
                     extra_data={
                         "authority": ingress.authority,
                         "frontend_key": ingress.frontend.key(),
                     },
                 )
 
-    def _revision_prefix(self, key: IngressKey) -> str:
-        return f"{_REVISION_ROOT}/worker_{key.authority}/{key.frontend_key}"
+    def _revision_prefix(self, ingress_key: IngressKey) -> str:
+        return f"{_REVISION_ROOT}/worker_{ingress_key.authority}/{ingress_key.frontend_key}"
 
-    def _revision_key(self, key: IngressKey) -> str:
-        return f"{self._revision_prefix(key)}/revision"
+    def _revision_key(self, ingress_key: IngressKey) -> str:
+        return f"{self._revision_prefix(ingress_key)}/revision"
 
     def _generate_ingress_subtree(
         self, ingress: Ingress, worker: TraefikWorker
     ) -> dict[str, NestedStrKeyedMapping]:
-        key = ingress.key()
-        names = _Names(key)
-        factory = self._routing_config_factory
+        ingress_key = ingress.key()
+        object_names = _IngressTraefikObjectNames(ingress_key)
+        routing_config_factory = self._routing_config_factory
         # Every prefix of the ingress is listed so a protocol or middleware it no longer has
         # is cleared in the same transaction.
         subtrees: dict[str, NestedStrKeyedMapping] = {
-            prefix: {} for prefix in _ingress_prefixes(key)
+            ingress_etcd_prefix: {} for ingress_etcd_prefix in _ingress_etcd_prefixes(ingress_key)
         }
-        root = factory.etcd_prefix(key.authority, ingress.frontend.protocol)
-        rule = factory.router_rule(ingress, worker)
-        entrypoint_name = factory.entrypoint_name(ingress.frontend)
+        protocol_etcd_prefix = routing_config_factory.etcd_prefix(
+            ingress_key.authority, ingress.frontend.protocol
+        )
+        router_rule = routing_config_factory.router_rule(ingress, worker)
+        entrypoint_name = routing_config_factory.entrypoint_name(ingress.frontend)
         match ingress.frontend.protocol:
             case IngressProtocol.TCP:
-                subtrees[f"{root}/routers/{names.router}"] = convert_to_etcd_dict(
-                    factory.tcp_router_config(rule, names.service, entrypoint_name)
+                subtrees[f"{protocol_etcd_prefix}/routers/{object_names.router_name}"] = (
+                    convert_to_etcd_dict(
+                        routing_config_factory.tcp_router_config(
+                            router_rule, object_names.service_name, entrypoint_name
+                        )
+                    )
                 )
-                subtrees[f"{root}/services/{names.service}"] = convert_to_etcd_dict(
-                    factory.tcp_service_config(ingress.backend)
+                subtrees[f"{protocol_etcd_prefix}/services/{object_names.service_name}"] = (
+                    convert_to_etcd_dict(routing_config_factory.tcp_service_config(ingress.backend))
                 )
             case IngressProtocol.HTTP | IngressProtocol.HTTP2:
                 has_allowed_client_ips = bool(ingress.access.allowed_client_ips)
-                subtrees[f"{root}/routers/{names.router}"] = convert_to_etcd_dict(
-                    factory.http_router_config(
-                        rule,
-                        names.service,
-                        entrypoint_name,
-                        ip_allowlist_middleware_name=(
-                            names.ip_allowlist if has_allowed_client_ips else None
-                        ),
-                        auth_plugin_middleware_name=names.auth,
-                        tls=worker.tls_listen,
+                subtrees[f"{protocol_etcd_prefix}/routers/{object_names.router_name}"] = (
+                    convert_to_etcd_dict(
+                        routing_config_factory.http_router_config(
+                            router_rule,
+                            object_names.service_name,
+                            entrypoint_name,
+                            ip_allowlist_middleware_name=(
+                                object_names.ip_allowlist_middleware_name
+                                if has_allowed_client_ips
+                                else None
+                            ),
+                            auth_plugin_middleware_name=object_names.auth_plugin_middleware_name,
+                            tls=worker.tls_listen,
+                        )
                     )
                 )
-                subtrees[f"{root}/services/{names.service}"] = convert_to_etcd_dict(
-                    factory.http_service_config(ingress.backend)
+                subtrees[f"{protocol_etcd_prefix}/services/{object_names.service_name}"] = (
+                    convert_to_etcd_dict(
+                        routing_config_factory.http_service_config(ingress.backend)
+                    )
                 )
-                subtrees[f"{root}/middlewares/{factory.CORS_HEADERS_MIDDLEWARE_NAME}"] = (
-                    convert_to_etcd_dict(factory.cors_headers_middleware_config())
-                )
+                subtrees[
+                    f"{protocol_etcd_prefix}/middlewares/{routing_config_factory.CORS_HEADERS_MIDDLEWARE_NAME}"
+                ] = convert_to_etcd_dict(routing_config_factory.cors_headers_middleware_config())
                 if has_allowed_client_ips:
-                    subtrees[f"{root}/middlewares/{names.ip_allowlist}"] = convert_to_etcd_dict(
-                        factory.ip_allowlist_middleware_config(ingress.access)
+                    subtrees[
+                        f"{protocol_etcd_prefix}/middlewares/{object_names.ip_allowlist_middleware_name}"
+                    ] = convert_to_etcd_dict(
+                        routing_config_factory.ip_allowlist_middleware_config(ingress.access)
                     )
-                subtrees[f"{root}/middlewares/{names.auth}"] = (
-                    factory.auth_plugin_middleware_config(ingress)
-                )
+                subtrees[
+                    f"{protocol_etcd_prefix}/middlewares/{object_names.auth_plugin_middleware_name}"
+                ] = routing_config_factory.auth_plugin_middleware_config(ingress)
         return subtrees
 
 
-class _Names:
+class _IngressTraefikObjectNames:
     """Traefik object names of one ingress. Frontend keys hold no '_', so no name of one
     ingress is a prefix of another's."""
 
-    router: str
-    service: str
-    ip_allowlist: str
-    auth: str
+    router_name: str
+    service_name: str
+    ip_allowlist_middleware_name: str
+    auth_plugin_middleware_name: str
 
-    def __init__(self, key: IngressKey) -> None:
-        base = f"bai_ingress_{key.frontend_key}"
-        self.router = f"{base}_router"
-        self.service = f"{base}_service"
-        self.ip_allowlist = f"{base}_ipallowlist"
-        self.auth = f"{base}_auth"
+    def __init__(self, ingress_key: IngressKey) -> None:
+        name_prefix = f"bai_ingress_{ingress_key.frontend_key}"
+        self.router_name = f"{name_prefix}_router"
+        self.service_name = f"{name_prefix}_service"
+        self.ip_allowlist_middleware_name = f"{name_prefix}_ipallowlist"
+        self.auth_plugin_middleware_name = f"{name_prefix}_auth"
 
 
-def _ingress_prefixes(key: IngressKey) -> list[str]:
-    names = _Names(key)
-    http = TraefikRoutingConfigFactory.etcd_prefix(key.authority, IngressProtocol.HTTP)
-    tcp = TraefikRoutingConfigFactory.etcd_prefix(key.authority, IngressProtocol.TCP)
+def _ingress_etcd_prefixes(ingress_key: IngressKey) -> list[str]:
+    object_names = _IngressTraefikObjectNames(ingress_key)
+    http_etcd_prefix = TraefikRoutingConfigFactory.etcd_prefix(
+        ingress_key.authority, IngressProtocol.HTTP
+    )
+    tcp_etcd_prefix = TraefikRoutingConfigFactory.etcd_prefix(
+        ingress_key.authority, IngressProtocol.TCP
+    )
     return [
-        f"{http}/routers/{names.router}",
-        f"{http}/services/{names.service}",
-        f"{http}/middlewares/{names.ip_allowlist}",
-        f"{http}/middlewares/{names.auth}",
-        f"{tcp}/routers/{names.router}",
-        f"{tcp}/services/{names.service}",
+        f"{http_etcd_prefix}/routers/{object_names.router_name}",
+        f"{http_etcd_prefix}/services/{object_names.service_name}",
+        f"{http_etcd_prefix}/middlewares/{object_names.ip_allowlist_middleware_name}",
+        f"{http_etcd_prefix}/middlewares/{object_names.auth_plugin_middleware_name}",
+        f"{tcp_etcd_prefix}/routers/{object_names.router_name}",
+        f"{tcp_etcd_prefix}/services/{object_names.service_name}",
     ]

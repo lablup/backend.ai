@@ -47,25 +47,25 @@ class IngressService:
         by_authority: defaultdict[IngressAuthority, list[Ingress]] = defaultdict(list)
         for ingress in ingresses:
             by_authority[ingress.authority].append(ingress)
-        worker_clients = await self._worker_clients(by_authority.keys())
+        worker_clients_by_authority = await self._worker_clients_by_authority(by_authority.keys())
         await self._await_every_push([
-            client.upsert(by_authority[authority])
-            for authority, clients in worker_clients.items()
-            for client in clients
+            worker_client.upsert(by_authority[authority])
+            for authority, worker_clients in worker_clients_by_authority.items()
+            for worker_client in worker_clients
         ])
 
     async def remove(self, keys: Sequence[IngressKey]) -> None:
         by_authority: defaultdict[IngressAuthority, list[IngressKey]] = defaultdict(list)
         for key in keys:
             by_authority[key.authority].append(key)
-        worker_clients = await self._worker_clients(by_authority.keys())
+        worker_clients_by_authority = await self._worker_clients_by_authority(by_authority.keys())
         await self._await_every_push([
-            client.remove(by_authority[authority])
-            for authority, clients in worker_clients.items()
-            for client in clients
+            worker_client.remove(by_authority[authority])
+            for authority, worker_clients in worker_clients_by_authority.items()
+            for worker_client in worker_clients
         ])
 
-    async def _worker_clients(
+    async def _worker_clients_by_authority(
         self, authorities: Iterable[IngressAuthority]
     ) -> dict[IngressAuthority, list[BaseWorkerClient]]:
         if self._traefik_client is not None:
