@@ -3327,27 +3327,140 @@ class ScheduleDBSource:
 
         async with self._db.begin_session_read_committed() as db_sess:
             now = await self._get_db_now_in_session(db_sess)
-            stmt = (
-                sa.update(KernelRow)
+            return await self._update_kernels_to_creating(db_sess, session_ids, reason, now)
+
+    async def _update_kernels_to_creating(
+        self,
+        db_sess: SASession,
+        session_ids: Sequence[SessionId],
+        reason: str,
+        now: datetime,
+    ) -> int:
+        """Move the PREPARED kernels of the sessions to CREATING inside the caller's
+        transaction. Returns the number of kernels updated."""
+        stmt = (
+            sa.update(KernelRow)
+            .where(
+                sa.and_(
+                    KernelRow.session_id.in_(session_ids),
+                    KernelRow.status == KernelStatus.PREPARED,
+                )
+            )
+            .values(
+                status=KernelStatus.CREATING,
+                status_info=reason,
+                status_changed=now,
+                status_history=sql_json_merge(
+                    KernelRow.__table__.c.status_history,
+                    (),
+                    {KernelStatus.CREATING.name: now.isoformat()},
+                ),
+            )
+        )
+        result = await db_sess.execute(stmt)
+        return cast(CursorResult[Any], result).rowcount
+
+    async def claim_sessions_for_start(
+        self, session_ids: Sequence[SessionId], reason: str
+    ) -> set[SessionId]:
+        """
+        Claim PREPARED sessions for one START pass before their kernels are created.
+
+        Moves the sessions that are still PREPARED, and their PREPARED kernels, to
+        CREATING in one transaction. The conditional session update is the claim: a
+        second pass claiming the same session waits for the first one's row lock, then
+        finds the session CREATING and leaves it out. The coordinator's own CREATING
+        transition after the pass then records the history. A deadlock with another
+        multi-session update rolls the claim back whole, and the claim is retried.
+
+        :param session_ids: IDs of the PREPARED sessions the pass fetched
+        :param reason: The reason recorded on the claimed kernels
+        :return: IDs of the sessions this call claimed
+        """
+        if not session_ids:
+            return set()
+
+        async with self._db.begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
+            claim_result = await db_sess.execute(
+                sa.update(SessionRow)
                 .where(
                     sa.and_(
-                        KernelRow.session_id.in_(session_ids),
-                        KernelRow.status == KernelStatus.PREPARED,
+                        SessionRow.id.in_(session_ids),
+                        SessionRow.status == SessionStatus.PREPARED,
                     )
                 )
                 .values(
-                    status=KernelStatus.CREATING,
-                    status_info=reason,
+                    status=SessionStatus.CREATING,
+                    status_history=sql_json_merge(
+                        SessionRow.__table__.c.status_history,
+                        (),
+                        {SessionStatus.CREATING.name: now.isoformat()},
+                    ),
+                )
+                .returning(SessionRow.id)
+            )
+            claimed_session_ids = [SessionId(row.id) for row in claim_result]
+            if claimed_session_ids:
+                await self._update_kernels_to_creating(db_sess, claimed_session_ids, reason, now)
+            return set(claimed_session_ids)
+
+    async def release_sessions_for_start(self, session_ids: Sequence[SessionId]) -> int:
+        """
+        Return the claim of sessions a START pass did not launch.
+
+        Moves the sessions that are still CREATING, and their CREATING kernels, back to
+        PREPARED, so the next START pass picks them up again. A session that moved on in
+        the meantime (for example, terminated by the user) keeps its status.
+
+        :param session_ids: IDs of the sessions claimed by `claim_sessions_for_start`
+        :return: The number of sessions released
+        """
+        if not session_ids:
+            return 0
+
+        async with self._db.begin_session_read_committed() as db_sess:
+            now = await self._get_db_now_in_session(db_sess)
+            release_result = await db_sess.execute(
+                sa.update(SessionRow)
+                .where(
+                    sa.and_(
+                        SessionRow.id.in_(session_ids),
+                        SessionRow.status == SessionStatus.CREATING,
+                    )
+                )
+                .values(
+                    status=SessionStatus.PREPARED,
+                    status_history=sql_json_merge(
+                        SessionRow.__table__.c.status_history,
+                        (),
+                        {SessionStatus.PREPARED.name: now.isoformat()},
+                    ),
+                )
+                .returning(SessionRow.id)
+            )
+            released_session_ids = [SessionId(row.id) for row in release_result]
+            if not released_session_ids:
+                return 0
+            await db_sess.execute(
+                sa.update(KernelRow)
+                .where(
+                    sa.and_(
+                        KernelRow.session_id.in_(released_session_ids),
+                        KernelRow.status == KernelStatus.CREATING,
+                    )
+                )
+                .values(
+                    status=KernelStatus.PREPARED,
                     status_changed=now,
                     status_history=sql_json_merge(
                         KernelRow.__table__.c.status_history,
                         (),
-                        {KernelStatus.CREATING.name: now.isoformat()},
+                        {KernelStatus.PREPARED.name: now.isoformat()},
                     ),
                 )
             )
-            result = await db_sess.execute(stmt)
-            return cast(CursorResult[Any], result).rowcount
+            return len(released_session_ids)
 
     async def update_kernels_to_terminated(self, kernel_ids: list[str], reason: str) -> int:
         """
@@ -4112,22 +4225,27 @@ class ScheduleDBSource:
         self,
         updater: SessionStatusBatchUpdater,
         histories: Sequence[SessionHistoryToCreate],
-    ) -> int:
+    ) -> list[SessionId]:
         """Move the sessions the updater selects and record each transition, in one
         transaction. A repeated transition is counted onto the session's latest
-        history row instead of inserting another.
+        history row instead of inserting another. A session the updater leaves alone
+        (``except_statuses``) gets no history row.
 
-        Returns the number of sessions updated.
+        Returns the IDs of the sessions updated.
         """
         async with self._reconcile_ops.write_ops() as w:
-            updated = await w.apply_batch_transition(
+            updated = await w.batch_update_in_global(updater)
+            updated_ids = [SessionId(data.id) for data in updated]
+            updated_id_set = set(updated_ids)
+            await w.apply_batch_transition(
                 BatchReconcileTransition(
-                    histories=self._to_field_creations(histories),
+                    histories=self._to_field_creations([
+                        history for history in histories if history.session_id in updated_id_set
+                    ]),
                     owner_column=SessionSchedulingHistoryRow.session_id,
-                    status_updater=updater,
                 )
             )
-            return len(updated)
+            return updated_ids
 
     async def create_scheduling_history(
         self,
