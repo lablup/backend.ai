@@ -25,7 +25,7 @@ _REVISION_ROOT: Final[str] = "ingress_revisions"
 @dataclass(frozen=True)
 class TraefikWorkerClientArgs:
     etcd: TraefikEtcd
-    workers: WorkerRepository
+    worker_repository: WorkerRepository
     routing_config_factory: TraefikRoutingConfigFactory
 
 
@@ -34,12 +34,12 @@ class TraefikWorkerClient(BaseWorkerClient):
     revision. The revision is kept in etcd and guards the replacement transaction."""
 
     _etcd: TraefikEtcd
-    _workers: WorkerRepository
+    _worker_repository: WorkerRepository
     _routing_config_factory: TraefikRoutingConfigFactory
 
     def __init__(self, args: TraefikWorkerClientArgs) -> None:
         self._etcd = args.etcd
-        self._workers = args.workers
+        self._worker_repository = args.worker_repository
         self._routing_config_factory = args.routing_config_factory
 
     @override
@@ -48,7 +48,7 @@ class TraefikWorkerClient(BaseWorkerClient):
         worker does. Each ingress is then written in its own transaction to stay within etcd's
         per-transaction operation limit."""
         workers = {
-            authority: await self._workers.get_traefik_worker(authority)
+            authority: await self._worker_repository.get_traefik_worker(authority)
             for authority in {ingress.authority for ingress in ingresses}
         }
         held_revisions = [

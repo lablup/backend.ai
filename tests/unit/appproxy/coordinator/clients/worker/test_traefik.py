@@ -113,7 +113,7 @@ def client(
     return TraefikWorkerClient(
         TraefikWorkerClientArgs(
             etcd=traefik_etcd,
-            workers=worker_repository,
+            worker_repository=worker_repository,
             routing_config_factory=routing_config_factory,
         )
     )
@@ -128,7 +128,7 @@ def client_on_etcd_holding_10206(
     return TraefikWorkerClient(
         TraefikWorkerClientArgs(
             etcd=etcd_holding_a_newer_revision_of_10206,
-            workers=worker_repository,
+            worker_repository=worker_repository,
             routing_config_factory=routing_config_factory,
         )
     )
