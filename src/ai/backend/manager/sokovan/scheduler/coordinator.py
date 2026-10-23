@@ -1288,7 +1288,23 @@ class ScheduleCoordinator:
                 )
                 for info in session_infos
             ]
-            updated = await self._repository.update_with_history(updater, histories)
+            if transition.kernel == KernelStatus.PENDING:
+                # Requeue atomically, and only sessions still in the status they were
+                # classified in: a session force-terminated meanwhile must stay terminal.
+                await self._record_failed_agents(session_ids)
+                updated, reset_count = await self._repository.requeue_sessions_with_history(
+                    updater,
+                    histories,
+                    kernel_reason=KernelLifecycleEventReason.EXCEEDED_MAX_RETRIES,
+                    expected_statuses={info.session_id: info.from_status for info in session_infos},
+                )
+                log.debug(
+                    "kernels reset while requeueing sessions",
+                    kernel_count=reset_count,
+                    session_count=updated,
+                )
+            else:
+                updated = await self._repository.update_with_history(updater, histories)
             log.debug(
                 "session status updated",
                 session_count=updated,
@@ -1296,29 +1312,11 @@ class ScheduleCoordinator:
                 scheduling_result=scheduling_result,
             )
 
-        # Kernel status reset if transitioning to PENDING
-        if transition.kernel == KernelStatus.PENDING:
-            await self._apply_kernel_pending_resets(session_ids)
+    async def _record_failed_agents(self, session_ids: list[SessionId]) -> None:
+        """Record the sessions' current agents as failed placements before a reset clears them.
 
-    async def _apply_kernel_pending_resets(
-        self,
-        session_ids: list[SessionId],
-    ) -> None:
-        """Reset kernels to PENDING for sessions going back to PENDING.
-
-        When sessions exceed max retries, they go back to PENDING for re-scheduling.
-        This also resets their kernels to PENDING and clears agent assignments.
-        Before resetting, records the current agent assignments as failed agents
-        so the scheduler can deprioritize them on retry.
-
-        Args:
-            session_ids: List of session IDs whose kernels should be reset
+        Best-effort: Valkey issues must not block kernel resets.
         """
-        if not session_ids:
-            return
-
-        # Record current agent assignments before they are cleared by the reset.
-        # This is best-effort: Valkey issues must not block kernel resets.
         agent_ids_by_session = await self._repository.get_agent_ids_for_sessions(session_ids)
         record_sessions: list[SessionId] = []
         record_tasks: list[Awaitable[None]] = []
@@ -1337,14 +1335,6 @@ class ScheduleCoordinator:
                         session_id=session_id,
                         exc_info=result,
                     )
-
-        reset_count = await self._kernel_state_engine.reset_kernels_to_pending_for_sessions(
-            session_ids,
-            reason=KernelLifecycleEventReason.EXCEEDED_MAX_RETRIES,
-        )
-        log.debug(
-            "kernels reset to pending", kernel_count=reset_count, session_count=len(session_ids)
-        )
 
     async def _record_history_without_transition(
         self,

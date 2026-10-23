@@ -70,3 +70,29 @@ class TestMarkSessionsStatus:
 
         assert result == []
         event_producer.broadcast_events_batch.assert_not_awaited()
+
+
+class TestBroadcastStatusTransitions:
+    async def test_each_session_is_broadcast_with_the_target_status(self) -> None:
+        """A transition written by a repository requeue is announced like a marked one."""
+        controller, _repository, _valkey_schedule, event_producer = _build_controller()
+        requeued = [SessionId(uuid.uuid4()), SessionId(uuid.uuid4())]
+
+        await controller.broadcast_status_transitions(
+            requeued, SessionStatus.PENDING, KernelLifecycleEventReason.RESCHEDULED
+        )
+
+        broadcast_events = event_producer.broadcast_events_batch.await_args.args[0]
+        assert [event.session_id for event in broadcast_events] == requeued
+        for event in broadcast_events:
+            assert event.status_transition == str(SessionStatus.PENDING)
+            assert event.reason == KernelLifecycleEventReason.RESCHEDULED
+
+    async def test_no_session_is_a_noop(self) -> None:
+        controller, _repository, _valkey_schedule, event_producer = _build_controller()
+
+        await controller.broadcast_status_transitions(
+            [], SessionStatus.PENDING, KernelLifecycleEventReason.RESCHEDULED
+        )
+
+        event_producer.broadcast_events_batch.assert_not_awaited()
