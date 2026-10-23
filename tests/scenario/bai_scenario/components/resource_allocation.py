@@ -64,7 +64,7 @@ from bai_scenario.seeds.resource_policy.keypair import TestSeedKeypairPolicy
 from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
 from bai_scenario.seeds.resource_slot.slot_type import TestSeedResourceSlotType
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
-from bai_scenario.seeds.session.kernel import TestSeedKernelOf
+from bai_scenario.seeds.session.kernel import TestSeedKernelOf, TestSeedMainKernelGroupOf
 from bai_scenario.seeds.session.session import TestSeedSession
 from bai_scenario.seeds.user.fields import TestSeedKeypairOf
 
@@ -190,9 +190,15 @@ async def lay_a_kernel(seeding: Any, place: LaidPlace) -> AKernel:
         TestSeedSession(access_key=place.access_key), place.project, place.owner, place.group
     )
     slots = asked_for(seeding, place)
+    group = await seeding.adding(
+        TestSeedMainKernelGroupOf(image=seeding.made(place.image), slots=slots), session
+    )
     kernel = await seeding.adding_with_nested(
         TestSeedKernelOf(
-            session=seeding.made(session), image=seeding.made(place.image), slots=slots
+            session=seeding.made(session),
+            group=seeding.made(group),
+            image=seeding.made(place.image),
+            slots=slots,
         ),
         session,
     )

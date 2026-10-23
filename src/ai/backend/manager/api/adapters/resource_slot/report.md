@@ -1044,6 +1044,7 @@ Given
   - 이미지 image-1: x86_64 이미지
   - 자원 슬롯 종류 slot-1: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1인 커널 하나를 갖는다
 
 When
@@ -1773,8 +1774,10 @@ Given
   - 이미지 image-1: x86_64 이미지
   - 자원 슬롯 종류 slot-1: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1인 커널 하나를 갖는다
   - 세션 session-2: 스케줄링을 기다리고 있다
+  - 세션 session-2: main 커널 그룹 하나를 갖는다
   - 세션 session-2: 요구량이 slot-1 1인 커널 하나를 갖는다
 
 When
@@ -1816,6 +1819,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -1857,6 +1861,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -1908,6 +1913,7 @@ Given
   - 자원 슬롯 종류 slot-10: count 종류
   - 자원 슬롯 종류 slot-11: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2, slot-3 3, slot-4 4, slot-5 5, slot-6 6, slot-7 7, slot-8 8, slot-9 9, slot-10 10, slot-11 11인 커널 하나를 갖는다
 
 When
@@ -1949,6 +1955,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -1990,6 +1997,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -2028,6 +2036,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -2419,6 +2428,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
   - 도메인 범위의 세션 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
@@ -2466,6 +2476,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -2505,6 +2516,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -2544,6 +2556,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -2579,6 +2592,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
   - 프로젝트 범위의 세션 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
@@ -2625,6 +2639,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -2662,6 +2677,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
   - 프로젝트 범위의 세션 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
@@ -2712,6 +2728,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -2754,6 +2771,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -2796,6 +2814,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -2834,6 +2853,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -2872,6 +2892,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -2910,6 +2931,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -2947,6 +2969,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
   - 도메인 범위의 세션 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
@@ -2991,6 +3014,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
   - 프로젝트 범위의 세션 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
@@ -3038,6 +3062,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -3077,6 +3102,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -3116,6 +3142,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -3155,6 +3182,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
