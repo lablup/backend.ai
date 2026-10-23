@@ -25,9 +25,11 @@ from ai.backend.manager.models.rbac_models.permission.permission import Permissi
 from ai.backend.manager.models.rbac_models.role.creators import RoleCreator
 from ai.backend.manager.models.rbac_models.role.purgers import RolePurger
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.role.searchable_fields import RoleSearchableFields
 from ai.backend.manager.models.rbac_models.role.updaters import RoleSoftDeleteUpdater, RoleUpdater
 from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
 from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
+from ai.backend.manager.models.specs.soft_delete import RestoreUpdater
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -78,7 +80,12 @@ class TestRoleWrite:
     def repository(self, db_with_tables: ExtendedAsyncSAEngine) -> OpsRepository[RoleData]:
         return OpsRepository(V2DBOpsProvider(db_with_tables))
 
-    async def _insert_role(self, db: ExtendedAsyncSAEngine, source: RoleSource) -> RoleID:
+    async def _insert_role(
+        self,
+        db: ExtendedAsyncSAEngine,
+        source: RoleSource,
+        status: RoleStatus = RoleStatus.ACTIVE,
+    ) -> RoleID:
         role_id = RoleID(uuid.uuid4())
         project_id = ProjectID(uuid.uuid4())
         async with db.begin_session() as db_sess:
@@ -89,7 +96,7 @@ class TestRoleWrite:
                     id=role_id,
                     name=f"role-{source.value}",
                     source=source,
-                    status=RoleStatus.ACTIVE,
+                    status=status,
                     scope_type=ProjectEntityType(),
                     scope_id=project_id,
                 )
@@ -111,11 +118,50 @@ class TestRoleWrite:
         updated = await repository.update(self._rename(role_id))
         assert updated.name == "renamed"
         deleted = await repository.update(RoleSoftDeleteUpdater(role_id=role_id))
-        assert deleted.status == RoleStatus.DELETED
+        assert deleted.status == RoleStatus.ACTIVE
         assert deleted.deleted_at is not None
         purged = await repository.purge_entity(RolePurger(role_id=role_id))
         assert purged.id == role_id
         assert await self._source_of(db_with_tables, role_id) is None
+
+    async def test_restore_keeps_the_status_held_before_the_soft_delete(
+        self, repository: OpsRepository[RoleData], db_with_tables: ExtendedAsyncSAEngine
+    ) -> None:
+        role_id = await self._insert_role(db_with_tables, RoleSource.CUSTOM, RoleStatus.INACTIVE)
+        await repository.update(RoleSoftDeleteUpdater(role_id=role_id))
+
+        restored = await repository.update(
+            RestoreUpdater(
+                target_row=RoleRow,
+                target_column=RoleRow.id,
+                target_id=role_id,
+                converter=RoleSearchableFields.own,
+            )
+        )
+
+        assert restored.status == RoleStatus.INACTIVE
+        assert restored.deleted_at is None
+
+    async def test_restored_inactive_role_can_be_activated_by_update(
+        self, repository: OpsRepository[RoleData], db_with_tables: ExtendedAsyncSAEngine
+    ) -> None:
+        role_id = await self._insert_role(db_with_tables, RoleSource.CUSTOM, RoleStatus.INACTIVE)
+        await repository.update(RoleSoftDeleteUpdater(role_id=role_id))
+        await repository.update(
+            RestoreUpdater(
+                target_row=RoleRow,
+                target_column=RoleRow.id,
+                target_id=role_id,
+                converter=RoleSearchableFields.own,
+            )
+        )
+
+        updated = await repository.update(
+            RoleUpdater(role_id=role_id, status=OptionalState.update(RoleStatus.ACTIVE))
+        )
+
+        assert updated.status == RoleStatus.ACTIVE
+        assert updated.deleted_at is None
 
     async def test_system_role_update_is_refused(
         self, repository: OpsRepository[RoleData], db_with_tables: ExtendedAsyncSAEngine

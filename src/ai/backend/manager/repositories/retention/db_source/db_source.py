@@ -27,7 +27,6 @@ from ai.backend.manager.data.auth.login_session_types import LoginSessionStatus
 from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle, RouteStatus
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.retention.types import (
     RetentionCategory,
     RetentionPolicyData,
@@ -171,7 +170,6 @@ class RetentionDBSource:
                     RoleRow,
                     RoleRow.deleted_at,
                     threshold,
-                    conditions=(RoleRow.status == RoleStatus.DELETED,),
                     entity=RoleEntityType(),
                 ),
                 # An offer that ran out is settled by its own moment rather than by

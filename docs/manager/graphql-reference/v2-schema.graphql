@@ -17828,6 +17828,11 @@ input RoleFilter {
   source: RoleSourceFilter = null
   status: RoleStatusFilter = null
 
+  """
+  Added in 26.10.0. Filter by soft-delete time. Setting it on the top-level filter includes soft-deleted roles; inside AND, OR or NOT it does not.
+  """
+  deletedAt: NullableDateTimeFilter = null
+
   """Filter roles by the users holding them."""
   assignedUser: RoleUserNestedFilter = null @deprecated(reason: "Deprecated since 26.9.0. A filter reaching the rows that join a role to a user cannot check whether the caller may read that user. Search roles within that user's scope instead.")
   mappedScope: RoleMappedScopeNestedFilter = null
@@ -18325,7 +18330,7 @@ input RoleSourceFilter {
 enum RoleStatus {
   ACTIVE
   INACTIVE
-  DELETED
+  DELETED @deprecated(reason: "Deprecated since 26.10.0. No role is stored with it; read `deletedAt` for soft deletion.")
 }
 
 """
@@ -22064,7 +22069,7 @@ input UpdateRoleInput {
   description: String
 
   """
-  DELETED is handled as `deleteRole`, ACTIVE on a deleted role as `restoreRole`; other values are ignored.
+  ACTIVE and INACTIVE set the status. DELETED is handled as `deleteRole`; ACTIVE on a deleted role also runs `restoreRole`.
   """
   status: RoleStatus @deprecated(reason: "Deprecated since 26.10.0. Use `deleteRole` or `restoreRole`.")
 

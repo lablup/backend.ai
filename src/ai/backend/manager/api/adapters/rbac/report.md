@@ -56,7 +56,7 @@
 | 시나리오 | 판정 |
 |---|---|
 | [아무 권한도 받지 않은 사용자가 역할 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-roles) | 성공 |
-| [활성 역할 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 삭제 상태로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | 성공 |
+| [활성 역할 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 soft delete 된 채로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | 성공 |
 
 **partial_bulk_purge**
 
@@ -97,7 +97,7 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [슈퍼관리자가 역할의 status 를 DELETED 로 고치면, soft delete 되어 삭제 상태로 온다](#editing-editing-status-to-deleted-soft-deletes-the-role) | 성공 |
+| [슈퍼관리자가 역할의 status 를 DELETED 로 고치면, soft delete 되어 status 는 그대로 온다](#editing-editing-status-to-deleted-soft-deletes-the-role) | 성공 |
 | [슈퍼관리자가 역할의 설명을 바꾸면, 새 설명을 실은 역할 전체가 온다](#editing-the-superadmin-edits-a-role) | 성공 |
 | [아무 권한도 받지 않은 사용자는 역할을 수정할 수 없다](#editing-a-user-granted-nothing-may-not-edit-a-role) | 거부 |
 
@@ -196,7 +196,7 @@ Then
 
 #### [soft-deleting-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/rbac/test_partial_bulk_deleting.py) — pass
 
-활성 역할 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 삭제 상태로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+활성 역할 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 soft delete 된 채로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
 Given
 
@@ -217,12 +217,12 @@ When
 
 Then
 
-- 역할이 모두 삭제 상태로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+- 역할이 모두 soft delete 된 상태로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
   - successes count = 2
   - successes[0].name = 'role-1'
   - successes[0].description = None
   - successes[0].source = <RoleSourceDTO.CUSTOM: 'custom'>
-  - successes[0].status = <RoleStatusDTO.DELETED: 'deleted'>
+  - successes[0].status = <RoleStatusDTO.ACTIVE: 'active'>
   - successes[0].auto_assign = False
   - successes[0].scope_type = 'domain'
   - successes[0].scope_id: 역할을 둔 도메인의 id와 같다
@@ -235,7 +235,7 @@ Then
   - successes[1].name = 'role-2'
   - successes[1].description = None
   - successes[1].source = <RoleSourceDTO.CUSTOM: 'custom'>
-  - successes[1].status = <RoleStatusDTO.DELETED: 'deleted'>
+  - successes[1].status = <RoleStatusDTO.ACTIVE: 'active'>
   - successes[1].auto_assign = False
   - successes[1].scope_type = 'domain'
   - successes[1].scope_id: 역할을 둔 도메인의 id와 같다
@@ -659,7 +659,7 @@ Then
 
 #### [editing-status-to-deleted-soft-deletes-the-role](/tests/scenario/bai_scenario/manager/rbac/test_editing.py) — pass
 
-슈퍼관리자가 역할의 status 를 DELETED 로 고치면, soft delete 되어 삭제 상태로 온다
+슈퍼관리자가 역할의 status 를 DELETED 로 고치면, soft delete 되어 status 는 그대로 온다
 
 Given
 
@@ -679,11 +679,11 @@ When
 
 Then
 
-- 삭제 상태의 역할 전체가 온다
+- soft delete 된 역할 전체가 온다
   - name = 'role-1'
   - description = None
   - source = <RoleSourceDTO.CUSTOM: 'custom'>
-  - status = <RoleStatusDTO.DELETED: 'deleted'>
+  - status = <RoleStatusDTO.ACTIVE: 'active'>
   - auto_assign = False
   - scope_type = 'domain'
   - scope_id: 역할을 둔 도메인의 id와 같다

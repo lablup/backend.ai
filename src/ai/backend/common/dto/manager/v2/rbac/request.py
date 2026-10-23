@@ -16,6 +16,7 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.query import (
     DateTimeFilter,
+    NullableDateTimeFilter,
     StringFilter,
     ToManyFilter,
     UUIDFilter,
@@ -138,8 +139,8 @@ class UpdateRoleInput(BaseRequestModel):
         default=UNSET,
         description=(
             f"Deprecated since {NEXT_RELEASE_VERSION}. Use the role delete and restore "
-            "operations. DELETED is handled as delete, ACTIVE on a deleted role as restore; "
-            "other values are ignored."
+            "operations. ACTIVE and INACTIVE set the status. DELETED is handled as delete; "
+            "ACTIVE on a deleted role also restores it."
         ),
         deprecated=True,
     )
@@ -382,11 +383,22 @@ class RolePermissionNestedFilter(ToManyFilter[PermissionFilter]):
 
 
 class RoleFilter(BaseRequestModel):
-    """Filter for roles."""
+    """Filter for roles.
+
+    Soft-deleted roles are left out unless the top-level filter gives ``deleted_at``. Inside
+    ``AND``/``OR``/``NOT`` it does not lift that default.
+    """
 
     name: StringFilter | None = None
     source: RoleSourceFilter | None = None
     status: RoleStatusFilter | None = None
+    deleted_at: NullableDateTimeFilter | None = Field(
+        default=None,
+        description=(
+            f"Added in {NEXT_RELEASE_VERSION}. Filter by soft-delete time. Setting it on the "
+            "top-level filter includes soft-deleted roles; inside AND, OR or NOT it does not."
+        ),
+    )
     assigned_user: UserNestedFilter | None = Field(
         default=None,
         description=(

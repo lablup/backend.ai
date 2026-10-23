@@ -1,7 +1,7 @@
 """DataUpdater implementations for the role repository.
 
-The ``status`` column is split off from the general updater, so the ordinary edit
-path has no field to make the transition with (`models/specs/AGENTS.md`).
+``deleted_at`` is split off from the general updater (`models/specs/AGENTS.md`). Restore is
+the shared ``RestoreUpdater`` in ``models/specs/soft_delete.py``.
 """
 
 from __future__ import annotations
@@ -21,13 +21,13 @@ from ai.backend.manager.errors.role_preset import SystemRoleNotEditable
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role.searchable_fields import RoleSearchableFields
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
-from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
+from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
 class RoleUpdater(GuardedDataUpdater[RoleRow, RoleData]):
-    """Edits a role's declaration. Carries no ``status`` field.
+    """Edits a role's declaration and status. Carries no ``deleted_at`` field.
 
     Declines a SYSTEM role: its declaration belongs to the role preset.
     """
@@ -36,6 +36,7 @@ class RoleUpdater(GuardedDataUpdater[RoleRow, RoleData]):
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
     auto_assign: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
+    status: OptionalState[RoleStatus] = field(default_factory=OptionalState[RoleStatus].nop)
 
     @property
     @override
@@ -70,6 +71,7 @@ class RoleUpdater(GuardedDataUpdater[RoleRow, RoleData]):
         self.name.update_dict(to_update, "name")
         self.description.update_dict(to_update, "description")
         self.auto_assign.update_dict(to_update, "auto_assign")
+        self.status.update_dict(to_update, "status")
         return to_update
 
     @override
@@ -79,7 +81,7 @@ class RoleUpdater(GuardedDataUpdater[RoleRow, RoleData]):
 
 @dataclass
 class RoleSoftDeleteUpdater(GuardedDataUpdater[RoleRow, RoleData]):
-    """Marks a role deleted; the values are constants so they cannot be passed wrong.
+    """Sets ``deleted_at`` as the shared ``SoftDeleteUpdater`` does; ``status`` stays.
 
     Declines a SYSTEM role, as :class:`RoleUpdater` does.
     """
@@ -115,40 +117,7 @@ class RoleSoftDeleteUpdater(GuardedDataUpdater[RoleRow, RoleData]):
 
     @override
     def build_values(self) -> dict[str, Any]:
-        return {"status": RoleStatus.DELETED, "deleted_at": sa.func.now()}
-
-    @override
-    def to_data(self, row: RoleRow) -> RoleData:
-        return RoleSearchableFields.own.to_data(row)
-
-
-@dataclass
-class RoleRestoreUpdater(DataUpdater[RoleRow, RoleData]):
-    """Undoes the soft delete; the mirror of :class:`RoleSoftDeleteUpdater`."""
-
-    role_id: RoleID
-
-    @property
-    @override
-    def row_class(self) -> type[RoleRow]:
-        return RoleRow
-
-    @override
-    def target_id_column(self) -> InstrumentedAttribute[Any]:
-        return RoleRow.id
-
-    @override
-    def target_id_value(self) -> RoleID:
-        return self.role_id
-
-    @property
-    @override
-    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
-
-    @override
-    def build_values(self) -> dict[str, Any]:
-        return {"status": RoleStatus.ACTIVE, "deleted_at": None}
+        return {"deleted_at": sa.func.now()}
 
     @override
     def to_data(self, row: RoleRow) -> RoleData:

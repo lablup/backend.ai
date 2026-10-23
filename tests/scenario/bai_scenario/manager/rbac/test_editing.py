@@ -12,7 +12,6 @@ from ai.backend.common.data.permission.types import RoleStatus
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.rbac.request import UpdateRoleInput
 from ai.backend.common.dto.manager.v2.rbac.response import RoleNode
-from ai.backend.common.dto.manager.v2.rbac.types import RoleStatusDTO
 from ai.backend.manager.api.adapters.rbac.adapter import RBACAdapter
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -76,22 +75,20 @@ class EditingStatusToDeleted(When[RolesAndACaller, RBACAdapter, RoleNode]):
 
 @dataclass(frozen=True)
 class TheSoftDeletedRole(Then[RolesAndACaller, RoleNode]):
-    """삭제 상태의 역할 전체가 온다."""
+    """soft delete 된 역할 전체가 온다."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "삭제 상태의 역할 전체가 온다"
+        return "soft delete 된 역할 전체가 온다"
 
     @override
     def look(self, laid: RolesAndACaller, answered: Answered[RoleNode]) -> list[Verdict]:
         node = answered.response
         if node is None:
             return [Refused(NotEnoughPermission, answered.raised)]
-        return RoleLook(self.started, status=RoleStatusDTO.DELETED).verdicts(
-            "", node, laid.role, laid.domain
-        )
+        return RoleLook(self.started, deleted=True).verdicts("", node, laid.role, laid.domain)
 
 
 @dataclass(frozen=True)
@@ -174,7 +171,7 @@ class EditingStatusToDeletedSoftDeletes(
 
     @override
     def describe(self) -> str:
-        return "슈퍼관리자가 역할의 status 를 DELETED 로 고치면, soft delete 되어 삭제 상태로 온다"
+        return "슈퍼관리자가 역할의 status 를 DELETED 로 고치면, soft delete 되어 status 는 그대로 온다"
 
     @override
     def given(self) -> Given[TestSeedingSession, RolesAndACaller]:

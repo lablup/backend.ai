@@ -245,7 +245,7 @@ class TestApply:
             await sess.execute(
                 sa.update(RoleRow)
                 .where(RoleRow.id == research_member.id)
-                .values(name="edited", status=RoleStatus.DELETED)
+                .values(name="edited", status=RoleStatus.INACTIVE, deleted_at=sa.func.now())
             )
         moved = research_member.model_copy(
             update={"scope_id": uuid.UUID("0198a5a0-0000-7000-8000-00000000e002")}

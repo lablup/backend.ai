@@ -135,7 +135,7 @@ class TestRoleCRUD:
         )
         assert not any(r.id == role_id for r in after_active.roles)
 
-    async def test_soft_deleted_role_included_in_deleted_search(
+    async def test_soft_deleted_role_keeps_its_status_and_leaves_the_search(
         self,
         admin_registry: BackendAIClientRegistry,
         role_factory: RoleFactory,
@@ -145,22 +145,26 @@ class TestRoleCRUD:
         created = await role_factory(name=marker)
         role_id = created.role.id
 
-        # Soft delete
         await admin_registry.rbac.delete_role(DeleteRoleRequest(role_id=role_id))
 
-        # Included in DELETED search
-        deleted_search = await admin_registry.rbac.search_roles(
-            SearchRolesRequest(
-                filter=RoleFilter(
-                    name=StringFilter(contains=marker),
-                    statuses=[RoleStatus.DELETED],
-                ),
-            )
+        searched = await admin_registry.rbac.search_roles(
+            SearchRolesRequest(filter=RoleFilter(name=StringFilter(contains=marker)))
         )
-        assert isinstance(deleted_search, SearchRolesResponse)
-        assert any(r.id == role_id for r in deleted_search.roles)
-        matching = next(r for r in deleted_search.roles if r.id == role_id)
-        assert matching.status == RoleStatus.DELETED
+        assert isinstance(searched, SearchRolesResponse)
+        assert not any(r.id == role_id for r in searched.roles)
+        fetched = await admin_registry.rbac.get_role(role_id)
+        assert fetched.role.status == RoleStatus.ACTIVE
+        assert fetched.role.deleted_at is not None
+
+    async def test_create_with_the_deprecated_deleted_status_makes_a_soft_deleted_role(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        role_factory: RoleFactory,
+    ) -> None:
+        created = await role_factory(status=RoleStatus.DELETED)
+
+        assert created.role.status == RoleStatus.INACTIVE
+        assert created.role.deleted_at is not None
 
     async def test_purge_makes_role_unretrievable(
         self,
@@ -213,14 +217,14 @@ class TestRoleSearch:
         assert active_role.role.id in role_ids
         assert deleted_role.role.id not in role_ids
 
-    async def test_search_deleted_roles_excludes_active(
+    async def test_the_deprecated_deleted_status_matches_no_role(
         self,
         admin_registry: BackendAIClientRegistry,
         role_factory: RoleFactory,
     ) -> None:
         unique = secrets.token_hex(4)
         prefix = f"search-deleted-{unique}"
-        active_role = await role_factory(name=f"{prefix}-a")
+        await role_factory(name=f"{prefix}-a")
         deleted_role = await role_factory(name=f"{prefix}-d")
 
         await admin_registry.rbac.delete_role(DeleteRoleRequest(role_id=deleted_role.role.id))
@@ -233,10 +237,7 @@ class TestRoleSearch:
                 ),
             )
         )
-        role_ids = [r.id for r in result.roles]
-        assert deleted_role.role.id in role_ids
-        assert active_role.role.id not in role_ids
-        assert all(r.status == RoleStatus.DELETED for r in result.roles)
+        assert result.roles == []
 
     async def test_search_by_name_filter(
         self,

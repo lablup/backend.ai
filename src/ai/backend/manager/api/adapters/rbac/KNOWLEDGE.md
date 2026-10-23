@@ -24,10 +24,11 @@ status: draft
 |---|---|---|---|
 | 슈퍼관리자가 역할의 설명을 바꾼다 | 커스텀 역할 하나 | 설명 수정 | 새 설명을 실은 역할 전체 |
 | 아무 권한도 받지 않은 사용자가 역할을 수정한다 | 같은 역할 | 설명 수정 | 권한 부족으로 거부 |
-| 슈퍼관리자가 역할의 status 를 DELETED 로 고친다 | 활성 역할 하나 | status DELETED | soft delete 되어 삭제 상태의 역할 |
+| 슈퍼관리자가 역할의 status 를 DELETED 로 고친다 | 활성 역할 하나 | status DELETED | soft delete 되어 status 는 그대로인 역할 |
 
-deprecated `status` 는 수정 뒤에 처리한다. DELETED 는 soft delete 로, 삭제된 역할에 ACTIVE 는
-restore 로 보낸다. 이미 그 상태면 아무것도 하지 않고, INACTIVE 는 반영하지 않는다.
+deprecated `status` 의 ACTIVE, INACTIVE 는 status 에 쓴다. DELETED 는 수정 뒤 soft delete 로,
+삭제된 역할에 ACTIVE 는 status 를 쓴 뒤 restore 로 보낸다. 이미 삭제된 역할에 DELETED 는 아무것도
+하지 않는다. soft delete 와 restore 는 `deleted_at` 만 쓰고, 응답의 `status` 는 저장된 값 그대로다.
 
 ## soft delete, restore, purge
 

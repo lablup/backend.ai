@@ -365,6 +365,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
                     ]),
                     RoleRow.auto_assign.is_(True),
                     RoleRow.status == RoleStatus.ACTIVE,
+                    RoleRow.deleted_at.is_(None),
                 )
             )
         ).all()

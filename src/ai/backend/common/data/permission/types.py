@@ -24,7 +24,7 @@ class RoleStatus(enum.StrEnum):
     ACTIVE = "active"
     # 'inactive' status is used when the role is temporarily disabled
     INACTIVE = "inactive"
-    # 'deleted' status is used when the role is permanently removed
+    # Deprecated: no role is stored with it; soft deletion is ``deleted_at``.
     DELETED = "deleted"
 
 

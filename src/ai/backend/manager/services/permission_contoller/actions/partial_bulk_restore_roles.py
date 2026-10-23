@@ -7,7 +7,8 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import RestorePartialBulkOpsAction
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
-from ai.backend.manager.models.rbac_models.role.updaters import RoleRestoreUpdater
+from ai.backend.manager.models.rbac_models.role.searchable_fields import RoleSearchableFields
+from ai.backend.manager.models.specs.soft_delete import RestoreUpdater
 
 
 @dataclass(frozen=True)
@@ -26,8 +27,16 @@ class PartialBulkRestoreRolesAction(RestorePartialBulkOpsAction[RoleRow, RoleDat
         return tuple(self.ids)
 
     @override
-    def to_updaters(self) -> Mapping[EntityIdentifier, RoleRestoreUpdater]:
-        return {role_id: RoleRestoreUpdater(role_id=role_id) for role_id in self.ids}
+    def to_updaters(self) -> Mapping[EntityIdentifier, RestoreUpdater[RoleRow, RoleData]]:
+        return {
+            role_id: RestoreUpdater(
+                target_row=RoleRow,
+                target_column=RoleRow.id,
+                target_id=role_id,
+                converter=RoleSearchableFields.own,
+            )
+            for role_id in self.ids
+        }
 
     @override
     def narrowed_to(self, entity_ids: Sequence[EntityIdentifier]) -> Self:
