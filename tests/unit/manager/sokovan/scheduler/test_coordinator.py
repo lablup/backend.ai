@@ -33,6 +33,7 @@ from ai.backend.manager.data.session.types import (
     StatusTransitions,
     TransitionStatus,
 )
+from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.sokovan.scheduler.coordinator import (
@@ -1477,3 +1478,58 @@ class TestScheduleCoordinatorFaultLogging:
             await coordinator._process_lifecycle_handler_schedule(ScheduleType.SCHEDULE, handler)
 
         assert self._error_records(caplog) == []
+
+
+class TestScheduleCoordinatorCleanupLock:
+    """A cleanup handler runs fetch and execute under the lock it declares."""
+
+    @pytest.fixture
+    def lock_events(self) -> list[str]:
+        return []
+
+    @pytest.fixture
+    def coordinator(self, lock_events: list[str]) -> ScheduleCoordinator:
+        def lock_factory(lock_id: LockID, lifetime: float) -> MagicMock:
+            lock = MagicMock()
+            lock.__aenter__.side_effect = lambda *_: lock_events.append(f"acquire:{lock_id.name}")
+            lock.__aexit__.side_effect = lambda *_: lock_events.append("release")
+            return lock
+
+        coordinator = ScheduleCoordinator.__new__(ScheduleCoordinator)
+        coordinator._operation_metrics = MagicMock()
+        coordinator._operation_metrics.measure_operation.return_value = nullcontext()
+        coordinator._config_provider = MagicMock()
+        coordinator._lock_factory = MagicMock(side_effect=lock_factory)
+        return coordinator
+
+    @pytest.fixture
+    def handler(self, lock_events: list[str]) -> MagicMock:
+        handler = MagicMock()
+        handler.name.return_value = _TEST_HANDLER_NAME
+        handler.lock_id = LockID.LOCKID_SOKOVAN_CLEANUP_FORCE_TERMINATED
+
+        async def fetch() -> list[SessionId]:
+            lock_events.append("fetch")
+            return [SessionId(uuid4())]
+
+        async def execute(_: Any) -> None:
+            lock_events.append("execute")
+
+        handler.fetch_session_ids = fetch
+        handler.execute = execute
+        return handler
+
+    async def test_fetch_and_execute_run_under_the_lock(
+        self,
+        coordinator: ScheduleCoordinator,
+        handler: MagicMock,
+        lock_events: list[str],
+    ) -> None:
+        await coordinator._process_cleanup_schedule(ScheduleType.CLEANUP_FORCE_TERMINATED, handler)
+
+        assert lock_events == [
+            "acquire:LOCKID_SOKOVAN_CLEANUP_FORCE_TERMINATED",
+            "fetch",
+            "execute",
+            "release",
+        ]
