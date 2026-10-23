@@ -17,6 +17,7 @@ from glide import ExpirySet, ExpiryType
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import (
     AGENT_LAST_CHECK_TTL_SEC,
     KERNEL_HEALTH_TTL_SEC,
+    MANAGER_SWEEP_TTL_SEC,
     MAX_HEALTH_STALENESS_SEC,
     MAX_KERNEL_HEALTH_STALENESS_SEC,
     HealthCheckStatus,
@@ -1135,3 +1136,44 @@ class TestReplicaHealthStatusClient:
         async with valkey_schedule_client._client.client() as conn:
             ttl = await conn.ttl(key)
         assert 0 < ttl <= 7
+
+
+class TestManagerSweepMark:
+    """The cluster-wide mark agents read to tell whether the manager is sweeping kernels."""
+
+    @pytest.fixture
+    async def valkey_schedule_client(
+        self,
+        redis_container: tuple[str, HostPortPairModel],
+    ) -> AsyncGenerator[ValkeyScheduleClient, None]:
+        _, hostport_pair = redis_container
+        client = await ValkeyScheduleClient.create(
+            valkey_target=ValkeyTarget(addr=hostport_pair.address),
+            db_id=REDIS_LIVE_DB,
+            human_readable_name="test-valkey-schedule-sweep",
+        )
+        try:
+            async with client._client.client() as conn:
+                await conn.delete([client._get_manager_sweep_key()])
+            yield client
+        finally:
+            await client.close()
+
+    async def test_absent_mark_reads_as_none(
+        self, valkey_schedule_client: ValkeyScheduleClient
+    ) -> None:
+        assert await valkey_schedule_client.get_manager_sweep_epoch() is None
+
+    async def test_mark_records_redis_time_with_expiry(
+        self, valkey_schedule_client: ValkeyScheduleClient
+    ) -> None:
+        before = await valkey_schedule_client.get_redis_time()
+
+        await valkey_schedule_client.mark_manager_sweep()
+
+        epoch = await valkey_schedule_client.get_manager_sweep_epoch()
+        assert epoch is not None
+        assert before <= epoch <= await valkey_schedule_client.get_redis_time()
+        async with valkey_schedule_client._client.client() as conn:
+            ttl = await conn.ttl(valkey_schedule_client._get_manager_sweep_key())
+        assert 0 < ttl <= MANAGER_SWEEP_TTL_SEC
