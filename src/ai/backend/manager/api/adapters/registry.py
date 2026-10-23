@@ -79,6 +79,7 @@ from ai.backend.manager.api.adapters.storage_namespace.adapter import StorageNam
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.adapters.user.config import UserConfigAdapter
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
+from ai.backend.manager.api.adapters.vfolder_auto_mount.adapter import VFolderAutoMountAdapter
 from ai.backend.manager.api.adapters.vfs_storage.adapter import VFSStorageAdapter
 from ai.backend.manager.secret.pool import KeyProviderPool
 
@@ -155,6 +156,7 @@ class Adapters:
         user: UserAdapter,
         user_config: UserConfigAdapter,
         vfolder: VFolderAdapter,
+        vfolder_auto_mount: VFolderAutoMountAdapter,
         vfs_storage: VFSStorageAdapter,
     ) -> None:
         self.agent = agent
@@ -211,6 +213,7 @@ class Adapters:
         self.user = user
         self.user_config = user_config
         self.vfolder = vfolder
+        self.vfolder_auto_mount = vfolder_auto_mount
         self.vfs_storage = vfs_storage
 
     @classmethod
@@ -334,5 +337,6 @@ class Adapters:
                 processors.deployment,
                 processors.vfolder_mount_policy,
             ),
+            vfolder_auto_mount=VFolderAutoMountAdapter(processors.vfolder_auto_mount),
             vfs_storage=VFSStorageAdapter(processors.vfs_storage),
         )
