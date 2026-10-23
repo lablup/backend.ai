@@ -119,6 +119,7 @@ from ai.backend.manager.api.gql.deployment.resolver.deployment import (
     deployment_status_changed,
     my_deployments,
     project_deployments,
+    replace_deployment_options,
     scoped_deployments,
     sync_replicas,
     update_model_deployment,
@@ -1139,6 +1140,7 @@ class Mutation:
     create_model_deployment = create_model_deployment
     update_model_deployment = update_model_deployment
     delete_model_deployment = delete_model_deployment
+    replace_deployment_options = replace_deployment_options
     sync_replicas = sync_replicas
     add_model_revision = add_model_revision
     admin_refresh_deployment_revisions = admin_refresh_deployment_revisions

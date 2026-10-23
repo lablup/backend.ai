@@ -87,6 +87,7 @@ def _make_resource_group_detail_node(name: str = "test-group") -> ResourceGroupD
                 default=DeploymentHandlerOptionsDefaultInfo(timeout_sec=None, max_retry_count=None),
                 by_handler=[],
             ),
+            agent_selection_policy=AgentSelectionPolicyEnum.PREFERRED,
         ),
         default_session_options=DefaultSessionOptionsInfo(
             priority=0,

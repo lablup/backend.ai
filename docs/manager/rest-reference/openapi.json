@@ -6764,6 +6764,15 @@
         "title": "DeleteDeploymentInput",
         "type": "object"
       },
+      "AgentSelectionPolicyEnum": {
+        "description": "Scheduling constraint applied to ``SchedulingTargetInput.designated_agents``.",
+        "enum": [
+          "strict",
+          "preferred"
+        ],
+        "title": "AgentSelectionPolicyEnum",
+        "type": "string"
+      },
       "DeploymentHandlerOptionsInput": {
         "description": "Handler-keyed scheduler policy for deployments.\n\n``default`` is the fallback applied to any handler not listed in\n``by_handler``; field-level ``null`` within either layer means\n\"fall back to global defaults\" (unbounded timeout, global retry\nfallback).",
         "properties": {
@@ -6789,6 +6798,18 @@
           "handler_options": {
             "$ref": "#/components/schemas/DeploymentHandlerOptionsInput",
             "description": "Handler-keyed scheduler policy (timeout + retry)."
+          },
+          "agent_selection_policy": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentSelectionPolicyEnum"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How the designated agents are enforced. `null` keeps the stored policy."
           }
         },
         "required": [
@@ -25681,15 +25702,6 @@
         ],
         "title": "ReplaceResourceGroupDefaultDeploymentOptionsInput",
         "type": "object"
-      },
-      "AgentSelectionPolicyEnum": {
-        "description": "Scheduling constraint applied to ``SchedulingTargetInput.designated_agents``.",
-        "enum": [
-          "strict",
-          "preferred"
-        ],
-        "title": "AgentSelectionPolicyEnum",
-        "type": "string"
       },
       "BinarySizeInput": {
         "description": "Binary size input accepting bytes integer or human-readable string.\n\nExamples: '536870912', '512m', '1g', '2048k'",
