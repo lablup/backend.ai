@@ -243,7 +243,9 @@ Conversion examples:
 |---|---|
 | Existing call sites | No change. Scope fields reach a log line once its call site moves to `StructuredLogger` |
 | OTel body | JSON string → message string, for each line once its call site moves to `StructuredLogger`. Queries relying on fields inside the body move to attributes. Two OTel log exporters run during the transition |
-| console/file/logstash/graylog | No change. The relay not forwarding fields stays as is |
+| console | Fields follow the message as `name=value`, without the `log_tag_` prefix. `BraceStyleAdapter` lines are unchanged |
+| file/graylog | The relay forwards fields, so records carry `log_tag_*` as `LocalLogger` records already do |
+| logstash | No change. It sends fixed keys only |
 | `with_log_context_fields`, `BraceStyleAdapter` | Removed after their call sites move to `with_log_context` or a wrapper and to `StructuredLogger` |
 
 ## Implementation Plan
@@ -272,6 +274,7 @@ None.
 | 2026-09-27 | `agent_id` goes in with `with_log_context`, not as a Resource attribute | One agent process can run several agents |
 | 2026-09-27 | ruff `G001`–`G004` stay off | The `StructuredLogger` signature already prevents it, and existing call sites go away as they are migrated |
 | 2026-09-27 | A new OTel handler is added and the legacy handler is kept until removal | Existing logs reach OTel unchanged; the legacy handler is removed once every call site is replaced |
+| 2026-10-23 | The relay forwards fields and the console shows them | A console line lost its values once its call site moved to `StructuredLogger` |
 
 ## References
 

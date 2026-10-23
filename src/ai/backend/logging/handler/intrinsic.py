@@ -10,12 +10,16 @@ import msgpack
 import psutil
 import zmq
 
+from ai.backend.logging.formatter import append_log_fields
+from ai.backend.logging.structured import LogFieldNormalizer
+
 if TYPE_CHECKING:
     from ai.backend.logging.types import MsgpackOptions
 
 
 class RelayHandler(logging.Handler):
     _sock: zmq.Socket[Any] | None
+    _normalizer: LogFieldNormalizer
 
     def __init__(self, *, endpoint: str, msgpack_options: MsgpackOptions) -> None:
         super().__init__()
@@ -24,6 +28,7 @@ class RelayHandler(logging.Handler):
         self._zctx = zmq.Context[zmq.Socket[Any]]()
         self._pid = os.getpid()
         self._process_name = psutil.Process().name()
+        self._normalizer = LogFieldNormalizer()
         # We should use PUSH-PULL socket pairs to avoid
         # lost of synchronization sentinel messages.
         if endpoint:
@@ -41,17 +46,18 @@ class RelayHandler(logging.Handler):
             self._sock.close()
         self._zctx.term()
 
-    def _fallback(self, record: logging.LogRecord | None) -> None:
+    def _print_to_stderr(self, record: logging.LogRecord | None) -> None:
         if record is None:
             return
-        print(record.getMessage(), file=sys.stderr)
+        print(append_log_fields(record.getMessage(), record), file=sys.stderr)
 
     @override
     def emit(self, record: logging.LogRecord | None) -> None:
         if self._sock is None:
-            self._fallback(record)
+            self._print_to_stderr(record)
             return
         # record may be None to signal shutdown.
+        log_body: dict[str, object] | None
         if record:
             log_body = {
                 "name": record.name,
@@ -62,6 +68,7 @@ class RelayHandler(logging.Handler):
                 "levelname": record.levelname,
                 "process": self._pid,
                 "processName": self._process_name,
+                **self._normalizer.normalized_fields_of(record),
             }
             if record.exc_info:
                 log_body["exc_info"] = traceback.format_exception(*record.exc_info)
@@ -71,4 +78,4 @@ class RelayHandler(logging.Handler):
             serialized_record = msgpack.packb(log_body, **self.msgpack_options["pack_opts"])
             self._sock.send(serialized_record)
         except zmq.ZMQError:
-            self._fallback(record)
+            self._print_to_stderr(record)
