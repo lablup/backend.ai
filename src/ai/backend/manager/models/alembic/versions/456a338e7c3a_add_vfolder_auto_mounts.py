@@ -5,7 +5,7 @@ role made from them, so an installation seeded before this reaches the new entit
 the way a fresh one does.
 
 Revision ID: 456a338e7c3a
-Revises: 945c2f111c6b
+Revises: bf07cae92d86
 Create Date: 2026-10-22
 
 """
@@ -19,7 +19,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "456a338e7c3a"
-down_revision = "945c2f111c6b"
+down_revision = "bf07cae92d86"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None

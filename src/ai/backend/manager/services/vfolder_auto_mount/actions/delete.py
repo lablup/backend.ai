@@ -6,8 +6,8 @@ from typing import override
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import DeleteSingleEntityOpsAction
 from ai.backend.manager.data.vfolder_auto_mount.types import VFolderAutoMountData
+from ai.backend.manager.models.specs.soft_delete import SoftDeleteUpdater
 from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
-from ai.backend.manager.models.vfolder_auto_mount.updaters import VFolderAutoMountSoftDeleteUpdater
 
 __all__ = ("DeleteVFolderAutoMountAction",)
 
@@ -18,11 +18,11 @@ class DeleteVFolderAutoMountAction(
 ):
     """Soft-delete an auto-mount; its graph stays so it can be restored."""
 
-    updater: VFolderAutoMountSoftDeleteUpdater
+    updater: SoftDeleteUpdater[VFolderAutoMountRow, VFolderAutoMountData]
 
     @override
     def entity_id(self) -> EntityIdentifier:
-        return self.updater.auto_mount_id
+        return self.updater.target_id
 
     @override
     @classmethod
@@ -30,5 +30,5 @@ class DeleteVFolderAutoMountAction(
         return "delete_vfolder_auto_mount"
 
     @override
-    def to_updater(self) -> VFolderAutoMountSoftDeleteUpdater:
+    def to_updater(self) -> SoftDeleteUpdater[VFolderAutoMountRow, VFolderAutoMountData]:
         return self.updater
