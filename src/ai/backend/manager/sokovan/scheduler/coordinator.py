@@ -87,6 +87,7 @@ from ai.backend.manager.views.sokovan.result import PromotionSpec
 from .factory import CoordinatorHandlers
 from .hooks.registry import HookRegistry
 from .results import (
+    FailureDisposition,
     KernelExecutionResult,
     KernelStatusTransitions,
     SessionExecutionResult,
@@ -1186,6 +1187,7 @@ class ScheduleCoordinator:
         is ``None``; ``expired`` never fires when ``timeout`` is ``None``.
 
         Classification priority (first match wins):
+        0. give_up: the failure's disposition is ABANDON
         1. give_up: max_retry_count set AND last_phase.attempts >= max_retry_count,
            and those attempts are not skips (a session queued behind a blocked
            one was never attempted, so it may not be given up on)
@@ -1212,6 +1214,13 @@ class ScheduleCoordinator:
             session = session_map.get(failure.session_id)
             if not session:
                 # Session not found - skip (shouldn't happen)
+                continue
+
+            # 0. ABANDON gives up at once: the agent's kernel creation finished with an error
+            # (other kernels may already exist; give-up tears them down). REPLACE takes the
+            # normal retry budget; sending it to PENDING would reset that budget and livelock.
+            if failure.disposition is FailureDisposition.ABANDON:
+                give_up_failures.append(failure)
                 continue
 
             policy = session.session_info.handler_options.resolve(handler_name)
