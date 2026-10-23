@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import pprint
 import time
@@ -12,9 +13,29 @@ from typing import Any, cast, override
 import coloredlogs
 from pythonjsonlogger.json import JsonFormatter
 
+from ai.backend.logging.structured import LogFieldNormalizer
+
 type _SysExcInfoType = (
     tuple[type[BaseException], BaseException, TracebackType | None] | tuple[None, None, None]
 )
+
+
+def append_log_fields(message: str, record: logging.LogRecord) -> str:
+    normalizer = LogFieldNormalizer()
+    normalized_fields = normalizer.normalized_fields_of(record)
+    if not normalized_fields:
+        return message
+    rendered_fields = " ".join(
+        f"{normalizer.field_name_of(name)}={_render_field_value(value)}"
+        for name, value in normalized_fields.items()
+    )
+    return f"{message} {rendered_fields}"
+
+
+def _render_field_value(value: object) -> str:
+    if isinstance(value, str) and (not value or any(c.isspace() or c in '"=' for c in value)):
+        return json.dumps(value, ensure_ascii=False)
+    return str(value)
 
 
 def format_exception(
@@ -40,6 +61,10 @@ class SerializedExceptionFormatter(logging.Formatter):
 
 
 class ConsoleFormatter(logging.Formatter):
+    @override
+    def formatMessage(self, record: logging.LogRecord) -> str:
+        return append_log_fields(super().formatMessage(record), record)
+
     @override
     def formatException(self, ei: Sequence[str] | _SysExcInfoType) -> str:
         return format_exception(self, ei)
@@ -81,6 +106,10 @@ class ColorizedFormatter(coloredlogs.ColoredFormatter):  # type: ignore[misc]
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         coloredlogs.logging.Formatter.formatException = format_exception
+
+    @override
+    def formatMessage(self, record: logging.LogRecord) -> str:
+        return append_log_fields(super().formatMessage(record), record)
 
 
 class pretty:
