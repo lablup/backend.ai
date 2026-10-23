@@ -24,6 +24,9 @@ _PUBLIC_MEMBER_REVISION = "c3e8a1f05b27_add_preset_scope_and_public_member_role"
 _MEMBER_READS_REVISION = "a1f6b7c4d902_grant_image_and_project_reads_to_members"
 _OWN_POLICY_READS_REVISION = "b8e0c1f4a276_grant_seed_roles_read_on_their_own_policy"
 _USER_OWNER_APP_CONFIG_REVISION = "d6e297fca9ae_grant_user_owners_read_on_app_configs"
+_SYSTEM_SESSION_ENVIRON_GRANTS_REVISION = (
+    "bf07cae92d86_grant_role_presets_on_system_session_environ"
+)
 _REPOSITORY = Path(__file__).resolve().parents[5]
 _VERSIONS = _REPOSITORY / "src/ai/backend/manager/models/alembic/versions"
 
@@ -77,6 +80,11 @@ def own_policy_reads_migration() -> Any:
 @pytest.fixture(scope="module")
 def user_owner_app_config_migration() -> Any:
     return load_python_file(str(_VERSIONS), f"{_USER_OWNER_APP_CONFIG_REVISION}.py")
+
+
+@pytest.fixture(scope="module")
+def system_session_environ_grants_migration() -> Any:
+    return load_python_file(str(_VERSIONS), f"{_SYSTEM_SESSION_ENVIRON_GRANTS_REVISION}.py")
 
 
 @pytest.fixture(scope="module")
@@ -144,6 +152,7 @@ class TestMigrationMatchesFixture:
         member_reads_migration: Any,
         own_policy_reads_migration: Any,
         user_owner_app_config_migration: Any,
+        system_session_environ_grants_migration: Any,
         fixture: dict[str, Any],
     ) -> None:
         written = {
@@ -259,6 +268,17 @@ class TestMigrationMatchesFixture:
             )
             for preset_id, entity_type in own_policy_reads_migration._GRANTS
         }
+        written |= {
+            (
+                system_session_environ_grants_migration._identify(
+                    "role_permission_preset", preset_id, entity_type, str(bit)
+                ),
+                preset_id,
+                entity_type,
+                bit,
+            )
+            for preset_id, entity_type, bit in system_session_environ_grants_migration._GRANTS
+        }
         seeded = {
             (row["id"], row["role_preset_id"], row["entity_type"], row["permission"])
             for row in fixture["role_permission_presets"]
@@ -267,10 +287,16 @@ class TestMigrationMatchesFixture:
 
 
 class TestEntityTypeSweep:
-    def test_the_seed_names_only_kept_types(self, migration: Any, fixture: dict[str, Any]) -> None:
-        """What the sweep keeps covers what the presets grant, or it deletes the grants."""
-        named = {row["entity_type"] for row in fixture["role_permission_presets"]}
-        assert named <= migration._ENTITY_TYPES
+    def test_the_presets_it_writes_name_only_kept_types(self, migration: Any) -> None:
+        """What the sweep keeps covers what the revision's own presets grant. A later revision
+        grants after the sweep has run, so the current fixture is not what it answers for."""
+        granted = {
+            entity_type
+            for preset in migration._PRESETS
+            for entity_type, bits in preset.grants
+            if bits
+        }
+        assert granted <= migration._ENTITY_TYPES
 
     def test_the_retired_names_are_not_kept(self, migration: Any) -> None:
         for name, replacement in migration._RETIRED.items():

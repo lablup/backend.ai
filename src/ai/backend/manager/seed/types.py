@@ -30,6 +30,7 @@ class SeedKind(StrEnum):
     RESOURCE_PRESET = "resource_preset"
     ROLE = "role"
     APP_CONFIG_FRAGMENT = "app_config_fragment"
+    SYSTEM_SESSION_ENVIRON = "system_session_environ"
     IDLE_CHECKER = "idle_checker"
     CONTAINER_REGISTRY = "container_registry"
     OBJECT_STORAGE = "object_storage"
