@@ -20,10 +20,7 @@ from ai.backend.common.configs import (
     PyroscopeConfig,
     ServiceDiscoveryConfig,
 )
-from ai.backend.common.configs.volume_status_check import (
-    VolumeStatusCheckConfig,
-    validate_volume_status_check_config,
-)
+from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.data.storage.types import ArtifactStorageType, StorageBackendType
@@ -129,9 +126,9 @@ class VolumeInfoConfig(BaseConfigSchema):
 
     @model_validator(mode="after")
     def _validate_volume_status_check(self) -> Self:
-        if self.volume_status_check is not None:
-            self.volume_status_check = validate_volume_status_check_config(
-                StorageBackendType(self.backend), self.volume_status_check
+        if self.volume_status_check is not None and self.backend != StorageBackendType("vfs"):
+            raise InvalidConfigError(
+                f"Volume status check is not supported for backend {self.backend!r}"
             )
         return self
 

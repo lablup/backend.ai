@@ -889,23 +889,12 @@
   # Added in 25.12.0
   init-timeout-sec = 120.0
 
-# Configurations of the volumes this agent holds, keyed by volume name.
+# Configuration for the periodic status checks of the volumes.
 # Added in 26.10.0
-# Replace <name> with your actual key (e.g., 'default', 'local')
-[volume.<name>]
-    # The type of the volume, such as 'vfs'.
-    # Added in 26.10.0
-    volume-type = "vfs"
-    # The mount path of the volume on this agent's node.
-    # Added in 26.10.0
-    path = "/mnt/vfroot"
-
-    # Configuration for the periodic status checks of the volume.
-    # Added in 26.10.0
-    [volume.<name>.status-check]
-      # Seconds between two status checks of a volume.
-      # Added in 26.10.0
-      check-interval = 60.0
+[volume-status-check]
+  # Seconds between two status checks of a volume.
+  # Added in 26.10.0
+  check-interval = 60.0
 
 # Configuration overrides for running multiple agents from a single
 # configuration file. Use this field only when defining 2 or more agents;

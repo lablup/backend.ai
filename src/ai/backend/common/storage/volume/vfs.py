@@ -4,23 +4,15 @@ import asyncio
 import logging
 import os
 import time
-import uuid
 from concurrent.futures import Executor, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Self, override
 
-from ai.backend.common.configs.volume_status_check import (
-    VfsVolumeStatusCheckConfig,
-    VolumeStatusCheckConfig,
-)
-from ai.backend.common.data.entity.storage_volume import StorageVolumeID, StorageVolumeName
+from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.data.storage.types import VfsVolumeStatusResult
-from ai.backend.common.storage.exceptions import (
-    InvalidVolumeStatusCheckConfigError,
-    VolumeMarkerInvalidError,
-)
 from ai.backend.common.storage.probe.volume import AbstractVolumeStatusCheck
 from ai.backend.logging.structured import StructuredLogger
 
@@ -28,33 +20,22 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
-class _MountSnapshot:
-    device_id: int
-    marker_file_exists: bool
-    marker_file_content: str
-
-
-@dataclass
 class VfsVolumeStatusCheckArgs:
     volume_name: StorageVolumeName
     mount_path: Path
-    marker_filename: str
     interval: float
     executor: Executor
 
 
 class VfsVolumeStatusCheck(AbstractVolumeStatusCheck[VfsVolumeStatusResult]):
-    """Reads what identifies the mount a vfs volume is served from.
+    """Reads the device id of the mount a vfs volume is served from.
 
-    It records the mount's device id and the volume id an operator wrote in the marker
-    file, and decides nothing about them: whoever reads the result compares them
-    against what it expects. The mount is read in the executor it is given, so a mount
-    hung in the kernel blocks a thread there and not the event loop.
+    The mount is read in the executor it is given, so a mount hung in the kernel blocks
+    a thread there and not the event loop.
     """
 
     _volume_name: StorageVolumeName
     _mount_path: Path
-    _marker_path: Path
     _interval: float
     _executor: Executor
     _latest: VfsVolumeStatusResult | None
@@ -62,7 +43,6 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck[VfsVolumeStatusResult]):
     def __init__(self, args: VfsVolumeStatusCheckArgs) -> None:
         self._volume_name = args.volume_name
         self._mount_path = args.mount_path
-        self._marker_path = args.mount_path / args.marker_filename
         self._interval = args.interval
         self._executor = args.executor
         self._latest = None
@@ -74,15 +54,10 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck[VfsVolumeStatusResult]):
         mount_path: Path,
         config: VolumeStatusCheckConfig,
     ) -> Self:
-        if not isinstance(config, VfsVolumeStatusCheckConfig):
-            raise InvalidVolumeStatusCheckConfigError(
-                f"A vfs volume status check needs a vfs config, got {type(config).__name__}"
-            )
         return cls(
             VfsVolumeStatusCheckArgs(
                 volume_name=volume_name,
                 mount_path=mount_path,
-                marker_filename=config.marker_filename,
                 interval=config.check_interval,
                 executor=ThreadPoolExecutor(
                     max_workers=1, thread_name_prefix=f"vfs-volume-status-{volume_name}"
@@ -107,12 +82,10 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck[VfsVolumeStatusResult]):
         started_at = datetime.now(UTC)
         start_counter = time.perf_counter()
         device_id: int | None = None
-        marker_volume_id: StorageVolumeID | None = None
         error_msg: str | None = None
         try:
             loop = asyncio.get_running_loop()
-            observed = await loop.run_in_executor(self._executor, self._read_mount)
-            device_id = observed.device_id
+            device_id = await loop.run_in_executor(self._executor, self._read_device_id)
         except OSError as e:
             log.exception(
                 "volume mount cannot be read",
@@ -127,51 +100,18 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck[VfsVolumeStatusResult]):
                 mount_path=str(self._mount_path),
             )
             error_msg = str(e)
-        else:
-            try:
-                marker_volume_id = self._parse_marker(observed)
-            except VolumeMarkerInvalidError as e:
-                log.warning(
-                    "volume marker does not hold a volume id",
-                    volume_name=self._volume_name,
-                    marker_path=str(self._marker_path),
-                )
-                error_msg = f"{self._marker_path} does not hold a volume id: {e.extra_msg}"
         self._latest = VfsVolumeStatusResult(
             check_started_at=started_at,
             duration=timedelta(seconds=time.perf_counter() - start_counter),
             error_msg=error_msg,
             device_id=device_id,
-            marker_volume_id=marker_volume_id,
         )
 
-    def _read_mount(self) -> _MountSnapshot:
-        """Reads what identifies the mount, blocking in the kernel while it does.
+    def _read_device_id(self) -> int:
+        """Reads the mount's device id, blocking in the kernel while it does.
 
         ``statvfs`` is called for that blocking rather than its numbers: a dead network
         mount hangs here, which is the only signal there is that it is dead.
         """
         os.statvfs(self._mount_path)
-        try:
-            marker_file_content = self._marker_path.read_text().strip()
-            marker_file_exists = True
-        except FileNotFoundError:
-            marker_file_content = ""
-            marker_file_exists = False
-        return _MountSnapshot(
-            device_id=self._mount_path.stat().st_dev,
-            marker_file_exists=marker_file_exists,
-            marker_file_content=marker_file_content,
-        )
-
-    def _parse_marker(self, observed: _MountSnapshot) -> StorageVolumeID:
-        if not observed.marker_file_exists:
-            raise VolumeMarkerInvalidError("Marker file does not exist")
-        if not observed.marker_file_content:
-            raise VolumeMarkerInvalidError("Marker file is empty")
-        try:
-            return StorageVolumeID(uuid.UUID(observed.marker_file_content))
-        except ValueError as e:
-            raise VolumeMarkerInvalidError(
-                f"Marker file content is not a volume id, got: {observed.marker_file_content}"
-            ) from e
+        return self._mount_path.stat().st_dev

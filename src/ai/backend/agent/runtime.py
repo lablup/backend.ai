@@ -15,13 +15,12 @@ from ai.backend.agent.monitor import AgentErrorPluginContext, AgentStatsPluginCo
 from ai.backend.agent.resources import ComputerContext, ResourceAllocator
 from ai.backend.agent.tasks import CollectNodeStatTask, UpdateSlotsTask
 from ai.backend.agent.types import AgentBackend, get_agent_discovery
-from ai.backend.agent.volume_status import create_volume_status_checks
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.cron import LocalCron
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.storage.probe.registry import VolumeStatusCheckRegistry
+from ai.backend.common.storage.probe.registry import VolumeStatusCheck, VolumeStatusCheckRegistry
 from ai.backend.common.storage.probe.runner import ProbeCheckRunner, ProbeCheckRunnerArgs
 from ai.backend.common.types import AgentId, DeviceName, SlotName
 
@@ -174,7 +173,7 @@ class AgentRuntime:
         self._metadata_server = metadata_server
 
         self._stop_signal = signal.SIGTERM
-        volume_status_checks = create_volume_status_checks(local_config.volume)
+        volume_status_checks: list[VolumeStatusCheck] = []
         self._volume_status_check_registry = VolumeStatusCheckRegistry(volume_status_checks)
         self._probe_check_runner = ProbeCheckRunner(
             ProbeCheckRunnerArgs(checks=volume_status_checks)
