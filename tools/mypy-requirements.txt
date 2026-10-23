@@ -1,3 +1,7 @@
 mypy==1.18.2
 pydantic~=2.13.5
 strawberry-graphql~=0.314.0
+# Keep in sync with the production resolve (requirements.txt: graphql-core~=3.2.6).
+# graphql-core 3.3.0 drops ExecutionContext from graphql.execution, which
+# strawberry's mypy plugin imports, and strawberry only caps it at <3.4.0.
+graphql-core~=3.2.6

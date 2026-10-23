@@ -4,6 +4,7 @@
     "CPython==3.13.7"
   ],
   "generated_with_requirements": [
+    "graphql-core~=3.2.6",
     "mypy==1.18.2",
     "pydantic~=2.13.5",
     "strawberry-graphql~=0.314.0"
