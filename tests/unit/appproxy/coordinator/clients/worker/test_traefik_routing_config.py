@@ -11,7 +11,6 @@ from ai.backend.appproxy.coordinator.clients.worker.traefik_routing_config impor
     TraefikRoutingConfigFactory,
 )
 from ai.backend.appproxy.coordinator.config import ClientIPStrategyConfig, TraefikConfig
-from ai.backend.appproxy.coordinator.repositories.worker import TraefikWorker
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
     Ingress,
     IngressAccess,
@@ -53,10 +52,26 @@ def routing_config_factory(case: _ClientIPStrategyCase) -> TraefikRoutingConfigF
 
 
 @pytest.fixture
-def access_allowing_one_network() -> IngressAccess:
-    return IngressAccess(
-        mode=IngressAccessMode.PUBLIC,
-        allowed_client_ips=[ipaddress.ip_network("192.168.0.0/24")],
+def http_ingress_allowing_one_network() -> Ingress:
+    return Ingress(
+        id=IngressID("ingress-10205"),
+        authority=IngressAuthority("worker-1"),
+        revision=1,
+        frontend=IngressFrontend(
+            kind=IngressFrontendKind.PORT,
+            protocol=IngressProtocol.HTTP,
+            port=PortFrontend(number=10205),
+        ),
+        access=IngressAccess(
+            mode=IngressAccessMode.PUBLIC,
+            allowed_client_ips=[ipaddress.ip_network("192.168.0.0/24")],
+        ),
+        backend=IngressBackend(
+            id=IngressBackendID("backend-10205"),
+            target_groups=[
+                IngressTargetGroup(id=IngressTargetGroupID("group-1"), weight=1, targets=[])
+            ],
+        ),
     )
 
 
@@ -84,11 +99,6 @@ def tcp_ingress(case: _ClientIPRuleCase) -> Ingress:
     )
 
 
-@pytest.fixture
-def worker() -> TraefikWorker:
-    return TraefikWorker(hostname="worker-1.example.com", wildcard_domain=None, tls_listen=False)
-
-
 class TestTraefikRoutingConfigFactory:
     @pytest.mark.parametrize(
         "case",
@@ -113,11 +123,14 @@ class TestTraefikRoutingConfigFactory:
         self,
         case: _ClientIPStrategyCase,
         routing_config_factory: TraefikRoutingConfigFactory,
-        access_allowing_one_network: IngressAccess,
+        http_ingress_allowing_one_network: Ingress,
     ) -> None:
-        ip_allowlist = routing_config_factory.ip_allowlist_middleware_config(
-            access_allowing_one_network
-        )["ipAllowList"]
+        middleware_configs = routing_config_factory.http_middleware_configs(
+            http_ingress_allowing_one_network
+        )
+        ip_allowlist = middleware_configs[
+            "worker_worker-1/http/middlewares/bai_ingress_10205_ipallowlist"
+        ]["ipAllowList"]
         assert ip_allowlist.get("ipStrategy") == case.expected_ip_strategy
         assert ip_allowlist["sourceRange"] == ["192.168.0.0/24"]
 
@@ -134,6 +147,8 @@ class TestTraefikRoutingConfigFactory:
         ids=lambda case: case.name,
     )
     def test_tcp_router_rule_matches_the_allowed_client_ips(
-        self, case: _ClientIPRuleCase, tcp_ingress: Ingress, worker: TraefikWorker
+        self, case: _ClientIPRuleCase, tcp_ingress: Ingress
     ) -> None:
-        assert TraefikRoutingConfigFactory.router_rule(tcp_ingress, worker) == case.expected_rule
+        assert TraefikRoutingConfigFactory.tcp_router_config(tcp_ingress)["rule"] == (
+            case.expected_rule
+        )
