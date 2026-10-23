@@ -5,18 +5,17 @@ Regression test for issue #11372 (expanded scope):
 
 The latent crash path is ``ModelServingService.list_serve``, which projects
 each returned ``EndpointData`` and reads ``endpoint.routings`` plus the
-revision-derived fields. Every relationship that ``to_data()`` traverses
-must be eagerly loaded by the listing query — ``routings``,
-``session_owner_row``, ``created_user_row``, and
-``revisions`` -> ``image_row`` — or the sync projection lazy-loads inside
-an async transaction and SQLAlchemy raises
-``sqlalchemy.exc.MissingGreenlet``.
+revision-derived fields. ``_to_endpoint_datas`` reads the active revision,
+the creator and owner emails and the routings with their own queries and
+builds ``EndpointData`` from them, so nothing lazy-loads inside the async
+transaction. ``search_services_paginated`` lists the same owned endpoint.
 """
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from decimal import Decimal
 from unittest.mock import MagicMock
 
 import pytest
@@ -37,10 +36,12 @@ from ai.backend.manager.data.deployment.types import RouteStatus
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.model_serving.types import EndpointData, EndpointLifecycle
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -60,6 +61,7 @@ from ai.backend.manager.models.resource_slot.row import (
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
@@ -90,6 +92,7 @@ async def db_with_cleanup(
             ImageRow,
             VFolderRow,
             EndpointRow,
+            DeploymentPolicyRow,
             ReplicaGroupRow,
             RuntimeVariantRow,
             DeploymentRevisionPresetRow,
@@ -202,6 +205,38 @@ async def test_user(
 
 
 @pytest.fixture
+async def test_creator_user(
+    db_with_cleanup: ExtendedAsyncSAEngine,
+    test_domain: DomainFixtureData,
+    test_user: tuple[uuid.UUID, str],
+) -> tuple[uuid.UUID, str]:
+    """A user who created the endpoint, kept apart from its owner."""
+    user_id = uuid.uuid4()
+    email = f"creator-{uuid.uuid4().hex[:8]}@test.com"
+    async with db_with_cleanup.begin_session() as sess:
+        sess.add(
+            UserRow(
+                uuid=user_id,
+                email=email,
+                username=f"creator-{uuid.uuid4().hex[:8]}",
+                password=PasswordInfo(
+                    password="pw",
+                    algorithm=PasswordHashAlgorithm.PBKDF2_SHA256,
+                    rounds=1,
+                    salt_size=16,
+                ),
+                domain_id=test_domain.domain_id,
+                domain_name=test_domain.domain_name,
+                resource_policy="default",
+                role=UserRole.USER,
+                status=UserStatus.ACTIVE,
+            )
+        )
+        await sess.flush()
+    return user_id, email
+
+
+@pytest.fixture
 async def test_group_id(
     db_with_cleanup: ExtendedAsyncSAEngine, test_domain: DomainFixtureData
 ) -> uuid.UUID:
@@ -267,6 +302,7 @@ async def test_image_id(db_with_cleanup: ExtendedAsyncSAEngine) -> uuid.UUID:
 async def listed_endpoint(
     db_with_cleanup: ExtendedAsyncSAEngine,
     test_user: tuple[uuid.UUID, str],
+    test_creator_user: tuple[uuid.UUID, str],
     test_domain: DomainFixtureData,
     test_group_id: uuid.UUID,
     test_scaling_group: str,
@@ -274,9 +310,10 @@ async def listed_endpoint(
 ) -> tuple[uuid.UUID, str]:
     """Create a CREATED endpoint with one revision (current) and one route
     so ``list_endpoints_by_owner_validated`` returns it. Returns
-    ``(endpoint_id, owner_email)``.
+    ``(endpoint_id, endpoint_name)``.
     """
     user_id, _email = test_user
+    creator_id, _creator_email = test_creator_user
     endpoint_id = uuid.uuid4()
     revision_id = uuid.uuid4()
     route_id = uuid.uuid4()
@@ -288,7 +325,7 @@ async def listed_endpoint(
             EndpointRow(
                 id=endpoint_id,
                 name=endpoint_name,
-                created_user=user_id,
+                created_user=creator_id,
                 session_owner=user_id,
                 domain=test_domain.domain_name,
                 project=test_group_id,
@@ -400,20 +437,15 @@ def repository(db_with_cleanup: ExtendedAsyncSAEngine) -> ModelServingRepository
 async def test_list_endpoints_by_owner_validated_drives_to_data_end_to_end(
     repository: ModelServingRepository,
     test_user: tuple[uuid.UUID, str],
+    test_creator_user: tuple[uuid.UUID, str],
     listed_endpoint: tuple[uuid.UUID, str],
 ) -> None:
-    """``list_endpoints_by_owner_validated`` must return ``EndpointData``
-    with every relationship-derived field populated — owner email
-    (``session_owner_row``), routings, and revision-derived fields
-    (``revisions`` -> ``image_row``).
-
-    Without eager-loading all four relationships, ``to_data()`` lazy-loads
-    them inside the async transaction and SQLAlchemy raises
-    ``sqlalchemy.exc.MissingGreenlet`` (the latent crash path that
-    ``ModelServingService.list_serve`` exposes through
-    ``GET /services``).
+    """``list_endpoints_by_owner_validated`` returns ``EndpointData`` with the
+    creator and owner emails, the routings and the revision-derived fields
+    filled from the separate reads in ``_to_endpoint_datas``.
     """
     user_id, owner_email = test_user
+    _creator_id, creator_email = test_creator_user
     endpoint_id, endpoint_name = listed_endpoint
 
     results = await repository.list_endpoints_by_owner_validated(user_id)
@@ -423,13 +455,30 @@ async def test_list_endpoints_by_owner_validated_drives_to_data_end_to_end(
     assert isinstance(endpoint, EndpointData)
     assert endpoint.id == endpoint_id
     assert endpoint.name == endpoint_name
-    # session_owner_row -> session_owner_email; defaults to "" if missing.
+    # session_owner -> its user's email; "" when no user row matches.
     assert endpoint.session_owner_email == owner_email
-    # created_user_row -> created_user_email; defaults to None if missing.
-    assert endpoint.created_user_email == owner_email
-    # revisions -> image_row -> EndpointData.image; falls back to None
-    # when revisions are not loaded.
+    # created_user -> its user's email; None when no user row matches.
+    assert endpoint.created_user_email == creator_email
+    # The active revision's image.
     assert endpoint.image is not None
-    # routings is sourced from EndpointRow.routings; defaults to [] if
-    # the relationship is not loaded.
+    # The routings read by endpoint id.
     assert len(endpoint.routings) == 1
+
+
+async def test_search_services_paginated_reads_the_current_revision_slots(
+    repository: ModelServingRepository,
+    test_user: tuple[uuid.UUID, str],
+    listed_endpoint: tuple[uuid.UUID, str],
+) -> None:
+    """The resource slots come from the current revision, read in the search's read ops."""
+    user_id, _owner_email = test_user
+    endpoint_id, _endpoint_name = listed_endpoint
+
+    result = await repository.search_services_paginated(
+        user_id, DeploymentInfoSearcher(pagination=NoPagination())
+    )
+
+    (item,) = result.items
+    assert item.id == endpoint_id
+    assert item.resource_slots == ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("268435456")})
+    assert len(item.routings) == 1
