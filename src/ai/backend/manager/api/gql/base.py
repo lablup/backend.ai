@@ -478,6 +478,22 @@ def resolve_global_id(global_id: str) -> tuple[str, str]:
     return type_, id_
 
 
+def to_relation_node_id(*ends: object) -> str:
+    """The node id of a relation: its end keys, a polymorphic side's type included."""
+    return ":".join(str(end) for end in ends)
+
+
+def resolve_relation_node_id(node_id: str, arity: int) -> tuple[str, ...]:
+    ends = tuple(node_id.split(":"))
+    if len(ends) != arity:
+        raise InvalidAPIParameters(f"Invalid id: {node_id}")
+    return ends
+
+
+def to_relation_global_id(type_: type[Any], *ends: object) -> str:
+    return to_global_id(type_, to_relation_node_id(*ends))
+
+
 def resolve_entity_id[TEntityId: EntityIdentifier](
     global_id: str, id_type: type[TEntityId]
 ) -> TEntityId:

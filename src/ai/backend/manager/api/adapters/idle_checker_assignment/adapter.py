@@ -12,6 +12,7 @@ from ai.backend.common.data.entity.idle_checker import (
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
 from ai.backend.common.data.filter_specs import StringInMatchSpec, StringMatchSpec
+from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.common import (
     OrderDirection,
     PartialBulkFailure,
@@ -21,6 +22,8 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     CreateIdleCheckerAssignmentInput,
     IdleCheckerAssignmentFilter,
     IdleCheckerAssignmentOrder,
+    IdleCheckerAssignmentScopeDTO,
+    IdleCheckerScopeRefDTO,
     PartialBulkPurgeIdleCheckerAssignmentsInput,
     PartialBulkUpdateIdleCheckerAssignmentsInput,
     PurgeIdleCheckerAssignmentInput,
@@ -214,6 +217,33 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
             LookupIdleCheckerAssignmentByPairAction(scope=scope, idle_checker_id=idle_checker_id)
         )
         return result.data
+
+    async def get(
+        self, scope: IdleCheckerScopeRefDTO, idle_checker_id: IdleCheckerID
+    ) -> IdleCheckerAssignmentNode:
+        """The binding between the two ends. Costs READ on the scope and on the checker.
+
+        The scoped search asks the scope and the pair lookup asks the checker, so the row is
+        read twice.
+        """
+        found = await self.scoped_search(
+            ScopedSearchIdleCheckerAssignmentsInput(
+                scope=IdleCheckerAssignmentScopeDTO(items=[scope]),
+                filter=IdleCheckerAssignmentFilter(
+                    idle_checker_id=UUIDFilter(equals=idle_checker_id)
+                ),
+                limit=1,
+            )
+        )
+        if not found.items:
+            raise IdleCheckerAssignmentNotFound(
+                f"{scope.scope_type}:{scope.scope_id} -> {idle_checker_id}"
+            )
+        return self._data_to_node(
+            await self._read_by_pair(
+                self._scope_entity(scope.scope_type, scope.scope_id), idle_checker_id
+            )
+        )
 
     async def admin_search(
         self, input: SearchIdleCheckerAssignmentsInput

@@ -3,13 +3,14 @@ from __future__ import annotations
 from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Any, Self, override
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 from uuid import UUID
 
 import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.idle_checker import IdleCheckerID
 from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     CreateIdleCheckerAssignmentInput as CreateIdleCheckerAssignmentInputDTO,
@@ -49,6 +50,9 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.response import (
     UpdateIdleCheckerAssignmentPayload as UpdateIdleCheckerAssignmentPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import (
+    IdleCheckerScopeTypeDTO,
+)
+from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import (
     ScopeTypeFilter as ScopeTypeFilterDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -56,6 +60,9 @@ from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
     OrderDirection,
     UUIDFilter,
+    parse_uuid,
+    resolve_relation_node_id,
+    to_relation_node_id,
 )
 from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
@@ -69,7 +76,9 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
-from ai.backend.manager.errors.api import NotImplementedAPI
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.errors.api import InvalidAPIParameters, NotImplementedAPI
+from ai.backend.manager.errors.idle_checker import IdleCheckerAssignmentNotFound
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.idle_checker.types import IdleCheckerGQL
@@ -138,7 +147,7 @@ class IdleCheckerAssignmentScopeGQL(PydanticInputMixin[IdleCheckerAssignmentScop
 )
 class IdleCheckerAssignmentGQL(PydanticNodeMixin[IdleCheckerAssignmentNode]):
     id: NodeID[str] = gql_field(
-        description="Relay global node identifier backed by the assignment's UUID."
+        description="Relay global node identifier built from the scope type, scope id and checker."
     )
     scope_type: IdleCheckerScopeTypeGQL = gql_field(description="Kind of the bound scope.")
     scope_id: UUID = gql_field(
@@ -161,14 +170,37 @@ class IdleCheckerAssignmentGQL(PydanticNodeMixin[IdleCheckerAssignmentNode]):
 
     @classmethod
     @override
-    def resolve_nodes(
+    def resolve_id(cls, root: Self, *, info: Info) -> str:
+        return to_relation_node_id(root.scope_type, root.scope_id, root.idle_checker_id)
+
+    @classmethod
+    @override
+    async def resolve_nodes(
         cls,
         *,
-        info: Info,
+        info: Info[StrawberryGQLContext],
         node_ids: Iterable[str],
         required: bool = False,
-    ) -> list[Self]:
-        raise NotImplementedAPI("Idle checker assignment node resolution is not implemented.")
+    ) -> Iterable[Self]:
+        results: list[Self | None] = []
+        for node_id in node_ids:
+            scope_type, scope_id, idle_checker_id = resolve_relation_node_id(node_id, 3)
+            try:
+                scope_type_dto = IdleCheckerScopeTypeDTO(scope_type)
+            except ValueError as e:
+                raise InvalidAPIParameters(f"Invalid id: {node_id}") from e
+            scope = IdleCheckerScopeRefDTO(scope_type=scope_type_dto, scope_id=parse_uuid(scope_id))
+            try:
+                node = await info.context.adapters.idle_checker_assignment.get(
+                    scope, IdleCheckerID(parse_uuid(idle_checker_id))
+                )
+            except IdleCheckerAssignmentNotFound:
+                if required:
+                    raise
+                results.append(None)
+            else:
+                results.append(cls.from_pydantic(node))
+        return cast(list[Self], results)
 
 
 IdleCheckerAssignmentEdgeGQL = Edge[IdleCheckerAssignmentGQL]
