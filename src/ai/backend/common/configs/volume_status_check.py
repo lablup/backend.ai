@@ -1,0 +1,25 @@
+from __future__ import annotations
+
+from typing import Annotated
+
+from pydantic import AliasChoices, Field
+
+from ai.backend.common.config import BaseConfigSchema
+from ai.backend.common.meta import NEXT_RELEASE_VERSION, BackendAIConfigMeta, ConfigExample
+
+
+class VolumeStatusCheckConfig(BaseConfigSchema):
+    check_interval: Annotated[
+        float,
+        Field(
+            default=30.0,
+            gt=0,
+            validation_alias=AliasChoices("check-interval", "check_interval"),
+            serialization_alias="check-interval",
+        ),
+        BackendAIConfigMeta(
+            description="Seconds between two status checks of a volume.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="60", prod="60"),
+        ),
+    ]
