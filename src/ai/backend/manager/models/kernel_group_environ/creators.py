@@ -42,8 +42,4 @@ class KernelGroupEnvironCreator(
 
     @override
     def to_data(self, row: KernelGroupEnvironRow) -> KernelGroupEnvironData:
-        return KernelGroupEnvironData(
-            kernel_group_id=row.kernel_group_id,
-            key=row.key,
-            value=row.value,
-        )
+        return row.to_data()

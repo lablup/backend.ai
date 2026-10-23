@@ -605,6 +605,7 @@ class KernelRow(CreatedAtMixin, Base):
                 callback_url=str(self.callback_url) if self.callback_url else None,
                 internal_data=self.internal_data,
             ),
+            kernel_group_id=self.kernel_group_id,
         )
 
 

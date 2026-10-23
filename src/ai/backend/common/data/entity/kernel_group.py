@@ -15,6 +15,7 @@ from ai.backend.common.data.entity.types import (
 )
 
 __all__ = (
+    "KernelGroupFieldType",
     "KernelGroupID",
     "KernelGroupRole",
 )

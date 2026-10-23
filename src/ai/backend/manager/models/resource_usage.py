@@ -1,6 +1,9 @@
+"""Legacy implementation. To be replaced by a proper resource aggregation and calculation service."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import datetime, tzinfo
 from decimal import Decimal
 from enum import StrEnum
@@ -25,6 +28,7 @@ from ai.backend.manager.models.kernel.row import (
     RESOURCE_USAGE_KERNEL_STATUSES,
     KernelRow,
 )
+from ai.backend.manager.models.kernel_group.row import KernelGroupRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.user.row import UserRow
@@ -36,6 +40,7 @@ __all__: Sequence[str] = (
     "BaseResourceUsageGroup",
     "ResourceGroupUnit",
     "ResourceUsage",
+    "ResourceUsageFetchResult",
     "fetch_resource_usage",
     "parse_resource_usage",
     "parse_resource_usage_groups",
@@ -452,6 +457,7 @@ def parse_total_resource_group(
 def parse_resource_usage(
     kernel: KernelRow,
     allocated_slots: ResourceSlot,
+    shmem: int | None,
     last_stat: Mapping[str, Any] | None,
 ) -> ResourceUsage:
     if not last_stat:
@@ -487,7 +493,7 @@ def parse_resource_usage(
         cpu_used=float(nmget(last_stat, "cpu_used.current", 0)),
         mem_allocated=int(allocated_slots.get("mem", 0)),
         mem_used=int(nmget(last_stat, "mem.capacity", 0)),
-        shared_memory=int(nmget(kernel.resource_opts or {}, "shmem", 0)),
+        shared_memory=shmem or 0,
         disk_allocated=0,
         disk_used=int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/")),
         io_read=int(nmget(last_stat, "io_read.current", 0)),
@@ -502,6 +508,7 @@ def parse_resource_usage(
 async def parse_resource_usage_groups(
     kernels: list[KernelRow],
     allocated_slots: Mapping[UUID, ResourceSlot],
+    shmems: Mapping[UUID, int | None],
     valkey_stat_client: ValkeyStatClient,
     local_tz: tzinfo,
 ) -> list[BaseResourceUsageGroup]:
@@ -549,7 +556,10 @@ async def parse_resource_usage_groups(
             status_info=kern.status_info,
             group_unit=ResourceGroupUnit.KERNEL,
             total_usage=parse_resource_usage(
-                kern, allocated_slots.get(kern.id, ResourceSlot()), stat_map.get(kern.id)
+                kern,
+                allocated_slots.get(kern.id, ResourceSlot()),
+                shmems.get(kern.id),
+                stat_map.get(kern.id),
             ),
         )
         for kern in kernels
@@ -592,7 +602,6 @@ KERNEL_RESOURCE_SELECT_COLS = (
     KernelRow.attached_devices,
     KernelRow.vfolder_mounts,
     KernelRow.mounts,
-    KernelRow.resource_opts,
     KernelRow.image,
     KernelRow.cluster_mode,
 )
@@ -625,14 +634,23 @@ def _parse_query(
     return query
 
 
+@dataclass(frozen=True)
+class ResourceUsageFetchResult:
+    """The kernels overlapping a period, with their allocated slots and group shmem."""
+
+    kernels: list[KernelRow]
+    allocated_slots: Mapping[UUID, ResourceSlot]
+    shmems: Mapping[UUID, int | None]
+
+
 async def fetch_resource_usage(
     db_engine: ExtendedAsyncSAEngine,
     start_date: datetime,
     end_date: datetime,
     session_ids: Sequence[UUID] | None = None,
     project_ids: Sequence[UUID] | None = None,
-) -> tuple[list[KernelRow], dict[UUID, ResourceSlot]]:
-    """Fetch the kernels overlapping the period with the slots they were allocated."""
+) -> ResourceUsageFetchResult:
+    """Fetch the kernels overlapping the period with their allocated slots and group shmem."""
     project_cond = None
     if project_ids:
         project_cond = ProjectRow.id.in_(project_ids)
@@ -653,14 +671,16 @@ async def fetch_resource_usage(
         ),
         session_cond=session_cond,
         project_cond=project_cond,
-    )
+    ).add_columns(KernelGroupRow.shmem)
+    query = query.outerjoin(KernelGroupRow, KernelGroupRow.id == KernelRow.kernel_group_id)
     async with db_engine.begin_readonly_session() as db_sess:
-        result = await db_sess.execute(query)
-        kernels: list[KernelRow] = list(result.scalars().all())
+        rows = (await db_sess.execute(query)).all()
+        kernels: list[KernelRow] = [kernel for kernel, _ in rows]
+        shmems: dict[UUID, int | None] = {kernel.id: shmem for kernel, shmem in rows}
         aggregates = await batch_load_kernel_allocations(
             db_sess, [KernelId(kernel.id) for kernel in kernels]
         )
     allocated_slots: dict[UUID, ResourceSlot] = {
         kernel_id: aggregate.allocated for kernel_id, aggregate in aggregates.items()
     }
-    return kernels, allocated_slots
+    return ResourceUsageFetchResult(kernels=kernels, allocated_slots=allocated_slots, shmems=shmems)

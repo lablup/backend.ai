@@ -213,6 +213,7 @@ def create_kernel_info(
             callback_url=None,
             internal_data=None,
         ),
+        kernel_group_id=None,
     )
 
 

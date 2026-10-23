@@ -42,6 +42,7 @@ from ai.backend.manager.api.gql.decorators import (
 )
 
 if TYPE_CHECKING:
+    from ai.backend.manager.api.gql.kernel_group.types import KernelGroupGQL
     from ai.backend.manager.api.gql.resource_slot.types import (
         KernelResourceAllocationFilterGQL,
         KernelResourceAllocationOrderByGQL,
@@ -57,6 +58,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.session.types import SessionV2GQL
 
 from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.kernel_group import KernelGroupID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
@@ -275,7 +277,8 @@ class KernelV2ResourceInfoGQL:
         description="The fractional resource shares occupied by this kernel."
     )
     resource_opts: ResourceOptsGQL | None = gql_field(
-        description="Additional resource options and configurations for this kernel."
+        description="Additional resource options and configurations for this kernel.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `kernelGroup.shmem`.",
     )
 
 
@@ -292,7 +295,8 @@ class KernelV2NetworkInfoGQL:
         description="Collection of service ports exposed by this kernel."
     )
     preopen_ports: list[int] | None = gql_field(
-        description="List of ports that are pre-opened for this kernel."
+        description="List of ports that are pre-opened for this kernel.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `kernelGroup.preopenPorts`.",
     )
 
 
@@ -343,10 +347,19 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
     image_id: strawberry.ID | None = gql_field(
         description="The UUID of the image used by this kernel. Null if the image has been purged.",
     )
+    kernel_group_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="ID of the kernel group this kernel belongs to.",
+        )
+    )
 
     # Inlined fields (from single-element types)
     startup_command: str | None = gql_field(
-        description="Startup command executed when the kernel starts."
+        description="Startup command executed when the kernel starts.",
+        deprecation_reason=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `kernelGroup.startupCommand`."
+        ),
     )
 
     # Sub-info types
@@ -391,6 +404,24 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
         if self.image_id is None:
             return None
         return await info.context.data_loaders.image_loader.load(ImageID(UUID(str(self.image_id))))
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The kernel group this kernel belongs to.",
+        )
+    )  # type: ignore[misc]
+    async def kernel_group(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[KernelGroupGQL, strawberry.lazy("ai.backend.manager.api.gql.kernel_group.types")]
+        | None
+    ):
+        if self.kernel_group_id is None:
+            return None
+        return await info.context.data_loaders.kernel_group_loader.load(
+            KernelGroupID(self.kernel_group_id)
+        )
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="26.2.0", description="The user who owns this kernel.")

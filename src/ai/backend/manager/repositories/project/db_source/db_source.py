@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.types import ResourceSlot, SessionId, SlotName, VFolderID
+from ai.backend.common.types import SessionId, SlotName, VFolderID
 from ai.backend.common.utils import nmget
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -43,6 +43,7 @@ from ai.backend.manager.models.kernel.row import (
     KernelRow,
     kernels,
 )
+from ai.backend.manager.models.kernel_group.row import KernelGroupRow
 from ai.backend.manager.models.project.purgers import (
     ProjectEndpointPurger,
     ProjectKernelPurger,
@@ -62,7 +63,7 @@ from ai.backend.manager.models.project.scopes import (
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.project.searchers import ProjectSearcher
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
-from ai.backend.manager.models.resource_usage import fetch_resource_usage
+from ai.backend.manager.models.resource_usage import ResourceUsageFetchResult, fetch_resource_usage
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.user.row import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -107,8 +108,11 @@ class ProjectDBSource:
     ) -> list[dict[str, Any]]:
         """Get container statistics for groups within a time period."""
         async with self._db.begin_readonly() as conn:
-            j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
-                users, users.c.uuid == kernels.c.user_uuid
+            kernel_groups = KernelGroupRow.__table__
+            j = (
+                kernels.join(groups, groups.c.id == kernels.c.group_id)
+                .join(users, users.c.uuid == kernels.c.user_uuid)
+                .outerjoin(kernel_groups, kernel_groups.c.id == kernels.c.kernel_group_id)
             )
             query = (
                 sa.select(
@@ -122,7 +126,7 @@ class ProjectDBSource:
                     kernels.c.group_id,
                     kernels.c.attached_devices,
                     kernel_allocated_slots_expr(kernels.c.id).label("occupied_slots"),
-                    kernels.c.resource_opts,
+                    kernel_groups.c.shmem,
                     kernels.c.vfolder_mounts,
                     kernels.c.mounts,
                     kernels.c.image,
@@ -216,7 +220,7 @@ class ProjectDBSource:
                 "cpu_used": float(nmget(last_stat, "cpu_used.current", 0)),
                 "mem_allocated": int(row.occupied_slots.get("mem", 0)),
                 "mem_used": int(nmget(last_stat, "mem.capacity", 0)),
-                "shared_memory": int(nmget(row.resource_opts, "shmem", 0)),
+                "shared_memory": row.shmem or 0,
                 "disk_allocated": 0,  # TODO: disk quota limit
                 "disk_used": int(nmget(last_stat, "io_scratch_size/stats.max", 0, "/")),
                 "io_read": int(nmget(last_stat, "io_read.current", 0)),
@@ -284,8 +288,8 @@ class ProjectDBSource:
         start_date: datetime,
         end_date: datetime,
         project_ids: Sequence[UUID] | None = None,
-    ) -> tuple[list[KernelRow], dict[UUID, ResourceSlot]]:
-        """Fetch the project's kernels with the slots they were allocated."""
+    ) -> ResourceUsageFetchResult:
+        """Fetch the project's kernels with their allocated slots and group shmem."""
         return await fetch_resource_usage(self._db, start_date, end_date, project_ids=project_ids)
 
     async def purge_group(
