@@ -277,6 +277,17 @@ type AdminRegisterSSHKeypairPayload {
 }
 
 """
+Added in 26.10.0. Input for reading the system session environ a session in a domain and project receives.
+"""
+input AdminResolveSystemSessionEnvironInput {
+  """The domain the session belongs to."""
+  domainId: UUID!
+
+  """The project the session belongs to."""
+  projectId: UUID!
+}
+
+"""
 Added in 26.9.0. Which key each stored secret sits on, across every encrypted column.
 """
 type AdminSecretStatusPayload {
@@ -14987,6 +14998,11 @@ type Query {
   schedulingHandlers: [SchedulingHandlerNode!]
 
   """
+  Added in 26.10.0. Read the system session environ rows a session in a domain and project receives, one per key (superadmin only).
+  """
+  adminResolveSystemSessionEnvironV2(input: AdminResolveSystemSessionEnvironInput!): ResolveSystemSessionEnvironPayload
+
+  """
   Added in 26.10.0. List all registered session lifecycle handlers (superadmin only). The returned ``name`` values are valid keys for ``DefaultSessionOptionsInfo.handlerOptions.byHandler``.
   """
   adminSessionLifecycleHandlers: [SessionLifecycleHandlerNode!]
@@ -16835,6 +16851,16 @@ type ReservoirRegistryEdge {
 
   """The item at the end of the edge"""
   node: ReservoirRegistry!
+}
+
+"""
+Added in 26.10.0. The rows a session in a domain and project receives, one per key.
+"""
+type ResolveSystemSessionEnvironPayload {
+  """
+  Per key the enabled row at the most specific scope: project, domain, then public.
+  """
+  items: [SystemSessionEnvironNode!]!
 }
 
 """Added in 26.2.0. Resource allocation with requested and used slots."""
@@ -20792,6 +20818,59 @@ input SyncReplicaInput {
 type SyncReplicaPayload {
   """Whether the sync succeeded"""
   success: Boolean!
+}
+
+"""
+Added in 26.10.0. A system session environ row: the value it injects under its key at its scope.
+"""
+type SystemSessionEnvironNode {
+  """The id of the row."""
+  entityId: UUID!
+
+  """The environment variable name the value is injected under."""
+  key: String!
+
+  """Which value of the starting session is injected."""
+  valueSource: SystemSessionEnvironValueSource!
+
+  """The scope the row is bound to."""
+  scope: SystemSessionEnvironScopeInfo!
+}
+
+"""Added in 26.10.0. The scope a system session environ row is bound to."""
+type SystemSessionEnvironScopeInfo {
+  """Whether the row applies to every session, a domain's or a project's."""
+  scopeType: SystemSessionEnvironScopeType!
+
+  """
+  The id of the public entity, the domain or the project the row is bound to.
+  """
+  scopeId: UUID!
+}
+
+"""
+Added in 26.10.0. Whether a system session environ row applies to every session, a domain's or a project's.
+"""
+enum SystemSessionEnvironScopeType {
+  PUBLIC
+  DOMAIN
+  PROJECT
+}
+
+"""
+Added in 26.10.0. Which value of a starting session a system session environ row injects.
+"""
+enum SystemSessionEnvironValueSource {
+  SESSION_ID
+  SESSION_NAME
+  CLUSTER_SIZE
+  CLUSTER_REPLICAS
+  CLUSTER_HOSTS
+  PREOPEN_PORTS
+  USER_UUID
+  USER_EMAIL
+  USER_NAME
+  ACCESS_KEY
 }
 
 """Added in 26.4.2. Payload returned after terminating sessions."""
