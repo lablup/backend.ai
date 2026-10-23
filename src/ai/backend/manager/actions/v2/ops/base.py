@@ -30,6 +30,7 @@ from ai.backend.manager.models.specs.purger import (
 from ai.backend.manager.models.specs.querier import (
     BulkEntityQuerier,
     BulkFieldQuerier,
+    BulkNestedFieldQuerier,
     DataQuerier,
     FieldQuerier,
     OwnedFieldQuerier,
@@ -113,6 +114,8 @@ __all__ = (
     "GetGlobalOpsAction",
     "OwnedFieldGetOpsAction",
     "BulkGetOwnedFieldOpsAction",
+    "PartialBulkGetOwnedFieldOpsAction",
+    "FieldPartialBulkGetNestedOpsAction",
     "EntityPartialBulkGetOpsAction",
     "PartialBulkGetEntityOpsAction",
 )
@@ -484,6 +487,16 @@ class FieldPartialBulkGetOpsAction[TRow: Base, TData: FieldData](OpsBackendActio
         raise NotImplementedError
 
 
+class FieldPartialBulkGetNestedOpsAction[TRow: Base, TData: FieldData](OpsBackendAction):
+    """A read of the rows nested under each field row the caller named, each answered for
+    separately; authorized through the entities owning the named rows."""
+
+    @abstractmethod
+    def to_querier(self) -> BulkNestedFieldQuerier[TRow, TData]:
+        """Return the read spec this action executes."""
+        raise NotImplementedError
+
+
 class GlobalEntityUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
     """A create-or-update of an entity created in the global scope."""
 
@@ -750,6 +763,21 @@ class BulkGetOwnedFieldOpsAction[TOwnerID: EntityIdentifier, TRow: Base, TData: 
     Bulk-shaped like :class:`BulkScopedSearchOpsAction` and for the same reason — the
     owners are named rather than being a scope — while the answer is one row per owner
     instead of a page.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+
+class PartialBulkGetOwnedFieldOpsAction[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
+    BasePartialBulkAction, OwnedFieldGetOpsAction[TOwnerID, TRow, TData], ABC
+):
+    """The row each named entity designates, each entity answered for on its own.
+
+    The partial counterpart of :class:`BulkGetOwnedFieldOpsAction`: an entity the caller
+    may not read is one denied item, and one designating no row answers nothing.
     """
 
     @override

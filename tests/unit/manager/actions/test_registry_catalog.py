@@ -33,6 +33,7 @@ from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.image_alias import ImageAliasFieldType
 from ai.backend.common.data.entity.kernel import KernelFieldType
+from ai.backend.common.data.entity.kernel_group import KernelGroupFieldType
 from ai.backend.common.data.entity.notification import (
     NotificationChannelEntityType,
     NotificationRuleEntityType,
@@ -85,6 +86,7 @@ from ai.backend.manager.data.dotfile.types import DotfileData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.data.image.types import ImageAliasData
 from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.data.kernel_group.types import KernelGroupData
 from ai.backend.manager.models.audit_log.owner_candidates import (
     AuditLogOwnerCandidates,
     AuditLogScopeOwnerCandidates,
@@ -320,15 +322,33 @@ from ai.backend.manager.services.scheduling_history.processors import (
     SchedulingHistoryProcessors,
 )
 from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
+from ai.backend.manager.services.session.actions.bulk_get_kernel_group_environs import (
+    BulkGetKernelGroupEnvironsAction,
+)
+from ai.backend.manager.services.session.actions.bulk_get_kernel_group_resource_slots import (
+    BulkGetKernelGroupResourceSlotsAction,
+)
+from ai.backend.manager.services.session.actions.bulk_get_kernel_groups import (
+    BulkGetKernelGroupsAction,
+)
 from ai.backend.manager.services.session.actions.bulk_get_kernels import BulkGetKernelsAction
+from ai.backend.manager.services.session.actions.bulk_get_main_kernel_groups import (
+    BulkGetMainKernelGroupsAction,
+)
 from ai.backend.manager.services.session.actions.compute_schedule import (
     ComputeScheduleAction,
+)
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_group_owner import (
+    LookupBulkKernelGroupOwnerAction,
 )
 from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
     LookupBulkKernelOwnerAction,
 )
 from ai.backend.manager.services.session.actions.lookup_kernel_field_owner import (
     LookupKernelFieldOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_group_field_owner import (
+    LookupKernelGroupFieldOwnerAction,
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
@@ -399,6 +419,15 @@ def _kernels(registry: ProcessorRegistry[Any]) -> LookupFieldGroup[KernelInfo]:
         KernelInfo,
         LookupKernelFieldOwnerAction,
         LookupBulkKernelOwnerAction,
+    )
+
+
+def _kernel_groups(registry: ProcessorRegistry[Any]) -> LookupFieldGroup[KernelGroupData]:
+    return registry.group(GroupMeta(SessionEntityType())).field_group(
+        FieldGroupMeta(KernelGroupFieldType()),
+        KernelGroupData,
+        LookupKernelGroupFieldOwnerAction,
+        LookupBulkKernelGroupOwnerAction,
     )
 
 
@@ -529,6 +558,7 @@ def test_resource_domain_and_agent_reads_keep_their_judged_gates() -> None:
         registry.group(GroupMeta(SessionEntityType())),
         resource_group_groups.group(GroupMeta(ResourceGroupEntityType())),
         _kernels(registry),
+        _kernel_groups(registry),
         ResourceAllocationProcessors(
             resource_group_groups.group(GroupMeta(UserEntityType())),
             resource_group_groups.group(GroupMeta(ProjectEntityType())),
@@ -758,12 +788,14 @@ def test_field_data_loader_reads_are_partial_permission_reads() -> None:
 
 
 def test_session_and_kernel_data_loader_reads_are_checked_per_session() -> None:
-    """The session DataLoader reads per named session, the kernel one per owning session."""
+    """The session DataLoaders read per named session, the kernel and kernel group ones per
+    owning session."""
     registry = _ops_registry()
     SessionProcessors(
         registry.group(GroupMeta(SessionEntityType())),
         registry.group(GroupMeta(ResourceGroupEntityType())),
         _kernels(registry),
+        _kernel_groups(registry),
         MagicMock(),
         MagicMock(),
     )
@@ -776,6 +808,10 @@ def test_session_and_kernel_data_loader_reads_are_checked_per_session() -> None:
     partial = (SessionEntityType(), ActionKind.BULK, ActionGate.PERMISSION)
     assert recorded[BulkGetSessionsAction] == partial
     assert recorded[BulkGetKernelsAction] == partial
+    assert recorded[BulkGetMainKernelGroupsAction] == partial
+    assert recorded[BulkGetKernelGroupsAction] == partial
+    assert recorded[BulkGetKernelGroupEnvironsAction] == partial
+    assert recorded[BulkGetKernelGroupResourceSlotsAction] == partial
 
     lookup_gates = {
         (record.action_cls, record.gate)
@@ -784,6 +820,8 @@ def test_session_and_kernel_data_loader_reads_are_checked_per_session() -> None:
     }
     assert (LookupBulkKernelOwnerAction, ActionGate.PUBLIC) in lookup_gates
     assert (LookupBulkKernelOwnerAction, ActionGate.PERMISSION) in lookup_gates
+    assert (LookupBulkKernelGroupOwnerAction, ActionGate.PUBLIC) in lookup_gates
+    assert (LookupBulkKernelGroupOwnerAction, ActionGate.PERMISSION) in lookup_gates
 
 
 def test_entity_data_loader_reads_are_checked_per_entity() -> None:

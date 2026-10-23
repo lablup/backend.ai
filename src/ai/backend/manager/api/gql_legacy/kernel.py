@@ -39,6 +39,7 @@ from ai.backend.manager.models.kernel.row import (
     KernelRow,
     kernels,
 )
+from ai.backend.manager.models.kernel_group.row import KernelGroupRow
 from ai.backend.manager.models.minilang import JSONFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import (
@@ -59,8 +60,9 @@ from .base import (
     Item,
     PaginatedList,
     batch_multiresult,
-    batch_multiresult_in_scalar_stream,
+    batch_multiresult_in_session,
     batch_result,
+    batch_result_in_session,
 )
 from .gql_relay import AsyncNode, Connection
 from .image import ImageNode
@@ -98,6 +100,25 @@ async def _batch_load_kernel_allocations(
     async with ctx.db.begin_readonly_session() as db_session:
         aggregates = await batch_load_kernel_allocations(db_session, kernel_ids)
     return [aggregates.get(kid) or ResourceAllocationAggregate.empty() for kid in kernel_ids]
+
+
+def _resource_opts(shmem: int | None) -> dict[str, Any]:
+    """The ``resource_opts`` shape the kernel row held, rebuilt from its group's shmem."""
+    return {"shmem": shmem} if shmem is not None else {}
+
+
+_KERNEL_GROUP_COLUMNS = (
+    KernelGroupRow.startup_command.label("kernel_group_startup_command"),
+    KernelGroupRow.shmem.label("kernel_group_shmem"),
+    KernelGroupRow.preopen_ports.label("kernel_group_preopen_ports"),
+)
+
+
+def _select_kernels_with_group() -> sa.Select[Any]:
+    """Kernel rows with their group's execution spec columns, NULL for a kernel without one."""
+    return sa.select(KernelRow, *_KERNEL_GROUP_COLUMNS).outerjoin(
+        KernelGroupRow, KernelGroupRow.id == KernelRow.kernel_group_id
+    )
 
 
 class KernelNode(graphene.ObjectType):  # type: ignore[misc]
@@ -147,14 +168,14 @@ class KernelNode(graphene.ObjectType):  # type: ignore[misc]
         session_ids: Sequence[SessionId],
     ) -> Sequence[Sequence[Self]]:
         async with graph_ctx.db.begin_readonly_session() as db_sess:
-            query = sa.select(KernelRow).where(KernelRow.session_id.in_(session_ids))
-            return await batch_multiresult_in_scalar_stream(
+            query = _select_kernels_with_group().where(KernelRow.session_id.in_(session_ids))
+            return await batch_multiresult_in_session(
                 graph_ctx,
                 db_sess,
                 query,
                 cls,
                 session_ids,
-                lambda row: row.session_id,
+                lambda row: row.KernelRow.session_id,
             )
 
     @classmethod
@@ -164,48 +185,49 @@ class KernelNode(graphene.ObjectType):  # type: ignore[misc]
         agent_ids: Sequence[AgentId],
     ) -> Sequence[Sequence[Self]]:
         async with graph_ctx.db.begin_readonly_session() as db_sess:
-            query = sa.select(KernelRow).where(KernelRow.agent.in_(agent_ids))
-            return await batch_multiresult_in_scalar_stream(
+            query = _select_kernels_with_group().where(KernelRow.agent.in_(agent_ids))
+            return await batch_multiresult_in_session(
                 graph_ctx,
                 db_sess,
                 query,
                 cls,
                 agent_ids,
-                lambda row: row.agent,
+                lambda row: row.KernelRow.agent,
             )
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: KernelRow) -> Self:
+    def from_row(cls, ctx: GraphQueryContext, row: Row[Any]) -> Self:
         # TODO: Replace 'hide-agents' option to RBAC
         is_superadmin = ctx.user["role"] == UserRole.SUPERADMIN
         if is_superadmin:
             hide_agents = False
         else:
             hide_agents = ctx.config_provider.config.manager.hide_agents
-        status_history = row.status_history or {}
+        kernel: KernelRow = row.KernelRow
+        status_history = kernel.status_history or {}
         return KernelNode(
-            id=row.id,  # auto-converted to Relay global ID
-            row_id=row.id,
-            cluster_idx=row.cluster_idx,
-            cluster_hostname=row.cluster_hostname,
-            local_rank=row.local_rank,
-            cluster_role=row.cluster_role,
-            session_id=row.session_id,
-            architecture=row.architecture,
-            image_reference=row.image,
-            status=row.status,
-            status_changed=row.status_changed,
-            status_info=row.status_info,
-            status_data=row.status_data,
-            created_at=row.created_at,
-            terminated_at=row.terminated_at,
-            starts_at=row.starts_at,
+            id=kernel.id,  # auto-converted to Relay global ID
+            row_id=kernel.id,
+            cluster_idx=kernel.cluster_idx,
+            cluster_hostname=kernel.cluster_hostname,
+            local_rank=kernel.local_rank,
+            cluster_role=kernel.cluster_role,
+            session_id=kernel.session_id,
+            architecture=kernel.architecture,
+            image_reference=kernel.image,
+            status=kernel.status,
+            status_changed=kernel.status_changed,
+            status_info=kernel.status_info,
+            status_data=kernel.status_data,
+            created_at=kernel.created_at,
+            terminated_at=kernel.terminated_at,
+            starts_at=kernel.starts_at,
             scheduled_at=status_history.get(KernelStatus.SCHEDULED.name),
-            agent_id=row.agent if not hide_agents else None,
-            agent_addr=row.agent_addr if not hide_agents else None,
-            container_id=row.container_id if not hide_agents else None,
-            resource_opts=row.resource_opts,
-            preopen_ports=row.preopen_ports,
+            agent_id=kernel.agent if not hide_agents else None,
+            agent_addr=kernel.agent_addr if not hide_agents else None,
+            container_id=kernel.container_id if not hide_agents else None,
+            resource_opts=_resource_opts(row.kernel_group_shmem),
+            preopen_ports=row.kernel_group_preopen_ports,
         )
 
     async def resolve_image(self, info: graphene.ResolveInfo) -> ImageNode | None:
@@ -284,7 +306,7 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
     preopen_ports = graphene.List(lambda: graphene.Int, required=False)
 
     @classmethod
-    def parse_row(cls, ctx: GraphQueryContext, row: KernelRow) -> Mapping[str, Any]:
+    def parse_row(cls, ctx: GraphQueryContext, row: Row[Any]) -> Mapping[str, Any]:
         from ai.backend.manager.errors.resource import DataTransformationFailed
 
         if row is None:
@@ -296,45 +318,46 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
             hide_agents = False
         else:
             hide_agents = ctx.config_provider.config.manager.hide_agents
-        status_history = row.status_history or {}
+        kernel: KernelRow = row.KernelRow
+        status_history = kernel.status_history or {}
         return {
             # identity
-            "id": row.id,
-            "kernel_id": row.id,
-            "idx": row.cluster_idx,
-            "role": row.cluster_role,
-            "hostname": row.cluster_hostname,
-            "cluster_idx": row.cluster_idx,
-            "local_rank": row.local_rank,
-            "cluster_role": row.cluster_role,
-            "cluster_hostname": row.cluster_hostname,
-            "session_id": row.session_id,
+            "id": kernel.id,
+            "kernel_id": kernel.id,
+            "idx": kernel.cluster_idx,
+            "role": kernel.cluster_role,
+            "hostname": kernel.cluster_hostname,
+            "cluster_idx": kernel.cluster_idx,
+            "local_rank": kernel.local_rank,
+            "cluster_role": kernel.cluster_role,
+            "cluster_hostname": kernel.cluster_hostname,
+            "session_id": kernel.session_id,
             # image
-            "image": row.image,
-            "image_object": ImageNode.from_row(ctx, row.image_row),
-            "architecture": row.architecture,
-            "registry": row.registry,
+            "image": kernel.image,
+            "image_object": ImageNode.from_row(ctx, kernel.image_row),
+            "architecture": kernel.architecture,
+            "registry": kernel.registry,
             # status
-            "status": row.status.name,
-            "status_changed": row.status_changed,
-            "status_info": row.status_info,
-            "status_data": row.status_data,
-            "created_at": row.created_at,
-            "terminated_at": row.terminated_at,
-            "starts_at": row.starts_at,
+            "status": kernel.status.name,
+            "status_changed": kernel.status_changed,
+            "status_info": kernel.status_info,
+            "status_data": kernel.status_data,
+            "created_at": kernel.created_at,
+            "terminated_at": kernel.terminated_at,
+            "starts_at": kernel.starts_at,
             "scheduled_at": status_history.get(KernelStatus.SCHEDULED.name),
             # resources
-            "agent": row.agent if not hide_agents else None,
-            "agent_addr": row.agent_addr if not hide_agents else None,
-            "container_id": row.container_id if not hide_agents else None,
-            "resource_opts": row.resource_opts,
-            "preopen_ports": row.preopen_ports,
+            "agent": kernel.agent if not hide_agents else None,
+            "agent_addr": kernel.agent_addr if not hide_agents else None,
+            "container_id": kernel.container_id if not hide_agents else None,
+            "resource_opts": _resource_opts(row.kernel_group_shmem),
+            "preopen_ports": row.kernel_group_preopen_ports,
             # statistics
             # last_stat is resolved by Graphene (resolve_last_stat method)
         }
 
     @classmethod
-    def from_row(cls, ctx: GraphQueryContext, row: KernelRow | None) -> ComputeContainer | None:
+    def from_row(cls, ctx: GraphQueryContext, row: Row[Any] | None) -> ComputeContainer | None:
         if row is None:
             return None
         props = cls.parse_row(ctx, row)
@@ -457,7 +480,7 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
         order: str | None = None,
     ) -> Sequence[ComputeContainer | None]:
         query = (
-            sa.select(KernelRow)
+            _select_kernels_with_group()
             .where(KernelRow.session_id == session_id)
             .limit(limit)
             .offset(offset)
@@ -482,7 +505,7 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
         else:
             query = query.order_by(*DEFAULT_KERNEL_ORDERING)
         async with ctx.db.begin_readonly_session() as db_session:
-            return [cls.from_row(ctx, r) async for r in (await db_session.stream_scalars(query))]
+            return [cls.from_row(ctx, r) async for r in (await db_session.stream(query))]
 
     @classmethod
     async def batch_load_by_session(
@@ -491,19 +514,19 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
         session_ids: Sequence[SessionId],
     ) -> Sequence[Sequence[ComputeContainer]]:
         query = (
-            sa.select(KernelRow)
+            _select_kernels_with_group()
             # TODO: use "owner session ID" when we implement multi-container session
             .where(KernelRow.session_id.in_(session_ids))
             .options(selectinload(KernelRow.image_row).options(selectinload(ImageRow.aliases)))
         )
         async with ctx.db.begin_readonly_session() as conn:
-            return await batch_multiresult(
+            return await batch_multiresult_in_session(
                 ctx,
                 conn,
                 query,
                 cls,
                 session_ids,
-                lambda row: row.session_id,
+                lambda row: row.KernelRow.session_id,
             )
 
     @classmethod
@@ -515,7 +538,7 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
         status: KernelStatus | None = None,
     ) -> Sequence[Sequence[ComputeContainer]]:
         query_stmt = (
-            sa.select(KernelRow)
+            _select_kernels_with_group()
             .where(KernelRow.agent.in_(agent_ids))
             .options(selectinload(KernelRow.image_row).options(selectinload(ImageRow.aliases)))
         )
@@ -526,13 +549,13 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
             kernel_status = AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES
         query_stmt = query_stmt.where(KernelRow.status.in_(kernel_status))
         async with ctx.db.begin_readonly_session() as db_session:
-            return await batch_multiresult_in_scalar_stream(
+            return await batch_multiresult_in_session(
                 ctx,
                 db_session,
                 query_stmt,
                 cls,
                 agent_ids,
-                lambda row: row.agent,
+                lambda row: row.KernelRow.agent,
             )
 
     @classmethod
@@ -546,7 +569,7 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
         user_id: uuid.UUID | None = None,
     ) -> Sequence[ComputeContainer | None]:
         query = (
-            sa.select(KernelRow)
+            _select_kernels_with_group()
             .where(
                 (KernelRow.id.in_(container_ids)),
             )
@@ -564,13 +587,13 @@ class ComputeContainer(graphene.ObjectType):  # type: ignore[misc]
         if user_id is not None:
             query = query.where(KernelRow.user_uuid == user_id)
         async with ctx.db.begin_readonly_session() as conn:
-            return await batch_result(
+            return await batch_result_in_session(
                 ctx,
                 conn,
                 query,
                 cls,
                 container_ids,
-                lambda row: row.id,
+                lambda row: row.KernelRow.id,
             )
 
 
@@ -791,10 +814,10 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
             "status_info": row.status_info,
             "created_at": row.created_at,
             "terminated_at": row.terminated_at,
-            "startup_command": row.startup_command,
+            "startup_command": row.kernel_group_startup_command,
             "result": row.result.name,
             "service_ports": row.service_ports,
-            "resource_opts": row.resource_opts,
+            "resource_opts": _resource_opts(row.kernel_group_shmem),
             "num_queries": row.num_queries,
             # optionally hidden
             "agent": row.agent if not hide_agents else None,
@@ -886,11 +909,13 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         else:
             _order_func = sa.asc if order_asc else sa.desc
             _ordering = [_order_func(getattr(kernels.c, order_key))]
-        j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
-            users, users.c.uuid == kernels.c.user_uuid
+        j = (
+            kernels.join(groups, groups.c.id == kernels.c.group_id)
+            .join(users, users.c.uuid == kernels.c.user_uuid)
+            .outerjoin(KernelGroupRow.__table__, KernelGroupRow.id == kernels.c.kernel_group_id)
         )
         query = (
-            sa.select(kernels, groups.c.name, users.c.email)
+            sa.select(kernels, groups.c.name, users.c.email, *_KERNEL_GROUP_COLUMNS)
             .select_from(j)
             .where(kernels.c.cluster_role == DEFAULT_ROLE)
             .order_by(*_ordering)
@@ -924,11 +949,13 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
         group_id: uuid.UUID | None = None,
         status: str | None = None,
     ) -> Sequence[LegacyComputeSession | None]:
-        j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
-            users, users.c.uuid == kernels.c.user_uuid
+        j = (
+            kernels.join(groups, groups.c.id == kernels.c.group_id)
+            .join(users, users.c.uuid == kernels.c.user_uuid)
+            .outerjoin(KernelGroupRow.__table__, KernelGroupRow.id == kernels.c.kernel_group_id)
         )
         query = (
-            sa.select(kernels, groups.c.name, users.c.email)
+            sa.select(kernels, groups.c.name, users.c.email, *_KERNEL_GROUP_COLUMNS)
             .select_from(j)
             .where(
                 (kernels.c.access_key.in_(access_keys)) & (kernels.c.cluster_role == DEFAULT_ROLE),
@@ -978,11 +1005,13 @@ class LegacyComputeSession(graphene.ObjectType):  # type: ignore[misc]
             status_list = [KernelStatus[s] for s in status.split(",")]
         elif status is None:
             status_list = [KernelStatus["RUNNING"]]
-        j = kernels.join(groups, groups.c.id == kernels.c.group_id).join(
-            users, users.c.uuid == kernels.c.user_uuid
+        j = (
+            kernels.join(groups, groups.c.id == kernels.c.group_id)
+            .join(users, users.c.uuid == kernels.c.user_uuid)
+            .outerjoin(KernelGroupRow.__table__, KernelGroupRow.id == kernels.c.kernel_group_id)
         )
         query = (
-            sa.select(kernels, groups.c.name, users.c.email)
+            sa.select(kernels, groups.c.name, users.c.email, *_KERNEL_GROUP_COLUMNS)
             .select_from(j)
             .where((kernels.c.cluster_role == DEFAULT_ROLE) & (kernels.c.session_id.in_(sess_ids)))
         )

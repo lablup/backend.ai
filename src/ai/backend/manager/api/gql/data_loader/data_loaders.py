@@ -44,6 +44,7 @@ from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType, Id
 from ai.backend.common.data.entity.image import ImageEntityType, ImageID
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.kernel_group import KernelGroupID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
@@ -123,6 +124,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.client_ip_masking.types import (  # pants: no-infer-dep
         ClientIPMaskingPolicyGQL,
     )
+    from ai.backend.manager.api.gql.common_types import (  # pants: no-infer-dep
+        ResourceSlotGQL,
+    )
     from ai.backend.manager.api.gql.container_registry.types import (  # pants: no-infer-dep
         ContainerRegistryGQL,
     )
@@ -141,7 +145,8 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.deployment.types.replica import (  # pants: no-infer-dep
         ModelReplica,
     )
-    from ai.backend.manager.api.gql.deployment.types.revision import (  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.deployment.types.revision import (  # pants: no-infer-dep  # pants: no-infer-dep
+        EnvironmentVariablesGQL,
         ModelRevision,
     )
     from ai.backend.manager.api.gql.deployment.types.revision_preset import (  # pants: no-infer-dep
@@ -166,6 +171,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.kernel.types import (  # pants: no-infer-dep
         KernelV2GQL,
         ResourceAllocationGQL,
+    )
+    from ai.backend.manager.api.gql.kernel_group.types import (  # pants: no-infer-dep
+        KernelGroupGQL,
     )
     from ai.backend.manager.api.gql.keypair.types.node import KeyPairGQL  # pants: no-infer-dep
     from ai.backend.manager.api.gql.login_client_type.types import (  # pants: no-infer-dep
@@ -845,6 +853,89 @@ class DataLoaders:
             dtos = await adapter.batch_load_kernels_by_ids(kernel_ids)
             return [
                 dto if dto is None or isinstance(dto, Exception) else KG.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def kernel_group_loader(
+        self,
+    ) -> DataLoader[KernelGroupID, KernelGroupGQL | None]:
+        adapter = self._adapters.session
+
+        async def load_fn(ids: list[KernelGroupID]) -> list[KernelGroupGQL | Exception | None]:
+            from ai.backend.manager.api.gql.kernel_group.types import (  # pants: no-infer-dep
+                KernelGroupGQL as KGG,
+            )
+
+            dtos = await adapter.batch_load_kernel_groups_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else KGG.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def main_kernel_group_loader(
+        self,
+    ) -> DataLoader[SessionID, KernelGroupGQL | None]:
+        adapter = self._adapters.session
+
+        async def load_fn(session_ids: list[SessionID]) -> list[KernelGroupGQL | Exception | None]:
+            from ai.backend.manager.api.gql.kernel_group.types import (  # pants: no-infer-dep
+                KernelGroupGQL as KGG,
+            )
+
+            dtos = await adapter.batch_load_main_kernel_groups(session_ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else KGG.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def kernel_group_environ_loader(
+        self,
+    ) -> DataLoader[KernelGroupID, EnvironmentVariablesGQL | None]:
+        adapter = self._adapters.session
+
+        async def load_fn(
+            ids: list[KernelGroupID],
+        ) -> list[EnvironmentVariablesGQL | Exception | None]:
+            from ai.backend.manager.api.gql.deployment.types.revision import (  # pants: no-infer-dep
+                EnvironmentVariableEntryGQL as EVE,
+            )
+            from ai.backend.manager.api.gql.deployment.types.revision import (  # pants: no-infer-dep
+                EnvironmentVariablesGQL as EV,
+            )
+
+            dtos = await adapter.batch_load_kernel_group_environs(ids)
+            return [
+                dto
+                if dto is None or isinstance(dto, Exception)
+                else EV(entries=[EVE(name=e.name, value=e.value) for e in dto.entries])
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def kernel_group_resource_slot_loader(
+        self,
+    ) -> DataLoader[KernelGroupID, ResourceSlotGQL | None]:
+        adapter = self._adapters.session
+
+        async def load_fn(ids: list[KernelGroupID]) -> list[ResourceSlotGQL | Exception | None]:
+            from ai.backend.manager.api.gql.common_types import (  # pants: no-infer-dep
+                ResourceSlotGQL as RS,
+            )
+
+            dtos = await adapter.batch_load_kernel_group_resource_slots(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else RS.from_pydantic(dto)
                 for dto in dtos
             ]
 

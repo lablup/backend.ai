@@ -8,6 +8,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
+from ai.backend.common.data.entity.kernel_group import KernelGroupID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.types import FieldData
@@ -314,6 +315,7 @@ class KernelInfo(FieldData):
     lifecycle: LifecycleStatus
     metrics: Metrics
     metadata: Metadata
+    kernel_group_id: KernelGroupID | None
 
 
 @dataclass

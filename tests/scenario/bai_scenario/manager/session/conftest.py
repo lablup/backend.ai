@@ -15,6 +15,7 @@ import pytest
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.entity.kernel import KernelFieldType
+from ai.backend.common.data.entity.kernel_group import KernelGroupFieldType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.etcd import AbstractKVStore
@@ -34,6 +35,7 @@ from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.data.kernel_group.types import KernelGroupData
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
@@ -49,11 +51,17 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_group_owner import (
+    LookupBulkKernelGroupOwnerAction,
+)
 from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
     LookupBulkKernelOwnerAction,
 )
 from ai.backend.manager.services.session.actions.lookup_kernel_field_owner import (
     LookupKernelFieldOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_group_field_owner import (
+    LookupKernelGroupFieldOwnerAction,
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
@@ -151,6 +159,12 @@ async def adapter(
                 KernelInfo,
                 LookupKernelFieldOwnerAction,
                 LookupBulkKernelOwnerAction,
+            ),
+            registry.group(GroupMeta(SessionEntityType())).field_group(
+                FieldGroupMeta(KernelGroupFieldType()),
+                KernelGroupData,
+                LookupKernelGroupFieldOwnerAction,
+                LookupBulkKernelGroupOwnerAction,
             ),
             unwired(ResourceAllocationProcessors, "only allocation reads reach it"),
             service,
