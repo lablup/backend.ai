@@ -322,6 +322,32 @@ class TestSessionLauncherKernelCreation:
         assert record.exc_info[1] is error
         mock_valkey_schedule.record_session_failed_agents.assert_awaited_once()
 
+    async def test_system_session_environ_overrides_the_session_environ(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_name_bound_to_key_a: None,
+        session_for_start_with_user_environ: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """A system session environ value wins over the session's own entry under its key.
+
+        Given: The session's environ sets A and U; a public row binds the session name to A
+        When: Start session
+        Then: The kernel's environ has the session name under A and the session's U
+        """
+        session_ids = [session_for_start_with_user_environ.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_with_user_environ],
+                image_config_default,
+            )
+
+        kernel_configs = mock_agent_client_pool._mock_client.create_kernels.call_args[0][2]
+        environ = kernel_configs[0]["environ"]
+        assert environ["A"] == "test-session"
+        assert environ["U"] == "mine"
+
 
 # =============================================================================
 # TestSessionLauncherNetworkSetup (SC-LA-009 ~ SC-LA-015)
