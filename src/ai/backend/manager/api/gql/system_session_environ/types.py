@@ -87,9 +87,7 @@ class SystemSessionEnvironScopeInfoGQL(PydanticOutputMixin[SystemSessionEnvironS
 )
 class SystemSessionEnvironNodeGQL(PydanticOutputMixin[SystemSessionEnvironNodeDTO]):
     entity_id: UUID = gql_field(description="The id of the row.")
-    key: str = gql_field(
-        description="The environment variable name the value is injected under."
-    )
+    key: str = gql_field(description="The environment variable name the value is injected under.")
     value_source: SystemSessionEnvironValueSourceGQL = gql_field(
         description="Which value of the starting session is injected."
     )
