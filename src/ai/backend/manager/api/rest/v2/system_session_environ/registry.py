@@ -22,8 +22,8 @@ def register_v2_system_session_environ_routes(
 
     registry.add(
         "POST",
-        "/resolve",
-        handler.admin_resolve,
+        "/search",
+        handler.admin_search,
         middlewares=[superadmin_required],
     )
 

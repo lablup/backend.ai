@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
@@ -12,7 +14,7 @@ from ai.backend.common.dto.manager.v2.system_session_environ.types import (
 )
 
 __all__ = (
-    "ResolveSystemSessionEnvironPayload",
+    "AdminSearchSystemSessionEnvironsPayload",
     "SystemSessionEnvironNode",
 )
 
@@ -26,11 +28,17 @@ class SystemSessionEnvironNode(BaseResponseModel):
         description="Which value of the starting session is injected."
     )
     scope: SystemSessionEnvironScopeInfo = Field(description="The scope the row is bound to.")
-
-
-class ResolveSystemSessionEnvironPayload(BaseResponseModel):
-    """The rows a session in the domain and project receives, one per key."""
-
-    items: list[SystemSessionEnvironNode] = Field(
-        description="Per key the enabled row at the most specific scope: project, domain, then public."
+    enabled: bool = Field(
+        description="Whether the row is injected. A disabled row still hides the same key at a broader scope."
     )
+    created_at: datetime = Field(description="When the row was created.")
+    updated_at: datetime = Field(description="When the row was last changed.")
+
+
+class AdminSearchSystemSessionEnvironsPayload(BaseResponseModel):
+    """A page of system session environ rows."""
+
+    items: list[SystemSessionEnvironNode] = Field(description="The rows on this page.")
+    total_count: int = Field(description="Total number of rows matching the filter.")
+    has_next_page: bool = Field(description="Whether there is a next page.")
+    has_previous_page: bool = Field(description="Whether there is a previous page.")
