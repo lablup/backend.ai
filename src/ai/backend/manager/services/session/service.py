@@ -26,6 +26,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
@@ -81,6 +82,7 @@ from ai.backend.manager.data.session.options import (
 from ai.backend.manager.data.session.types import SessionTerminationStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.agent import AgentNotAllocated
+from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.common import (
     InternalServerError,
     ServiceUnavailable,
@@ -1473,9 +1475,9 @@ class SessionService:
         Builds a :class:`SessionSpecDraft` inline from the caller-supplied
         action, resolves delegation (``action.owner_id``), and hands the
         draft straight to the scheduling controller. The controller owns
-        every DB read the preparer / validator chain needs — this
-        service just extracts values from the action and shapes them
-        into the draft.
+        every DB read the preparer / validator chain needs; this service
+        reads only the session group the action names, to check it belongs
+        to the session's owner and project.
         """
         user_id = action.user_id
         access_key = action.access_key
@@ -1500,6 +1502,20 @@ class SessionService:
             user_id = owner.id
             access_key = owner_access_key
             domain_name = owner.domain_name
+
+        if action.session_group_id is not None:
+            session_group = await self._scheduler_repository.get_session_group(
+                action.session_group_id
+            )
+            if (
+                session_group.owner_user_id != user_id
+                or session_group.project_id != action.group_id
+                or session_group.deleted_at is not None
+            ):
+                raise EntityNotFoundError(
+                    f"Session group {action.session_group_id} not found",
+                    entity_type=SessionGroupEntityType(),
+                )
 
         # Keep the image resolve so callers passing a stale UUID get a
         # sharp error here instead of deep inside the preparer chain.
@@ -1623,6 +1639,7 @@ class SessionService:
                 project_id=ProjectID(action.group_id),
                 resource_group_id=resource_group_id,
                 resource_group_name=resource_group_name,
+                session_group_id=action.session_group_id,
             ),
         )
 
