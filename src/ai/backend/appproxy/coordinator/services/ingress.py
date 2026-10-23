@@ -26,19 +26,19 @@ class IngressService:
     """Sends ingresses to the worker clients of their authority: Traefik when it is enabled,
     otherwise every api-delivery worker node. The coordinator keeps none of them."""
 
-    _service_discovery: ServiceDiscovery
+    _worker_service_discovery: ServiceDiscovery
     _client_pool: ClientPool
     _secrets: SecretConfig
     _traefik_client: TraefikWorkerClient | None
 
     def __init__(
         self,
-        service_discovery: ServiceDiscovery,
+        worker_service_discovery: ServiceDiscovery,
         client_pool: ClientPool,
         secrets: SecretConfig,
         traefik_client: TraefikWorkerClient | None,
     ) -> None:
-        self._service_discovery = service_discovery
+        self._worker_service_discovery = worker_service_discovery
         self._client_pool = client_pool
         self._secrets = secrets
         self._traefik_client = traefik_client
@@ -102,7 +102,7 @@ class IngressService:
         self, authorities: Iterable[IngressAuthority]
     ) -> dict[IngressAuthority, list[HostPortPair]]:
         try:
-            workers = await self._service_discovery.get_service_group(WORKER_SERVICE_GROUP)
+            workers = await self._worker_service_discovery.get_service_group(WORKER_SERVICE_GROUP)
         except ValueError:
             # RedisServiceDiscovery raises ValueError for a group with no registered service.
             workers = []

@@ -138,7 +138,7 @@ def client(
     return TraefikWorkerClient(
         TraefikWorkerClientArgs(
             etcd=traefik_etcd,
-            service_discovery=worker_service_discovery,
+            worker_service_discovery=worker_service_discovery,
             routing_config_factory=routing_config_factory,
         )
     )
@@ -153,7 +153,7 @@ def client_on_etcd_holding_10206(
     return TraefikWorkerClient(
         TraefikWorkerClientArgs(
             etcd=etcd_holding_a_newer_revision_of_10206,
-            service_discovery=worker_service_discovery,
+            worker_service_discovery=worker_service_discovery,
             routing_config_factory=routing_config_factory,
         )
     )

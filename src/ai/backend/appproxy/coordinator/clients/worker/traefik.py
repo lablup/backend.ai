@@ -34,7 +34,7 @@ from ai.backend.common.service_discovery.service_discovery import ServiceDiscove
 @dataclass(frozen=True)
 class TraefikWorkerClientArgs:
     etcd: TraefikEtcd
-    service_discovery: ServiceDiscovery
+    worker_service_discovery: ServiceDiscovery
     routing_config_factory: TraefikRoutingConfigFactory
 
 
@@ -47,12 +47,12 @@ class TraefikWorkerClient(BaseWorkerClient):
     _REVISION_ROOT: Final[str] = "ingress_revisions"
 
     _etcd: TraefikEtcd
-    _service_discovery: ServiceDiscovery
+    _worker_service_discovery: ServiceDiscovery
     _routing_config_factory: TraefikRoutingConfigFactory
 
     def __init__(self, args: TraefikWorkerClientArgs) -> None:
         self._etcd = args.etcd
-        self._service_discovery = args.service_discovery
+        self._worker_service_discovery = args.worker_service_discovery
         self._routing_config_factory = args.routing_config_factory
 
     @override
@@ -112,7 +112,9 @@ class TraefikWorkerClient(BaseWorkerClient):
         self, authorities: Iterable[IngressAuthority]
     ) -> dict[IngressAuthority, TraefikWorker]:
         try:
-            worker_services = await self._service_discovery.get_service_group(WORKER_SERVICE_GROUP)
+            worker_services = await self._worker_service_discovery.get_service_group(
+                WORKER_SERVICE_GROUP
+            )
         except ValueError:
             # RedisServiceDiscovery raises ValueError for a group with no registered service.
             worker_services = []

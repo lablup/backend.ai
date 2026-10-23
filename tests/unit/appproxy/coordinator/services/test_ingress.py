@@ -155,22 +155,22 @@ def unannounced_ingress(public_access: IngressAccess, backend: IngressBackend) -
 
 
 @pytest.fixture
-def service_discovery() -> AsyncMock:
-    service_discovery = AsyncMock(spec=ServiceDiscovery)
-    service_discovery.get_service_group.return_value = [
+def worker_service_discovery() -> AsyncMock:
+    worker_service_discovery = AsyncMock(spec=ServiceDiscovery)
+    worker_service_discovery.get_service_group.return_value = [
         _node("worker-1", IngressDeliveryMode.API, WORKER_1_NODE_A),
         _node("worker-1", IngressDeliveryMode.API, WORKER_1_NODE_B),
         _node("worker-1", IngressDeliveryMode.REDIS, WORKER_1_REDIS_NODE),
         _node("worker-2", IngressDeliveryMode.API, WORKER_2_NODE),
     ]
-    return service_discovery
+    return worker_service_discovery
 
 
 @pytest.fixture
-def empty_service_discovery() -> AsyncMock:
-    service_discovery = AsyncMock(spec=ServiceDiscovery)
-    service_discovery.get_service_group.side_effect = ValueError("No services found")
-    return service_discovery
+def empty_worker_service_discovery() -> AsyncMock:
+    worker_service_discovery = AsyncMock(spec=ServiceDiscovery)
+    worker_service_discovery.get_service_group.side_effect = ValueError("No services found")
+    return worker_service_discovery
 
 
 @pytest.fixture
@@ -252,19 +252,21 @@ def traefik_client(slow_traefik_write_finished: asyncio.Event) -> AsyncMock:
 
 @pytest.fixture
 def traefik_service(
-    service_discovery: AsyncMock,
+    worker_service_discovery: AsyncMock,
     client_pool: Mock,
     secrets: SecretConfig,
     traefik_client: AsyncMock,
 ) -> IngressService:
-    return IngressService(service_discovery, client_pool, secrets, traefik_client=traefik_client)
+    return IngressService(
+        worker_service_discovery, client_pool, secrets, traefik_client=traefik_client
+    )
 
 
 @pytest.fixture
 def service(
-    service_discovery: AsyncMock, client_pool: Mock, secrets: SecretConfig
+    worker_service_discovery: AsyncMock, client_pool: Mock, secrets: SecretConfig
 ) -> IngressService:
-    return IngressService(service_discovery, client_pool, secrets, traefik_client=None)
+    return IngressService(worker_service_discovery, client_pool, secrets, traefik_client=None)
 
 
 class TestIngressService:
@@ -338,13 +340,15 @@ class TestIngressService:
 
     async def test_no_registered_worker_pushes_nothing(
         self,
-        empty_service_discovery: AsyncMock,
+        empty_worker_service_discovery: AsyncMock,
         client_pool: Mock,
         secrets: SecretConfig,
         worker_sessions: dict[str, MagicMock],
         worker_1_ingress: Ingress,
     ) -> None:
-        service = IngressService(empty_service_discovery, client_pool, secrets, traefik_client=None)
+        service = IngressService(
+            empty_worker_service_discovery, client_pool, secrets, traefik_client=None
+        )
         await service.upsert([worker_1_ingress])
         for session in worker_sessions.values():
             session.post.assert_not_called()

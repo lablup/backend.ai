@@ -944,7 +944,7 @@ async def ingress_service_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         traefik_client = TraefikWorkerClient(
             TraefikWorkerClientArgs(
                 etcd=root_ctx.traefik_etcd,
-                service_discovery=root_ctx.worker_service_discovery,
+                worker_service_discovery=root_ctx.worker_service_discovery,
                 routing_config_factory=TraefikRoutingConfigFactory(
                     traefik_config,
                     jwt_secret=root_ctx.local_config.secrets.jwt_secret,
