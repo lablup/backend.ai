@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Final
 
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
-from ai.backend.appproxy.coordinator.config import ClientIPStrategyConfig, TraefikConfig
+from ai.backend.appproxy.coordinator.config import TraefikConfig
 from ai.backend.appproxy.coordinator.errors.ingress import TraefikWildcardDomainMissingError
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
     Ingress,
@@ -32,14 +32,14 @@ class TraefikRoutingConfigFactory:
     """Builds the Traefik router, middleware and service configs of an ingress and the etcd keys
     Traefik reads them from."""
 
-    _client_ip_strategy: ClientIPStrategyConfig | None
+    _traefik_config: TraefikConfig
     _jwt_secret: str
     _permit_hash_secret: str
 
     def __init__(
         self, traefik_config: TraefikConfig, *, jwt_secret: str, permit_hash_secret: str
     ) -> None:
-        self._client_ip_strategy = traefik_config.client_ip_strategy
+        self._traefik_config = traefik_config
         self._jwt_secret = jwt_secret
         self._permit_hash_secret = permit_hash_secret
 
@@ -153,7 +153,7 @@ class TraefikRoutingConfigFactory:
         ip_allowlist: dict[str, Any] = {
             "sourceRange": [str(network) for network in access.allowed_client_ips],
         }
-        client_ip_strategy = self._client_ip_strategy
+        client_ip_strategy = self._traefik_config.client_ip_strategy
         if client_ip_strategy is not None:
             if client_ip_strategy.depth is not None:
                 ip_allowlist["ipStrategy"] = {"depth": client_ip_strategy.depth}
