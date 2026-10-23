@@ -22,6 +22,7 @@ from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.events.event_types.kernel.types import (
     KernelCreationInfo,
@@ -53,6 +54,7 @@ from ai.backend.manager.data.resource.types import UserEnqueuePolicy
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.types import SessionInfo, SessionStatus
+from ai.backend.manager.data.session_group.types import SessionGroupData
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
@@ -506,6 +508,10 @@ class SchedulerRepository:
         self, resource_group_id: ResourceGroupID
     ) -> ResourceGroupName:
         return await self._db_source.get_resource_group_name_by_id(resource_group_id)
+
+    @scheduler_repository_resilience.apply()
+    async def get_session_group(self, session_group_id: SessionGroupID) -> SessionGroupData:
+        return await self._db_source.get_session_group(session_group_id)
 
     @scheduler_repository_resilience.apply()
     async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
