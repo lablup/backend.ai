@@ -84,9 +84,11 @@ class TraefikWorkerClient(BaseWorkerClient):
     @override
     async def remove(self, keys: Sequence[IngressKey]) -> None:
         for ingress_key in keys:
+            routing_config_etcd_keys = self._routing_config_factory.routing_config_etcd_keys(
+                ingress_key
+            )
             replacements: dict[str, NestedStrKeyedMapping] = {
-                object_etcd_key: {}
-                for object_etcd_key in self._routing_config_factory.object_etcd_keys(ingress_key)
+                routing_config_etcd_key: {} for routing_config_etcd_key in routing_config_etcd_keys
             }
             replacements[self._revision_prefix(ingress_key)] = {}
             await self._etcd.atomic_replace_prefixes(replacements)
@@ -101,7 +103,8 @@ class TraefikWorkerClient(BaseWorkerClient):
             replacements, guards={self._revision_key(ingress_key): held_revision}
         ):
             raise TraefikIngressConcurrentWriteError(
-                f"frontend {ingress.frontend.key()} changed after revision {held_revision} was read",
+                f"frontend {ingress.frontend.key()} changed after revision {held_revision} "
+                "was read",
                 extra_data={
                     "authority": ingress.authority,
                     "frontend_key": ingress.frontend.key(),
@@ -147,13 +150,15 @@ class TraefikWorkerClient(BaseWorkerClient):
         self, ingress: Ingress, worker: TraefikWorker
     ) -> dict[str, NestedStrKeyedMapping]:
         routing_config_factory = self._routing_config_factory
-        # Every object key of the ingress is listed so a protocol or middleware it no longer has
-        # is cleared in the same transaction.
+        # Every routing config key of the ingress is listed so a protocol or middleware it no
+        # longer has is cleared in the same transaction.
         subtrees: dict[str, NestedStrKeyedMapping] = {
-            object_etcd_key: {}
-            for object_etcd_key in routing_config_factory.object_etcd_keys(ingress.key())
+            routing_config_etcd_key: {}
+            for routing_config_etcd_key in routing_config_factory.routing_config_etcd_keys(
+                ingress.key()
+            )
         }
-        object_configs = routing_config_factory.object_configs_by_etcd_key(ingress, worker)
-        for object_etcd_key, object_config in object_configs.items():
-            subtrees[object_etcd_key] = convert_to_etcd_dict(object_config)
+        routing_configs = routing_config_factory.routing_configs_by_etcd_key(ingress, worker)
+        for routing_config_etcd_key, routing_config in routing_configs.items():
+            subtrees[routing_config_etcd_key] = convert_to_etcd_dict(routing_config)
         return subtrees

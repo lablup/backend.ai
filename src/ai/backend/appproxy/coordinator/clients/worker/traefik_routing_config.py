@@ -44,8 +44,8 @@ class TraefikRoutingConfigFactory:
         self._permit_hash_secret = permit_hash_secret
 
     @classmethod
-    def object_etcd_keys(cls, ingress_key: IngressKey) -> list[str]:
-        """Every object key an ingress can own, for clearing the ones it no longer has."""
+    def routing_config_etcd_keys(cls, ingress_key: IngressKey) -> list[str]:
+        """Every routing config key an ingress can own, for clearing the ones it no longer has."""
         return [
             cls._router_etcd_key(ingress_key, IngressProtocol.HTTP),
             cls._service_etcd_key(ingress_key, IngressProtocol.HTTP),
@@ -59,10 +59,10 @@ class TraefikRoutingConfigFactory:
             cls._service_etcd_key(ingress_key, IngressProtocol.TCP),
         ]
 
-    def object_configs_by_etcd_key(
+    def routing_configs_by_etcd_key(
         self, ingress: Ingress, worker: TraefikWorker
     ) -> dict[str, dict[str, Any]]:
-        """The config of every Traefik object the ingress uses, by the etcd key Traefik reads."""
+        """Router, service and middleware configs of the ingress, by the etcd key Traefik reads."""
         ingress_key = ingress.key()
         frontend_protocol = ingress.frontend.protocol
         router_etcd_key = self._router_etcd_key(ingress_key, frontend_protocol)
@@ -196,7 +196,8 @@ class TraefikRoutingConfigFactory:
             return {}
         return {"loadBalancer": {"servers": servers}}
 
-    # Frontend keys hold no '_', so no object name of one ingress is a prefix of another's.
+    # Frontend keys hold no '_', so no router, service or middleware name of one ingress is a
+    # prefix of another's.
     @staticmethod
     def _router_name(ingress_key: IngressKey) -> str:
         return f"bai_ingress_{ingress_key.frontend_key}_router"

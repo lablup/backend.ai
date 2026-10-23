@@ -141,10 +141,10 @@ class TestTraefikRoutingConfigFactory:
         http_ingress_allowing_one_network: Ingress,
         worker: TraefikWorker,
     ) -> None:
-        object_configs = routing_config_factory.object_configs_by_etcd_key(
+        routing_configs = routing_config_factory.routing_configs_by_etcd_key(
             http_ingress_allowing_one_network, worker
         )
-        ip_allowlist = object_configs[
+        ip_allowlist = routing_configs[
             "worker_worker-1/http/middlewares/bai_ingress_10205_ipallowlist"
         ]["ipAllowList"]
         assert ip_allowlist.get("ipStrategy") == case.expected_ip_strategy
@@ -169,10 +169,10 @@ class TestTraefikRoutingConfigFactory:
         tcp_ingress: Ingress,
         worker: TraefikWorker,
     ) -> None:
-        object_configs = (
-            routing_config_factory_without_client_ip_strategy.object_configs_by_etcd_key(
+        routing_configs = (
+            routing_config_factory_without_client_ip_strategy.routing_configs_by_etcd_key(
                 tcp_ingress, worker
             )
         )
-        router_config = object_configs["worker_worker-1/tcp/routers/bai_ingress_10205_router"]
+        router_config = routing_configs["worker_worker-1/tcp/routers/bai_ingress_10205_router"]
         assert router_config["rule"] == case.expected_rule
