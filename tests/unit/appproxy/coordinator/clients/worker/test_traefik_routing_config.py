@@ -2,15 +2,16 @@ from __future__ import annotations
 
 import ipaddress
 from dataclasses import dataclass, field
-from typing import Any
 from unittest.mock import Mock
 
 import pytest
 
 from ai.backend.appproxy.common.config import PermitHashConfig, SecretConfig
 from ai.backend.appproxy.coordinator.clients.worker.traefik_routing_config import (
+    TraefikIpAllowListMiddlewareConfig,
     TraefikRoutingConfigFactory,
     TraefikRoutingConfigFactoryArgs,
+    TraefikTcpRouterConfig,
 )
 from ai.backend.appproxy.coordinator.config import ClientIPStrategyConfig, TraefikConfig
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
@@ -34,7 +35,7 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
 class _ClientIPStrategyCase:
     name: str
     strategy: ClientIPStrategyConfig | None
-    expected_ip_strategy: dict[str, Any] | None
+    expected_ip_allowlist_middleware_config: TraefikIpAllowListMiddlewareConfig
 
 
 @dataclass(frozen=True)
@@ -118,18 +119,34 @@ class TestTraefikRoutingConfigFactory:
     @pytest.mark.parametrize(
         "case",
         [
-            _ClientIPStrategyCase(name="no-strategy", strategy=None, expected_ip_strategy=None),
+            _ClientIPStrategyCase(
+                name="no-strategy",
+                strategy=None,
+                expected_ip_allowlist_middleware_config={
+                    "ipAllowList": {"sourceRange": ["192.168.0.0/24"]},
+                },
+            ),
             _ClientIPStrategyCase(
                 name="depth",
                 strategy=ClientIPStrategyConfig(depth=2, excluded_ips=[]),
-                expected_ip_strategy={"depth": 2},
+                expected_ip_allowlist_middleware_config={
+                    "ipAllowList": {
+                        "sourceRange": ["192.168.0.0/24"],
+                        "ipStrategy": {"depth": 2},
+                    },
+                },
             ),
             _ClientIPStrategyCase(
                 name="excluded-ips",
                 strategy=ClientIPStrategyConfig(
                     depth=None, excluded_ips=[ipaddress.ip_network("10.0.0.0/8")]
                 ),
-                expected_ip_strategy={"excludedIPs": ["10.0.0.0/8"]},
+                expected_ip_allowlist_middleware_config={
+                    "ipAllowList": {
+                        "sourceRange": ["192.168.0.0/24"],
+                        "ipStrategy": {"excludedIPs": ["10.0.0.0/8"]},
+                    },
+                },
             ),
         ],
         ids=lambda case: case.name,
@@ -146,11 +163,10 @@ class TestTraefikRoutingConfigFactory:
             wildcard_domain=None,
             tls_listen=False,
         )
-        ip_allowlist = routing_configs[
-            "worker_worker-1/http/middlewares/bai_ingress_10205_ipallowlist"
-        ]["ipAllowList"]
-        assert ip_allowlist.get("ipStrategy") == case.expected_ip_strategy
-        assert ip_allowlist["sourceRange"] == ["192.168.0.0/24"]
+        assert (
+            routing_configs["worker_worker-1/http/middlewares/bai_ingress_10205_ipallowlist"]
+            == case.expected_ip_allowlist_middleware_config
+        )
 
     @pytest.mark.parametrize(
         "case",
@@ -175,5 +191,10 @@ class TestTraefikRoutingConfigFactory:
                 tcp_ingress, hostname="worker-1.example.com", wildcard_domain=None, tls_listen=False
             )
         )
-        router_config = routing_configs["worker_worker-1/tcp/routers/bai_ingress_10205_router"]
-        assert router_config["rule"] == case.expected_rule
+        assert routing_configs[
+            "worker_worker-1/tcp/routers/bai_ingress_10205_router"
+        ] == TraefikTcpRouterConfig(
+            rule=case.expected_rule,
+            service="bai_ingress_10205_service",
+            entrypoints=["portproxy_10205"],
+        )
