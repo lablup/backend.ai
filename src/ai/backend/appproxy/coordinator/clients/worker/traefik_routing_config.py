@@ -36,12 +36,20 @@ class TraefikRoutingConfigFactory:
         self._permit_hash_secret = permit_hash_secret
 
     @staticmethod
-    def etcd_prefix(authority: IngressAuthority, protocol: IngressProtocol) -> str:
-        match protocol:
-            case IngressProtocol.HTTP | IngressProtocol.HTTP2:
-                return f"worker_{authority}/http"
-            case IngressProtocol.TCP:
-                return f"worker_{authority}/tcp"
+    def router_etcd_key(
+        authority: IngressAuthority, protocol: IngressProtocol, router_name: str
+    ) -> str:
+        return f"worker_{authority}/{_traefik_protocol_key(protocol)}/routers/{router_name}"
+
+    @staticmethod
+    def service_etcd_key(
+        authority: IngressAuthority, protocol: IngressProtocol, service_name: str
+    ) -> str:
+        return f"worker_{authority}/{_traefik_protocol_key(protocol)}/services/{service_name}"
+
+    @staticmethod
+    def http_middleware_etcd_key(authority: IngressAuthority, middleware_name: str) -> str:
+        return f"worker_{authority}/http/middlewares/{middleware_name}"
 
     @staticmethod
     def router_rule(ingress: Ingress, worker: TraefikWorker) -> str:
@@ -161,6 +169,15 @@ class TraefikRoutingConfigFactory:
         if not servers:
             return {}
         return {"loadBalancer": {"servers": servers}}
+
+
+def _traefik_protocol_key(protocol: IngressProtocol) -> str:
+    # Traefik keeps HTTP/2 routing under its http configuration.
+    match protocol:
+        case IngressProtocol.HTTP | IngressProtocol.HTTP2:
+            return "http"
+        case IngressProtocol.TCP:
+            return "tcp"
 
 
 def _targets_receiving_traffic(backend: IngressBackend) -> list[IngressTarget]:
