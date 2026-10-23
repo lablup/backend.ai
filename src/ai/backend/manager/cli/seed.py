@@ -76,18 +76,27 @@ def apply(cli_ctx: CLIContext, paths: tuple[Path, ...], overwrite: bool) -> None
     from ai.backend.manager.repositories.ops.v2.seed.provider import SeedOpsProvider
     from ai.backend.manager.repositories.seed.repository import SeedRepository
     from ai.backend.manager.seed.factory import create_seed_kind_registry
-    from ai.backend.manager.seed.runner import SeedApplier, SeedPlanner
+    from ai.backend.manager.seed.runner import SeedApplier, SeedPlan, SeedPlanner
+    from ai.backend.manager.seed.types import SeedKind
 
     plan = SeedPlanner(create_seed_kind_registry()).plan(paths)
+    # The other kinds read the global entity ids, which a fresh database gets from this kind.
+    global_entity_plan = SeedPlan(
+        batches=[batch for batch in plan.batches if batch.kind.name == SeedKind.GLOBAL_ENTITY]
+    )
+    plan_after_global_entities = SeedPlan(
+        batches=[batch for batch in plan.batches if batch.kind.name != SeedKind.GLOBAL_ENTITY]
+    )
 
     async def _apply() -> dict[SeedKind, SeedWriteResult]:
         bootstrap_config = await cli_ctx.get_bootstrap_config()
         # A standalone CLI process has not imported the full model tree.
         ensure_all_tables_registered()
         async with connect_database(bootstrap_config.db) as db:
+            applier = SeedApplier(SeedRepository(SeedOpsProvider(db)))
+            results = await applier.apply(global_entity_plan, overwrite)
             await GlobalEntityIDLoader(db).load()
-            repository = SeedRepository(SeedOpsProvider(db))
-            return await SeedApplier(repository).apply(plan, overwrite)
+            return results | await applier.apply(plan_after_global_entities, overwrite)
 
     results = asyncio.run(_apply())
     failed = 0

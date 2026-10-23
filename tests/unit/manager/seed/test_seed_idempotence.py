@@ -85,9 +85,16 @@ async def _snapshot(
     return snapshot
 
 
+# The database these cases share holds the global entities already, so the first apply
+# skips them; `global_entity/test_apply.py` applies that kind to a database without them.
+_KINDS_APPLIED_TO_THEIR_OWN_DATABASE: Final[frozenset[SeedKind]] = frozenset({
+    SeedKind.GLOBAL_ENTITY
+})
+
+
 def test_every_registered_kind_has_a_case() -> None:
     registered = {kind.name for kind in create_seed_kind_registry().ordered()}
-    assert {case.kind_name for case in _CASES} == registered
+    assert {case.kind_name for case in _CASES} == registered - _KINDS_APPLIED_TO_THEIR_OWN_DATABASE
 
 
 @pytest.fixture

@@ -47,7 +47,10 @@ The spec bases live in `models/specs/` — read `models/specs/AGENTS.md` before 
 - Do NOT delete a `global_entities` row or its node (a `virtual_entities` row with
   `entity_type = 'global'`). Deleting the node cascades to the scope's edges, roles and
   role assignments.
-- The migration writes the rows and nodes. Do NOT add a code path that creates or deletes them.
+- The migration writes the rows and nodes on an existing database, under ids the database
+  generates. A fresh install gets them from the `global_entity` seed kind, under the ids
+  `seeds/manager/global_entity/defaults.yaml` states; `mgr schema oneshot` does not write them.
+  Do NOT add another code path that creates them, or any that deletes them.
 - The manager checks both rows and nodes at startup and refuses to start when one is missing.
 
 ## No logic in Row classes

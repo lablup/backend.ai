@@ -55,6 +55,7 @@ from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain.row import DomainRow, domains
+from ai.backend.manager.models.global_entity.seed import SEED_GLOBAL_ENTITIES_SQL
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.project.row import ProjectRow, association_groups_users, groups
@@ -416,6 +417,16 @@ def database(request: pytest.FixtureRequest, db_config: DatabaseConfig, test_db:
     click_ctx = cli_schema_oneshot.make_context("test", ["-f", cfg_path], obj=cli_ctx)
     cli_schema_oneshot.invoke(click_ctx)
     Path(cfg_path).unlink(missing_ok=True)
+
+    # Installs get the global entities from their seed file; the manager reads them at startup.
+    async def _seed_global_entities() -> None:
+        engine = create_async_engine(sa_url, connect_args=pgsql_connect_opts)
+        async with engine.begin() as conn:
+            for statement in SEED_GLOBAL_ENTITIES_SQL:
+                await conn.exec_driver_sql(statement)
+        await engine.dispose()
+
+    asyncio.run(_seed_global_entities())
 
     yield
 
