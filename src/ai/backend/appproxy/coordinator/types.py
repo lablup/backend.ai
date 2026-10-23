@@ -30,6 +30,7 @@ from ai.backend.appproxy.common.events import (
     AppProxyWorkerCircuitAddedEvent,
 )
 from ai.backend.appproxy.common.types import ProxyProtocol, RouteInfo, SerializableCircuit
+from ai.backend.common.clients.http_client.client_pool import ClientPool
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_lock.client import ValkeyLockClient
@@ -44,6 +45,7 @@ from ai.backend.common.metrics.metric import (
     SystemMetricObserver,
 )
 from ai.backend.common.metrics.multiprocess import generate_latest_multiprocess
+from ai.backend.common.service_discovery.service_discovery import ServiceDiscovery
 from ai.backend.common.types import AgentId, BackendAISchema
 from ai.backend.logging.structured import StructuredLogger
 
@@ -54,6 +56,8 @@ from .models.utils import ExtendedAsyncSAEngine
 from .models.worker import Worker
 
 if TYPE_CHECKING:
+    from ai.backend.appproxy.coordinator.services.ingress import IngressService
+
     from .services.endpoint import EndpointService
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -414,6 +418,9 @@ class RootContext:
 
     circuit_manager: CircuitManager
     endpoint_service: EndpointService
+    worker_client_pool: ClientPool
+    ingress_service: IngressService
+    worker_service_discovery: ServiceDiscovery
 
     metrics: CoordinatorMetricRegistry
     health_probe: HealthProbe

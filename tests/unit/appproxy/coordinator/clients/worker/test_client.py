@@ -7,11 +7,8 @@ from unittest.mock import AsyncMock, MagicMock
 import aiohttp
 import pytest
 
-from ai.backend.appproxy.common.config import SecretConfig
-from ai.backend.appproxy.coordinator.clients.worker.client import (
-    AppProxyWorkerClient,
-    AppProxyWorkerClientPool,
-)
+from ai.backend.appproxy.common.config import HostPortPair, SecretConfig
+from ai.backend.appproxy.coordinator.clients.worker.client import AppProxyWorkerClient
 from ai.backend.appproxy.coordinator.errors.ingress import (
     ApiDeliveryWorkerRejectedError,
     ApiDeliveryWorkerServerError,
@@ -35,13 +32,19 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
 from ai.backend.common.exception import BackendAIError
 
 API_SECRET = "api-secret"
-WORKER_ADDR = "10.0.0.1:10201"
+WORKER_ADDR = HostPortPair(host="10.0.0.1", port=10201)
 
 
 @dataclass(frozen=True)
 class _ErrorAnswerCase:
     status: HTTPStatus
     expected_error: type[BackendAIError]
+
+
+@dataclass(frozen=True)
+class _UnreachableCase:
+    name: str
+    raised: Exception
 
 
 def _answering_session(status: int, body: bytes) -> MagicMock:
@@ -84,21 +87,15 @@ def applying_session() -> MagicMock:
     return _answering_session(HTTPStatus.OK, b"")
 
 
-@pytest.fixture
-def unreachable_session() -> MagicMock:
-    session = MagicMock()
-    session.post.side_effect = aiohttp.ClientConnectionError("connection refused")
-    return session
-
-
 class TestAppProxyWorkerClient:
-    async def test_push_carries_the_api_secret(
+    async def test_push_carries_the_api_secret_and_asks_for_json(
         self, applying_session: MagicMock, secrets: SecretConfig, ingress: Ingress
     ) -> None:
         client = AppProxyWorkerClient(applying_session, WORKER_ADDR, secrets)
         await client.upsert([ingress])
         assert applying_session.post.call_args.kwargs["headers"] == {
-            "X-BackendAI-Token": API_SECRET
+            "Accept": "application/json",
+            "X-BackendAI-Token": API_SECRET,
         }
 
     @pytest.mark.parametrize(
@@ -131,23 +128,27 @@ class TestAppProxyWorkerClient:
         with pytest.raises(case.expected_error) as exc_info:
             await client.upsert([ingress])
         assert exc_info.value.extra_data == {
-            "worker_addr": WORKER_ADDR,
+            "worker_addr": "10.0.0.1:10201",
             "status": case.status,
             "body": "rejected",
         }
 
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _UnreachableCase(
+                name="connection-error",
+                raised=aiohttp.ClientConnectionError("connection refused"),
+            ),
+            _UnreachableCase(name="timeout", raised=TimeoutError()),
+        ],
+        ids=lambda case: case.name,
+    )
     async def test_unreachable_worker_raises(
-        self, unreachable_session: MagicMock, secrets: SecretConfig, ingress: Ingress
+        self, case: _UnreachableCase, secrets: SecretConfig, ingress: Ingress
     ) -> None:
-        client = AppProxyWorkerClient(unreachable_session, WORKER_ADDR, secrets)
+        session = MagicMock()
+        session.post.side_effect = case.raised
+        client = AppProxyWorkerClient(session, WORKER_ADDR, secrets)
         with pytest.raises(ApiDeliveryWorkerUnreachableError):
             await client.upsert([ingress])
-
-
-class TestAppProxyWorkerClientPool:
-    async def test_client_of_an_address_is_reused(self, secrets: SecretConfig) -> None:
-        pool = AppProxyWorkerClientPool(secrets)
-        try:
-            assert pool.load_client(WORKER_ADDR) is pool.load_client(WORKER_ADDR)
-        finally:
-            await pool.close()

@@ -58,3 +58,18 @@ class ApiDeliveryWorkerServerError(BackendAIError, web.HTTPBadGateway):
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.INTERNAL_ERROR,
         )
+
+
+class ApiDeliveryWorkerPushFailedError(BackendAIError, web.HTTPBadGateway):
+    """Raised after every push has settled when any api-delivery worker push failed."""
+
+    error_type = "https://api.backend.ai/probs/appproxy-coordinator/api-delivery-worker-push-failed"
+    error_title = "Pushes to api-delivery workers failed."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.UNAVAILABLE,
+        )

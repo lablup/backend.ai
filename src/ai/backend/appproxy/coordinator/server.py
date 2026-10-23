@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, cast
 from uuid import UUID
 
+import aiohttp
 import aiohttp_cors
 import aiohttp_jinja2
 import aiomonitor
@@ -82,6 +83,11 @@ from ai.backend.appproxy.common.utils import (
     mime_match,
 )
 from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
+from ai.backend.appproxy.coordinator.services.ingress import IngressService
+from ai.backend.common.clients.http_client.client_pool import (
+    ClientPool,
+    tcp_client_session_factory,
+)
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
@@ -173,6 +179,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".conf",
     ".endpoint",
     ".health",
+    ".ingress",
     ".proxy",
     ".slot_v1",
     ".slot_v2",
@@ -784,33 +791,48 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
 @asynccontextmanager
 async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     sd_type = root_ctx.local_config.service_discovery.type
-    service_discovery: ServiceDiscovery
+    core_service_discovery: ServiceDiscovery
+    worker_service_discovery: ServiceDiscovery
     match sd_type:
         case ServiceDiscoveryType.REDIS:
-            # Use core redis for service discovery if available, otherwise use main redis
-            core_redis_profile_target = RedisProfileTarget.from_dict(
-                (root_ctx.local_config.core_redis or root_ctx.local_config.redis).to_dict()
+            # Workers register in the AppProxy redis, which core redis may not be.
+            worker_live_target = (
+                RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
+                .profile_target(RedisRole.LIVE)
+                .to_valkey_target()
             )
-            live_valkey_target = core_redis_profile_target.profile_target(
-                RedisRole.LIVE
-            ).to_valkey_target()
-            service_discovery = await RedisServiceDiscovery.create(
+            worker_service_discovery = await RedisServiceDiscovery.create(
                 RedisServiceDiscoveryArgs(
-                    valkey_target=live_valkey_target,
-                    sentinel_monitor=root_ctx.sentinel_monitors.monitor_for(live_valkey_target),
+                    valkey_target=worker_live_target,
+                    sentinel_monitor=root_ctx.sentinel_monitors.monitor_for(worker_live_target),
                 )
             )
+            if root_ctx.local_config.core_redis is None:
+                core_service_discovery = worker_service_discovery
+            else:
+                core_live_target = (
+                    RedisProfileTarget.from_dict(root_ctx.local_config.core_redis.to_dict())
+                    .profile_target(RedisRole.LIVE)
+                    .to_valkey_target()
+                )
+                core_service_discovery = await RedisServiceDiscovery.create(
+                    RedisServiceDiscoveryArgs(
+                        valkey_target=core_live_target,
+                        sentinel_monitor=root_ctx.sentinel_monitors.monitor_for(core_live_target),
+                    )
+                )
         case _:
             raise RuntimeError(
                 f"Unsupported service discovery type: {sd_type}. "
                 "Please use Redis service discovery for appproxy."
             )
+    root_ctx.worker_service_discovery = worker_service_discovery
 
     # Determine announce addresses
     announce_addr = root_ctx.local_config.proxy_coordinator.announce_addr
     sd_loop = ServiceDiscoveryLoop(
         sd_type,
-        service_discovery,
+        core_service_discovery,
         ServiceMetadata.for_endpoint(
             display_name=f"appproxy-coordinator-{root_ctx.local_config.proxy_coordinator.id}",
             service_group="appproxy-coordinator",
@@ -859,6 +881,9 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         if sd_event_publisher is not None:
             await sd_event_publisher.stop()
         sd_loop.close()
+        # sd_loop unregisters after close() returns, so the discovery it uses stays open.
+        if root_ctx.local_config.core_redis is not None:
+            await worker_service_discovery.close()
 
 
 @asynccontextmanager
@@ -884,6 +909,28 @@ async def endpoint_service_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.endpoint_service = EndpointService(
         repository=EndpointRepository(root_ctx.db),
         circuit_manager=root_ctx.circuit_manager,
+    )
+    yield
+
+
+@asynccontextmanager
+async def worker_client_pool_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    client_timeout = aiohttp.ClientTimeout(total=30.0, connect=10.0)
+    root_ctx.worker_client_pool = ClientPool(
+        functools.partial(tcp_client_session_factory, timeout=client_timeout),
+    )
+    try:
+        yield
+    finally:
+        await root_ctx.worker_client_pool.close()
+
+
+@asynccontextmanager
+async def ingress_service_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    root_ctx.ingress_service = IngressService(
+        root_ctx.worker_service_discovery,
+        root_ctx.worker_client_pool,
+        root_ctx.local_config.secrets,
     )
     yield
 
@@ -1097,6 +1144,8 @@ def build_root_app(
             unused_port_collection_ctx,
             event_handler_ctx,
             service_discovery_ctx,
+            worker_client_pool_ctx,
+            ingress_service_ctx,
         ]
     shutdown_context_instances = []
 
