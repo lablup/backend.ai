@@ -20626,7 +20626,7 @@ type Query
   """
   Added in 26.10.0. Read the system session environ rows a session in a domain and project receives, one per key (superadmin only).
   """
-  adminResolveSystemSessionEnvironV2(input: AdminResolveSystemSessionEnvironInput!): ResolveSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
+  adminResolveSystemSessionEnviron(input: AdminResolveSystemSessionEnvironInput!): ResolveSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.10.0. List all registered session lifecycle handlers (superadmin only). The returned ``name`` values are valid keys for ``DefaultSessionOptionsInfo.handlerOptions.byHandler``.
