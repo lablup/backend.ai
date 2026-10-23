@@ -277,6 +277,9 @@ if TYPE_CHECKING:
         StreamProcessors,
     )
     from ai.backend.manager.services.stream.service import StreamService
+    from ai.backend.manager.services.system_session_environ.processors import (
+        SystemSessionEnvironProcessors,
+    )
     from ai.backend.manager.services.template.processors import (
         TemplateProcessors,
     )
@@ -454,6 +457,7 @@ class Processors:
     keypair_resource_policy: KeypairResourcePolicyProcessors
     manager_admin: ManagerAdminProcessors
     secret: SecretProcessors
+    system_session_environ: SystemSessionEnvironProcessors
     user_resource_policy: UserResourcePolicyProcessors
     project_resource_policy: ProjectResourcePolicyProcessors
     prometheus_query_preset: PrometheusQueryPresetProcessors

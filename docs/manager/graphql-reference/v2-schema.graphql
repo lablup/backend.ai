@@ -14987,6 +14987,11 @@ type Query {
   schedulingHandlers: [SchedulingHandlerNode!]
 
   """
+  Added in 26.10.0. Search every system session environ row at every scope, disabled ones included (superadmin only).
+  """
+  adminSystemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection
+
+  """
   Added in 26.10.0. List all registered session lifecycle handlers (superadmin only). The returned ``name`` values are valid keys for ``DefaultSessionOptionsInfo.handlerOptions.byHandler``.
   """
   adminSessionLifecycleHandlers: [SessionLifecycleHandlerNode!]
@@ -20792,6 +20797,174 @@ input SyncReplicaInput {
 type SyncReplicaPayload {
   """Whether the sync succeeded"""
   success: Boolean!
+}
+
+"""
+Added in 26.10.0. A system session environ row: the value of a starting session it injects under its key into every session of its scope.
+"""
+type SystemSessionEnviron implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """The id of the row."""
+  entityId: UUID!
+
+  """The environment variable name the value is injected under."""
+  key: String!
+
+  """Which value of the starting session is injected."""
+  valueSource: SystemSessionEnvironValueSource!
+
+  """The scope the row is bound to."""
+  scope: SystemSessionEnvironScopeInfo!
+
+  """
+  Whether the row is injected. A disabled row still hides the same key at a broader scope.
+  """
+  enabled: Boolean!
+
+  """When the row was created."""
+  createdAt: DateTime!
+
+  """When the row was last changed."""
+  updatedAt: DateTime!
+}
+
+"""
+Added in 26.10.0. Paginated connection for system session environ rows.
+"""
+type SystemSessionEnvironConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection"""
+  edges: [SystemSessionEnvironEdge!]!
+
+  """Total number of rows matching the query."""
+  count: Int!
+}
+
+"""An edge in a connection."""
+type SystemSessionEnvironEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: SystemSessionEnviron!
+}
+
+"""Added in 26.10.0. Filter for system session environ rows."""
+input SystemSessionEnvironFilter {
+  """Filter by the row's id."""
+  entityId: UUIDFilter = null
+
+  """Filter by the environment variable name."""
+  key: StringFilter = null
+
+  """Filter by which value of the starting session is injected."""
+  valueSource: SystemSessionEnvironValueSourceFilter = null
+
+  """Filter by the kind of scope the row is bound to."""
+  scopeType: SystemSessionEnvironScopeTypeFilter = null
+
+  """Filter by the id of the public entity, the domain or the project."""
+  scopeId: UUIDFilter = null
+
+  """Filter by the enabled flag."""
+  enabled: Boolean = null
+}
+
+"""
+Added in 26.10.0. One ordering rule for a system session environ search.
+"""
+input SystemSessionEnvironOrderBy {
+  """Field to order by."""
+  field: SystemSessionEnvironOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.10.0. Fields available for ordering system session environ rows.
+"""
+enum SystemSessionEnvironOrderField {
+  KEY
+  VALUE_SOURCE
+  SCOPE_TYPE
+  ENABLED
+  CREATED_AT
+  UPDATED_AT
+}
+
+"""Added in 26.10.0. The scope a system session environ row is bound to."""
+type SystemSessionEnvironScopeInfo {
+  """Whether the row applies to every session, a domain's or a project's."""
+  scopeType: SystemSessionEnvironScopeType!
+
+  """
+  The id of the public entity, the domain or the project the row is bound to.
+  """
+  scopeId: UUID!
+}
+
+"""
+Added in 26.10.0. Whether a system session environ row applies to every session, a domain's or a project's.
+"""
+enum SystemSessionEnvironScopeType {
+  PUBLIC
+  DOMAIN
+  PROJECT
+}
+
+"""
+Added in 26.10.0. Filter for the scope type with equality and membership operators.
+"""
+input SystemSessionEnvironScopeTypeFilter {
+  """Exact match."""
+  equals: SystemSessionEnvironScopeType = null
+
+  """Match any of the provided values."""
+  in: [SystemSessionEnvironScopeType!] = null
+
+  """Exclude an exact match."""
+  notEquals: SystemSessionEnvironScopeType = null
+
+  """Exclude any of the provided values."""
+  notIn: [SystemSessionEnvironScopeType!] = null
+}
+
+"""
+Added in 26.10.0. Which value of a starting session a system session environ row injects.
+"""
+enum SystemSessionEnvironValueSource {
+  SESSION_ID
+  SESSION_NAME
+  CLUSTER_SIZE
+  CLUSTER_REPLICAS
+  CLUSTER_HOSTS
+  PREOPEN_PORTS
+  USER_UUID
+  USER_EMAIL
+  USER_NAME
+  ACCESS_KEY
+}
+
+"""
+Added in 26.10.0. Filter for the injected value with equality and membership operators.
+"""
+input SystemSessionEnvironValueSourceFilter {
+  """Exact match."""
+  equals: SystemSessionEnvironValueSource = null
+
+  """Match any of the provided values."""
+  in: [SystemSessionEnvironValueSource!] = null
+
+  """Exclude an exact match."""
+  notEquals: SystemSessionEnvironValueSource = null
+
+  """Exclude any of the provided values."""
+  notIn: [SystemSessionEnvironValueSource!] = null
 }
 
 """Added in 26.4.2. Payload returned after terminating sessions."""
