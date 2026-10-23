@@ -8,7 +8,7 @@ from unittest.mock import Mock
 import pytest
 
 from ai.backend.appproxy.coordinator.config import ClientIPStrategyConfig, TraefikConfig
-from ai.backend.appproxy.coordinator.traefik_config import TraefikConfigBuilder
+from ai.backend.appproxy.coordinator.traefik_routing_config import TraefikRoutingConfigFactory
 
 
 @dataclass(frozen=True)
@@ -26,15 +26,15 @@ class _ClientIPRuleCase:
 
 
 @pytest.fixture
-def builder(case: _ClientIPStrategyCase) -> TraefikConfigBuilder:
-    return TraefikConfigBuilder(
+def routing_config_factory(case: _ClientIPStrategyCase) -> TraefikRoutingConfigFactory:
+    return TraefikRoutingConfigFactory(
         Mock(spec=TraefikConfig, client_ip_strategy=case.strategy),
         jwt_secret="jwt-secret",
         permit_hash_secret="permit-hash-secret",
     )
 
 
-class TestTraefikConfigBuilder:
+class TestTraefikRoutingConfigFactory:
     @pytest.mark.parametrize(
         "case",
         [
@@ -55,9 +55,11 @@ class TestTraefikConfigBuilder:
         ids=lambda case: case.name,
     )
     def test_ip_allowlist_reads_the_client_ip_strategy(
-        self, case: _ClientIPStrategyCase, builder: TraefikConfigBuilder
+        self, case: _ClientIPStrategyCase, routing_config_factory: TraefikRoutingConfigFactory
     ) -> None:
-        ip_allowlist = builder.ip_allowlist_middleware_config(["192.168.0.0/24"])["ipAllowList"]
+        ip_allowlist = routing_config_factory.ip_allowlist_middleware_config(["192.168.0.0/24"])[
+            "ipAllowList"
+        ]
         assert ip_allowlist.get("ipStrategy") == case.expected_ip_strategy
         assert ip_allowlist["sourceRange"] == ["192.168.0.0/24"]
 
@@ -74,4 +76,4 @@ class TestTraefikConfigBuilder:
         ids=lambda case: case.name,
     )
     def test_client_ip_rule_matches_the_allowed_ranges(self, case: _ClientIPRuleCase) -> None:
-        assert TraefikConfigBuilder.client_ip_rule(case.ranges) == case.expected_rule
+        assert TraefikRoutingConfigFactory.client_ip_rule(case.ranges) == case.expected_rule

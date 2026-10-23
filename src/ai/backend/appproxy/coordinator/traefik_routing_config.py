@@ -7,7 +7,7 @@ from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
 from ai.backend.appproxy.coordinator.config import ClientIPStrategyConfig, TraefikConfig
 
 
-class TraefikConfigBuilder:
+class TraefikRoutingConfigFactory:
     """Builds the Traefik router, middleware and service configs that circuits and ingresses share.
     Object names stay with each caller."""
 

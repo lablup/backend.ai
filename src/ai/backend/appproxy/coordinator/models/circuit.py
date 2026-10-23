@@ -25,7 +25,7 @@ from ai.backend.appproxy.coordinator.errors import (
     InvalidCircuitConfigError,
     MissingTraefikConfigError,
 )
-from ai.backend.appproxy.coordinator.traefik_config import TraefikConfigBuilder
+from ai.backend.appproxy.coordinator.traefik_routing_config import TraefikRoutingConfigFactory
 from ai.backend.common.types import RuntimeVariant
 
 from .base import (
@@ -304,17 +304,17 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                 # encoded into the router's ClientIP match rule: connections from
                 # other sources match no router and are dropped. Falls back to
                 # accepting any source when unrestricted.
-                return TraefikConfigBuilder.client_ip_rule(self._ip_validator.ranges)
+                return TraefikRoutingConfigFactory.client_ip_rule(self._ip_validator.ranges)
             case _:
                 match self.frontend_mode:
                     case FrontendMode.PORT:
-                        return TraefikConfigBuilder.host_rule(self.worker_row.hostname)
+                        return TraefikRoutingConfigFactory.host_rule(self.worker_row.hostname)
                     case FrontendMode.WILDCARD_DOMAIN:
                         if not self.subdomain:
                             raise InvalidCircuitConfigError(
                                 "Subdomain is required for wildcard domain frontend mode"
                             )
-                        return TraefikConfigBuilder.host_rule(
+                        return TraefikRoutingConfigFactory.host_rule(
                             f"{self.subdomain}{self.worker_row.wildcard_domain}"
                         )
                     case _:
@@ -326,11 +326,11 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
     def traefik_entrypoint(self) -> str:
         match self.frontend_mode:
             case FrontendMode.WILDCARD_DOMAIN:
-                return TraefikConfigBuilder.domain_entrypoint_name()
+                return TraefikRoutingConfigFactory.domain_entrypoint_name()
             case FrontendMode.PORT:
                 if not self.port:
                     raise InvalidCircuitConfigError("Port is required for port frontend mode")
-                return TraefikConfigBuilder.port_entrypoint_name(self.port)
+                return TraefikRoutingConfigFactory.port_entrypoint_name(self.port)
             case _:
                 raise ValueError(f"Invalid frontend mode for traefik setup: {self.frontend_mode}")
 
@@ -342,7 +342,7 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                     f"bai_ipallowlist_{self.id}" if self._ip_validator.ranges else None
                 )
                 return {
-                    f"bai_router_{self.id}": TraefikConfigBuilder.http_router_config(
+                    f"bai_router_{self.id}": TraefikRoutingConfigFactory.http_router_config(
                         self.traefik_rule,
                         f"bai_service_{self.id}",
                         self.traefik_entrypoint,
@@ -354,7 +354,7 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                 }
             case ProxyProtocol.TCP:
                 return {
-                    f"bai_router_{self.id}": TraefikConfigBuilder.tcp_router_config(
+                    f"bai_router_{self.id}": TraefikRoutingConfigFactory.tcp_router_config(
                         self.traefik_rule, f"bai_service_{self.id}", self.traefik_entrypoint
                     ),
                 }
@@ -410,7 +410,7 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
         match self.protocol:
             case ProxyProtocol.HTTP:
                 return {
-                    f"bai_service_{self.id}": TraefikConfigBuilder.http_service_config(
+                    f"bai_service_{self.id}": TraefikRoutingConfigFactory.http_service_config(
                         servers, health_check_block
                     ),
                 }
@@ -418,7 +418,11 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                 # Traefik TCP services use a different healthCheck syntax; skip
                 # directive injection here and rely on the coordinator's existing
                 # behaviour for TCP circuits (follow-up PR will add TCP support).
-                return {f"bai_service_{self.id}": TraefikConfigBuilder.tcp_service_config(servers)}
+                return {
+                    f"bai_service_{self.id}": TraefikRoutingConfigFactory.tcp_service_config(
+                        servers
+                    )
+                }
         return {}
 
     def get_traefik_middlewares(self, local_config: ServerConfig) -> dict[str, Any]:
@@ -427,15 +431,15 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                 traefik_config = local_config.proxy_coordinator.traefik
                 if not traefik_config:
                     raise MissingTraefikConfigError("Traefik configuration is required")
-                builder = TraefikConfigBuilder(
+                routing_config_factory = TraefikRoutingConfigFactory(
                     traefik_config,
                     jwt_secret=local_config.secrets.jwt_secret,
                     permit_hash_secret=local_config.permit_hash.secret.decode(),
                 )
 
                 middlewares: dict[str, Any] = {
-                    TraefikConfigBuilder.CORS_HEADERS_MIDDLEWARE_NAME: builder.cors_headers_middleware_config(),
-                    f"bai_appproxy_plugin_{self.id}": builder.auth_plugin_middleware_config(
+                    TraefikRoutingConfigFactory.CORS_HEADERS_MIDDLEWARE_NAME: routing_config_factory.cors_headers_middleware_config(),
+                    f"bai_appproxy_plugin_{self.id}": routing_config_factory.auth_plugin_middleware_config(
                         "circuit", SerializableCircuit(**self.dump_model()).model_dump_json()
                     ),
                     f"bai_appproxy_plugin_{self.id}_go": {
@@ -451,7 +455,7 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                 ranges = self._ip_validator.ranges
                 if ranges:
                     middlewares[f"bai_ipallowlist_{self.id}"] = (
-                        builder.ip_allowlist_middleware_config(ranges)
+                        routing_config_factory.ip_allowlist_middleware_config(ranges)
                     )
                 return middlewares
         return {}
