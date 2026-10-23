@@ -37438,6 +37438,29 @@
         "title": "AdminSearchStorageNamespacesInput",
         "type": "object"
       },
+      "AdminResolveSystemSessionEnvironInput": {
+        "description": "Input for reading the system session environ a session in a domain and project receives.",
+        "properties": {
+          "domain_id": {
+            "description": "The domain the session belongs to.",
+            "format": "uuid",
+            "title": "Domain Id",
+            "type": "string"
+          },
+          "project_id": {
+            "description": "The project the session belongs to.",
+            "format": "uuid",
+            "title": "Project Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "domain_id",
+          "project_id"
+        ],
+        "title": "AdminResolveSystemSessionEnvironInput",
+        "type": "object"
+      },
       "ArrayFilter_int_": {
         "properties": {
           "contains": {
@@ -64998,6 +65021,35 @@
           }
         ],
         "description": "Get all namespaces for a given storage.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/system-session-environs/resolve": {
+      "post": {
+        "operationId": "v2/system-session-environs.admin_resolve",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminResolveSystemSessionEnvironInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Read the rows a session in the domain and project receives (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/users/search": {
