@@ -48,6 +48,7 @@ from ai.backend.manager.models.project.purgers import (
     ProjectKernelPurger,
     ProjectPurger,
     ProjectSessionPurger,
+    ProjectVFolderAutoMountPurger,
     SessionsByIdsPurger,
 )
 from ai.backend.manager.models.project.row import (
@@ -321,6 +322,9 @@ class ProjectDBSource:
                 project_id, ProjectKernelPurger(project_id=project_id)
             )
             await w.batch_purge_entities_in_global(ProjectSessionPurger(project_id=project_id))
+            await w.batch_purge_entities_in_global(
+                ProjectVFolderAutoMountPurger(project_id=project_id)
+            )
             if await w.purge_entity(ProjectPurger(project_id=project_id)) is None:
                 raise ProjectNotFound("project not found")
 

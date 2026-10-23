@@ -107,6 +107,7 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderUserMountPolicyRow,
 )
 from ai.backend.manager.models.vfolder.updaters import VFolderSoftDeleteUpdater
+from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -1122,6 +1123,8 @@ class TestVfolderRepositoryPurge:
                 EntityFieldRow,
                 PermissionRow,
                 EntityShareRow,
+                VirtualEntityRow,
+                VFolderAutoMountRow,
             ],
         ):
             yield database_connection

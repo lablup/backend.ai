@@ -67,6 +67,7 @@ from ai.backend.common.data.entity.usage_bucket import (
 )
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountEntityType
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -285,6 +286,7 @@ from ai.backend.manager.services.vfolder.services.invite import VFolderInviteSer
 from ai.backend.manager.services.vfolder.services.mount_policy import VFolderMountPolicyService
 from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
+from ai.backend.manager.services.vfolder_auto_mount.processors import VFolderAutoMountProcessors
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
 
@@ -678,6 +680,9 @@ def create_processors(
         ),
         vfolder_mount_policy=VFolderMountPolicyProcessors(
             vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_mount_policy
+        ),
+        vfolder_auto_mount=VFolderAutoMountProcessors(
+            vfolder_groups.group(GroupMeta(VFolderAutoMountEntityType()))
         ),
         session_group=SessionGroupProcessors(
             session_groups.group(GroupMeta(SessionGroupEntityType())),

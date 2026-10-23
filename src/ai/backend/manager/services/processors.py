@@ -311,6 +311,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.vfolder.services.vfolder import (
         VFolderService,
     )
+    from ai.backend.manager.services.vfolder_auto_mount.processors import (
+        VFolderAutoMountProcessors,
+    )
     from ai.backend.manager.services.vfs_storage.processors import (
         VFSStorageProcessors,
     )
@@ -444,6 +447,7 @@ class Processors:
     vfolder_sharing: VFolderSharingProcessors
     vfolder_mount_policy: VFolderMountPolicyProcessors
     vfolder_file: VFolderFileProcessors
+    vfolder_auto_mount: VFolderAutoMountProcessors
     session: SessionProcessors
     session_group: SessionGroupProcessors
     container_registry: ContainerRegistryProcessors
