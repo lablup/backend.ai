@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.system_session_environ.types import SystemSessionEnvironScopeType
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import SessionId
@@ -55,6 +57,14 @@ class SystemSessionEnvironRepository:
                 for row in effective_rows
             }
         return resolved_environ_by_session
+
+    async def resolve_rows(
+        self, domain_id: DomainID, project_id: ProjectID
+    ) -> list[SystemSessionEnvironData]:
+        """The enabled row each key resolves to for a session in the domain and project."""
+        scope = SessionSystemSessionEnvironScope(domain_id=domain_id, project_id=project_id)
+        effective_rows_by_scope = await self._effective_rows_by_scope([scope])
+        return effective_rows_by_scope[scope]
 
     async def _effective_rows_by_scope(
         self, scopes: Sequence[SessionSystemSessionEnvironScope]

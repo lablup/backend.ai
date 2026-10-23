@@ -414,3 +414,16 @@ class TestResolve:
         assert resolved_environ_by_session[starting_session.session_id] == {
             "K": case.expected_value
         }
+
+
+class TestResolveRows:
+    async def test_returns_the_effective_rows_of_the_domain_and_project(
+        self,
+        repository: SystemSessionEnvironRepository,
+        rows_at_two_projects: None,
+    ) -> None:
+        effective_rows = await repository.resolve_rows(_DOMAIN_ID, _PROJECT_ID)
+
+        assert {row.key: row.value_source for row in effective_rows} == {
+            "K": SystemSessionEnvironValueSource.USER_NAME
+        }
