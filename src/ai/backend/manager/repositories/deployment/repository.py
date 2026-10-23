@@ -429,6 +429,15 @@ class DeploymentRepository:
         await self._db_source.replace_designated_agents(deployment_id, agent_uuids)
 
     @deployment_repository_resilience.apply()
+    async def fetch_agents_in_resource_group(
+        self,
+        resource_group: str,
+        agent_uuids: Collection[AgentUUID],
+    ) -> set[AgentUUID]:
+        """Return those of ``agent_uuids`` that belong to ``resource_group``."""
+        return await self._db_source.fetch_agents_in_resource_group(resource_group, agent_uuids)
+
+    @deployment_repository_resilience.apply()
     async def fetch_designated_agents_by_deployment_ids(
         self,
         deployment_ids: set[DeploymentID],

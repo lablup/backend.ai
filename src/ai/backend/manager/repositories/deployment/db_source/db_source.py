@@ -2801,6 +2801,23 @@ class DeploymentDBSource:
                     ],
                 )
 
+    async def fetch_agents_in_resource_group(
+        self,
+        resource_group: str,
+        agent_uuids: Collection[AgentUUID],
+    ) -> set[AgentUUID]:
+        """Return those of ``agent_uuids`` that belong to ``resource_group``."""
+        if not agent_uuids:
+            return set()
+        async with self._begin_readonly_session_read_committed() as db_sess:
+            rows = await db_sess.scalars(
+                sa.select(AgentRow.uuid).where(
+                    AgentRow.uuid.in_(agent_uuids),
+                    AgentRow.scaling_group == resource_group,
+                )
+            )
+            return {AgentUUID(agent_uuid) for agent_uuid in rows}
+
     async def fetch_designated_agents_by_deployment_ids(
         self,
         deployment_ids: set[DeploymentID],

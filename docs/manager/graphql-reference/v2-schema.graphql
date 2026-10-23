@@ -9077,6 +9077,11 @@ input ModelDeploymentMetadataInput {
   resourceGroupName: String!
   name: String = null
   tags: [String!] = null
+
+  """
+  Added in 26.10.0. UUIDs of the agents the route sessions are placed on. Each must belong to the resource group.
+  """
+  designatedAgentIds: [UUID!] = null
 }
 
 """
@@ -21154,6 +21159,11 @@ input UpdateDeploymentInput {
   replicaCount: Int
   name: String
   preferredDomainName: String
+
+  """
+  Added in 26.10.0. Replaces the designated agent UUIDs; an empty list clears them. Each must belong to the deployment's resource group. Omit to leave unchanged.
+  """
+  designatedAgentIds: [UUID!]
 }
 
 """Added in 25.19.0. Payload for updating a model deployment."""
