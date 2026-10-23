@@ -75,6 +75,24 @@ class IngressPushFailedError(BackendAIError, web.HTTPBadGateway):
         )
 
 
+class TraefikIngressConcurrentWriteError(BackendAIError, web.HTTPConflict):
+    """Raised when another write to the same frontend commits between the revision check and
+    this upsert's write. Resending the ingress applies it or reports a newer revision."""
+
+    error_type = (
+        "https://api.backend.ai/probs/appproxy-coordinator/traefik-ingress-concurrent-write"
+    )
+    error_title = "Another write to the ingress frontend committed first."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.UPSERT,
+            error_detail=ErrorDetail.CONFLICT,
+        )
+
+
 class TraefikIngressRevisionConflictError(BackendAIError, web.HTTPConflict):
     """Raised when an upsert carries a revision older than the one Traefik etcd holds."""
 
