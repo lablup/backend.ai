@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from ai.backend.common.configs.volume_status_check import VfsVolumeStatusCheckConfig
+from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
@@ -50,9 +50,7 @@ class TestBaseVolume:
             event_dispatcher=mock_event_dispatcher,
             event_producer=mock_event_producer,
             volume_name=StorageVolumeName("test-volume"),
-            status_check_config=VfsVolumeStatusCheckConfig(
-                check_interval=60.0, marker_filename=".backend.ai-volume-id"
-            ),
+            status_check_config=VolumeStatusCheckConfig(check_interval=60.0),
         )
         await volume.init()
         try:
