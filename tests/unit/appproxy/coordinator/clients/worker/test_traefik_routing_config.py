@@ -141,7 +141,7 @@ class TestTraefikRoutingConfigFactory:
             _ClientIPRuleCase(
                 name="restricted",
                 ranges=["192.168.0.0/24", "10.1.2.3/32"],
-                expected_rule="ClientIP(`192.168.0.0/24`, `10.1.2.3/32`)",
+                expected_rule="ClientIP(`192.168.0.0/24`) || ClientIP(`10.1.2.3/32`)",
             ),
         ],
         ids=lambda case: case.name,

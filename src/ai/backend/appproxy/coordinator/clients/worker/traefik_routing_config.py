@@ -216,7 +216,8 @@ class TraefikRoutingConfigFactory:
         allowed_client_ip_ranges = [str(network) for network in access.allowed_client_ips]
         if not allowed_client_ip_ranges:
             return "ClientIP(`0.0.0.0/0`)"
-        return "ClientIP(" + ", ".join(f"`{cidr}`" for cidr in allowed_client_ip_ranges) + ")"
+        # Traefik v3 rule matchers take one value each, so the ranges are joined with ||.
+        return " || ".join(f"ClientIP(`{cidr}`)" for cidr in allowed_client_ip_ranges)
 
     @staticmethod
     def _entrypoint_name(frontend: IngressFrontend) -> str:
