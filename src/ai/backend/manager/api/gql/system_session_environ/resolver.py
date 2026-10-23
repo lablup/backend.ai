@@ -23,7 +23,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
         ),
     )
 )  # type: ignore[misc]
-async def admin_resolve_system_session_environ_v2(
+async def admin_resolve_system_session_environ(
     info: Info[StrawberryGQLContext],
     input: AdminResolveSystemSessionEnvironInputGQL,
 ) -> ResolveSystemSessionEnvironPayloadGQL | None:
