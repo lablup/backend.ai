@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
-class TraefikWorker:
+class WorkerFrontendSettings:
     hostname: str
     wildcard_domain: str | None
     tls_listen: bool

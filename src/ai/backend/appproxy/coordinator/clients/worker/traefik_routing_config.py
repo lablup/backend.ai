@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Final
 
 from ai.backend.appproxy.common.defs import PERMIT_COOKIE_NAME
-from ai.backend.appproxy.coordinator.clients.worker.types import TraefikWorker
+from ai.backend.appproxy.coordinator.clients.worker.types import WorkerFrontendSettings
 from ai.backend.appproxy.coordinator.config import TraefikConfig
 from ai.backend.appproxy.coordinator.errors.ingress import TraefikWildcardDomainMissingError
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
@@ -53,7 +53,7 @@ class TraefikRoutingConfigFactory:
         ]
 
     def routing_configs_by_etcd_key(
-        self, ingress: Ingress, worker: TraefikWorker
+        self, ingress: Ingress, worker_frontend_settings: WorkerFrontendSettings
     ) -> dict[str, dict[str, Any]]:
         """Router, service and middleware configs of the ingress, by the etcd key Traefik reads."""
         ingress_key = ingress.key()
@@ -68,7 +68,7 @@ class TraefikRoutingConfigFactory:
                 }
             case IngressProtocol.HTTP | IngressProtocol.HTTP2:
                 return {
-                    router_etcd_key: self._http_router_config(ingress, worker),
+                    router_etcd_key: self._http_router_config(ingress, worker_frontend_settings),
                     service_etcd_key: self._http_service_config(ingress.backend),
                     **self._http_middleware_configs(ingress),
                 }
@@ -90,7 +90,9 @@ class TraefikRoutingConfigFactory:
         )
 
     @classmethod
-    def _http_router_config(cls, ingress: Ingress, worker: TraefikWorker) -> dict[str, Any]:
+    def _http_router_config(
+        cls, ingress: Ingress, worker_frontend_settings: WorkerFrontendSettings
+    ) -> dict[str, Any]:
         ingress_key = ingress.key()
         # The ipAllowList middleware must precede the auth plugin so that disallowed
         # clients are rejected before any credential handling.
@@ -99,12 +101,12 @@ class TraefikRoutingConfigFactory:
             middleware_names.append(cls._ip_allowlist_middleware_name(ingress_key))
         middleware_names.append(cls._auth_plugin_middleware_name(ingress_key))
         router_config: dict[str, Any] = {
-            "rule": cls._host_rule(ingress, worker),
+            "rule": cls._host_rule(ingress, worker_frontend_settings),
             "service": cls._service_name(ingress_key),
             "entrypoints": [cls._entrypoint_name(ingress.frontend)],
             "middlewares": middleware_names,
         }
-        if worker.tls_listen:
+        if worker_frontend_settings.tls_listen:
             router_config["tls"] = ""
         return router_config
 
@@ -221,16 +223,16 @@ class TraefikRoutingConfigFactory:
         return f"worker_{authority}/http/middlewares/{middleware_name}"
 
     @staticmethod
-    def _host_rule(ingress: Ingress, worker: TraefikWorker) -> str:
+    def _host_rule(ingress: Ingress, worker_frontend_settings: WorkerFrontendSettings) -> str:
         match ingress.frontend.kind:
             case IngressFrontendKind.PORT:
-                return f"Host(`{worker.hostname}`)"
+                return f"Host(`{worker_frontend_settings.hostname}`)"
             case IngressFrontendKind.WILDCARD:
-                if worker.wildcard_domain is None:
+                if worker_frontend_settings.wildcard_domain is None:
                     raise TraefikWildcardDomainMissingError(
                         extra_data={"authority": ingress.authority}
                     )
-                return f"Host(`{ingress.frontend.key()}{worker.wildcard_domain}`)"
+                return f"Host(`{ingress.frontend.key()}{worker_frontend_settings.wildcard_domain}`)"
 
     @staticmethod
     def _client_ip_rule(access: IngressAccess) -> str:
