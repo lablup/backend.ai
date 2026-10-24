@@ -41,7 +41,6 @@ from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
 from ai.backend.agent.kernel_registry.recovery.kubernetes_recovery import (
     KubernetesKernelRegistryRecovery,
 )
-from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -1001,12 +1000,8 @@ class KubernetesAgent(
         return await self._kernel_recovery.load_kernel_registry()
 
     @override
-    async def _write_kernel_registry_to_recovery(
-        self,
-        kernel_registry: MutableMapping[KernelId, AbstractKernel],
-        metadata: KernelRegistrySaveMetadata,
-    ) -> None:
-        await self._kernel_recovery.save_kernel_registry(kernel_registry, metadata)
+    async def _write_kernel_to_recovery(self, kernel: AbstractKernel) -> None:
+        await self._kernel_recovery.save_kernel(kernel)
 
     @override
     async def get_cgroup_path(
