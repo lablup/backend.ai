@@ -267,7 +267,6 @@ from .kernel import (
     match_distro_data,
     read_krunner_python_version,
 )
-from .kernel_registry.writer.types import KernelRegistrySaveMetadata
 from .observer.host_port import HostPortObserver
 from .observer.kernel_presence import KernelPresenceObserver
 from .observer.orphan_kernel_cleanup import OrphanKernelCleanupObserver
@@ -1147,7 +1146,6 @@ class AbstractAgent[
                 if kernel_obj.runner is not None:
                     await kernel_obj.runner.close()
                 await kernel_obj.close()
-            await self.save_last_registry(force=True)
 
         # Stop timers.
         if self._local_cron is not None:
@@ -1183,11 +1181,7 @@ class AbstractAgent[
         raise NotImplementedError
 
     @abstractmethod
-    async def _write_kernel_registry_to_recovery(
-        self,
-        kernel_registry: MutableMapping[KernelId, AbstractKernel],
-        metadata: KernelRegistrySaveMetadata,
-    ) -> None:
+    async def _write_kernel_to_recovery(self, kernel: AbstractKernel) -> None:
         raise NotImplementedError
 
     async def _pre_anycast_event(self, event: AbstractEvent) -> None:
@@ -1205,8 +1199,6 @@ class AbstractAgent[
                             await t
                         except asyncio.CancelledError:
                             continue
-        if isinstance(event, (KernelStartedAnycastEvent, KernelTerminatedAnycastEvent)):
-            await self.save_last_registry()
 
     async def anycast_event(self, event: AbstractAnycastEvent) -> None:
         """
@@ -1646,7 +1638,6 @@ class AbstractAgent[
                 ev = await self.container_lifecycle_queue.get()
                 log.debug("lifecycle event received", lifecycle_event=str(ev))
                 if isinstance(ev, Sentinel):
-                    await self.save_last_registry(force=True)
                     return
                 # attrs currently does not support customizing getstate/setstate dunder methods
                 # until the next release.
@@ -3208,18 +3199,7 @@ class AbstractAgent[
                             resource_spec.allocations, attached_devices
                         ),
                     )
-                    await self.anycast_and_broadcast_event(
-                        KernelStartedAnycastEvent(
-                            kernel_id=kernel_id,
-                            session_id=session_id,
-                            creation_info=creation_info,
-                        ),
-                        KernelStartedBroadcastEvent(
-                            kernel_id=kernel_id,
-                            session_id=session_id,
-                            creation_info=creation_info,
-                        ),
-                    )
+                    await self._notify_kernel_started(kernel_obj, creation_info)
                     async with self.registry_lock:
                         kernel_obj.state = KernelLifecycleStatus.RUNNING
 
@@ -3232,6 +3212,28 @@ class AbstractAgent[
                 except Exception:
                     await self.reconstruct_resource_usage()
                     raise
+
+    async def _notify_kernel_started(
+        self,
+        kernel_obj: KernelObjectType,
+        creation_info: KernelCreationInfo,
+    ) -> None:
+        try:
+            await self._write_kernel_to_recovery(kernel_obj)
+        except Exception as e:
+            log.exception("kernel recovery data save failed", error_repr=repr(e))
+        await self.anycast_and_broadcast_event(
+            KernelStartedAnycastEvent(
+                kernel_id=kernel_obj.kernel_id,
+                session_id=kernel_obj.session_id,
+                creation_info=creation_info,
+            ),
+            KernelStartedBroadcastEvent(
+                kernel_id=kernel_obj.kernel_id,
+                session_id=kernel_obj.session_id,
+                creation_info=creation_info,
+            ),
+        )
 
     async def start_model_service_and_handle_failure(
         self,
@@ -3579,12 +3581,6 @@ class AbstractAgent[
 
     async def ping_kernel(self, kernel_id: KernelId) -> dict[str, float] | None:
         return await self._get_live_kernel(kernel_id).ping()
-
-    async def save_last_registry(self, force: bool = False) -> None:
-        await self._write_kernel_registry_to_recovery(
-            self.kernel_registry,
-            KernelRegistrySaveMetadata(force),
-        )
 
 
 async def handle_volume_mount(
