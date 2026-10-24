@@ -17,7 +17,6 @@ from ai.backend.agent.agent import (
 from ai.backend.agent.config.unified import AgentUnifiedConfig
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.kernel import AbstractKernel
-from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.agent.resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -272,11 +271,7 @@ class DummyAgent(
         return {}
 
     @override
-    async def _write_kernel_registry_to_recovery(
-        self,
-        kernel_registry: Mapping[KernelId, AbstractKernel],
-        metadata: KernelRegistrySaveMetadata,
-    ) -> None:
+    async def _write_kernel_to_recovery(self, kernel: AbstractKernel) -> None:
         pass
 
     @override
