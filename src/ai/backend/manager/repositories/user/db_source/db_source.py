@@ -397,17 +397,22 @@ class UserDBSource:
             return UserSearchableFields.own.to_data(deleted_user)
 
     async def restore_user_by_uuid_validated(self, user_uuid: UUID) -> None:
-        """Restore a soft-deleted user by UUID, setting status back to ACTIVE."""
+        """Restore a soft-deleted user by UUID, setting status back to ACTIVE.
+
+        A user whose status is not DELETED is refused.
+        """
         async with self._db.begin() as conn:
             result = await conn.execute(
                 sa.update(users)
                 .values(status=UserStatus.ACTIVE, status_info="admin-requested")
-                .where(
-                    (users.c.uuid == user_uuid)
-                    & users.c.status.not_in(UserStatus.purge_in_progress())
-                )
+                .where((users.c.uuid == user_uuid) & (users.c.status == UserStatus.DELETED))
             )
             if result.rowcount == 0:
+                current = await conn.scalar(
+                    sa.select(users.c.status).where(users.c.uuid == user_uuid)
+                )
+                if current is not None and current not in UserStatus.purge_in_progress():
+                    raise UserModificationBadRequest(f"User is not deleted: {user_uuid}")
                 await self._raise_missing_or_purging(conn, user_uuid)
 
     async def _raise_missing_or_purging(self, conn: AsyncConnection, user_uuid: UUID) -> NoReturn:

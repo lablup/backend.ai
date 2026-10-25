@@ -50,7 +50,7 @@
   - UserAdapter.bulk_purge_users — 성공 있음 2 · 실패 있음 1 (global_scope)
   - UserAdapter.issue_my_keypair — 성공 있음 2 · 실패 있음 1 (single_entity)
   - UserAdapter.purge_user_by_id — 성공 있음 1 · 실패 있음 2 (single_entity)
-  - UserAdapter.restore_user_by_id — 성공 있음 2 · 실패 있음 1 (single_entity)
+  - UserAdapter.restore_user_by_id — 성공 있음 1 · 실패 있음 2 (single_entity)
   - UserAdapter.revoke_my_keypair — 성공 있음 1 · 실패 있음 4 (single_field)
   - UserAdapter.switch_default_access_key — 성공 있음 1 · 실패 있음 2 (single_entity)
   - UserAdapter.update_my_keypair — 성공 있음 1 · 실패 있음 3 (single_field)
@@ -358,8 +358,8 @@
 | 시나리오 | 판정 |
 |---|---|
 | [대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 삭제 상태 사용자를 되살리면, 성공이 오고 상태가 활성으로 바뀐다](#retiring-a-user-granted-soft-delete-restores-a-deleted-user-to-active) | 성공 |
-| [권한 받은 사용자가 비활성 사용자를 되살리면, 현재 상태와 무관하게 활성이 된다](#retiring-restoring-a-user-who-was-never-deleted-still-makes-them-active) | 성공 |
 | [역할 없이 되살리려 하면, 엔티티 권한 문이 막는다](#retiring-a-user-granted-nothing-may-not-restore-another-user) | 거부 |
+| [권한 받은 사용자가 물리지 않은 비활성 사용자를 되살리려 하면, 삭제 상태가 아니라 막힌다](#retiring-restoring-a-user-who-was-not-deleted-is-refused) | 거부 |
 
 **UserAdapter.revoke_my_keypair**
 
@@ -4643,62 +4643,6 @@ Then
   - 뒤이은 읽기.timestamps.created_at: 이 실행이 쓴 시각
   - 뒤이은 읽기.timestamps.modified_at: 이 실행이 쓴 시각
 
-<a id="retiring-restoring-a-user-who-was-never-deleted-still-makes-them-active"></a>
-
-#### [restoring-a-user-who-was-never-deleted-still-makes-them-active](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
-
-권한 받은 사용자가 비활성 사용자를 되살리면, 현재 상태와 무관하게 활성이 된다
-
-Given
-
-- 도메인 하나와 대상 inactive 상태 사용자 하나, 부르는 사람 하나, 부르는 사람은 대상에 대한 사용자 SOFT_DELETE, READ 권한을 받았다
-  - 도메인 home-1
-  - 도메인에 속한 inactive 상태 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 상태 inactive, 자기 키와 개인 프로젝트를 갖는다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 사용자 SOFT_DELETE, READ 권한을 준 역할 배정
-    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 user-role-1: user 전체에 SOFT_DELETE 허용
-    - 역할 user-role-1: user 전체에 READ 허용
-    - 일반 사용자 user-2: 역할 user-role-1 보유
-
-When
-
-- UserAdapter.restore_user_by_id — user-2이 user-1을 되살림 뒤 다시 읽음
-
-Then
-
-- 성공이 오고, 다시 읽은 사용자는 active 상태다
-  - success = True
-  - 뒤이은 읽기.id: 심은 사용자와 같다
-  - 뒤이은 읽기.basic_info.username = 'user-1'
-  - 뒤이은 읽기.basic_info.email = 'user-1@scenario.local'
-  - 뒤이은 읽기.basic_info.full_name = None
-  - 뒤이은 읽기.basic_info.description = None
-  - 뒤이은 읽기.basic_info.integration_name = None
-  - 뒤이은 읽기.status.status = 'active'
-  - 뒤이은 읽기.status.status_info = 'admin-requested'
-  - 뒤이은 읽기.status.need_password_change = False
-  - 뒤이은 읽기.organization.domain_name = 'home-1'
-  - 뒤이은 읽기.organization.role = 'user'
-  - 뒤이은 읽기.organization.resource_policy = 'user-policy-1'
-  - 뒤이은 읽기.organization.main_access_key: 활성 기본 키가 없어 비어 있다
-  - 뒤이은 읽기.security.allowed_client_ip = None
-  - 뒤이은 읽기.security.totp_activated = False
-  - 뒤이은 읽기.security.totp_activated_at = None
-  - 뒤이은 읽기.security.sudo_session_enabled = False
-  - 뒤이은 읽기.container.container_uid = None
-  - 뒤이은 읽기.container.container_main_gid = None
-  - 뒤이은 읽기.container.container_gids = None
-  - 뒤이은 읽기.timestamps.created_at: 이 실행이 쓴 시각
-  - 뒤이은 읽기.timestamps.modified_at: 이 실행이 쓴 시각
-
 <a id="retiring-a-user-granted-nothing-may-not-restore-another-user"></a>
 
 #### [a-user-granted-nothing-may-not-restore-another-user](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
@@ -4727,6 +4671,40 @@ Then
 
 - 거부된다
   - 거부: NotEnoughPermission
+
+<a id="retiring-restoring-a-user-who-was-not-deleted-is-refused"></a>
+
+#### [restoring-a-user-who-was-not-deleted-is-refused](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+
+권한 받은 사용자가 물리지 않은 비활성 사용자를 되살리려 하면, 삭제 상태가 아니라 막힌다
+
+Given
+
+- 도메인 하나와 대상 inactive 상태 사용자 하나, 부르는 사람 하나, 부르는 사람은 대상에 대한 사용자 SOFT_DELETE, READ 권한을 받았다
+  - 도메인 home-1
+  - 도메인에 속한 inactive 상태 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 상태 inactive, 자기 키와 개인 프로젝트를 갖는다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 사용자 SOFT_DELETE, READ 권한을 준 역할 배정
+    - 역할 user-role-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 user-role-1: user 전체에 SOFT_DELETE 허용
+    - 역할 user-role-1: user 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 user-role-1 보유
+
+When
+
+- UserAdapter.restore_user_by_id — user-2이 user-1을 되살림
+
+Then
+
+- 거부된다
+  - 거부: UserModificationBadRequest
 
 ### UserAdapter.revoke_my_keypair
 

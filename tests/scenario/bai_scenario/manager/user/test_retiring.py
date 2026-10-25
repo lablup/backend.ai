@@ -500,18 +500,16 @@ class AGrantedUserRestoresADeletedUser(
 
 
 @dataclass(frozen=True)
-class RestoringAnInactiveUserMakesThemActive(
+class RestoringAUserWhoWasNotDeletedIsRefused(
     Scenario[TestSeedingSession, ACallerAndATarget, UserAdapter, Answer]
 ):
-    started: datetime
-
     @override
     def summary(self) -> str:
-        return "restoring-a-user-who-was-never-deleted-still-makes-them-active"
+        return "restoring-a-user-who-was-not-deleted-is-refused"
 
     @override
     def describe(self) -> str:
-        return "권한 받은 사용자가 비활성 사용자를 되살리면, 현재 상태와 무관하게 활성이 된다"
+        return "권한 받은 사용자가 물리지 않은 비활성 사용자를 되살리려 하면, 삭제 상태가 아니라 막힌다"
 
     @override
     def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
@@ -522,11 +520,11 @@ class RestoringAnInactiveUserMakesThemActive(
 
     @override
     def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
-        return RestoringTheTarget()
+        return RestoringTheTarget(then_reading=False)
 
     @override
     def then(self) -> Then[ACallerAndATarget, Answer]:
-        return TheTargetNowStands(started=self.started, status="active", key_is_active=False)
+        return TheCallIsRefused(UserModificationBadRequest)
 
 
 @dataclass(frozen=True)
@@ -1115,7 +1113,7 @@ SCENARIOS: list[Scenario[TestSeedingSession, Any, UserAdapter, Answer]] = [
     AGrantedUserDeletesAUser(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotDelete(),
     AGrantedUserRestoresADeletedUser(started=datetime.now(UTC)),
-    RestoringAnInactiveUserMakesThemActive(started=datetime.now(UTC)),
+    RestoringAUserWhoWasNotDeletedIsRefused(),
     AUserGrantedNothingMayNotRestore(),
     AGrantedUserPurgesAUser(),
     AUserGrantedNothingMayNotPurge(),
