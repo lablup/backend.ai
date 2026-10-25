@@ -617,17 +617,6 @@ def _set_unauthenticated_state(request: web.Request) -> None:
     request["user"] = None
 
 
-#: Statuses whose owner may not authenticate: the ones login rejects, plus a purge
-#: working through the account. Deactivating or deleting a user leaves its keypairs
-#: active, so this is what keeps them from reaching the API.
-_AUTH_DENIED_USER_STATUSES: Final = frozenset({
-    UserStatus.INACTIVE,
-    UserStatus.DELETED,
-    UserStatus.BEFORE_VERIFICATION,
-    *UserStatus.purge_in_progress(),
-})
-
-
 @dataclass(frozen=True)
 class _AuthContext:
     """What an authenticated request carries about its caller."""
@@ -693,7 +682,8 @@ async def _query_auth_context(
             return None
 
         keypair_row, user_row, keypair_policy_row, user_policy_row, default_rate_limit = row
-        if user_row.status in _AUTH_DENIED_USER_STATUSES:
+        # Deactivating or deleting a user leaves its keypairs active.
+        if user_row.status in UserStatus.auth_denied():
             raise AuthorizationFailed(f"User account is {user_row.status}")
         return _AuthContext(
             user=AuthenticatedUser(

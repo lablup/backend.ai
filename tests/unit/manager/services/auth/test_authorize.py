@@ -239,6 +239,35 @@ async def test_authorize_invalid_credentials(
         await auth_service.authorize(action)
 
 
+@pytest.mark.parametrize(
+    "status",
+    [UserStatus.INACTIVE, UserStatus.DELETED, UserStatus.PURGING, UserStatus.PURGE_ERROR],
+)
+async def test_authorize_rejects_user_by_status(
+    auth_service: AuthService,
+    setup_successful_auth: None,
+    mock_auth_repository: AsyncMock,
+    status: UserStatus,
+) -> None:
+    mock_auth_repository.verify_credential.return_value = CredentialVerificationResult(
+        user=_make_mock_user(status=status),
+        active_sessions=[],
+    )
+    action = AuthorizeAction(
+        type=AuthTokenType.KEYPAIR,
+        domain_name="default",
+        email="test@example.com",
+        password="correct_password",
+        request=MagicMock(),
+        stoken=None,
+        client_type_id=uuid4(),
+        otp=None,
+    )
+
+    with pytest.raises(AuthorizationFailed, match="User credential mismatch"):
+        await auth_service.authorize(action)
+
+
 async def test_authorize_with_hook_authorization(
     auth_service: AuthService,
     mock_hook_plugin_ctx: MagicMock,

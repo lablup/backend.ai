@@ -54,6 +54,16 @@ class UserStatus(enum.StrEnum):
         """Statuses a purge is working through. Writes are refused while in one."""
         return frozenset({cls.PURGING, cls.PURGE_ERROR})
 
+    @classmethod
+    def auth_denied(cls) -> frozenset[UserStatus]:
+        """Statuses whose owner may not authenticate, by password login or by an API request."""
+        return frozenset({
+            cls.INACTIVE,
+            cls.DELETED,
+            cls.BEFORE_VERIFICATION,
+            *cls.purge_in_progress(),
+        })
+
     def deletes_from(self, current: UserStatus) -> bool:
         """Whether an update asking for this status soft-deletes a user in ``current``."""
         return self is UserStatus.DELETED and current is not UserStatus.DELETED
