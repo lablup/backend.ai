@@ -6,6 +6,7 @@ from enum import StrEnum
 class SeedKind(StrEnum):
     """The ``kind`` a seed file states, declared in the order kinds are applied."""
 
+    GLOBAL_ENTITY = "global_entity"
     RESOURCE_SLOT_TYPE = "resource_slot_type"
     LOGIN_CLIENT_TYPE = "login_client_type"
     RETENTION_POLICY = "retention_policy"

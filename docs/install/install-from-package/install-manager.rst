@@ -220,11 +220,14 @@ and
 `example-resource-presets.json <https://github.com/lablup/backend.ai/blob/main/fixtures/manager/example-resource-presets.json>`_)
 as ``keypairs.json`` and ``resource-presets.json``, save them under
 ``${HOME}/manager/``. Customize them to have unique keypairs and passwords for
-your initial superadmin and sample user accounts for security.
+your initial superadmin and sample user accounts for security. Also save
+`seeds/manager/global_entity/defaults.yaml <https://github.com/lablup/backend.ai/blob/main/seeds/manager/global_entity/defaults.yaml>`_
+as ``global-entities.yaml``: the manager does not start without the global entities it holds.
 
 .. code-block:: console
 
    $ backend.ai mgr schema oneshot
+   $ backend.ai mgr seed apply ./global-entities.yaml
    $ backend.ai mgr fixture populate ./users.json
    $ backend.ai mgr fixture populate ./keypairs.json
    $ backend.ai mgr fixture populate ./resource-presets.json
