@@ -143,7 +143,7 @@ legacy GQL `modify_user`와 legacy REST `PATCH /admin/users/{user_id}`도 같은
 | get | 엔티티 권한 | 사용자 READ | `NotEnoughPermission` |
 | create_user | 인증(도메인 이름 조회) → 스코프 권한 → 입력 검증 | 도메인 스코프에 사용자 CREATE (`create_user.py:39-40`) | `EntityNotFoundError`, `NotEnoughPermission`, `UserConflict` |
 | update_user_by_id | 엔티티 권한 → 입력 검증 | 사용자 UPDATE. DELETED와 삭제 상태 사용자에 ACTIVE를 주면 사용자 SOFT_DELETE도, 그때 상태를 읽느라 READ도 | `NotEnoughPermission`, `UserModificationBadRequest`, `UserNotFound`, `UserDeleted`, `UserPurgeInProgress`, 기본 키 전환에서 `KeyPairNotFound`/`KeyPairForbidden` |
-| delete_user_by_id, restore_user_by_id | 엔티티 권한 | 사용자 SOFT_DELETE | `NotEnoughPermission` |
+| delete_user_by_id, restore_user_by_id | 엔티티 권한 → 입력 검증 | 사용자 SOFT_DELETE | `NotEnoughPermission`, restore_user_by_id는 삭제 상태가 아닌 사용자에 `UserModificationBadRequest` |
 | purge_user_by_id | 엔티티 권한 → 입력 검증 | 사용자 HARD_DELETE | `NotEnoughPermission`, 관리자 id가 없으면 `UserNotFound` (`services/user/service.py:186`), 활성 커널에 폴더가 걸려 있으면 `UserPurgeFailure` |
 | bulk_create_users, bulk_create_users_with_keypair | 전역 역할 → 입력 검증 | 슈퍼관리자만 (쓰기라 모니터 불가) | `InsufficientPrivilege`, 항목별 실패는 답에 담긴다 |
 | bulk_update_users, bulk_purge_users | 전역 역할 → 입력 검증 | 슈퍼관리자만 | `InsufficientPrivilege`, 항목별 실패는 답에 담긴다. bulk_update_users의 물리기와 되살리기는 항목마다 엔티티 권한을 따로 본다 |
@@ -399,7 +399,7 @@ legacy GQL `modify_user`와 legacy REST `PATCH /admin/users/{user_id}`도 같은
 | 권한 받은 사용자가 사용자를 물리면 그 사용자는 삭제 상태가 된다 | 대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 물리면, 성공이 오고 그 사용자 상태가 삭제로 바뀐다 | 권한 받은 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나, 대상 스코프에 SOFT_DELETE를 준 역할 | 성공 참, 뒤이은 읽기에서 상태 삭제, 상태 사유 `"admin-requested"` |
 | 권한 없는 사용자는 사용자를 물릴 수 없다 | 역할 없이 물리려 하면, 엔티티 권한 문이 막는다 | 권한 없는 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나 | `NotEnoughPermission` |
 | 권한 받은 사용자가 물린 사용자를 되살리면 활성이 된다 | 대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 삭제 상태 사용자를 되살리면, 성공이 오고 상태가 활성으로 바뀐다 | 권한 받은 사용자 | 도메인 하나, 삭제 상태 대상 사용자 하나, 행위자 하나, 대상 스코프에 SOFT_DELETE를 준 역할 | 성공 참, 뒤이은 읽기에서 상태 활성 |
-| 물리지 않은 사용자를 되살려도 활성이 된다 | 권한 받은 사용자가 비활성 사용자를 되살리면, 현재 상태와 무관하게 활성이 된다 | 권한 받은 사용자 | 도메인 하나, 비활성 대상 사용자 하나, 행위자 하나, 대상 스코프에 SOFT_DELETE를 준 역할 | 성공 참, 뒤이은 읽기에서 상태 활성 |
+| 물리지 않은 사용자는 되살릴 수 없다 | 권한 받은 사용자가 물리지 않은 비활성 사용자를 되살리려 하면, 삭제 상태가 아니라 막힌다 | 권한 받은 사용자 | 도메인 하나, 비활성 대상 사용자 하나, 행위자 하나, 대상 스코프에 SOFT_DELETE를 준 역할 | `UserModificationBadRequest` |
 | 권한 없는 사용자는 사용자를 되살릴 수 없다 | 역할 없이 되살리려 하면, 엔티티 권한 문이 막는다 | 권한 없는 사용자 | 도메인 하나, 삭제 상태 대상 사용자 하나, 행위자 하나 | `NotEnoughPermission` |
 | 수정으로 DELETED를 주면 물리기와 같다 | 대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 수정으로 DELETED를 주면, 물리기와 같이 삭제 상태가 된다 | 권한 받은 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나, 대상 스코프에 SOFT_DELETE와 READ를 준 역할 | 노드 전체, 상태 삭제, 상태 사유 `"admin-requested"` |
 | SOFT_DELETE 없이 수정으로 DELETED를 줄 수 없다 | 대상 사용자 스코프에서 UPDATE와 READ만 받은 사용자가 수정으로 DELETED를 주면, 물리기의 엔티티 권한 문이 막는다 | 권한 받은 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나, 대상 스코프에 UPDATE와 READ를 준 역할 | `NotEnoughPermission` |
