@@ -59,7 +59,7 @@ class SystemSessionEnvironRepository:
     async def _environs_applied_by_scope(
         self, scopes: Sequence[SessionSystemSessionEnvironScope]
     ) -> Mapping[SessionSystemSessionEnvironScope, list[SystemSessionEnvironData]]:
-        """The enabled environ each key resolves to at every scope, read in one query.
+        """The live environ each key resolves to at every scope, read in one query.
 
         Per key the environ at the most specific scope wins: project, then domain, then public.
         """
@@ -81,9 +81,7 @@ class SystemSessionEnvironRepository:
             most_specific_environ_by_key: dict[str, SystemSessionEnvironData] = {}
             for environ in environs_visible_to_scope:
                 most_specific_environ_by_key[environ.key] = environ
-            environs_applied_by_scope[scope] = [
-                environ for environ in most_specific_environ_by_key.values() if environ.enabled
-            ]
+            environs_applied_by_scope[scope] = list(most_specific_environ_by_key.values())
         return environs_applied_by_scope
 
     def _is_visible_to_scope(

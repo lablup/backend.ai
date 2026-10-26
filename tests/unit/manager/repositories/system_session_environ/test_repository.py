@@ -4,6 +4,7 @@ import enum
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 
 import pytest
 
@@ -75,7 +76,7 @@ class _RowAtOwner:
     key: str
     value_source: SystemSessionEnvironValueSource
     owner: _RowOwner
-    enabled: bool = True
+    deleted: bool = False
 
 
 @dataclass(frozen=True)
@@ -169,7 +170,7 @@ async def case_rows(
                 key=row.key,
                 scope_type=row_scope_by_owner[row.owner].scope_type,
                 scope_id=SystemSessionEnvironScopeID(row_scope_by_owner[row.owner].scope_id),
-                enabled=row.enabled,
+                deleted_at=datetime.now(UTC) if row.deleted else None,
             )
             for row in case.rows
         ])
@@ -316,40 +317,38 @@ class TestResolve:
                 expected_environ={"K": "user@example.com"},
             ),
             _EffectiveRowsCase(
-                name="disabled_row_left_out",
+                name="deleted_row_left_out",
                 rows=[
                     _RowAtOwner(
                         "K",
                         SystemSessionEnvironValueSource.SESSION_NAME,
                         _RowOwner.PUBLIC,
-                        enabled=False,
+                        deleted=True,
                     ),
                 ],
                 expected_environ={},
             ),
             _EffectiveRowsCase(
-                name="disabled_project_row_turns_off_the_public_key",
+                name="deleted_project_row_leaves_the_public_key",
                 rows=[
-                    _RowAtOwner(
-                        "K", SystemSessionEnvironValueSource.SESSION_NAME, _RowOwner.PUBLIC
-                    ),
-                    _RowAtOwner(
-                        "K",
-                        SystemSessionEnvironValueSource.USER_NAME,
-                        _RowOwner.PROJECT,
-                        enabled=False,
-                    ),
-                ],
-                expected_environ={},
-            ),
-            _EffectiveRowsCase(
-                name="enabled_project_row_turns_on_a_disabled_public_key",
-                rows=[
+                    _RowAtOwner("K", SystemSessionEnvironValueSource.USER_NAME, _RowOwner.PUBLIC),
                     _RowAtOwner(
                         "K",
                         SystemSessionEnvironValueSource.USER_EMAIL,
+                        _RowOwner.PROJECT,
+                        deleted=True,
+                    ),
+                ],
+                expected_environ={"K": "test-user"},
+            ),
+            _EffectiveRowsCase(
+                name="live_project_row_over_a_deleted_public_key",
+                rows=[
+                    _RowAtOwner(
+                        "K",
+                        SystemSessionEnvironValueSource.USER_NAME,
                         _RowOwner.PUBLIC,
-                        enabled=False,
+                        deleted=True,
                     ),
                     _RowAtOwner("K", SystemSessionEnvironValueSource.USER_EMAIL, _RowOwner.PROJECT),
                 ],

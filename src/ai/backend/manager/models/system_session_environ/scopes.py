@@ -24,7 +24,7 @@ __all__ = ("SessionSystemSessionEnvironScope",)
 
 @dataclass(frozen=True)
 class SessionSystemSessionEnvironScope(OperationScope):
-    """The rows one session receives: ``public``, its domain's and its project's.
+    """The live rows one session receives: ``public``, its domain's and its project's.
 
     Not a :class:`ScopeTarget`: the launcher reads these rows with no caller to authorize.
     """
@@ -45,12 +45,16 @@ class SessionSystemSessionEnvironScope(OperationScope):
             )
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return sa.or_(
-                bound_to_scope(
-                    SystemSessionEnvironScopeType.PUBLIC, global_entity_id(GlobalEntityName.PUBLIC)
+            return sa.and_(
+                fields.deleted_at.filter.is_null()(),
+                sa.or_(
+                    bound_to_scope(
+                        SystemSessionEnvironScopeType.PUBLIC,
+                        global_entity_id(GlobalEntityName.PUBLIC),
+                    ),
+                    bound_to_scope(SystemSessionEnvironScopeType.DOMAIN, self.domain_id),
+                    bound_to_scope(SystemSessionEnvironScopeType.PROJECT, self.project_id),
                 ),
-                bound_to_scope(SystemSessionEnvironScopeType.DOMAIN, self.domain_id),
-                bound_to_scope(SystemSessionEnvironScopeType.PROJECT, self.project_id),
             )
 
         return inner
