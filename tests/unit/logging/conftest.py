@@ -16,8 +16,8 @@ def structured_record(caplog: pytest.LogCaptureFixture) -> logging.LogRecord:
     logger = StructuredLogger(logging.getLogger(_RECORD_LOGGER_NAME))
     with (
         caplog.at_level(logging.INFO, logger=_RECORD_LOGGER_NAME),
-        with_log_context(kernel_id="kernel-1"),
+        with_log_context(context_field="context-value"),
     ):
-        logger.warning("mock error", attempt=3)
+        logger.warning("mock error message", call_field=1)
     [record] = caplog.records
     return record

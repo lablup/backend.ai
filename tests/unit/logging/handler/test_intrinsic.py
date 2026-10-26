@@ -52,9 +52,9 @@ class TestRelayHandler:
         relay_handler.emit(structured_record)
 
         relayed_record = logging.makeLogRecord(msgpack.unpackb(parent_socket.recv()))
-        assert relayed_record.getMessage() == "mock error"
-        assert relayed_record.__dict__["log_tag_kernel_id"] == "kernel-1"
-        assert relayed_record.__dict__["log_tag_attempt"] == 3
+        assert relayed_record.getMessage() == "mock error message"
+        assert relayed_record.__dict__["log_tag_context_field"] == "context-value"
+        assert relayed_record.__dict__["log_tag_call_field"] == 1
 
     def test_fallback_prints_fields(
         self,
@@ -64,4 +64,7 @@ class TestRelayHandler:
     ) -> None:
         socketless_relay_handler.emit(structured_record)
 
-        assert capsys.readouterr().err == "mock error kernel_id=kernel-1 attempt=3\n"
+        assert (
+            capsys.readouterr().err
+            == "mock error message context_field=context-value call_field=1\n"
+        )
