@@ -113,8 +113,7 @@ would be:
    path = "./logs"
    filename = "webserver.log"
 
-   # Set the maximum number of recent container coredumps in the coredump directory.
-   # Oldest coredumps are deleted if there is more than this number of coredumps.
+   # Number of outdated log files to retain.
    backup-count = 10
 
    # The log file size to begin rotation.
