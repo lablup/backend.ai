@@ -53,9 +53,7 @@ Optimize sysctl/ulimit parameters
 ---------------------------------
 
 This is not essential but the recommended step to optimize the performance and
-stability of operating Backend.AI. Refer to the
-`guide of the Manager repiository <https://github.com/lablup/backend.ai/blob/main/src/ai/backend/manager/README.md#kernelsystem-configuration>`_
-for the details of the kernel parameters and the ulimit settings. Depending on the
+stability of operating Backend.AI. Depending on the
 Backend.AI services you install, the optimal values may vary. Each service
 installation section guide with the values, if needed.
 
