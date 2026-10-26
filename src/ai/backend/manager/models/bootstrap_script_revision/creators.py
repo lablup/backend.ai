@@ -6,6 +6,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
+import sqlalchemy as sa
+
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScript, BootstrapScriptID
 from ai.backend.common.data.entity.bootstrap_script_revision import BootstrapScriptRevisionID
 from ai.backend.common.data.entity.user import UserID
@@ -23,7 +25,6 @@ class BootstrapScriptRevisionCreator(
     DanglingFieldCreator[BootstrapScriptRevisionRow, BootstrapScriptRevisionData]
 ):
     script_id: BootstrapScriptID
-    revision_number: int
     script: BootstrapScript
     creator_id: UserID
 
@@ -31,7 +32,13 @@ class BootstrapScriptRevisionCreator(
     def build_row(self) -> BootstrapScriptRevisionRow:
         return BootstrapScriptRevisionRow(
             script_id=self.script_id,
-            revision_number=self.revision_number,
+            revision_number=(
+                sa.select(
+                    sa.func.coalesce(sa.func.max(BootstrapScriptRevisionRow.revision_number), 0) + 1
+                )
+                .where(BootstrapScriptRevisionRow.script_id == self.script_id)
+                .scalar_subquery()
+            ),
             script=self.script,
             creator_id=self.creator_id,
         )

@@ -176,8 +176,7 @@ class UserDBSource:
     async def add_default_bootstrap_script_revision(
         self, user_id: UserID, script: BootstrapScript, creator_id: UserID
     ) -> None:
-        """Append the next revision to the user's live default script. A concurrent write
-        that takes the same number fails on the unique constraint."""
+        """Append the next revision to the user's live default script."""
         async with self._v2_ops.write_ops() as w:
             current = await self._current_default_revision(w, user_id)
             if current is None:
@@ -185,7 +184,6 @@ class UserDBSource:
             await w.create_dangling_field(
                 BootstrapScriptRevisionCreator(
                     script_id=current.script_id,
-                    revision_number=current.revision_number + 1,
                     script=script,
                     creator_id=creator_id,
                 )
