@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import ipaddress
 from dataclasses import dataclass, field
-from unittest.mock import Mock
 
 import pytest
 
 from ai.backend.appproxy.common.config import PermitHashConfig, SecretConfig
+from ai.backend.appproxy.common.types import DigestModType
 from ai.backend.appproxy.coordinator.clients.worker.traefik.routing_config import (
     TraefikRoutingConfigFactory,
     TraefikRoutingConfigFactoryArgs,
@@ -16,6 +16,7 @@ from ai.backend.appproxy.coordinator.clients.worker.traefik.types import (
     TcpRouterConfig,
 )
 from ai.backend.appproxy.coordinator.config import ClientIPStrategyConfig, TraefikConfig
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
     Ingress,
     IngressAccess,
@@ -51,9 +52,14 @@ class _ClientIPRuleCase:
 def routing_config_factory(case: _ClientIPStrategyCase) -> TraefikRoutingConfigFactory:
     return TraefikRoutingConfigFactory(
         TraefikRoutingConfigFactoryArgs(
-            traefik_config=Mock(spec=TraefikConfig, client_ip_strategy=case.strategy),
-            secrets=Mock(spec=SecretConfig, jwt_secret="jwt-secret"),
-            permit_hash=Mock(spec=PermitHashConfig, secret=b"permit-hash-secret"),
+            traefik_config=TraefikConfig(
+                etcd=EtcdConfig.model_validate({"namespace": "traefik"}),
+                client_ip_strategy=case.strategy,
+            ),
+            secrets=SecretConfig(jwt_secret="jwt-secret", api_secret="api-secret"),
+            permit_hash=PermitHashConfig(
+                secret=b"permit-hash-secret", digest_mod=DigestModType.SHA256
+            ),
         )
     )
 
@@ -62,9 +68,13 @@ def routing_config_factory(case: _ClientIPStrategyCase) -> TraefikRoutingConfigF
 def routing_config_factory_without_client_ip_strategy() -> TraefikRoutingConfigFactory:
     return TraefikRoutingConfigFactory(
         TraefikRoutingConfigFactoryArgs(
-            traefik_config=Mock(spec=TraefikConfig, client_ip_strategy=None),
-            secrets=Mock(spec=SecretConfig, jwt_secret="jwt-secret"),
-            permit_hash=Mock(spec=PermitHashConfig, secret=b"permit-hash-secret"),
+            traefik_config=TraefikConfig(
+                etcd=EtcdConfig.model_validate({"namespace": "traefik"}), client_ip_strategy=None
+            ),
+            secrets=SecretConfig(jwt_secret="jwt-secret", api_secret="api-secret"),
+            permit_hash=PermitHashConfig(
+                secret=b"permit-hash-secret", digest_mod=DigestModType.SHA256
+            ),
         )
     )
 
