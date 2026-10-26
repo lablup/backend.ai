@@ -70,9 +70,9 @@ class SerializedExceptionFormatter(logging.Formatter):
 class ConsoleFormatter(logging.Formatter):
     _normalizer: LogFieldNormalizer
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, normalizer: LogFieldNormalizer, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self._normalizer = LogFieldNormalizer()
+        self._normalizer = normalizer
 
     @override
     def formatMessage(self, record: logging.LogRecord) -> str:
@@ -118,10 +118,10 @@ class CustomJsonFormatter(JsonFormatter):
 class ColorizedFormatter(coloredlogs.ColoredFormatter):  # type: ignore[misc]
     _normalizer: LogFieldNormalizer
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, *args: Any, normalizer: LogFieldNormalizer, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         coloredlogs.logging.Formatter.formatException = format_exception
-        self._normalizer = LogFieldNormalizer()
+        self._normalizer = normalizer
 
     @override
     def formatMessage(self, record: logging.LogRecord) -> str:
