@@ -46,6 +46,18 @@ class SystemSessionEnvironFilter(BaseRequestModel):
         description="Filter by the id of the public entity, the domain or the project.",
     )
     enabled: bool | None = Field(default=None, description="Filter by the enabled flag.")
+    AND: list[SystemSessionEnvironFilter] | None = Field(
+        default=None, description="Logical AND of multiple filter conditions."
+    )
+    OR: list[SystemSessionEnvironFilter] | None = Field(
+        default=None, description="Logical OR of multiple filter conditions."
+    )
+    NOT: list[SystemSessionEnvironFilter] | None = Field(
+        default=None, description="Logical NOT of filter conditions."
+    )
+
+
+SystemSessionEnvironFilter.model_rebuild()
 
 
 class SystemSessionEnvironOrder(BaseRequestModel):
