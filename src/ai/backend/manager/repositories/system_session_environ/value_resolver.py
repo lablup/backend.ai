@@ -164,11 +164,10 @@ class SystemSessionEnvironValueResolverRegistry:
         SystemSessionEnvironValueSource, SystemSessionEnvironValueResolver
     ]
 
-    def __init__(self) -> None:
-        self._resolver_by_value_source = {}
-
-    def register(self, resolver: SystemSessionEnvironValueResolver) -> None:
-        self._resolver_by_value_source[resolver.value_source()] = resolver
+    def __init__(self, resolvers: list[SystemSessionEnvironValueResolver]) -> None:
+        self._resolver_by_value_source = {
+            resolver.value_source(): resolver for resolver in resolvers
+        }
 
     def ensure_every_value_source_registered(self) -> None:
         unregistered_sources = set(SystemSessionEnvironValueSource) - set(

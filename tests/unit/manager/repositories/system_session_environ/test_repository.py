@@ -119,18 +119,18 @@ async def database(
 
 @pytest.fixture
 def value_resolver_registry() -> SystemSessionEnvironValueResolverRegistry:
-    registry = SystemSessionEnvironValueResolverRegistry()
-    registry.register(SessionIdValueResolver())
-    registry.register(SessionNameValueResolver())
-    registry.register(ClusterSizeValueResolver())
-    registry.register(ClusterReplicasValueResolver())
-    registry.register(ClusterHostsValueResolver())
-    registry.register(PreopenPortsValueResolver())
-    registry.register(UserUuidValueResolver())
-    registry.register(UserEmailValueResolver())
-    registry.register(UserNameValueResolver())
-    registry.register(AccessKeyValueResolver())
-    return registry
+    return SystemSessionEnvironValueResolverRegistry([
+        SessionIdValueResolver(),
+        SessionNameValueResolver(),
+        ClusterSizeValueResolver(),
+        ClusterReplicasValueResolver(),
+        ClusterHostsValueResolver(),
+        PreopenPortsValueResolver(),
+        UserUuidValueResolver(),
+        UserEmailValueResolver(),
+        UserNameValueResolver(),
+        AccessKeyValueResolver(),
+    ])
 
 
 @pytest.fixture

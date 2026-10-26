@@ -26,17 +26,18 @@ class SystemSessionEnvironRepositories:
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
-        value_resolver_registry = SystemSessionEnvironValueResolverRegistry()
-        value_resolver_registry.register(SessionIdValueResolver())
-        value_resolver_registry.register(SessionNameValueResolver())
-        value_resolver_registry.register(ClusterSizeValueResolver())
-        value_resolver_registry.register(ClusterReplicasValueResolver())
-        value_resolver_registry.register(ClusterHostsValueResolver())
-        value_resolver_registry.register(PreopenPortsValueResolver())
-        value_resolver_registry.register(UserUuidValueResolver())
-        value_resolver_registry.register(UserEmailValueResolver())
-        value_resolver_registry.register(UserNameValueResolver())
-        value_resolver_registry.register(AccessKeyValueResolver())
+        value_resolver_registry = SystemSessionEnvironValueResolverRegistry([
+            SessionIdValueResolver(),
+            SessionNameValueResolver(),
+            ClusterSizeValueResolver(),
+            ClusterReplicasValueResolver(),
+            ClusterHostsValueResolver(),
+            PreopenPortsValueResolver(),
+            UserUuidValueResolver(),
+            UserEmailValueResolver(),
+            UserNameValueResolver(),
+            AccessKeyValueResolver(),
+        ])
         value_resolver_registry.ensure_every_value_source_registered()
         return cls(
             repository=SystemSessionEnvironRepository(
