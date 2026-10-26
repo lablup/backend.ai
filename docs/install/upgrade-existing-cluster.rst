@@ -77,7 +77,7 @@ To plan the upgrade, first check following facts:
 
 
 Example of allowed upgrade paths
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * **23.09.10 (latest in the previous major)** -> 24.03.0
 * **23.09.10 (latest in the previous major)** -> 24.03.5
 * 23.09.9 -> **23.09.10 (latest in the previous major)** -> 24.03.0
@@ -85,7 +85,7 @@ Example of allowed upgrade paths
 * ...
 
 Example of forbidden upgrade paths
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * 23.09.9 (a non-latest minor version of the prior release) -> 24.03.0
 * 23.03.0 (not a direct prior release) -> 24.03.0
 * ...

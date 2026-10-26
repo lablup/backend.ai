@@ -113,7 +113,7 @@ There can be several ways to prepare a specific Python version. Here, we will be
 using a standalone static built Python.
 
 Use a standalone static built Python (Recommended)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Obtain distribution of `a standalone static built Python <https://github.com/astral-sh/python-build-standalone/releases>`_ according to required
 python version, target machine architecture and etc. Then extract the distribution
@@ -154,7 +154,7 @@ packages can be compiled and installed on your system.
 
 
 (Alternative) Use pyenv to manually build and select a specific Python version
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 If you prefer, there is no problem using pyenv and pyenv-virtualenv.
 
 Install `pyenv <https://github.com/pyenv/pyenv>`_ and
