@@ -37,7 +37,7 @@ class SystemSessionEnvironRepository:
         self, sessions: Sequence[SessionDataForStart]
     ) -> Mapping[SessionId, Mapping[str, str]]:
         """The system session environ each starting session receives, keyed by session id."""
-        effective_rows_by_scope = await self._effective_rows_by_scope([
+        environs_applied_by_scope = await self._environs_applied_by_scope([
             SessionSystemSessionEnvironScope(
                 domain_id=session.domain_id, project_id=session.project_id
             )
@@ -45,52 +45,58 @@ class SystemSessionEnvironRepository:
         ])
         resolved_environ_by_session: dict[SessionId, dict[str, str]] = {}
         for session in sessions:
-            effective_rows = effective_rows_by_scope[
+            environs_applied_to_session = environs_applied_by_scope[
                 SessionSystemSessionEnvironScope(
                     domain_id=session.domain_id, project_id=session.project_id
                 )
             ]
             resolved_environ_by_session[session.session_id] = {
-                row.key: self._value_resolver_registry.resolve(row.value_source, session)
-                for row in effective_rows
+                environ.key: self._value_resolver_registry.resolve(environ.value_source, session)
+                for environ in environs_applied_to_session
             }
         return resolved_environ_by_session
 
-    async def _effective_rows_by_scope(
+    async def _environs_applied_by_scope(
         self, scopes: Sequence[SessionSystemSessionEnvironScope]
     ) -> Mapping[SessionSystemSessionEnvironScope, list[SystemSessionEnvironData]]:
-        """The enabled row each key resolves to at every scope, read in one query.
+        """The enabled environ each key resolves to at every scope, read in one query.
 
-        Per key the row at the most specific scope wins: project, then domain, then public.
+        Per key the environ at the most specific scope wins: project, then domain, then public.
         """
-        rows_in_scopes = await self._db_source.search_in_scopes(scopes)
-        effective_rows_by_scope: dict[
+        environs_in_any_scope = await self._db_source.search_in_scopes(scopes)
+        environs_applied_by_scope: dict[
             SessionSystemSessionEnvironScope, list[SystemSessionEnvironData]
         ] = {}
         for scope in scopes:
-            matching_rows = [row for row in rows_in_scopes if self._scope_matches(scope, row)]
-            matching_rows.sort(
-                key=lambda row: SystemSessionEnvironScopeType.of_owner(row.scope_id).override_rank()
-            )
-            most_specific_row_by_key: dict[str, SystemSessionEnvironData] = {}
-            for row in matching_rows:
-                most_specific_row_by_key[row.key] = row
-            effective_rows_by_scope[scope] = [
-                row for row in most_specific_row_by_key.values() if row.enabled
+            environs_visible_to_scope = [
+                environ
+                for environ in environs_in_any_scope
+                if self._is_visible_to_scope(scope, environ)
             ]
-        return effective_rows_by_scope
+            environs_visible_to_scope.sort(
+                key=lambda environ: SystemSessionEnvironScopeType.of_owner(
+                    environ.scope_id
+                ).override_rank()
+            )
+            most_specific_environ_by_key: dict[str, SystemSessionEnvironData] = {}
+            for environ in environs_visible_to_scope:
+                most_specific_environ_by_key[environ.key] = environ
+            environs_applied_by_scope[scope] = [
+                environ for environ in most_specific_environ_by_key.values() if environ.enabled
+            ]
+        return environs_applied_by_scope
 
-    def _scope_matches(
-        self, scope: SessionSystemSessionEnvironScope, row: SystemSessionEnvironData
+    def _is_visible_to_scope(
+        self, scope: SessionSystemSessionEnvironScope, environ: SystemSessionEnvironData
     ) -> bool:
-        match SystemSessionEnvironScopeType.of_owner(row.scope_id):
+        match SystemSessionEnvironScopeType.of_owner(environ.scope_id):
             case SystemSessionEnvironScopeType.PUBLIC:
                 return True
             case SystemSessionEnvironScopeType.DOMAIN:
-                return row.scope_id == scope.domain_id
+                return environ.scope_id == scope.domain_id
             case SystemSessionEnvironScopeType.PROJECT:
-                return row.scope_id == scope.project_id
+                return environ.scope_id == scope.project_id
             case _:
                 raise UnreachableError(
-                    f"Unknown system session environ scope type of {row.scope_id}"
+                    f"Unknown system session environ scope type of {environ.scope_id}"
                 )
