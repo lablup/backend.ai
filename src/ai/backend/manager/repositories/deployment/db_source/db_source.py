@@ -15,7 +15,7 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncConnection as SAConnection
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.ext.asyncio import async_sessionmaker
-from sqlalchemy.orm import aliased, contains_eager, selectinload, with_expression
+from sqlalchemy.orm import aliased, contains_eager, with_expression
 
 from ai.backend.common.config import ModelHealthCheck
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -509,7 +509,6 @@ class DeploymentDBSource:
                     with_expression(
                         EndpointRow.current_revision_id, current_revision_id_subquery()
                     ),
-                    selectinload(EndpointRow.deployment_policy),
                 )
             )
             result = await db_sess.execute(query)
@@ -518,7 +517,17 @@ class DeploymentDBSource:
             if not row:
                 raise EndpointNotFound(f"Endpoint {endpoint_id} not found")
 
-            return row.to_modern_deployment_info()
+            policy = await db_sess.scalar(
+                sa.select(DeploymentPolicyRow).where(DeploymentPolicyRow.endpoint == endpoint_id)
+            )
+            return replace(
+                row.to_bare_deployment_info(),
+                current_revision_id=row.current_revision_id,
+                deploying_revision_id=row.deploying_revision_id,
+                policy=DeploymentPolicySearchableFields.own.to_data(policy)
+                if policy is not None
+                else None,
+            )
 
     async def get_legacy_endpoint(
         self,
