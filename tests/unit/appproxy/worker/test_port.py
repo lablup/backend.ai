@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import gzip
+from collections.abc import AsyncIterator
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID
 
+import aiohttp
 import pytest
 import pytest_mock
 from aiohttp import web
@@ -18,6 +22,8 @@ from ai.backend.appproxy.common.types import (
 from ai.backend.appproxy.worker.proxy.frontend.http.port import PortFrontend
 from ai.backend.appproxy.worker.types import Circuit, InferenceAppInfo, PortFrontendInfo
 from ai.backend.common.types import RuntimeVariant
+
+_GZIP_REQUEST_BODY = gzip.compress(b'{"data": "' + b"a" * 1000 + b'"}')
 
 
 def create_circuit(port: int) -> Circuit:
@@ -133,3 +139,54 @@ async def test_ensure_slot(
     assert request["backend"] == backend
     handler.assert_awaited_once()
     mocked_ensure_credential.assert_called_once_with(request, circuit)
+
+
+@dataclass(frozen=True)
+class _ServingPortFrontend:
+    port: int
+    bodies_received_by_backend: list[bytes]
+
+
+@pytest.fixture
+async def serving_port_frontend(
+    mocker: pytest_mock.MockerFixture,
+    unused_tcp_port: int,
+) -> AsyncIterator[_ServingPortFrontend]:
+    root_context = mocker.MagicMock()
+    proxy_worker_config = root_context.local_config.proxy_worker
+    proxy_worker_config.tls_listen = False
+    proxy_worker_config.trusted_proxies = []
+    proxy_worker_config.max_header_field_size = 8190
+    proxy_worker_config.port_proxy.bind_host = "127.0.0.1"
+    proxy_worker_config.port_proxy.bind_port_range = (unused_tcp_port, unused_tcp_port)
+    bodies_received_by_backend: list[bytes] = []
+
+    async def record_request_body(request: web.Request) -> web.Response:
+        bodies_received_by_backend.append(await request.read())
+        return web.Response()
+
+    frontend = PortFrontend(root_context=root_context)
+    frontend.circuits = {
+        unused_tcp_port: create_circuit(unused_tcp_port).model_copy(update={"open_to_public": True})
+    }
+    frontend.backends = {unused_tcp_port: mocker.MagicMock(proxy_http=record_request_body)}
+    await frontend.start()
+    yield _ServingPortFrontend(
+        port=unused_tcp_port,
+        bodies_received_by_backend=bodies_received_by_backend,
+    )
+    await frontend.stop()
+
+
+async def test_proxy_passes_compressed_request_body_as_received(
+    serving_port_frontend: _ServingPortFrontend,
+) -> None:
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+            f"http://127.0.0.1:{serving_port_frontend.port}/",
+            data=_GZIP_REQUEST_BODY,
+            headers={"Content-Encoding": "gzip"},
+        ) as response:
+            assert response.status == 200
+
+    assert serving_port_frontend.bodies_received_by_backend == [_GZIP_REQUEST_BODY]
