@@ -32,5 +32,5 @@ class V2SystemSessionEnvironHandler:
 
     async def list_value_sources(self) -> APIResponse:
         """List every value source a system session environ row can carry."""
-        payload = await self._adapter.list_value_sources()
+        payload = await self._adapter.public_list_value_sources()
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)

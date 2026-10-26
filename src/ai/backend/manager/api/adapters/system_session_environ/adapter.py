@@ -57,6 +57,9 @@ from ai.backend.manager.services.system_session_environ.actions.bulk_get import 
 from ai.backend.manager.services.system_session_environ.actions.global_search import (
     GlobalSearchSystemSessionEnvironsAction,
 )
+from ai.backend.manager.services.system_session_environ.actions.public_list_value_sources import (
+    PublicListSystemSessionEnvironValueSourcesAction,
+)
 from ai.backend.manager.services.system_session_environ.processors import (
     SystemSessionEnvironProcessors,
 )
@@ -105,10 +108,13 @@ class SystemSessionEnvironAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
-    async def list_value_sources(self) -> ListSystemSessionEnvironValueSourcesPayload:
-        """Every value source a system session environ row can carry."""
+    async def public_list_value_sources(self) -> ListSystemSessionEnvironValueSourcesPayload:
+        """Every value source a system session environ row can carry, for any logged-in user."""
+        result = await self._system_session_environ.public_list_value_sources.run(
+            PublicListSystemSessionEnvironValueSourcesAction()
+        )
         return ListSystemSessionEnvironValueSourcesPayload(
-            items=[value_source.value for value_source in SystemSessionEnvironValueSource]
+            items=[value_source.value for value_source in result.value_sources]
         )
 
     async def bulk_get_ids(

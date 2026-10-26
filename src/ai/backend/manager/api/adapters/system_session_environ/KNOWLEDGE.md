@@ -3,7 +3,7 @@ name: system-session-environ-adapter-scenarios
 type: reference
 description: what the system session environ adapter guarantees, as scenarios; superadmin search of every row at every scope with filters, the default order and pages, the monitor role passing the search, the value source list any user reads, the read by ids checked per row against the public, domain and project member grants
 scope: src/ai/backend/manager/api/adapters/system_session_environ
-keywords: [system session environ, scenario, adapter, superadmin, monitor, global_search, list_value_sources, bulk_get_ids, partial bulk]
+keywords: [system session environ, scenario, adapter, superadmin, monitor, global_search, public_list_value_sources, bulk_get_ids, partial bulk]
 generated:
   by: claude-code/opus-5.5
   at: 2026-10-23
@@ -51,7 +51,7 @@ id로 여러 행을 읽을 때는 행마다 권한을 검사한다. 모든 사�
 |---|---|---|---|
 | 일반 사용자가 값 출처 목록을 읽는다 | 어느 도메인과 프로젝트의 권한도 받지 않은 사용자 | 값 출처 목록을 조회 | 매니저가 제공하는 값 출처의 이름이 모두 반환된다 |
 
-값 출처는 행이 아니라 매니저가 제공하는 목록이므로 권한 검사 없이 반환된다. 행의 값 출처는 이 목록의
+값 출처는 행이 아니라 매니저가 제공하는 목록이므로 로그인 여부만 확인하고 반환된다. 행의 값 출처는 이 목록의
 이름으로 반환되고, 검색 조건에도 이 이름을 쓴다.
 
 ## id로 여러 행 읽기

@@ -86,5 +86,5 @@ async def admin_system_session_environs(
 async def system_session_environ_value_sources(
     info: Info[StrawberryGQLContext],
 ) -> list[str] | None:
-    payload = await info.context.adapters.system_session_environ.list_value_sources()
+    payload = await info.context.adapters.system_session_environ.public_list_value_sources()
     return payload.items
