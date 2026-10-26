@@ -647,15 +647,49 @@ class TestRequestRetry:
 
         assert communicator.put.call_count == 4
 
-    async def test_timed_out_request_is_not_resent(
+    async def test_timed_out_get_is_resent(self, etcd: AsyncEtcd, communicator: AsyncMock) -> None:
+        communicator.get.side_effect = [
+            self._err(GRPCStatusCode.Cancelled, "Timeout expired"),
+            b"v",
+        ]
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            assert await etcd.get("k", scope=ConfigScopes.GLOBAL) == "v"
+
+        assert communicator.get.call_count == 2
+
+    async def test_timed_out_get_prefix_is_resent(
         self, etcd: AsyncEtcd, communicator: AsyncMock
     ) -> None:
-        communicator.get.side_effect = self._err(GRPCStatusCode.Cancelled, "Timeout expired")
+        communicator.get_prefix.side_effect = [
+            self._err(GRPCStatusCode.Cancelled, "Timeout expired"),
+            [(b"/sorna/test-retry/k/a", b"1")],
+        ]
+
+        with patch("asyncio.sleep", new_callable=AsyncMock):
+            assert await etcd.get_prefix("k", scope=ConfigScopes.GLOBAL) == {"a": "1"}
+
+        assert communicator.get_prefix.call_count == 2
+
+    async def test_timed_out_write_is_not_resent(
+        self, etcd: AsyncEtcd, communicator: AsyncMock
+    ) -> None:
+        communicator.put.side_effect = self._err(GRPCStatusCode.Cancelled, "Timeout expired")
 
         with pytest.raises(GRPCStatusError):
-            await etcd.get("k", scope=ConfigScopes.GLOBAL)
+            await etcd.put("k", "v")
 
-        assert communicator.get.call_count == 1
+        assert communicator.put.call_count == 1
+
+    async def test_timed_out_conditional_txn_is_not_resent(
+        self, etcd: AsyncEtcd, communicator: AsyncMock
+    ) -> None:
+        communicator.txn.side_effect = self._err(GRPCStatusCode.Cancelled, "Timeout expired")
+
+        with pytest.raises(GRPCStatusError):
+            await etcd.replace("k", "old", "v")
+
+        assert communicator.txn.call_count == 1
 
     async def test_unconditional_write_is_resent_after_reaching_a_server(
         self, etcd: AsyncEtcd, communicator: AsyncMock
