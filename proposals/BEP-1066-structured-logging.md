@@ -273,7 +273,6 @@ None.
 | 2026-09-27 | `agent_id` goes in with `with_log_context`, not as a Resource attribute | One agent process can run several agents |
 | 2026-09-27 | ruff `G001`–`G004` stay off | The `StructuredLogger` signature already prevents it, and existing call sites go away as they are migrated |
 | 2026-09-27 | A new OTel handler is added and the legacy handler is kept until removal | Existing logs reach OTel unchanged; the legacy handler is removed once every call site is replaced |
-| 2026-10-23 | The relay forwards fields and the console shows them | A console line lost its values once its call site moved to `StructuredLogger` |
 
 ## References
 
