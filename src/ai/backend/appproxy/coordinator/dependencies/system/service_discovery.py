@@ -7,6 +7,7 @@ from typing import override
 
 from ai.backend.appproxy.coordinator import __version__
 from ai.backend.appproxy.coordinator.config import ServerConfig
+from ai.backend.appproxy.coordinator.errors.config import UnsupportedServiceDiscoveryTypeError
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.defs import RedisRole
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
@@ -84,8 +85,8 @@ class ServiceDiscoveryProvider(
                             sentinel_monitor=sentinel_monitors.monitor_for(core_live_target),
                         )
                     )
-            case _:
-                raise RuntimeError(
+            case ServiceDiscoveryType.ETCD:
+                raise UnsupportedServiceDiscoveryTypeError(
                     f"Unsupported service discovery type: {sd_type}. "
                     "Please use Redis service discovery for appproxy."
                 )
