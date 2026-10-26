@@ -8,6 +8,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import assert_never
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.system_session_environ import (
     SystemSessionEnvironID,
     SystemSessionEnvironScopeID,
@@ -15,15 +17,18 @@ from ai.backend.common.data.entity.system_session_environ import (
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     AdminSearchSystemSessionEnvironsInput,
+    ScopedSearchSystemSessionEnvironsInput,
     SystemSessionEnvironFilter,
     SystemSessionEnvironOrder,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
     AdminSearchSystemSessionEnvironsPayload,
+    ScopedSearchSystemSessionEnvironsPayload,
     SystemSessionEnvironNode,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironOrderField,
+    SystemSessionEnvironScope,
     SystemSessionEnvironScopeInfo,
     SystemSessionEnvironScopeType,
 )
@@ -36,8 +41,14 @@ from ai.backend.manager.models.condition_utils import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
+from ai.backend.manager.models.system_session_environ.scopes import (
+    DomainSystemSessionEnvironTarget,
+    ProjectSystemSessionEnvironTarget,
+    PublicSystemSessionEnvironTarget,
+    SystemSessionEnvironTarget,
+)
 from ai.backend.manager.models.system_session_environ.searchable_fields import (
     SystemSessionEnvironSearchableFields,
 )
@@ -49,6 +60,9 @@ from ai.backend.manager.services.system_session_environ.actions.bulk_get import 
 )
 from ai.backend.manager.services.system_session_environ.actions.global_search import (
     GlobalSearchSystemSessionEnvironsAction,
+)
+from ai.backend.manager.services.system_session_environ.actions.scoped_search import (
+    ScopedSearchSystemSessionEnvironsAction,
 )
 from ai.backend.manager.services.system_session_environ.processors import (
     SystemSessionEnvironProcessors,
@@ -74,24 +88,32 @@ class SystemSessionEnvironAdapter(BaseAdapter):
         self, input: AdminSearchSystemSessionEnvironsInput
     ) -> AdminSearchSystemSessionEnvironsPayload:
         """Search every system session environ row, at every scope (superadmin)."""
-        searcher = self._build_searcher(
-            SystemSessionEnvironSearcher,
-            conditions=self._convert_filter(input.filter) if input.filter else [],
-            orders=self._convert_orders(input.order) if input.order else [],
-            pagination_spec=_SYSTEM_SESSION_ENVIRON_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
+        searcher = self._build_system_session_environ_searcher(input)
         result = await self._system_session_environ.global_search.run(
             GlobalSearchSystemSessionEnvironsAction(
                 searcher=GlobalSearcher(used_by=(), searcher=searcher)
             )
         )
         return AdminSearchSystemSessionEnvironsPayload(
+            items=[self._data_to_node(environ) for environ in result.items],
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
+
+    async def scoped_search(
+        self, input: ScopedSearchSystemSessionEnvironsInput
+    ) -> ScopedSearchSystemSessionEnvironsPayload:
+        """Search the system session environ rows the named scopes reach, combined with OR."""
+        searcher = self._build_system_session_environ_searcher(input)
+        result = await self._system_session_environ.scoped_search.run(
+            ScopedSearchSystemSessionEnvironsAction(
+                searcher=ScopedSearcher(
+                    scopes=self._scope_targets(input.scope), used_by=(), searcher=searcher
+                )
+            )
+        )
+        return ScopedSearchSystemSessionEnvironsPayload(
             items=[self._data_to_node(environ) for environ in result.items],
             total_count=result.total_count,
             has_next_page=result.has_next_page,
@@ -113,6 +135,36 @@ class SystemSessionEnvironAdapter(BaseAdapter):
             else self.batch_load_failure(item.error)
             for item in result.items
         ]
+
+    def _build_system_session_environ_searcher(
+        self,
+        input: AdminSearchSystemSessionEnvironsInput | ScopedSearchSystemSessionEnvironsInput,
+    ) -> SystemSessionEnvironSearcher:
+        return self._build_searcher(
+            SystemSessionEnvironSearcher,
+            conditions=self._convert_filter(input.filter) if input.filter else [],
+            orders=self._convert_orders(input.order) if input.order else [],
+            pagination_spec=_SYSTEM_SESSION_ENVIRON_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
+
+    def _scope_targets(self, scope: SystemSessionEnvironScope) -> list[SystemSessionEnvironTarget]:
+        targets: list[SystemSessionEnvironTarget] = [
+            DomainSystemSessionEnvironTarget(domain_id=DomainID(entry.value))
+            for entry in scope.domain or ()
+        ]
+        targets.extend(
+            ProjectSystemSessionEnvironTarget(project_id=ProjectID(entry.value))
+            for entry in scope.project or ()
+        )
+        if scope.public:
+            targets.append(PublicSystemSessionEnvironTarget())
+        return targets
 
     def _convert_filter(self, filter: SystemSessionEnvironFilter) -> list[QueryCondition]:
         fields = SystemSessionEnvironSearchableFields.own
