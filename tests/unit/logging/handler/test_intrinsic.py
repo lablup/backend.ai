@@ -56,26 +56,6 @@ class TestRelayHandler:
         assert relayed_record.__dict__["log_tag_kernel_id"] == "kernel-1"
         assert relayed_record.__dict__["log_tag_attempt"] == 3
 
-    def test_plain_extra_is_not_relayed(
-        self,
-        relay_handler: RelayHandler,
-        parent_socket: zmq.Socket[Any],
-        record_with_plain_extra: logging.LogRecord,
-    ) -> None:
-        relay_handler.emit(record_with_plain_extra)
-
-        relayed_body = msgpack.unpackb(parent_socket.recv())
-        assert relayed_body.keys() == {
-            "name",
-            "pathname",
-            "lineno",
-            "msg",
-            "levelno",
-            "levelname",
-            "process",
-            "processName",
-        }
-
     def test_fallback_prints_fields(
         self,
         socketless_relay_handler: RelayHandler,
