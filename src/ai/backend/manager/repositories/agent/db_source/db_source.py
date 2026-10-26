@@ -256,9 +256,9 @@ class AgentDBSource:
                 sa.delete(DeploymentDesignatedAgentRow).where(
                     DeploymentDesignatedAgentRow.agent_uuid == agent.uuid,
                     DeploymentDesignatedAgentRow.endpoint_id.in_(
-                        sa.select(EndpointRow.id).where(
-                            EndpointRow.resource_group != resource_group_name
-                        )
+                        sa.select(EndpointRow.id)
+                        .join(ResourceGroupRow, ResourceGroupRow.name == EndpointRow.resource_group)
+                        .where(ResourceGroupRow.id != resource_group_id)
                     ),
                 )
             )
