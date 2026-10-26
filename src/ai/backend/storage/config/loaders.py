@@ -62,4 +62,6 @@ def make_etcd(local_config: StorageProxyUnifiedConfig) -> AsyncEtcd:
         local_config.etcd.namespace,
         scope_prefix_map,
         credentials=etcd_credentials,
+        keep_alive_interval=etcd_config_data.keep_alive_interval,
+        keep_alive_timeout=etcd_config_data.keep_alive_timeout,
     )
