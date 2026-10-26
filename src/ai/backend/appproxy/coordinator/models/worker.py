@@ -107,9 +107,6 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
     traefik_last_used_marker_path: Mapped[str | None] = mapped_column(
         sa.String(length=1024), nullable=True
     )
-    reject_brotli_request_body: Mapped[bool] = mapped_column(
-        sa.Boolean(), default=False, server_default=sa.false(), nullable=False
-    )
 
     created_at: Mapped[datetime | None] = mapped_column(
         sa.DateTime(timezone=True), server_default=sa.func.now()
@@ -204,7 +201,6 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
         wildcard_domain: str | None = None,
         wildcard_traffic_port: int | None = None,
         traefik_last_used_marker_path: str | None = None,
-        reject_brotli_request_body: bool = False,
         filtered_apps_only: bool = False,
         status: WorkerStatus = WorkerStatus.LOST,
     ) -> "Worker":
@@ -223,7 +219,6 @@ class Worker(Base, BaseMixin):  # type: ignore[misc]
         w.wildcard_traffic_port = wildcard_traffic_port
         w.filtered_apps_only = filtered_apps_only
         w.traefik_last_used_marker_path = traefik_last_used_marker_path
-        w.reject_brotli_request_body = reject_brotli_request_body
         w.status = status
 
         w.occupied_slots = 0

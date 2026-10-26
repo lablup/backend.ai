@@ -835,6 +835,7 @@ def build_root_app(
     subapp_pkgs: Sequence[str] = (),
 ) -> web.Application:
     root_ctx = RootContext()
+    root_ctx.reject_brotli_request_body = False
     root_ctx.metrics = WorkerMetricRegistry.instance()
 
     app = web.Application(

@@ -478,7 +478,7 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                                 "sessionids": [str(x) for x in self.session_ids],
                                 "lastusedmarkerpath": self.worker_row.traefik_last_used_marker_path,
                                 "rejectbrotlirequestbody": str(
-                                    self.worker_row.reject_brotli_request_body
+                                    local_config.proxy_coordinator.reject_brotli_request_body
                                 ).lower(),
                             }
                         }

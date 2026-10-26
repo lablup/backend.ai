@@ -214,6 +214,11 @@
   # older Backend.AI clusters. Keep this disabled in production environments.
   # Added in 25.9.0
   allow_unauthorized_configure_request = false
+  # Reject requests whose Content-Encoding contains br with 415 instead of
+  # forwarding them to session apps. Applies to both the built-in proxy workers
+  # and Traefik.
+  # Added in 26.10.0
+  reject_brotli_request_body = false
   # Enable Traefik integration as the proxy worker's data plane. When enabled,
   # the coordinator will manage routing rules through Traefik instead of the
   # built-in proxy workers. Requires Traefik to be deployed and configured

@@ -527,6 +527,20 @@ class ProxyCoordinatorConfig(BaseSchema):
         ),
     ]
 
+    reject_brotli_request_body: Annotated[
+        bool,
+        Field(default=False),
+        BackendAIConfigMeta(
+            description=(
+                "Reject requests whose Content-Encoding contains br with 415 instead of "
+                "forwarding them to session apps. Applies to both the built-in proxy workers "
+                "and Traefik."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+
     enable_traefik: Annotated[
         bool,
         Field(default=False),

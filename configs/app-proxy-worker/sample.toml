@@ -191,11 +191,6 @@
   # by a forged header. Leave empty when clients connect directly to the worker.
   # Added in 26.4.5
   trusted_proxies = ["10.0.0.0/8"]
-  # Reject requests whose Content-Encoding contains br with 415 instead of
-  # forwarding them to session apps. In Traefik mode the coordinator applies it
-  # to the Traefik plugin of every circuit served by this worker.
-  # Added in 26.10.0
-  reject_brotli_request_body = false
 
   # Configuration for wildcard domain routing. Required when frontend_mode is
   # 'wildcard'. Defines the bind address, base domain, and port settings for
