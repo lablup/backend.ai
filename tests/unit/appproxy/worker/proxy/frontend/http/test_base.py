@@ -21,14 +21,14 @@ class _ContentEncodingHeaders:
 @pytest.fixture
 def port_frontend_rejecting_brotli(mocker: pytest_mock.MockerFixture) -> PortFrontend:
     root_context = mocker.MagicMock()
-    root_context.reject_brotli_request_body = True
+    root_context.local_config.proxy_worker.reject_brotli_request_body = True
     return PortFrontend(root_context=root_context)
 
 
 @pytest.fixture
 def port_frontend_allowing_brotli(mocker: pytest_mock.MockerFixture) -> PortFrontend:
     root_context = mocker.MagicMock()
-    root_context.reject_brotli_request_body = False
+    root_context.local_config.proxy_worker.reject_brotli_request_body = False
     return PortFrontend(root_context=root_context)
 
 
