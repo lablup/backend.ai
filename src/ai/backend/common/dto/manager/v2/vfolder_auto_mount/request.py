@@ -125,28 +125,28 @@ class CreateVFolderAutoMountInput(BaseRequestModel):
 class UpdateVFolderAutoMountInput(BaseRequestModel):
     """Input for changing where and how an auto-mounted vfolder is mounted.
 
-    At least one of the three fields must be given.
+    At least one of the three fields must be given a value; a null leaves the field unchanged.
     """
 
     id: UUID = Field(description="ID of the auto-mount to update.")
-    mount_destination: str | Unset = Field(
+    mount_destination: str | None | Unset = Field(
         default=UNSET,
         min_length=1,
         description="New path in the session container. Omit to leave unchanged.",
     )
-    subpath: str | Unset = Field(
+    subpath: str | None | Unset = Field(
         default=UNSET, description="New path inside the vfolder. Omit to leave unchanged."
     )
-    mount_permission: MountPermission | Unset = Field(
+    mount_permission: MountPermission | None | Unset = Field(
         default=UNSET, description="New mount permission. Omit to leave unchanged."
     )
 
     @model_validator(mode="after")
     def _require_a_change(self) -> Self:
         if (
-            isinstance(self.mount_destination, Unset)
-            and isinstance(self.subpath, Unset)
-            and isinstance(self.mount_permission, Unset)
+            not isinstance(self.mount_destination, str)
+            and not isinstance(self.subpath, str)
+            and not isinstance(self.mount_permission, MountPermission)
         ):
             raise ValueError(
                 "UpdateVFolderAutoMountInput requires 'mount_destination', 'subpath' or "

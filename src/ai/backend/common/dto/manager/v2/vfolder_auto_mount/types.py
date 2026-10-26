@@ -6,11 +6,10 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import Field, model_validator
+from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
-from ai.backend.common.exception import InvalidAPIParameters
 
 __all__ = (
     "VFolderAutoMountOrderField",
@@ -31,11 +30,6 @@ class VFolderAutoMountScope(BaseRequestModel):
     """Scope for the scoped vfolder auto-mount query; the items are OR'd."""
 
     project: list[UUIDScope] = Field(
-        description="Projects whose auto-mounts are being read. A personal project included."
+        min_length=1,
+        description="Projects whose auto-mounts are being read. A personal project included.",
     )
-
-    @model_validator(mode="after")
-    def _require_non_empty(self) -> VFolderAutoMountScope:
-        if not self.project:
-            raise InvalidAPIParameters("VFolderAutoMountScope requires a non-empty 'project'")
-        return self

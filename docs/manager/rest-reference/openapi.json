@@ -40558,6 +40558,7 @@
             "items": {
               "$ref": "#/components/schemas/UUIDScope"
             },
+            "minItems": 1,
             "title": "Project",
             "type": "array"
           }
@@ -40689,7 +40690,7 @@
         "type": "object"
       },
       "UpdateVFolderAutoMountInput": {
-        "description": "Input for changing where and how an auto-mounted vfolder is mounted.\n\nAt least one of the three fields must be given.",
+        "description": "Input for changing where and how an auto-mounted vfolder is mounted.\n\nAt least one of the three fields must be given a value; a null leaves the field unchanged.",
         "properties": {
           "id": {
             "description": "ID of the auto-mount to update.",
@@ -40698,18 +40699,39 @@
             "type": "string"
           },
           "mount_destination": {
+            "anyOf": [
+              {
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "New path in the session container. Omit to leave unchanged.",
-            "minLength": 1,
-            "title": "Mount Destination",
-            "type": "string"
+            "title": "Mount Destination"
           },
           "subpath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "New path inside the vfolder. Omit to leave unchanged.",
-            "title": "Subpath",
-            "type": "string"
+            "title": "Subpath"
           },
           "mount_permission": {
-            "$ref": "#/components/schemas/MountPermission",
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MountPermission"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "description": "New mount permission. Omit to leave unchanged.",
             "title": "Mount Permission"
           }
