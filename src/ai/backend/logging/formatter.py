@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import pprint
+import re
 import time
 import traceback
 from collections.abc import Sequence
@@ -19,6 +20,8 @@ type _SysExcInfoType = (
     tuple[type[BaseException], BaseException, TracebackType | None] | tuple[None, None, None]
 )
 
+_CHARS_NEEDING_QUOTES = re.compile(r'[\s"=]')
+
 
 def append_log_fields(
     message: str, record: logging.LogRecord, normalizer: LogFieldNormalizer
@@ -34,7 +37,7 @@ def append_log_fields(
 
 
 def _render_field_value(value: object) -> str:
-    if isinstance(value, str) and (not value or any(c.isspace() or c in '"=' for c in value)):
+    if isinstance(value, str) and (value == "" or _CHARS_NEEDING_QUOTES.search(value)):
         return json.dumps(value, ensure_ascii=False)
     return str(value)
 
