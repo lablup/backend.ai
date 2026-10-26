@@ -72,10 +72,11 @@ class ScheduleResult:
 class FailureDisposition(StrEnum):
     """How a handler classifies a failure that the retry counters cannot."""
 
-    #: Nothing was asked of any agent: retried under the normal retry budget.
+    #: Nothing was asked of any agent, and another attempt may succeed: retried under the
+    #: normal retry budget.
     REPLACE = "replace"
-    #: An agent's kernel creation finished with an error; other kernels may already exist,
-    #: and give-up tears them down. Never re-placed.
+    #: Another attempt cannot succeed: given up at once. Kernels already created are torn
+    #: down by the give-up.
     ABANDON = "abandon"
 
 

@@ -82,6 +82,15 @@ class StartFailure:
 
 
 @dataclass
+class _AgentRequest:
+    """What one agent is asked to create for a session."""
+
+    kernel_ids: list[KernelId]
+    kernel_configs: list[KernelCreationConfig]
+    kernel_image_refs: dict[KernelId, ImageRef]
+
+
+@dataclass
 class _StartAttempt:
     """What one start attempt has done so far, kept across a timeout."""
 
@@ -236,19 +245,11 @@ class SessionLauncher:
         """
         if not sessions:
             return {}
-        try:
-            system_session_environ_by_session = (
-                await self._system_session_environ_repository.resolve(sessions)
-            )
-        except Exception as e:
-            # No agent was asked yet: every session of the batch is placed again.
-            log.warning("system session environ not resolved", exc_info=True)
-            return {
-                session.session_id: StartFailure(
-                    f"{type(e).__name__}: {e}", FailureDisposition.REPLACE
-                )
-                for session in sessions
-            }
+        # Raised, not reported: an error here is the batch's, and must not spend the sessions'
+        # retry budget.
+        system_session_environ_by_session = await self._system_session_environ_repository.resolve(
+            sessions
+        )
 
         async def start_with_timeout(session: SessionDataForStart) -> StartFailure | None:
             with with_log_context(session_id=session.session_id):
@@ -282,7 +283,7 @@ class SessionLauncher:
         image_configs: dict[UUID, ImageConfigData],
         system_session_environ: Mapping[str, str],
     ) -> StartFailure | None:
-        """Start a single session; on REPLACE, give back the host ports this attempt took."""
+        """Start a single session; if no agent was asked to create, give back its host ports."""
         attempt = _StartAttempt()
         try:
             async with async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC):
@@ -298,7 +299,8 @@ class SessionLauncher:
                 "session start timed out before kernel creation was requested",
                 FailureDisposition.REPLACE,
             )
-        if failure is not None and failure.disposition is FailureDisposition.REPLACE:
+        # Only before dispatch: after it, the agent gives back a port it used.
+        if failure is not None and not attempt.dispatched:
             await self._release_assigned_ports(attempt.assigned_ports)
         return failure
 
@@ -321,7 +323,7 @@ class SessionLauncher:
     ) -> StartFailure | None:
         """Start one session's kernels on agents, recording progress in `attempt`.
         Returns None if started or possibly still starting, REPLACE if no kernel creation was
-        requested, ABANDON if every agent that failed finished its kernel creation with an error."""
+        requested and another attempt may succeed, ABANDON if another attempt cannot."""
         log.debug(
             "session start attempted",
             session_type=session.session_type,
@@ -334,6 +336,15 @@ class SessionLauncher:
             # Ensure we have kernels to start
             if len(session.kernels) == 0:
                 raise InvalidSessionData(f"Session {session.session_id} has no kernels")
+            # A partly placed session would start only some of its kernels.
+            unassigned = [k for k in session.kernels if not k.agent_id]
+            if unassigned:
+                log.warning("kernels not assigned to an agent", kernel_count=len(unassigned))
+                return StartFailure(
+                    f"{len(unassigned)} of {len(session.kernels)} kernel(s) are not assigned"
+                    " to an agent",
+                    FailureDisposition.REPLACE,
+                )
 
             # Get resource policy and idle timeout
             # In production, this would come from database lookups
@@ -387,13 +398,9 @@ class SessionLauncher:
             for img_id, img_cfg in image_configs.items():
                 image_configs_by_id[img_id] = img_cfg.to_image_config(auto_pull)
 
-            # Create kernels on each agent
-            async def create_kernels_on_agent(
-                agent_id: AgentId,
-                agent_kernels: list[KernelBindingData],
-            ) -> None:
-                # Prepare kernel creation configs
-                kernel_ids = [k.kernel_id for k in agent_kernels]
+            # Built for every agent before any RPC: a local failure here asks no agent.
+            def build_agent_request(agent_kernels: list[KernelBindingData]) -> _AgentRequest:
+                kernel_ids = [KernelId(k.kernel_id) for k in agent_kernels]
                 kernel_configs: list[KernelCreationConfig] = []
                 kernel_image_refs: dict[KernelId, ImageRef] = {}
 
@@ -484,50 +491,55 @@ class SessionLauncher:
                         is_local=kernel_image_config["is_local"],
                     )
 
-                # Create cluster info with network and SSH configuration
-                cluster_info: ClusterInfo = {
-                    "mode": session.cluster_mode,
-                    "size": len(session.kernels),
-                    "replicas": replicas,
-                    "network_config": network_setup.network_config,
-                    "ssh_keypair": ssh_keypair,
-                    "cluster_ssh_port_mapping": network_setup.cluster_ssh_port_mapping,
-                }
+                return _AgentRequest(kernel_ids, kernel_configs, kernel_image_refs)
 
-                # Create the kernels using connection pool
+            try:
+                requests = {
+                    agent_id: build_agent_request(agent_kernels)
+                    for agent_id, agent_kernels in kernels_by_agent.items()
+                }
+            except Exception as e:
+                # Built from the session's own rows, so another attempt fails the same way.
+                log.warning("kernel creation request not built", exc_info=True)
+                await self._record_start_error(session.session_id, e)
+                return StartFailure(f"{type(e).__name__}: {e}", FailureDisposition.ABANDON)
+            cluster_info: ClusterInfo = {
+                "mode": session.cluster_mode,
+                "size": len(session.kernels),
+                "replicas": replicas,
+                "network_config": network_setup.network_config,
+                "ssh_keypair": ssh_keypair,
+                "cluster_ssh_port_mapping": network_setup.cluster_ssh_port_mapping,
+            }
+            sent: set[AgentId] = set()
+
+            async def create_kernels_on_agent(agent_id: AgentId, request: _AgentRequest) -> None:
                 async with self._agent_client_pool.acquire(agent_id) as client:
+                    # From here the agent may be creating, whatever this call returns.
+                    sent.add(agent_id)
+                    attempt.dispatched = True
                     await client.create_kernels(
                         session.session_id,
-                        kernel_ids,
-                        kernel_configs,
+                        request.kernel_ids,
+                        request.kernel_configs,
                         cluster_info,
-                        kernel_image_refs,
+                        request.kernel_image_refs,
                     )
 
-            agent_ids_ordered: list[AgentId] = []
-            create_tasks: list[Awaitable[None]] = []
-            for agent_id, agent_kernels in kernels_by_agent.items():
-                agent_ids_ordered.append(agent_id)
-                create_tasks.append(create_kernels_on_agent(agent_id, agent_kernels))
-
-            if not create_tasks:
-                # No kernel has an agent: a placement to make again, not a started session.
-                log.warning("no kernel of the session is assigned to an agent")
-                return StartFailure(
-                    "no kernel of this session is assigned to an agent",
-                    FailureDisposition.REPLACE,
-                )
-            attempt.dispatched = True
-            results = await asyncio.gather(*create_tasks, return_exceptions=True)
+            agent_ids_ordered = list(requests)
+            results = await asyncio.gather(
+                *(create_kernels_on_agent(aid, requests[aid]) for aid in agent_ids_ordered),
+                return_exceptions=True,
+            )
             failed_agent_ids: list[AgentId] = []
             errored_agent_ids: list[AgentId] = []
             for aid, result in zip(agent_ids_ordered, results, strict=True):
                 if isinstance(result, BaseException):
                     log.error("kernel creation failed on agent", agent_id=aid, exc_info=result)
                     failed_agent_ids.append(aid)
-                    # Only an error raised by the agent means its creation finished; on a
-                    # transport failure or timeout the agent may still be creating.
-                    if isinstance(result, RPCUserError):
+                    # Finished: the agent raised, or was never asked. On a transport failure
+                    # or timeout after the request went out, the agent may still be creating.
+                    if isinstance(result, RPCUserError) or aid not in sent:
                         errored_agent_ids.append(aid)
             if failed_agent_ids:
                 try:
@@ -539,6 +551,13 @@ class SessionLauncher:
             # ABANDON only when every failed agent finished; one that may still be creating
             # leaves the session to the creation timeout rather than a give-up under it.
             if errored_agent_ids and len(errored_agent_ids) == len(failed_agent_ids):
+                if not sent:
+                    log.warning("no agent could be asked to create kernels")
+                    return StartFailure(
+                        f"no agent could be asked to create kernels ({len(failed_agent_ids)}"
+                        " failed)",
+                        FailureDisposition.REPLACE,
+                    )
                 # Other kernels may already exist; give-up tears them down.
                 log.warning(
                     "kernel creation finished with an error",

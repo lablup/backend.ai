@@ -1216,9 +1216,9 @@ class ScheduleCoordinator:
                 # Session not found - skip (shouldn't happen)
                 continue
 
-            # 0. ABANDON gives up at once: the agent's kernel creation finished with an error
-            # (other kernels may already exist; give-up tears them down). REPLACE takes the
-            # normal retry budget; sending it to PENDING would reset that budget and livelock.
+            # 0. ABANDON gives up at once: another attempt cannot succeed (kernels already
+            # created are torn down by the give-up). REPLACE takes the normal retry budget;
+            # sending it to PENDING would reset that budget and livelock.
             if failure.disposition is FailureDisposition.ABANDON:
                 give_up_failures.append(failure)
                 continue
