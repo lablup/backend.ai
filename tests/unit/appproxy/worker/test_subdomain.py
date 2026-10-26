@@ -100,18 +100,20 @@ async def serving_subdomain_frontend(
     await frontend.stop()
 
 
-async def test_proxy_passes_compressed_request_body_as_received(
-    serving_subdomain_frontend: _ServingSubdomainFrontend,
-) -> None:
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            f"http://127.0.0.1:{serving_subdomain_frontend.port}/",
-            data=_GZIP_REQUEST_BODY,
-            headers={
-                "Host": f"{_SUBDOMAIN}{_WILDCARD_DOMAIN}:{serving_subdomain_frontend.port}",
-                "Content-Encoding": "gzip",
-            },
-        ) as response:
-            assert response.status == 200
+class TestSubdomainFrontend:
+    async def test_proxy_passes_compressed_request_body_as_received(
+        self,
+        serving_subdomain_frontend: _ServingSubdomainFrontend,
+    ) -> None:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"http://127.0.0.1:{serving_subdomain_frontend.port}/",
+                data=_GZIP_REQUEST_BODY,
+                headers={
+                    "Host": f"{_SUBDOMAIN}{_WILDCARD_DOMAIN}:{serving_subdomain_frontend.port}",
+                    "Content-Encoding": "gzip",
+                },
+            ) as response:
+                assert response.status == 200
 
-    assert serving_subdomain_frontend.bodies_received_by_backend == [_GZIP_REQUEST_BODY]
+        assert serving_subdomain_frontend.bodies_received_by_backend == [_GZIP_REQUEST_BODY]
