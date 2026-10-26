@@ -25,8 +25,10 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
     IngressBackend,
     IngressBackendID,
     IngressFrontend,
+    IngressFrontendKey,
     IngressFrontendKind,
     IngressID,
+    IngressKey,
     IngressProtocol,
     IngressTargetGroup,
     IngressTargetGroupID,
@@ -127,6 +129,13 @@ def tcp_ingress(case: _ClientIPRuleCase) -> Ingress:
     )
 
 
+@pytest.fixture
+def port_10205_ingress_key() -> IngressKey:
+    return IngressKey(
+        authority=IngressAuthority("worker-1"), frontend_key=IngressFrontendKey("10205")
+    )
+
+
 class TestTraefikRoutingConfigFactory:
     @pytest.mark.parametrize(
         "case",
@@ -210,3 +219,15 @@ class TestTraefikRoutingConfigFactory:
             service="bai_ingress_10205_service",
             entrypoints=["portproxy_10205"],
         )
+
+    def test_all_routing_config_etcd_keys_lists_every_key_of_both_protocols(
+        self, port_10205_ingress_key: IngressKey
+    ) -> None:
+        assert TraefikRoutingConfigFactory.all_routing_config_etcd_keys(port_10205_ingress_key) == [
+            "worker_worker-1/http/routers/bai_ingress_10205_router",
+            "worker_worker-1/http/services/bai_ingress_10205_service",
+            "worker_worker-1/http/middlewares/bai_ingress_10205_ipallowlist",
+            "worker_worker-1/http/middlewares/bai_ingress_10205_auth",
+            "worker_worker-1/tcp/routers/bai_ingress_10205_router",
+            "worker_worker-1/tcp/services/bai_ingress_10205_service",
+        ]
