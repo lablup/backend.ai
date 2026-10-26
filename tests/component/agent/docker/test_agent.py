@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import secrets
 import signal
-from collections.abc import Mapping
+from collections.abc import AsyncIterator, Mapping
 from http import HTTPStatus
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+import pytest_asyncio
 from aiodocker import Docker
 from aiodocker.exceptions import DockerError
 
@@ -38,6 +39,13 @@ async def _remove_test_socket_relay(agent_id: str) -> None:
         await docker.close()
 
 
+@pytest_asyncio.fixture(scope="module", loop_scope="module", autouse=True)
+async def remove_test_socket_relay(test_id: str) -> AsyncIterator[None]:
+    # Every agent shares one relay because the agent id is fixed per session.
+    yield
+    await _remove_test_socket_relay(f"i-{test_id}")
+
+
 @pytest.fixture
 async def agent(local_config: Any, test_id: str, mocker: Any, socket_relay_image: Any) -> Any:
     dummy_etcd = DummyEtcd()
@@ -62,10 +70,7 @@ async def agent(local_config: Any, test_id: str, mocker: Any, socket_relay_image
     try:
         yield agent
     finally:
-        try:
-            await agent.shutdown(signal.SIGTERM)
-        finally:
-            await _remove_test_socket_relay(str(agent.id))
+        await agent.shutdown(signal.SIGTERM)
 
 
 async def test_init(agent: DockerAgent, mocker: Any) -> None:
