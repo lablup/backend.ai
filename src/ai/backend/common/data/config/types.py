@@ -9,3 +9,5 @@ class EtcdConfigData:
     addrs: list[HostPortPair]
     user: str | None
     password: str | None
+    keep_alive_interval: float
+    keep_alive_timeout: float
