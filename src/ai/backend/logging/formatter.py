@@ -20,8 +20,9 @@ type _SysExcInfoType = (
 )
 
 
-def append_log_fields(message: str, record: logging.LogRecord) -> str:
-    normalizer = LogFieldNormalizer()
+def append_log_fields(
+    message: str, record: logging.LogRecord, normalizer: LogFieldNormalizer
+) -> str:
     normalized_fields = normalizer.normalized_fields_of(record)
     if not normalized_fields:
         return message
@@ -61,9 +62,15 @@ class SerializedExceptionFormatter(logging.Formatter):
 
 
 class ConsoleFormatter(logging.Formatter):
+    _normalizer: LogFieldNormalizer
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        self._normalizer = LogFieldNormalizer()
+
     @override
     def formatMessage(self, record: logging.LogRecord) -> str:
-        return append_log_fields(super().formatMessage(record), record)
+        return append_log_fields(super().formatMessage(record), record, self._normalizer)
 
     @override
     def formatException(self, ei: Sequence[str] | _SysExcInfoType) -> str:
@@ -103,13 +110,16 @@ class CustomJsonFormatter(JsonFormatter):
 
 
 class ColorizedFormatter(coloredlogs.ColoredFormatter):  # type: ignore[misc]
+    _normalizer: LogFieldNormalizer
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
         coloredlogs.logging.Formatter.formatException = format_exception
+        self._normalizer = LogFieldNormalizer()
 
     @override
     def formatMessage(self, record: logging.LogRecord) -> str:
-        return append_log_fields(super().formatMessage(record), record)
+        return append_log_fields(super().formatMessage(record), record, self._normalizer)
 
 
 class pretty:
