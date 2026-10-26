@@ -62,7 +62,8 @@ class PublicSystemSessionEnvironTarget(SystemSessionEnvironTarget):
 
 @dataclass(frozen=True)
 class DomainSystemSessionEnvironTarget(SystemSessionEnvironTarget):
-    """The rows of one domain."""
+    """The rows bound to one domain itself. The graph binds a project under its domain,
+    so the scope type column keeps the projects' rows out."""
 
     domain_id: DomainID
 
@@ -73,13 +74,19 @@ class DomainSystemSessionEnvironTarget(SystemSessionEnvironTarget):
     @override
     def to_condition(self) -> QueryCondition:
         domain_id = self.domain_id
+        bound_to_domain = SystemSessionEnvironSearchableFields.own.scope_type.filter.equals(
+            SystemSessionEnvironScopeType.DOMAIN
+        )
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return scope_membership_exists(
-                DomainEntityType(),
-                domain_id,
-                SystemSessionEnvironEntityType(),
-                SystemSessionEnvironRow.id,
+            return sa.and_(
+                bound_to_domain(),
+                scope_membership_exists(
+                    DomainEntityType(),
+                    domain_id,
+                    SystemSessionEnvironEntityType(),
+                    SystemSessionEnvironRow.id,
+                ),
             )
 
         return inner
