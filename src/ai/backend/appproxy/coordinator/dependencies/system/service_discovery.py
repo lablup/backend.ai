@@ -85,7 +85,7 @@ class ServiceDiscoveryProvider(
                             sentinel_monitor=sentinel_monitors.monitor_for(core_live_target),
                         )
                     )
-            case ServiceDiscoveryType.ETCD:
+            case _:
                 raise UnsupportedServiceDiscoveryTypeError(
                     f"Unsupported service discovery type: {sd_type}. "
                     "Please use Redis service discovery for appproxy."
