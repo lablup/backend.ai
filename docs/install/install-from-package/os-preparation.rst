@@ -5,7 +5,7 @@ Backend.AI and its associated components share common requirements and
 configurations for proper operation. This section explains how to configure the
 OS environment.
 
-.. note:: This section assumes the installation on Ubuntu 20.04 LTS.
+.. note:: This section assumes the installation on Ubuntu 24.04 LTS.
 
 
 Create a user account for operation
@@ -258,12 +258,10 @@ Pull container images
 ---------------------
 
 For compute nodes, you need to pull some container images that are required for
-creating a compute session. Lablup provides a set of open container images and
-you may pull the following starter images:
+creating a compute session. Lablup provides a set of open container images at
+``cr.backend.ai``, and you may pull the starter Python image for the
+architecture of the node (``amd64`` or ``arm64``):
 
 .. code-block:: bash
 
-   docker pull cr.backend.ai/stable/filebrowser:21.02-ubuntu20.04
-   docker pull cr.backend.ai/stable/python:3.9-ubuntu20.04
-   docker pull cr.backend.ai/stable/python-pytorch:1.11-py38-cuda11.3
-   docker pull cr.backend.ai/stable/python-tensorflow:2.7-py38-cuda11.3
+   docker pull cr.backend.ai/stable/python:3.13-ubuntu24.04-amd64
