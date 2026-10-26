@@ -65,6 +65,7 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
             app,
             keepalive_timeout=30.0,
             max_field_size=self.root_context.local_config.proxy_worker.max_header_field_size,
+            auto_decompress=False,  # transparently pass the request body
         )
         await runner.setup()
         service_addr = self.wildcard_config.bind_addr
