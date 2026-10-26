@@ -244,18 +244,18 @@ class EndpointRow(Base):
         default=DeploymentOptions,
     )
 
-    # Read by gql_legacy (api/gql_legacy/endpoint.py) and to_data. Delete once to_data
-    # stops reading relationships; the pair RoutingRow.endpoint_row stays (D-6).
+    # Read only by gql_legacy (endpoint.py, through to_data).
+    # Delete it together with the gql_legacy cleanup.
     routings: Mapped[list[RoutingRow]] = relationship("RoutingRow", back_populates="endpoint_row")
-    # Read only by gql_legacy (api/gql_legacy/endpoint.py) and to_data. Delete once
-    # to_data stops reading relationships.
+    # Read only by gql_legacy (endpoint.py, through to_data).
+    # Delete it together with the gql_legacy cleanup.
     created_user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         foreign_keys=[created_user],
         primaryjoin=_get_created_user_row_join_condition,
     )
-    # Read only by gql_legacy (api/gql_legacy/endpoint.py) and to_data; v2 readers join
-    # UserRow explicitly. Delete once to_data stops reading relationships.
+    # Read only by gql_legacy (endpoint.py, through to_data).
+    # Delete it together with the gql_legacy cleanup.
     session_owner_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         foreign_keys=[session_owner],
@@ -426,21 +426,10 @@ class EndpointRow(Base):
         """
         return self.current_revision_row or self.deploying_revision_row
 
+    # Read only by gql_legacy (endpoint.py); v2 builds EndpointData in ModelServingRepository.
+    # Delete it together with the gql_legacy cleanup.
     def to_data(self) -> EndpointData:
-        """Convert to EndpointData.
-
-        Requires ``current_revision_row`` / ``deploying_revision_row`` and
-        their ``image_row`` to be eagerly loaded via selectinload for
-        revision field population.
-        ``_find_active_revision`` prefers ``current_revision`` and falls
-        back to ``deploying_revision`` so the projection reflects the
-        spec currently being deployed during the initial DEPLOYING
-        phase. When neither pointer is set (PENDING endpoint without a
-        revision yet, or leftover orphan data), revision-derived fields
-        degrade to ``None`` / sentinel defaults and
-        ``runtime_variant_id`` stays ``None``; legacy response surfaces
-        render that as the historical blank state.
-        """
+        """Convert to EndpointData from the eagerly loaded relationships."""
         current_rev = self._find_active_revision()
         return EndpointData(
             id=self.id,
