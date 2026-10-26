@@ -32,7 +32,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, cast
 from uuid import UUID
 
-import aiohttp
 import aiohttp_cors
 import aiohttp_jinja2
 import aiomonitor
@@ -62,7 +61,6 @@ from ai.backend.appproxy.common.errors import (
     ObjectNotFound,
     URLNotFound,
 )
-from ai.backend.appproxy.common.etcd import TraefikEtcd
 from ai.backend.appproxy.common.events import (
     DoCheckUnusedPortEvent,
     DoCheckWorkerLostEvent,
@@ -82,21 +80,19 @@ from ai.backend.appproxy.common.utils import (
     ensure_json_serializable,
     mime_match,
 )
+from ai.backend.appproxy.coordinator.dependencies.composer import (
+    CoordinatorDependencyComposer,
+    DependencyInput,
+    DependencyResources,
+)
 from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
 from ai.backend.appproxy.coordinator.services.ingress import IngressService
-from ai.backend.common.clients.http_client.client_pool import (
-    ClientPool,
-    tcp_client_session_factory,
-)
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
-from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-from ai.backend.common.clients.valkey_client.valkey_lock.client import ValkeyLockClient
-from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.contexts.request_id import with_request_context
-from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK, RedisRole
+from ai.backend.common.defs import REDIS_STREAM_DB, REDIS_STREAM_LOCK, RedisRole
+from ai.backend.common.dependencies.stacks.builder import DependencyBuilderStack
 from ai.backend.common.dto.appproxy_coordinator.v2.status.types import AppProxyStatusResponse
-from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.exception import BackendAIError, BackendAISchemaValidationFailed
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
@@ -119,20 +115,9 @@ from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
-from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
-    RedisServiceDiscovery,
-    RedisServiceDiscoveryArgs,
-)
-from ai.backend.common.service_discovery.service_discovery import (
-    ServiceDiscovery,
-    ServiceDiscoveryLoop,
-    ServiceEndpoint,
-    ServiceMetadata,
-)
 from ai.backend.common.types import (
     AgentId,
     RedisProfileTarget,
-    ServiceDiscoveryType,
 )
 from ai.backend.common.utils import env_info
 from ai.backend.logging import Logger, LogLevel
@@ -152,11 +137,10 @@ from .defs import EVENT_DISPATCHER_CONSUMER_GROUP
 from .errors import (
     CleanupContextNotInitializedError,
     MissingProfilingConfigError,
-    MissingTraefikConfigError,
 )
 from .health.database import DatabaseHealthChecker
 from .models import Circuit, Worker
-from .models.utils import connect_database, execute_with_txn_retry
+from .models.utils import execute_with_txn_retry
 from .pglock import PgAdvisoryLock
 from .repositories.endpoint import EndpointRepository
 from .services.endpoint import EndpointService
@@ -311,75 +295,6 @@ async def exception_middleware(
             raise InternalServerError() from e
     except BackendAIError as ex:
         return _render_error_response(request, ex)
-
-
-@asynccontextmanager
-async def sentinel_monitor_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    redis_profile_target = RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
-    core_redis_profile_target = RedisProfileTarget.from_dict(
-        (root_ctx.local_config.core_redis or root_ctx.local_config.redis).to_dict()
-    )
-    root_ctx.sentinel_monitors = SentinelMonitorSet([
-        *redis_profile_target.valkey_targets(),
-        *core_redis_profile_target.valkey_targets(),
-    ])
-    await root_ctx.sentinel_monitors.start()
-    try:
-        yield
-    finally:
-        await root_ctx.sentinel_monitors.close()
-
-
-@asynccontextmanager
-async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    redis_profile_target = RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
-    core_redis_profile_target = RedisProfileTarget.from_dict(
-        (root_ctx.local_config.core_redis or root_ctx.local_config.redis).to_dict()
-    )
-    sentinel_monitors = root_ctx.sentinel_monitors
-    live_target = redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target()
-    core_live_target = core_redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target()
-    core_stream_target = core_redis_profile_target.profile_target(
-        RedisRole.STREAM
-    ).to_valkey_target()
-
-    # Create valkey clients for live data access
-    root_ctx.valkey_live = await ValkeyLiveClient.create(
-        valkey_target=live_target,
-        db_id=REDIS_LIVE_DB,
-        human_readable_name="appproxy-coordinator-live",
-        sentinel_monitor=sentinel_monitors.monitor_for(live_target),
-    )
-    root_ctx.core_valkey_live = await ValkeyLiveClient.create(
-        valkey_target=core_live_target,
-        db_id=REDIS_LIVE_DB,
-        human_readable_name="appproxy-coordinator-core-live",
-        sentinel_monitor=sentinel_monitors.monitor_for(core_live_target),
-    )
-
-    lock_target = redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target()
-    root_ctx.valkey_lock = await ValkeyLockClient.create(
-        valkey_target=lock_target,
-        db_id=REDIS_STREAM_LOCK,
-        human_readable_name="appproxy-coordinator-lock",
-        sentinel_monitor=sentinel_monitors.monitor_for(lock_target),
-    )
-
-    # Initialize ValkeyScheduleClient for health status updates
-    root_ctx.valkey_schedule = await ValkeyScheduleClient.create(
-        valkey_target=core_stream_target,
-        db_id=REDIS_LIVE_DB,
-        human_readable_name="appproxy-schedule",
-        sentinel_monitor=sentinel_monitors.monitor_for(core_stream_target),
-    )
-    log.debug("valkey schedule client initialized")
-    try:
-        yield
-    finally:
-        await root_ctx.valkey_live.close()
-        await root_ctx.core_valkey_live.close()
-        await root_ctx.valkey_schedule.close()
-        await root_ctx.valkey_lock.close()
 
 
 async def _make_message_queue(
@@ -540,32 +455,6 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         await root_ctx.leader_election.stop()
 
 
-@asynccontextmanager
-async def etcd_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    if root_ctx.local_config.proxy_coordinator.enable_traefik:
-        traefik_config = root_ctx.local_config.proxy_coordinator.traefik
-        if not traefik_config:
-            raise MissingTraefikConfigError(
-                "Traefik configuration is required when enable_traefik is True"
-            )
-
-        creds: dict[str, str] | None = None
-        if traefik_config.etcd.password:
-            creds = {"password": traefik_config.etcd.password}
-
-        async with TraefikEtcd(
-            [addr.to_legacy() for addr in traefik_config.etcd.addrs],
-            traefik_config.etcd.namespace,
-            {ConfigScopes.GLOBAL: ""},
-            credentials=creds,
-        ) as traefik_etcd:
-            root_ctx.traefik_etcd = traefik_etcd
-            yield
-    else:
-        root_ctx.traefik_etcd = None
-        yield
-
-
 async def on_worker_lost_event(
     context: RootContext,
     _worker_id: AgentId,
@@ -710,13 +599,6 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @asynccontextmanager
-async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    async with connect_database(root_ctx.local_config.db) as db:
-        root_ctx.db = db
-        yield
-
-
-@asynccontextmanager
 async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.distributed_lock_factory = init_lock_factory(root_ctx)
     yield
@@ -789,101 +671,22 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
 
 
 @asynccontextmanager
-async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    sd_type = root_ctx.local_config.service_discovery.type
-    core_service_discovery: ServiceDiscovery
-    worker_service_discovery: ServiceDiscovery
-    match sd_type:
-        case ServiceDiscoveryType.REDIS:
-            # Workers register in the AppProxy redis, which core redis may not be.
-            worker_live_target = (
-                RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
-                .profile_target(RedisRole.LIVE)
-                .to_valkey_target()
-            )
-            worker_service_discovery = await RedisServiceDiscovery.create(
-                RedisServiceDiscoveryArgs(
-                    valkey_target=worker_live_target,
-                    sentinel_monitor=root_ctx.sentinel_monitors.monitor_for(worker_live_target),
-                )
-            )
-            if root_ctx.local_config.core_redis is None:
-                core_service_discovery = worker_service_discovery
-            else:
-                core_live_target = (
-                    RedisProfileTarget.from_dict(root_ctx.local_config.core_redis.to_dict())
-                    .profile_target(RedisRole.LIVE)
-                    .to_valkey_target()
-                )
-                core_service_discovery = await RedisServiceDiscovery.create(
-                    RedisServiceDiscoveryArgs(
-                        valkey_target=core_live_target,
-                        sentinel_monitor=root_ctx.sentinel_monitors.monitor_for(core_live_target),
-                    )
-                )
-        case _:
-            raise RuntimeError(
-                f"Unsupported service discovery type: {sd_type}. "
-                "Please use Redis service discovery for appproxy."
-            )
-    root_ctx.worker_service_discovery = worker_service_discovery
-
-    # Determine announce addresses
-    announce_addr = root_ctx.local_config.proxy_coordinator.announce_addr
-    sd_loop = ServiceDiscoveryLoop(
-        sd_type,
-        core_service_discovery,
-        ServiceMetadata.for_endpoint(
-            display_name=f"appproxy-coordinator-{root_ctx.local_config.proxy_coordinator.id}",
-            service_group="appproxy-coordinator",
-            version=__version__,
-            endpoint=ServiceEndpoint(
-                address=announce_addr.host,
-                port=announce_addr.port,
-                protocol="http",
-                # It can be separated into an internal-purpose port later.
-                prometheus_address=str(announce_addr),
-            ),
-        ),
-    )
-
-    if root_ctx.local_config.otel.enabled:
-        meta = sd_loop.metadata
-        otel_spec = OpenTelemetrySpec(
-            service_name=meta.service_group,
-            service_version=meta.version,
-            log_level=root_ctx.local_config.otel.log_level,
-            endpoint=root_ctx.local_config.otel.endpoint,
-            service_instance_id=meta.id,
-            service_instance_name=meta.display_name,
-            max_queue_size=root_ctx.local_config.otel.max_queue_size,
-            max_export_batch_size=root_ctx.local_config.otel.max_export_batch_size,
-        )
-        LegacyOtelLogging(otel_spec).attach()
-        apply_otel_tracer(otel_spec)
-        StructuredOtelLogging(otel_spec).attach(root_ctx.local_config.logging.pkg_ns.keys())
-
-    # Start event-based SD publishing if config has service_group set
+async def service_discovery_event_publisher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     sd_config = root_ctx.local_config.service_discovery
-    sd_event_publisher: ServiceDiscoveryEventPublisher | None = None
-    if sd_config.service_group and hasattr(root_ctx, "event_producer"):
-        sd_event_publisher = ServiceDiscoveryEventPublisher(
-            event_producer=root_ctx.event_producer,
-            config=sd_config,
-            component_version=__version__,
-            startup_time=datetime.now(tz=UTC),
-        )
-        await sd_event_publisher.start()
-
+    if not sd_config.service_group:
+        yield
+        return
+    sd_event_publisher = ServiceDiscoveryEventPublisher(
+        event_producer=root_ctx.event_producer,
+        config=sd_config,
+        component_version=__version__,
+        startup_time=datetime.now(tz=UTC),
+    )
+    await sd_event_publisher.start()
     try:
         yield
     finally:
-        if sd_event_publisher is not None:
-            await sd_event_publisher.stop()
-        sd_loop.close()
-        # sd_loop unregisters after close() returns, so the discovery it uses stays open.
-        if root_ctx.local_config.core_redis is not None:
-            await worker_service_discovery.close()
+        await sd_event_publisher.stop()
 
 
 @asynccontextmanager
@@ -911,18 +714,6 @@ async def endpoint_service_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         circuit_manager=root_ctx.circuit_manager,
     )
     yield
-
-
-@asynccontextmanager
-async def worker_client_pool_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    client_timeout = aiohttp.ClientTimeout(total=30.0, connect=10.0)
-    root_ctx.worker_client_pool = ClientPool(
-        functools.partial(tcp_client_session_factory, timeout=client_timeout),
-    )
-    try:
-        yield
-    finally:
-        await root_ctx.worker_client_pool.close()
 
 
 @asynccontextmanager
@@ -1096,6 +887,7 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
 def build_root_app(
     pidx: int,
     local_config: ServerConfig,
+    dependency_resources: DependencyResources,
     *,
     cleanup_contexts: Sequence[CleanupContext] | None = None,
     subapp_pkgs: Sequence[str] = (),
@@ -1119,6 +911,16 @@ def build_root_app(
     app["_root.context"] = root_ctx
     root_ctx.local_config = local_config
     root_ctx.pidx = pidx
+    infrastructure = dependency_resources.infrastructure
+    root_ctx.db = infrastructure.db
+    root_ctx.sentinel_monitors = infrastructure.sentinel_monitors
+    root_ctx.valkey_live = infrastructure.valkey.valkey_live
+    root_ctx.core_valkey_live = infrastructure.valkey.core_valkey_live
+    root_ctx.valkey_lock = infrastructure.valkey.valkey_lock
+    root_ctx.valkey_schedule = infrastructure.valkey.valkey_schedule
+    root_ctx.traefik_etcd = infrastructure.traefik_etcd
+    root_ctx.worker_service_discovery = dependency_resources.system.worker_service_discovery
+    root_ctx.worker_client_pool = dependency_resources.components.worker_client_pool
     root_ctx.cors_options = {
         "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
             allow_credentials=False, expose_headers="*", allow_headers="*"
@@ -1131,20 +933,15 @@ def build_root_app(
 
     if cleanup_contexts is None:
         cleanup_contexts = [
-            sentinel_monitor_ctx,
-            redis_ctx,
             distributed_lock_ctx,
-            database_ctx,
             event_dispatcher_ctx,
             leader_election_ctx,
-            etcd_ctx,
             circuit_manager_ctx,
             endpoint_service_ctx,
             health_probe_ctx,
             unused_port_collection_ctx,
             event_handler_ctx,
-            service_discovery_ctx,
-            worker_client_pool_ctx,
+            service_discovery_event_publisher_ctx,
             ingress_service_ctx,
         ]
     shutdown_context_instances = []
@@ -1193,6 +990,7 @@ async def server_main(
     _args: Sequence[Any],
 ) -> AsyncIterator[None]:
     local_config: ServerConfig = _args[0]
+    config_path: Path | None = _args[2]
     loop.set_debug(local_config.debug.asyncio)
 
     @asynccontextmanager
@@ -1258,7 +1056,32 @@ async def server_main(
     proxy_init_stack = AsyncExitStack()
     await proxy_init_stack.__aenter__()
     try:
-        root_app = build_root_app(pidx, local_config, subapp_pkgs=global_subapp_pkgs)
+        dependency_stack = DependencyBuilderStack()
+        await proxy_init_stack.enter_async_context(dependency_stack)
+        dependency_resources = await dependency_stack.enter_composer(
+            CoordinatorDependencyComposer(),
+            DependencyInput(config_path=config_path),
+        )
+
+        if local_config.otel.enabled:
+            meta = dependency_resources.system.sd_loop.metadata
+            otel_spec = OpenTelemetrySpec(
+                service_name=meta.service_group,
+                service_version=meta.version,
+                log_level=local_config.otel.log_level,
+                endpoint=local_config.otel.endpoint,
+                service_instance_id=meta.id,
+                service_instance_name=meta.display_name,
+                max_queue_size=local_config.otel.max_queue_size,
+                max_export_batch_size=local_config.otel.max_export_batch_size,
+            )
+            LegacyOtelLogging(otel_spec).attach()
+            apply_otel_tracer(otel_spec)
+            StructuredOtelLogging(otel_spec).attach(local_config.logging.pkg_ns.keys())
+
+        root_app = build_root_app(
+            pidx, local_config, dependency_resources, subapp_pkgs=global_subapp_pkgs
+        )
         await proxy_init_stack.enter_async_context(aiomonitor_ctx(root_app))
         await proxy_init_stack.enter_async_context(webapp_ctx())
 
@@ -1392,7 +1215,7 @@ def main(ctx: click.Context, config_path: Path | None, debug: bool, log_level: L
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=1,
-                        args=(server_config, log_endpoint),
+                        args=(server_config, log_endpoint, config_path),
                         wait_timeout=5.0,
                         runner=runner,
                     )
