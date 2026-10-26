@@ -42,7 +42,6 @@ class _SeededRows:
     public_row: SystemSessionEnvironID
     domain_row: SystemSessionEnvironID
     project_row: SystemSessionEnvironID
-    deleted_project_row: SystemSessionEnvironID
 
 
 @pytest.fixture
@@ -82,12 +81,6 @@ async def seeded_rows(database: ExtendedAsyncSAEngine) -> _SeededRows:
         key="BACKENDAI_USER_NAME",
         scope_type=SystemSessionEnvironScopeType.PROJECT,
         scope_id=SystemSessionEnvironScopeID(_PROJECT_ID),
-    )
-    deleted_project_row = SystemSessionEnvironRow(
-        value_source=SystemSessionEnvironValueSource.USER_EMAIL,
-        key="BACKENDAI_USER_EMAIL",
-        scope_type=SystemSessionEnvironScopeType.PROJECT,
-        scope_id=SystemSessionEnvironScopeID(_PROJECT_ID),
         deleted_at=datetime.now(UTC),
     )
     async with database.begin_session() as db_sess:
@@ -95,7 +88,6 @@ async def seeded_rows(database: ExtendedAsyncSAEngine) -> _SeededRows:
             public_row,
             domain_row,
             project_row,
-            deleted_project_row,
             SystemSessionEnvironRow(
                 value_source=SystemSessionEnvironValueSource.USER_UUID,
                 key="BACKENDAI_USER_UUID",
@@ -114,7 +106,6 @@ async def seeded_rows(database: ExtendedAsyncSAEngine) -> _SeededRows:
             public_row=public_row.id,
             domain_row=domain_row.id,
             project_row=project_row.id,
-            deleted_project_row=deleted_project_row.id,
         )
 
 
@@ -170,7 +161,7 @@ class TestSessionSystemSessionEnvironScope:
             seeded_rows.project_row: _PROJECT_ID,
         }
 
-    async def test_leaves_out_the_deleted_rows(
+    async def test_returns_the_deleted_rows_with_their_deletion(
         self,
         repository: OpsRepository[SystemSessionEnvironData],
         searcher: SystemSessionEnvironSearcher,
@@ -181,4 +172,8 @@ class TestSessionSystemSessionEnvironScope:
             searcher,
         )
 
-        assert seeded_rows.deleted_project_row not in {row.id for row in result.items}
+        assert {row.id: row.deleted_at is not None for row in result.items} == {
+            seeded_rows.public_row: False,
+            seeded_rows.domain_row: False,
+            seeded_rows.project_row: True,
+        }

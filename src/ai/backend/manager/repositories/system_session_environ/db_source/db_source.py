@@ -7,6 +7,9 @@ from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.system_session_environ.scopes import (
     SessionSystemSessionEnvironScope,
 )
+from ai.backend.manager.models.system_session_environ.searchable_fields import (
+    SystemSessionEnvironSearchableFields,
+)
 from ai.backend.manager.models.system_session_environ.searchers import (
     SystemSessionEnvironSearcher,
 )
@@ -26,6 +29,12 @@ class SystemSessionEnvironDBSource:
     ) -> list[SystemSessionEnvironData]:
         async with self._ops_provider.read_ops() as r:
             result = await r.search_with_scopes(
-                scopes, SystemSessionEnvironSearcher(pagination=NoPagination(), conditions=[])
+                scopes,
+                SystemSessionEnvironSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        SystemSessionEnvironSearchableFields.own.deleted_at.filter.is_null()
+                    ],
+                ),
             )
         return list(result.items)
