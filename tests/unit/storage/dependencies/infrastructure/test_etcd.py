@@ -31,6 +31,8 @@ class TestEtcdProvider:
             namespace=test_ns,
             user=None,
             password=None,
+            keep_alive_interval=5.0,
+            keep_alive_timeout=3.0,
         )
         return config
 

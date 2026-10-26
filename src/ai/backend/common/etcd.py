@@ -294,6 +294,8 @@ class AsyncEtcd(AbstractKVStore):
         request_timeout: float = 5.0,
         request_retries: int = 3,
         request_retry_intvl: float = 0.05,
+        keep_alive_interval: float = 5.0,
+        keep_alive_timeout: float = 3.0,
     ) -> None:
         self.scope_prefix_map = t.Dict({
             t.Key(ConfigScopes.GLOBAL): t.String(allow_blank=True),
@@ -307,8 +309,11 @@ class AsyncEtcd(AbstractKVStore):
             )
         else:
             self._connect_options = None
-        self._request_options = (self._connect_options or ConnectOptions()).with_timeout(
-            request_timeout
+        self._request_options = (
+            (self._connect_options or ConnectOptions())
+            .with_timeout(request_timeout)
+            .with_keep_alive(keep_alive_interval, keep_alive_timeout)
+            .with_keep_alive_while_idle(False)
         )
         self._connection = None
         self._communicator = None
@@ -369,7 +374,14 @@ class AsyncEtcd(AbstractKVStore):
             # TODO: provide a way to specify other scope prefixes
         }
 
-        return cls(etcd_addrs, namespace, scope_prefix_map, credentials=credentials)
+        return cls(
+            etcd_addrs,
+            namespace,
+            scope_prefix_map,
+            credentials=credentials,
+            keep_alive_interval=etcd_config.keep_alive_interval,
+            keep_alive_timeout=etcd_config.keep_alive_timeout,
+        )
 
     async def open(self) -> None:
         self._connection = self.etcd.connect(self._request_options)
@@ -404,9 +416,16 @@ class AsyncEtcd(AbstractKVStore):
         async with self.etcd.connect(self._request_options) as communicator:
             yield communicator
 
-    def _should_retry(self, e: GRPCStatusError, *, conditional: bool) -> bool:
-        """A conditional txn is retried only when it failed before reaching a server."""
+    def _should_retry(self, e: GRPCStatusError, *, conditional: bool, read: bool) -> bool:
+        """A read is also retried on timeout. A conditional txn is retried only when it failed
+        before reaching a server."""
         err_detail = e.args[0]
+        if (
+            read
+            and err_detail["code"] == GRPCStatusCode.Cancelled
+            and err_detail.get("message") == "Timeout expired"
+        ):
+            return True
         if err_detail["code"] != GRPCStatusCode.Unavailable:
             return False
         return not conditional or err_detail.get("message") == "tcp connect error"
@@ -416,10 +435,11 @@ class AsyncEtcd(AbstractKVStore):
         request: Callable[[EtcdCommunicator], Awaitable[R]],
         *,
         conditional: bool = False,
+        read: bool = False,
     ) -> R:
-        """Run ``request``, resending it up to ``request_retries`` times on ``UNAVAILABLE``.
+        """Run ``request``, resending it up to ``request_retries`` times as ``_should_retry`` allows.
 
-        Set ``conditional`` for a txn whose result changes once it has applied."""
+        Set ``conditional`` for a txn whose result changes once applied, ``read`` for a read."""
         attempt = 0
         while True:
             try:
@@ -427,11 +447,11 @@ class AsyncEtcd(AbstractKVStore):
                     return await request(communicator)
             except GRPCStatusError as e:
                 if attempt >= self.request_retries or not self._should_retry(
-                    e, conditional=conditional
+                    e, conditional=conditional, read=read
                 ):
                     raise
                 attempt += 1
-                log.debug("etcd request unavailable, retrying", retry_count=attempt)
+                log.debug("etcd request failed, retrying", retry_count=attempt)
                 await asyncio.sleep(self.request_retry_intvl * (2 ** (attempt - 1)))
 
     async def ping(self) -> None:
@@ -658,7 +678,7 @@ class AsyncEtcd(AbstractKVStore):
                     return bytes(value).decode(self.encoding)
             return None
 
-        return await self._request(_get)
+        return await self._request(_get, read=True)
 
     async def get_prefix(
         self,
@@ -735,7 +755,7 @@ class AsyncEtcd(AbstractKVStore):
                 ])
             return pair_sets
 
-        pair_sets = await self._request(_get_prefix)
+        pair_sets = await self._request(_get_prefix, read=True)
 
         pair_sets = [sorted(pairs, key=lambda x: x[0]) for pairs in pair_sets]
 

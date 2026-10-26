@@ -1485,6 +1485,8 @@ async def etcd_ctx(local_config: AgentUnifiedConfig) -> AsyncGenerator[AsyncEtcd
         local_config.etcd.namespace,
         scope_prefix_map,
         credentials=etcd_credentials,
+        keep_alive_interval=etcd_config_data.keep_alive_interval,
+        keep_alive_timeout=etcd_config_data.keep_alive_timeout,
     ) as etcd:
         yield etcd
 
