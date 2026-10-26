@@ -1,18 +1,22 @@
-"""``ScheduleDBSource.get_session_group``: the group a session enqueue names."""
+"""``ScheduleDBSource.search_session_groups`` with the searcher a session enqueue builds."""
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime
 
 import pytest
+import sqlalchemy as sa
 
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
+from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
@@ -21,13 +25,19 @@ from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
+from ai.backend.manager.services.session.actions.enqueue_session import (
+    EnqueueSessionAction,
+    ResourceSlotEntry,
+    SessionResourceSpec,
+    SessionSchedulingSpec,
+)
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -63,6 +73,19 @@ async def session_group_id(
             )
         )
     return group_id
+
+
+@pytest.fixture
+async def deleted(
+    db_with_cleanup: ExtendedAsyncSAEngine,
+    session_group_id: SessionGroupID,
+) -> None:
+    async with db_with_cleanup.begin_session() as db_sess:
+        await db_sess.execute(
+            sa.update(SessionGroupRow)
+            .where(SessionGroupRow.id == session_group_id)
+            .values(deleted_at=datetime.now(UTC))
+        )
 
 
 @pytest.fixture
@@ -107,8 +130,30 @@ async def held_by_replica_group(
         )
 
 
-class TestGetSessionGroup:
-    async def test_answers_the_group_with_its_owner_and_project(
+def _searcher(
+    session_group_id: SessionGroupID, owner_user_id: uuid.UUID, project_id: uuid.UUID
+) -> SessionGroupSearcher:
+    """The searcher an enqueue by ``owner_user_id`` into ``project_id`` naming the group builds."""
+    action = EnqueueSessionAction(
+        project_id=ProjectID(project_id),
+        session_name="grouped",
+        session_type=SessionTypes.INTERACTIVE,
+        image_id=uuid.uuid4(),
+        resource=SessionResourceSpec(
+            entries=[ResourceSlotEntry(resource_type="cpu", quantity="1")],
+            resource_group_id=ResourceGroupID(uuid.uuid4()),
+        ),
+        scheduling=SessionSchedulingSpec(),
+        session_group_id=session_group_id,
+        group_id=project_id,
+    )
+    searcher = action.to_session_group_searcher(owner_user_id)
+    assert searcher is not None
+    return searcher
+
+
+class TestSearchSessionGroups:
+    async def test_answers_the_owners_group_in_the_project(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         test_group_id: uuid.UUID,
@@ -117,29 +162,82 @@ class TestGetSessionGroup:
     ) -> None:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
-        group = await db_source.get_session_group(session_group_id)
+        groups = await db_source.search_session_groups(
+            _searcher(session_group_id, test_user_uuid, test_group_id)
+        )
 
-        assert group.id == session_group_id
-        assert group.owner_user_id == test_user_uuid
-        assert group.project_id == test_group_id
-        assert group.deleted_at is None
+        assert [g.id for g in groups] == [session_group_id]
 
-    async def test_refuses_a_missing_group(
+    async def test_answers_nothing_for_a_missing_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
     ) -> None:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
-        with pytest.raises(EntityNotFoundError):
-            await db_source.get_session_group(SessionGroupID(uuid.uuid4()))
+        groups = await db_source.search_session_groups(
+            _searcher(SessionGroupID(uuid.uuid4()), test_user_uuid, test_group_id)
+        )
 
-    async def test_refuses_a_group_a_replica_group_holds(
+        assert groups == []
+
+    async def test_answers_nothing_for_another_owner(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
+        test_group_id: uuid.UUID,
+        session_group_id: SessionGroupID,
+    ) -> None:
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+
+        groups = await db_source.search_session_groups(
+            _searcher(session_group_id, uuid.uuid4(), test_group_id)
+        )
+
+        assert groups == []
+
+    async def test_answers_nothing_for_another_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_user_uuid: uuid.UUID,
+        session_group_id: SessionGroupID,
+    ) -> None:
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+
+        groups = await db_source.search_session_groups(
+            _searcher(session_group_id, test_user_uuid, uuid.uuid4())
+        )
+
+        assert groups == []
+
+    async def test_answers_nothing_for_a_deleted_group(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+        session_group_id: SessionGroupID,
+        deleted: None,
+    ) -> None:
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+
+        groups = await db_source.search_session_groups(
+            _searcher(session_group_id, test_user_uuid, test_group_id)
+        )
+
+        assert groups == []
+
+    async def test_answers_nothing_for_a_group_a_replica_group_holds(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_group_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
         session_group_id: SessionGroupID,
         held_by_replica_group: None,
     ) -> None:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
-        with pytest.raises(EntityNotFoundError):
-            await db_source.get_session_group(session_group_id)
+        groups = await db_source.search_session_groups(
+            _searcher(session_group_id, test_user_uuid, test_group_id)
+        )
+
+        assert groups == []

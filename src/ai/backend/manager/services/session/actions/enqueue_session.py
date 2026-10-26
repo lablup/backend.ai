@@ -11,11 +11,15 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.types import AccessKey, ClusterMode, MountInfoEntry, SessionTypes
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionData
+from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
+from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.session.base import (
     SessionScopeAction,
@@ -124,6 +128,29 @@ class EnqueueSessionAction(SessionScopeAction):
     @classmethod
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
+
+    def to_session_group_searcher(self, owner_user_id: uuid.UUID) -> SessionGroupSearcher | None:
+        """The live session group named, owned by ``owner_user_id`` in the project and not held
+        by a replica group; ``None`` when none is named."""
+        if self.session_group_id is None:
+            return None
+        fields = SessionGroupSearchableFields
+        return SessionGroupSearcher(
+            pagination=NoPagination(),
+            conditions=[
+                fields.own.id.filter.equals(
+                    UUIDEqualMatchSpec(value=self.session_group_id, negated=False)
+                ),
+                fields.own.owner_user_id.filter.equals(
+                    UUIDEqualMatchSpec(value=owner_user_id, negated=False)
+                ),
+                fields.own.project_id.filter.equals(
+                    UUIDEqualMatchSpec(value=self.group_id, negated=False)
+                ),
+                fields.own.deleted_at.filter.is_null(),
+                fields.linked.replica_groups.not_exists(),
+            ],
+        )
 
 
 @dataclass

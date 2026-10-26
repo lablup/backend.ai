@@ -1503,15 +1503,12 @@ class SessionService:
             access_key = owner_access_key
             domain_name = owner.domain_name
 
-        if action.session_group_id is not None:
-            session_group = await self._scheduler_repository.get_session_group(
-                action.session_group_id
+        session_group_searcher = action.to_session_group_searcher(user_id)
+        if session_group_searcher is not None:
+            session_groups = await self._scheduler_repository.search_session_groups(
+                session_group_searcher
             )
-            if (
-                session_group.owner_user_id != user_id
-                or session_group.project_id != action.group_id
-                or session_group.deleted_at is not None
-            ):
+            if not session_groups:
                 raise EntityNotFoundError(
                     f"Session group {action.session_group_id} not found",
                     entity_type=SessionGroupEntityType(),

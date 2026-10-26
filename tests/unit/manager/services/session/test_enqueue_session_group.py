@@ -35,21 +35,16 @@ _PROJECT_ID = ProjectID(uuid.uuid4())
 _SESSION_GROUP_ID = SessionGroupID(uuid.uuid4())
 
 
-def _session_group(
-    *,
-    owner_user_id: UserID = _USER_ID,
-    project_id: ProjectID = _PROJECT_ID,
-    deleted_at: datetime | None = None,
-) -> SessionGroupData:
+def _session_group() -> SessionGroupData:
     return SessionGroupData(
         id=_SESSION_GROUP_ID,
         domain_id=DomainID(uuid.uuid4()),
-        project_id=project_id,
-        owner_user_id=owner_user_id,
+        project_id=_PROJECT_ID,
+        owner_user_id=_USER_ID,
         placement_direction=SessionGroupPlacementDirection.SPREAD,
         placement_enforcement=SessionGroupPlacementEnforcement.PREFERRED,
         created_at=datetime.now(UTC),
-        deleted_at=deleted_at,
+        deleted_at=None,
     )
 
 
@@ -121,31 +116,21 @@ class TestEnqueueSessionGroup:
         scheduling_controller: MagicMock,
         action: EnqueueSessionAction,
     ) -> None:
-        scheduler_repository.get_session_group = AsyncMock(return_value=_session_group())
+        scheduler_repository.search_session_groups = AsyncMock(return_value=[_session_group()])
 
         await session_service.enqueue_session(action)
 
         draft = scheduling_controller.enqueue_session_from_draft.call_args.args[0]
         assert draft.scope.session_group_id == _SESSION_GROUP_ID
 
-    @pytest.mark.parametrize(
-        "session_group",
-        [
-            _session_group(owner_user_id=UserID(uuid.uuid4())),
-            _session_group(project_id=ProjectID(uuid.uuid4())),
-            _session_group(deleted_at=datetime.now(UTC)),
-        ],
-        ids=["another-owner", "another-project", "deleted"],
-    )
-    async def test_refuses_a_group_the_session_cannot_join(
+    async def test_refuses_a_group_the_search_does_not_answer(
         self,
         session_service: SessionService,
         scheduler_repository: MagicMock,
         scheduling_controller: MagicMock,
         action: EnqueueSessionAction,
-        session_group: SessionGroupData,
     ) -> None:
-        scheduler_repository.get_session_group = AsyncMock(return_value=session_group)
+        scheduler_repository.search_session_groups = AsyncMock(return_value=[])
 
         with pytest.raises(EntityNotFoundError):
             await session_service.enqueue_session(action)
@@ -159,11 +144,11 @@ class TestEnqueueSessionGroup:
         scheduling_controller: MagicMock,
         action: EnqueueSessionAction,
     ) -> None:
-        scheduler_repository.get_session_group = AsyncMock()
+        scheduler_repository.search_session_groups = AsyncMock()
         ungrouped = replace(action, session_group_id=None)
 
         await session_service.enqueue_session(ungrouped)
 
-        scheduler_repository.get_session_group.assert_not_called()
+        scheduler_repository.search_session_groups.assert_not_called()
         draft = scheduling_controller.enqueue_session_from_draft.call_args.args[0]
         assert draft.scope.session_group_id is None

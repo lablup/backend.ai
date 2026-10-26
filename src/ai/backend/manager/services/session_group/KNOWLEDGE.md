@@ -40,7 +40,7 @@ shape, operation, gate and backing.
 | `global_search` | Not left out: the superadmin sees every group |
 | `update` | `SessionGroupUpdater` carries the condition as a `GuardCheck`; a held group is refused as in use (409) |
 | `purge` | The purger's guard rides on the DELETE; a held group is refused as in use (409) |
-| session `enqueue` | `SchedulerRepository.get_session_group` reads with the same condition; a held group answers not found |
+| session `enqueue` | `EnqueueSessionAction.to_session_group_searcher` carries the condition; a held group answers not found |
 
 - The condition is `SessionGroupSearchableFields.linked.replica_groups.not_exists()`, one
   declaration every path reads.

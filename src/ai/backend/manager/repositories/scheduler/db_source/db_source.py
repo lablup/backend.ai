@@ -35,7 +35,7 @@ from ai.backend.common.data.entity.resource_group import (
 )
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.data.entity.session_group import SessionGroupEntityType, SessionGroupID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.events.event_types.kernel.types import (
@@ -89,7 +89,6 @@ from ai.backend.manager.data.session.types import (
 )
 from ai.backend.manager.data.session_group.types import SessionGroupData
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import IncompleteSessionSpec
 from ai.backend.manager.errors.network import NetworkNotFound
@@ -140,7 +139,7 @@ from ai.backend.manager.models.session.row import (
 from ai.backend.manager.models.session.searchers import SessionInfoSearcher, SessionSearcher
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.models.session_group.row import SessionGroupRow
-from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
+from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
 from ai.backend.manager.models.specs.creator import FieldToCreate, NestedFieldToCreate
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import (
@@ -2392,22 +2391,11 @@ class ScheduleDBSource:
             raise ResourceGroupNotFound(f"Resource group not found (id:{resource_group_id})")
         return ResourceGroupName(resource_group_name)
 
-    async def get_session_group(self, session_group_id: SessionGroupID) -> SessionGroupData:
-        """Read one session group by its id; a group a replica group holds is not found."""
-        fields = SessionGroupSearchableFields
-        async with self._db.begin_readonly_session_read_committed() as db_sess:
-            row = await db_sess.scalar(
-                sa.select(SessionGroupRow).where(
-                    SessionGroupRow.id == session_group_id,
-                    fields.linked.replica_groups.not_exists()(),
-                )
-            )
-            if row is None:
-                raise EntityNotFoundError(
-                    f"Session group {session_group_id} not found",
-                    entity_type=SessionGroupEntityType(),
-                )
-            return fields.own.to_data(row)
+    async def search_session_groups(self, searcher: SessionGroupSearcher) -> list[SessionGroupData]:
+        """Search session groups for a session enqueue."""
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return list(result.items)
 
     async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
         async with self._db.begin_readonly_session_read_committed() as db_sess:

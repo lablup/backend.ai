@@ -22,7 +22,6 @@ from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.network import NetworkID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
-from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.events.event_types.kernel.types import (
     KernelCreationInfo,
@@ -60,6 +59,7 @@ from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.searchers import SessionInfoSearcher, SessionSearcher
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
+from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
@@ -510,8 +510,8 @@ class SchedulerRepository:
         return await self._db_source.get_resource_group_name_by_id(resource_group_id)
 
     @scheduler_repository_resilience.apply()
-    async def get_session_group(self, session_group_id: SessionGroupID) -> SessionGroupData:
-        return await self._db_source.get_session_group(session_group_id)
+    async def search_session_groups(self, searcher: SessionGroupSearcher) -> list[SessionGroupData]:
+        return await self._db_source.search_session_groups(searcher)
 
     @scheduler_repository_resilience.apply()
     async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
