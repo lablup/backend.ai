@@ -74,73 +74,6 @@ def port_frontend(mocker: pytest_mock.MockerFixture) -> PortFrontend:
     return frontend
 
 
-async def test_ensure_slot_unregistered_port(
-    mocker: pytest_mock.MockerFixture,
-    port_frontend: PortFrontend,
-) -> None:
-    """
-    Test that a GenericBadRequest is raised for an unregistered port.
-    """
-    port = 10200
-    app = web.Application()
-    app.update({"port": port})
-    request = make_mocked_request(method="GET", path="/", headers={}, app=app)
-    handler = mocker.AsyncMock()
-
-    with pytest.raises(GenericBadRequest):
-        await port_frontend.ensure_slot_middleware(request, handler)
-
-
-async def test_ensure_slot_no_circuit(
-    mocker: pytest_mock.MockerFixture,
-    port_frontend: PortFrontend,
-) -> None:
-    """
-    Test that a GenericBadRequest is raised when no circuit is available for a registered port.
-    """
-    port = 10200
-    app = web.Application()
-    app.update({"port": port})
-    request = make_mocked_request(method="GET", path="/", headers={}, app=app)
-    handler = mocker.AsyncMock()
-
-    port_frontend.circuits.pop(port, None)  # ensure deleted
-    port_frontend.backends.pop(port, None)  # ensure deleted
-
-    with pytest.raises(GenericBadRequest):
-        await port_frontend.ensure_slot_middleware(request, handler)
-
-
-async def test_ensure_slot(
-    mocker: pytest_mock.MockerFixture,
-    port_frontend: PortFrontend,
-) -> None:
-    """
-    Test the normal flow where a circuit and backend are properly set up.
-    """
-    port = 10200
-    app = web.Application()
-    app.update({"port": port})
-    request = make_mocked_request(method="GET", path="/", headers={}, app=app)
-    handler = mocker.AsyncMock(return_value=web.Response(text="success"))
-
-    circuit = create_circuit(port=port)
-    backend = mocker.MagicMock()
-    port_frontend.circuits[port] = circuit
-    port_frontend.backends[port] = backend
-
-    mocked_ensure_credential = mocker.patch.object(port_frontend, "ensure_credential")
-
-    response = await port_frontend.ensure_slot_middleware(request, handler)
-    assert isinstance(response, web.Response)  # for this test case
-
-    assert response.text == "success"
-    assert request["circuit"] == circuit
-    assert request["backend"] == backend
-    handler.assert_awaited_once()
-    mocked_ensure_credential.assert_called_once_with(request, circuit)
-
-
 @dataclass(frozen=True)
 class _ServingPortFrontend:
     port: int
@@ -178,15 +111,84 @@ async def serving_port_frontend(
     await frontend.stop()
 
 
-async def test_proxy_passes_compressed_request_body_as_received(
-    serving_port_frontend: _ServingPortFrontend,
-) -> None:
-    async with aiohttp.ClientSession() as session:
-        async with session.post(
-            f"http://127.0.0.1:{serving_port_frontend.port}/",
-            data=_GZIP_REQUEST_BODY,
-            headers={"Content-Encoding": "gzip"},
-        ) as response:
-            assert response.status == 200
+class TestPortFrontend:
+    async def test_ensure_slot_unregistered_port(
+        self,
+        mocker: pytest_mock.MockerFixture,
+        port_frontend: PortFrontend,
+    ) -> None:
+        """
+        Test that a GenericBadRequest is raised for an unregistered port.
+        """
+        port = 10200
+        app = web.Application()
+        app.update({"port": port})
+        request = make_mocked_request(method="GET", path="/", headers={}, app=app)
+        handler = mocker.AsyncMock()
 
-    assert serving_port_frontend.bodies_received_by_backend == [_GZIP_REQUEST_BODY]
+        with pytest.raises(GenericBadRequest):
+            await port_frontend.ensure_slot_middleware(request, handler)
+
+    async def test_ensure_slot_no_circuit(
+        self,
+        mocker: pytest_mock.MockerFixture,
+        port_frontend: PortFrontend,
+    ) -> None:
+        """
+        Test that a GenericBadRequest is raised when no circuit is available for a registered port.
+        """
+        port = 10200
+        app = web.Application()
+        app.update({"port": port})
+        request = make_mocked_request(method="GET", path="/", headers={}, app=app)
+        handler = mocker.AsyncMock()
+
+        port_frontend.circuits.pop(port, None)  # ensure deleted
+        port_frontend.backends.pop(port, None)  # ensure deleted
+
+        with pytest.raises(GenericBadRequest):
+            await port_frontend.ensure_slot_middleware(request, handler)
+
+    async def test_ensure_slot(
+        self,
+        mocker: pytest_mock.MockerFixture,
+        port_frontend: PortFrontend,
+    ) -> None:
+        """
+        Test the normal flow where a circuit and backend are properly set up.
+        """
+        port = 10200
+        app = web.Application()
+        app.update({"port": port})
+        request = make_mocked_request(method="GET", path="/", headers={}, app=app)
+        handler = mocker.AsyncMock(return_value=web.Response(text="success"))
+
+        circuit = create_circuit(port=port)
+        backend = mocker.MagicMock()
+        port_frontend.circuits[port] = circuit
+        port_frontend.backends[port] = backend
+
+        mocked_ensure_credential = mocker.patch.object(port_frontend, "ensure_credential")
+
+        response = await port_frontend.ensure_slot_middleware(request, handler)
+        assert isinstance(response, web.Response)  # for this test case
+
+        assert response.text == "success"
+        assert request["circuit"] == circuit
+        assert request["backend"] == backend
+        handler.assert_awaited_once()
+        mocked_ensure_credential.assert_called_once_with(request, circuit)
+
+    async def test_proxy_passes_compressed_request_body_as_received(
+        self,
+        serving_port_frontend: _ServingPortFrontend,
+    ) -> None:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"http://127.0.0.1:{serving_port_frontend.port}/",
+                data=_GZIP_REQUEST_BODY,
+                headers={"Content-Encoding": "gzip"},
+            ) as response:
+                assert response.status == 200
+
+        assert serving_port_frontend.bodies_received_by_backend == [_GZIP_REQUEST_BODY]
