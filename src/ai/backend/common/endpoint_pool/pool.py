@@ -21,11 +21,13 @@ What this pool does:
 3. Delegates "which healthy endpoint to use" to an
    :class:`EndpointSelectionStrategy` passed in at construction time.
 4. Owns the bookkeeping for caller request outcomes. The acquire context
-   itself records connection-level failures (so the next select skips a
-   dying endpoint) and records success on clean exit (so the failure
-   counter resets on recovery). Business-level exceptions (e.g. HTTP 4xx
-   surfacing as application errors) are *not* counted, since they ride on
-   top of a working connection.
+   itself records connection-level failures, found on the raised exception
+   or its ``__cause__`` chain (so the next select skips a dying endpoint),
+   and records success on clean exit (so the failure counter resets on
+   recovery). A refused connection excludes the endpoint immediately
+   unless it is the last healthy one, which keeps the threshold.
+   Business-level exceptions (e.g. HTTP 4xx surfacing as application
+   errors) are *not* counted, since they ride on top of a working connection.
 """
 
 from __future__ import annotations
@@ -33,7 +35,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from collections.abc import AsyncIterator, Callable, Sequence
+from collections.abc import AsyncIterator, Callable, Collection, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from http import HTTPStatus
@@ -116,20 +118,23 @@ class HealthyEndpointPool:
     # --- Acquisition ----------------------------------------------------
 
     @asynccontextmanager
-    async def acquire(self) -> AsyncIterator[AcquiredEndpoint]:
-        """Yield a healthy endpoint chosen by the configured strategy.
+    async def acquire(self, *, exclude: Collection[str] = ()) -> AsyncIterator[AcquiredEndpoint]:
+        """Yield a healthy endpoint chosen by the configured strategy, skipping ``exclude``.
 
         On context exit, a caller exception matching ``_CONNECTION_ERRORS``
-        is recorded against the chosen endpoint and re-raised; a clean exit
-        resets the failure counter while the endpoint is healthy. Only a
-        successful probe restores an unhealthy endpoint.
+        (directly or through ``__cause__``) is recorded against the chosen
+        endpoint and re-raised; a clean exit resets the failure counter while
+        the endpoint is healthy. Only a successful probe restores an unhealthy
+        endpoint.
 
-        Raises NoHealthyEndpointError when no endpoint is
+        Raises NoHealthyEndpointError when no endpoint outside ``exclude`` is
         currently healthy.
         """
         async with self._lock:
             healthy_entries = [
-                cached.entry for cached in self._entries.values() if cached.is_healthy
+                cached.entry
+                for endpoint, cached in self._entries.items()
+                if cached.is_healthy and endpoint not in exclude
             ]
         if not healthy_entries:
             raise NoHealthyEndpointError(
@@ -163,12 +168,34 @@ class HealthyEndpointPool:
     async def _record_outcome(self, cached: _CachedEntry) -> AsyncIterator[None]:
         try:
             yield
-        except _CONNECTION_ERRORS as error:
-            self._mark_failure(cached, reason=f"request: {error}")
+        except Exception as error:
+            connection_error = self._find_connection_error(error)
+            if connection_error is None:
+                raise
+            self._mark_failure(
+                cached,
+                reason=f"request: {connection_error}",
+                immediate=self._is_connection_refused(connection_error),
+            )
             raise
         else:
             if cached.is_healthy:
                 self._mark_success(cached)
+
+    def _find_connection_error(self, error: BaseException) -> BaseException | None:
+        current: BaseException | None = error
+        seen: set[int] = set()
+        while current is not None and id(current) not in seen:
+            if isinstance(current, _CONNECTION_ERRORS):
+                return current
+            seen.add(id(current))
+            current = current.__cause__
+        return None
+
+    def _is_connection_refused(self, error: BaseException) -> bool:
+        if isinstance(error, aiohttp.ClientConnectorError):
+            return isinstance(error.os_error, ConnectionRefusedError)
+        return isinstance(error, ConnectionRefusedError)
 
     # --- Health-state read API -----------------------------------------
 
@@ -187,9 +214,17 @@ class HealthyEndpointPool:
 
     # --- Internal bookkeeping ------------------------------------------
 
-    def _mark_failure(self, cached: _CachedEntry, *, reason: str) -> None:
+    def _mark_failure(self, cached: _CachedEntry, *, reason: str, immediate: bool = False) -> None:
+        """Count a failure; ``immediate`` skips the threshold unless ``cached`` is the last healthy endpoint."""
         cached.failure_count += 1
-        if self._spec.is_failure_threshold_reached(cached.failure_count) and cached.is_healthy:
+        if not cached.is_healthy:
+            return
+        has_other_healthy = any(
+            other.is_healthy for other in self._entries.values() if other is not cached
+        )
+        if (immediate and has_other_healthy) or self._spec.is_failure_threshold_reached(
+            cached.failure_count
+        ):
             cached.is_healthy = False
             cached.unhealthy_since = time.perf_counter()
             log.warning(
