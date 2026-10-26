@@ -62,6 +62,7 @@ class TestRelayHandler:
         structured_record: logging.LogRecord,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
+        """Without a relay socket, records go to stderr and must still carry their fields."""
         socketless_relay_handler.emit(structured_record)
 
         assert (
