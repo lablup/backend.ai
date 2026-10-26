@@ -23,7 +23,7 @@ type _SysExcInfoType = (
 _CHARS_NEEDING_QUOTES = re.compile(r'[\s"=]')
 
 
-def append_log_fields(
+def message_with_log_fields(
     message: str, record: logging.LogRecord, normalizer: LogFieldNormalizer
 ) -> str:
     normalized_fields = normalizer.normalized_fields_of(record)
@@ -76,7 +76,7 @@ class ConsoleFormatter(logging.Formatter):
 
     @override
     def formatMessage(self, record: logging.LogRecord) -> str:
-        return append_log_fields(super().formatMessage(record), record, self._normalizer)
+        return message_with_log_fields(super().formatMessage(record), record, self._normalizer)
 
     @override
     def formatException(self, ei: Sequence[str] | _SysExcInfoType) -> str:
@@ -125,7 +125,7 @@ class ColorizedFormatter(coloredlogs.ColoredFormatter):  # type: ignore[misc]
 
     @override
     def formatMessage(self, record: logging.LogRecord) -> str:
-        return append_log_fields(super().formatMessage(record), record, self._normalizer)
+        return message_with_log_fields(super().formatMessage(record), record, self._normalizer)
 
 
 class pretty:

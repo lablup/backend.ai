@@ -10,7 +10,7 @@ import msgpack
 import psutil
 import zmq
 
-from ai.backend.logging.formatter import append_log_fields
+from ai.backend.logging.formatter import message_with_log_fields
 from ai.backend.logging.structured import LogFieldNormalizer
 
 if TYPE_CHECKING:
@@ -49,7 +49,9 @@ class RelayHandler(logging.Handler):
     def _print_to_stderr(self, record: logging.LogRecord | None) -> None:
         if record is None:
             return
-        print(append_log_fields(record.getMessage(), record, self._normalizer), file=sys.stderr)
+        print(
+            message_with_log_fields(record.getMessage(), record, self._normalizer), file=sys.stderr
+        )
 
     @override
     def emit(self, record: logging.LogRecord | None) -> None:
