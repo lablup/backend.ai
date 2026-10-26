@@ -187,7 +187,7 @@ issuing SQL statement directly inside the PostgreSQL container:
 .. code-block:: console
 
    $ vfolder_host_val='{"bai-m1:local": ["create-vfolder", "modify-vfolder", "delete-vfolder", "mount-in-session", "upload-file", "download-file", "invite-others", "set-user-specific-permission"]}'
-   $ docker compose -f "$HOME/halfstack/postgres-cluster-default" exec -it backendai-half-db psql -U postgres -d backend \
+   $ docker compose -f "$HOME/halfstack/postgres-cluster-default/docker-compose.yaml" exec -it backendai-half-db psql -U postgres -d backend \
          -c "UPDATE domains SET allowed_vfolder_hosts = '${vfolder_host_val}' WHERE name = 'default';"
 
 
