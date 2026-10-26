@@ -37,9 +37,9 @@ def append_log_fields(
 
 
 def _render_field_value(value: object) -> str:
-    """Quote a value as logfmt does, so a reader can tell where it ends on the console line:
-    ``kernel-1`` -> ``kernel-1``, ``a b`` -> ``"a b"``, ``a=b`` -> ``"a=b"``, ``""`` -> ``""``,
-    ``"x"`` -> ``"\\"x\\""``, ``line1\\nline2`` -> ``"line1\\nline2"``, ``3`` -> ``3``."""
+    """Quote a string as logfmt does, so the console line shows where the value ends.
+    kernel-1 -> kernel-1   a b -> "a b"   a=b -> "a=b"   (empty) -> ""   3 -> 3
+    """
     if isinstance(value, str) and (value == "" or _CHARS_NEEDING_QUOTES.search(value)):
         return json.dumps(value, ensure_ascii=False)
     return str(value)
