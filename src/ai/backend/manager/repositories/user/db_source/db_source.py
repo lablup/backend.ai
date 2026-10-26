@@ -174,7 +174,7 @@ class UserDBSource:
             return await self._current_default_revision(r, user_id)
 
     async def add_default_bootstrap_script_revision(
-        self, user_id: UserID, script: BootstrapScript, creator_id: UserID | None
+        self, user_id: UserID, script: BootstrapScript, creator_id: UserID
     ) -> None:
         """Append the next revision to the user's live default script. A concurrent write
         that takes the same number fails on the unique constraint."""

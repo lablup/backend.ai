@@ -25,7 +25,7 @@ class BootstrapScriptRevisionCreator(
     script_id: BootstrapScriptID
     revision_number: int
     script: BootstrapScript
-    creator_id: UserID | None
+    creator_id: UserID
 
     @override
     def build_row(self) -> BootstrapScriptRevisionRow:

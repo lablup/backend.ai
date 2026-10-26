@@ -111,7 +111,7 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def add_default_bootstrap_script_revision(
-        self, user_id: UserID, script: BootstrapScript, creator_id: UserID | None
+        self, user_id: UserID, script: BootstrapScript, creator_id: UserID
     ) -> None:
         await self._db_source.add_default_bootstrap_script_revision(user_id, script, creator_id)
 
