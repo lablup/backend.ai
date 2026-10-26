@@ -107,9 +107,9 @@ Prepare required Python versions and virtual environments
 ---------------------------------------------------------
 
 Prepare a Python distribution whose version meets the requirements of the target
-package. Backend.AI 22.09, for example, requires Python 3.10. The latest
+package. The main branch, for example, requires CPython 3.13.7. The latest
 information on the Python version compatibility can be found at
-`here <https://github.com/lablup/backend.ai#package-installation-guide#python-version-compatibility>`_.
+`here <https://github.com/lablup/backend.ai/blob/main/src/ai/backend/README.md#development-setup>`_.
 
 There can be several ways to prepare a specific Python version. Here, we will be
 using a standalone static built Python.
@@ -128,14 +128,15 @@ to a directory of your choice.
    $ mkdir -p "/home/${USERNAME}/.static-python/versions"
    $ mv python "/home/${USERNAME}/.static-python/versions/${PYTHON_VERSION}"
 
-For example,
+For example, with ``PYTHON_RELEASE_DATE`` set to the release tag that ships
+CPython 3.13.7:
 
 .. code-block:: console
 
-   $ curl -L "https://github.com/astral-sh/python-build-standalone/releases/download/20241219/cpython-3.13.3+20250409-x86_64-unknown-linux-gnu-install_only.tar.gz" > cpython-3.13.3+20250409-x86_64-unknown-linux-gnu-install_only.tar.gz
-   $ tar -xf "cpython-3.13.3+20241219-x86_64-unknown-linux-gnu-install_only.tar.gz"
+   $ curl -L "https://github.com/astral-sh/python-build-standalone/releases/download/${PYTHON_RELEASE_DATE}/cpython-3.13.7+${PYTHON_RELEASE_DATE}-x86_64-unknown-linux-gnu-install_only.tar.gz" > cpython-3.13.7+${PYTHON_RELEASE_DATE}-x86_64-unknown-linux-gnu-install_only.tar.gz
+   $ tar -xf "cpython-3.13.7+${PYTHON_RELEASE_DATE}-x86_64-unknown-linux-gnu-install_only.tar.gz"
    $ mkdir -p "/home/bai/.static-python/versions"
-   $ mv python "/home/bai/.static-python/versions/3.13.3"
+   $ mv python "/home/bai/.static-python/versions/3.13.7"
 
 Then, you can create multiple virtual environments per service. To create a
 virtual environment for Backend.AI Manager and activate it, for example, you may run:
@@ -144,7 +145,7 @@ virtual environment for Backend.AI Manager and activate it, for example, you may
 
    $ mkdir "${HOME}/manager"
    $ cd "${HOME}/manager"
-   $ ~/.static-python/versions/3.13.3/bin/python3 -m venv .venv
+   $ ~/.static-python/versions/3.13.7/bin/python3 -m venv .venv
    $ source .venv/bin/activate
    $ pip install -U pip setuptools wheel
 
@@ -173,15 +174,15 @@ a Python version that are needed:
    to build Python from pyenv.
 
 Then, you can create multiple virtual environments per service. To create a
-virtual environment for Backend.AI Manager 22.09.x and automatically activate
+virtual environment for Backend.AI Manager and automatically activate
 it, for example, you may run:
 
 .. code-block:: console
 
    $ mkdir "${HOME}/manager"
    $ cd "${HOME}/manager"
-   $ pyenv virtualenv "${YOUR_PYTHON_VERSION}" bai-22.09-manager
-   $ pyenv local bai-22.09-manager
+   $ pyenv virtualenv "${YOUR_PYTHON_VERSION}" bai-manager
+   $ pyenv local bai-manager
    $ pip install -U pip setuptools wheel
 
 You also need to make ``pip`` available to the Python installation with the
