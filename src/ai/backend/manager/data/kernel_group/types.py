@@ -6,6 +6,7 @@ from decimal import Decimal
 
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel_group import KernelGroupID, KernelGroupRole
+from ai.backend.common.data.entity.kernel_group_environ import KernelGroupEnvironID
 from ai.backend.common.data.entity.kernel_group_resource_slot import KernelGroupResourceSlotID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
@@ -41,6 +42,7 @@ class KernelGroupResourceSlotData(FieldData):
 
 @dataclass(frozen=True)
 class KernelGroupEnvironData(FieldData):
+    id: KernelGroupEnvironID
     kernel_group_id: KernelGroupID
     key: str
     value: str
