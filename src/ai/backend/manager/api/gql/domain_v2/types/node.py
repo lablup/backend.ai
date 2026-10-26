@@ -17,7 +17,6 @@ from ai.backend.common.dto.manager.v2.domain.types import (
     DomainFairShareScopeDTO,
     DomainUsageScopeDTO,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -52,11 +51,6 @@ if TYPE_CHECKING:
         ResourceGroupConnection,
         ResourceGroupFilterGQL,
         ResourceGroupOrderByGQL,
-    )
-    from ai.backend.manager.api.gql.system_session_environ.types import (
-        SystemSessionEnvironConnectionGQL,
-        SystemSessionEnvironFilterGQL,
-        SystemSessionEnvironOrderByGQL,
     )
     from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2Connection
@@ -394,90 +388,6 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
         nodes = [ResourceGroupGQL.from_pydantic(data) for data in payload.items]
         edges = [ResourceGroupEdge(node=node, cursor=encode_cursor(node.id)) for node in nodes]
         return ResourceGroupConnection(
-            edges=edges,
-            page_info=PageInfo(
-                has_next_page=payload.has_next_page,
-                has_previous_page=payload.has_previous_page,
-                start_cursor=edges[0].cursor if edges else None,
-                end_cursor=edges[-1].cursor if edges else None,
-            ),
-            count=payload.total_count,
-        )
-
-    @gql_added_field(
-        BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
-            description=(
-                "System session environ rows bound to this domain itself, disabled ones included."
-            ),
-        )
-    )  # type: ignore[misc]
-    async def system_session_environs(
-        self,
-        info: Info[StrawberryGQLContext],
-        filter: Annotated[
-            SystemSessionEnvironFilterGQL,
-            strawberry.lazy("ai.backend.manager.api.gql.system_session_environ.types"),
-        ]
-        | None = None,
-        order_by: list[
-            Annotated[
-                SystemSessionEnvironOrderByGQL,
-                strawberry.lazy("ai.backend.manager.api.gql.system_session_environ.types"),
-            ]
-        ]
-        | None = None,
-        before: str | None = None,
-        after: str | None = None,
-        first: int | None = None,
-        last: int | None = None,
-        limit: int | None = None,
-        offset: int | None = None,
-    ) -> (
-        Annotated[
-            SystemSessionEnvironConnectionGQL,
-            strawberry.lazy("ai.backend.manager.api.gql.system_session_environ.types"),
-        ]
-        | None
-    ):
-        from strawberry.relay import PageInfo
-
-        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
-        from ai.backend.common.dto.manager.v2.system_session_environ.request import (
-            ScopedSearchSystemSessionEnvironsInput,
-        )
-        from ai.backend.common.dto.manager.v2.system_session_environ.types import (
-            SystemSessionEnvironScope,
-        )
-        from ai.backend.manager.api.gql.base import encode_cursor
-        from ai.backend.manager.api.gql.system_session_environ.types import (
-            SystemSessionEnvironConnectionGQL,
-            SystemSessionEnvironEdgeGQL,
-            SystemSessionEnvironGQL,
-        )
-
-        payload = await info.context.adapters.system_session_environ.scoped_search(
-            ScopedSearchSystemSessionEnvironsInput(
-                scope=SystemSessionEnvironScope(domain=[UUIDScope(value=UUID(self.id))]),
-                filter=filter.to_pydantic() if filter else None,
-                order=[order.to_pydantic() for order in order_by] if order_by else None,
-                first=first,
-                after=after,
-                last=last,
-                before=before,
-                limit=limit,
-                offset=offset,
-            )
-        )
-        nodes = [
-            SystemSessionEnvironGQL.from_pydantic(item, id_field="entity_id")
-            for item in payload.items
-        ]
-        edges = [
-            SystemSessionEnvironEdgeGQL(node=node, cursor=encode_cursor(str(node.entity_id)))
-            for node in nodes
-        ]
-        return SystemSessionEnvironConnectionGQL(
             edges=edges,
             page_info=PageInfo(
                 has_next_page=payload.has_next_page,

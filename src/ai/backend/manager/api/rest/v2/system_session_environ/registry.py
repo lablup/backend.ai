@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
+from ai.backend.manager.api.rest.middleware.auth import superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import V2SystemSessionEnvironHandler
@@ -25,18 +25,6 @@ def register_v2_system_session_environ_routes(
         "/search",
         handler.admin_search,
         middlewares=[superadmin_required],
-    )
-    registry.add(
-        "POST",
-        "/my/search",
-        handler.my_search,
-        middlewares=[auth_required],
-    )
-    registry.add(
-        "POST",
-        "/scoped/search",
-        handler.scoped_search,
-        middlewares=[auth_required],
     )
 
     return registry

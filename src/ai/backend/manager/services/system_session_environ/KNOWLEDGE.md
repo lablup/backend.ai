@@ -1,9 +1,9 @@
 ---
 name: system-session-environ-service-shapes
 type: design-rationale
-description: system_session_environ service knowledge - why the domain has no service, why the admin search is global, the scoped search per scope and the read by ids partial, what each is authorized against
+description: system_session_environ service knowledge - why the domain has no service, why the search is global and the read by ids partial, what each is authorized against
 scope: src/ai/backend/manager/services/system_session_environ
-keywords: [GlobalSearchSystemSessionEnvironsAction, ScopedSearchSystemSessionEnvironsAction, BulkGetSystemSessionEnvironsAction, SystemSessionEnvironProcessors, global_searcher_ops, scoped_search_ops, partial_bulk_get_ops, BulkSystemSessionEnvironQuerier, global_search, scoped_search, bulk_get_ids]
+keywords: [GlobalSearchSystemSessionEnvironsAction, BulkGetSystemSessionEnvironsAction, SystemSessionEnvironProcessors, global_searcher_ops, partial_bulk_get_ops, BulkSystemSessionEnvironQuerier, global_search, bulk_get_ids]
 sources:
   - src/ai/backend/manager/services/system_session_environ
   - src/ai/backend/manager/models/system_session_environ
@@ -28,32 +28,19 @@ domain repository; this package holds the operations a caller reaches through th
 | Field | Failure mode | Authorized against |
 |---|---|---|
 | `global_search` | one run | the `global` singleton, by entity type |
-| `scoped_search` | one run | every named scope (public, domain, project) |
 | `bulk_get_ids` | partial bulk | each named row |
 
 ## The domain has no service
 
-- Every operation hands a spec to the generic ops services and convert the row, so no
+- Both operations hand a spec to the generic ops services and convert the row, so no
   `service.py` method is written.
 - The rows a session receives (per key the row at the most specific scope) are a branch over
   several rows; that read stays in the domain repository the launcher calls, not in ops.
 
-## The admin search is global
+## The search is global
 
 - It reads every row at every scope, disabled ones included, so it names no scope to check.
 - The global gate passes a superadmin, and a monitor for reads.
-
-## The scoped search is per scope
-
-- The caller names public, domains and projects; the rows of any of them are read, disabled
-  ones included. Every named scope is checked before the read, so one scope the caller
-  cannot read refuses the whole search.
-- A domain scope reads the rows bound to the domain itself. The graph binds a project's node
-  under its domain, so the target also matches the scope type column to keep the projects'
-  rows out.
-- The caller's own search is this operation with public, the caller's domain and projects as
-  the scopes and the enabled rows only. The REST handler and the GQL resolver look the
-  projects up through the project adapter.
 
 ## The read by ids is partial
 

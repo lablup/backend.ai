@@ -15,7 +15,6 @@ from ai.backend.common.dto.manager.v2.system_session_environ.types import (
 
 __all__ = (
     "AdminSearchSystemSessionEnvironsPayload",
-    "ScopedSearchSystemSessionEnvironsPayload",
     "SystemSessionEnvironNode",
 )
 
@@ -38,15 +37,6 @@ class SystemSessionEnvironNode(BaseResponseModel):
 
 class AdminSearchSystemSessionEnvironsPayload(BaseResponseModel):
     """A page of system session environ rows."""
-
-    items: list[SystemSessionEnvironNode] = Field(description="The rows on this page.")
-    total_count: int = Field(description="Total number of rows matching the filter.")
-    has_next_page: bool = Field(description="Whether there is a next page.")
-    has_previous_page: bool = Field(description="Whether there is a previous page.")
-
-
-class ScopedSearchSystemSessionEnvironsPayload(BaseResponseModel):
-    """A page of the system session environ rows the named scopes reach."""
 
     items: list[SystemSessionEnvironNode] = Field(description="The rows on this page.")
     total_count: int = Field(description="Total number of rows matching the filter.")

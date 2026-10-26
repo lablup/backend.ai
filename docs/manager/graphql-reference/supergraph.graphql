@@ -7945,11 +7945,6 @@ type DomainV2 implements Node
 
   """Added in 26.9.0. Resource groups this domain may schedule on."""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
-
-  """
-  Added in 26.10.0. System session environ rows bound to this domain itself, disabled ones included.
-  """
-  systemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection
 }
 
 """
@@ -19243,11 +19238,6 @@ type ProjectV2 implements Node
 
   """Added in 26.9.0. Model cards belonging to this project."""
   modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
-
-  """
-  Added in 26.10.0. System session environ rows registered in this project, disabled ones included.
-  """
-  systemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection
 }
 
 """
@@ -20624,16 +20614,6 @@ type Query
   Added in 26.10.0. Search every system session environ row at every scope, disabled ones included (superadmin only).
   """
   adminSystemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 26.10.0. Page through the system session environ rows the named scopes reach, combined with OR, disabled ones included. Every scope is authorized before the read runs.
-  """
-  scopedSystemSessionEnvirons(scope: SystemSessionEnvironScope!, filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection @join__field(graph: STRAWBERRY)
-
-  """
-  Added in 26.10.0. Page through the enabled system session environ rows bound to public, the current user's domain and the projects the current user belongs to.
-  """
-  mySystemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.10.0. List all registered session lifecycle handlers (superadmin only). The returned ``name`` values are valid keys for ``DefaultSessionOptionsInfo.handlerOptions.byHandler``.
@@ -27577,22 +27557,6 @@ enum SystemSessionEnvironOrderField
   ENABLED @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
-}
-
-"""
-Added in 26.10.0. Scope for the scoped system session environ query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
-"""
-input SystemSessionEnvironScope
-  @join__type(graph: STRAWBERRY)
-{
-  """Domains whose rows are being read."""
-  domain: [UUIDScope!] = null
-
-  """Projects whose rows are being read."""
-  project: [UUIDScope!] = null
-
-  """Include the rows registered in public."""
-  public: Boolean! = false
 }
 
 """Added in 26.10.0. The scope a system session environ row is bound to."""
