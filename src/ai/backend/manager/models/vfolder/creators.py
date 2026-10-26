@@ -257,20 +257,9 @@ class ProjectVFolderCreator(VFolderBaseCreator):
     def precondition_checks(self) -> Sequence[PreconditionCheck]:
         """What the allowance says, plus what the named project may not be.
 
-        A personal project is never addressed by a request: a folder under somebody's
-        own name is theirs to create, and sharing is what puts one into anyone else's.
         A model store holds model folders only.
         """
-        checks = [
-            *super().precondition_checks(),
-            PreconditionCheck(
-                finder=self._project_of_type(ProjectType.PERSONAL),
-                error=VFolderInvalidParameter(
-                    "A personal project cannot be named as the target of a vfolder. "
-                    "Omit the project to create your own folder."
-                ),
-            ),
-        ]
+        checks = [*super().precondition_checks()]
         if self.usage_mode != VFolderUsageMode.MODEL:
             checks.append(
                 PreconditionCheck(
