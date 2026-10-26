@@ -4855,6 +4855,9 @@ input DeploymentFilter {
   """Added in 26.9.0. Filter by the requested replica count."""
   desiredReplicas: IntFilter = null
 
+  """Added in 26.10.0. Filter by the replica count the user set."""
+  replicaCount: IntFilter = null
+
   """Added in 26.9.0. Filter by scaling state."""
   scalingState: ScalingStateFilter = null
   AND: [DeploymentFilter!] = null
@@ -4984,6 +4987,7 @@ enum DeploymentOrderField {
   TAG
   ENTITY_ID
   DESIRED_REPLICAS
+  REPLICA_COUNT
   SCALING_STATE
   CREATED_USER_ID
   OPEN_TO_PUBLIC
@@ -16724,6 +16728,10 @@ enum ReplicaOrderField {
 Added in 25.19.0. Represents the current replica state of a deployment, including the desired replica count and access to the list of active replicas.
 """
 type ReplicaState {
+  """
+  Added in 26.10.0. The replica count the user set. Autoscaling changes only desiredReplicaCount.
+  """
+  replicaCount: Int!
   desiredReplicaCount: Int!
 }
 

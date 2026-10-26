@@ -83,6 +83,7 @@ class TestData:
     resource_group_id: ResourceGroupID
     endpoint_ids_in_a: list[uuid.UUID]
     endpoint_ids_in_b: list[uuid.UUID]
+    autoscaled_to_zero_id: uuid.UUID
 
 
 def _user_row(user_id: uuid.UUID, domain_id: DomainID, domain_name: str, policy: str) -> UserRow:
@@ -150,7 +151,10 @@ class TestDeploymentScopedSearch:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> AsyncGenerator[TestData, None]:
-        """One owner with 2 endpoints in project A and 1 in project B; one user with none."""
+        """One owner with 2 endpoints in project A and 1 in project B; one user with none.
+
+        In project A, one deployment was never scaled and one was autoscaled to zero.
+        """
         domain_name = f"test-domain-{uuid.uuid4().hex[:8]}"
         domain_id = DomainID(uuid.uuid4())
         sgroup_name = f"test-sgroup-{uuid.uuid4().hex[:8]}"
@@ -248,11 +252,14 @@ class TestDeploymentScopedSearch:
 
             endpoint_ids_in_a: list[uuid.UUID] = []
             endpoint_ids_in_b: list[uuid.UUID] = []
-            for project_id, ids, count in (
-                (project_a_id, endpoint_ids_in_a, 2),
-                (project_b_id, endpoint_ids_in_b, 1),
-            ):
-                for i in range(count):
+            desired_replicas_by_project: list[
+                tuple[uuid.UUID, list[uuid.UUID], list[int | None]]
+            ] = [
+                (project_a_id, endpoint_ids_in_a, [None, 0]),
+                (project_b_id, endpoint_ids_in_b, [None]),
+            ]
+            for project_id, ids, desired_replicas_list in desired_replicas_by_project:
+                for i, desired_replicas in enumerate(desired_replicas_list):
                     eid = DeploymentID(uuid.uuid4())
                     db_sess.add(
                         EndpointRow(
@@ -265,6 +272,7 @@ class TestDeploymentScopedSearch:
                             resource_group=sgroup_name,
                             lifecycle_stage=EndpointLifecycle.CREATED,
                             replicas=1,
+                            desired_replicas=desired_replicas,
                         )
                     )
                     ids.append(eid)
@@ -311,6 +319,7 @@ class TestDeploymentScopedSearch:
             resource_group_id=resource_group_id,
             endpoint_ids_in_a=endpoint_ids_in_a,
             endpoint_ids_in_b=endpoint_ids_in_b,
+            autoscaled_to_zero_id=endpoint_ids_in_a[1],
         )
 
     @pytest.fixture
@@ -469,3 +478,28 @@ class TestDeploymentScopedSearch:
         )
 
         assert result.total_count == 0
+
+    async def test_replica_count_tells_autoscaled_to_zero_apart(
+        self,
+        repository: OpsRepository[ModelDeploymentData],
+        test_data: TestData,
+    ) -> None:
+        fields = DeploymentSearchableFields.own
+        result = await repository.scoped_search(
+            ScopedSearcher(
+                scopes=[ProjectDeploymentTarget(project_id=test_data.project_a_id)],
+                used_by=[],
+                searcher=DeploymentSearcher(
+                    pagination=OffsetPagination(limit=10, offset=0),
+                    conditions=[
+                        fields.desired_replicas.filter.equals(0),
+                        fields.replica_count.filter.greater_than_or_equal(1),
+                    ],
+                ),
+            )
+        )
+
+        (item,) = result.items
+        assert item.id == test_data.autoscaled_to_zero_id
+        assert item.replica_state.replica_count == 1
+        assert item.replica_state.desired_replica_count == 0

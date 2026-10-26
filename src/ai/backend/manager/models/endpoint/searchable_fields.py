@@ -86,7 +86,7 @@ class _DeploymentOwnFields(RowDataConverter[EndpointRow, ModelDeploymentData]):
         UUIDConditions(EndpointRow.session_owner),
         ColumnOrder(EndpointRow.session_owner),
     )
-    replicas = SearchableField(
+    replica_count = SearchableField(
         EndpointRow.replicas,
         IntConditions(EndpointRow.replicas),
         ColumnOrder(EndpointRow.replicas),
@@ -203,9 +203,10 @@ class _DeploymentOwnFields(RowDataConverter[EndpointRow, ModelDeploymentData]):
             revision_history_ids=[],
             scaling_rule_ids=[],
             replica_state=ReplicaStateData(
+                replica_count=self.replica_count.read(row),
                 desired_replica_count=desired_replicas
                 if desired_replicas is not None
-                else self.replicas.read(row),
+                else self.replica_count.read(row),
                 replica_ids=[],
             ),
             default_deployment_strategy=DeploymentStrategy.ROLLING,

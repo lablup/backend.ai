@@ -671,6 +671,9 @@ class DeploymentFilter(BaseRequestModel):
     desired_replicas: IntFilter | None = Field(
         default=None, description="Filter by the requested replica count"
     )
+    replica_count: IntFilter | None = Field(
+        default=None, description="Filter by the replica count the user set"
+    )
     scaling_state: DeploymentScalingStateFilter | None = Field(
         default=None, description="Filter by scaling state"
     )

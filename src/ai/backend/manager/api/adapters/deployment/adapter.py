@@ -1760,6 +1760,7 @@ class DeploymentAdapter(BaseAdapter):
             *self._convert_deployment_status_filter(f.status),
             *self.apply_uuid_filter(f.entity_id, fields.entity_id.filter),
             *self.apply_int_filter(f.desired_replicas, fields.desired_replicas.filter),
+            *self.apply_int_filter(f.replica_count, fields.replica_count.filter),
             *self.apply_enum_filter(f.scaling_state, fields.scaling_state.filter),
             *self.apply_to_many_filter(
                 f.replicas, nested.replicas.correlation, self._convert_replica_filter
@@ -2262,6 +2263,8 @@ class DeploymentAdapter(BaseAdapter):
                 return fields.entity_id.order.apply(ascending)
             case DeploymentOrderField.DESIRED_REPLICAS:
                 return fields.desired_replicas.order.apply(ascending)
+            case DeploymentOrderField.REPLICA_COUNT:
+                return fields.replica_count.order.apply(ascending)
             case DeploymentOrderField.SCALING_STATE:
                 return fields.scaling_state.order.apply(ascending)
             case DeploymentOrderField.CREATED_USER_ID:
@@ -2443,6 +2446,7 @@ class DeploymentAdapter(BaseAdapter):
                 open_to_public=data.network_access.open_to_public,
             ),
             replica_state=ReplicaStateInfo(
+                replica_count=data.replica_state.replica_count,
                 desired_replica_count=data.replica_state.desired_replica_count,
                 replica_ids=data.replica_state.replica_ids,
             ),

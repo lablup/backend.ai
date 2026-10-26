@@ -98,6 +98,7 @@ class DeploymentOrderField(StrEnum):
     TAG = "tag"
     ENTITY_ID = "entity_id"
     DESIRED_REPLICAS = "desired_replicas"
+    REPLICA_COUNT = "replica_count"
     SCALING_STATE = "scaling_state"
     CREATED_USER_ID = "created_user_id"
     OPEN_TO_PUBLIC = "open_to_public"
@@ -153,6 +154,7 @@ class NetworkConfigInfo(BaseResponseModel):
 class ReplicaStateInfo(BaseResponseModel):
     """Current replica state of a deployment."""
 
+    replica_count: int
     desired_replica_count: int
     replica_ids: list[UUID]
 

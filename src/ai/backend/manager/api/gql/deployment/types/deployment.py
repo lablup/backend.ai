@@ -249,6 +249,12 @@ class DeploymentStrategyGQL:
 )
 class ReplicaState:
     desired_replica_count: int
+    replica_count: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The replica count the user set. Autoscaling changes only desiredReplicaCount.",
+        )
+    )
 
 
 @gql_pydantic_type(
@@ -898,6 +904,13 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
         BackendAIGQLMeta(
             added_version="26.9.0",
             description="Filter by the requested replica count.",
+        ),
+        default=None,
+    )
+    replica_count: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the replica count the user set.",
         ),
         default=None,
     )
