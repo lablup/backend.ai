@@ -258,8 +258,11 @@ Pull container images
 For compute nodes, you need to pull some container images that are required for
 creating a compute session. Lablup provides a set of open container images at
 ``cr.backend.ai``, and you may pull the starter Python image for the
-architecture of the node (``amd64`` or ``arm64``):
+architecture of the node:
 
 .. code-block:: bash
 
+   # amd64 (x86_64) nodes
    docker pull cr.backend.ai/stable/python:3.13-ubuntu24.04-amd64
+   # arm64 (aarch64) nodes
+   docker pull cr.backend.ai/stable/python:3.13-ubuntu24.04-arm64
