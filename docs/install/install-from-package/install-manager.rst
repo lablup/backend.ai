@@ -73,7 +73,7 @@ would be:
    hide-agents = true
    # event-loop = "asyncio"
    # importer-image = "lablup/importer:manylinux2010"
-   distributed-lock = "filelock"
+   distributed-lock = "pg_advisory"
 
    [docker-registry]
    ssl-verify = false

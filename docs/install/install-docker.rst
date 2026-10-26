@@ -94,16 +94,15 @@ Create ``manager.toml`` with the following content:
 
    [manager]
    num-proc = 4
-   distributed-lock = "filelock"
+   distributed-lock = "pg_advisory"
    service-addr = { host = "0.0.0.0", port = 8091 }
    heartbeat-timeout = 5.0
    secret = "some-secret-private-for-signing-manager-api-requests"
    hide-agents = true
    importer-image = "lablup/backend.ai-importer:manylinux2014"
-   use_sokovan = true
 
    [docker-registry]
-   enabled = false
+   ssl-verify = false
 
    [logging]
    level = "INFO"
