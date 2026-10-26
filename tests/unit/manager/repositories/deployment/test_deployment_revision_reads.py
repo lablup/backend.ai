@@ -1,6 +1,7 @@
-"""The revisions and the policy a deployment search fills in.
+"""The revisions and the policy a deployment read fills in.
 
-``search_legacy_endpoints`` fills them in the read ops of its search.
+``search_legacy_endpoints`` fills them in the read ops of its search;
+``get_deployments_by_ids`` fills them in its own session.
 """
 
 from __future__ import annotations
@@ -404,4 +405,30 @@ class TestSearchLegacyEndpoints:
         info = await self._search(deployment_repository, seeded.endpoint_id)
 
         assert info.deploying_revision_id == seeded.deploying_revision_id
+        assert info.deploying_revision is None
+
+
+class TestGetDeploymentsByIds:
+    async def test_fills_the_revisions_and_the_policy(
+        self, deployment_repository: DeploymentRepository, seeder: DeploymentSeeder
+    ) -> None:
+        seeded = await seeder.seed(deploying_revision_exists=True)
+
+        (info,) = await deployment_repository.get_deployments_by_ids({seeded.endpoint_id})
+
+        assert info.current_revision is not None
+        assert info.current_revision.id == seeded.current_revision_id
+        assert info.deploying_revision is not None
+        assert info.deploying_revision.id == seeded.deploying_revision_id
+        assert info.policy is not None
+        assert info.policy.strategy == DeploymentStrategy.ROLLING
+
+    async def test_drops_the_id_of_a_missing_revision(
+        self, deployment_repository: DeploymentRepository, seeder: DeploymentSeeder
+    ) -> None:
+        seeded = await seeder.seed(deploying_revision_exists=False)
+
+        (info,) = await deployment_repository.get_deployments_by_ids({seeded.endpoint_id})
+
+        assert info.deploying_revision_id is None
         assert info.deploying_revision is None
