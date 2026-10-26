@@ -27482,14 +27482,14 @@ type SystemSessionEnvironConnection
   """Pagination data for this connection"""
   pageInfo: PageInfo!
 
-  """Contains the nodes in this connection"""
+  """Contains the nodes in this connection."""
   edges: [SystemSessionEnvironEdge!]!
 
   """Total number of rows matching the query."""
   count: Int!
 }
 
-"""An edge in a connection."""
+"""Added in 26.10.0. One system session environ row within a connection."""
 type SystemSessionEnvironEdge
   @join__type(graph: STRAWBERRY)
 {
