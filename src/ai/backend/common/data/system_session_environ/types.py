@@ -44,6 +44,16 @@ class SystemSessionEnvironScopeType(enum.StrEnum):
             case SystemSessionEnvironScopeType.PROJECT:
                 return ProjectID(scope_id)
 
+    def override_rank(self) -> int:
+        """The rank among rows sharing a key; the highest one is injected."""
+        match self:
+            case SystemSessionEnvironScopeType.PUBLIC:
+                return 0
+            case SystemSessionEnvironScopeType.DOMAIN:
+                return 1
+            case SystemSessionEnvironScopeType.PROJECT:
+                return 2
+
 
 class SystemSessionEnvironSourceKind(enum.StrEnum):
     """``required`` values win over the session's own environ; ``optional`` ones lose to it."""

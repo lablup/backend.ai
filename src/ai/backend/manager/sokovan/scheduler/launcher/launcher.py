@@ -43,6 +43,9 @@ from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler.repository import (
     SchedulerRepository,
 )
+from ai.backend.manager.repositories.system_session_environ.repository import (
+    SystemSessionEnvironRepository,
+)
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.views.sokovan.config import NetworkSetup
 from ai.backend.manager.views.sokovan.image import ImageConfigData
@@ -57,7 +60,8 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 @dataclass
 class SessionLauncherArgs:
-    repository: SchedulerRepository
+    scheduler_repository: SchedulerRepository
+    system_session_environ_repository: SystemSessionEnvironRepository
     agent_client_pool: AgentClientPool
     network_plugin_ctx: NetworkPluginContext
     config_provider: ManagerConfigProvider
@@ -74,7 +78,8 @@ class SessionLauncher:
     3. Retry operations for stuck sessions
     """
 
-    _repository: SchedulerRepository
+    _scheduler_repository: SchedulerRepository
+    _system_session_environ_repository: SystemSessionEnvironRepository
     _agent_client_pool: AgentClientPool
     _network_plugin_ctx: NetworkPluginContext
     _config_provider: ManagerConfigProvider
@@ -82,7 +87,8 @@ class SessionLauncher:
     _phase_metrics: SchedulerPhaseMetricObserver
 
     def __init__(self, args: SessionLauncherArgs) -> None:
-        self._repository = args.repository
+        self._scheduler_repository = args.scheduler_repository
+        self._system_session_environ_repository = args.system_session_environ_repository
         self._agent_client_pool = args.agent_client_pool
         self._network_plugin_ctx = args.network_plugin_ctx
         self._config_provider = args.config_provider
@@ -205,11 +211,20 @@ class SessionLauncher:
         :param sessions: List of sessions to start
         :param image_configs: Image configurations indexed by image ID
         """
+        if not sessions:
+            return
+        system_session_environ_by_session = await self._system_session_environ_repository.resolve(
+            sessions
+        )
 
         async def start_with_timeout(session: SessionDataForStart) -> None:
             with with_log_context(session_id=session.session_id):
                 async with async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC):
-                    await self._start_single_session(session, image_configs)
+                    await self._start_single_session(
+                        session,
+                        image_configs,
+                        system_session_environ_by_session[session.session_id],
+                    )
 
         results = await asyncio.gather(
             *[start_with_timeout(session) for session in sessions],
@@ -227,12 +242,14 @@ class SessionLauncher:
         self,
         session: SessionDataForStart,
         image_configs: dict[UUID, ImageConfigData],
+        system_session_environ: Mapping[str, str],
     ) -> None:
         """
         Start a single session by creating kernels on agents.
 
         :param session: Session data to start
         :param image_configs: Image configurations indexed by image ID
+        :param system_session_environ: The system session environ the session receives
         """
         log.debug(
             "session start attempted",
@@ -250,9 +267,6 @@ class SessionLauncher:
             # Get resource policy and idle timeout
             # In production, this would come from database lookups
             idle_timeout = 600  # Default timeout in seconds
-            if hasattr(self, "_repository") and hasattr(self._repository, "_db_source"):
-                # Would need proper resource policy lookup
-                pass
 
             # Setup network configuration
             network_setup = await self._setup_network_configuration(session)
@@ -268,27 +282,7 @@ class SessionLauncher:
                     key=keyfunc,
                 )
             }
-            environ: dict[str, str] = {
-                **session.environ,
-                "BACKENDAI_USER_UUID": str(session.user_uuid),
-                "BACKENDAI_USER_EMAIL": session.user_email,
-                "BACKENDAI_USER_NAME": session.user_name,
-                "BACKENDAI_SESSION_ID": str(session.session_id),
-                "BACKENDAI_SESSION_NAME": str(session.name),
-                "BACKENDAI_CLUSTER_SIZE": str(len(session.kernels)),
-                "BACKENDAI_CLUSTER_REPLICAS": ",".join(f"{k}:{v}" for k, v in replicas.items()),
-                "BACKENDAI_CLUSTER_HOSTS": ",".join(
-                    k.cluster_hostname or f"{k.cluster_role}{k.cluster_idx}"
-                    for k in session.kernels
-                ),
-                "BACKENDAI_ACCESS_KEY": session.access_key,
-                # BACKENDAI_SERVICE_PORTS are set as per-kernel env-vars.
-                "BACKENDAI_PREOPEN_PORTS": (
-                    ",".join(str(port) for port in session.kernels[0].preopen_ports)
-                    if session.kernels and session.kernels[0].preopen_ports
-                    else ""
-                ),
-            }
+            environ = {**session.environ, **system_session_environ}
 
             # Group kernels by agent to minimize RPC calls
             kernels_by_agent: defaultdict[AgentId, list[KernelBindingData]] = defaultdict(list)
@@ -456,7 +450,9 @@ class SessionLauncher:
             log.warning("session start failed", exc_info=True)
             # Update error info in status_data without changing status
             # Session will be handled by timeout detection in Coordinator
-            await self._repository.update_session_error_info(session.session_id, error_info)
+            await self._scheduler_repository.update_session_error_info(
+                session.session_id, error_info
+            )
 
     async def _setup_network_configuration(
         self,
@@ -477,7 +473,7 @@ class SessionLauncher:
         if network_type == NetworkType.PERSISTENT:
             # For persistent networks, use pre-created network
             if session.network_id:
-                network = await self._repository.get_attached_network(
+                network = await self._scheduler_repository.get_attached_network(
                     NetworkID(UUID(session.network_id))
                 )
                 network_name = network.ref_name
@@ -556,7 +552,7 @@ class SessionLauncher:
                 cluster_ssh_port_mapping = ClusterSSHPortMapping(port_mapping)
 
         if network_type != NetworkType.PERSISTENT:
-            await self._repository.update_session_network_id(
+            await self._scheduler_repository.update_session_network_id(
                 session.session_id,
                 network_name,
             )
