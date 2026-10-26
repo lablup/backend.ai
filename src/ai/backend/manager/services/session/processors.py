@@ -18,6 +18,11 @@ from ai.backend.manager.actions.v2.ops.result import (
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.data.kernel_group.types import (
+    KernelGroupData,
+    KernelGroupEnvironData,
+    KernelGroupResourceSlotData,
+)
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import SessionEntityData, SessionTerminationStatus
@@ -29,7 +34,22 @@ from ai.backend.manager.services.session.actions.batch_get_session_resource_allo
     BatchGetSessionResourceAllocationAction,
 )
 from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
+from ai.backend.manager.services.session.actions.bulk_get_kernel_group_environs import (
+    BulkGetKernelGroupEnvironsAction,
+)
+from ai.backend.manager.services.session.actions.bulk_get_kernel_group_environs_by_group import (
+    BulkGetKernelGroupEnvironsByGroupAction,
+)
+from ai.backend.manager.services.session.actions.bulk_get_kernel_group_resource_slots import (
+    BulkGetKernelGroupResourceSlotsAction,
+)
+from ai.backend.manager.services.session.actions.bulk_get_kernel_groups import (
+    BulkGetKernelGroupsAction,
+)
 from ai.backend.manager.services.session.actions.bulk_get_kernels import BulkGetKernelsAction
+from ai.backend.manager.services.session.actions.bulk_get_main_kernel_groups import (
+    BulkGetMainKernelGroupsAction,
+)
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
     CommitSessionActionResult,
@@ -141,6 +161,15 @@ from ai.backend.manager.services.session.actions.resolve_session_name import (
 from ai.backend.manager.services.session.actions.scoped_search import (
     ScopedSearchSessionsAction,
 )
+from ai.backend.manager.services.session.actions.scoped_search_kernel_group_environs import (
+    ScopedSearchKernelGroupEnvironsAction,
+)
+from ai.backend.manager.services.session.actions.scoped_search_kernel_group_resource_slots import (
+    ScopedSearchKernelGroupResourceSlotsAction,
+)
+from ai.backend.manager.services.session.actions.scoped_search_kernel_groups import (
+    ScopedSearchKernelGroupsAction,
+)
 from ai.backend.manager.services.session.actions.scoped_search_kernels import (
     ScopedSearchKernelsAction,
 )
@@ -232,6 +261,32 @@ class SessionProcessors:
     batch_get_kernel_resource_allocation: BulkFieldActionProcessor[
         BatchGetKernelResourceAllocationAction, BatchGetKernelResourceAllocationActionResult
     ]
+    bulk_get_kernel_groups: PartialBulkFieldActionProcessor[
+        BulkGetKernelGroupsAction, KernelGroupData
+    ]
+    bulk_get_main_kernel_groups: PartialBulkActionProcessor[
+        BulkGetMainKernelGroupsAction, KernelGroupData
+    ]
+    scoped_search_kernel_groups: BulkActionProcessor[
+        ScopedSearchKernelGroupsAction, ScopedFieldsOpsResult[KernelGroupData]
+    ]
+    # What the deprecated session environ reads: every environ row of each named group.
+    bulk_get_kernel_group_environs_by_group: PartialBulkFieldActionProcessor[
+        BulkGetKernelGroupEnvironsByGroupAction, list[KernelGroupEnvironData]
+    ]
+    bulk_get_kernel_group_environs: PartialBulkFieldActionProcessor[
+        BulkGetKernelGroupEnvironsAction, KernelGroupEnvironData
+    ]
+    scoped_search_kernel_group_environs: BulkActionProcessor[
+        ScopedSearchKernelGroupEnvironsAction, ScopedFieldsOpsResult[KernelGroupEnvironData]
+    ]
+    bulk_get_kernel_group_resource_slots: PartialBulkFieldActionProcessor[
+        BulkGetKernelGroupResourceSlotsAction, KernelGroupResourceSlotData
+    ]
+    scoped_search_kernel_group_resource_slots: BulkActionProcessor[
+        ScopedSearchKernelGroupResourceSlotsAction,
+        ScopedFieldsOpsResult[KernelGroupResourceSlotData],
+    ]
     global_search: GlobalActionProcessor[
         GlobalSearchSessionsAction, BatchOpsResult[SessionEntityData]
     ]
@@ -259,6 +314,9 @@ class SessionProcessors:
         group: ProcessorGroup[SessionEntityData],
         resource_group: ProcessorGroup[ResourceGroupData],
         kernels: LookupFieldGroup[KernelInfo],
+        kernel_groups: LookupFieldGroup[KernelGroupData],
+        kernel_group_environs: LookupFieldGroup[KernelGroupEnvironData],
+        kernel_group_resource_slots: LookupFieldGroup[KernelGroupResourceSlotData],
         resource_allocation: ResourceAllocationProcessors,
         service: SessionService,
     ) -> None:
@@ -322,6 +380,32 @@ class SessionProcessors:
             BatchGetKernelResourceAllocationAction,
             LookupBulkKernelOwnerAction,
             service.batch_get_kernel_resource_allocation,
+        )
+        self.bulk_get_kernel_groups = kernel_groups.partial_bulk_get_ops(BulkGetKernelGroupsAction)
+        self.bulk_get_main_kernel_groups = kernel_groups.partial_bulk_get_owned_ops(
+            BulkGetMainKernelGroupsAction
+        )
+        self.scoped_search_kernel_groups = kernel_groups.atomic_bulk_scoped_search_ops(
+            ScopedSearchKernelGroupsAction
+        )
+        self.bulk_get_kernel_group_environs_by_group = kernel_groups.partial_bulk_get_nested_ops(
+            BulkGetKernelGroupEnvironsByGroupAction, KernelGroupEnvironData
+        )
+        self.bulk_get_kernel_group_environs = kernel_group_environs.partial_bulk_get_ops(
+            BulkGetKernelGroupEnvironsAction
+        )
+        self.scoped_search_kernel_group_environs = (
+            kernel_group_environs.atomic_bulk_scoped_search_ops(
+                ScopedSearchKernelGroupEnvironsAction
+            )
+        )
+        self.bulk_get_kernel_group_resource_slots = (
+            kernel_group_resource_slots.partial_bulk_get_ops(BulkGetKernelGroupResourceSlotsAction)
+        )
+        self.scoped_search_kernel_group_resource_slots = (
+            kernel_group_resource_slots.atomic_bulk_scoped_search_ops(
+                ScopedSearchKernelGroupResourceSlotsAction
+            )
         )
         self.global_search = group.global_searcher_ops(GlobalSearchSessionsAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetSessionsAction)

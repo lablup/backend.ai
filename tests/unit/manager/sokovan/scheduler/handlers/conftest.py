@@ -229,6 +229,7 @@ def _create_session(
             ),
             metrics=KernelMetrics(num_queries=0, last_stat=None, container_log=None),
             metadata=KernelMetadata(callback_url=None, internal_data=None),
+            kernel_group_id=None,
         )
         kernel_infos.append(kernel_info)
 
@@ -328,6 +329,7 @@ def _create_kernel(
         ),
         metrics=KernelMetrics(num_queries=0, last_stat=None, container_log=None),
         metadata=KernelMetadata(callback_url=None, internal_data=None),
+        kernel_group_id=None,
     )
 
 
@@ -591,6 +593,7 @@ def kernel_without_agent() -> KernelInfo:
         lifecycle=kernel.lifecycle,
         metrics=kernel.metrics,
         metadata=kernel.metadata,
+        kernel_group_id=None,
     )
 
 

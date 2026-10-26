@@ -8,7 +8,6 @@ from decimal import Decimal
 from typing import override
 
 from ai.backend.common.data.entity.kernel_group import KernelGroupID
-from ai.backend.common.data.entity.kernel_group_resource_slot import KernelGroupResourceSlotID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.manager.data.kernel_group.types import KernelGroupResourceSlotData
 from ai.backend.manager.models.kernel_group_resource_slot.row import KernelGroupResourceSlotRow
@@ -41,9 +40,4 @@ class KernelGroupResourceSlotCreator(
 
     @override
     def to_data(self, row: KernelGroupResourceSlotRow) -> KernelGroupResourceSlotData:
-        return KernelGroupResourceSlotData(
-            id=KernelGroupResourceSlotID(row.id),
-            kernel_group_id=row.kernel_group_id,
-            slot_name=ResourceSlotName(row.slot_name),
-            quantity=row.quantity,
-        )
+        return row.to_data()
