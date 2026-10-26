@@ -132,6 +132,7 @@ from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_policy.searchable_fields import (
     DeploymentPolicySearchableFields,
 )
+from ai.backend.manager.models.deployment_policy.searchers import DeploymentPolicySearcher
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
@@ -220,6 +221,7 @@ from ai.backend.manager.repositories.deployment.types.endpoint import (
     RouteSessionInfo,
     RouteSessionKernelInfo,
 )
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.write import ReconcileTransition
 from ai.backend.manager.repositories.vfolder.mount_policy import MountPolicyInputs
@@ -257,6 +259,62 @@ def _project_preset_slots(
         return None
     return [
         ResourceSlotEntryData(resource_type=name, quantity=str(qty)) for name, qty in slot_entries
+    ]
+
+
+async def attach_revisions_and_policy(
+    r: V2ReadOps, infos: Sequence[DeploymentInfo]
+) -> list[DeploymentInfo]:
+    """Fill the current and deploying revisions and the policy of ``infos``, which carry
+    the revision ids only, in the transaction of ``r``."""
+    revision_ids = [
+        revision_id
+        for info in infos
+        for revision_id in (info.current_revision_id, info.deploying_revision_id)
+        if revision_id is not None
+    ]
+    revisions = (
+        await r.search_in_global(
+            ModelRevisionSearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    ModelRevisionSearchableFields.own.field_id.filter.in_(
+                        UUIDInMatchSpec(values=revision_ids, negated=False)
+                    )
+                ],
+            )
+        )
+        if revision_ids
+        else None
+    )
+    revision_by_id = {revision.id: revision for revision in revisions.items} if revisions else {}
+    policies = (
+        await r.search_in_global(
+            DeploymentPolicySearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    DeploymentPolicySearchableFields.own.endpoint.filter.in_(
+                        UUIDInMatchSpec(values=[info.id for info in infos], negated=False)
+                    )
+                ],
+            )
+        )
+        if infos
+        else None
+    )
+    policy_by_endpoint = {policy.endpoint: policy for policy in policies.items} if policies else {}
+    return [
+        replace(
+            info,
+            current_revision=revision_by_id.get(info.current_revision_id)
+            if info.current_revision_id is not None
+            else None,
+            deploying_revision=revision_by_id.get(info.deploying_revision_id)
+            if info.deploying_revision_id is not None
+            else None,
+            policy=policy_by_endpoint.get(info.id),
+        )
+        for info in infos
     ]
 
 
@@ -602,7 +660,7 @@ class DeploymentDBSource:
         """
         async with self._reconcile_ops.read_ops() as r:
             result = await r.search_in_global(searcher)
-        deployments = result.items
+            deployments = await attach_revisions_and_policy(r, result.items)
         if not deployments:
             return []
         async with self._begin_readonly_session_read_committed() as db_sess:
@@ -1195,8 +1253,9 @@ class DeploymentDBSource:
         """
         async with self._reconcile_ops.read_ops() as r:
             result = await r.search_in_global(searcher)
+            items = await attach_revisions_and_policy(r, result.items)
         return DeploymentInfoSearchResult(
-            items=result.items,
+            items=items,
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
