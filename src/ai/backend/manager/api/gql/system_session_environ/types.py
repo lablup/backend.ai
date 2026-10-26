@@ -253,6 +253,13 @@ class SystemSessionEnvironFilterGQL(PydanticInputMixin[SystemSessionEnvironFilte
         default=None,
     )
     enabled: bool | None = gql_field(description="Filter by the enabled flag.", default=None)
+    AND: list[Self] | None = gql_field(
+        description="Combine multiple filters with AND logic.", default=None
+    )
+    OR: list[Self] | None = gql_field(
+        description="Combine multiple filters with OR logic.", default=None
+    )
+    NOT: list[Self] | None = gql_field(description="Negate the given filters.", default=None)
 
 
 @gql_pydantic_input(

@@ -27521,6 +27521,15 @@ input SystemSessionEnvironFilter
 
   """Filter by the enabled flag."""
   enabled: Boolean = null
+
+  """Combine multiple filters with AND logic."""
+  AND: [SystemSessionEnvironFilter!] = null
+
+  """Combine multiple filters with OR logic."""
+  OR: [SystemSessionEnvironFilter!] = null
+
+  """Negate the given filters."""
+  NOT: [SystemSessionEnvironFilter!] = null
 }
 
 """

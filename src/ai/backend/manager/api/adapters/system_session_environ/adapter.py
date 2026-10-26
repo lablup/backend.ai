@@ -31,6 +31,11 @@ from ai.backend.manager.api.adapter_options.pagination.pagination import Paginat
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
 from ai.backend.manager.models.system_session_environ.searchable_fields import (
@@ -111,7 +116,7 @@ class SystemSessionEnvironAdapter(BaseAdapter):
 
     def _convert_filter(self, filter: SystemSessionEnvironFilter) -> list[QueryCondition]:
         fields = SystemSessionEnvironSearchableFields.own
-        return [
+        conditions: list[QueryCondition] = [
             *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
             *self.apply_string_filter(filter.key, fields.key.filter),
             *self.apply_enum_filter(filter.value_source, fields.value_source.filter),
@@ -119,6 +124,23 @@ class SystemSessionEnvironAdapter(BaseAdapter):
             *self.apply_uuid_filter(filter.scope_id, fields.scope_id.filter),
             *self.apply_bool_filter(filter.enabled, fields.enabled.filter),
         ]
+        if filter.AND:
+            for sub_filter in filter.AND:
+                conditions.extend(self._convert_filter(sub_filter))
+        if filter.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub_filter in filter.OR:
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if filter.NOT:
+            for sub_filter in filter.NOT:
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+        return conditions
 
     def _convert_orders(self, orders: list[SystemSessionEnvironOrder]) -> list[QueryOrder]:
         return [self._convert_order(order) for order in orders]
