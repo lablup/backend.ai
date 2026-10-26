@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -19,6 +21,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.defs import LockID
+from ai.backend.manager.sokovan.scheduler.handlers.cleanup import force_terminated
 from ai.backend.manager.sokovan.scheduler.handlers.cleanup.force_terminated import (
     MAX_NETWORK_RELEASE_ATTEMPTS,
     CleanupForceTerminatedHandler,
@@ -32,8 +35,12 @@ from ai.backend.manager.views.sokovan.session import (
 @pytest.fixture
 def mock_terminator() -> AsyncMock:
     terminator = AsyncMock()
-    terminator.terminate_sessions_for_handler = AsyncMock(return_value=None)
+    terminator.terminate_sessions_for_handler = AsyncMock(side_effect=_every_agent_accepts)
     return terminator
+
+
+def _every_agent_accepts(sessions: list[TerminatingSessionData]) -> set[SessionId]:
+    return {session.session_id for session in sessions}
 
 
 @pytest.fixture
@@ -175,7 +182,7 @@ class TestCleanupForceTerminatedHandler:
 
         # First call succeeds, second raises
         mock_terminator.terminate_sessions_for_handler.side_effect = [
-            None,
+            {sid_ok},
             RuntimeError("Agent unreachable"),
         ]
 
@@ -199,6 +206,190 @@ class TestCleanupForceTerminatedHandler:
         await handler.execute([session_id])
 
         mock_valkey_schedule.remove_force_terminated_sessions.assert_not_awaited()
+
+    async def test_execute_keeps_a_session_an_agent_refused_to_destroy(
+        self,
+        handler: CleanupForceTerminatedHandler,
+        mock_terminator: AsyncMock,
+        mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        mock_hook: AsyncMock,
+    ) -> None:
+        """The terminator reports a refused destroy without raising; the next cycle resends it."""
+        sid_refused = SessionId(uuid4())
+        sid_ok = SessionId(uuid4())
+        mock_repository.get_terminating_sessions_by_ids.return_value = [
+            _make_terminating_session_data(sid_refused),
+            _make_terminating_session_data(sid_ok),
+        ]
+        mock_terminator.terminate_sessions_for_handler.side_effect = [set(), {sid_ok}]
+
+        await handler.execute([sid_refused, sid_ok])
+
+        mock_hook.execute.assert_awaited_once_with(_A_SESSION)
+        mock_valkey_schedule.record_force_terminated_release_failure.assert_not_awaited()
+        mock_valkey_schedule.remove_force_terminated_sessions.assert_awaited_once_with([sid_ok])
+
+    async def test_a_stuck_destroy_times_out_without_holding_up_the_others(
+        self,
+        handler: CleanupForceTerminatedHandler,
+        mock_terminator: AsyncMock,
+        mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A destroy RPC to an agent that died after it was connected never returns on its own."""
+        monkeypatch.setattr(force_terminated, "DESTROY_TIMEOUT_SEC", 0.1)
+        sid_stuck = SessionId(uuid4())
+        sid_ok = SessionId(uuid4())
+        mock_repository.get_terminating_sessions_by_ids.return_value = [
+            _make_terminating_session_data(sid_stuck),
+            _make_terminating_session_data(sid_ok),
+        ]
+
+        async def _destroy(sessions: list[TerminatingSessionData]) -> set[SessionId]:
+            if sessions[0].session_id == sid_stuck:
+                await asyncio.Event().wait()
+            return {sessions[0].session_id}
+
+        mock_terminator.terminate_sessions_for_handler.side_effect = _destroy
+
+        async with asyncio.timeout(5):
+            await handler.execute([sid_stuck, sid_ok])
+
+        mock_valkey_schedule.record_force_terminated_release_failure.assert_not_awaited()
+        mock_valkey_schedule.remove_force_terminated_sessions.assert_awaited_once_with([sid_ok])
+
+    async def test_a_stuck_destroy_does_not_delay_another_session_s_release(
+        self,
+        handler: CleanupForceTerminatedHandler,
+        mock_terminator: AsyncMock,
+        mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+    ) -> None:
+        sid_stuck = SessionId(uuid4())
+        sid_ok = SessionId(uuid4())
+        mock_repository.get_terminating_sessions_by_ids.return_value = [
+            _make_terminating_session_data(sid_stuck),
+            _make_terminating_session_data(sid_ok),
+        ]
+        unstuck = asyncio.Event()
+        ok_removed = asyncio.Event()
+
+        async def _destroy(sessions: list[TerminatingSessionData]) -> set[SessionId]:
+            if sessions[0].session_id == sid_stuck:
+                await unstuck.wait()
+            return {sessions[0].session_id}
+
+        async def _remove(ids: list[SessionId]) -> None:
+            if ids == [sid_ok]:
+                ok_removed.set()
+
+        mock_terminator.terminate_sessions_for_handler.side_effect = _destroy
+        mock_valkey_schedule.remove_force_terminated_sessions.side_effect = _remove
+
+        task = asyncio.create_task(handler.execute([sid_stuck, sid_ok]))
+        async with asyncio.timeout(5):
+            await ok_removed.wait()
+        assert not task.done(), "the other session was released only after the stuck one"
+        unstuck.set()
+        await task
+
+    async def test_what_a_cut_cycle_finished_has_left_the_queue(
+        self,
+        handler: CleanupForceTerminatedHandler,
+        mock_terminator: AsyncMock,
+        mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+    ) -> None:
+        """The coordinator cancels a cycle at its lock lifetime; finished sessions stay finished."""
+        sid_stuck = SessionId(uuid4())
+        sid_ok = SessionId(uuid4())
+        mock_repository.get_terminating_sessions_by_ids.return_value = [
+            _make_terminating_session_data(sid_stuck),
+            _make_terminating_session_data(sid_ok),
+        ]
+
+        async def _destroy(sessions: list[TerminatingSessionData]) -> set[SessionId]:
+            if sessions[0].session_id == sid_stuck:
+                await asyncio.Event().wait()
+            return {sessions[0].session_id}
+
+        mock_terminator.terminate_sessions_for_handler.side_effect = _destroy
+
+        with pytest.raises(TimeoutError):
+            async with asyncio.timeout(0.2):
+                await handler.execute([sid_stuck, sid_ok])
+
+        mock_valkey_schedule.remove_force_terminated_sessions.assert_awaited_once_with([sid_ok])
+
+    async def test_no_more_sessions_than_the_limit_run_at_once(
+        self,
+        handler: CleanupForceTerminatedHandler,
+        mock_terminator: AsyncMock,
+        mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(force_terminated, "MAX_CONCURRENT_SESSIONS", 2)
+        session_ids = [SessionId(uuid4()) for _ in range(5)]
+        mock_repository.get_terminating_sessions_by_ids.return_value = [
+            _make_terminating_session_data(sid) for sid in session_ids
+        ]
+        running = 0
+        peak = 0
+
+        async def _destroy(sessions: list[TerminatingSessionData]) -> set[SessionId]:
+            nonlocal running, peak
+            running += 1
+            peak = max(peak, running)
+            await asyncio.sleep(0.01)
+            running -= 1
+            return {sessions[0].session_id}
+
+        mock_terminator.terminate_sessions_for_handler.side_effect = _destroy
+
+        await handler.execute(session_ids)
+
+        assert peak == 2
+        removed = [
+            call.args[0][0]
+            for call in mock_valkey_schedule.remove_force_terminated_sessions.await_args_list
+        ]
+        assert sorted(removed) == sorted(session_ids)
+
+    async def test_a_stuck_release_times_out_and_counts_as_a_failed_attempt(
+        self,
+        handler: CleanupForceTerminatedHandler,
+        mock_valkey_schedule: AsyncMock,
+        mock_hook: AsyncMock,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(force_terminated, "RELEASE_TIMEOUT_SEC", 0.1)
+        sid_stuck = SessionId(uuid4())
+        sid_ok = SessionId(uuid4())
+        mock_valkey_schedule.get_force_terminated_release_attempts.return_value = {
+            sid_stuck: 1,
+            sid_ok: 1,
+        }
+        calls = 0
+
+        async def _release(_: Any) -> None:
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                await asyncio.Event().wait()
+
+        mock_hook.execute.side_effect = _release
+        mock_valkey_schedule.record_force_terminated_release_failure.return_value = 2
+
+        async with asyncio.timeout(5):
+            await handler.execute([sid_stuck, sid_ok])
+
+        mock_valkey_schedule.record_force_terminated_release_failure.assert_awaited_once_with(
+            sid_stuck
+        )
+        mock_valkey_schedule.remove_force_terminated_sessions.assert_awaited_once_with([sid_ok])
 
     async def test_execute_runs_the_terminated_hook(
         self,

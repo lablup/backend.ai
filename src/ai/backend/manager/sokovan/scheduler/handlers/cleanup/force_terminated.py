@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from collections.abc import Sequence
+from collections.abc import Awaitable, Sequence
 from typing import TYPE_CHECKING, override
 
 from ai.backend.common.clients.valkey_client.valkey_schedule.client import ValkeyScheduleClient
@@ -21,10 +22,16 @@ from ai.backend.manager.sokovan.scheduler.hooks.registry import HookRegistry
 
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.scheduler.terminator.terminator import SessionTerminator
+    from ai.backend.manager.views.sokovan.session import TerminatingSessionData
 
 log = StructuredLogger(logging.getLogger(__name__))
 
 MAX_NETWORK_RELEASE_ATTEMPTS = 5
+# An RPC to an agent that died after it was connected never returns on its own.
+DESTROY_TIMEOUT_SEC = 20.0
+RELEASE_TIMEOUT_SEC = 5.0
+# Bounds the DB queries and agent RPCs one cycle runs at once.
+MAX_CONCURRENT_SESSIONS = 10
 
 
 class CleanupForceTerminatedHandler(CleanupHandler):
@@ -36,8 +43,9 @@ class CleanupForceTerminatedHandler(CleanupHandler):
     info from DB, and sends destroy RPCs to ensure containers are cleaned up.
 
     It also runs the TERMINATED hook, which the promotion pass skipped, to release the
-    session network. Destroy RPCs go out once; only a failed release is retried, at most
-    ``MAX_NETWORK_RELEASE_ATTEMPTS`` times.
+    session network. A session whose destroy RPCs an agent refused stays queued and is sent
+    them again (an agent ignores a repeated destroy); once every agent has accepted them,
+    only a failed release is retried, at most ``MAX_NETWORK_RELEASE_ATTEMPTS`` times.
     """
 
     _terminator: SessionTerminator
@@ -77,34 +85,61 @@ class CleanupForceTerminatedHandler(CleanupHandler):
         log.debug("force-terminated session cleanup processing", session_count=len(session_ids))
 
         release_attempts = await self._valkey_schedule.get_force_terminated_release_attempts()
-        done_ids: list[SessionId] = []
-        release_ids: list[SessionId] = []
         destroy_ids = [sid for sid in session_ids if sid not in release_attempts]
+        flows: list[tuple[SessionId, Awaitable[bool]]] = []
         if destroy_ids:
             try:
-                destroyed, gone = await self._destroy(destroy_ids)
+                terminating_sessions, gone = await self._fetch_terminating(destroy_ids)
             except Exception:
                 log.exception("fetching force-terminated sessions failed; kept queued")
             else:
-                done_ids.extend(gone)
-                release_ids.extend(destroyed)
-        release_ids.extend(sid for sid in session_ids if sid in release_attempts)
+                if gone:
+                    try:
+                        await self._valkey_schedule.remove_force_terminated_sessions(gone)
+                    except Exception:
+                        log.exception("dropping force-terminated ids with no session failed")
+                flows.extend(
+                    (s.session_id, self._destroy_then_release(s)) for s in terminating_sessions
+                )
+        flows.extend((sid, self._settle_one(sid)) for sid in session_ids if sid in release_attempts)
 
-        for session_id in release_ids:
-            with with_log_context(session_id=session_id):
-                try:
-                    if await self._settle_release(session_id):
-                        done_ids.append(session_id)
-                except Exception:
-                    log.exception("force-terminated session cleanup failed; kept queued")
+        # Each session runs to its end on its own, so a stuck agent delays only its own sessions.
+        limit = asyncio.Semaphore(MAX_CONCURRENT_SESSIONS)
+        finished = await asyncio.gather(*(self._finish(sid, flow, limit) for sid, flow in flows))
+        log.debug(
+            "force-terminated sessions cleaned up",
+            success_count=sum(finished),
+            failure_count=len(finished) - sum(finished),
+        )
 
-        if done_ids:
-            await self._valkey_schedule.remove_force_terminated_sessions(done_ids)
-            log.debug(
-                "force-terminated sessions cleaned up",
-                success_count=len(done_ids),
-                failure_count=len(session_ids) - len(done_ids),
-            )
+    async def _finish(
+        self, session_id: SessionId, flow: Awaitable[bool], limit: asyncio.Semaphore
+    ) -> bool:
+        """Run one session's cleanup; drop it from the queue the moment it is done."""
+        async with limit:
+            if not await flow:
+                return False
+        with with_log_context(session_id=session_id):
+            try:
+                # Removed one by one: a cycle cut at its lock lifetime keeps what it finished.
+                await self._valkey_schedule.remove_force_terminated_sessions([session_id])
+            except Exception:
+                log.exception("force-terminated session could not leave the queue; kept queued")
+                return False
+        return True
+
+    async def _destroy_then_release(self, session_data: TerminatingSessionData) -> bool:
+        if not await self._destroy_one(session_data):
+            return False
+        return await self._settle_one(session_data.session_id)
+
+    async def _settle_one(self, session_id: SessionId) -> bool:
+        with with_log_context(session_id=session_id):
+            try:
+                return await self._settle_release(session_id)
+            except Exception:
+                log.exception("force-terminated session cleanup failed; kept queued")
+                return False
 
     async def _settle_release(self, session_id: SessionId) -> bool:
         """Release the network or count a failed attempt; True once the id may leave the queue."""
@@ -122,10 +157,10 @@ class CleanupForceTerminatedHandler(CleanupHandler):
             return True
         return False
 
-    async def _destroy(
+    async def _fetch_terminating(
         self, session_ids: Sequence[SessionId]
-    ) -> tuple[list[SessionId], list[SessionId]]:
-        """Send destroy RPCs; return the destroyed ids and the ids with no session data."""
+    ) -> tuple[list[TerminatingSessionData], list[SessionId]]:
+        """Return the sessions to destroy and the ids with no session data."""
         terminating_sessions = await self._repository.get_terminating_sessions_by_ids(
             list(session_ids)
         )
@@ -135,16 +170,30 @@ class CleanupForceTerminatedHandler(CleanupHandler):
             log.debug(
                 "no session data found for force-terminated sessions", session_count=len(gone)
             )
-        destroyed: list[SessionId] = []
-        for session_data in terminating_sessions:
-            with with_log_context(session_id=session_data.session_id):
-                try:
-                    await self._terminator.terminate_sessions_for_handler([session_data])
-                except Exception:
-                    log.exception("force-terminated session cleanup failed")
-                    continue
-                destroyed.append(session_data.session_id)
-        return destroyed, gone
+        return terminating_sessions, gone
+
+    async def _destroy_one(self, session_data: TerminatingSessionData) -> bool:
+        """True once every agent accepted the destroy RPCs; False keeps the session queued."""
+        with with_log_context(session_id=session_data.session_id):
+            try:
+                async with asyncio.timeout(DESTROY_TIMEOUT_SEC):
+                    confirmed = await self._terminator.terminate_sessions_for_handler([
+                        session_data
+                    ])
+            except TimeoutError:
+                log.warning(
+                    "force-terminated session destroy timed out; kept queued",
+                    timeout_sec=DESTROY_TIMEOUT_SEC,
+                )
+                return False
+            except Exception:
+                log.exception("force-terminated session cleanup failed")
+                return False
+            if session_data.session_id not in confirmed:
+                # Releasing the network under a live container would only fail.
+                log.warning("force-terminated session destroy refused by an agent; kept queued")
+                return False
+            return True
 
     async def _release_network(self, session_id: SessionId) -> bool:
         """Run the TERMINATED hook for one session to release its volatile network.
@@ -169,7 +218,8 @@ class CleanupForceTerminatedHandler(CleanupHandler):
             return True
         for session in sessions:
             try:
-                await hook.execute(session)
+                async with asyncio.timeout(RELEASE_TIMEOUT_SEC):
+                    await hook.execute(session)
             except Exception as e:
                 log.warning("force-terminated session network release failed", error=repr(e))
                 return False

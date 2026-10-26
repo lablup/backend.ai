@@ -42,9 +42,12 @@ class TestSessionTerminatorTermination:
         """
         session_ids = [terminating_session_single_kernel.session_id]
         with RecorderContext.scope("test", entity_ids=session_ids):
-            await terminator.terminate_sessions_for_handler([terminating_session_single_kernel])
+            confirmed = await terminator.terminate_sessions_for_handler([
+                terminating_session_single_kernel
+            ])
 
         # Assert
+        assert confirmed == {terminating_session_single_kernel.session_id}
         mock_client = mock_agent_client_pool._mock_client
         mock_client.destroy_kernel.assert_awaited_once()
 
@@ -67,9 +70,12 @@ class TestSessionTerminatorTermination:
         """
         session_ids = [terminating_session_kernel_no_agent.session_id]
         with RecorderContext.scope("test", entity_ids=session_ids):
-            await terminator.terminate_sessions_for_handler([terminating_session_kernel_no_agent])
+            confirmed = await terminator.terminate_sessions_for_handler([
+                terminating_session_kernel_no_agent
+            ])
 
-        # Assert - destroy_kernel should not be called
+        # Assert - nothing to destroy, so nothing left to retry
+        assert confirmed == {terminating_session_kernel_no_agent.session_id}
         mock_client = mock_agent_client_pool._mock_client
         mock_client.destroy_kernel.assert_not_awaited()
 
@@ -85,7 +91,9 @@ class TestSessionTerminatorTermination:
         Then: No agent calls made
         """
         with RecorderContext.scope("test", entity_ids=[]):
-            await terminator.terminate_sessions_for_handler([])
+            confirmed = await terminator.terminate_sessions_for_handler([])
+
+        assert confirmed == set()
 
         # Assert
         mock_client = mock_agent_client_pool._mock_client
@@ -113,10 +121,37 @@ class TestSessionTerminatorTermination:
         session_ids = [terminating_session_multi_kernel.session_id]
         with RecorderContext.scope("test", entity_ids=session_ids):
             # Act - Should not raise
-            await terminator.terminate_sessions_for_handler([terminating_session_multi_kernel])
+            confirmed = await terminator.terminate_sessions_for_handler([
+                terminating_session_multi_kernel
+            ])
 
-        # Assert - Both kernels attempted
+        # Assert - Both kernels attempted, and one refusal unconfirms the session
         assert mock_client.destroy_kernel.await_count == 2
+        assert confirmed == set()
+
+    async def test_only_the_session_whose_destroy_failed_is_unconfirmed(
+        self,
+        terminator: SessionTerminator,
+        mock_agent_client_pool: MagicMock,
+        terminating_sessions_multiple: list[TerminatingSessionData],
+    ) -> None:
+        refused, accepted = terminating_sessions_multiple
+        refused_kernel_id = refused.kernels[0].kernel_id
+
+        async def _destroy(kernel_id: KernelId, *args: object, **kwargs: object) -> None:
+            if kernel_id == refused_kernel_id:
+                raise RuntimeError("agent unreachable")
+
+        mock_client = mock_agent_client_pool._mock_client
+        mock_client.destroy_kernel.side_effect = _destroy
+
+        session_ids = [s.session_id for s in terminating_sessions_multiple]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            confirmed = await terminator.terminate_sessions_for_handler(
+                terminating_sessions_multiple
+            )
+
+        assert confirmed == {accepted.session_id}
 
     async def test_multiple_sessions_terminated_parallel(
         self,

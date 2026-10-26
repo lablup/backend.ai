@@ -12,6 +12,7 @@ Test Scenarios:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import nullcontext
 from datetime import datetime, timedelta
@@ -1499,6 +1500,7 @@ class TestScheduleCoordinatorCleanupLock:
         coordinator._operation_metrics = MagicMock()
         coordinator._operation_metrics.measure_operation.return_value = nullcontext()
         coordinator._config_provider = MagicMock()
+        coordinator._config_provider.config.manager.session_schedule_lock_lifetime = 30.0
         coordinator._lock_factory = MagicMock(side_effect=lock_factory)
         return coordinator
 
@@ -1533,3 +1535,41 @@ class TestScheduleCoordinatorCleanupLock:
             "execute",
             "release",
         ]
+
+    async def test_a_handler_stuck_past_the_lock_lifetime_gives_the_lock_back(
+        self,
+        coordinator: ScheduleCoordinator,
+        handler: MagicMock,
+        lock_events: list[str],
+    ) -> None:
+        """A pg advisory lock ignores its lifetime; the coordinator must end the wait itself."""
+        coordinator._config_provider.config.manager.session_schedule_lock_lifetime = 0.1
+
+        async def stuck(_: Any) -> None:
+            lock_events.append("execute")
+            await asyncio.Event().wait()  # a destroy RPC to an agent that died mid-connection
+
+        handler.execute = stuck
+
+        async with asyncio.timeout(5):
+            done = await coordinator._process_cleanup_schedule(
+                ScheduleType.CLEANUP_FORCE_TERMINATED, handler
+            )
+
+        assert done
+        assert lock_events[-1] == "release"
+
+    async def test_a_timeout_the_handler_raised_itself_is_not_swallowed(
+        self,
+        coordinator: ScheduleCoordinator,
+        handler: MagicMock,
+    ) -> None:
+        async def raises(_: Any) -> None:
+            raise TimeoutError("the handler's own timeout")
+
+        handler.execute = raises
+
+        with pytest.raises(TimeoutError):
+            await coordinator._process_cleanup_schedule(
+                ScheduleType.CLEANUP_FORCE_TERMINATED, handler
+            )

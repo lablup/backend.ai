@@ -6,9 +6,11 @@ Tests the client with real Redis operations for route health monitoring.
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from time import time
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import UUID, uuid4
 
 import pytest
@@ -946,6 +948,25 @@ class TestForceTerminatedCleanupQueue:
         await valkey_schedule_client.remove_force_terminated_sessions([sid_remove])
 
         assert await valkey_schedule_client.get_force_terminated_release_attempts() == {sid_keep: 1}
+
+    async def test_a_failed_release_failure_count_is_not_retried(
+        self, valkey_schedule_client: ValkeyScheduleClient
+    ) -> None:
+        """A retry after a lost reply would count the one failure twice."""
+        conn = AsyncMock()
+        conn.exec = AsyncMock(side_effect=ConnectionError("reply lost"))
+
+        @asynccontextmanager
+        async def _client() -> AsyncIterator[AsyncMock]:
+            yield conn
+
+        with patch.object(valkey_schedule_client, "_client", MagicMock(client=_client)):
+            with pytest.raises(ConnectionError):
+                await valkey_schedule_client.record_force_terminated_release_failure(
+                    SessionId(uuid4())
+                )
+
+        conn.exec.assert_awaited_once()
 
 
 class TestReplicaProbeTargetClient:

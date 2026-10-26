@@ -67,6 +67,13 @@ valkey_schedule_resilience = Resilience(
     ]
 )
 
+# For writes a retry could apply twice, such as an increment whose reply was lost.
+valkey_schedule_unretried_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.VALKEY, layer=LayerType.VALKEY_SCHEDULE)),
+    ]
+)
+
 
 @dataclass
 class HealthStatus:
@@ -1152,7 +1159,7 @@ class ValkeyScheduleClient:
             return {}
         return {SessionId(UUID(k.decode())): int(v) for k, v in raw.items()}
 
-    @valkey_schedule_resilience.apply()
+    @valkey_schedule_unretried_resilience.apply()
     async def record_force_terminated_release_failure(
         self,
         session_id: SessionId,
@@ -1160,6 +1167,7 @@ class ValkeyScheduleClient:
     ) -> int:
         """
         Count one failed network release of a force-terminated session.
+        Not retried: a lost reply would count the failure twice. The caller keeps the id queued.
 
         :return: The number of failed releases so far
         """
