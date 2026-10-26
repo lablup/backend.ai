@@ -88,7 +88,18 @@ class SystemSessionEnvironAdapter(BaseAdapter):
         self, input: AdminSearchSystemSessionEnvironsInput
     ) -> AdminSearchSystemSessionEnvironsPayload:
         """Search every system session environ row, at every scope (superadmin)."""
-        searcher = self._build_system_session_environ_searcher(input)
+        searcher = self._build_searcher(
+            SystemSessionEnvironSearcher,
+            conditions=self._convert_filter(input.filter) if input.filter else [],
+            orders=self._convert_orders(input.order) if input.order else [],
+            pagination_spec=_SYSTEM_SESSION_ENVIRON_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
         result = await self._system_session_environ.global_search.run(
             GlobalSearchSystemSessionEnvironsAction(
                 searcher=GlobalSearcher(used_by=(), searcher=searcher)
@@ -105,7 +116,18 @@ class SystemSessionEnvironAdapter(BaseAdapter):
         self, input: ScopedSearchSystemSessionEnvironsInput
     ) -> ScopedSearchSystemSessionEnvironsPayload:
         """Search the system session environ rows the named scopes reach, combined with OR."""
-        searcher = self._build_system_session_environ_searcher(input)
+        searcher = self._build_searcher(
+            SystemSessionEnvironSearcher,
+            conditions=self._convert_filter(input.filter) if input.filter else [],
+            orders=self._convert_orders(input.order) if input.order else [],
+            pagination_spec=_SYSTEM_SESSION_ENVIRON_PAGINATION_SPEC,
+            first=input.first,
+            after=input.after,
+            last=input.last,
+            before=input.before,
+            limit=input.limit,
+            offset=input.offset,
+        )
         result = await self._system_session_environ.scoped_search.run(
             ScopedSearchSystemSessionEnvironsAction(
                 searcher=ScopedSearcher(
@@ -135,23 +157,6 @@ class SystemSessionEnvironAdapter(BaseAdapter):
             else self.batch_load_failure(item.error)
             for item in result.items
         ]
-
-    def _build_system_session_environ_searcher(
-        self,
-        input: AdminSearchSystemSessionEnvironsInput | ScopedSearchSystemSessionEnvironsInput,
-    ) -> SystemSessionEnvironSearcher:
-        return self._build_searcher(
-            SystemSessionEnvironSearcher,
-            conditions=self._convert_filter(input.filter) if input.filter else [],
-            orders=self._convert_orders(input.order) if input.order else [],
-            pagination_spec=_SYSTEM_SESSION_ENVIRON_PAGINATION_SPEC,
-            first=input.first,
-            after=input.after,
-            last=input.last,
-            before=input.before,
-            limit=input.limit,
-            offset=input.offset,
-        )
 
     def _scope_targets(self, scope: SystemSessionEnvironScope) -> list[SystemSessionEnvironTarget]:
         targets: list[SystemSessionEnvironTarget] = [
