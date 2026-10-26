@@ -17,7 +17,11 @@ import pytest
 
 from ai.backend.agent.agent import AbstractAgent
 from ai.backend.agent.docker.agent import DockerKernelCreationContext
-from ai.backend.agent.errors.agent import ContainerCreationError, ContainerCreationFailedError
+from ai.backend.agent.errors.agent import (
+    ContainerCreationError,
+    ContainerCreationFailedError,
+    ContainerStartupCancelledError,
+)
 from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.types import ContainerLifecycleEvent, KernelLifecycleStatus, LifecycleEvent
@@ -87,11 +91,16 @@ class _Kernel(dict[str, Any]):
     def container_id(self) -> str | None:
         return cast(str | None, self["container_id"])
 
+    def set_container_id(self, cid: str) -> None:
+        self["container_id"] = cid
+
 
 def _agent(registry: dict[Any, Any] | None = None) -> Any:
     agent = SimpleNamespace(
         kernel_registry=registry if registry is not None else {},
         restarting_kernels={},
+        _deferred_destroys={},
+        container_lifecycle_queue=asyncio.Queue(),
         inject_container_lifecycle_event=AsyncMock(),
         reconstruct_resource_usage=AsyncMock(),
     )
@@ -162,11 +171,21 @@ class TestAFailedCreateThatRegisteredAKernel:
         assert agent.container_lifecycle_queue.empty()
 
     async def test_a_kernel_someone_else_already_destroyed_is_left_alone(self) -> None:
+        kernel = _Kernel("cid-1")
         agent = _agent({})
 
-        await _unwind(agent, _Kernel("cid-1"), [])
+        await _unwind(agent, kernel, [])
 
         agent.inject_container_lifecycle_event.assert_not_awaited()
+        assert agent.container_lifecycle_queue.empty()
+
+    async def test_a_kernel_destroyed_before_it_had_a_container_is_left_alone(self) -> None:
+        agent = _agent({})
+
+        await _unwind(agent, _Kernel(None), [])
+
+        agent.inject_container_lifecycle_event.assert_not_awaited()
+        assert agent.container_lifecycle_queue.empty()
 
     async def test_a_failed_re_creation_is_forgotten_not_kept_for_a_restart(self) -> None:
         kernel = _Kernel(None)
@@ -187,7 +206,42 @@ class TestAFailedCreateThatRegisteredAKernel:
         await _unwind(agent, kernel, [])
 
         agent.inject_container_lifecycle_event.assert_not_awaited()
+        assert agent.container_lifecycle_queue.empty()
         assert "k1" not in agent.restarting_kernels, "that DESTROY's CLEAN would keep it"
+
+    @pytest.mark.parametrize("container_id", ["cid-1", None], ids=["container", "no-container"])
+    async def test_a_held_destroy_is_sent_with_what_the_create_made(
+        self, container_id: str | None
+    ) -> None:
+        kernel = _Kernel(container_id)
+        kernel.state = KernelLifecycleStatus.TERMINATING
+        agent = _agent({"k1": kernel})
+        agent.restarting_kernels["k1"] = MagicMock()
+        done: asyncio.Future[Any] = asyncio.get_running_loop().create_future()
+        agent._deferred_destroys["k1"] = [
+            ContainerLifecycleEvent(
+                cast(Any, "k1"),
+                cast(Any, "s1"),
+                None,
+                LifecycleEvent.DESTROY,
+                KernelLifecycleEventReason.USER_REQUESTED,
+                done_future=done,
+            )
+        ]
+
+        await _unwind(agent, kernel, [])
+
+        agent.inject_container_lifecycle_event.assert_not_awaited()
+        ev = agent.container_lifecycle_queue.get_nowait()
+        assert (ev.event, ev.reason, ev.container_id) == (
+            LifecycleEvent.DESTROY,
+            KernelLifecycleEventReason.USER_REQUESTED,
+            container_id,
+        )
+        assert ev.done_future is done, "the manager waits on this DESTROY"
+        assert agent.container_lifecycle_queue.empty()
+        assert agent._deferred_destroys == {}
+        assert "k1" not in agent.restarting_kernels
 
     async def test_the_destroy_survives_the_cancellation_that_triggered_it(self) -> None:
         kernel = _Kernel("cid-1")
@@ -208,6 +262,112 @@ class TestAFailedCreateThatRegisteredAKernel:
         await asyncio.sleep(0.1)
 
         assert getattr(agent, "destroyed", False), "the teardown was cancelled halfway"
+
+
+class TestADestroyThatComesBeforeTheContainer:
+    """A DESTROY that comes while the create has no container waits for the create to finish."""
+
+    def _agent(self, kernel_id: Any, kernel: _Kernel) -> Any:
+        agent = SimpleNamespace(
+            _ongoing_destruction_tasks={},
+            _active_creates={kernel_id: MagicMock()},
+            _deferred_destroys={},
+            stat_ctx=SimpleNamespace(remove_kernel_metric=AsyncMock()),
+            registry_lock=asyncio.Lock(),
+            kernel_registry={kernel_id: kernel},
+            restarting_kernels={},
+            container_lifecycle_queue=asyncio.Queue(),
+            destroy_kernel=AsyncMock(),
+            clean_kernel=AsyncMock(),
+            _restore_ports=MagicMock(),
+            reconstruct_resource_usage=AsyncMock(),
+            anycast_and_broadcast_event=AsyncMock(),
+            produce_error_event=AsyncMock(),
+        )
+        agent._take_back_failed_create = functools.partial(
+            AbstractAgent._take_back_failed_create, cast(Any, agent)
+        )
+        return agent
+
+    async def _handle(self, agent: Any, ev: ContainerLifecycleEvent) -> None:
+        # Each in its own task, as `process_lifecycle_events` runs them.
+        if ev.event == LifecycleEvent.DESTROY:
+            await asyncio.create_task(AbstractAgent._handle_destroy_event(cast(Any, agent), ev))
+        else:
+            await asyncio.create_task(AbstractAgent._handle_clean_event(cast(Any, agent), ev))
+
+    async def _drain(self, agent: Any) -> None:
+        while not agent.container_lifecycle_queue.empty():
+            await self._handle(agent, agent.container_lifecycle_queue.get_nowait())
+
+    def _destroy(
+        self, kernel_id: Any, session_id: Any, done: Any = None
+    ) -> ContainerLifecycleEvent:
+        return ContainerLifecycleEvent(
+            kernel_id,
+            session_id,
+            None,
+            LifecycleEvent.DESTROY,
+            KernelLifecycleEventReason.USER_REQUESTED,
+            done_future=done,
+        )
+
+    @pytest.mark.parametrize("container_id", ["cid-1", None], ids=["container", "no-container"])
+    async def test_nothing_is_torn_down_until_the_create_sends_it(
+        self, container_id: str | None
+    ) -> None:
+        kernel_id, session_id = KernelId(uuid.uuid4()), SessionId(uuid.uuid4())
+        kernel = _Kernel(None)
+        kernel["host_ports"] = [30001]
+        agent = self._agent(kernel_id, kernel)
+        done: asyncio.Future[Any] = asyncio.get_running_loop().create_future()
+
+        await self._handle(agent, self._destroy(kernel_id, session_id, done))
+
+        agent.destroy_kernel.assert_not_awaited()
+        assert agent.container_lifecycle_queue.empty(), "a CLEAN ran under the live create"
+        agent._restore_ports.assert_not_called()
+        assert not done.done()
+
+        # The create goes on, then fails with or without a container.
+        if container_id is not None:
+            kernel.set_container_id(container_id)
+        await _unwind(agent, kernel, [], kernel_id, session_id)
+        await self._drain(agent)
+
+        agent.destroy_kernel.assert_awaited_once_with(kernel_id, container_id)
+        agent.clean_kernel.assert_awaited_once_with(kernel_id, container_id, False)
+        assert kernel_id not in agent.kernel_registry
+        agent._restore_ports.assert_called_once_with([30001])
+        agent.anycast_and_broadcast_event.assert_awaited_once()
+        anycast, _ = agent.anycast_and_broadcast_event.await_args.args
+        assert anycast.reason == KernelLifecycleEventReason.USER_REQUESTED
+        assert done.done()
+
+    async def test_a_second_destroy_is_held_too(self) -> None:
+        kernel_id, session_id = KernelId(uuid.uuid4()), SessionId(uuid.uuid4())
+        kernel = _Kernel(None)
+        agent = self._agent(kernel_id, kernel)
+
+        await self._handle(agent, self._destroy(kernel_id, session_id))
+        await self._handle(agent, self._destroy(kernel_id, session_id))
+
+        agent.destroy_kernel.assert_not_awaited()
+        assert len(agent._deferred_destroys[kernel_id]) == 2
+
+    async def test_a_container_recorded_after_the_destroy_was_injected_is_destroyed(
+        self,
+    ) -> None:
+        kernel_id, session_id = KernelId(uuid.uuid4()), SessionId(uuid.uuid4())
+        kernel = _Kernel("cid-1")
+        agent = self._agent(kernel_id, kernel)
+
+        await self._handle(agent, self._destroy(kernel_id, session_id))
+
+        assert agent._deferred_destroys == {}
+        agent.destroy_kernel.assert_awaited_once_with(kernel_id, "cid-1")
+        ev = agent.container_lifecycle_queue.get_nowait()
+        assert (ev.event, ev.container_id) == (LifecycleEvent.CLEAN, "cid-1")
 
 
 class TestAFailedCreateThatRegisteredNothing:
@@ -434,6 +594,22 @@ class TestARestartWhoseReCreationFails:
 
         assert kernel_id not in agent.restarting_kernels
 
+    @pytest.mark.parametrize(
+        "failure", [RuntimeError("no image"), asyncio.CancelledError()], ids=["error", "cancel"]
+    )
+    async def test_the_failure_is_left_to_the_caller_to_log(self, failure: BaseException) -> None:
+        kernel_id = uuid.uuid4()
+        agent = self._agent(kernel_id, {}, AsyncMock(side_effect=failure))
+
+        with (
+            patch("ai.backend.agent.agent.log") as log,
+            pytest.raises(type(failure)),
+        ):
+            await self._restart(agent, kernel_id)
+
+        log.exception.assert_not_called()
+        assert kernel_id not in agent.restarting_kernels
+
 
 class _StartKernel(dict[str, Any]):
     def __init__(self) -> None:
@@ -565,9 +741,7 @@ class _CreatedKernel(_Kernel):
     def __init__(self) -> None:
         super().__init__(None)
         self.session_type: SessionTypes | None = None
-
-    def set_container_id(self, container_id: ContainerId) -> None:
-        self["container_id"] = container_id
+        self.data: dict[str, Any] = {}
 
 
 class TestCreateKernelWhoseContainerStartFails:
@@ -614,6 +788,7 @@ class TestCreateKernelWhoseContainerStartFails:
         local_config.resource.allocation_order = []
         agent = SimpleNamespace(
             _active_creates={},
+            _deferred_destroys={},
             local_config=local_config,
             kernel_registry={},
             restarting_kernels={},
@@ -682,3 +857,51 @@ class TestCreateKernelWhoseContainerStartFails:
         assert [(ev.event, ev.reason, ev.container_id) for ev in queued] == [
             (LifecycleEvent.DESTROY, KernelLifecycleEventReason.FAILED_TO_CREATE, container_id)
         ]
+
+    async def test_a_destroy_held_during_the_start_is_sent_with_the_container(self) -> None:
+        kernel_id = KernelId(uuid.uuid4())
+        ctx = self._context(kernel_id, RuntimeError("unused"))
+        agent = self._creating_agent(ctx)
+        session_id = SessionId(uuid.uuid4())
+
+        async def _starts_while_destroyed(*args: Any, **kwargs: Any) -> dict[str, Any]:
+            agent._deferred_destroys[kernel_id] = [
+                ContainerLifecycleEvent(
+                    kernel_id,
+                    session_id,
+                    None,
+                    LifecycleEvent.DESTROY,
+                    KernelLifecycleEventReason.USER_REQUESTED,
+                )
+            ]
+            return {"container_id": "cid-1"}
+
+        ctx.start_container = AsyncMock(side_effect=_starts_while_destroyed)
+        kernel_config = {
+            "environ": {},
+            "image": {"labels": {}, "digest": "sha256:0", "registry": {}},
+            "resource_opts": {},
+            "mounts": [],
+            "session_type": SessionTypes.INTERACTIVE,
+        }
+
+        with (
+            patch("ai.backend.agent.agent.get_arch_name", return_value="x86_64"),
+            patch("ai.backend.agent.agent.allocate"),
+            pytest.raises(ContainerStartupCancelledError),
+        ):
+            await AbstractAgent.create_kernel(
+                cast(Any, agent),
+                cast(Any, SimpleNamespace(kernel_id=kernel_id, session_id=session_id)),
+                MagicMock(),
+                cast(Any, kernel_config),
+                cast(Any, {}),
+            )
+
+        queued: list[ContainerLifecycleEvent] = []
+        while not agent.container_lifecycle_queue.empty():
+            queued.append(agent.container_lifecycle_queue.get_nowait())
+        assert [(ev.event, ev.reason, ev.container_id) for ev in queued] == [
+            (LifecycleEvent.DESTROY, KernelLifecycleEventReason.USER_REQUESTED, "cid-1")
+        ]
+        assert agent._deferred_destroys == {}

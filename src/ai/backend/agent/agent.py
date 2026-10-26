@@ -877,6 +877,8 @@ class AbstractAgent[
     # Health monitoring tracking
     _active_pulls: dict[str, PullTaskInfo]  # key: image canonical name
     _active_creates: dict[KernelId, CreateTaskInfo]
+    # DESTROYs that came while a create had no container yet; that create sends them.
+    _deferred_destroys: dict[KernelId, list[ContainerLifecycleEvent]]
 
     @contextmanager
     def track_pull(self, image: str) -> Generator[bool, None, None]:
@@ -962,6 +964,7 @@ class AbstractAgent[
         # Initialize health monitoring tracking maps
         self._active_pulls = {}
         self._active_creates = {}
+        self._deferred_destroys = {}
         self._sync_container_lifecycle_observer = SyncContainerLifecycleObserver.instance()
         self._clean_kernel_registry_task = asyncio.create_task(self._clean_kernel_registry_loop())
 
@@ -1432,6 +1435,7 @@ class AbstractAgent[
                 raise AsyncioTaskNotAvailableError("No current asyncio task is available.")
             if ev.kernel_id not in self._ongoing_destruction_tasks:
                 self._ongoing_destruction_tasks[ev.kernel_id] = current_task
+            container_id = ev.container_id
             async with self.registry_lock:
                 kernel_obj = self.kernel_registry.get(ev.kernel_id)
                 if kernel_obj is None:
@@ -1454,13 +1458,29 @@ class AbstractAgent[
                         ev.set_done_future_result(None)
                         return
                 else:
+                    if (
+                        kernel_obj.container_id is None
+                        and ev.kernel_id in self._active_creates
+                        and (
+                            ev.kernel_id in self._deferred_destroys
+                            or kernel_obj.state != KernelLifecycleStatus.TERMINATING
+                        )
+                    ):
+                        # The create has no container yet; `_unwind_failed_create` sends this
+                        # DESTROY once the create knows what it made.
+                        kernel_obj.state = KernelLifecycleStatus.TERMINATING
+                        self._deferred_destroys.setdefault(ev.kernel_id, []).append(ev)
+                        return
+                    if container_id is None:
+                        # Made after this DESTROY was injected.
+                        container_id = kernel_obj.container_id
                     kernel_obj.state = KernelLifecycleStatus.TERMINATING
                     kernel_obj.termination_reason = ev.reason
                     if kernel_obj.runner is not None:
                         await kernel_obj.runner.close()
                     kernel_obj.clean_event = ev.done_future
                 try:
-                    await self.destroy_kernel(ev.kernel_id, ev.container_id)
+                    await self.destroy_kernel(ev.kernel_id, container_id)
                 except Exception as e:
                     ev.set_done_future_exception(e)
                     raise
@@ -1471,7 +1491,7 @@ class AbstractAgent[
                         ContainerLifecycleEvent(
                             ev.kernel_id,
                             ev.session_id,
-                            ev.container_id,
+                            container_id,
                             LifecycleEvent.CLEAN,
                             ev.reason,
                             suppress_events=ev.suppress_events,
@@ -2590,7 +2610,9 @@ class AbstractAgent[
     ) -> None:
         """A kernel this create registered gets exactly one lifecycle DESTROY, whose CLEAN frees
         its scratch, ports and devices. Before registration, the undo stack runs in reverse.
+        A DESTROY held while the create had no container is sent instead.
         """
+        deferred = self._deferred_destroys.pop(kernel_id, [])
         if registered is None:
             for undo in reversed(made):
                 try:
@@ -2602,14 +2624,33 @@ class AbstractAgent[
                         session_id=session_id,
                     )
             await self.reconstruct_resource_usage()
+        else:
+            if self.kernel_registry.get(kernel_id) is registered:
+                # A failed re-creation ends the kernel: CLEAN must forget it, not keep it.
+                self.restarting_kernels.pop(kernel_id, None)
+        if deferred:
+            # Held while this create had no container; sent now with the one it made, if any.
+            container_id = registered.container_id if registered is not None else None
+            for ev in deferred:
+                await self.container_lifecycle_queue.put(
+                    ContainerLifecycleEvent(
+                        kernel_id,
+                        session_id,
+                        container_id,
+                        LifecycleEvent.DESTROY,
+                        ev.reason,
+                        done_future=ev.done_future,
+                        suppress_events=ev.suppress_events,
+                    ),
+                )
+            return
+        if registered is None:
             return
         if self.kernel_registry.get(kernel_id) is not registered:
             # Already destroyed by someone else, whose CLEAN took everything back.
             return
-        # A failed re-creation ends the kernel: CLEAN must forget it, not keep it for a restart.
-        self.restarting_kernels.pop(kernel_id, None)
         if registered.state == KernelLifecycleStatus.TERMINATING:
-            # A DESTROY (e.g. the manager's) is already running; its CLEAN takes everything back.
+            # A DESTROY that knew the container is running; its CLEAN takes everything back.
             return
         await self.inject_container_lifecycle_event(
             kernel_id,
@@ -3040,9 +3081,9 @@ class AbstractAgent[
                         # Only record the container; `_unwind_failed_create` owns the DESTROY.
                         if e.container_id:
                             async with self.registry_lock:
-                                self.kernel_registry[ctx.kernel_id].set_container_id(
-                                    ContainerId(e.container_id)
-                                )
+                                # The object, not the registry: a concurrent CLEAN may have
+                                # dropped it.
+                                kernel_obj.set_container_id(ContainerId(e.container_id))
                         raise ContainerCreationFailedError(
                             f"Kernel failed to create container (k:{ctx.kernel_id!s}, detail:{msg})"
                         ) from e
@@ -3058,6 +3099,11 @@ class AbstractAgent[
                         if "container_id" in container_data:
                             self.kernel_registry[kernel_id].set_container_id(
                                 container_data["container_id"]
+                            )
+                        if kernel_id in self._deferred_destroys:
+                            # Destroyed while its container was being made.
+                            raise ContainerStartupCancelledError(
+                                f"Kernel destroyed during container creation (k:{kernel_id!s})"
                             )
                     await kernel_obj.init(self.event_producer)
                     log.debug(
@@ -3490,7 +3536,7 @@ class AbstractAgent[
                         restarting=True,
                     )
                 except BaseException:
-                    log.exception("kernel re-creation on restart failed")
+                    # Not logged here: the RPC handler reports the raised failure.
                     self.restarting_kernels.pop(kernel_id, None)
                     await self._forget_kernel_of_failed_restart(kernel_id, session_id, old_kernel)
                     raise
