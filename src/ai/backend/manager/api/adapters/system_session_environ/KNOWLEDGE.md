@@ -1,15 +1,15 @@
 ---
 name: system-session-environ-adapter-scenarios
 type: reference
-description: what the system session environ adapter guarantees, as scenarios; superadmin search of every row at every scope with filters, the default order and pages, the monitor role passing the search, the read by ids checked per row against the public, domain and project member grants
+description: what the system session environ adapter guarantees, as scenarios; superadmin search of every row at every scope with filters, the default order and pages, the monitor role passing the search, the search within named public, domain and project scopes, the read by ids checked per row against the public, domain and project member grants
 scope: src/ai/backend/manager/api/adapters/system_session_environ
-keywords: [system session environ, scenario, adapter, superadmin, monitor, global_search, bulk_get_ids, partial bulk]
+keywords: [system session environ, scenario, adapter, superadmin, monitor, global_search, scoped_search, bulk_get_ids, partial bulk]
 generated:
   by: claude-code/opus-5.5
   at: 2026-10-23
 updated:
   by: claude-code/opus-5.5
-  at: 2026-10-23
+  at: 2026-10-26
 status: draft
 ---
 # 시스템 세션 환경변수 어댑터 — 시나리오
@@ -18,7 +18,8 @@ status: draft
 의심한다.
 
 시스템 세션 환경변수 행은 public 스코프, 도메인 스코프, 프로젝트 스코프 중 하나에 만들어진다.
-이 어댑터는 모든 행을 검색하는 호출과 id로 여러 행을 읽는 호출을 제공한다.
+이 어댑터는 모든 행을 검색하는 호출, 지정한 스코프 안에서 검색하는 호출, id로 여러 행을 읽는 호출을
+제공한다.
 
 검색은 전역 superadmin 역할 검사로 보호된다. 세션에 실제로 주입되는 행을 고르지 않고, 스코프와
 켜짐 여부에 상관없이 조건에 맞는 행을 모두 반환한다.
@@ -44,6 +45,22 @@ id로 여러 행을 읽을 때는 행마다 권한을 검사한다. 모든 사�
 어댑터를 부르기 전에 superadmin만 통과시키므로, 모니터 역할의 검색은 어댑터를 직접 부를 때만
 통과한다.
 
+## 스코프 안에서 검색
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 프로젝트 구성원이 자기 프로젝트의 행을 검색한다 | public 스코프, 한 도메인, 그 도메인의 한 프로젝트에 행을 하나씩 미리 만들어 둠. 프로젝트의 행은 꺼져 있음. 그 프로젝트의 구성원 | 그 프로젝트를 스코프로 지정해 검색 | 프로젝트의 행만 반환된다. 꺼진 행도 반환된다 |
+| 프로젝트 구성원이 다른 프로젝트의 행을 검색한다 | 두 프로젝트에 행을 하나씩 미리 만들어 둠, 한 프로젝트의 구성원 | 다른 프로젝트를 스코프로 지정해 검색 | 권한 부족으로 거부 |
+| 도메인 구성원이 자기 도메인의 행을 검색한다 | "프로젝트 구성원이 자기 프로젝트의 행을 검색한다"와 같은 행, 그 도메인의 구성원 | 그 도메인을 스코프로 지정해 검색 | 도메인의 행과 그 도메인에 속한 프로젝트의 행이 반환된다 |
+| 도메인 구성원이 다른 도메인의 행을 검색한다 | 두 도메인에 행을 하나씩 미리 만들어 둠, 한 도메인의 구성원 | 다른 도메인을 스코프로 지정해 검색 | 권한 부족으로 거부 |
+| 도메인과 프로젝트의 권한이 없는 사용자가 public 스코프의 행을 검색한다 | "프로젝트 구성원이 자기 프로젝트의 행을 검색한다"와 같은 행, 어느 도메인과 프로젝트의 읽기 권한도 받지 않은 사용자 | public 스코프를 지정해 검색 | public 스코프의 행만 반환된다 |
+| 여러 스코프를 함께 지정한다 | "프로젝트 구성원이 자기 프로젝트의 행을 검색한다"와 같은 행, 그 프로젝트의 구성원 | public 스코프와 그 프로젝트를 함께 지정해 검색 | public 스코프의 행과 프로젝트의 행이 반환된다 |
+| 읽을 수 없는 스코프를 하나 섞어 지정한다 | 두 프로젝트에 행을 하나씩 미리 만들어 둠, 한 프로젝트의 구성원 | 자기 프로젝트와 다른 프로젝트를 함께 지정해 검색 | 호출 전체가 권한 부족으로 거부 |
+| 스코프를 하나도 지정하지 않는다 | superadmin | 스코프 없이 검색 | 입력 검증에서 거부 |
+
+도메인 스코프는 그 도메인에 속한 프로젝트까지 닿는다. 권한 그래프가 도메인 아래에 프로젝트를 두기
+때문이다.
+
 ## id로 여러 행 읽기
 
 | 시나리오 | 상황 | 요청 | 결과 |
@@ -63,6 +80,6 @@ id로 여러 행을 읽을 때는 행마다 권한을 검사한다. 모든 사�
 
 ## 아직 적지 않은 것
 
-없다. 어댑터가 제공하는 전체 검색과 id로 여러 행 읽기가 모두 위에 있다.
+없다. 어댑터가 제공하는 전체 검색, 스코프 안에서 검색, id로 여러 행 읽기가 모두 위에 있다.
 
 모든 어댑터가 물려받는 공용 도우미는 이 엔티티의 호출이 아니므로 적을 시나리오가 없다.

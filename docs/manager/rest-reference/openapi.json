@@ -37863,6 +37863,175 @@
         "title": "AdminSearchSystemSessionEnvironsInput",
         "type": "object"
       },
+      "SystemSessionEnvironScope": {
+        "description": "Scope for the scoped system session environ query.\n\nEach list is OR'd internally and across lists. Raises an error if every field is empty.",
+        "properties": {
+          "domain": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Domains whose rows are being read",
+            "title": "Domain"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Projects whose rows are being read",
+            "title": "Project"
+          },
+          "public": {
+            "default": false,
+            "description": "Include the rows registered in public",
+            "title": "Public",
+            "type": "boolean"
+          }
+        },
+        "title": "SystemSessionEnvironScope",
+        "type": "object"
+      },
+      "ScopedSearchSystemSessionEnvironsInput": {
+        "description": "Input for searching the system session environ rows the named scopes reach.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/SystemSessionEnvironScope",
+            "description": "Scope (OR across all items)."
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemSessionEnvironFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SystemSessionEnvironOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip.",
+            "title": "Offset"
+          }
+        },
+        "required": [
+          "scope"
+        ],
+        "title": "ScopedSearchSystemSessionEnvironsInput",
+        "type": "object"
+      },
       "ArrayFilter_int_": {
         "properties": {
           "contains": {
@@ -65452,6 +65621,35 @@
         },
         "parameters": [],
         "description": "Search every system session environ row, at every scope (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/system-session-environs/scoped/search": {
+      "post": {
+        "operationId": "v2/system-session-environs.scoped_search",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScopedSearchSystemSessionEnvironsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search the system session environ rows the named scopes reach.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/users/search": {

@@ -343,6 +343,9 @@ from ai.backend.manager.services.system_session_environ.actions.bulk_get import 
 from ai.backend.manager.services.system_session_environ.actions.global_search import (
     GlobalSearchSystemSessionEnvironsAction,
 )
+from ai.backend.manager.services.system_session_environ.actions.scoped_search import (
+    ScopedSearchSystemSessionEnvironsAction,
+)
 from ai.backend.manager.services.system_session_environ.processors import (
     SystemSessionEnvironProcessors,
 )
@@ -987,7 +990,8 @@ def test_vfs_storage_loader_read_is_a_partial_permission_read() -> None:
 
 
 def test_system_session_environ_reads_keep_their_judged_gates() -> None:
-    """The search reads every row under the global gate; the DataLoader reads per named row."""
+    """The admin search reads every row under the global gate, the scoped search is authorized
+    against the named scopes, and the DataLoader reads per named row."""
     registry = _ops_registry()
     SystemSessionEnvironProcessors(registry.group(GroupMeta(SystemSessionEnvironEntityType())))
 
@@ -995,6 +999,11 @@ def test_system_session_environ_reads_keep_their_judged_gates() -> None:
         GlobalSearchSystemSessionEnvironsAction: (
             SystemSessionEnvironEntityType(),
             ActionKind.GLOBAL,
+            ActionGate.PERMISSION,
+        ),
+        ScopedSearchSystemSessionEnvironsAction: (
+            SystemSessionEnvironEntityType(),
+            ActionKind.SCOPE,
             ActionGate.PERMISSION,
         ),
         BulkGetSystemSessionEnvironsAction: (
