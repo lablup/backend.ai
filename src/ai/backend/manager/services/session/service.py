@@ -101,6 +101,7 @@ from ai.backend.manager.errors.resource import (
     NoCurrentTaskContext,
     SessionTemplateNotFound,
 )
+from ai.backend.manager.errors.session_group import SessionGroupInUseForEnqueue
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.session.row import (
@@ -1503,15 +1504,19 @@ class SessionService:
             access_key = owner_access_key
             domain_name = owner.domain_name
 
-        session_group_searcher = action.to_session_group_searcher(user_id)
-        if session_group_searcher is not None:
-            session_groups = await self._scheduler_repository.search_session_groups(
-                session_group_searcher
-            )
-            if not session_groups:
+        owned_session_group_searcher = action.to_owned_session_group_searcher(user_id)
+        held_session_group_searcher = action.to_held_session_group_searcher(user_id)
+        if owned_session_group_searcher is not None and held_session_group_searcher is not None:
+            if not await self._scheduler_repository.search_session_groups(
+                owned_session_group_searcher
+            ):
                 raise EntityNotFoundError(
                     f"Session group {action.session_group_id} not found",
                     entity_type=SessionGroupEntityType(),
+                )
+            if await self._scheduler_repository.search_session_groups(held_session_group_searcher):
+                raise SessionGroupInUseForEnqueue(
+                    f"Session group {action.session_group_id} is used by a replica group"
                 )
 
         # Keep the image resolve so callers passing a stale UUID get a

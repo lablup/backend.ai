@@ -40,7 +40,7 @@ shape, operation, gate and backing.
 | `global_search` | Not left out: the superadmin sees every group |
 | `update` | `SessionGroupUpdater` carries the condition as a `GuardCheck`; a held group is refused as in use (409) |
 | `purge` | The purger's guard rides on the DELETE; a held group is refused as in use (409) |
-| session `enqueue` | `EnqueueSessionAction.to_session_group_searcher` carries the condition; a held group answers not found |
+| session `enqueue` | `EnqueueSessionAction.to_held_session_group_searcher` carries the condition; the owner's held group is refused as in use (409), any other group answers not found |
 
 - The condition is `SessionGroupSearchableFields.linked.replica_groups.not_exists()`, one
   declaration every path reads.
@@ -48,6 +48,8 @@ shape, operation, gate and backing.
   through the project, so the permission is not what keeps it out.
 - The update and the purge refuse a held group as in use: only a caller holding UPDATE or
   PURGE on the group reaches the guard, and the deployment manages the group it references.
+- The enqueue refuses a held group as in use only to its owner in its project; to anyone
+  else the group answers not found, since the enqueue checks no permission on the group.
 
 ## The reads by id keep a service
 

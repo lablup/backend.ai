@@ -22,6 +22,7 @@ from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementEnforcement,
 )
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.session_group import SessionGroupInUseForEnqueue
 from ai.backend.manager.services.session.actions.enqueue_session import (
     EnqueueSessionAction,
     ResourceSlotEntry,
@@ -116,23 +117,39 @@ class TestEnqueueSessionGroup:
         scheduling_controller: MagicMock,
         action: EnqueueSessionAction,
     ) -> None:
-        scheduler_repository.search_session_groups = AsyncMock(return_value=[_session_group()])
+        scheduler_repository.search_session_groups = AsyncMock(side_effect=[[_session_group()], []])
 
         await session_service.enqueue_session(action)
 
         draft = scheduling_controller.enqueue_session_from_draft.call_args.args[0]
         assert draft.scope.session_group_id == _SESSION_GROUP_ID
 
-    async def test_refuses_a_group_the_search_does_not_answer(
+    async def test_refuses_a_group_the_owner_does_not_have_as_not_found(
         self,
         session_service: SessionService,
         scheduler_repository: MagicMock,
         scheduling_controller: MagicMock,
         action: EnqueueSessionAction,
     ) -> None:
-        scheduler_repository.search_session_groups = AsyncMock(return_value=[])
+        scheduler_repository.search_session_groups = AsyncMock(side_effect=[[]])
 
         with pytest.raises(EntityNotFoundError):
+            await session_service.enqueue_session(action)
+
+        scheduling_controller.enqueue_session_from_draft.assert_not_called()
+
+    async def test_refuses_the_owners_group_a_replica_group_holds_as_in_use(
+        self,
+        session_service: SessionService,
+        scheduler_repository: MagicMock,
+        scheduling_controller: MagicMock,
+        action: EnqueueSessionAction,
+    ) -> None:
+        scheduler_repository.search_session_groups = AsyncMock(
+            side_effect=[[_session_group()], [_session_group()]]
+        )
+
+        with pytest.raises(SessionGroupInUseForEnqueue):
             await session_service.enqueue_session(action)
 
         scheduling_controller.enqueue_session_from_draft.assert_not_called()

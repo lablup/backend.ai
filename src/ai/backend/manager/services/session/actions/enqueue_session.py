@@ -17,6 +17,7 @@ from ai.backend.common.types import AccessKey, ClusterMode, MountInfoEntry, Sess
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionData
+from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.session_group.searchable_fields import SessionGroupSearchableFields
 from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
@@ -129,28 +130,46 @@ class EnqueueSessionAction(SessionScopeAction):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
-    def to_session_group_searcher(self, owner_user_id: uuid.UUID) -> SessionGroupSearcher | None:
-        """The live session group named, owned by ``owner_user_id`` in the project and not held
-        by a replica group; ``None`` when none is named."""
-        if self.session_group_id is None:
+    def to_owned_session_group_searcher(
+        self, owner_user_id: uuid.UUID
+    ) -> SessionGroupSearcher | None:
+        """The live session group named, owned by ``owner_user_id`` in the project;
+        ``None`` when none is named."""
+        conditions = self._owned_session_group_conditions(owner_user_id)
+        if conditions is None:
             return None
-        fields = SessionGroupSearchableFields
+        return SessionGroupSearcher(pagination=NoPagination(), conditions=conditions)
+
+    def to_held_session_group_searcher(
+        self, owner_user_id: uuid.UUID
+    ) -> SessionGroupSearcher | None:
+        """The owned session group named, only when a replica group holds it;
+        ``None`` when none is named."""
+        conditions = self._owned_session_group_conditions(owner_user_id)
+        if conditions is None:
+            return None
         return SessionGroupSearcher(
             pagination=NoPagination(),
             conditions=[
-                fields.own.id.filter.equals(
-                    UUIDEqualMatchSpec(value=self.session_group_id, negated=False)
-                ),
-                fields.own.owner_user_id.filter.equals(
-                    UUIDEqualMatchSpec(value=owner_user_id, negated=False)
-                ),
-                fields.own.project_id.filter.equals(
-                    UUIDEqualMatchSpec(value=self.group_id, negated=False)
-                ),
-                fields.own.deleted_at.filter.is_null(),
-                fields.linked.replica_groups.not_exists(),
+                *conditions,
+                SessionGroupSearchableFields.linked.replica_groups.exists(),
             ],
         )
+
+    def _owned_session_group_conditions(
+        self, owner_user_id: uuid.UUID
+    ) -> list[QueryCondition] | None:
+        if self.session_group_id is None:
+            return None
+        fields = SessionGroupSearchableFields.own
+        return [
+            fields.id.filter.equals(UUIDEqualMatchSpec(value=self.session_group_id, negated=False)),
+            fields.owner_user_id.filter.equals(
+                UUIDEqualMatchSpec(value=owner_user_id, negated=False)
+            ),
+            fields.project_id.filter.equals(UUIDEqualMatchSpec(value=self.group_id, negated=False)),
+            fields.deleted_at.filter.is_null(),
+        ]
 
 
 @dataclass
