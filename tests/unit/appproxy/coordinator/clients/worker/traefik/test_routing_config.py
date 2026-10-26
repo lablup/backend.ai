@@ -7,11 +7,13 @@ from unittest.mock import Mock
 import pytest
 
 from ai.backend.appproxy.common.config import PermitHashConfig, SecretConfig
-from ai.backend.appproxy.coordinator.clients.worker.traefik_routing_config import (
-    IpAllowListMiddlewareConfig,
-    TcpRouterConfig,
+from ai.backend.appproxy.coordinator.clients.worker.traefik.routing_config import (
     TraefikRoutingConfigFactory,
     TraefikRoutingConfigFactoryArgs,
+)
+from ai.backend.appproxy.coordinator.clients.worker.traefik.types import (
+    IpAllowListMiddlewareConfig,
+    TcpRouterConfig,
 )
 from ai.backend.appproxy.coordinator.config import ClientIPStrategyConfig, TraefikConfig
 from ai.backend.common.dto.appproxy.v2.ingress.types import (
