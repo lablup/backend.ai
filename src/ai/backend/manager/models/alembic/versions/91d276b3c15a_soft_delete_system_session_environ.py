@@ -4,7 +4,7 @@ A disabled row becomes a soft-deleted one, and deleted_at alone says whether a r
 soft-deleted.
 
 Revision ID: 91d276b3c15a
-Revises: f73d1b0ee986
+Revises: a7c3e9d1b5f2
 Create Date: 2026-10-26
 
 """
@@ -15,7 +15,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "91d276b3c15a"  # Part of: NEXT_RELEASE_VERSION
-down_revision = "f73d1b0ee986"
+down_revision = "a7c3e9d1b5f2"
 branch_labels = None
 depends_on = None
 
