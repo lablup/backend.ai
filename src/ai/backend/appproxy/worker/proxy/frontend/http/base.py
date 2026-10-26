@@ -14,6 +14,7 @@ from ai.backend.appproxy.common.defs import (
     PERMIT_COOKIE_NAME,
 )
 from ai.backend.appproxy.common.errors import ClientIPNotAllowed, InvalidCredentials
+from ai.backend.appproxy.common.errors.http import UnsupportedContentEncoding
 from ai.backend.appproxy.common.types import RouteInfo, WebRequestHandler
 from ai.backend.appproxy.common.utils import ensure_json_serializable, is_permit_valid, mime_match
 from ai.backend.appproxy.worker.proxy.backend.http import HTTPBackend
@@ -117,7 +118,18 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
             and request.headers.get("upgrade", "").lower() == "websocket"
         )
 
+    def _is_brotli_encoded_request(self, request: web.Request) -> bool:
+        return any(
+            coding.strip().lower() == "br"
+            for header_value in request.headers.getall(hdrs.CONTENT_ENCODING, [])
+            for coding in header_value.split(",")
+        )
+
     async def proxy(self, request: web.Request) -> web.StreamResponse | web.WebSocketResponse:
+        # Session images may ship a Brotli decoder vulnerable to CVE-2026-111497.
+        if self._is_brotli_encoded_request(request):
+            log.trace("rejecting a Brotli-encoded request body from {}", request.remote)
+            raise UnsupportedContentEncoding("Brotli-encoded request bodies are not accepted")
         backend: HTTPBackend = request["backend"]
 
         if self._is_websocket_request(request):
