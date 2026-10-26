@@ -10,14 +10,12 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironID
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironScopeInfo,
-    SystemSessionEnvironSourceKind,
 )
 
 __all__ = (
     "AdminSearchSystemSessionEnvironsPayload",
     "ListSystemSessionEnvironValueSourcesPayload",
     "SystemSessionEnvironNode",
-    "SystemSessionEnvironValueSourceNode",
 )
 
 
@@ -49,19 +47,7 @@ class AdminSearchSystemSessionEnvironsPayload(BaseResponseModel):
     has_previous_page: bool = Field(description="Whether there is a previous page.")
 
 
-class SystemSessionEnvironValueSourceNode(BaseResponseModel):
-    """A value of a starting session a system session environ row can inject."""
-
-    name: str = Field(description="The value source name a row carries in value_source.")
-    kind: SystemSessionEnvironSourceKind = Field(
-        description=(
-            "Whether the value wins over the session's own environ (required) or loses to it "
-            "(optional)."
-        )
-    )
-
-
 class ListSystemSessionEnvironValueSourcesPayload(BaseResponseModel):
     """Every value source a system session environ row can carry."""
 
-    items: list[SystemSessionEnvironValueSourceNode] = Field(description="The value sources.")
+    items: list[str] = Field(description="The value source names a row can carry.")

@@ -20616,9 +20616,9 @@ type Query
   adminSystemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.10.0. List every value source a system session environ row can carry. The returned ``name`` values are the ones ``SystemSessionEnviron.valueSource`` holds.
+  Added in 26.10.0. List every value source name a system session environ row can carry, the values ``SystemSessionEnviron.valueSource`` holds.
   """
-  systemSessionEnvironValueSources: [SystemSessionEnvironValueSource!] @join__field(graph: STRAWBERRY)
+  systemSessionEnvironValueSources: [String!] @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.10.0. List all registered session lifecycle handlers (superadmin only). The returned ``name`` values are valid keys for ``DefaultSessionOptionsInfo.handlerOptions.byHandler``.
@@ -27607,31 +27607,6 @@ input SystemSessionEnvironScopeTypeFilter
 
   """Exclude any of the provided values."""
   notIn: [SystemSessionEnvironScopeType!] = null
-}
-
-"""
-Added in 26.10.0. Whether a value source's value wins over the session's own environ (required) or loses to it (optional).
-"""
-enum SystemSessionEnvironSourceKind
-  @join__type(graph: STRAWBERRY)
-{
-  REQUIRED @join__enumValue(graph: STRAWBERRY)
-  OPTIONAL @join__enumValue(graph: STRAWBERRY)
-}
-
-"""
-Added in 26.10.0. A value of a starting session a system session environ row can inject.
-"""
-type SystemSessionEnvironValueSource
-  @join__type(graph: STRAWBERRY)
-{
-  """The value source name a row carries in valueSource."""
-  name: String!
-
-  """
-  Whether the value wins over the session's own environ (required) or loses to it (optional).
-  """
-  kind: SystemSessionEnvironSourceKind!
 }
 
 """

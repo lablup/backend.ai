@@ -24,7 +24,6 @@ from ai.backend.common.dto.manager.v2.system_session_environ.response import (
     AdminSearchSystemSessionEnvironsPayload,
     ListSystemSessionEnvironValueSourcesPayload,
     SystemSessionEnvironNode,
-    SystemSessionEnvironValueSourceNode,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironOrderField,
@@ -109,12 +108,7 @@ class SystemSessionEnvironAdapter(BaseAdapter):
     async def list_value_sources(self) -> ListSystemSessionEnvironValueSourcesPayload:
         """Every value source a system session environ row can carry."""
         return ListSystemSessionEnvironValueSourcesPayload(
-            items=[
-                SystemSessionEnvironValueSourceNode(
-                    name=value_source.value, kind=value_source.kind()
-                )
-                for value_source in SystemSessionEnvironValueSource
-            ]
+            items=[value_source.value for value_source in SystemSessionEnvironValueSource]
         )
 
     async def bulk_get_ids(

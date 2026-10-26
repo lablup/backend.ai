@@ -10,7 +10,6 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironScopeID
 from ai.backend.common.data.system_session_environ.types import (
     SystemSessionEnvironScopeType,
-    SystemSessionEnvironSourceKind,
     SystemSessionEnvironValueSource,
 )
 
@@ -18,7 +17,6 @@ __all__ = (
     "SystemSessionEnvironOrderField",
     "SystemSessionEnvironScopeInfo",
     "SystemSessionEnvironScopeType",
-    "SystemSessionEnvironSourceKind",
     "SystemSessionEnvironValueSource",
 )
 
