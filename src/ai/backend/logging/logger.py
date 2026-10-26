@@ -37,6 +37,7 @@ from .formatter import (
     SerializedExceptionFormatter,
 )
 from .handler.intrinsic import RelayHandler
+from .structured import LogFieldNormalizer
 from .types import LogFormat, LogLevel, MsgpackOptions
 from .utils import _register_custom_loglevels
 
@@ -233,6 +234,7 @@ def setup_console_log_handler(config: LoggingConfig) -> Iterator[logging.Handler
         "verbose": "%(asctime)s %(levelname)s %(name)s [%(process)d] %(message)s",
     }
     drv_config = config.console
+    normalizer = LogFieldNormalizer()
     console_formatter: logging.Formatter
     colored = drv_config.colored
     if colored is None:
@@ -241,6 +243,7 @@ def setup_console_log_handler(config: LoggingConfig) -> Iterator[logging.Handler
         console_formatter = ColorizedFormatter(
             log_formats[drv_config.format],
             datefmt="%Y-%m-%d %H:%M:%S.%f",  # coloredlogs has intrinsic support for msec
+            normalizer=normalizer,
             field_styles={
                 "levelname": {"color": 248, "bold": True},
                 "name": {"color": 246, "bold": False},
@@ -262,6 +265,7 @@ def setup_console_log_handler(config: LoggingConfig) -> Iterator[logging.Handler
         console_formatter = ConsoleFormatter(
             log_formats[drv_config.format],
             datefmt="%Y-%m-%d %H:%M:%S.%f",
+            normalizer=normalizer,
         )
     console_handler = logging.StreamHandler(
         stream=sys.stderr,
