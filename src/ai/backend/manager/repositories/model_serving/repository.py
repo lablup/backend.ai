@@ -509,7 +509,7 @@ class ModelServingRepository:
                     })
                     if revision is not None
                     else ResourceSlot({}),
-                    url=row.url or "",
+                    url=row.url,
                     model=(
                         revision.model or uuid.UUID(int=0)
                         if revision is not None

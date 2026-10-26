@@ -75,7 +75,7 @@ class EndpointData:
     project: uuid.UUID
     resource_group: str
     resource_slots: ResourceSlot
-    url: str
+    url: str | None
     model: uuid.UUID
     model_definition_path: str | None
     model_mount_destination: str | None
