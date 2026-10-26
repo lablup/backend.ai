@@ -48,8 +48,12 @@ domain repository; this package holds the operations a caller reaches through th
 - The caller names public, domains and projects; the rows of any of them are read, disabled
   ones included. Every named scope is checked before the read, so one scope the caller
   cannot read refuses the whole search.
-- A domain scope reaches the rows of the domain's projects too: the graph binds a project's
-  node under its domain.
+- A domain scope reads the rows bound to the domain itself. The graph binds a project's node
+  under its domain, so the target also matches the scope type column to keep the projects'
+  rows out.
+- The caller's own search is this operation with public, the caller's domain and projects as
+  the scopes and the enabled rows only. The REST handler and the GQL resolver look the
+  projects up through the project adapter.
 
 ## The read by ids is partial
 

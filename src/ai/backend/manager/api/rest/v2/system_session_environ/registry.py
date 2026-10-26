@@ -28,6 +28,12 @@ def register_v2_system_session_environ_routes(
     )
     registry.add(
         "POST",
+        "/my/search",
+        handler.my_search,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/scoped/search",
         handler.scoped_search,
         middlewares=[auth_required],
