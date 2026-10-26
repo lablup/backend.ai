@@ -102,6 +102,9 @@ from ai.backend.manager.models.audit_log.owner_candidates import (
     AuditLogScopeOwnerCandidates,
 )
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.resource_allocation.provider import (
+    ResourceAllocationOpsProvider,
+)
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
 )
@@ -542,6 +545,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
         resource_allocation=ResourceAllocationService(
             resource_allocation_repository=ResourceAllocationRepository(
                 db=args.db,
+                ops_provider=ResourceAllocationOpsProvider(args.db),
                 config_provider=args.config_provider,
             ),
             resource_preset_repository=repositories.resource_preset.repository,

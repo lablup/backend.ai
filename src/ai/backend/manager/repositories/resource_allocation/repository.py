@@ -23,6 +23,9 @@ from ai.backend.manager.data.resource_allocation.types import (
     UserConcurrencyData,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.resource_allocation.provider import (
+    ResourceAllocationOpsProvider,
+)
 
 from .db_source.db_source import ResourceAllocationDBSource
 
@@ -33,14 +36,17 @@ class ResourceAllocationRepository:
     """Repository that wraps the DB source for resource allocation operations."""
 
     _db_source: ResourceAllocationDBSource
+    _ops_provider: ResourceAllocationOpsProvider
     _config_provider: ManagerConfigProvider
 
     def __init__(
         self,
         db: ExtendedAsyncSAEngine,
+        ops_provider: ResourceAllocationOpsProvider,
         config_provider: ManagerConfigProvider,
     ) -> None:
         self._db_source = ResourceAllocationDBSource(db)
+        self._ops_provider = ops_provider
         self._config_provider = config_provider
 
     async def get_keypair_context(self, user_id: UUID) -> KeypairContextData:
@@ -65,6 +71,12 @@ class ResourceAllocationRepository:
         return await self._db_source.get_keypair_usage(
             access_key, resource_policy, known_slot_types
         )
+
+    async def get_user_usage(self, user_id: UserID) -> ScopeUsageData:
+        """Get a user's resource usage across all their keypairs (limits, used, assignable)."""
+        known_slot_types = await self._get_known_slot_types()
+        async with self._ops_provider.read_ops() as ops:
+            return await ops.user_usage(user_id, known_slot_types)
 
     async def get_project_usage(
         self,

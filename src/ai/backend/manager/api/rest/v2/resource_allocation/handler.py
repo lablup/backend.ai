@@ -39,12 +39,17 @@ class V2ResourceAllocationHandler:
         ctx: UserContext,
         req: RequestCtx,
     ) -> APIResponse:
-        """Get keypair resource usage for the current user."""
+        """Deprecated. Use `GET /v2/resource-allocation/my/usage`."""
         resource_policy = req.request["keypair"]["resource_policy"]
         result = await self._adapter.my_keypair_usage(
             access_key=ctx.access_key,
             resource_policy=resource_policy,
         )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def my_user_usage(self) -> APIResponse:
+        """Get the current user's resource usage across all their keypairs."""
+        result = await self._adapter.my_user_usage()
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def project_usage(

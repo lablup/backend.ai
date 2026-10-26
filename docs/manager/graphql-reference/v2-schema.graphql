@@ -15990,8 +15990,15 @@ type Query {
   """
   modelCardAvailablePresets(scope: ModelCardAvailablePresetsScope!, filter: DeploymentRevisionPresetFilter = null, orderBy: [DeploymentRevisionPresetOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): DeploymentRevisionPresetConnection
 
-  """Added in 26.4.2. Get my keypair resource allocation (current user)."""
-  myKeypairResourceAllocationV2: KeypairResourceAllocationV2
+  """
+  Added in 26.4.2. Get my keypair resource allocation (current user). Deprecated since 26.10.0. Use `myUserResourceAllocationV2`.
+  """
+  myKeypairResourceAllocationV2: KeypairResourceAllocationV2 @deprecated(reason: "Deprecated since 26.10.0. Use `myUserResourceAllocationV2`, which counts sessions from all of the user's keypairs.")
+
+  """
+  Added in 26.10.0. Get my resource allocation summed across all of my keypairs.
+  """
+  myUserResourceAllocationV2: UserResourceAllocationV2
 
   """Added in 26.4.2. Get project resource allocation (project usage)."""
   projectResourceAllocationV2(projectId: UUID!): ProjectResourceAllocationV2
@@ -22747,6 +22754,12 @@ Added in 26.2.0. Nested filter for projects a user belongs to. Filters users tha
 input UserProjectNestedFilter {
   name: StringFilter = null
   isActive: Boolean = null
+}
+
+"""Added in 26.10.0. Payload for user resource allocation query."""
+type UserResourceAllocationV2 {
+  """User resource usage summed across all of the user's keypairs."""
+  user: ScopeResourceUsageV2!
 }
 
 """

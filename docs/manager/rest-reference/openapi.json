@@ -60144,7 +60144,27 @@
           }
         ],
         "parameters": [],
-        "description": "Get keypair resource usage for the current user.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Deprecated. Use `GET /v2/resource-allocation/my/usage`.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/resource-allocation/my/usage": {
+      "get": {
+        "operationId": "v2/resource-allocation.my_user_usage",
+        "tags": [
+          "v2/resource-allocation"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "Get the current user's resource usage across all their keypairs.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/resource-allocation/projects/{project_id}": {
