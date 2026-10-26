@@ -23,4 +23,4 @@ class TestConsoleFormatters:
     ) -> None:
         console_line = _ANSI_ESCAPE_SEQUENCE.sub("", console_formatter.format(structured_record))
 
-        assert console_line == "image pull retried kernel_id=kernel-1 attempt=3"
+        assert console_line == "mock error kernel_id=kernel-1 attempt=3"

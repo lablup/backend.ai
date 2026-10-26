@@ -52,7 +52,7 @@ class TestRelayHandler:
         relay_handler.emit(structured_record)
 
         relayed_record = logging.makeLogRecord(msgpack.unpackb(parent_socket.recv()))
-        assert relayed_record.getMessage() == "image pull retried"
+        assert relayed_record.getMessage() == "mock error"
         assert relayed_record.__dict__["log_tag_kernel_id"] == "kernel-1"
         assert relayed_record.__dict__["log_tag_attempt"] == 3
 
@@ -64,4 +64,4 @@ class TestRelayHandler:
     ) -> None:
         socketless_relay_handler.emit(structured_record)
 
-        assert capsys.readouterr().err == "image pull retried kernel_id=kernel-1 attempt=3\n"
+        assert capsys.readouterr().err == "mock error kernel_id=kernel-1 attempt=3\n"

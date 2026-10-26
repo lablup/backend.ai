@@ -18,6 +18,6 @@ def structured_record(caplog: pytest.LogCaptureFixture) -> logging.LogRecord:
         caplog.at_level(logging.INFO, logger=_RECORD_LOGGER_NAME),
         with_log_context(kernel_id="kernel-1"),
     ):
-        logger.warning("image pull retried", attempt=3)
+        logger.warning("mock error", attempt=3)
     [record] = caplog.records
     return record
