@@ -92,7 +92,6 @@ To cleanly separate the configurations, you may follow the steps below.
      net.ipv4.tcp_window_scaling=1
      net.ipv4.tcp_tw_reuse=1
      net.ipv4.tcp_early_retrans=1
-     net.ipv4.ip_local_port_range="10000 65000"
      net.core.rmem_max=16777216
      net.core.wmem_max=16777216
      net.ipv4.tcp_rmem=4096 12582912 16777216
