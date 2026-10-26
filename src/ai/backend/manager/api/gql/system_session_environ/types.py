@@ -153,7 +153,15 @@ class SystemSessionEnvironGQL(PydanticNodeMixin[SystemSessionEnvironNodeDTO]):
         return cast(list[Self], results)
 
 
-SystemSessionEnvironEdgeGQL = Edge[SystemSessionEnvironGQL]
+@gql_connection_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="One system session environ row within a connection.",
+    ),
+    name="SystemSessionEnvironEdge",
+)
+class SystemSessionEnvironEdgeGQL(Edge[SystemSessionEnvironGQL]):
+    pass
 
 
 @gql_connection_type(
@@ -164,6 +172,9 @@ SystemSessionEnvironEdgeGQL = Edge[SystemSessionEnvironGQL]
     name="SystemSessionEnvironConnection",
 )
 class SystemSessionEnvironConnectionGQL(Connection[SystemSessionEnvironGQL]):
+    edges: list[SystemSessionEnvironEdgeGQL] = gql_field(  # type: ignore[assignment]
+        description="Contains the nodes in this connection."
+    )
     count: int = gql_field(description="Total number of rows matching the query.")
 
     def __init__(self, *args: Any, count: int, **kwargs: Any) -> None:
