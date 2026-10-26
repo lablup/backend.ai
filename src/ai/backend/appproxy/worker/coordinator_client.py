@@ -171,6 +171,7 @@ async def register_worker(root_ctx: RootContext, request_id: str) -> list[Slot]:
             resp.raise_for_status()
             body = await resp.json()
             root_ctx.worker_id = body["id"]
+            root_ctx.reject_brotli_request_body = body.get("reject_brotli_request_body", False)
             log.info(
                 "joined the coordinator",
                 worker_id=root_ctx.worker_id,
@@ -210,6 +211,8 @@ async def ping_worker(root_ctx: RootContext, request_id: str) -> None:
     try:
         async with sess.patch(f"/api/worker/{root_ctx.worker_id}", headers=headers) as resp:
             resp.raise_for_status()
+            body = await resp.json()
+            root_ctx.reject_brotli_request_body = body.get("reject_brotli_request_body", False)
     except ClientConnectorError as e:
         raise CoordinatorConnectionError(
             extra_data={

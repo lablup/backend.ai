@@ -126,8 +126,9 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
         )
 
     async def proxy(self, request: web.Request) -> web.StreamResponse | web.WebSocketResponse:
-        # Session images may ship a Brotli decoder vulnerable to CVE-2026-111497.
-        if self._is_brotli_encoded_request(request):
+        if self.root_context.reject_brotli_request_body and self._is_brotli_encoded_request(
+            request
+        ):
             log.trace("rejecting a Brotli-encoded request body from {}", request.remote)
             raise UnsupportedContentEncoding("Brotli-encoded request bodies are not accepted")
         backend: HTTPBackend = request["backend"]

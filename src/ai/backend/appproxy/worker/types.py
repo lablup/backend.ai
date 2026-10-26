@@ -346,6 +346,7 @@ class RootContext:
     valkey_stat: ValkeyStatClient
     http_client_pool: ClientPool
     worker_id: UUID
+    reject_brotli_request_body: bool
     local_config: ServerConfig
     last_used_time_marker_redis_queue: asyncio.Queue[tuple[list[str], float]]
     request_counter_redis_queue: asyncio.Queue[str]

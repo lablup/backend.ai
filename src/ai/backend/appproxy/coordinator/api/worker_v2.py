@@ -111,6 +111,15 @@ class WorkerResponseModel(WorkerModel):
     slots: list[SlotModel]
 
 
+class WorkerRegistrationResponseModel(WorkerResponseModel):
+    reject_brotli_request_body: Annotated[
+        bool,
+        Field(
+            description="Whether the worker must reject requests whose Content-Encoding contains br."
+        ),
+    ]
+
+
 class WorkerListResponseModel(BackendAISchema):
     workers: list[WorkerResponseModel]
 
@@ -190,7 +199,7 @@ async def list_worker_circuits(request: web.Request) -> PydanticResponse[Circuit
 @pydantic_api_handler(WorkerRequestModel)
 async def update_worker(
     request: web.Request, params: WorkerRequestModel
-) -> PydanticResponse[WorkerResponseModel]:
+) -> PydanticResponse[WorkerRegistrationResponseModel]:
     """
     Registers worker to coordinator.
     """
@@ -259,7 +268,12 @@ async def update_worker(
 
     async with root_ctx.db.connect() as db_conn:
         result = await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
-    return PydanticResponse(WorkerResponseModel(**result))
+    return PydanticResponse(
+        WorkerRegistrationResponseModel(
+            reject_brotli_request_body=root_ctx.local_config.proxy_coordinator.reject_brotli_request_body,
+            **result,
+        )
+    )
 
 
 @auth_required("worker")
@@ -288,7 +302,9 @@ async def delete_worker(request: web.Request) -> PydanticResponse[StubResponseMo
 
 @auth_required("worker")
 @pydantic_api_response_handler
-async def heartbeat_worker(request: web.Request) -> PydanticResponse[WorkerResponseModel]:
+async def heartbeat_worker(
+    request: web.Request,
+) -> PydanticResponse[WorkerRegistrationResponseModel]:
     root_ctx: RootContext = request.app["_root.context"]
     worker_id = UUID(request.match_info["worker_id"])
     now = datetime.now(tzutc())
@@ -323,7 +339,12 @@ async def heartbeat_worker(request: web.Request) -> PydanticResponse[WorkerRespo
             prev_worker_status=prev_status,
         )
     request["do_not_print_access_log"] = True
-    return PydanticResponse(WorkerResponseModel(**result))
+    return PydanticResponse(
+        WorkerRegistrationResponseModel(
+            reject_brotli_request_body=root_ctx.local_config.proxy_coordinator.reject_brotli_request_body,
+            **result,
+        )
+    )
 
 
 @auth_required("worker")
