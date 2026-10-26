@@ -760,8 +760,7 @@ class SessionAdapter(BaseAdapter):
             error = self.batch_load_failure(agents.error)
             if error is not None:
                 raise error
-            agent_ids = [str(agent_id) for agent_id in agents.value or []]
-            nodes.append(self._session_data_to_node(item, allocation, agent_ids))
+            nodes.append(self._session_data_to_node(item, allocation, agents.value or []))
         return nodes
 
     async def _kernel_infos_to_nodes(self, data: Sequence[KernelInfo]) -> list[KernelNode]:
@@ -1459,7 +1458,7 @@ class SessionAdapter(BaseAdapter):
 
     @staticmethod
     def _session_data_to_node(
-        data: SessionData, allocation: ResourceAllocationGQLDTO, designated_agent_ids: list[str]
+        data: SessionData, allocation: ResourceAllocationGQLDTO, designated_agent_ids: list[AgentId]
     ) -> SessionNode:
         environ = (
             EnvironmentVariablesInfoDTO(
@@ -1495,7 +1494,7 @@ class SessionAdapter(BaseAdapter):
                 allocation=allocation,
                 resource_group_name=data.resource_group_name,
                 session_group_id=data.session_group_id,
-                designated_agent_ids=designated_agent_ids or None,
+                designated_agent_ids=[str(agent_id) for agent_id in designated_agent_ids] or None,
             ),
             lifecycle=SessionLifecycleInfoGQLDTO(
                 status=_fold_session_status(data.status),

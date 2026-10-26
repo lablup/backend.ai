@@ -162,7 +162,9 @@ class TestSessionDataToNode:
 
     def test_the_designated_agents_reach_the_node(self) -> None:
         node = SessionAdapter._session_data_to_node(
-            _create_session_data(), _create_allocation(), ["i-agent-1", "i-agent-2"]
+            _create_session_data(),
+            _create_allocation(),
+            [AgentId("i-agent-1"), AgentId("i-agent-2")],
         )
 
         assert node.resource.designated_agent_ids == ["i-agent-1", "i-agent-2"]
