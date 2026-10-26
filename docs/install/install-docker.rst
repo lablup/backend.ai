@@ -371,7 +371,7 @@ Alternatively, you can run the containers manually:
      -v /var/run/docker.sock:/var/run/docker.sock \
      -e PYTHONUNBUFFERED=1 \
      --restart unless-stopped \
-     backend.ai/manager:26.1.0rc1
+     backend.ai/manager:${PKGVER}
 
 **AppProxy Coordinator:**
 
@@ -385,7 +385,7 @@ Alternatively, you can run the containers manually:
      -v $(pwd)/proxy-coordinator.toml:/etc/backend.ai/proxy-coordinator.toml:ro \
      -e PYTHONUNBUFFERED=1 \
      --restart unless-stopped \
-     backend.ai/appproxy-coordinator:26.1.0rc1
+     backend.ai/appproxy-coordinator:${PKGVER}
 
 **AppProxy Worker:**
 
@@ -399,7 +399,7 @@ Alternatively, you can run the containers manually:
      -v $(pwd)/proxy-worker.toml:/etc/backend.ai/proxy-worker.toml:ro \
      -e PYTHONUNBUFFERED=1 \
      --restart unless-stopped \
-     backend.ai/appproxy-worker:26.1.0rc1
+     backend.ai/appproxy-worker:${PKGVER}
 
 **Webserver:**
 
@@ -412,7 +412,7 @@ Alternatively, you can run the containers manually:
      -p 8090:8090 \
      -v $(pwd)/webserver.conf:/etc/backend.ai/webserver.conf:ro \
      --restart unless-stopped \
-     backend.ai/webserver:26.1.0rc1
+     backend.ai/webserver:${PKGVER}
 
 Accessing the Services
 ----------------------
@@ -455,7 +455,7 @@ If you encounter DNS resolution errors, verify the pycares version:
 
 .. code-block:: bash
 
-   docker run --rm backend.ai/webserver:26.1.0rc1 pip list | grep pycares
+   docker run --rm backend.ai/webserver:${PKGVER} pip list | grep pycares
 
 It should show version 4.11.0.
 
