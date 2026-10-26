@@ -14992,6 +14992,11 @@ type Query {
   adminSystemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection
 
   """
+  Added in 26.10.0. List every value source a system session environ row can carry. The returned ``name`` values are the ones ``SystemSessionEnviron.valueSource`` holds.
+  """
+  systemSessionEnvironValueSources: [SystemSessionEnvironValueSource!]
+
+  """
   Added in 26.10.0. List all registered session lifecycle handlers (superadmin only). The returned ``name`` values are valid keys for ``DefaultSessionOptionsInfo.handlerOptions.byHandler``.
   """
   adminSessionLifecycleHandlers: [SessionLifecycleHandlerNode!]
@@ -20812,8 +20817,10 @@ type SystemSessionEnviron implements Node {
   """The environment variable name the value is injected under."""
   key: String!
 
-  """Which value of the starting session is injected."""
-  valueSource: SystemSessionEnvironValueSource!
+  """
+  Which value of the starting session is injected, as a value source name systemSessionEnvironValueSources lists.
+  """
+  valueSource: String!
 
   """The scope the row is bound to."""
   scope: SystemSessionEnvironScopeInfo!
@@ -20944,36 +20951,41 @@ input SystemSessionEnvironScopeTypeFilter {
 }
 
 """
-Added in 26.10.0. Which value of a starting session a system session environ row injects.
+Added in 26.10.0. Whether a value source's value wins over the session's own environ (required) or loses to it (optional).
 """
-enum SystemSessionEnvironValueSource {
-  SESSION_ID
-  SESSION_NAME
-  CLUSTER_SIZE
-  CLUSTER_REPLICAS
-  CLUSTER_HOSTS
-  PREOPEN_PORTS
-  USER_UUID
-  USER_EMAIL
-  USER_NAME
-  ACCESS_KEY
+enum SystemSessionEnvironSourceKind {
+  REQUIRED
+  OPTIONAL
 }
 
 """
-Added in 26.10.0. Filter for the injected value with equality and membership operators.
+Added in 26.10.0. A value of a starting session a system session environ row can inject.
+"""
+type SystemSessionEnvironValueSource {
+  """The value source name a row carries in valueSource."""
+  name: String!
+
+  """
+  Whether the value wins over the session's own environ (required) or loses to it (optional).
+  """
+  kind: SystemSessionEnvironSourceKind!
+}
+
+"""
+Added in 26.10.0. Filter by value source name with equality and membership operators. The names are the ones systemSessionEnvironValueSources lists.
 """
 input SystemSessionEnvironValueSourceFilter {
   """Exact match."""
-  equals: SystemSessionEnvironValueSource = null
+  equals: String = null
 
   """Match any of the provided values."""
-  in: [SystemSessionEnvironValueSource!] = null
+  in: [String!] = null
 
   """Exclude an exact match."""
-  notEquals: SystemSessionEnvironValueSource = null
+  notEquals: String = null
 
   """Exclude any of the provided values."""
-  notIn: [SystemSessionEnvironValueSource!] = null
+  notIn: [String!] = null
 }
 
 """Added in 26.4.2. Payload returned after terminating sessions."""

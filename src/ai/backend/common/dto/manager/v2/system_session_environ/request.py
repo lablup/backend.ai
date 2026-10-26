@@ -10,7 +10,6 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironOrderField,
     SystemSessionEnvironScopeType,
-    SystemSessionEnvironValueSource,
 )
 
 __all__ = (
@@ -22,8 +21,18 @@ __all__ = (
 )
 
 
-class SystemSessionEnvironValueSourceFilter(EnumFilter[SystemSessionEnvironValueSource]):
-    """Filter for the value of a starting session a row injects."""
+class SystemSessionEnvironValueSourceFilter(BaseRequestModel):
+    """Filter by value source name. The names are strings so that a new value source does not
+    change the schema."""
+
+    equals: str | None = Field(default=None, description="Exact match.")
+    in_: list[str] | None = Field(
+        default=None, alias="in", description="Match any of the provided values."
+    )
+    not_equals: str | None = Field(default=None, description="Exclude an exact match.")
+    not_in: list[str] | None = Field(
+        default=None, description="Exclude any of the provided values."
+    )
 
 
 class SystemSessionEnvironScopeTypeFilter(EnumFilter[SystemSessionEnvironScopeType]):

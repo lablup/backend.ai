@@ -37667,42 +37667,27 @@
         "title": "SystemSessionEnvironScopeTypeFilter",
         "type": "object"
       },
-      "SystemSessionEnvironValueSource": {
-        "enum": [
-          "session_id",
-          "session_name",
-          "cluster_size",
-          "cluster_replicas",
-          "cluster_hosts",
-          "preopen_ports",
-          "user_uuid",
-          "user_email",
-          "user_name",
-          "access_key"
-        ],
-        "title": "SystemSessionEnvironValueSource",
-        "type": "string"
-      },
       "SystemSessionEnvironValueSourceFilter": {
-        "description": "Filter for the value of a starting session a row injects.",
+        "description": "Filter by value source name. The names are strings so that a new value source does not\nchange the schema.",
         "properties": {
           "equals": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SystemSessionEnvironValueSource"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Exact match."
+            "description": "Exact match.",
+            "title": "Equals"
           },
           "in": {
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/SystemSessionEnvironValueSource"
+                  "type": "string"
                 },
                 "type": "array"
               },
@@ -37717,20 +37702,21 @@
           "not_equals": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/SystemSessionEnvironValueSource"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Exclude an exact match."
+            "description": "Exclude an exact match.",
+            "title": "Not Equals"
           },
           "not_in": {
             "anyOf": [
               {
                 "items": {
-                  "$ref": "#/components/schemas/SystemSessionEnvironValueSource"
+                  "type": "string"
                 },
                 "type": "array"
               },
@@ -65452,6 +65438,26 @@
         },
         "parameters": [],
         "description": "Search every system session environ row, at every scope (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/system-session-environs/value-sources": {
+      "get": {
+        "operationId": "v2/system-session-environs.list_value_sources",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "List every value source a system session environ row can carry.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/users/search": {

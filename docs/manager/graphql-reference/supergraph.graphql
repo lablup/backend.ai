@@ -20616,6 +20616,11 @@ type Query
   adminSystemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.10.0. List every value source a system session environ row can carry. The returned ``name`` values are the ones ``SystemSessionEnviron.valueSource`` holds.
+  """
+  systemSessionEnvironValueSources: [SystemSessionEnvironValueSource!] @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.10.0. List all registered session lifecycle handlers (superadmin only). The returned ``name`` values are valid keys for ``DefaultSessionOptionsInfo.handlerOptions.byHandler``.
   """
   adminSessionLifecycleHandlers: [SessionLifecycleHandlerNode!] @join__field(graph: STRAWBERRY)
@@ -27455,8 +27460,10 @@ type SystemSessionEnviron implements Node
   """The environment variable name the value is injected under."""
   key: String!
 
-  """Which value of the starting session is injected."""
-  valueSource: SystemSessionEnvironValueSource!
+  """
+  Which value of the starting session is injected, as a value source name systemSessionEnvironValueSources lists.
+  """
+  valueSource: String!
 
   """The scope the row is bound to."""
   scope: SystemSessionEnvironScopeInfo!
@@ -27603,40 +27610,47 @@ input SystemSessionEnvironScopeTypeFilter
 }
 
 """
-Added in 26.10.0. Which value of a starting session a system session environ row injects.
+Added in 26.10.0. Whether a value source's value wins over the session's own environ (required) or loses to it (optional).
 """
-enum SystemSessionEnvironValueSource
+enum SystemSessionEnvironSourceKind
   @join__type(graph: STRAWBERRY)
 {
-  SESSION_ID @join__enumValue(graph: STRAWBERRY)
-  SESSION_NAME @join__enumValue(graph: STRAWBERRY)
-  CLUSTER_SIZE @join__enumValue(graph: STRAWBERRY)
-  CLUSTER_REPLICAS @join__enumValue(graph: STRAWBERRY)
-  CLUSTER_HOSTS @join__enumValue(graph: STRAWBERRY)
-  PREOPEN_PORTS @join__enumValue(graph: STRAWBERRY)
-  USER_UUID @join__enumValue(graph: STRAWBERRY)
-  USER_EMAIL @join__enumValue(graph: STRAWBERRY)
-  USER_NAME @join__enumValue(graph: STRAWBERRY)
-  ACCESS_KEY @join__enumValue(graph: STRAWBERRY)
+  REQUIRED @join__enumValue(graph: STRAWBERRY)
+  OPTIONAL @join__enumValue(graph: STRAWBERRY)
 }
 
 """
-Added in 26.10.0. Filter for the injected value with equality and membership operators.
+Added in 26.10.0. A value of a starting session a system session environ row can inject.
+"""
+type SystemSessionEnvironValueSource
+  @join__type(graph: STRAWBERRY)
+{
+  """The value source name a row carries in valueSource."""
+  name: String!
+
+  """
+  Whether the value wins over the session's own environ (required) or loses to it (optional).
+  """
+  kind: SystemSessionEnvironSourceKind!
+}
+
+"""
+Added in 26.10.0. Filter by value source name with equality and membership operators. The names are the ones systemSessionEnvironValueSources lists.
 """
 input SystemSessionEnvironValueSourceFilter
   @join__type(graph: STRAWBERRY)
 {
   """Exact match."""
-  equals: SystemSessionEnvironValueSource = null
+  equals: String = null
 
   """Match any of the provided values."""
-  in: [SystemSessionEnvironValueSource!] = null
+  in: [String!] = null
 
   """Exclude an exact match."""
-  notEquals: SystemSessionEnvironValueSource = null
+  notEquals: String = null
 
   """Exclude any of the provided values."""
-  notIn: [SystemSessionEnvironValueSource!] = null
+  notIn: [String!] = null
 }
 
 """Added in 26.4.2. Payload returned after terminating sessions."""

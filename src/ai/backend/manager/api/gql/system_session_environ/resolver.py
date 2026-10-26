@@ -17,6 +17,7 @@ from ai.backend.manager.api.gql.system_session_environ.types import (
     SystemSessionEnvironFilterGQL,
     SystemSessionEnvironGQL,
     SystemSessionEnvironOrderByGQL,
+    SystemSessionEnvironValueSourceGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -72,3 +73,19 @@ async def admin_system_session_environs(
         ),
         count=payload.total_count,
     )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "List every value source a system session environ row can carry. The returned "
+            "``name`` values are the ones ``SystemSessionEnviron.valueSource`` holds."
+        ),
+    )
+)  # type: ignore[misc]
+async def system_session_environ_value_sources(
+    info: Info[StrawberryGQLContext],
+) -> list[SystemSessionEnvironValueSourceGQL] | None:
+    payload = await info.context.adapters.system_session_environ.list_value_sources()
+    return [SystemSessionEnvironValueSourceGQL.from_pydantic(node) for node in payload.items]

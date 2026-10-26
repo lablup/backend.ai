@@ -42,6 +42,13 @@ domain repository; this package holds the operations a caller reaches through th
 - It reads every row at every scope, disabled ones included, so it names no scope to check.
 - The global gate passes a superadmin, and a monitor for reads.
 
+## The value source list has no action
+
+- The value sources are the manager's own list, not rows, so the adapter answers from the
+  enum the resolvers are registered by and no permission is checked.
+- The API carries a value source as its name rather than an enum, so a new value source
+  leaves the schema unchanged. The adapter refuses a name the manager does not provide.
+
 ## The read by ids is partial
 
 - It feeds the GQL DataLoader behind `node(id:)`, where one batch mixes ids from several

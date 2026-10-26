@@ -26,10 +26,13 @@ from ai.backend.common.dto.manager.v2.system_session_environ.request import (
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
     SystemSessionEnvironNode as SystemSessionEnvironNodeDTO,
 )
+from ai.backend.common.dto.manager.v2.system_session_environ.response import (
+    SystemSessionEnvironValueSourceNode as SystemSessionEnvironValueSourceNodeDTO,
+)
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironOrderField,
     SystemSessionEnvironScopeType,
-    SystemSessionEnvironValueSource,
+    SystemSessionEnvironSourceKind,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironScopeInfo as SystemSessionEnvironScopeInfoDTO,
@@ -59,16 +62,20 @@ __all__ = (
     "SystemSessionEnvironGQL",
     "SystemSessionEnvironOrderByGQL",
     "SystemSessionEnvironScopeInfoGQL",
+    "SystemSessionEnvironValueSourceGQL",
 )
 
 
-SystemSessionEnvironValueSourceGQL = gql_enum(
+SystemSessionEnvironSourceKindGQL = gql_enum(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Which value of a starting session a system session environ row injects.",
+        description=(
+            "Whether a value source's value wins over the session's own environ (required) or "
+            "loses to it (optional)."
+        ),
     ),
-    SystemSessionEnvironValueSource,
-    name="SystemSessionEnvironValueSource",
+    SystemSessionEnvironSourceKind,
+    name="SystemSessionEnvironSourceKind",
 )
 
 
@@ -123,8 +130,11 @@ class SystemSessionEnvironGQL(PydanticNodeMixin[SystemSessionEnvironNodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
     entity_id: UUID = gql_field(description="The id of the row.")
     key: str = gql_field(description="The environment variable name the value is injected under.")
-    value_source: SystemSessionEnvironValueSourceGQL = gql_field(
-        description="Which value of the starting session is injected."
+    value_source: str = gql_field(
+        description=(
+            "Which value of the starting session is injected, as a value source name "
+            "systemSessionEnvironValueSources lists."
+        )
     )
     scope: SystemSessionEnvironScopeInfoGQL = gql_field(
         description="The scope the row is bound to."
@@ -185,23 +195,22 @@ class SystemSessionEnvironConnectionGQL(Connection[SystemSessionEnvironGQL]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Filter for the injected value with equality and membership operators.",
+        description=(
+            "Filter by value source name with equality and membership operators. The names are "
+            "the ones systemSessionEnvironValueSources lists."
+        ),
     ),
     name="SystemSessionEnvironValueSourceFilter",
 )
 class SystemSessionEnvironValueSourceFilterGQL(
     PydanticInputMixin[SystemSessionEnvironValueSourceFilterDTO]
 ):
-    equals: SystemSessionEnvironValueSourceGQL | None = gql_field(
-        description="Exact match.", default=None
-    )
-    in_: list[SystemSessionEnvironValueSourceGQL] | None = gql_field(
+    equals: str | None = gql_field(description="Exact match.", default=None)
+    in_: list[str] | None = gql_field(
         description="Match any of the provided values.", name="in", default=None
     )
-    not_equals: SystemSessionEnvironValueSourceGQL | None = gql_field(
-        description="Exclude an exact match.", default=None
-    )
-    not_in: list[SystemSessionEnvironValueSourceGQL] | None = gql_field(
+    not_equals: str | None = gql_field(description="Exclude an exact match.", default=None)
+    not_in: list[str] | None = gql_field(
         description="Exclude any of the provided values.", default=None
     )
 
@@ -273,4 +282,24 @@ class SystemSessionEnvironOrderByGQL(PydanticInputMixin[SystemSessionEnvironOrde
     field: SystemSessionEnvironOrderFieldGQL = gql_field(description="Field to order by.")
     direction: OrderDirection = gql_field(
         description="Order direction.", default=OrderDirection.ASC
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="A value of a starting session a system session environ row can inject.",
+    ),
+    model=SystemSessionEnvironValueSourceNodeDTO,
+    name="SystemSessionEnvironValueSource",
+)
+class SystemSessionEnvironValueSourceGQL(
+    PydanticOutputMixin[SystemSessionEnvironValueSourceNodeDTO]
+):
+    name: str = gql_field(description="The value source name a row carries in valueSource.")
+    kind: SystemSessionEnvironSourceKindGQL = gql_field(
+        description=(
+            "Whether the value wins over the session's own environ (required) or loses to it "
+            "(optional)."
+        )
     )
