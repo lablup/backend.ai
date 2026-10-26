@@ -11,8 +11,8 @@ from ai.backend.manager.actions.v2.bulk.base import BasePartialBulkAction
 
 
 @dataclass(frozen=True)
-class BulkGetSessionDesignatedAgentsAction(BasePartialBulkAction):
-    """Read the agents the sessions the caller named designate.
+class BulkGetSessionDesignatedAgentIdsAction(BasePartialBulkAction):
+    """Read the ids of the agents the sessions the caller named designate.
 
     Answered for by each session the ids name.
     """
@@ -27,7 +27,7 @@ class BulkGetSessionDesignatedAgentsAction(BasePartialBulkAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "bulk_get_session_designated_agents"
+        return "bulk_get_session_designated_agent_ids"
 
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:

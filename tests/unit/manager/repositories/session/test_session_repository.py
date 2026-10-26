@@ -862,7 +862,7 @@ class TestBatchLoadSessionAllocations:
         )
         session_id = SessionID(session_with_allocations.session_id)
 
-        designated = await repository.bulk_get_designated_agents_by_session([session_id])
+        designated = await repository.bulk_get_designated_agent_ids_by_session([session_id])
 
         assert designated == {session_id: [designated_agent_id]}
 
@@ -877,7 +877,7 @@ class TestBatchLoadSessionAllocations:
             registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(db_with_resource_tables)),
         )
 
-        designated = await repository.bulk_get_designated_agents_by_session([
+        designated = await repository.bulk_get_designated_agent_ids_by_session([
             SessionID(session_with_allocations.session_id)
         ])
 

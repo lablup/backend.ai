@@ -117,8 +117,8 @@ from ai.backend.manager.services.session.actions.batch_get_kernel_resource_alloc
 from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
     BatchGetSessionResourceAllocationAction,
 )
-from ai.backend.manager.services.session.actions.bulk_get_session_designated_agents import (
-    BulkGetSessionDesignatedAgentsAction,
+from ai.backend.manager.services.session.actions.bulk_get_session_designated_agent_ids import (
+    BulkGetSessionDesignatedAgentIdsAction,
 )
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
@@ -1439,11 +1439,11 @@ class SessionService:
             session_data=session_row.to_dataclass(owner=session_owner_data)
         )
 
-    async def bulk_get_session_designated_agents(
-        self, action: BulkGetSessionDesignatedAgentsAction
+    async def bulk_get_session_designated_agent_ids(
+        self, action: BulkGetSessionDesignatedAgentIdsAction
     ) -> PartialBulkResult[list[AgentId]]:
-        """Read the agents each session designates; one designating none answers ``[]``."""
-        data = await self._session_repository.bulk_get_designated_agents_by_session(
+        """Read the agent ids each session designates; one designating none answers ``[]``."""
+        data = await self._session_repository.bulk_get_designated_agent_ids_by_session(
             action.session_ids
         )
         return PartialBulkResult(

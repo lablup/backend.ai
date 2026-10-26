@@ -70,8 +70,8 @@ from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.services.session.actions.batch_get_session_resource_allocation import (
     BatchGetSessionResourceAllocationAction,
 )
-from ai.backend.manager.services.session.actions.bulk_get_session_designated_agents import (
-    BulkGetSessionDesignatedAgentsAction,
+from ai.backend.manager.services.session.actions.bulk_get_session_designated_agent_ids import (
+    BulkGetSessionDesignatedAgentIdsAction,
 )
 
 
@@ -245,7 +245,7 @@ async def _no_allocations(
 
 
 async def _no_designations(
-    action: BulkGetSessionDesignatedAgentsAction,
+    action: BulkGetSessionDesignatedAgentIdsAction,
 ) -> PartialBulkResult[list[AgentId]]:
     """The read answers for every session named, each designating no agent."""
     return PartialBulkResult(
@@ -373,7 +373,9 @@ class TestBatchLoadSessions:
         processors.batch_get_session_resource_allocation.run = AsyncMock(
             side_effect=_no_allocations
         )
-        processors.bulk_get_session_designated_agents.run = AsyncMock(side_effect=_no_designations)
+        processors.bulk_get_session_designated_agent_ids.run = AsyncMock(
+            side_effect=_no_designations
+        )
         return processors
 
     @pytest.fixture
@@ -572,7 +574,7 @@ class TestEnqueueActionBuilding:
         processors.session.batch_get_session_resource_allocation.run = AsyncMock(
             side_effect=_no_allocations
         )
-        processors.session.bulk_get_session_designated_agents.run = AsyncMock(
+        processors.session.bulk_get_session_designated_agent_ids.run = AsyncMock(
             side_effect=_no_designations
         )
         return processors

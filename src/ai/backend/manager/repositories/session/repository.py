@@ -290,12 +290,12 @@ class SessionRepository:
         return await self._db_source.get_session_with_routing_minimal(session_id)
 
     @session_repository_resilience.apply()
-    async def bulk_get_designated_agents_by_session(
+    async def bulk_get_designated_agent_ids_by_session(
         self,
         session_ids: Sequence[SessionID],
     ) -> dict[SessionID, list[AgentId]]:
-        """Read the agents each session designates, by agent id; one with none is absent."""
-        return await self._db_source.bulk_get_designated_agents_by_session(session_ids)
+        """Read the agent ids each session designates; one with none is absent."""
+        return await self._db_source.bulk_get_designated_agent_ids_by_session(session_ids)
 
     @session_repository_resilience.apply()
     async def batch_get_resource_allocation_by_session(

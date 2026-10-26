@@ -185,8 +185,8 @@ from ai.backend.manager.services.session.actions.bulk_get_kernels import BulkGet
 from ai.backend.manager.services.session.actions.bulk_get_main_kernel_groups import (
     BulkGetMainKernelGroupsAction,
 )
-from ai.backend.manager.services.session.actions.bulk_get_session_designated_agents import (
-    BulkGetSessionDesignatedAgentsAction,
+from ai.backend.manager.services.session.actions.bulk_get_session_designated_agent_ids import (
+    BulkGetSessionDesignatedAgentIdsAction,
 )
 from ai.backend.manager.services.session.actions.compute_schedule import (
     ComputeScheduleAction,
@@ -746,8 +746,8 @@ class SessionAdapter(BaseAdapter):
         allocations = await self.batch_resource_allocation_by_session(session_ids)
         designated = (
             (
-                await self._session.bulk_get_session_designated_agents.run(
-                    BulkGetSessionDesignatedAgentsAction(session_ids=session_ids)
+                await self._session.bulk_get_session_designated_agent_ids.run(
+                    BulkGetSessionDesignatedAgentIdsAction(session_ids=session_ids)
                 )
             ).items
             if session_ids

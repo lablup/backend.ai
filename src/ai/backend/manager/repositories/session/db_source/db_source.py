@@ -657,11 +657,11 @@ class SessionDBSource:
             for key in keys
         }
 
-    async def bulk_get_designated_agents_by_session(
+    async def bulk_get_designated_agent_ids_by_session(
         self,
         session_ids: Sequence[SessionID],
     ) -> dict[SessionID, list[AgentId]]:
-        """Read the agents each session designates, by agent id; one with none is absent."""
+        """Read the agent ids each session designates; one with none is absent."""
         if not session_ids:
             return {}
         stmt = (
