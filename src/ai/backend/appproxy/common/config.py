@@ -322,7 +322,7 @@ class GroupIDValidator:
 
 class ContentEncodingConfig(BaseSchema):
     rejected_encodings: Annotated[
-        list[Annotated[str, StringConstraints(strip_whitespace=True)]],
+        list[Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True)]],
         Field(default_factory=list),
         BackendAIConfigMeta(
             description=(

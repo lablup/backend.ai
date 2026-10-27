@@ -128,11 +128,13 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
     def _find_rejected_content_encoding(self, content_encoding_headers: list[str]) -> str | None:
         rejected_encodings = self._content_encoding.rejected_encodings
         # Each header line may list several codings, e.g. "gzip, br" (RFC 9110 section 8.4).
+        # Codings are case-insensitive (RFC 9110 section 8.4.1), and some session apps decode
+        # "BR" as brotli, so the header is lowercased like the configured codings.
         for header_value in content_encoding_headers:
             for coding in header_value.split(","):
-                trimmed_coding = coding.strip()
-                if trimmed_coding in rejected_encodings:
-                    return trimmed_coding
+                lowercased_coding = coding.strip().lower()
+                if lowercased_coding in rejected_encodings:
+                    return lowercased_coding
         return None
 
     async def proxy(self, request: web.Request) -> web.StreamResponse | web.WebSocketResponse:
