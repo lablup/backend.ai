@@ -1,7 +1,7 @@
 """The revisions and the policy a deployment read fills in.
 
-Every read fills them by the deployment id; a revision whose row is missing leaves its
-id ``None``. ``get_endpoint_info`` carries the revision ids and the policy only.
+A revision whose row is missing leaves its id ``None``. ``get_endpoint_info`` carries the
+revision ids and the policy only.
 """
 
 from __future__ import annotations
