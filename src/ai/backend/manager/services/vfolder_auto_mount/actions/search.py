@@ -16,7 +16,7 @@ __all__ = ("SearchVFolderAutoMountsAction",)
 class SearchVFolderAutoMountsAction(
     ScopedSearchOpsAction[VFolderAutoMountRow, VFolderAutoMountData]
 ):
-    """Page through the auto-mounts of the named projects, combined with OR."""
+    """Page through the auto-mounts of the named projects and users, combined with OR."""
 
     @override
     @classmethod

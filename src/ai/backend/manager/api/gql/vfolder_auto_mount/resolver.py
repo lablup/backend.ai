@@ -39,7 +39,8 @@ from ai.backend.manager.api.gql.vfolder_auto_mount.types import (
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Page through the vfolder auto-mounts of the named projects, combined with OR. "
+            "Page through the vfolder auto-mounts of the named projects and users, combined "
+            "with OR. "
             "Every project is authorized before the read runs. Auto-mounts marked deleted "
             "are left out unless the filter names `deletedAt`."
         ),
@@ -77,8 +78,9 @@ async def scoped_vfolder_auto_mounts(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Auto-mount a vfolder into every session created in a project. The vfolder must "
-            "belong to the project, and the caller needs the auto-mount create permission on it."
+            "Auto-mount a vfolder into every session created in a project or by a user. The "
+            "vfolder must belong to the project, or be owned by the user, and the caller needs "
+            "the auto-mount create permission on that project or user."
         ),
     )
 )

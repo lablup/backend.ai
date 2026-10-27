@@ -2197,6 +2197,41 @@
             "entity_type": "vfolder",
             "permission": 16,
             "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-71da-b8ab-3ef81c507c89",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "vfolder_auto_mount",
+            "permission": 1,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-758d-8b38-017b992fda14",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "vfolder_auto_mount",
+            "permission": 2,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-7aa0-8fc3-8ce43d9d8a0f",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "vfolder_auto_mount",
+            "permission": 4,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-7d8a-9948-fb96efd2e446",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "vfolder_auto_mount",
+            "permission": 8,
+            "created_at": "2025-09-12 09:51:58.265582+00"
+        },
+        {
+            "id": "01993d56-bb39-7f83-9d2e-f48845987aea",
+            "role_preset_id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+            "entity_type": "vfolder_auto_mount",
+            "permission": 16,
+            "created_at": "2025-09-12 09:51:58.265582+00"
         }
     ]
 }

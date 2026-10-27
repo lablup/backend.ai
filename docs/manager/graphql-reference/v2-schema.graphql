@@ -4069,11 +4069,14 @@ type CreateVFSStoragePayload {
 }
 
 """
-Added in 26.10.0. Input for auto-mounting a vfolder into every session created in a project. The vfolder must belong to that project.
+Added in 26.10.0. Input for auto-mounting a vfolder into every session created in a project or by a user. Exactly one of `projectId` and `userId` is given. The vfolder must belong to that project, or be owned by that user.
 """
 input CreateVFolderAutoMountInput {
   """ID of the project the vfolder is auto-mounted in."""
-  projectId: UUID!
+  projectId: UUID = null
+
+  """ID of the user the vfolder is auto-mounted for."""
+  userId: UUID = null
 
   """ID of the vfolder to auto-mount."""
   vfolderId: UUID!
@@ -11292,7 +11295,7 @@ type Mutation {
   purgeSessionGroup(input: PurgeSessionGroupInput!): PurgeSessionGroupPayload
 
   """
-  Added in 26.10.0. Auto-mount a vfolder into every session created in a project. The vfolder must belong to the project, and the caller needs the auto-mount create permission on it.
+  Added in 26.10.0. Auto-mount a vfolder into every session created in a project or by a user. The vfolder must belong to the project, or be owned by the user, and the caller needs the auto-mount create permission on that project or user.
   """
   createVfolderAutoMount(input: CreateVFolderAutoMountInput!): CreateVFolderAutoMountPayload
 
@@ -15361,7 +15364,7 @@ type Query {
   scopedSessionGroups(scope: SessionGroupScope!, filter: SessionGroupFilter = null, orderBy: [SessionGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionGroupConnection
 
   """
-  Added in 26.10.0. Page through the vfolder auto-mounts of the named projects, combined with OR. Every project is authorized before the read runs. Auto-mounts marked deleted are left out unless the filter names `deletedAt`.
+  Added in 26.10.0. Page through the vfolder auto-mounts of the named projects and users, combined with OR. Every project is authorized before the read runs. Auto-mounts marked deleted are left out unless the filter names `deletedAt`.
   """
   scopedVfolderAutoMounts(scope: VFolderAutoMountScope!, filter: VFolderAutoMountFilter = null, orderBy: [VFolderAutoMountOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderAutoMountConnection
 
@@ -23379,6 +23382,11 @@ type UserV2 implements Node @key(fields: "id") {
 
   """Added in 26.9.0. Resource groups this user may schedule on."""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
+
+  """
+  Added in 26.10.0. VFolders auto-mounted into every session this user creates. Those of the user's personal project are not included.
+  """
+  vfolderAutoMounts(filter: VFolderAutoMountFilter = null, orderBy: [VFolderAutoMountOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderAutoMountConnection
 }
 
 """
@@ -23791,7 +23799,7 @@ type VFolderAccessControlInfo {
 }
 
 """
-Added in 26.10.0. A vfolder mounted into every session created in a project, a personal project included.
+Added in 26.10.0. A vfolder mounted into every session created in a project, a personal project included, or by a user. Exactly one of `projectId` and `userId` is set.
 """
 type VFolderAutoMount implements Node {
   """The Globally Unique ID of this object"""
@@ -23800,8 +23808,13 @@ type VFolderAutoMount implements Node {
   """ID of the auto-mount."""
   entityId: UUID!
 
-  """ID of the project the vfolder is auto-mounted in."""
-  projectId: UUID!
+  """ID of the project the vfolder is auto-mounted in. Null for a user one."""
+  projectId: UUID
+
+  """
+  ID of the user the vfolder is auto-mounted for. Null for a project one.
+  """
+  userId: UUID
 
   """ID of the auto-mounted vfolder."""
   vfolderId: UUID!
@@ -23824,8 +23837,11 @@ type VFolderAutoMount implements Node {
   """Deletion timestamp. Null while the auto-mount is in use."""
   deletedAt: DateTime
 
-  """The project the vfolder is auto-mounted in."""
+  """The project the vfolder is auto-mounted in. Null for a user one."""
   project: ProjectV2
+
+  """The user the vfolder is auto-mounted for. Null for a project one."""
+  user: UserV2
 
   """The auto-mounted vfolder."""
   vfolder: VFolder
@@ -23859,8 +23875,11 @@ input VFolderAutoMountFilter {
   """Filter by auto-mount ID."""
   entityId: UUIDFilter = null
 
-  """Filter by project ID."""
+  """Filter by the ID of the project the auto-mount is set on."""
   projectId: UUIDFilter = null
+
+  """Filter by the ID of the user the auto-mount is set on."""
+  userId: UUIDFilter = null
 
   """Filter by vfolder ID."""
   vfolderId: UUIDFilter = null
@@ -23927,13 +23946,18 @@ input VFolderAutoMountPermissionFilter {
 }
 
 """
-Added in 26.10.0. Scope for the scoped vfolder auto-mount query. The items are OR'd, and every scope named is authorized before the read runs.
+Added in 26.10.0. Scope for the scoped vfolder auto-mount query. The items are OR'd, and every scope named is authorized before the read runs. At least one of `project` and `user` must be non-empty.
 """
 input VFolderAutoMountScope {
   """
   Projects whose auto-mounts are being read. A personal project included.
   """
-  project: [UUIDScope!]!
+  project: [UUIDScope!] = null
+
+  """
+  Users whose own auto-mounts are being read; those of a personal project are not.
+  """
+  user: [UUIDScope!] = null
 }
 
 """

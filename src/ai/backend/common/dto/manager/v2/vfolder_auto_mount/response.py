@@ -11,6 +11,7 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.data.vfolder_auto_mount.types import VFolderAutoMountScopeType
 from ai.backend.common.types import MountPermission
 
 __all__ = (
@@ -23,11 +24,14 @@ __all__ = (
 
 
 class VFolderAutoMountNode(BaseResponseModel):
-    """A vfolder mounted into every session created in a project."""
+    """A vfolder mounted into every session created in a project or by a user."""
 
     id: UUID = Field(description="ID of the auto-mount.")
     entity_id: UUID = Field(description="ID of the auto-mount.")
-    project_id: UUID = Field(description="ID of the project the vfolder is auto-mounted in.")
+    scope_type: VFolderAutoMountScopeType = Field(
+        description="Kind of the scope the auto-mount is set on."
+    )
+    scope_id: UUID = Field(description="ID of the project or the user.")
     vfolder_id: UUID = Field(description="ID of the auto-mounted vfolder.")
     mount_destination: str = Field(
         description="Path in the session container the vfolder is mounted at."
