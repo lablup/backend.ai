@@ -16,7 +16,6 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 @dataclass
 class ProbeCheckRunnerArgs[TID: Hashable]:
     checks: Sequence[AbstractProbeCheck[TID]]
-    initial_delay: float = 5.0
 
 
 class ProbeCheckRunner[TID: Hashable]:
@@ -29,12 +28,10 @@ class ProbeCheckRunner[TID: Hashable]:
     """
 
     _checks: Sequence[AbstractProbeCheck[TID]]
-    _initial_delay: float
     _tasks: list[asyncio.Task[None]]
 
     def __init__(self, args: ProbeCheckRunnerArgs[TID]) -> None:
         self._checks = args.checks
-        self._initial_delay = args.initial_delay
         self._tasks = []
 
     async def start(self) -> None:
@@ -56,7 +53,7 @@ class ProbeCheckRunner[TID: Hashable]:
     async def _run_check(self, check: AbstractProbeCheck[TID]) -> None:
         with with_log_context(check_id=str(check.id())):
             try:
-                await asyncio.sleep(self._initial_delay)
+                await asyncio.sleep(check.initial_delay())
                 while True:
                     try:
                         await check.check_status()

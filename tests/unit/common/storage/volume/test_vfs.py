@@ -20,6 +20,7 @@ def _make_check(mount_path: Path, executor: Executor) -> VfsVolumeStatusCheck:
             volume_name=StorageVolumeName("volume-1"),
             mount_path=mount_path,
             interval=60.0,
+            initial_delay=5.0,
             executor=executor,
         )
     )

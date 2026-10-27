@@ -348,6 +348,9 @@
       # Seconds between two status checks of a volume.
       # Added in 26.10.0
       check-interval = 60.0
+      # Seconds to wait before the first status check of a volume.
+      # Added in 26.10.0
+      initial-delay = 5.0
 
 # Debugging options configuration. Controls various debugging features like
 # asyncio debug mode, enhanced task monitoring, and verbose event logging.

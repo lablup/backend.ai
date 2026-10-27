@@ -24,6 +24,7 @@ class VfsVolumeStatusCheckArgs:
     volume_name: StorageVolumeName
     mount_path: Path
     interval: float
+    initial_delay: float
     executor: Executor
 
 
@@ -37,6 +38,7 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck[VfsVolumeStatusResult]):
     _volume_name: StorageVolumeName
     _mount_path: Path
     _interval: float
+    _initial_delay: float
     _executor: Executor
     _latest: VfsVolumeStatusResult | None
 
@@ -44,6 +46,7 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck[VfsVolumeStatusResult]):
         self._volume_name = args.volume_name
         self._mount_path = args.mount_path
         self._interval = args.interval
+        self._initial_delay = args.initial_delay
         self._executor = args.executor
         self._latest = None
 
@@ -59,6 +62,7 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck[VfsVolumeStatusResult]):
                 volume_name=volume_name,
                 mount_path=mount_path,
                 interval=config.check_interval,
+                initial_delay=config.initial_delay,
                 executor=ThreadPoolExecutor(
                     max_workers=1, thread_name_prefix=f"vfs-volume-status-{volume_name}"
                 ),
@@ -72,6 +76,10 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck[VfsVolumeStatusResult]):
     @override
     def interval(self) -> float:
         return self._interval
+
+    @override
+    def initial_delay(self) -> float:
+        return self._initial_delay
 
     @override
     def latest(self) -> VfsVolumeStatusResult | None:

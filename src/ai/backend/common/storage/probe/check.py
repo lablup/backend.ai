@@ -25,6 +25,11 @@ class AbstractProbeCheck[TID: Hashable](metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
+    def initial_delay(self) -> float:
+        """Seconds to wait before the first run of this check."""
+        raise NotImplementedError
+
+    @abstractmethod
     async def check_status(self) -> None:
         """
         Observes the subject and records what it saw, judging none of it.

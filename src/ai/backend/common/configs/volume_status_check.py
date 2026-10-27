@@ -23,3 +23,17 @@ class VolumeStatusCheckConfig(BaseConfigSchema):
             example=ConfigExample(local="60", prod="60"),
         ),
     ]
+    initial_delay: Annotated[
+        float,
+        Field(
+            default=5.0,
+            ge=0,
+            validation_alias=AliasChoices("initial-delay", "initial_delay"),
+            serialization_alias="initial-delay",
+        ),
+        BackendAIConfigMeta(
+            description="Seconds to wait before the first status check of a volume.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="5", prod="5"),
+        ),
+    ]
