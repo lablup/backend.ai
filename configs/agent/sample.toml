@@ -277,8 +277,8 @@
       # Added in 26.4.4
       interval = 30.0
 
-  # User, privilege, and resource limits of the socket relay container that
-  # connects kernel containers to the agent socket.
+  # User, privilege, resource limits, and healthcheck of the socket relay
+  # container that connects kernel containers to the agent socket.
   # Added in 26.10.0
   [agent.socket-relay]
     # Run socat in the socket relay container as a non-root user. A root agent
@@ -317,14 +317,28 @@
     # CPU limit of the socket relay container, in cores. Unlimited if not set.
     # Added in 26.10.0
     ## cpus = 1.0
-    # Add a healthcheck to the socket relay container that reports it unhealthy
-    # when the agent socket file in the container is missing or not a socket.
-    # The healthcheck only reports the status and does not restart the
-    # container. The setting applies when the relay container is created, so
-    # remove the backendai-socket-relay.<agent id> container before restarting
-    # the agent after changing it.
+
+    # Healthcheck of the socket relay container. The settings apply when the
+    # relay container is created, so remove the backendai-socket-relay.<agent
+    # id> container before restarting the agent after changing them.
     # Added in 26.10.0
-    enable-healthcheck = true
+    [agent.socket-relay.health-check]
+      # Add a healthcheck to the socket relay container that reports it
+      # unhealthy when the agent socket file in the container is missing or not
+      # a socket. The healthcheck only reports the status and does not restart
+      # the container.
+      # Added in 26.10.0
+      enable = true
+      # Seconds between healthcheck runs.
+      # Added in 26.10.0
+      interval = 30.0
+      # Seconds a healthcheck run may take before it counts as a failure.
+      # Added in 26.10.0
+      timeout = 30.0
+      # Number of consecutive failed healthcheck runs before the container is
+      # reported unhealthy.
+      # Added in 26.10.0
+      retries = 3
 
 # Container runtime configuration including execution modes, user settings, and
 # networking. In multi-agent mode (when 'agents' field is populated), this

@@ -1734,9 +1734,13 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
             if relay_user is not None:
                 relay_container_config["User"] = relay_user
-            if relay_config.enable_healthcheck:
+            relay_health_check_config = relay_config.health_check
+            if relay_health_check_config.enable:
                 relay_container_config["Healthcheck"] = {
                     "Test": ["CMD", "test", "-S", relay_container_sockpath],
+                    "Interval": int(relay_health_check_config.interval * 1_000_000_000),
+                    "Timeout": int(relay_health_check_config.timeout * 1_000_000_000),
+                    "Retries": relay_health_check_config.retries,
                 }
             socket_relay_name = f"backendai-socket-relay.{self.id}"
             socket_relay_container = PersistentServiceContainer(

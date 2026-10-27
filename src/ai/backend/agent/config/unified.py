@@ -136,6 +136,52 @@ class SyncContainerLifecyclesConfig(BaseConfigSchema):
     ]
 
 
+class SocketRelayHealthCheckConfig(BaseConfigSchema):
+    enable: Annotated[
+        bool,
+        Field(default=True),
+        BackendAIConfigMeta(
+            description=(
+                "Add a healthcheck to the socket relay container that reports it unhealthy "
+                "when the agent socket file in the container is missing or not a socket. "
+                "The healthcheck only reports the status and does not restart the container."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
+    interval: Annotated[
+        float,
+        Field(default=30.0, ge=0.001),
+        BackendAIConfigMeta(
+            description="Seconds between healthcheck runs.",
+            added_version="26.10.0",
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
+    timeout: Annotated[
+        float,
+        Field(default=30.0, ge=0.001),
+        BackendAIConfigMeta(
+            description="Seconds a healthcheck run may take before it counts as a failure.",
+            added_version="26.10.0",
+            example=ConfigExample(local="30.0", prod="30.0"),
+        ),
+    ]
+    retries: Annotated[
+        int,
+        Field(default=3, ge=1),
+        BackendAIConfigMeta(
+            description=(
+                "Number of consecutive failed healthcheck runs before the container is "
+                "reported unhealthy."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="3", prod="3"),
+        ),
+    ]
+
+
 class SocketRelayConfig(BaseConfigSchema):
     run_as_non_root: Annotated[
         bool,
@@ -257,24 +303,21 @@ class SocketRelayConfig(BaseConfigSchema):
             example=ConfigExample(local="1.0", prod="1.0"),
         ),
     ]
-    enable_healthcheck: Annotated[
-        bool,
+    health_check: Annotated[
+        SocketRelayHealthCheckConfig,
         Field(
-            default=True,
-            validation_alias=AliasChoices("enable-healthcheck", "enable_healthcheck"),
-            serialization_alias="enable-healthcheck",
+            default_factory=SocketRelayHealthCheckConfig,
+            validation_alias=AliasChoices("health-check", "health_check"),
+            serialization_alias="health-check",
         ),
         BackendAIConfigMeta(
             description=(
-                "Add a healthcheck to the socket relay container that reports it unhealthy "
-                "when the agent socket file in the container is missing or not a socket. "
-                "The healthcheck only reports the status and does not restart the container. "
-                "The setting applies when the relay container is created, so remove the "
-                "backendai-socket-relay.<agent id> container before restarting the agent "
-                "after changing it."
+                "Healthcheck of the socket relay container. The settings apply when the "
+                "relay container is created, so remove the backendai-socket-relay.<agent id> "
+                "container before restarting the agent after changing them."
             ),
             added_version="26.10.0",
-            example=ConfigExample(local="true", prod="true"),
+            composite=CompositeType.FIELD,
         ),
     ]
 
@@ -946,8 +989,8 @@ class CommonAgentConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description=(
-                "User, privilege, and resource limits of the socket relay container "
-                "that connects kernel containers to the agent socket."
+                "User, privilege, resource limits, and healthcheck of the socket relay "
+                "container that connects kernel containers to the agent socket."
             ),
             added_version="26.10.0",
             composite=CompositeType.FIELD,
