@@ -75,7 +75,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
     status: VFolderOperationStatusGQL = gql_field(
         description=(
             "Current operation status. "
-            "READY, CLONING, "
+            "READY, CREATING, CLONING, "
             "DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR."
         )
     )
