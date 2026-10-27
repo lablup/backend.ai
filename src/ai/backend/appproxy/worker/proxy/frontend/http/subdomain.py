@@ -60,7 +60,11 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
             template_path = f / "templates"
             aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(template_path))
 
-        runner = web.AppRunner(app, keepalive_timeout=30.0)
+        runner = web.AppRunner(
+            app,
+            keepalive_timeout=30.0,
+            auto_decompress=False,  # transparently pass the request body
+        )
         await runner.setup()
         service_addr = self.wildcard_config.bind_addr
         site = web.TCPSite(
