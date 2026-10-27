@@ -10993,6 +10993,11 @@ type Mutation {
   updateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayload!
 
   """
+  Added in 26.10.0. Change a system session environ row's key. Only provided fields are updated.
+  """
+  updateSystemSessionEnviron(input: UpdateSystemSessionEnvironInput!): UpdateSystemSessionEnvironPayload!
+
+  """
   Added in 26.10.0. Purge a runtime variant with the presets in its catalog.
   """
   purgeRuntimeVariant(id: UUID!): PurgeRuntimeVariantPayload!
@@ -22480,6 +22485,23 @@ input UpdateStorageVolumeInput {
 type UpdateStorageVolumePayload {
   """The updated storage volume."""
   item: StorageVolumeV2!
+}
+
+"""
+Added in 26.10.0. Input for changing a system session environ row's key.
+"""
+input UpdateSystemSessionEnvironInput {
+  """The id of the row to update."""
+  id: UUID!
+
+  """New environment variable name."""
+  key: String
+}
+
+"""Added in 26.10.0. Payload for a system session environ row update."""
+type UpdateSystemSessionEnvironPayload {
+  """The updated row."""
+  systemSessionEnviron: SystemSessionEnviron!
 }
 
 """

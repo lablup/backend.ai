@@ -37872,6 +37872,36 @@
         "title": "AdminSearchSystemSessionEnvironsInput",
         "type": "object"
       },
+      "UpdateSystemSessionEnvironInput": {
+        "description": "Input for changing a system session environ row's key.",
+        "properties": {
+          "id": {
+            "description": "The id of the row to update.",
+            "format": "uuid",
+            "title": "Id",
+            "type": "string"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "New environment variable name. Omit to leave unchanged.",
+            "title": "Key"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "UpdateSystemSessionEnvironInput",
+        "type": "object"
+      },
       "ArrayFilter_int_": {
         "properties": {
           "contains": {
@@ -65978,6 +66008,44 @@
         ],
         "parameters": [],
         "description": "List every value source a system session environ row can carry.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/system-session-environs/{environ_id}": {
+      "patch": {
+        "operationId": "v2/system-session-environs.update",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSystemSessionEnvironInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "environ_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Change a system session environ row's key.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/users/search": {
