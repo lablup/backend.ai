@@ -425,6 +425,8 @@ class DeploymentDBSource:
     ) -> list[DeploymentInfo]:
         """Fill the current and deploying revisions and the policy of ``infos``, read by the
         deployment id. A revision whose row is missing leaves its id ``None`` as well."""
+        if not infos:
+            return []
         revisions = ModelRevisionSearchableFields.own
         deployment_ids = [info.id for info in infos]
         current_result = await db_sess.execute(
