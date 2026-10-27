@@ -282,7 +282,7 @@ class ClientIPStrategyConfig(BaseSchema):
         return self
 
 
-class RequestBodyConfig(BaseSchema):
+class ContentEncodingConfig(BaseSchema):
     reject_brotli: Annotated[
         bool,
         Field(default=False),
@@ -542,13 +542,13 @@ class ProxyCoordinatorConfig(BaseSchema):
         ),
     ]
 
-    request_body: Annotated[
-        RequestBodyConfig,
-        Field(default_factory=lambda: RequestBodyConfig()),
+    content_encoding: Annotated[
+        ContentEncodingConfig,
+        Field(default_factory=lambda: ContentEncodingConfig()),
         BackendAIConfigMeta(
             description=(
-                "Rules applied to request bodies before they are forwarded to session apps. "
-                "Applies to both the built-in proxy workers and Traefik."
+                "Rules applied to the Content-Encoding of requests before they are forwarded to "
+                "session apps. Applies to both the built-in proxy workers and Traefik."
             ),
             added_version="26.10.0",
             composite=CompositeType.FIELD,
