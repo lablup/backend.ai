@@ -40,6 +40,10 @@ class AgentBackend(enum.StrEnum):
     DUMMY = "dummy"
 
 
+# The message of the cancellation that a destroy sends to the creation of the same kernel.
+CREATION_DESTROYED_MESSAGE = "kernel destroyed during creation"
+
+
 class AbstractAgentDiscovery(ABC):
     @abstractmethod
     def get_agent_cls(self) -> type[AbstractAgent[Any, Any]]:

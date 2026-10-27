@@ -11,7 +11,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from ai.backend.agent.agent import AbstractAgent
-from ai.backend.agent.types import KernelOwnershipData, LifecycleEvent
+from ai.backend.agent.types import CREATION_DESTROYED_MESSAGE, KernelOwnershipData, LifecycleEvent
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import AgentId, ContainerId, KernelId, SessionId
 
@@ -87,6 +87,7 @@ def agent(kernel_context: MagicMock) -> MagicMock:
     cpu = SimpleNamespace(instance=SimpleNamespace(get_attached_devices=AsyncMock(return_value=[])))
     agent = MagicMock()
     agent.failure_reporting_kernels = set()
+    agent._active_creates = {}
     agent.kernel_registry = {}
     agent.track_create = track_create
     agent.registry_lock = AsyncMock()
@@ -150,3 +151,34 @@ class TestCreateKernelInitFailure:
             KernelLifecycleEventReason.FAILED_TO_START,
             container_id=CONTAINER_ID,
         )
+
+    async def test_init_cancelled_by_a_destroy_does_not_inject_failed_to_start(
+        self,
+        agent: MagicMock,
+        kernel_obj: MagicMock,
+        ownership_data: KernelOwnershipData,
+        kernel_config: dict[str, Any],
+    ) -> None:
+        """The destroy that cancelled the creation reports the termination itself."""
+        error = asyncio.CancelledError(CREATION_DESTROYED_MESSAGE)
+        kernel_obj.init = AsyncMock(side_effect=error)
+        agent._active_creates = {
+            ownership_data.kernel_id: SimpleNamespace(cancelled_by_destroy=True)
+        }
+
+        with (
+            patch("ai.backend.agent.agent.get_arch_name", return_value="x86_64"),
+            patch("ai.backend.agent.agent.allocate"),
+            pytest.raises(asyncio.CancelledError) as exc_info,
+        ):
+            await AbstractAgent.create_kernel(
+                agent,
+                ownership_data,
+                MagicMock(),
+                cast(Any, kernel_config),
+                cast(Any, {}),
+            )
+
+        assert exc_info.value is error
+        kernel_obj.init.assert_awaited_once()
+        agent.inject_container_lifecycle_event.assert_not_awaited()
