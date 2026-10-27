@@ -35,6 +35,7 @@ from ai.backend.common.dto.manager.v2.system_session_environ.types import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
+    DateTimeFilter,
     NullableDateTimeFilter,
     OrderDirection,
     StringFilter,
@@ -107,8 +108,8 @@ class SystemSessionEnvironScopeInfoGQL(PydanticOutputMixin[SystemSessionEnvironS
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "A system session environ row: the value of a starting session it injects under "
-            "its key into every session of its scope."
+            "A system session environ row: binds a value of a starting session to an "
+            "environment variable name at the public scope, a domain or a project."
         ),
     ),
     name="SystemSessionEnviron",
@@ -129,7 +130,7 @@ class SystemSessionEnvironGQL(PydanticNodeMixin[SystemSessionEnvironNodeDTO]):
     created_at: datetime = gql_field(description="When the row was created.")
     updated_at: datetime = gql_field(description="When the row was last changed.")
     deleted_at: datetime | None = gql_field(
-        description="When the row was soft-deleted. Null while the row is injected."
+        description="When the row was soft-deleted, or null if it is not."
     )
 
     @classmethod
@@ -244,6 +245,12 @@ class SystemSessionEnvironFilterGQL(PydanticInputMixin[SystemSessionEnvironFilte
     scope_id: UUIDFilter | None = gql_field(
         description="Filter by the id of the public entity, the domain or the project.",
         default=None,
+    )
+    created_at: DateTimeFilter | None = gql_field(
+        description="Filter by when the row was created.", default=None
+    )
+    updated_at: DateTimeFilter | None = gql_field(
+        description="Filter by when the row was last changed.", default=None
     )
     deleted_at: NullableDateTimeFilter | None = gql_field(
         description="Filter by when the row was soft-deleted.", default=None

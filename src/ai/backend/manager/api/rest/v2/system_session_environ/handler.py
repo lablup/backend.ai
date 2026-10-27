@@ -19,6 +19,8 @@ if TYPE_CHECKING:
 class V2SystemSessionEnvironHandler:
     """REST v2 handler for the system session environ domain."""
 
+    _adapter: SystemSessionEnvironAdapter
+
     def __init__(self, *, adapter: SystemSessionEnvironAdapter) -> None:
         self._adapter = adapter
 

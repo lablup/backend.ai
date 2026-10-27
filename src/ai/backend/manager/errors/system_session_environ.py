@@ -15,8 +15,6 @@ from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
 
 
 class UnknownSystemSessionEnvironValueSource(EntityError, web.HTTPBadRequest):
-    """Raised when a request names a value source the manager does not have."""
-
     error_type = "https://api.backend.ai/probs/unknown-system-session-environ-value-source"
     error_title = "The value source is not one the manager provides."
 

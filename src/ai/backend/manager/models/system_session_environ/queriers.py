@@ -17,8 +17,6 @@ __all__ = ("BulkSystemSessionEnvironQuerier",)
 class BulkSystemSessionEnvironQuerier(
     BulkEntityQuerier[SystemSessionEnvironRow, SystemSessionEnvironData]
 ):
-    """The system session environ rows the caller named."""
-
     @override
     def row_class(self) -> type[SystemSessionEnvironRow]:
         return SystemSessionEnvironRow

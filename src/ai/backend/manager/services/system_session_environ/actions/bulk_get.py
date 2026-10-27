@@ -20,8 +20,6 @@ __all__ = ("BulkGetSystemSessionEnvironsAction",)
 class BulkGetSystemSessionEnvironsAction(
     PartialBulkGetEntityOpsAction[SystemSessionEnvironRow, SystemSessionEnvironData]
 ):
-    """Read the system session environ rows the caller named, one permission check per row."""
-
     ids: Sequence[SystemSessionEnvironID]
 
     @override

@@ -73,8 +73,6 @@ _SYSTEM_SESSION_ENVIRON_PAGINATION_SPEC = PaginationSpec(
 
 
 class SystemSessionEnvironAdapter(BaseAdapter):
-    """Adapter for the system session environ search and the reads by id."""
-
     _system_session_environ: SystemSessionEnvironProcessors
 
     def __init__(self, system_session_environ: SystemSessionEnvironProcessors) -> None:
@@ -83,7 +81,6 @@ class SystemSessionEnvironAdapter(BaseAdapter):
     async def global_search(
         self, input: AdminSearchSystemSessionEnvironsInput
     ) -> AdminSearchSystemSessionEnvironsPayload:
-        """Search every system session environ row, at every scope (superadmin)."""
         searcher = self._build_searcher(
             SystemSessionEnvironSearcher,
             conditions=self._convert_filter(input.filter) if input.filter else [],
@@ -109,7 +106,6 @@ class SystemSessionEnvironAdapter(BaseAdapter):
         )
 
     async def public_list_value_sources(self) -> ListSystemSessionEnvironValueSourcesPayload:
-        """Every value source a system session environ row can carry, for any logged-in user."""
         result = await self._system_session_environ.public_list_value_sources.run(
             PublicListSystemSessionEnvironValueSourcesAction()
         )
@@ -120,7 +116,6 @@ class SystemSessionEnvironAdapter(BaseAdapter):
     async def bulk_get_ids(
         self, ids: Sequence[SystemSessionEnvironID]
     ) -> list[SystemSessionEnvironNode | Exception | None]:
-        """Batch load system session environ rows by id for DataLoader use, one answer per id."""
         if not ids:
             return []
         result = await self._system_session_environ.bulk_get_ids.run(
@@ -143,6 +138,8 @@ class SystemSessionEnvironAdapter(BaseAdapter):
             ),
             *self.apply_enum_filter(filter.scope_type, fields.scope_type.filter),
             *self.apply_uuid_filter(filter.scope_id, fields.scope_id.filter),
+            *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(filter.updated_at, fields.updated_at.filter),
             *self.apply_nullable_datetime_filter(filter.deleted_at, fields.deleted_at.filter),
         ]
         if filter.AND:

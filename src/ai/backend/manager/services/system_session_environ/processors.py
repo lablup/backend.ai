@@ -26,8 +26,6 @@ __all__ = ("SystemSessionEnvironProcessors",)
 
 
 class SystemSessionEnvironProcessors:
-    """The row operations run straight against ops; the value source list is the service's."""
-
     global_search: GlobalActionProcessor[
         GlobalSearchSystemSessionEnvironsAction,
         BatchOpsResult[SystemSessionEnvironData],

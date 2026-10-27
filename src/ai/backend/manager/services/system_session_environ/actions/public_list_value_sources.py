@@ -17,8 +17,6 @@ __all__ = (
 
 @dataclass(frozen=True)
 class PublicListSystemSessionEnvironValueSourcesAction(BaseGlobalAction):
-    """List every value source a system session environ row can carry."""
-
     @override
     @classmethod
     def entity_type(cls) -> EntityType:

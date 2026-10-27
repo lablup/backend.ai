@@ -6,6 +6,7 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import (
+    DateTimeFilter,
     EnumFilter,
     NullableDateTimeFilter,
     StringFilter,
@@ -58,6 +59,12 @@ class SystemSessionEnvironFilter(BaseRequestModel):
     scope_id: UUIDFilter | None = Field(
         default=None,
         description="Filter by the id of the public entity, the domain or the project.",
+    )
+    created_at: DateTimeFilter | None = Field(
+        default=None, description="Filter by when the row was created."
+    )
+    updated_at: DateTimeFilter | None = Field(
+        default=None, description="Filter by when the row was last changed."
     )
     deleted_at: NullableDateTimeFilter | None = Field(
         default=None, description="Filter by when the row was soft-deleted."

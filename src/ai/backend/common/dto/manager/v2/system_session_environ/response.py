@@ -35,7 +35,7 @@ class SystemSessionEnvironNode(BaseResponseModel):
     updated_at: datetime = Field(description="When the row was last changed.")
     deleted_at: datetime | None = Field(
         default=None,
-        description="When the row was soft-deleted. Null while the row is injected.",
+        description="When the row was soft-deleted, or null if it is not.",
     )
 
 
