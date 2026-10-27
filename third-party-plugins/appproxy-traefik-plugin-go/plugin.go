@@ -95,7 +95,9 @@ func (a *Plugin) findRejectedContentEncoding(req *http.Request) (string, bool) {
 		for _, coding := range strings.Split(headerValue, ",") {
 			trimmedCoding := strings.TrimSpace(coding)
 			for _, rejectedEncoding := range a.config.ContentEncoding.RejectedEncodings {
-				if trimmedCoding == rejectedEncoding {
+				// Codings are case-insensitive (RFC 9110 section 8.4.1), and some session apps
+				// decode "BR" as brotli.
+				if strings.EqualFold(trimmedCoding, rejectedEncoding) {
 					return trimmedCoding, true
 				}
 			}

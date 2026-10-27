@@ -18,7 +18,8 @@ type contentEncodingCase struct {
 func TestServeHTTPContentEncoding(t *testing.T) {
 	cases := []contentEncodingCase{
 		{name: "br rejected/br", rejectedEncodings: []string{"br"}, contentEncodings: []string{"br"}, expectedStatus: http.StatusUnsupportedMediaType, expectedForwardedCount: 0},
-		{name: "br rejected/BR", rejectedEncodings: []string{"br"}, contentEncodings: []string{"BR"}, expectedStatus: http.StatusOK, expectedForwardedCount: 1},
+		{name: "br rejected/BR", rejectedEncodings: []string{"br"}, contentEncodings: []string{"BR"}, expectedStatus: http.StatusUnsupportedMediaType, expectedForwardedCount: 0},
+		{name: "br rejected/gzip, Br", rejectedEncodings: []string{"br"}, contentEncodings: []string{"gzip, Br"}, expectedStatus: http.StatusUnsupportedMediaType, expectedForwardedCount: 0},
 		{name: "br rejected/gzip, br", rejectedEncodings: []string{"br"}, contentEncodings: []string{"gzip, br"}, expectedStatus: http.StatusUnsupportedMediaType, expectedForwardedCount: 0},
 		{name: "br rejected/gzip + br", rejectedEncodings: []string{"br"}, contentEncodings: []string{"gzip", "br"}, expectedStatus: http.StatusUnsupportedMediaType, expectedForwardedCount: 0},
 		{name: "br rejected/none", rejectedEncodings: []string{"br"}, contentEncodings: nil, expectedStatus: http.StatusOK, expectedForwardedCount: 1},
@@ -29,7 +30,7 @@ func TestServeHTTPContentEncoding(t *testing.T) {
 		{name: "none rejected/gzip, br", rejectedEncodings: nil, contentEncodings: []string{"gzip, br"}, expectedStatus: http.StatusOK, expectedForwardedCount: 1},
 		{name: "none rejected/gzip", rejectedEncodings: nil, contentEncodings: []string{"gzip"}, expectedStatus: http.StatusOK, expectedForwardedCount: 1},
 		{name: "none rejected/none", rejectedEncodings: nil, contentEncodings: nil, expectedStatus: http.StatusOK, expectedForwardedCount: 1},
-		{name: "BR rejected/br", rejectedEncodings: []string{"BR"}, contentEncodings: []string{"br"}, expectedStatus: http.StatusOK, expectedForwardedCount: 1},
+		{name: "BR rejected/br", rejectedEncodings: []string{"BR"}, contentEncodings: []string{"br"}, expectedStatus: http.StatusUnsupportedMediaType, expectedForwardedCount: 0},
 		{name: "br, zstd rejected/zstd", rejectedEncodings: []string{"br", "zstd"}, contentEncodings: []string{"zstd"}, expectedStatus: http.StatusUnsupportedMediaType, expectedForwardedCount: 0},
 		{name: "br, zstd rejected/gzip", rejectedEncodings: []string{"br", "zstd"}, contentEncodings: []string{"gzip"}, expectedStatus: http.StatusOK, expectedForwardedCount: 1},
 	}
