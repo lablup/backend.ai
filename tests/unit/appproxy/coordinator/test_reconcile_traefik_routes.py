@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
@@ -88,7 +89,52 @@ class TestOnReconcileTraefikRoutes:
         manager.update_circuit_routes = AsyncMock()
         manager.reconcile_traefik_etcd_state = AsyncMock()
         manager.circuit_lock = _noop_lock
+        manager.traefik_reconcile_lock = asyncio.Lock()
         return manager
+
+    async def test_skips_cycle_while_previous_cycle_is_running(
+        self,
+        circuit_manager: Any,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # Regression: a cycle blocked on a circuit lock (e.g. behind an etcd call
+        # that never returned) used to be joined by a new cycle every 30 seconds,
+        # each pinning its own snapshot of every circuit until the process ran
+        # out of memory. An overlapping cycle must return before loading circuits.
+        circuits = [_make_circuit(AppMode.INFERENCE)]
+        workers = [_make_worker()]
+        context = _make_context(enable_traefik=True, circuit_manager=circuit_manager)
+
+        list_circuits_mock = AsyncMock(return_value=circuits)
+        monkeypatch.setattr(Circuit, "list_circuits", list_circuits_mock)
+        monkeypatch.setattr(Worker, "list_workers", AsyncMock(return_value=workers))
+
+        entered = asyncio.Event()
+        release = asyncio.Event()
+
+        async def _blocking_update(*_args: Any) -> None:
+            entered.set()
+            await release.wait()
+
+        circuit_manager.update_circuit_routes = AsyncMock(side_effect=_blocking_update)
+
+        first = asyncio.create_task(
+            on_reconcile_traefik_routes(context, AgentId("test"), DoReconcileTraefikRoutesEvent())
+        )
+        await entered.wait()
+
+        await asyncio.wait_for(
+            on_reconcile_traefik_routes(context, AgentId("test"), DoReconcileTraefikRoutesEvent()),
+            timeout=5.0,
+        )
+        assert list_circuits_mock.await_count == 1
+
+        release.set()
+        await first
+
+        await on_reconcile_traefik_routes(context, AgentId("test"), DoReconcileTraefikRoutesEvent())
+        assert list_circuits_mock.await_count == 2
+        assert not circuit_manager.traefik_reconcile_lock.locked()
 
     async def test_noop_when_traefik_disabled(
         self,

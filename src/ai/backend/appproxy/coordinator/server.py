@@ -526,7 +526,25 @@ async def on_reconcile_traefik_routes(
     _source: AgentId,
     _event: DoReconcileTraefikRoutesEvent,
 ) -> None:
-    """Periodic reconcile handler that re-publishes every active circuit's
+    """Run one Traefik route reconcile cycle unless the previous one is still running.
+
+    A cycle waits on per-circuit locks and etcd calls, so it can outlast the 30-second
+    interval. Skipping the overlapping cycle keeps the coordinator from stacking up
+    handler tasks that each hold a full snapshot of every circuit until it runs out of
+    memory; the next interval picks up whatever this one skipped.
+    """
+    if not context.local_config.proxy_coordinator.enable_traefik:
+        return
+    reconcile_lock = context.circuit_manager.traefik_reconcile_lock
+    if reconcile_lock.locked():
+        log.warning("traefik route reconcile skipped; the previous cycle is still running")
+        return
+    async with reconcile_lock:
+        await _reconcile_traefik_routes(context)
+
+
+async def _reconcile_traefik_routes(context: RootContext) -> None:
+    """Periodic reconcile that re-publishes every active circuit's
     etcd routing config from the PG source of truth, then drops any stale
     circuit keys that were left behind in etcd by missed unloads.
 
@@ -546,8 +564,6 @@ async def on_reconcile_traefik_routes(
     Each phase swallows its own errors so a single bad circuit or worker
     cannot short-circuit the entire reconcile cycle.
     """
-    if not context.local_config.proxy_coordinator.enable_traefik:
-        return
     async with context.db.begin_readonly_session() as db_sess:
         circuits = await Circuit.list_circuits(db_sess, load_worker=True, load_endpoint=True)
         workers = await Worker.list_workers(db_sess)

@@ -111,6 +111,9 @@ class CircuitManager:
     traefik_etcd: TraefikEtcd | None
     local_config: ServerConfig
     _circuit_locks: dict[UUID, asyncio.Lock] = field(default_factory=dict)
+    # Held for the duration of one periodic Traefik route reconcile cycle, so a
+    # cycle that is still running makes the next one skip instead of piling up.
+    traefik_reconcile_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
     def _get_lock(self, circuit_id: UUID) -> asyncio.Lock:
         if circuit_id not in self._circuit_locks:
