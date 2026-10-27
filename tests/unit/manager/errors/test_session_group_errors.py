@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from http import HTTPStatus
 
-from ai.backend.manager.errors.session_group import SessionGroupInUse, SessionGroupInUseForEnqueue
+from ai.backend.manager.errors.session_group import SessionGroupInUse
 
 
 class TestSessionGroupInUse:
@@ -16,11 +16,3 @@ class TestSessionGroupInUse:
 
         assert error.body_dict["msg"] == "boom"
         assert error.content_type == "application/problem+json"
-
-
-class TestSessionGroupInUseForEnqueue:
-    def test_reports_a_conflict_on_session_create(self) -> None:
-        error = SessionGroupInUseForEnqueue("boom")
-
-        assert error.status_code == HTTPStatus.CONFLICT
-        assert str(error.error_code()) == "session_create_conflict"
