@@ -86,6 +86,9 @@ from ai.backend.manager.repositories.user_resource_policy.repositories import (
     UserResourcePolicyRepositories,
 )
 from ai.backend.manager.repositories.vfolder.repositories import VfolderRepositories
+from ai.backend.manager.repositories.vfolder_auto_mount.repositories import (
+    VFolderAutoMountRepositories,
+)
 from ai.backend.manager.repositories.vfs_storage.repositories import VFSStorageRepositories
 
 
@@ -131,6 +134,7 @@ class Repositories:
     user: UserRepositories
     user_resource_policy: UserResourcePolicyRepositories
     vfolder: VfolderRepositories
+    vfolder_auto_mount: VFolderAutoMountRepositories
     object_storage: ObjectStorageRepositories
     vfs_storage: VFSStorageRepositories
     huggingface_registry: HuggingFaceRegistryRepositories
@@ -186,6 +190,7 @@ class Repositories:
         user_repositories = UserRepositories.create(args)
         user_resource_policy_repositories = UserResourcePolicyRepositories.create(args)
         vfolder_repositories = VfolderRepositories.create(args)
+        vfolder_auto_mount_repositories = VFolderAutoMountRepositories.create(args)
         object_storage_repositories = ObjectStorageRepositories.create(args)
         vfs_storage_repositories = VFSStorageRepositories.create(args)
         artifact_repositories = ArtifactRepositories.create(args)
@@ -241,6 +246,7 @@ class Repositories:
             user=user_repositories,
             user_resource_policy=user_resource_policy_repositories,
             vfolder=vfolder_repositories,
+            vfolder_auto_mount=vfolder_auto_mount_repositories,
             object_storage=object_storage_repositories,
             vfs_storage=vfs_storage_repositories,
             huggingface_registry=huggingface_registry_repositories,

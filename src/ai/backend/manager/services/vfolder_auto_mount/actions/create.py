@@ -6,18 +6,20 @@ from typing import override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountEntityType
-from ai.backend.manager.actions.v2.ops.base import CreateEntityOpsAction
+from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
+from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.data.vfolder_auto_mount.types import VFolderAutoMountData
 from ai.backend.manager.models.vfolder_auto_mount.creators import VFolderAutoMountCreator
-from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
 
-__all__ = ("CreateVFolderAutoMountAction",)
+__all__ = (
+    "CreateVFolderAutoMountAction",
+    "CreateVFolderAutoMountActionResult",
+)
 
 
 @dataclass(frozen=True)
-class CreateVFolderAutoMountAction(
-    CreateEntityOpsAction[VFolderAutoMountRow, VFolderAutoMountData]
-):
+class CreateVFolderAutoMountAction(BaseScopeAction):
     """Add a vfolder to the auto-mounts of a project."""
 
     creator: VFolderAutoMountCreator
@@ -28,8 +30,9 @@ class CreateVFolderAutoMountAction(
         return VFolderAutoMountEntityType()
 
     @override
-    def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return (self.creator.scope,)
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.CREATE
 
     @override
     @classmethod
@@ -37,5 +40,14 @@ class CreateVFolderAutoMountAction(
         return "create_vfolder_auto_mount"
 
     @override
-    def to_creator(self) -> VFolderAutoMountCreator:
-        return self.creator
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return (self.creator.scope,)
+
+
+@dataclass(frozen=True)
+class CreateVFolderAutoMountActionResult(BaseScopeActionResult):
+    data: VFolderAutoMountData
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return (self.data.entity_id(),)
