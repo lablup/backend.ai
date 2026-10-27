@@ -16,6 +16,7 @@ from sqlalchemy.orm import selectinload
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
@@ -38,6 +39,7 @@ from ai.backend.manager.clients.storage_proxy.session_manager import StorageSess
 from ai.backend.manager.config.loader.legacy_etcd_loader import LegacyEtcdLoader
 from ai.backend.manager.data.deployment.types import (
     ModelDeploymentAccessTokenData,
+    ModelRevisionData,
     RouteHealthStatus,
     RouteStatus,
 )
@@ -856,28 +858,23 @@ class ModelServingRepository:
                 if deployments
                 else []
             )
-            revision_ids = [
-                info.current_revision_id
-                for info in deployments
-                if info.current_revision_id is not None
-            ]
-            revisions = (
-                (
-                    await r.search_in_global(
-                        ModelRevisionSearcher(
-                            pagination=NoPagination(),
-                            conditions=[
-                                ModelRevisionSearchableFields.own.field_id.filter.in_(
-                                    UUIDInMatchSpec(values=revision_ids, negated=False)
-                                )
-                            ],
+            current_revision_ids: list[DeploymentRevisionID] = []
+            for info in deployments:
+                if info.current_revision_id is not None:
+                    current_revision_ids.append(info.current_revision_id)
+            current_revisions: dict[DeploymentRevisionID, ModelRevisionData] = {}
+            if current_revision_ids:
+                revision_searcher = ModelRevisionSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        ModelRevisionSearchableFields.own.field_id.filter.in_(
+                            UUIDInMatchSpec(values=current_revision_ids, negated=False)
                         )
-                    )
-                ).items
-                if revision_ids
-                else []
-            )
-        revision_by_id = {revision.id: revision for revision in revisions}
+                    ],
+                )
+                revision_result = await r.search_in_global(revision_searcher)
+                for revision in revision_result.items:
+                    current_revisions[revision.id] = revision
         routes_by_deployment: defaultdict[uuid.UUID, list[RoutingData]] = defaultdict(list)
         for route in routes:
             routes_by_deployment[route.endpoint].append(route)
@@ -885,11 +882,9 @@ class ModelServingRepository:
         items: list[ServiceSearchItem] = []
         for info in deployments:
             deployment_routes = routes_by_deployment[info.id]
-            current_rev = (
-                revision_by_id.get(info.current_revision_id)
-                if info.current_revision_id is not None
-                else None
-            )
+            current_revision = None
+            if info.current_revision_id is not None:
+                current_revision = current_revisions.get(info.current_revision_id)
             items.append(
                 ServiceSearchItem(
                     id=info.id,
@@ -904,8 +899,8 @@ class ModelServingRepository:
                     service_endpoint=HttpUrl(info.network.url) if info.network.url else None,
                     open_to_public=info.network.open_to_public,
                     resource_slots=(
-                        current_rev.resource_config.resource_slot
-                        if current_rev
+                        current_revision.resource_config.resource_slot
+                        if current_revision is not None
                         else ResourceSlot({})
                     ),
                     resource_group=info.metadata.resource_group,
