@@ -4,12 +4,20 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import override
+from typing import Final, override
+
+import aiohttp
 
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 
-from .bootstrap import BootstrapComposer, BootstrapInput
+from .bootstrap import BootstrapComposer, BootstrapInput, BootstrapResources
+from .components.composer import ComponentsComposer, ComponentsInput, ComponentsResources
 from .infrastructure import InfrastructureComposer, InfrastructureResources
+from .system.composer import SystemComposer, SystemInput, SystemResources
+
+_WORKER_CLIENT_TIMEOUT: Final[aiohttp.ClientTimeout] = aiohttp.ClientTimeout(
+    total=30.0, connect=10.0
+)
 
 
 @dataclass
@@ -23,7 +31,10 @@ class DependencyInput:
 class DependencyResources:
     """All dependency resources for app proxy coordinator."""
 
+    bootstrap: BootstrapResources
     infrastructure: InfrastructureResources
+    system: SystemResources
+    components: ComponentsResources
 
 
 class CoordinatorDependencyComposer(DependencyComposer[DependencyInput, DependencyResources]):
@@ -54,6 +65,24 @@ class CoordinatorDependencyComposer(DependencyComposer[DependencyInput, Dependen
             bootstrap.config,
         )
 
+        # Stage 3: System (service discovery)
+        system = await stack.enter_composer(
+            SystemComposer(),
+            SystemInput(
+                config=bootstrap.config,
+                sentinel_monitors=infrastructure.sentinel_monitors,
+            ),
+        )
+
+        # Stage 4: Components (worker client pool)
+        components = await stack.enter_composer(
+            ComponentsComposer(),
+            ComponentsInput(worker_client_timeout=_WORKER_CLIENT_TIMEOUT),
+        )
+
         yield DependencyResources(
+            bootstrap=bootstrap,
             infrastructure=infrastructure,
+            system=system,
+            components=components,
         )

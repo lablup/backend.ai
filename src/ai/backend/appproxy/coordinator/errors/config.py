@@ -208,3 +208,18 @@ class MissingHealthCheckInfoError(BackendAIError):
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
         )
+
+
+class UnsupportedServiceDiscoveryTypeError(BackendAIError):
+    """Raised when the configured service discovery type is not supported by the coordinator."""
+
+    error_type = "https://api.backend.ai/probs/appproxy/unsupported-service-discovery-type"
+    error_title = "Service discovery type is not supported."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
