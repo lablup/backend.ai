@@ -38,7 +38,6 @@ class SystemSessionEnvironUpserter(
     owner: EntityIdentifier
     value_source: SystemSessionEnvironValueSource
     key: str
-    enabled: bool
 
     @override
     def row_class(self) -> type[SystemSessionEnvironRow]:
@@ -74,14 +73,12 @@ class SystemSessionEnvironUpserter(
             "scope_type": SystemSessionEnvironScopeType.of_owner(self.owner),
             "scope_id": self.owner,
             "value_source": self.value_source,
-            "enabled": self.enabled,
         }
 
     @override
     def build_update_values(self) -> dict[str, Any]:
         return {
             "value_source": self.value_source,
-            "enabled": self.enabled,
             "updated_at": sa.func.now(),
         }
 

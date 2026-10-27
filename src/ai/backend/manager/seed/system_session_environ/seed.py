@@ -29,7 +29,6 @@ class SystemSessionEnvironSeed(SeedItem):
     scope_type: SystemSessionEnvironScopeType
     # TODO(BA-8661): Make this required once the global entity ids are fixed by the seed.
     scope_id: SystemSessionEnvironScopeID | None = None
-    enabled: bool
 
     @model_validator(mode="after")
     def _validate_scope_id_for_scope_type(self) -> Self:
@@ -56,7 +55,6 @@ class SystemSessionEnvironSeed(SeedItem):
                 owner=owner,
                 value_source=self.value_source,
                 key=self.environ_key,
-                enabled=self.enabled,
             ),
             field_upserters=[],
             field_purgers=[],
