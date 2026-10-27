@@ -4069,14 +4069,11 @@ type CreateVFSStoragePayload {
 }
 
 """
-Added in 26.10.0. Input for auto-mounting a vfolder into every session created in a project or by a user. Exactly one of `projectId` and `userId` is given. The vfolder must belong to that project, or be owned by that user.
+Added in 26.10.0. Input for auto-mounting a vfolder into every session created in a project or by a user. The vfolder must belong to that project, or be owned by that user.
 """
 input CreateVFolderAutoMountInput {
-  """ID of the project the vfolder is auto-mounted in."""
-  projectId: UUID = null
-
-  """ID of the user the vfolder is auto-mounted for."""
-  userId: UUID = null
+  """The project or the user the vfolder is auto-mounted for."""
+  scope: VFolderAutoMountScopeRef!
 
   """ID of the vfolder to auto-mount."""
   vfolderId: UUID!
@@ -23799,7 +23796,7 @@ type VFolderAccessControlInfo {
 }
 
 """
-Added in 26.10.0. A vfolder mounted into every session created in a project, a personal project included, or by a user. Exactly one of `projectId` and `userId` is set.
+Added in 26.10.0. A vfolder mounted into every session created in a project, a personal project included, or by a user.
 """
 type VFolderAutoMount implements Node {
   """The Globally Unique ID of this object"""
@@ -23808,13 +23805,11 @@ type VFolderAutoMount implements Node {
   """ID of the auto-mount."""
   entityId: UUID!
 
-  """ID of the project the vfolder is auto-mounted in. Null for a user one."""
-  projectId: UUID
+  """Kind of the scope the auto-mount is set on."""
+  scopeType: VFolderAutoMountScopeType!
 
-  """
-  ID of the user the vfolder is auto-mounted for. Null for a project one.
-  """
-  userId: UUID
+  """ID of the project or the user."""
+  scopeId: UUID!
 
   """ID of the auto-mounted vfolder."""
   vfolderId: UUID!
@@ -23875,11 +23870,11 @@ input VFolderAutoMountFilter {
   """Filter by auto-mount ID."""
   entityId: UUIDFilter = null
 
-  """Filter by the ID of the project the auto-mount is set on."""
-  projectId: UUIDFilter = null
+  """Filter by the kind of scope the auto-mount is set on."""
+  scopeType: VFolderAutoMountScopeTypeFilter = null
 
-  """Filter by the ID of the user the auto-mount is set on."""
-  userId: UUIDFilter = null
+  """Filter by the ID of the project or the user."""
+  scopeId: UUIDFilter = null
 
   """Filter by vfolder ID."""
   vfolderId: UUIDFilter = null
@@ -23958,6 +23953,40 @@ input VFolderAutoMountScope {
   Users whose own auto-mounts are being read; those of a personal project are not.
   """
   user: [UUIDScope!] = null
+}
+
+"""Added in 26.10.0. The one project or user an auto-mount is set on."""
+input VFolderAutoMountScopeRef {
+  """Kind of the scope."""
+  scopeType: VFolderAutoMountScopeType!
+
+  """ID of the project or the user."""
+  scopeId: UUID!
+}
+
+"""
+Added in 26.10.0. Whether an auto-mount is set on a project or on a user.
+"""
+enum VFolderAutoMountScopeType {
+  PROJECT
+  USER
+}
+
+"""
+Added in 26.10.0. Filter for the scope type with equality and membership operators.
+"""
+input VFolderAutoMountScopeTypeFilter {
+  """Exact match."""
+  equals: VFolderAutoMountScopeType = null
+
+  """Match any of the provided values."""
+  in: [VFolderAutoMountScopeType!] = null
+
+  """Exclude an exact match."""
+  notEquals: VFolderAutoMountScopeType = null
+
+  """Exclude any of the provided values."""
+  notIn: [VFolderAutoMountScopeType!] = null
 }
 
 """

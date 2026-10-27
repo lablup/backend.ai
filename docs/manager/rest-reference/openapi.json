@@ -40266,36 +40266,42 @@
         "title": "BulkDeleteVFoldersInput",
         "type": "object"
       },
-      "CreateVFolderAutoMountInput": {
-        "description": "Input for auto-mounting a vfolder into every session created in a project or by a user.\n\nExactly one of ``project_id`` and ``user_id`` is given. The vfolder must belong to that\nproject, or be owned by that user.",
+      "VFolderAutoMountScopeRef": {
+        "description": "The one project or user an auto-mount is set on.",
         "properties": {
-          "project_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "ID of the project the vfolder is auto-mounted in.",
-            "title": "Project Id"
+          "scope_type": {
+            "$ref": "#/components/schemas/VFolderAutoMountScopeType",
+            "description": "Kind of the scope."
           },
-          "user_id": {
-            "anyOf": [
-              {
-                "format": "uuid",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "description": "ID of the user the vfolder is auto-mounted for.",
-            "title": "User Id"
+          "scope_id": {
+            "description": "ID of the project or the user.",
+            "format": "uuid",
+            "title": "Scope Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope_type",
+          "scope_id"
+        ],
+        "title": "VFolderAutoMountScopeRef",
+        "type": "object"
+      },
+      "VFolderAutoMountScopeType": {
+        "description": "Scope whose sessions a vfolder is auto-mounted into; a personal project is a project,\nand a user scope is mapped to the user directly.",
+        "enum": [
+          "project",
+          "user"
+        ],
+        "title": "VFolderAutoMountScopeType",
+        "type": "string"
+      },
+      "CreateVFolderAutoMountInput": {
+        "description": "Input for auto-mounting a vfolder into every session created in a project or by a user.\n\nThe vfolder must belong to that project, or be owned by that user.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/VFolderAutoMountScopeRef",
+            "description": "The project or the user the vfolder is auto-mounted for."
           },
           "vfolder_id": {
             "description": "ID of the vfolder to auto-mount.",
@@ -40321,6 +40327,7 @@
           }
         },
         "required": [
+          "scope",
           "vfolder_id",
           "mount_destination",
           "mount_permission"
@@ -40343,19 +40350,19 @@
             "default": null,
             "description": "Filter by auto-mount ID."
           },
-          "project_id": {
+          "scope_type": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/UUIDFilter"
+                "$ref": "#/components/schemas/VFolderAutoMountScopeTypeFilter"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Filter by the ID of the project the auto-mount is set on."
+            "description": "Filter by the kind of scope the auto-mount is set on."
           },
-          "user_id": {
+          "scope_id": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/UUIDFilter"
@@ -40365,7 +40372,7 @@
               }
             ],
             "default": null,
-            "description": "Filter by the ID of the user the auto-mount is set on."
+            "description": "Filter by the ID of the project or the user."
           },
           "vfolder_id": {
             "anyOf": [
@@ -40621,6 +40628,69 @@
           }
         },
         "title": "VFolderAutoMountScope",
+        "type": "object"
+      },
+      "VFolderAutoMountScopeTypeFilter": {
+        "description": "Filter for the kind of scope an auto-mount is set on.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderAutoMountScopeType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderAutoMountScopeType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderAutoMountScopeType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderAutoMountScopeType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "VFolderAutoMountScopeTypeFilter",
         "type": "object"
       },
       "ScopedSearchVFolderAutoMountsInput": {
