@@ -5703,6 +5703,11 @@ type DomainV2 implements Node @key(fields: "id") {
 
   """Added in 26.9.0. Resource groups this domain may schedule on."""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
+
+  """
+  Added in 26.10.0. System session environ rows bound to this domain itself, soft-deleted ones included.
+  """
+  systemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection
 }
 
 """
@@ -14205,6 +14210,11 @@ type ProjectV2 implements Node @key(fields: "id") {
 
   """Added in 26.9.0. Model cards belonging to this project."""
   modelCards(filter: ModelCardV2Filter = null, orderBy: [ModelCardV2OrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ModelCardV2Connection
+
+  """
+  Added in 26.10.0. System session environ rows registered in this project, soft-deleted ones included.
+  """
+  systemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection
 }
 
 """
@@ -14995,6 +15005,16 @@ type Query {
   Added in 26.10.0. List every value source name a system session environ row can carry, the values ``SystemSessionEnviron.valueSource`` holds.
   """
   systemSessionEnvironValueSources: [String!]
+
+  """
+  Added in 26.10.0. Page through the system session environ rows the named scopes reach, combined with OR, soft-deleted ones included. Every scope is authorized before the read runs.
+  """
+  scopedSystemSessionEnvirons(scope: SystemSessionEnvironScope!, filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection
+
+  """
+  Added in 26.10.0. Page through the system session environ rows bound to public, the current user's domain and the projects the current user belongs to, soft-deleted ones excluded.
+  """
+  mySystemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection
 
   """
   Added in 26.10.0. List all registered session lifecycle handlers (superadmin only). The returned ``name`` values are valid keys for ``DefaultSessionOptionsInfo.handlerOptions.byHandler``.
@@ -20915,6 +20935,20 @@ enum SystemSessionEnvironOrderField {
   CREATED_AT
   UPDATED_AT
   DELETED_AT
+}
+
+"""
+Added in 26.10.0. Scope for the scoped system session environ query. Each list is OR'd internally and across lists, and every scope named is authorized before the read runs.
+"""
+input SystemSessionEnvironScope {
+  """Domains whose rows are being read."""
+  domain: [UUIDScope!] = null
+
+  """Projects whose rows are being read."""
+  project: [UUIDScope!] = null
+
+  """Include the rows registered in public."""
+  public: Boolean! = false
 }
 
 """Added in 26.10.0. The scope a system session environ row is bound to."""
