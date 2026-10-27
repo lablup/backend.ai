@@ -2443,6 +2443,7 @@ class DeploymentAdapter(BaseAdapter):
                 open_to_public=data.network_access.open_to_public,
             ),
             replica_state=ReplicaStateInfo(
+                replica_count=data.replica_state.replica_count,
                 desired_replica_count=data.replica_state.desired_replica_count,
                 replica_ids=data.replica_state.replica_ids,
             ),

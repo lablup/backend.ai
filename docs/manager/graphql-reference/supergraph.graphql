@@ -6815,7 +6815,9 @@ input DeploymentFilter
   """Added in 26.9.0. Filter by deployment ID."""
   entityId: UUIDFilter = null
 
-  """Added in 26.9.0. Filter by the requested replica count."""
+  """
+  Added in 26.9.0. Filter by the desired replica count. Falls back to the user-set replica count until autoscaling sets one.
+  """
   desiredReplicas: IntFilter = null
 
   """Added in 26.9.0. Filter by scaling state."""
@@ -22510,6 +22512,10 @@ Added in 25.19.0. Represents the current replica state of a deployment, includin
 type ReplicaState
   @join__type(graph: STRAWBERRY)
 {
+  """
+  Added in 26.10.0. The replica count the user set. Autoscaling changes only desiredReplicaCount, so the two differ when an autoscaling rule set the count.
+  """
+  replicaCount: Int!
   desiredReplicaCount: Int!
 }
 

@@ -669,7 +669,8 @@ class DeploymentFilter(BaseRequestModel):
     )
     entity_id: UUIDFilter | None = Field(default=None, description="Filter by deployment ID")
     desired_replicas: IntFilter | None = Field(
-        default=None, description="Filter by the requested replica count"
+        default=None,
+        description="Filter by the desired replica count, or the user-set replica count until autoscaling sets one",
     )
     scaling_state: DeploymentScalingStateFilter | None = Field(
         default=None, description="Filter by scaling state"
