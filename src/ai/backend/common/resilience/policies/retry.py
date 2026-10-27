@@ -16,6 +16,7 @@ from ai.backend.common.exception import (
     UnreachableError,
 )
 from ai.backend.common.resilience.policy import Policy
+from ai.backend.common.resilience.resilience import get_current_operation
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -128,6 +129,8 @@ class RetryPolicy(Policy):
                         "retryable call failed",
                         attempt_count=attempt,
                         max_retries=self._max_retries,
+                        error_repr=repr(e),
+                        operation_name=get_current_operation(),
                     )
                     delay = self._calculate_delay(attempt)
                     await asyncio.sleep(delay)
