@@ -37438,6 +37438,440 @@
         "title": "AdminSearchStorageNamespacesInput",
         "type": "object"
       },
+      "SystemSessionEnvironFilter": {
+        "properties": {
+          "entity_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the row's id."
+          },
+          "key": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the environment variable name."
+          },
+          "value_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemSessionEnvironValueSourceFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by which value of the starting session is injected."
+          },
+          "scope_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemSessionEnvironScopeTypeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the kind of scope the row is bound to."
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the id of the public entity, the domain or the project."
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by when the row was created."
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by when the row was last changed."
+          },
+          "deleted_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NullableDateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by when the row was soft-deleted."
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SystemSessionEnvironFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Logical AND of multiple filter conditions.",
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SystemSessionEnvironFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Logical OR of multiple filter conditions.",
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SystemSessionEnvironFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Logical NOT of filter conditions.",
+            "title": "Not"
+          }
+        },
+        "title": "SystemSessionEnvironFilter",
+        "type": "object"
+      },
+      "SystemSessionEnvironOrder": {
+        "properties": {
+          "field": {
+            "$ref": "#/components/schemas/SystemSessionEnvironOrderField",
+            "description": "Field to order by."
+          },
+          "direction": {
+            "$ref": "#/components/schemas/OrderDirection",
+            "default": "ASC",
+            "description": "Order direction."
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "SystemSessionEnvironOrder",
+        "type": "object"
+      },
+      "SystemSessionEnvironOrderField": {
+        "enum": [
+          "key",
+          "value_source",
+          "scope_type",
+          "created_at",
+          "updated_at",
+          "deleted_at"
+        ],
+        "title": "SystemSessionEnvironOrderField",
+        "type": "string"
+      },
+      "SystemSessionEnvironScopeType": {
+        "enum": [
+          "public",
+          "domain",
+          "project"
+        ],
+        "title": "SystemSessionEnvironScopeType",
+        "type": "string"
+      },
+      "SystemSessionEnvironScopeTypeFilter": {
+        "description": "Filter for whether a row applies to every session, a domain's or a project's.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemSessionEnvironScopeType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SystemSessionEnvironScopeType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemSessionEnvironScopeType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SystemSessionEnvironScopeType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "SystemSessionEnvironScopeTypeFilter",
+        "type": "object"
+      },
+      "SystemSessionEnvironValueSourceFilter": {
+        "description": "Filter by value source name. The names are strings so that a new value source does not\nchange the schema.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match.",
+            "title": "Equals"
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match.",
+            "title": "Not Equals"
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "SystemSessionEnvironValueSourceFilter",
+        "type": "object"
+      },
+      "AdminSearchSystemSessionEnvironsInput": {
+        "description": "Input for searching every system session environ row (superadmin).",
+        "properties": {
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SystemSessionEnvironFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter conditions."
+          },
+          "order": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/SystemSessionEnvironOrder"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Order specifications.",
+            "title": "Order"
+          },
+          "first": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: number of items.",
+            "title": "First"
+          },
+          "after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: after cursor.",
+            "title": "After"
+          },
+          "last": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: last N items.",
+            "title": "Last"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Cursor pagination: before cursor.",
+            "title": "Before"
+          },
+          "limit": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: maximum items.",
+            "title": "Limit"
+          },
+          "offset": {
+            "anyOf": [
+              {
+                "minimum": 0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Offset pagination: number to skip.",
+            "title": "Offset"
+          }
+        },
+        "title": "AdminSearchSystemSessionEnvironsInput",
+        "type": "object"
+      },
       "ArrayFilter_int_": {
         "properties": {
           "contains": {
@@ -64998,6 +65432,35 @@
           }
         ],
         "description": "Get all namespaces for a given storage.\n\n**Preconditions:**\n* Superadmin privilege required.\n"
+      }
+    },
+    "/v2/system-session-environs/search": {
+      "post": {
+        "operationId": "v2/system-session-environs.admin_search",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSearchSystemSessionEnvironsInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Search every system session environ row, at every scope (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
     "/v2/system-session-environs/value-sources": {

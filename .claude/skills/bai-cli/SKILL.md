@@ -46,7 +46,7 @@ Check options with `--help`.
 - **image**: user(empty group) · admin(search, forget, purge, update · sub alias: create, remove, search)
 - **entity-label**: user(upsert, purge, search)
 - **session**: user(compute-schedule, enqueue, exclude-idle-checks, include-idle-checks, get, logs, project-search, start-service, shutdown-service, terminate, update) · admin(search · sub kernel: search) · my(search)
-- **system-session-environ**: user(value-sources)
+- **system-session-environ**: user(value-sources) · admin(search)
 
 ### Compute & Serving
 
