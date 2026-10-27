@@ -15,12 +15,11 @@ from aiohttp import web
 from dateutil.tz import tzutc
 from pydantic import Field
 
-from ai.backend.appproxy.common.config import get_default_redis_key_ttl
+from ai.backend.appproxy.common.config import ContentEncodingConfig, get_default_redis_key_ttl
 from ai.backend.appproxy.common.errors import ObjectNotFound
 from ai.backend.appproxy.common.events import DoCheckWorkerLostEvent, WorkerLostEvent
 from ai.backend.appproxy.common.types import (
     AppMode,
-    ContentEncodingPolicy,
     CORSOptions,
     FrontendMode,
     ProxyProtocol,
@@ -113,7 +112,7 @@ class WorkerResponseModel(WorkerModel):
 
 
 class WorkerRegistrationResponseModel(WorkerResponseModel):
-    content_encoding: ContentEncodingPolicy
+    content_encoding: ContentEncodingConfig
 
 
 class WorkerListResponseModel(BackendAISchema):
@@ -266,9 +265,7 @@ async def update_worker(
         result = await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
     return PydanticResponse(
         WorkerRegistrationResponseModel(
-            content_encoding=ContentEncodingPolicy(
-                rejected_encodings=root_ctx.local_config.proxy_coordinator.content_encoding.rejected_encodings,
-            ),
+            content_encoding=root_ctx.local_config.proxy_coordinator.content_encoding,
             **result,
         )
     )

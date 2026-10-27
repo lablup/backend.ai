@@ -22,9 +22,9 @@ import aiohttp_cors
 import attrs
 import prometheus_client
 
+from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.types import (
     AppMode,
-    ContentEncodingPolicy,
     FrontendMode,
     ProxyProtocol,
     SerializableCircuit,
@@ -347,7 +347,7 @@ class RootContext:
     valkey_stat: ValkeyStatClient
     http_client_pool: ClientPool
     worker_id: UUID
-    content_encoding: ContentEncodingPolicy
+    content_encoding: ContentEncodingConfig
     local_config: ServerConfig
     last_used_time_marker_redis_queue: asyncio.Queue[tuple[list[str], float]]
     request_counter_redis_queue: asyncio.Queue[str]

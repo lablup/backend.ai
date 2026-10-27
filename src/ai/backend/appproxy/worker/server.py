@@ -37,7 +37,7 @@ from aiohttp.web_app import CleanupError
 from setproctitle import setproctitle
 from tenacity import AsyncRetrying, TryAgain, retry_if_exception_type, wait_exponential
 
-from ai.backend.appproxy.common.config import get_default_redis_key_ttl
+from ai.backend.appproxy.common.config import ContentEncodingConfig, get_default_redis_key_ttl
 from ai.backend.appproxy.common.defs import (
     AGENTID_WORKER,
     APPPROXY_ANYCAST_STREAM_KEY,
@@ -61,12 +61,11 @@ from ai.backend.appproxy.common.events import (
     AppProxyCircuitCreatedEvent,
     AppProxyCircuitRemovedEvent,
     AppProxyCircuitRouteUpdatedEvent,
-    AppProxyContentEncodingPolicyUpdatedEvent,
+    AppProxyContentEncodingConfigUpdatedEvent,
     AppProxyWorkerCircuitAddedEvent,
 )
 from ai.backend.appproxy.common.types import (
     AppCreator,
-    ContentEncodingPolicy,
     EventLoopType,
     FrontendMode,
     FrontendServerMode,
@@ -452,9 +451,9 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ]
     handlers.append(
         root_ctx.event_dispatcher.subscribe(
-            AppProxyContentEncodingPolicyUpdatedEvent,
+            AppProxyContentEncodingConfigUpdatedEvent,
             root_ctx,
-            handle_content_encoding_policy_updated_event,
+            handle_content_encoding_config_updated_event,
             name="proxy-worker",
         )
     )
@@ -739,14 +738,14 @@ async def status(request: web.Request) -> web.Response:
     return web.json_response({"api_version": "v2"})
 
 
-async def handle_content_encoding_policy_updated_event(
+async def handle_content_encoding_config_updated_event(
     context: RootContext,
     _agent_id: AgentId,
-    event: AppProxyContentEncodingPolicyUpdatedEvent,
+    event: AppProxyContentEncodingConfigUpdatedEvent,
 ) -> None:
     context.content_encoding = event.content_encoding
     log.info(
-        "applied the content encoding policy",
+        "applied the content encoding config",
         rejected_encodings=context.content_encoding.rejected_encodings,
     )
 
@@ -857,7 +856,7 @@ def build_root_app(
     subapp_pkgs: Sequence[str] = (),
 ) -> web.Application:
     root_ctx = RootContext()
-    root_ctx.content_encoding = ContentEncodingPolicy()
+    root_ctx.content_encoding = ContentEncodingConfig()
     root_ctx.metrics = WorkerMetricRegistry.instance()
 
     app = web.Application(

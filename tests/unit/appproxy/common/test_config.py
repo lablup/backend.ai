@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from ai.backend.appproxy.coordinator.config import ContentEncodingConfig
+from ai.backend.appproxy.common.config import ContentEncodingConfig
 
 
 @dataclass(frozen=True)

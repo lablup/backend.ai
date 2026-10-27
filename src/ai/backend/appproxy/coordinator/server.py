@@ -62,7 +62,7 @@ from ai.backend.appproxy.common.errors import (
     URLNotFound,
 )
 from ai.backend.appproxy.common.events import (
-    AppProxyContentEncodingPolicyUpdatedEvent,
+    AppProxyContentEncodingConfigUpdatedEvent,
     DoCheckUnusedPortEvent,
     DoCheckWorkerLostEvent,
     DoReconcileTraefikRoutesEvent,
@@ -71,7 +71,6 @@ from ai.backend.appproxy.common.events import (
 from ai.backend.appproxy.common.types import (
     AppCreator,
     AppMode,
-    ContentEncodingPolicy,
     EventLoopType,
     ProxyProtocol,
     WebMiddleware,
@@ -692,12 +691,10 @@ async def service_discovery_event_publisher_ctx(root_ctx: RootContext) -> AsyncI
 
 
 @asynccontextmanager
-async def content_encoding_policy_broadcast_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+async def content_encoding_config_broadcast_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     await root_ctx.event_producer.broadcast_event(
-        AppProxyContentEncodingPolicyUpdatedEvent(
-            content_encoding=ContentEncodingPolicy(
-                rejected_encodings=root_ctx.local_config.proxy_coordinator.content_encoding.rejected_encodings,
-            ),
+        AppProxyContentEncodingConfigUpdatedEvent(
+            content_encoding=root_ctx.local_config.proxy_coordinator.content_encoding,
         )
     )
     yield
@@ -949,7 +946,7 @@ def build_root_app(
         cleanup_contexts = [
             distributed_lock_ctx,
             event_dispatcher_ctx,
-            content_encoding_policy_broadcast_ctx,
+            content_encoding_config_broadcast_ctx,
             leader_election_ctx,
             circuit_manager_ctx,
             endpoint_service_ctx,

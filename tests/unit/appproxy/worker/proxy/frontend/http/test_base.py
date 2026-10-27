@@ -9,8 +9,8 @@ from aiohttp import hdrs, web
 from aiohttp.test_utils import make_mocked_request
 from multidict import CIMultiDict
 
+from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.errors.http import UnsupportedContentEncoding
-from ai.backend.appproxy.common.types import ContentEncodingPolicy
 from ai.backend.appproxy.worker.proxy.frontend.http.port import PortFrontend
 
 
@@ -22,14 +22,14 @@ class _ContentEncodingHeaders:
 @pytest.fixture
 def port_frontend_rejecting_br_and_zstd(mocker: pytest_mock.MockerFixture) -> PortFrontend:
     root_context = mocker.MagicMock()
-    root_context.content_encoding = ContentEncodingPolicy(rejected_encodings=["br", "zstd"])
+    root_context.content_encoding = ContentEncodingConfig(rejected_encodings=["br", "zstd"])
     return PortFrontend(root_context=root_context)
 
 
 @pytest.fixture
 def port_frontend_rejecting_no_encoding(mocker: pytest_mock.MockerFixture) -> PortFrontend:
     root_context = mocker.MagicMock()
-    root_context.content_encoding = ContentEncodingPolicy()
+    root_context.content_encoding = ContentEncodingConfig()
     return PortFrontend(root_context=root_context)
 
 

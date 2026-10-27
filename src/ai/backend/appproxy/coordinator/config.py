@@ -12,13 +12,13 @@ from pydantic import (
     Field,
     FilePath,
     IPvAnyNetwork,
-    StringConstraints,
     ValidationError,
     model_validator,
 )
 
 from ai.backend.appproxy.common.config import (
     BaseSchema,
+    ContentEncodingConfig,
     DebugConfig,
     GroupIDValidator,
     HostPortPair,
@@ -287,21 +287,6 @@ class ClientIPStrategyConfig(BaseSchema):
                 "client_ip_strategy: 'depth' and 'excluded_ips' are mutually exclusive"
             )
         return self
-
-
-class ContentEncodingConfig(BaseSchema):
-    rejected_encodings: Annotated[
-        list[Annotated[str, StringConstraints(strip_whitespace=True)]],
-        Field(default_factory=list),
-        BackendAIConfigMeta(
-            description=(
-                "Content codings that make a request be answered with 415 instead of being "
-                "forwarded to session apps when its Content-Encoding contains any of them."
-            ),
-            added_version=NEXT_RELEASE_VERSION,
-            example=ConfigExample(local="[]", prod='["br"]'),
-        ),
-    ]
 
 
 class TraefikConfig(BaseSchema):

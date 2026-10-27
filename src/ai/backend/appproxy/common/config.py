@@ -12,11 +12,17 @@ from pydantic import (
     Field,
     GetCoreSchemaHandler,
     GetJsonSchemaHandler,
+    StringConstraints,
 )
 from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.types import BackendAISchema
 
 from .errors import (
@@ -312,6 +318,21 @@ class GroupIDValidator:
                 core_schema.str_schema(),
             ])
         )
+
+
+class ContentEncodingConfig(BaseSchema):
+    rejected_encodings: Annotated[
+        list[Annotated[str, StringConstraints(strip_whitespace=True)]],
+        Field(default_factory=list),
+        BackendAIConfigMeta(
+            description=(
+                "Content codings that make a request be answered with 415 instead of being "
+                "forwarded to session apps when its Content-Encoding contains any of them."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="[]", prod='["br"]'),
+        ),
+    ]
 
 
 class DebugConfig(BaseSchema):

@@ -5,6 +5,7 @@ import aiohttp
 from aiohttp.client_exceptions import ClientConnectorError
 from opentelemetry.propagate import inject
 
+from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.errors import (
     CoordinatorConnectionError,
     InternalServerError,
@@ -13,7 +14,6 @@ from ai.backend.appproxy.common.errors import (
     WorkerRegistrationError,
 )
 from ai.backend.appproxy.common.types import (
-    ContentEncodingPolicy,
     FrontendMode,
     FrontendServerMode,
     SerializableCircuit,
@@ -172,7 +172,7 @@ async def register_worker(root_ctx: RootContext, request_id: str) -> list[Slot]:
             resp.raise_for_status()
             body = await resp.json()
             root_ctx.worker_id = body["id"]
-            root_ctx.content_encoding = ContentEncodingPolicy.model_validate(
+            root_ctx.content_encoding = ContentEncodingConfig.model_validate(
                 body.get("content_encoding", {})
             )
             log.info(
