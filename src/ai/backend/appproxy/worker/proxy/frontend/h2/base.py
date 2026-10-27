@@ -1,7 +1,7 @@
 import asyncio
 import logging
 from asyncio import subprocess
-from typing import Any
+from typing import Any, override
 
 from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError

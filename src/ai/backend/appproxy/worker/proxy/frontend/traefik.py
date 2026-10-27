@@ -5,7 +5,7 @@ import logging
 import time
 import uuid
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, override
 
 from aiohttp import web
 
@@ -110,15 +110,11 @@ class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
         app.router.add_head("/{key}/mark-inactive", self.mark_inactive)
         self.runner = web.AppRunner(app, access_log=None)
 
-<<<<<<< HEAD
-=======
     @override
     def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
         # The Go plugin applies the config the coordinator writes to Traefik etcd.
         pass
 
-    @override
->>>>>>> f2da0d86d (feat(BA-8693): reject configured request content codings at the App Proxy (#16041))
     async def start(self) -> None:
         if not self.root_context.local_config.proxy_worker.traefik:
             raise MissingTraefikConfigError("Traefik configuration is required")

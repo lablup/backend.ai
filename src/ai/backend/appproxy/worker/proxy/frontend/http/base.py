@@ -1,5 +1,6 @@
 import logging
 import time
+from typing import override
 
 import aiohttp_jinja2
 import jwt

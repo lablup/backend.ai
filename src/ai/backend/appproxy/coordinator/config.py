@@ -38,6 +38,7 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -524,7 +525,6 @@ class ProxyCoordinatorConfig(BaseSchema):
         ),
     ]
 
-<<<<<<< HEAD
     use_experimental_redis_event_dispatcher: Annotated[
         bool,
         Field(default=False),
@@ -536,7 +536,9 @@ class ProxyCoordinatorConfig(BaseSchema):
             ),
             added_version="25.9.0",
             example=ConfigExample(local="false", prod="false"),
-=======
+        ),
+    ]
+
     content_encoding: Annotated[
         ContentEncodingConfig,
         Field(default_factory=lambda: ContentEncodingConfig()),
@@ -548,7 +550,6 @@ class ProxyCoordinatorConfig(BaseSchema):
             ),
             added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
->>>>>>> f2da0d86d (feat(BA-8693): reject configured request content codings at the App Proxy (#16041))
         ),
     ]
 
