@@ -518,7 +518,7 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ):
         with attempt:
             try:
-                await register_worker(root_ctx, str(uuid.uuid4()))
+                registration = await register_worker(root_ctx, str(uuid.uuid4()))
             except CoordinatorConnectionError as e:
                 log.warning(
                     "failed to connect to the coordinator; retrying",
@@ -527,6 +527,7 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                     ),
                 )
                 raise TryAgain from e
+            root_ctx.proxy_frontend.apply_content_encoding_config(registration.content_encoding)
 
     circuits = await list_worker_circuits(root_ctx, str(uuid.uuid4()))
     for circuit in circuits:

@@ -51,6 +51,9 @@ from ai.backend.manager.api.rest.v2.resource_allocation.registry import (
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.config.unified import ManagerUnifiedConfig
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.ops.v2.resource_allocation.provider import (
+    ResourceAllocationOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
@@ -152,6 +155,7 @@ class TestHideAgentsVisibility:
     ) -> ResourceAllocationProcessors:
         ra_repo = ResourceAllocationRepository(
             db=database_engine,
+            ops_provider=ResourceAllocationOpsProvider(database_engine),
             config_provider=config_provider_hide_agents,
         )
         rp_repo = ResourcePresetRepository(
@@ -287,6 +291,7 @@ class TestGroupResourceVisibility:
     ) -> ResourceAllocationProcessors:
         ra_repo = ResourceAllocationRepository(
             db=database_engine,
+            ops_provider=ResourceAllocationOpsProvider(database_engine),
             config_provider=config_provider_no_grv,
         )
         rp_repo = ResourcePresetRepository(

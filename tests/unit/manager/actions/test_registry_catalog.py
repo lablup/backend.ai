@@ -337,6 +337,12 @@ from ai.backend.manager.services.session.resource_allocation.processors import (
 )
 from ai.backend.manager.services.session_group.actions.bulk_get import BulkGetSessionGroupsAction
 from ai.backend.manager.services.session_group.processors import SessionGroupProcessors
+from ai.backend.manager.services.system_session_environ.actions.bulk_get import (
+    BulkGetSystemSessionEnvironsAction,
+)
+from ai.backend.manager.services.system_session_environ.actions.global_search import (
+    GlobalSearchSystemSessionEnvironsAction,
+)
 from ai.backend.manager.services.system_session_environ.actions.public_list_value_sources import (
     PublicListSystemSessionEnvironValueSourcesAction,
 )
@@ -982,6 +988,33 @@ def test_vfs_storage_loader_read_is_a_partial_permission_read() -> None:
         ActionKind.BULK,
         ActionGate.PERMISSION,
     )
+
+
+def test_system_session_environ_reads_keep_their_judged_gates() -> None:
+    """The search reads every row under the global gate, and the DataLoader reads per named row."""
+    registry = _ops_registry()
+    SystemSessionEnvironProcessors(
+        registry.group(GroupMeta(SystemSessionEnvironEntityType())), SystemSessionEnvironService()
+    )
+
+    judged = {
+        GlobalSearchSystemSessionEnvironsAction: (
+            SystemSessionEnvironEntityType(),
+            ActionKind.GLOBAL,
+            ActionGate.PERMISSION,
+        ),
+        BulkGetSystemSessionEnvironsAction: (
+            SystemSessionEnvironEntityType(),
+            ActionKind.BULK,
+            ActionGate.PERMISSION,
+        ),
+    }
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+        if record.action_cls in judged
+    }
+    assert recorded == judged
 
 
 def test_system_session_environ_value_source_list_is_public() -> None:

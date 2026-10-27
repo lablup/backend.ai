@@ -257,6 +257,15 @@ def scheduling_handler() -> None:
 
 @admin.group(
     cls=LazyGroup,
+    import_name="ai.backend.client.cli.v2.admin.system_session_environ:system_session_environ",
+    name="system-session-environ",
+)
+def system_session_environ() -> None:
+    """Admin system session environ commands."""
+
+
+@admin.group(
+    cls=LazyGroup,
     import_name=(
         "ai.backend.client.cli.v2.admin.session_lifecycle_handler:session_lifecycle_handler"
     ),

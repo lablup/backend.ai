@@ -23,6 +23,8 @@ from ai.backend.common.data.storage.types import (
     StorageBackendType,
 )
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
+from ai.backend.common.storage.probe.registry import VolumeStatusCheck
+from ai.backend.common.storage.volume.vfs import VfsVolumeStatusCheck
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import (
@@ -420,6 +422,14 @@ class BaseVolume(AbstractVolume):
             self.mount_path,
             self.local_config["storage-proxy"]["scandir-limit"],
             self.watcher,
+        )
+
+    @override
+    def volume_status_checker(self) -> VolumeStatusCheck | None:
+        if self._status_check_config is None:
+            return None
+        return VfsVolumeStatusCheck.create(
+            self._volume_name, self.mount_path, self._status_check_config
         )
 
     @override

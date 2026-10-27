@@ -2,6 +2,8 @@ from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 from typing import override
 
+import sqlalchemy as sa
+
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
 from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountID
@@ -17,9 +19,13 @@ from ai.backend.manager.errors.repository import (
     UniqueConstraintViolationError,
 )
 from ai.backend.manager.errors.storage import VFolderNotFound
-from ai.backend.manager.errors.vfolder_auto_mount import VFolderAutoMountAlreadyExists
-from ai.backend.manager.models.specs.creator import EntityCreator
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.errors.vfolder_auto_mount import (
+    VFolderAutoMountAlreadyExists,
+    VFolderAutoMountVFolderOutsideScope,
+)
+from ai.backend.manager.models.specs.creator import GuardedEntityCreator
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
 from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
     VFolderAutoMountSearchableFields,
@@ -27,8 +33,8 @@ from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
 
 
 @dataclass(frozen=True)
-class VFolderAutoMountCreator(EntityCreator[VFolderAutoMountRow, VFolderAutoMountData]):
-    """Add one vfolder to the auto-mounts of a project.
+class VFolderAutoMountCreator(GuardedEntityCreator[VFolderAutoMountRow, VFolderAutoMountData]):
+    """Add one vfolder to the auto-mounts of a project; the vfolder must belong to it.
 
     The row carries the project; the own and govern edges are derived from it.
     """
@@ -43,6 +49,18 @@ class VFolderAutoMountCreator(EntityCreator[VFolderAutoMountRow, VFolderAutoMoun
     @override
     def created_in(self, row: VFolderAutoMountRow) -> Collection[EntityIdentifier]:
         return (RuntimeEntityID(EntityType(row.scope_type), row.scope_id),)
+
+    @override
+    def precondition_checks(self) -> Sequence[PreconditionCheck]:
+        return (
+            PreconditionCheck(
+                finder=sa.select(VFolderRow.id).where(
+                    VFolderRow.id == self.spec.vfolder_id,
+                    VFolderRow.group.is_distinct_from(self.scope),
+                ),
+                error=VFolderAutoMountVFolderOutsideScope(),
+            ),
+        )
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

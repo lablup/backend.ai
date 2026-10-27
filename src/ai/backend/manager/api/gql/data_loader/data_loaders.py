@@ -90,9 +90,11 @@ from ai.backend.common.data.entity.storage_namespace import (
     StorageNamespaceEntityType,
     StorageNamespaceID,
 )
+from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountID
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType, VFSStorageID
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.types import AgentId
@@ -250,7 +252,13 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.storage_namespace import (  # pants: no-infer-dep
         StorageNamespace,
     )
+    from ai.backend.manager.api.gql.system_session_environ.types import (  # pants: no-infer-dep
+        SystemSessionEnvironGQL,
+    )
     from ai.backend.manager.api.gql.user.types.node import UserV2GQL  # pants: no-infer-dep
+    from ai.backend.manager.api.gql.vfolder_auto_mount.types import (  # pants: no-infer-dep
+        VFolderAutoMountGQL,
+    )
     from ai.backend.manager.api.gql.vfolder_v2.types.node import (  # pants: no-infer-dep
         VFolderGQL,
     )
@@ -883,6 +891,50 @@ class DataLoaders:
             dtos = await adapter.bulk_get_ids(ids)
             return [
                 dto if dto is None or isinstance(dto, Exception) else SGG.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def system_session_environ_loader(
+        self,
+    ) -> DataLoader[SystemSessionEnvironID, SystemSessionEnvironGQL | None]:
+        adapter = self._adapters.system_session_environ
+
+        async def load_fn(
+            ids: list[SystemSessionEnvironID],
+        ) -> list[SystemSessionEnvironGQL | Exception | None]:
+            from ai.backend.manager.api.gql.system_session_environ.types import (  # pants: no-infer-dep
+                SystemSessionEnvironGQL,
+            )
+
+            environ_nodes = await adapter.bulk_get_ids(ids)
+            return [
+                environ_node
+                if environ_node is None or isinstance(environ_node, Exception)
+                else SystemSessionEnvironGQL.from_pydantic(environ_node, id_field="entity_id")
+                for environ_node in environ_nodes
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def vfolder_auto_mount_loader(
+        self,
+    ) -> DataLoader[VFolderAutoMountID, VFolderAutoMountGQL | None]:
+        adapter = self._adapters.vfolder_auto_mount
+
+        async def load_fn(
+            ids: list[VFolderAutoMountID],
+        ) -> list[VFolderAutoMountGQL | Exception | None]:
+            from ai.backend.manager.api.gql.vfolder_auto_mount.types import (  # pants: no-infer-dep
+                VFolderAutoMountGQL as VAM,
+            )
+
+            dtos = await adapter.bulk_get_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else VAM.from_pydantic(dto)
                 for dto in dtos
             ]
 
