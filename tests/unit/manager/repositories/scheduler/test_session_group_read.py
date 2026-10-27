@@ -54,11 +54,21 @@ async def db_with_cleanup(
 
 
 @pytest.fixture
+def project_id(test_group_id: uuid.UUID) -> ProjectID:
+    return ProjectID(test_group_id)
+
+
+@pytest.fixture
+def owner_user_id(test_user_uuid: uuid.UUID) -> UserID:
+    return UserID(test_user_uuid)
+
+
+@pytest.fixture
 async def session_group_id(
     db_with_cleanup: ExtendedAsyncSAEngine,
     test_domain_id: DomainID,
-    test_group_id: uuid.UUID,
-    test_user_uuid: uuid.UUID,
+    project_id: ProjectID,
+    owner_user_id: UserID,
 ) -> SessionGroupID:
     group_id = SessionGroupID(uuid.uuid4())
     async with db_with_cleanup.begin_session() as db_sess:
@@ -66,8 +76,8 @@ async def session_group_id(
             SessionGroupRow(
                 id=group_id,
                 domain_id=test_domain_id,
-                project_id=ProjectID(test_group_id),
-                owner_user_id=UserID(test_user_uuid),
+                project_id=project_id,
+                owner_user_id=owner_user_id,
                 placement_direction=SessionGroupPlacementDirection.SPREAD,
                 placement_enforcement=SessionGroupPlacementEnforcement.PREFERRED,
             )
@@ -93,8 +103,8 @@ async def held_by_replica_group(
     db_with_cleanup: ExtendedAsyncSAEngine,
     test_domain: DomainFixtureData,
     test_scaling_group_name: str,
-    test_group_id: uuid.UUID,
-    test_user_uuid: uuid.UUID,
+    project_id: ProjectID,
+    owner_user_id: UserID,
     session_group_id: SessionGroupID,
 ) -> None:
     endpoint_id = uuid.uuid4()
@@ -103,10 +113,10 @@ async def held_by_replica_group(
             EndpointRow(
                 id=endpoint_id,
                 name=f"test-endpoint-{endpoint_id.hex[:8]}",
-                created_user=test_user_uuid,
-                session_owner=test_user_uuid,
+                created_user=owner_user_id,
+                session_owner=owner_user_id,
                 domain=test_domain.domain_name,
-                project=test_group_id,
+                project=project_id,
                 resource_group=test_scaling_group_name,
                 desired_replicas=1,
                 url=f"http://test-{endpoint_id.hex[:8]}.example.com",
@@ -130,10 +140,10 @@ async def held_by_replica_group(
         )
 
 
-def _action(session_group_id: SessionGroupID, project_id: uuid.UUID) -> EnqueueSessionAction:
+def _action(session_group_id: SessionGroupID, project_id: ProjectID) -> EnqueueSessionAction:
     """An enqueue into ``project_id`` naming the group."""
     return EnqueueSessionAction(
-        project_id=ProjectID(project_id),
+        project_id=project_id,
         session_name="grouped",
         session_type=SessionTypes.INTERACTIVE,
         image_id=uuid.uuid4(),
@@ -148,7 +158,7 @@ def _action(session_group_id: SessionGroupID, project_id: uuid.UUID) -> EnqueueS
 
 
 def _owned_searcher(
-    session_group_id: SessionGroupID, owner_user_id: UserID, project_id: uuid.UUID
+    session_group_id: SessionGroupID, owner_user_id: UserID, project_id: ProjectID
 ) -> SessionGroupSearcher:
     """The searcher for a group ``owner_user_id`` owns in ``project_id``."""
     searcher = _action(session_group_id, project_id).to_owned_session_group_searcher(owner_user_id)
@@ -157,7 +167,7 @@ def _owned_searcher(
 
 
 def _held_searcher(
-    session_group_id: SessionGroupID, owner_user_id: UserID, project_id: uuid.UUID
+    session_group_id: SessionGroupID, owner_user_id: UserID, project_id: ProjectID
 ) -> SessionGroupSearcher:
     """The searcher for that owned group, only when a replica group holds it."""
     searcher = _action(session_group_id, project_id).to_held_session_group_searcher(owner_user_id)
@@ -169,14 +179,14 @@ class TestSearchSessionGroups:
     async def test_answers_the_owners_group_in_the_project(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_group_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
+        project_id: ProjectID,
+        owner_user_id: UserID,
         session_group_id: SessionGroupID,
     ) -> None:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         groups = await db_source.search_session_groups(
-            _owned_searcher(session_group_id, UserID(test_user_uuid), test_group_id)
+            _owned_searcher(session_group_id, owner_user_id, project_id)
         )
 
         assert [g.id for g in groups] == [session_group_id]
@@ -184,13 +194,13 @@ class TestSearchSessionGroups:
     async def test_answers_nothing_for_a_missing_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_group_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
+        project_id: ProjectID,
+        owner_user_id: UserID,
     ) -> None:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         groups = await db_source.search_session_groups(
-            _owned_searcher(SessionGroupID(uuid.uuid4()), UserID(test_user_uuid), test_group_id)
+            _owned_searcher(SessionGroupID(uuid.uuid4()), owner_user_id, project_id)
         )
 
         assert groups == []
@@ -198,13 +208,13 @@ class TestSearchSessionGroups:
     async def test_answers_nothing_for_another_owner(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_group_id: uuid.UUID,
+        project_id: ProjectID,
         session_group_id: SessionGroupID,
     ) -> None:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         groups = await db_source.search_session_groups(
-            _owned_searcher(session_group_id, UserID(uuid.uuid4()), test_group_id)
+            _owned_searcher(session_group_id, UserID(uuid.uuid4()), project_id)
         )
 
         assert groups == []
@@ -212,13 +222,13 @@ class TestSearchSessionGroups:
     async def test_answers_nothing_for_another_project(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_user_uuid: uuid.UUID,
+        owner_user_id: UserID,
         session_group_id: SessionGroupID,
     ) -> None:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         groups = await db_source.search_session_groups(
-            _owned_searcher(session_group_id, UserID(test_user_uuid), uuid.uuid4())
+            _owned_searcher(session_group_id, owner_user_id, ProjectID(uuid.uuid4()))
         )
 
         assert groups == []
@@ -226,15 +236,15 @@ class TestSearchSessionGroups:
     async def test_answers_nothing_for_a_deleted_group(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_group_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
+        project_id: ProjectID,
+        owner_user_id: UserID,
         session_group_id: SessionGroupID,
         deleted: None,
     ) -> None:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         groups = await db_source.search_session_groups(
-            _owned_searcher(session_group_id, UserID(test_user_uuid), test_group_id)
+            _owned_searcher(session_group_id, owner_user_id, project_id)
         )
 
         assert groups == []
@@ -242,15 +252,15 @@ class TestSearchSessionGroups:
     async def test_the_owned_searcher_answers_a_group_a_replica_group_holds(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_group_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
+        project_id: ProjectID,
+        owner_user_id: UserID,
         session_group_id: SessionGroupID,
         held_by_replica_group: None,
     ) -> None:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         groups = await db_source.search_session_groups(
-            _owned_searcher(session_group_id, UserID(test_user_uuid), test_group_id)
+            _owned_searcher(session_group_id, owner_user_id, project_id)
         )
 
         assert [g.id for g in groups] == [session_group_id]
@@ -258,15 +268,15 @@ class TestSearchSessionGroups:
     async def test_the_held_searcher_answers_a_group_a_replica_group_holds(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_group_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
+        project_id: ProjectID,
+        owner_user_id: UserID,
         session_group_id: SessionGroupID,
         held_by_replica_group: None,
     ) -> None:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         groups = await db_source.search_session_groups(
-            _held_searcher(session_group_id, UserID(test_user_uuid), test_group_id)
+            _held_searcher(session_group_id, owner_user_id, project_id)
         )
 
         assert [g.id for g in groups] == [session_group_id]
@@ -274,14 +284,14 @@ class TestSearchSessionGroups:
     async def test_the_held_searcher_answers_nothing_for_a_group_no_replica_group_holds(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
-        test_group_id: uuid.UUID,
-        test_user_uuid: uuid.UUID,
+        project_id: ProjectID,
+        owner_user_id: UserID,
         session_group_id: SessionGroupID,
     ) -> None:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         groups = await db_source.search_session_groups(
-            _held_searcher(session_group_id, UserID(test_user_uuid), test_group_id)
+            _held_searcher(session_group_id, owner_user_id, project_id)
         )
 
         assert groups == []
