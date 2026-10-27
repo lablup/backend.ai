@@ -11,15 +11,10 @@ import (
 	"time"
 )
 
-type ContentEncodingConfig struct {
-	RejectedEncodings []string `yaml:"rejectedencodings"`
-}
-
 type Config struct {
-	LastUsedMarkerPath string                `yaml:"lastusedmarkerpath"`
-	Id                 string                `yaml:"id"`
-	SessionIds         []string              `yaml:"sessionids"`
-	ContentEncoding    ContentEncodingConfig `yaml:"contentencoding"`
+	LastUsedMarkerPath string   `yaml:"lastusedmarkerpath"`
+	Id                 string   `yaml:"id"`
+	SessionIds         []string `yaml:"sessionids"`
 }
 
 func CreateConfig() *Config {
@@ -27,7 +22,6 @@ func CreateConfig() *Config {
 		LastUsedMarkerPath: "",
 		Id:                 "",
 		SessionIds:         []string{},
-		ContentEncoding:    ContentEncodingConfig{RejectedEncodings: []string{}},
 	}
 }
 
@@ -90,25 +84,7 @@ func (a *Plugin) MarkInactive() {
 	}
 }
 
-func (a *Plugin) findRejectedContentEncoding(req *http.Request) (string, bool) {
-	for _, headerValue := range req.Header.Values("Content-Encoding") {
-		for _, coding := range strings.Split(headerValue, ",") {
-			trimmedCoding := strings.TrimSpace(coding)
-			for _, rejectedEncoding := range a.config.ContentEncoding.RejectedEncodings {
-				if trimmedCoding == rejectedEncoding {
-					return trimmedCoding, true
-				}
-			}
-		}
-	}
-	return "", false
-}
-
 func (a *Plugin) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if rejectedEncoding, found := a.findRejectedContentEncoding(req); found {
-		http.Error(rw, fmt.Sprintf("Request bodies encoded with %s are not accepted", rejectedEncoding), http.StatusUnsupportedMediaType)
-		return
-	}
 
 	isWebsocket := strings.ToLower(req.Header.Get("Upgrade")) == "websocket"
 
