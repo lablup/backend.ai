@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -25,9 +25,7 @@ from ai.backend.common.types import (
     SessionId,
     SessionResult,
     SessionTypes,
-    SlotName,
     SlotQuantity,
-    SlotTypes,
 )
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
@@ -67,10 +65,6 @@ from ai.backend.manager.repositories.ops.v2.resource_allocation.provider import 
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.testutils.db import with_tables
 
-_KNOWN_SLOT_TYPES: Mapping[SlotName, SlotTypes] = {
-    SlotName("cpu"): SlotTypes.COUNT,
-    SlotName("mem"): SlotTypes.BYTES,
-}
 _LIMIT_CPU = Decimal("10")
 _LIMIT_MEM = Decimal("10240")
 
@@ -348,7 +342,7 @@ class TestGetUserUsage:
         sessions_on_both_keypairs: None,
     ) -> None:
         async with ops_provider.read_ops() as ops:
-            usage = await ops.user_usage(owner.user_id, _KNOWN_SLOT_TYPES)
+            usage = await ops.user_usage(owner.user_id)
 
         assert _as_dict(usage.used) == {"cpu": Decimal("5"), "mem": Decimal("3072")}
         assert _as_dict(usage.assignable) == {
@@ -364,6 +358,6 @@ class TestGetUserUsage:
         sftp_session_on_other_keypair: None,
     ) -> None:
         async with ops_provider.read_ops() as ops:
-            usage = await ops.user_usage(owner.user_id, _KNOWN_SLOT_TYPES)
+            usage = await ops.user_usage(owner.user_id)
 
         assert _as_dict(usage.used) == {"cpu": Decimal("5"), "mem": Decimal("3072")}

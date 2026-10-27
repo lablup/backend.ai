@@ -44,12 +44,9 @@ from ai.backend.manager.repositories.resource_slot.types import (
 class ResourceAllocationReadOps(V2ReadOps):
     """The general v2 read ops plus the resource allocation usage reads."""
 
-    async def user_usage(
-        self,
-        user_id: UserID,
-        known_slot_types: Mapping[SlotName, SlotTypes],
-    ) -> ScopeUsageData:
+    async def user_usage(self, user_id: UserID) -> ScopeUsageData:
         """A user's usage across all their keypairs, counted as the scheduler does."""
+        known_slot_types = await self._known_slot_types()
         resource_policy = await self._default_keypair_resource_policy(user_id)
         limits = self._limits_from_policy(resource_policy, known_slot_types)
         used = await self._resource_occupancy(
@@ -61,6 +58,17 @@ class ResourceAllocationReadOps(V2ReadOps):
             used=used,
             assignable=subtract_quantities(limits, used),
         )
+
+    async def _known_slot_types(self) -> Mapping[SlotName, SlotTypes]:
+        """The enabled slot types in the resource_slot_types registry, as the scheduler reads them."""
+        rows = (
+            await self._sess.execute(
+                sa.select(ResourceSlotTypeRow.slot_name, ResourceSlotTypeRow.slot_type).where(
+                    ResourceSlotTypeRow.enabled.is_(True)
+                )
+            )
+        ).all()
+        return {SlotName(row.slot_name): SlotTypes(row.slot_type) for row in rows}
 
     async def _default_keypair_resource_policy(self, user_id: UserID) -> KeyPairResourcePolicyData:
         """The resource policy of the user's default keypair."""

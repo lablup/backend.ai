@@ -74,9 +74,8 @@ class ResourceAllocationRepository:
 
     async def get_user_usage(self, user_id: UserID) -> ScopeUsageData:
         """Get a user's resource usage across all their keypairs (limits, used, assignable)."""
-        known_slot_types = await self._get_known_slot_types()
         async with self._ops_provider.read_ops() as ops:
-            return await ops.user_usage(user_id, known_slot_types)
+            return await ops.user_usage(user_id)
 
     async def get_project_usage(
         self,
