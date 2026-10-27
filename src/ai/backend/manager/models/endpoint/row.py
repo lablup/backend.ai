@@ -265,8 +265,9 @@ class EndpointRow(Base):
     # The primary replica group's current revision. Filled only where the query passes
     # with_expression(current_revision_id_subquery()); None otherwise.
     current_revision_id: Mapped[DeploymentRevisionID | None] = query_expression()
-    # current_revision_row and deploying_revision_row are read only by gql_legacy (endpoint.py,
-    # EndpointRow.get, list_endpoint, to_data). Delete them with the gql_legacy cleanup.
+    # current_revision_row and deploying_revision_row are read by gql_legacy (endpoint.py),
+    # EndpointRow.get, list_endpoint and to_data, and ModelServingRepository for EndpointData.
+    # Delete them once those read the revisions with their own queries.
     current_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
         "DeploymentRevisionRow",
         secondary="replica_groups",
