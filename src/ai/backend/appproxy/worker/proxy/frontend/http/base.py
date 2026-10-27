@@ -127,6 +127,7 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
 
     def _find_rejected_content_encoding(self, content_encoding_headers: list[str]) -> str | None:
         rejected_encodings = self._content_encoding.rejected_encodings
+        # Each header line may list several codings, e.g. "gzip, br" (RFC 9110 section 8.4).
         for header_value in content_encoding_headers:
             for coding in header_value.split(","):
                 trimmed_coding = coding.strip()
