@@ -25,9 +25,6 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
         self.circuits = {}
         self.backends = {}
 
-    def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
-        pass
-
     async def register_circuit(self, circuit: Circuit, routes: list[RouteInfo]) -> None:
         metrics = self.root_context.metrics
 
@@ -90,6 +87,10 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
 
     @abstractmethod
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
         raise NotImplementedError
 
     @abstractmethod
