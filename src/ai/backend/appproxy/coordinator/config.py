@@ -282,6 +282,21 @@ class ClientIPStrategyConfig(BaseSchema):
         return self
 
 
+class RequestBodyConfig(BaseSchema):
+    reject_brotli: Annotated[
+        bool,
+        Field(default=False),
+        BackendAIConfigMeta(
+            description=(
+                "Reject requests whose Content-Encoding contains br with 415 instead of "
+                "forwarding them to session apps."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+
+
 class TraefikConfig(BaseSchema):
     etcd: Annotated[
         EtcdConfig,
@@ -527,17 +542,16 @@ class ProxyCoordinatorConfig(BaseSchema):
         ),
     ]
 
-    reject_brotli_request_body: Annotated[
-        bool,
-        Field(default=False),
+    request_body: Annotated[
+        RequestBodyConfig,
+        Field(default_factory=lambda: RequestBodyConfig()),
         BackendAIConfigMeta(
             description=(
-                "Reject requests whose Content-Encoding contains br with 415 instead of "
-                "forwarding them to session apps. Applies to both the built-in proxy workers "
-                "and Traefik."
+                "Rules applied to request bodies before they are forwarded to session apps. "
+                "Applies to both the built-in proxy workers and Traefik."
             ),
             added_version="26.10.0",
-            example=ConfigExample(local="false", prod="false"),
+            composite=CompositeType.FIELD,
         ),
     ]
 

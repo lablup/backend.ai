@@ -214,11 +214,6 @@
   # older Backend.AI clusters. Keep this disabled in production environments.
   # Added in 25.9.0
   allow_unauthorized_configure_request = false
-  # Reject requests whose Content-Encoding contains br with 415 instead of
-  # forwarding them to session apps. Applies to both the built-in proxy workers
-  # and Traefik.
-  # Added in 26.10.0
-  reject_brotli_request_body = false
   # Enable Traefik integration as the proxy worker's data plane. When enabled,
   # the coordinator will manage routing rules through Traefik instead of the
   # built-in proxy workers. Requires Traefik to be deployed and configured
@@ -277,6 +272,15 @@
     # Retry interval in seconds for Redis lock acquisition.
     # Added in 25.9.0
     ## lock_retry_interval = 0.5
+
+  # Rules applied to request bodies before they are forwarded to session apps.
+  # Applies to both the built-in proxy workers and Traefik.
+  # Added in 26.10.0
+  [proxy_coordinator.request_body]
+    # Reject requests whose Content-Encoding contains br with 415 instead of
+    # forwarding them to session apps.
+    # Added in 26.10.0
+    reject_brotli = false
 
   # Configuration for Traefik integration when enable_traefik is true. Includes
   # the etcd connection settings that Traefik uses as its configuration backend.
