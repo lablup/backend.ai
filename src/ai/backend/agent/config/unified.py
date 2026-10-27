@@ -146,7 +146,7 @@ class SocketRelayHealthCheckConfig(BaseConfigSchema):
                 "when the agent socket file in the container is missing or not a socket. "
                 "The healthcheck only reports the status and does not restart the container."
             ),
-            added_version="26.10.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="true", prod="true"),
         ),
     ]
@@ -155,7 +155,7 @@ class SocketRelayHealthCheckConfig(BaseConfigSchema):
         Field(default=30.0, ge=0.001),
         BackendAIConfigMeta(
             description="Seconds between healthcheck runs.",
-            added_version="26.10.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="30.0", prod="30.0"),
         ),
     ]
@@ -164,7 +164,7 @@ class SocketRelayHealthCheckConfig(BaseConfigSchema):
         Field(default=30.0, ge=0.001),
         BackendAIConfigMeta(
             description="Seconds a healthcheck run may take before it counts as a failure.",
-            added_version="26.10.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="30.0", prod="30.0"),
         ),
     ]
@@ -176,7 +176,7 @@ class SocketRelayHealthCheckConfig(BaseConfigSchema):
                 "Number of consecutive failed healthcheck runs before the container is "
                 "reported unhealthy."
             ),
-            added_version="26.10.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="3", prod="3"),
         ),
     ]
@@ -316,7 +316,7 @@ class SocketRelayConfig(BaseConfigSchema):
                 "relay container is created, so remove the backendai-socket-relay.<agent id> "
                 "container before restarting the agent after changing them."
             ),
-            added_version="26.10.0",
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]
