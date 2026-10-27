@@ -37,6 +37,7 @@ __all__ = (
     "BulkFieldActionProcessor",
     "FieldResultJudge",
     "PartialBulkFieldActionProcessor",
+    "PartialBulkNestedFieldActionProcessor",
     "PartialBulkOwnerCandidatesFieldActionProcessor",
     "PartialFieldResultJudge",
 )
@@ -342,6 +343,160 @@ class PartialBulkFieldActionProcessor[TAction: BasePartialBulkFieldAction[Any, A
                     return BulkFieldOpsResult(
                         successes=result.successes,
                         errors={**result.errors, **denied_rows},
+                    )
+            finally:
+                ended_at = datetime.now(UTC)
+                meta = BulkActionResultMeta(
+                    action_id=action_id,
+                    entity_results=entity_results,
+                    started_at=started_at,
+                    ended_at=ended_at,
+                    duration=ended_at - started_at,
+                )
+                await self._finalize_monitors(trigger_meta, meta)
+
+    def _denied_row_results(
+        self,
+        denied_rows: Mapping[FieldIdentifier, Exception],
+        owners: Mapping[FieldIdentifier, EntityIdentifier],
+    ) -> Sequence[BulkEntityResult]:
+        """Record a denial as DENIED, naming the owner that answered for the row."""
+        results = []
+        for field_id, exception in denied_rows.items():
+            run_status = ActionRunStatus.of_failure(exception, during_validation=True)
+            results.append(
+                BulkEntityResult(
+                    entity_id=owners[field_id],
+                    status=run_status.status,
+                    description=f"{run_status.description} ({field_id})",
+                    error_code=run_status.error_code,
+                )
+            )
+        return results
+
+    def _same_result_for_every_owner(
+        self, owners: Sequence[EntityIdentifier], run_status: ActionRunStatus
+    ) -> Sequence[BulkEntityResult]:
+        return [
+            BulkEntityResult(
+                entity_id=entity_id,
+                status=run_status.status,
+                description=run_status.description,
+                error_code=run_status.error_code,
+            )
+            for entity_id in owners
+        ]
+
+
+class PartialBulkNestedFieldActionProcessor[TAction: BasePartialBulkFieldAction[Any, Any], TData]:
+    """Read the owners of every row named, then read what is nested under the rows the
+    caller may reach.
+
+    Unlike :class:`PartialBulkFieldActionProcessor`, a row the lookup found no owner for
+    fails before the run: the nested read cannot tell it from a row holding nothing.
+    """
+
+    _func: Callable[[TAction], Awaitable[BulkFieldOpsResult[TData]]]
+    _owner_lookup: OwnerBulkLookupProcessor
+    _monitors: Sequence[BulkActionMonitor]
+    _partial_validators: Sequence[PartialBulkActionValidator]
+
+    def __init__(
+        self,
+        func: Callable[[TAction], Awaitable[BulkFieldOpsResult[TData]]],
+        owner_lookup: OwnerBulkLookupProcessor,
+        monitors: Sequence[BulkActionMonitor] | None = None,
+        partial_validators: Sequence[PartialBulkActionValidator] | None = None,
+    ) -> None:
+        self._func = func
+        self._owner_lookup = owner_lookup
+        self._monitors = monitors or []
+        self._partial_validators = partial_validators or []
+
+    async def _prepare_monitors(self, trigger_meta: BulkActionTriggerMeta) -> None:
+        for monitor in self._monitors:
+            try:
+                await monitor.prepare(trigger_meta)
+            except Exception as e:
+                log.warning("action monitor prepare failed", exc_info=e)
+
+    async def _finalize_monitors(
+        self, trigger_meta: BulkActionTriggerMeta, meta: BulkActionResultMeta
+    ) -> None:
+        process_result = BulkActionProcessResult(meta=meta)
+        for monitor in reversed(self._monitors):
+            try:
+                await monitor.done(trigger_meta, process_result)
+            except Exception as e:
+                log.warning("action monitor done failed", exc_info=e)
+
+    async def run(self, action: TAction) -> BulkFieldOpsResult[TData]:
+        with with_bulk_field_action_context(action) as action_id:
+            field_ids = list(dict.fromkeys(action.field_ids()))
+            lookup_result = await self._owner_lookup.run(action.to_owner_lookup_action())
+            owners = lookup_result.owners
+            missing: dict[FieldIdentifier, Exception] = {
+                field_id: FieldNotFoundError(
+                    "No field row matches the given id",
+                    field_type=field_id.field_type(),
+                    operation=action.operation_type(),
+                )
+                for field_id in field_ids
+                if field_id not in owners
+            }
+            distinct = list(dict.fromkeys(owners.values()))
+            if not distinct:
+                return BulkFieldOpsResult(successes={}, errors=missing)
+
+            started_at = datetime.now(UTC)
+            trigger_meta = BulkActionTriggerMeta(
+                action_id=action_id,
+                started_at=started_at,
+                entity_ids=distinct,
+                operation_type=action.operation_type(),
+                action_name=action.action_name(),
+            )
+
+            entity_results: Sequence[BulkEntityResult] = []
+
+            await self._prepare_monitors(trigger_meta)
+            try:
+                denied_owners: dict[EntityIdentifier, Exception] = {}
+                try:
+                    for partial_validator in self._partial_validators:
+                        denied_owners.update(await partial_validator.validate(trigger_meta))
+                except BaseException as e:
+                    run_status = ActionRunStatus.of_failure(e, during_validation=True)
+                    entity_results = self._same_result_for_every_owner(distinct, run_status)
+                    raise
+                denied_rows = {
+                    field_id: denied_owners[owner]
+                    for field_id, owner in owners.items()
+                    if owner in denied_owners
+                }
+                allowed = [
+                    field_id
+                    for field_id in field_ids
+                    if field_id in owners and field_id not in denied_rows
+                ]
+                try:
+                    result = (
+                        await self._func(action.narrowed_to(allowed))
+                        if allowed
+                        else BulkFieldOpsResult[TData](successes={}, errors={})
+                    )
+                except BaseException as e:
+                    run_status = ActionRunStatus.of_failure(e, during_validation=False)
+                    entity_results = self._same_result_for_every_owner(distinct, run_status)
+                    raise
+                else:
+                    entity_results = [
+                        *PartialFieldResultJudge[TData]().judge(result, owners),
+                        *self._denied_row_results(denied_rows, owners),
+                    ]
+                    return BulkFieldOpsResult(
+                        successes=result.successes,
+                        errors={**missing, **result.errors, **denied_rows},
                     )
             finally:
                 ended_at = datetime.now(UTC)

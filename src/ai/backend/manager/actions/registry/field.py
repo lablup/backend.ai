@@ -31,6 +31,7 @@ from ai.backend.manager.actions.v2.field.bulk_base import BasePartialBulkFieldAc
 from ai.backend.manager.actions.v2.field.bulk_processor import (
     OwnerBulkLookupProcessor,
     PartialBulkFieldActionProcessor,
+    PartialBulkNestedFieldActionProcessor,
     PartialBulkOwnerCandidatesFieldActionProcessor,
 )
 from ai.backend.manager.actions.v2.field.ops import (
@@ -573,16 +574,17 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
         *,
         validators: Sequence[PartialBulkActionValidator] = (),
         monitors: Sequence[BulkActionMonitor] = (),
-    ) -> PartialBulkFieldActionProcessor[TAction, list[TNestedData]]:
+    ) -> PartialBulkNestedFieldActionProcessor[TAction, list[TNestedData]]:
         """Read the rows nested under each row the caller named, one permission check per
         entity owning the named row.
 
         An owner the caller may not read puts the rows it owns into the answer as denied
-        items; a named row holding no nested rows answers an empty list.
+        items, a row the lookup found no owner for fails as not found, and a named row
+        holding no nested rows answers an empty list.
         """
         self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
         self._record_partial_owner_lookup()
-        return PartialBulkFieldActionProcessor(
+        return PartialBulkNestedFieldActionProcessor(
             FieldPartialBulkNestedGetService[TNestedData](self._deps.repository).execute,
             self._partial_bulk_owner_lookup,
             monitors=(*self._deps.monitors.bulk, *monitors),

@@ -896,8 +896,8 @@ class FieldPartialBulkGetService[TData: FieldData]:
 class FieldPartialBulkNestedGetService[TNestedData]:
     """Reads the rows nested under each field row the action names, a list per row.
 
-    The rows whose owner the caller may not read are gone from the action by the time
-    this runs; a row holding no nested rows answers an empty list.
+    The rows that are gone or whose owner the caller may not read are out of the action
+    by the time this runs, so an empty list means the row holds no nested rows.
     """
 
     _repository: OpsRepository[Any]
