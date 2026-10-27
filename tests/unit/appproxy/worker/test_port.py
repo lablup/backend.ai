@@ -89,7 +89,6 @@ async def serving_port_frontend(
     proxy_worker_config = root_context.local_config.proxy_worker
     proxy_worker_config.tls_listen = False
     proxy_worker_config.trusted_proxies = []
-    proxy_worker_config.max_header_field_size = 8190
     proxy_worker_config.port_proxy.bind_host = "127.0.0.1"
     proxy_worker_config.port_proxy.bind_port_range = (unused_tcp_port, unused_tcp_port)
     bodies_received_by_backend: list[bytes] = []
