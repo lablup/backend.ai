@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.types import AccessKey, ClusterMode, MountInfoEntry, SessionTypes
@@ -130,9 +131,7 @@ class EnqueueSessionAction(SessionScopeAction):
     def operation_type(cls) -> ActionOperationType:
         return ActionOperationType.CREATE
 
-    def to_owned_session_group_searcher(
-        self, owner_user_id: uuid.UUID
-    ) -> SessionGroupSearcher | None:
+    def to_owned_session_group_searcher(self, owner_user_id: UserID) -> SessionGroupSearcher | None:
         """The live session group named, owned by ``owner_user_id`` in the project;
         ``None`` when none is named."""
         conditions = self._owned_session_group_conditions(owner_user_id)
@@ -140,9 +139,7 @@ class EnqueueSessionAction(SessionScopeAction):
             return None
         return SessionGroupSearcher(pagination=NoPagination(), conditions=conditions)
 
-    def to_held_session_group_searcher(
-        self, owner_user_id: uuid.UUID
-    ) -> SessionGroupSearcher | None:
+    def to_held_session_group_searcher(self, owner_user_id: UserID) -> SessionGroupSearcher | None:
         """The owned session group named, only when a replica group holds it;
         ``None`` when none is named."""
         conditions = self._owned_session_group_conditions(owner_user_id)
@@ -156,9 +153,7 @@ class EnqueueSessionAction(SessionScopeAction):
             ],
         )
 
-    def _owned_session_group_conditions(
-        self, owner_user_id: uuid.UUID
-    ) -> list[QueryCondition] | None:
+    def _owned_session_group_conditions(self, owner_user_id: UserID) -> list[QueryCondition] | None:
         if self.session_group_id is None:
             return None
         fields = SessionGroupSearchableFields.own

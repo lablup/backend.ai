@@ -148,7 +148,7 @@ def _action(session_group_id: SessionGroupID, project_id: uuid.UUID) -> EnqueueS
 
 
 def _owned_searcher(
-    session_group_id: SessionGroupID, owner_user_id: uuid.UUID, project_id: uuid.UUID
+    session_group_id: SessionGroupID, owner_user_id: UserID, project_id: uuid.UUID
 ) -> SessionGroupSearcher:
     """The searcher for a group ``owner_user_id`` owns in ``project_id``."""
     searcher = _action(session_group_id, project_id).to_owned_session_group_searcher(owner_user_id)
@@ -157,7 +157,7 @@ def _owned_searcher(
 
 
 def _held_searcher(
-    session_group_id: SessionGroupID, owner_user_id: uuid.UUID, project_id: uuid.UUID
+    session_group_id: SessionGroupID, owner_user_id: UserID, project_id: uuid.UUID
 ) -> SessionGroupSearcher:
     """The searcher for that owned group, only when a replica group holds it."""
     searcher = _action(session_group_id, project_id).to_held_session_group_searcher(owner_user_id)
@@ -176,7 +176,7 @@ class TestSearchSessionGroups:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         groups = await db_source.search_session_groups(
-            _owned_searcher(session_group_id, test_user_uuid, test_group_id)
+            _owned_searcher(session_group_id, UserID(test_user_uuid), test_group_id)
         )
 
         assert [g.id for g in groups] == [session_group_id]
@@ -190,7 +190,7 @@ class TestSearchSessionGroups:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         groups = await db_source.search_session_groups(
-            _owned_searcher(SessionGroupID(uuid.uuid4()), test_user_uuid, test_group_id)
+            _owned_searcher(SessionGroupID(uuid.uuid4()), UserID(test_user_uuid), test_group_id)
         )
 
         assert groups == []
@@ -204,7 +204,7 @@ class TestSearchSessionGroups:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         groups = await db_source.search_session_groups(
-            _owned_searcher(session_group_id, uuid.uuid4(), test_group_id)
+            _owned_searcher(session_group_id, UserID(uuid.uuid4()), test_group_id)
         )
 
         assert groups == []
@@ -218,7 +218,7 @@ class TestSearchSessionGroups:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         groups = await db_source.search_session_groups(
-            _owned_searcher(session_group_id, test_user_uuid, uuid.uuid4())
+            _owned_searcher(session_group_id, UserID(test_user_uuid), uuid.uuid4())
         )
 
         assert groups == []
@@ -234,7 +234,7 @@ class TestSearchSessionGroups:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         groups = await db_source.search_session_groups(
-            _owned_searcher(session_group_id, test_user_uuid, test_group_id)
+            _owned_searcher(session_group_id, UserID(test_user_uuid), test_group_id)
         )
 
         assert groups == []
@@ -250,7 +250,7 @@ class TestSearchSessionGroups:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         groups = await db_source.search_session_groups(
-            _owned_searcher(session_group_id, test_user_uuid, test_group_id)
+            _owned_searcher(session_group_id, UserID(test_user_uuid), test_group_id)
         )
 
         assert [g.id for g in groups] == [session_group_id]
@@ -266,7 +266,7 @@ class TestSearchSessionGroups:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         groups = await db_source.search_session_groups(
-            _held_searcher(session_group_id, test_user_uuid, test_group_id)
+            _held_searcher(session_group_id, UserID(test_user_uuid), test_group_id)
         )
 
         assert [g.id for g in groups] == [session_group_id]
@@ -281,7 +281,7 @@ class TestSearchSessionGroups:
         db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
 
         groups = await db_source.search_session_groups(
-            _held_searcher(session_group_id, test_user_uuid, test_group_id)
+            _held_searcher(session_group_id, UserID(test_user_uuid), test_group_id)
         )
 
         assert groups == []

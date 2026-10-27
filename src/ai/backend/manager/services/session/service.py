@@ -1505,8 +1505,8 @@ class SessionService:
             access_key = owner_access_key
             domain_name = owner.domain_name
 
-        owned_session_group_searcher = action.to_owned_session_group_searcher(user_id)
-        held_session_group_searcher = action.to_held_session_group_searcher(user_id)
+        owned_session_group_searcher = action.to_owned_session_group_searcher(UserID(user_id))
+        held_session_group_searcher = action.to_held_session_group_searcher(UserID(user_id))
         if owned_session_group_searcher is not None and held_session_group_searcher is not None:
             if not await self._scheduler_repository.search_session_groups(
                 owned_session_group_searcher
