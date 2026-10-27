@@ -15,7 +15,7 @@ from ai.backend.appproxy.common.defs import (
     PERMIT_COOKIE_NAME,
 )
 from ai.backend.appproxy.common.errors import ClientIPNotAllowed, InvalidCredentials
-from ai.backend.appproxy.common.errors.http import UnsupportedContentEncoding
+from ai.backend.appproxy.common.errors.http import ContentEncodingNotAllowed
 from ai.backend.appproxy.common.types import RouteInfo, WebRequestHandler
 from ai.backend.appproxy.common.utils import ensure_json_serializable, is_permit_valid, mime_match
 from ai.backend.appproxy.worker.proxy.backend.http import HTTPBackend
@@ -144,7 +144,7 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
                 rejected_encoding,
                 request.remote,
             )
-            raise UnsupportedContentEncoding(
+            raise ContentEncodingNotAllowed(
                 f"Request bodies encoded with {rejected_encoding} are not accepted"
             )
         backend: HTTPBackend = request["backend"]

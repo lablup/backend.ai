@@ -10,7 +10,7 @@ from aiohttp.test_utils import make_mocked_request
 from multidict import CIMultiDict
 
 from ai.backend.appproxy.common.config import ContentEncodingConfig
-from ai.backend.appproxy.common.errors.http import UnsupportedContentEncoding
+from ai.backend.appproxy.common.errors.http import ContentEncodingNotAllowed
 from ai.backend.appproxy.worker.proxy.frontend.http.port import PortFrontend
 
 
@@ -69,7 +69,7 @@ class TestBaseHTTPFrontendProxy:
         http_backend: MagicMock,
         request_with_content_encoding: web.Request,
     ) -> None:
-        with pytest.raises(UnsupportedContentEncoding):
+        with pytest.raises(ContentEncodingNotAllowed):
             await port_frontend_rejecting_br_and_zstd.proxy(request_with_content_encoding)
 
         http_backend.proxy_http.assert_not_awaited()
