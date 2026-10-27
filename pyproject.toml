@@ -1,5 +1,5 @@
 [project]
-requires-python = "~=3.13.7"
+requires-python = "~=3.13.18"
 name = "backend.ai"
 dynamic = ["version"]
 
@@ -329,7 +329,7 @@ strict = true
 mypy_path = "stubs:src"
 namespace_packages = true
 explicit_package_bases = true
-python_executable = "dist/export/python/virtualenvs/python-default/3.13.7/bin/python"
+python_executable = "dist/export/python/virtualenvs/python-default/3.13.18/bin/python"
 disable_error_code = ["typeddict-unknown-key", "import-untyped"]
 enable_error_code = ["possibly-undefined"]
 warn_unreachable = true
@@ -389,7 +389,7 @@ exclude = [
     "src/ai/backend/web/static",
 ]
 venvPath = "dist/export/python/virtualenvs/python-default"
-venv = "3.13.7"
+venv = "3.13.18"
 typeCheckingMode = "standard"
 reportMatchNotExhaustive = "error"
 
