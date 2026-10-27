@@ -481,12 +481,10 @@ class TestGetModifiedEndpoint:
 
 
 class TestGetEndpointsWithAutoscalingRules:
-    async def test_fills_the_revisions_and_the_policy(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        deployment_repository: DeploymentRepository,
-        seeder: DeploymentSeeder,
-    ) -> None:
+    @pytest.fixture
+    async def deployment_with_a_rule(
+        self, db_with_cleanup: ExtendedAsyncSAEngine, seeder: DeploymentSeeder
+    ) -> SeededDeployment:
         seeded = await seeder.seed(deploying_revision_exists=True)
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
@@ -498,11 +496,22 @@ class TestGetEndpointsWithAutoscalingRules:
                     cooldown_seconds=300,
                 )
             )
+        return seeded
 
+    async def test_fills_the_revisions_and_the_policy(
+        self,
+        deployment_repository: DeploymentRepository,
+        deployment_with_a_rule: SeededDeployment,
+    ) -> None:
         (item,) = await deployment_repository.get_endpoints_with_autoscaling_rules()
 
         assert item.deployment_info.current_revision is not None
-        assert item.deployment_info.current_revision.id == seeded.current_revision_id
+        assert (
+            item.deployment_info.current_revision.id == deployment_with_a_rule.current_revision_id
+        )
         assert item.deployment_info.deploying_revision is not None
-        assert item.deployment_info.deploying_revision.id == seeded.deploying_revision_id
+        assert (
+            item.deployment_info.deploying_revision.id
+            == deployment_with_a_rule.deploying_revision_id
+        )
         assert item.deployment_info.policy is not None
