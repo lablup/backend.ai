@@ -125,14 +125,12 @@ _SYSTEM_SESSION_ENVIRONS: list[dict[str, Any]] = [
         "value_source": "session_id",
         "key": "BACKENDAI_SESSION_ID",
         "scope_type": "public",
-        "enabled": True,
     },
     {
         "value_source": "user_email",
         "key": "BACKENDAI_USER_EMAIL",
         "scope_type": "domain",
         "scope_id": "0198a5a0-0000-7000-8000-00000000d001",
-        "enabled": False,
     },
 ]
 _RESOURCE_SLOT_TYPES: list[dict[str, Any]] = [

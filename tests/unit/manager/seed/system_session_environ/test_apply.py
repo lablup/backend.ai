@@ -37,12 +37,12 @@ _DOMAIN_USER_EMAIL_SEED_KEY = f"BACKENDAI_USER_EMAIL:domain:{_DOMAIN_ID}"
 
 
 @dataclass(frozen=True)
-class _ValueSourceAndEnabled:
+class _ValueSourceAndDeleted:
     value_source: SystemSessionEnvironValueSource
-    enabled: bool
+    deleted: bool
 
 
-async def _rows_by_seed_key(db: ExtendedAsyncSAEngine) -> dict[str, _ValueSourceAndEnabled]:
+async def _rows_by_seed_key(db: ExtendedAsyncSAEngine) -> dict[str, _ValueSourceAndDeleted]:
     """Each binding by the key its seed item answers, with the public scope named."""
     public_id = global_entity_id(GlobalEntityName.PUBLIC)
     async with db.begin_readonly() as conn:
@@ -52,7 +52,9 @@ async def _rows_by_seed_key(db: ExtendedAsyncSAEngine) -> dict[str, _ValueSource
                 f"{row.key}:{row.scope_type}"
                 if row.scope_id == public_id
                 else f"{row.key}:{row.scope_type}:{row.scope_id}"
-            ): _ValueSourceAndEnabled(value_source=row.value_source, enabled=row.enabled)
+            ): _ValueSourceAndDeleted(
+                value_source=row.value_source, deleted=row.deleted_at is not None
+            )
             for row in rows
         }
 
@@ -97,15 +99,15 @@ async def seeds_applied_once(
 
 
 @pytest.fixture
-async def public_session_id_disabled_after_apply(
+async def public_session_id_deleted_after_apply(
     seeds_applied_once: None, db: ExtendedAsyncSAEngine
 ) -> None:
-    """The public binding switched off after the seed wrote it."""
+    """The public binding soft-deleted after the seed wrote it."""
     async with db.begin_session() as sess:
         await sess.execute(
             sa.update(SystemSessionEnvironRow)
             .where(SystemSessionEnvironRow.key == "BACKENDAI_SESSION_ID")
-            .values(enabled=False)
+            .values(deleted_at=sa.func.now())
         )
 
 
@@ -113,7 +115,7 @@ async def public_session_id_disabled_after_apply(
 def plan_rebinding_public_session_id(
     seeds_applied_once: None, system_session_environ_seed_dir: Path
 ) -> SeedPlan:
-    """The seeds with the public binding stating another source, switched off."""
+    """The seeds with the public binding stating another source."""
     (system_session_environ_seed_dir / "system_session_environ" / "bindings.yaml").write_text(
         yaml.safe_dump({
             "kind": "system_session_environ",
@@ -123,7 +125,6 @@ def plan_rebinding_public_session_id(
                     "value_source": "session_name",
                     "key": "BACKENDAI_SESSION_ID",
                     "scope_type": "public",
-                    "enabled": False,
                 }
             ],
         })
@@ -140,7 +141,6 @@ async def public_session_id_row_from_migration(db: ExtendedAsyncSAEngine) -> Sys
             key="BACKENDAI_SESSION_ID",
             scope_type=SystemSessionEnvironScopeType.PUBLIC,
             scope_id=SystemSessionEnvironScopeID(global_entity_id(GlobalEntityName.PUBLIC)),
-            enabled=True,
         )
         sess.add(row)
         await sess.flush()
@@ -161,11 +161,11 @@ class TestApply:
             _DOMAIN_USER_EMAIL_SEED_KEY,
         ]
         assert await _rows_by_seed_key(db) == {
-            _PUBLIC_SESSION_ID_SEED_KEY: _ValueSourceAndEnabled(
-                value_source=SystemSessionEnvironValueSource.SESSION_ID, enabled=True
+            _PUBLIC_SESSION_ID_SEED_KEY: _ValueSourceAndDeleted(
+                value_source=SystemSessionEnvironValueSource.SESSION_ID, deleted=False
             ),
-            _DOMAIN_USER_EMAIL_SEED_KEY: _ValueSourceAndEnabled(
-                value_source=SystemSessionEnvironValueSource.USER_EMAIL, enabled=False
+            _DOMAIN_USER_EMAIL_SEED_KEY: _ValueSourceAndDeleted(
+                value_source=SystemSessionEnvironValueSource.USER_EMAIL, deleted=False
             ),
         }
 
@@ -202,7 +202,7 @@ class TestApply:
         db: ExtendedAsyncSAEngine,
         repository: SeedRepository,
         system_session_environ_plan: SeedPlan,
-        public_session_id_disabled_after_apply: None,
+        public_session_id_deleted_after_apply: None,
     ) -> None:
         results = await SeedApplier(repository).apply(system_session_environ_plan, overwrite=False)
 
@@ -211,9 +211,9 @@ class TestApply:
             "exists",
             "exists",
         ]
-        assert (await _rows_by_seed_key(db))[_PUBLIC_SESSION_ID_SEED_KEY].enabled is False
+        assert (await _rows_by_seed_key(db))[_PUBLIC_SESSION_ID_SEED_KEY].deleted is True
 
-    async def test_an_overwrite_replaces_the_source_and_the_switch(
+    async def test_an_overwrite_replaces_the_source(
         self,
         db: ExtendedAsyncSAEngine,
         repository: SeedRepository,
@@ -221,8 +221,21 @@ class TestApply:
     ) -> None:
         await SeedApplier(repository).apply(plan_rebinding_public_session_id, overwrite=True)
 
-        assert (await _rows_by_seed_key(db))[_PUBLIC_SESSION_ID_SEED_KEY] == _ValueSourceAndEnabled(
-            value_source=SystemSessionEnvironValueSource.SESSION_NAME, enabled=False
+        assert (await _rows_by_seed_key(db))[_PUBLIC_SESSION_ID_SEED_KEY] == _ValueSourceAndDeleted(
+            value_source=SystemSessionEnvironValueSource.SESSION_NAME, deleted=False
+        )
+
+    async def test_an_overwrite_keeps_a_deleted_binding_deleted(
+        self,
+        db: ExtendedAsyncSAEngine,
+        repository: SeedRepository,
+        public_session_id_deleted_after_apply: None,
+        plan_rebinding_public_session_id: SeedPlan,
+    ) -> None:
+        await SeedApplier(repository).apply(plan_rebinding_public_session_id, overwrite=True)
+
+        assert (await _rows_by_seed_key(db))[_PUBLIC_SESSION_ID_SEED_KEY] == _ValueSourceAndDeleted(
+            value_source=SystemSessionEnvironValueSource.SESSION_NAME, deleted=True
         )
 
     async def test_a_binding_the_migration_wrote_is_kept_and_placed_in_public(
