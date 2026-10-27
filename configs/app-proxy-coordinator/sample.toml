@@ -258,6 +258,17 @@
     # Added in 25.9.0
     ## lock_retry_interval = 0.5
 
+  # Rules applied to the Content-Encoding of requests before they are forwarded
+  # to session apps. Applies to both the built-in proxy workers and Traefik.
+  # Built-in workers read it when they register, so restart them after changing
+  # it.
+  # Added in 26.10.0
+  [proxy_coordinator.content_encoding]
+    # Content codings that make a request be answered with 415 instead of being
+    # forwarded to session apps when its Content-Encoding contains any of them.
+    # Added in 26.10.0
+    rejected_encodings = ["br"]
+
   # Configuration for Traefik integration when enable_traefik is true. Includes
   # the etcd connection settings that Traefik uses as its configuration backend.
   # Required when enable_traefik is enabled.
