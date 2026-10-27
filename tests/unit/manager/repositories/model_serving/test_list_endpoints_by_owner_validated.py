@@ -482,3 +482,133 @@ async def test_search_services_paginated_reads_the_current_revision_slots(
     assert item.id == endpoint_id
     assert item.resource_slots == ResourceSlot({"cpu": Decimal("1"), "mem": Decimal("268435456")})
     assert len(item.routings) == 1
+
+
+@pytest.fixture
+async def deploying_revision(
+    db_with_cleanup: ExtendedAsyncSAEngine,
+    listed_endpoint: tuple[uuid.UUID, str],
+    test_image_id: uuid.UUID,
+    test_scaling_group: str,
+) -> uuid.UUID:
+    """A second revision ``listed_endpoint`` is rolling out."""
+    endpoint_id, _endpoint_name = listed_endpoint
+    revision_id = uuid.uuid4()
+    async with db_with_cleanup.begin_session() as sess:
+        runtime_variant_id = await sess.scalar(
+            sa.select(DeploymentRevisionRow.runtime_variant_id).where(
+                DeploymentRevisionRow.endpoint == endpoint_id
+            )
+        )
+        sess.add(
+            DeploymentRevisionRow(
+                id=revision_id,
+                endpoint=endpoint_id,
+                revision_number=2,
+                image=test_image_id,
+                model_mount_destination="/models",
+                model_definition_path="deploying-definition.yaml",
+                model_definition=ModelDefinition.model_validate({"models": []}),
+                resource_group=test_scaling_group,
+                resource_opts={},
+                cluster_mode="single-node",
+                cluster_size=1,
+                environ={},
+                runtime_variant_id=runtime_variant_id,
+                extra_mounts=[],
+            )
+        )
+        await sess.flush()
+        await sess.execute(
+            sa.update(EndpointRow)
+            .where(EndpointRow.id == endpoint_id)
+            .values(deploying_revision_id=revision_id)
+        )
+    return revision_id
+
+
+@pytest.fixture
+async def deploying_revision_without_current(
+    db_with_cleanup: ExtendedAsyncSAEngine,
+    listed_endpoint: tuple[uuid.UUID, str],
+    deploying_revision: uuid.UUID,
+) -> uuid.UUID:
+    """``deploying_revision`` with the primary group serving no revision yet."""
+    endpoint_id, _endpoint_name = listed_endpoint
+    async with db_with_cleanup.begin_session() as sess:
+        await sess.execute(
+            sa.update(ReplicaGroupRow)
+            .where(ReplicaGroupRow.deployment_id == endpoint_id)
+            .values(current_revision_id=None)
+        )
+    return deploying_revision
+
+
+@pytest.fixture
+async def endpoint_without_revision(
+    db_with_cleanup: ExtendedAsyncSAEngine,
+    test_user: tuple[uuid.UUID, str],
+    test_domain: DomainFixtureData,
+    test_group_id: uuid.UUID,
+    test_scaling_group: str,
+) -> uuid.UUID:
+    """An endpoint no revision has been made for."""
+    user_id, _email = test_user
+    endpoint_id = uuid.uuid4()
+    async with db_with_cleanup.begin_session() as sess:
+        sess.add(
+            EndpointRow(
+                id=endpoint_id,
+                name=f"test-ep-{uuid.uuid4().hex[:8]}",
+                created_user=user_id,
+                session_owner=user_id,
+                domain=test_domain.domain_name,
+                project=test_group_id,
+                resource_group=test_scaling_group,
+                lifecycle_stage=EndpointLifecycle.CREATED,
+                replicas=1,
+            )
+        )
+    return endpoint_id
+
+
+class TestGetEndpointByIdActiveRevision:
+    async def test_the_current_revision_wins_over_the_deploying_one(
+        self,
+        repository: ModelServingRepository,
+        listed_endpoint: tuple[uuid.UUID, str],
+        deploying_revision: uuid.UUID,
+    ) -> None:
+        endpoint_id, _endpoint_name = listed_endpoint
+
+        data = await repository.get_endpoint_by_id(endpoint_id)
+
+        assert data is not None
+        assert data.model_definition_path == "model-definition.yaml"
+
+    async def test_the_deploying_revision_stands_in_without_a_current_one(
+        self,
+        repository: ModelServingRepository,
+        listed_endpoint: tuple[uuid.UUID, str],
+        deploying_revision_without_current: uuid.UUID,
+    ) -> None:
+        endpoint_id, _endpoint_name = listed_endpoint
+
+        data = await repository.get_endpoint_by_id(endpoint_id)
+
+        assert data is not None
+        assert data.model_definition_path == "deploying-definition.yaml"
+
+    async def test_an_endpoint_without_a_revision_answers_the_defaults(
+        self,
+        repository: ModelServingRepository,
+        endpoint_without_revision: uuid.UUID,
+    ) -> None:
+        data = await repository.get_endpoint_by_id(endpoint_without_revision)
+
+        assert data is not None
+        assert data.image is None
+        assert data.model == uuid.UUID(int=0)
+        assert data.resource_slots == ResourceSlot({})
+        assert data.runtime_variant_id is None
+        assert data.routings == []
