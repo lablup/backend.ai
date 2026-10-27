@@ -33,9 +33,6 @@ import click
 import uvloop
 from aiohttp import web
 from aiohttp.typedefs import Handler, Middleware
-from opentelemetry.instrumentation.aiohttp_server import (
-    middleware as otel_server_middleware,
-)
 from setproctitle import setproctitle
 
 from ai.backend.common.cli import LazyGroup
@@ -54,6 +51,7 @@ from ai.backend.common.utils import env_info
 from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
 from ai.backend.logging.otel import (
     OpenTelemetrySpec,
+    build_otel_server_middleware,
     instrument_aiohttp_client,
     instrument_aiohttp_server,
 )
@@ -413,7 +411,7 @@ async def server_main(
             BraceStyleAdapter.apply_otel(otel_spec)
             instrument_aiohttp_server()
             instrument_aiohttp_client()
-            root_app.middlewares.insert(0, otel_server_middleware)
+            root_app.middlewares.insert(0, build_otel_server_middleware())
 
         # Plugin webapps should be loaded before runner.setup() because root_app is frozen upon on_startup event.
         await manager_init_stack.enter_async_context(
