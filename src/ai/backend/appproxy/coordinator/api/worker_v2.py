@@ -111,15 +111,6 @@ class WorkerResponseModel(WorkerModel):
     slots: list[SlotModel]
 
 
-class WorkerRegistrationResponseModel(WorkerResponseModel):
-    rejected_content_encodings: Annotated[
-        list[str],
-        Field(
-            description="Content codings the worker must reject when a request's Content-Encoding contains any of them."
-        ),
-    ]
-
-
 class WorkerListResponseModel(BackendAISchema):
     workers: list[WorkerResponseModel]
 
@@ -199,7 +190,7 @@ async def list_worker_circuits(request: web.Request) -> PydanticResponse[Circuit
 @pydantic_api_handler(WorkerRequestModel)
 async def update_worker(
     request: web.Request, params: WorkerRequestModel
-) -> PydanticResponse[WorkerRegistrationResponseModel]:
+) -> PydanticResponse[WorkerResponseModel]:
     """
     Registers worker to coordinator.
     """
@@ -268,12 +259,7 @@ async def update_worker(
 
     async with root_ctx.db.connect() as db_conn:
         result = await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
-    return PydanticResponse(
-        WorkerRegistrationResponseModel(
-            rejected_content_encodings=root_ctx.local_config.proxy_coordinator.content_encoding.rejected_encodings,
-            **result,
-        )
-    )
+    return PydanticResponse(WorkerResponseModel(**result))
 
 
 @auth_required("worker")
@@ -302,9 +288,7 @@ async def delete_worker(request: web.Request) -> PydanticResponse[StubResponseMo
 
 @auth_required("worker")
 @pydantic_api_response_handler
-async def heartbeat_worker(
-    request: web.Request,
-) -> PydanticResponse[WorkerRegistrationResponseModel]:
+async def heartbeat_worker(request: web.Request) -> PydanticResponse[WorkerResponseModel]:
     root_ctx: RootContext = request.app["_root.context"]
     worker_id = UUID(request.match_info["worker_id"])
     now = datetime.now(tzutc())
@@ -339,12 +323,7 @@ async def heartbeat_worker(
             prev_worker_status=prev_status,
         )
     request["do_not_print_access_log"] = True
-    return PydanticResponse(
-        WorkerRegistrationResponseModel(
-            rejected_content_encodings=root_ctx.local_config.proxy_coordinator.content_encoding.rejected_encodings,
-            **result,
-        )
-    )
+    return PydanticResponse(WorkerResponseModel(**result))
 
 
 @auth_required("worker")

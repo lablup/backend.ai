@@ -142,21 +142,6 @@ class ClientIPNotAllowed(BackendAIError, web.HTTPForbidden):
         )
 
 
-class UnsupportedContentEncoding(BackendAIError, web.HTTPUnsupportedMediaType):
-    """Raised when a request body uses a content coding the proxy refuses to forward."""
-
-    error_type = "https://api.backend.ai/probs/unsupported-content-encoding"
-    error_title = "Unsupported content encoding."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.APPPROXY,
-            operation=ErrorOperation.REQUEST,
-            error_detail=ErrorDetail.BAD_REQUEST,
-        )
-
-
 class InsufficientPrivilege(BackendAIError, web.HTTPForbidden):
     """Raised when user has insufficient privileges."""
 
