@@ -119,7 +119,10 @@ class SystemSessionEnvironGQL(PydanticNodeMixin[SystemSessionEnvironNodeDTO]):
     entity_id: UUID = gql_field(description="The id of the row.")
     key: str = gql_field(description="The environment variable name the value is injected under.")
     value_source: str = gql_field(
-        description="Which value of the starting session is injected, as a value source name."
+        description=(
+            "Which value of the starting session is injected, as a value source name "
+            "systemSessionEnvironValueSources lists."
+        )
     )
     scope: SystemSessionEnvironScopeInfoGQL = gql_field(
         description="The scope the row is bound to."
@@ -177,7 +180,10 @@ class SystemSessionEnvironConnectionGQL(Connection[SystemSessionEnvironGQL]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Filter by value source name with equality and membership operators.",
+        description=(
+            "Filter by value source name with equality and membership operators. The names are "
+            "the ones systemSessionEnvironValueSources lists."
+        ),
     ),
     name="SystemSessionEnvironValueSourceFilter",
 )

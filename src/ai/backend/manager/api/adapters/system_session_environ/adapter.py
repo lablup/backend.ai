@@ -22,6 +22,7 @@ from ai.backend.common.dto.manager.v2.system_session_environ.request import (
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
     AdminSearchSystemSessionEnvironsPayload,
+    ListSystemSessionEnvironValueSourcesPayload,
     SystemSessionEnvironNode,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
@@ -55,6 +56,9 @@ from ai.backend.manager.services.system_session_environ.actions.bulk_get import 
 )
 from ai.backend.manager.services.system_session_environ.actions.global_search import (
     GlobalSearchSystemSessionEnvironsAction,
+)
+from ai.backend.manager.services.system_session_environ.actions.public_list_value_sources import (
+    PublicListSystemSessionEnvironValueSourcesAction,
 )
 from ai.backend.manager.services.system_session_environ.processors import (
     SystemSessionEnvironProcessors,
@@ -99,6 +103,14 @@ class SystemSessionEnvironAdapter(BaseAdapter):
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
+        )
+
+    async def public_list_value_sources(self) -> ListSystemSessionEnvironValueSourcesPayload:
+        result = await self._system_session_environ.public_list_value_sources.run(
+            PublicListSystemSessionEnvironValueSourcesAction()
+        )
+        return ListSystemSessionEnvironValueSourcesPayload(
+            items=[value_source.value for value_source in result.value_sources]
         )
 
     async def bulk_get_ids(

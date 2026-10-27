@@ -71,6 +71,7 @@ class PortFrontend(BaseHTTPFrontend[int]):
                 app,
                 keepalive_timeout=30.0,
                 max_field_size=proxy_worker_config.max_header_field_size,
+                auto_decompress=False,  # transparently pass the request body
             )
             await runner.setup()
             service_host = port_proxy_config.bind_host
