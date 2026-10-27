@@ -123,7 +123,7 @@ async def volume(
         event_dispatcher=mock_event_dispatcher,
         event_producer=mock_event_producer,
         volume_name=StorageVolumeName("test-volume"),
-        status_check_config=VolumeStatusCheckConfig(check_interval=60.0),
+        status_check_config=VolumeStatusCheckConfig(check_interval=60.0, initial_delay=5.0),
     )
     await volume.init()
     try:
