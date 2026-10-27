@@ -635,6 +635,10 @@ jobs:
         # macos-15: apple silicon
         os: [ubuntu-22.04, ubuntu-22.04-arm, macos-15]
     runs-on: ${{ matrix.os }}
+    # A late re-run of this job uploads its own artifacts to the release that
+    # `make-final-release` already created.
+    permissions:
+      contents: write
     env:
       SCIENCE_AUTH_API_GITHUB_COM_BEARER: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -682,6 +686,29 @@ jobs:
       with:
         name: scies-${{ matrix.os }}
         path: dist/*
+    - name: Upload scies to the release, if it exists already
+      # This job does not block the release: `make-final-release` publishes without the
+      # platforms that failed. Re-running just this job later then puts its artifacts on
+      # the release that already exists, instead of re-running the whole tag workflow.
+      # On the first run the release does not exist yet and this step does nothing.
+      run: |
+        if ! gh release view "${{ github.ref_name }}" > /dev/null 2>&1; then
+          echo "Release ${{ github.ref_name }} does not exist yet; make-final-release uploads these."
+          exit 0
+        fi
+        for artifact in dist/*; do
+          [ -f "${artifact}" ] || continue
+          gh release upload "${{ github.ref_name }}" "${artifact}" --clobber
+        done
+        # Rebuild checksum.txt from every per-platform file now on the release, so that a
+        # platform that lands late is not missing from it.
+        checksum_dir="$(mktemp -d)"
+        gh release download "${{ github.ref_name }}" \
+          --pattern 'checksum-*.txt' --dir "${checksum_dir}"
+        cat "${checksum_dir}"/checksum-*.txt | sort -u -k2 > "${checksum_dir}/checksum.txt"
+        gh release upload "${{ github.ref_name }}" "${checksum_dir}/checksum.txt" --clobber
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Upload pants log
       uses: actions/upload-artifact@v5
       with:
@@ -794,7 +821,12 @@ jobs:
 
   build-isla-sorna-image:
     needs: [build-scies, build-wheels]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    # `build-scies` may fail for a single platform without holding back the release, so
+    # depend on its completion rather than its success.
+    if: |
+      !cancelled()
+      && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      && needs.build-wheels.result == 'success'
     runs-on: ubuntu-latest
 
     steps:
@@ -809,7 +841,14 @@ jobs:
 
   make-final-release:
     needs: [build-scies, build-wheels, build-supergraph]
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    # `build-scies` is not a release blocker: publish with the scies that did build, and
+    # re-run that job later to add the rest. The wheels and the supergraph schema stay
+    # required, as the release and the PyPI upload are nothing without them.
+    if: |
+      !cancelled()
+      && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+      && needs.build-wheels.result == 'success'
+      && needs.build-supergraph.result == 'success'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -840,14 +879,31 @@ jobs:
         name: wheels
         path: dist
     - name: Download scies
+      # No scie built at all leaves nothing for the pattern to match, which is not a
+      # reason to withhold the release.
+      continue-on-error: true
       uses: actions/download-artifact@v6
       with:
         pattern: scies-*
         path: dist
         merge-multiple: true
+    - name: Record which installers this release carries
+      run: |
+        if [ -f dist/backendai-install-macos-aarch64 ]; then
+          echo "HAS_MACOS_INSTALLER=true" >> $GITHUB_ENV
+        else
+          echo "HAS_MACOS_INSTALLER=false" >> $GITHUB_ENV
+          echo "::warning::No macOS installer in this release; re-run build-scies (macos-15) to add it."
+        fi
     - name: Merge checksum files into one
       run: |
-        cat dist/checksum-*.txt > dist/checksum.txt
+        shopt -s nullglob
+        checksums=(dist/checksum-*.txt)
+        if [ ${#checksums[@]} -eq 0 ]; then
+          echo "No scie checksums to merge."
+          exit 0
+        fi
+        cat "${checksums[@]}" > dist/checksum.txt
         sort -u -k2 dist/checksum.txt -o dist/checksum.txt
     - name: Download SBOM report
       continue-on-error: true
@@ -933,8 +989,10 @@ jobs:
       run: |
         release_version=$(awk -F'.' '{print $1"."$2}' <<< "${{ github.ref_name }}")
         echo "RELEASE_VERSION=$release_version" >> $GITHUB_OUTPUT
-    - name: Update stable installer shorten URL
-      if: ${{ env.IS_PRERELEASE == 'false' && vars.STABLE_RELEASE == steps.extract_stable_release_version.outputs.RELEASE_VERSION }}
+    - name: Update stable macOS installer shorten URL
+      # Skipped while the macOS scie is missing, so the shortened URL keeps pointing at
+      # the last release that has one instead of at a 404.
+      if: ${{ env.IS_PRERELEASE == 'false' && vars.STABLE_RELEASE == steps.extract_stable_release_version.outputs.RELEASE_VERSION && env.HAS_MACOS_INSTALLER == 'true' }}
       run: |
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-stable-macos-aarch64' \
@@ -944,6 +1002,9 @@ jobs:
           -d '{
           "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-aarch64"
         }'
+    - name: Update stable Linux installer shorten URLs
+      if: ${{ env.IS_PRERELEASE == 'false' && vars.STABLE_RELEASE == steps.extract_stable_release_version.outputs.RELEASE_VERSION }}
+      run: |
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-stable-linux-aarch64' \
           -H 'accept: application/json' \
@@ -965,8 +1026,10 @@ jobs:
       run: |
         release_version=$(git branch -r | grep -E 'origin/[0-9]{2}\.[0-9]{2}$' | awk -F'/' '{print $2}' | sort -V | tail -n 1)
         echo "RELEASE_VERSION=$release_version" >> $GITHUB_OUTPUT
-    - name: Update edge installer shorten URL
-      if: ${{ startsWith(github.ref_name, steps.extract_edge_release_version.outputs.RELEASE_VERSION) }}
+    - name: Update edge macOS installer shorten URL
+      # Skipped while the macOS scie is missing, so the shortened URL keeps pointing at
+      # the last release that has one instead of at a 404.
+      if: ${{ startsWith(github.ref_name, steps.extract_edge_release_version.outputs.RELEASE_VERSION) && env.HAS_MACOS_INSTALLER == 'true' }}
       run: |
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-edge-macos-aarch64' \
@@ -976,6 +1039,9 @@ jobs:
           -d '{
           "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-aarch64"
         }'
+    - name: Update edge Linux installer shorten URLs
+      if: ${{ startsWith(github.ref_name, steps.extract_edge_release_version.outputs.RELEASE_VERSION) }}
+      run: |
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-edge-linux-aarch64' \
           -H 'accept: application/json' \
