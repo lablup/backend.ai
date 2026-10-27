@@ -81,7 +81,7 @@ class EtcdConfig(BaseConfigSchema):
                 "on a connection with requests in flight. "
                 "Must not be below the server's --grpc-keepalive-min-time (5 seconds by default)."
             ),
-            added_version="26.10.0",
+            added_version="26.4.16",
             example=ConfigExample(local="5.0", prod="5.0"),
         ),
     ]
@@ -93,7 +93,7 @@ class EtcdConfig(BaseConfigSchema):
                 "Seconds to wait for a keep-alive ping reply before the connection to that "
                 "etcd member is closed and its requests go to the other members."
             ),
-            added_version="26.10.0",
+            added_version="26.4.16",
             example=ConfigExample(local="3.0", prod="3.0"),
         ),
     ]

@@ -16,6 +16,29 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.16 (2026-10-27)
+
+### Fixes
+* Fix the `dev` helper script silently leaving an orphaned agent on restart when `agent.pid` is missing, which made the newly started agent die on a port conflict ([#14958](https://github.com/lablup/backend.ai/issues/14958))
+* Insert every row of a fixture dataset with all of its own attributes, so rows that carry extra columns are no longer silently written with only the first row's columns ([#15087](https://github.com/lablup/backend.ai/issues/15087))
+* Fix GraphQL queries through the Hive Gateway being rejected at half of the alias limit, by no longer counting aliased `__typename` fields ([#15635](https://github.com/lablup/backend.ai/issues/15635))
+* Keep etcd requests and watches working when the first configured etcd endpoint is down by reusing one connection and resending requests that fail with `UNAVAILABLE` ([#15815](https://github.com/lablup/backend.ai/issues/15815))
+* Fix persistent service containers such as the socket relay staying on the old container at the first agent start after an image version bump and staying stopped at the next start ([#15846](https://github.com/lablup/backend.ai/issues/15846))
+* Fix Jupyter login cookies piling up with every App Proxy session until the browser can no longer open apps ([#15856](https://github.com/lablup/backend.ai/issues/15856))
+* Fix manager `/metrics` blocking other requests on the same worker and growing without bound, and report system metrics per worker instead of summing stale values ([#15862](https://github.com/lablup/backend.ai/issues/15862))
+* Fix the kernel entrypoint on Alpine images without the shadow package failing to add the work user to the shadow and grpread groups ([#15903](https://github.com/lablup/backend.ai/issues/15903))
+* Fix Alpine-based images failing to start with `UnsupportedBaseDistroError` by matching the `musllinux_*` kernel runner volume of krunner-alpine 5.x and installing krunner-alpine with the agent ([#15904](https://github.com/lablup/backend.ai/issues/15904))
+* Fix the password-change requirement staying set after a user changes their own password through `updateUserV2` ([#15979](https://github.com/lablup/backend.ai/issues/15979))
+* Fix etcd reads failing for as long as one etcd member stops responding by dropping that member through HTTP/2 keep-alive and resending timed-out reads ([#16032](https://github.com/lablup/backend.ai/issues/16032))
+
+### External Dependency Updates
+* Bump certifi, pip, uv, pex, aiohttp, yarl and the OpenTelemetry packages to drop trust in the compromised emSign root certificate and to pick up their latest security fixes ([#16022](https://github.com/lablup/backend.ai/issues/16022))
+* Bump CPython to 3.13.18 and setuptools to 84.2.1 ([#16068](https://github.com/lablup/backend.ai/issues/16068))
+
+### Miscellaneous
+* Fix the App Proxy worker decompressing request bodies it forwards, which truncated `gzip`/`deflate` bodies and rejected `br` bodies with 400. ([#16037](https://github.com/lablup/backend.ai/issues/16037))
+
+
 ## 26.4.15 (2026-10-16)
 
 ### Features
