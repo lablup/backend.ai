@@ -49,12 +49,8 @@ from ai.backend.manager.errors.agent import (
     AgentNotFound,
 )
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
-<<<<<<< HEAD
-from ai.backend.manager.models.agent import AgentRow
-=======
 from ai.backend.manager.errors.resource_slot import ResourceSlotTypeNotFound
-from ai.backend.manager.models.agent.row import AgentRow
->>>>>>> c8c1c108 (fix(BA-8140): name the unregistered slot type when a heartbeat fails on it (#16094))
+from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow

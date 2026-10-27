@@ -8,17 +8,10 @@ from decimal import Decimal
 from typing import Any, override
 
 from ai.backend.common.data.entity.agent import AgentUUID
-<<<<<<< HEAD
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
-from ai.backend.manager.models.resource_slot.row import AgentResourceRow
-=======
-from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
-from ai.backend.common.types import SlotTypes
-from ai.backend.manager.data.resource_slot.types import AgentResourceData, ResourceSlotTypeData
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.errors.resource_slot import ResourceSlotTypeNotFound
-from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
->>>>>>> c8c1c108 (fix(BA-8140): name the unregistered slot type when a heartbeat fails on it (#16094))
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.resource_slot.searchable_fields import (
     AgentResourceSearchableFields,
 )
