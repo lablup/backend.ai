@@ -9,6 +9,8 @@ import aiofiles
 import aiofiles.os
 
 from ai.backend.common.asyncio import run_in_executor_with_context
+from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.data.storage.types import StorageBackendCapability, StorageBackendType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
@@ -298,6 +300,8 @@ class XfsVolume(BaseVolume):
         event_producer: EventProducer,
         watcher: WatcherClient | None = None,
         options: Mapping[str, Any] | None = None,
+        volume_name: StorageVolumeName,
+        status_check_config: VolumeStatusCheckConfig | None,
     ) -> None:
         super().__init__(
             local_config,
@@ -307,6 +311,8 @@ class XfsVolume(BaseVolume):
             event_producer=event_producer,
             watcher=watcher,
             options=options,
+            volume_name=volume_name,
+            status_check_config=status_check_config,
         )
         self._lock_path = Path(self.config.get("lock_file_path", DEFAULT_LOCK_FILE))
         try:

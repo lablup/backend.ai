@@ -13,6 +13,8 @@ from ai.backend.common.clients.storage_backends.purestorage.client import (
     RapidFileToolkitV2Client,
     get_toolkit_version,
 )
+from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.data.storage.types import (
     StorageBackendCapability,
     StorageBackendType,
@@ -122,12 +124,16 @@ class FlashBladeVolume(BaseVolume):
         event_producer: EventProducer,
         watcher: WatcherClient | None = None,
         options: Mapping[str, Any] | None = None,
+        volume_name: StorageVolumeName,
+        status_check_config: VolumeStatusCheckConfig | None,
     ) -> None:
         super().__init__(
             local_config,
             mount_path,
             etcd=etcd,
             options=options,
+            volume_name=volume_name,
+            status_check_config=status_check_config,
             event_dispatcher=event_dispatcher,
             event_producer=event_producer,
             watcher=watcher,

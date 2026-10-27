@@ -18,7 +18,10 @@ from ai.backend.agent.types import AgentBackend, get_agent_discovery
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.cron import LocalCron
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
+from ai.backend.common.storage.probe.registry import VolumeStatusCheck, VolumeStatusCheckRegistry
+from ai.backend.common.storage.probe.runner import ProbeCheckRunner, ProbeCheckRunnerArgs
 from ai.backend.common.types import AgentId, DeviceName, SlotName
 
 if TYPE_CHECKING:
@@ -35,6 +38,8 @@ class AgentRuntime:
     _metadata_server: MetadataServer | None
 
     _stop_signal: signal.Signals
+    _volume_status_check_registry: VolumeStatusCheckRegistry
+    _probe_check_runner: ProbeCheckRunner[StorageVolumeName]
     _local_cron: LocalCron
 
     @classmethod
@@ -99,6 +104,7 @@ class AgentRuntime:
             metadata_server=metadata_server,
         )
         await runtime._local_cron.start()
+        await runtime._probe_check_runner.start()
         return runtime
 
     @classmethod
@@ -167,12 +173,18 @@ class AgentRuntime:
         self._metadata_server = metadata_server
 
         self._stop_signal = signal.SIGTERM
+        volume_status_checks: list[VolumeStatusCheck] = []
+        self._volume_status_check_registry = VolumeStatusCheckRegistry(volume_status_checks)
+        self._probe_check_runner = ProbeCheckRunner(
+            ProbeCheckRunnerArgs(checks=volume_status_checks)
+        )
         self._local_cron = LocalCron([
             UpdateSlotsTask(self),
             CollectNodeStatTask(self, local_config),
         ])
 
     async def __aexit__(self, *exc_info: Any) -> None:
+        await self._probe_check_runner.stop()
         await self._local_cron.stop()
         for agent in self._agents.values():
             await agent.shutdown(self._stop_signal)

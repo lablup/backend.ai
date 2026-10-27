@@ -45,6 +45,7 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
 from ai.backend.common.meta import (
     NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
@@ -2518,6 +2519,19 @@ class AgentGlobalConfig(BaseConfigSchema):
                 "Plugin settings are managed centrally in etcd and distributed to agents automatically."
             ),
             added_version="25.12.0",
+        ),
+    ]
+    volume_status_check: Annotated[
+        VolumeStatusCheckConfig,
+        Field(
+            default_factory=VolumeStatusCheckConfig,
+            validation_alias=AliasChoices("volume-status-check", "volume_status_check"),
+            serialization_alias="volume-status-check",
+        ),
+        BackendAIConfigMeta(
+            description="Configuration for the periodic status checks of the volumes.",
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
         ),
     ]
     redis: Annotated[
