@@ -7,6 +7,7 @@ from typing import Any, override
 
 from aiohttp import web
 
+from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.errors import (
     ServerMisconfiguredError,
 )
@@ -36,6 +37,11 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
 
         self.servers = []
         self.server_tasks = []
+
+    @override
+    def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
+        # A raw TCP stream carries no Content-Encoding.
+        pass
 
     @override
     async def start(self) -> None:
