@@ -4,6 +4,7 @@ import asyncio
 import logging
 from abc import ABCMeta, abstractmethod
 
+from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.types import (
     RouteInfo,
 )
@@ -86,6 +87,10 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
 
     @abstractmethod
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
         raise NotImplementedError
 
     @abstractmethod
