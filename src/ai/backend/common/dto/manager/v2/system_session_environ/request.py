@@ -5,13 +5,18 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import EnumFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import (
+    DateTimeFilter,
+    EnumFilter,
+    NullableDateTimeFilter,
+    StringFilter,
+    UUIDFilter,
+)
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironOrderField,
     SystemSessionEnvironScope,
     SystemSessionEnvironScopeType,
-    SystemSessionEnvironValueSource,
 )
 
 __all__ = (
@@ -25,8 +30,18 @@ __all__ = (
 )
 
 
-class SystemSessionEnvironValueSourceFilter(EnumFilter[SystemSessionEnvironValueSource]):
-    """Filter for the value of a starting session a row injects."""
+class SystemSessionEnvironValueSourceFilter(BaseRequestModel):
+    """Filter by value source name. The names are strings so that a new value source does not
+    change the schema."""
+
+    equals: str | None = Field(default=None, description="Exact match.")
+    in_: list[str] | None = Field(
+        default=None, alias="in", description="Match any of the provided values."
+    )
+    not_equals: str | None = Field(default=None, description="Exclude an exact match.")
+    not_in: list[str] | None = Field(
+        default=None, description="Exclude any of the provided values."
+    )
 
 
 class SystemSessionEnvironScopeTypeFilter(EnumFilter[SystemSessionEnvironScopeType]):
@@ -48,7 +63,15 @@ class SystemSessionEnvironFilter(BaseRequestModel):
         default=None,
         description="Filter by the id of the public entity, the domain or the project.",
     )
-    enabled: bool | None = Field(default=None, description="Filter by the enabled flag.")
+    created_at: DateTimeFilter | None = Field(
+        default=None, description="Filter by when the row was created."
+    )
+    updated_at: DateTimeFilter | None = Field(
+        default=None, description="Filter by when the row was last changed."
+    )
+    deleted_at: NullableDateTimeFilter | None = Field(
+        default=None, description="Filter by when the row was soft-deleted."
+    )
     AND: list[SystemSessionEnvironFilter] | None = Field(
         default=None, description="Logical AND of multiple filter conditions."
     )
@@ -104,8 +127,8 @@ class ScopedSearchSystemSessionEnvironsInput(BaseRequestModel):
 
 
 class MySearchSystemSessionEnvironsInput(BaseRequestModel):
-    """Input for searching the enabled rows bound to public, the caller's domain and the
-    projects the caller belongs to."""
+    """Input for searching the rows bound to public, the caller's domain and the projects the
+    caller belongs to, soft-deleted ones excluded."""
 
     filter: SystemSessionEnvironFilter | None = Field(
         default=None, description="Filter conditions."

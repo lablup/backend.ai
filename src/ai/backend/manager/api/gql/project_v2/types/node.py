@@ -449,7 +449,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
-            description="System session environ rows registered in this project, disabled ones included.",
+            description="System session environ rows registered in this project, soft-deleted ones included.",
         )
     )  # type: ignore[misc]
     async def system_session_environs(

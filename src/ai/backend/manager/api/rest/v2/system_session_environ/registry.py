@@ -27,6 +27,12 @@ def register_v2_system_session_environ_routes(
         middlewares=[superadmin_required],
     )
     registry.add(
+        "GET",
+        "/value-sources",
+        handler.list_value_sources,
+        middlewares=[auth_required],
+    )
+    registry.add(
         "POST",
         "/my/search",
         handler.my_search,

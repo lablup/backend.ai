@@ -58,14 +58,14 @@ _PERSISTENT_NETWORK_REF_NAME = "bai-multinode-00000000-0000-0000-0000-0000000000
 def mock_system_session_environ_repository() -> AsyncMock:
     repository = AsyncMock()
     repository.resolve = AsyncMock(
-        side_effect=lambda sessions: {session.session_id: {} for session in sessions}
+        side_effect=lambda sessions, searcher: {session.session_id: {} for session in sessions}
     )
     return repository
 
 
 @pytest.fixture
 def session_name_bound_to_key_a(mock_system_session_environ_repository: AsyncMock) -> None:
-    mock_system_session_environ_repository.resolve.side_effect = lambda sessions: {
+    mock_system_session_environ_repository.resolve.side_effect = lambda sessions, searcher: {
         session.session_id: {"A": session.name} for session in sessions
     }
 

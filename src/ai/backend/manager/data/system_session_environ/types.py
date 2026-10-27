@@ -17,9 +17,9 @@ class SystemSessionEnvironData(EntityData):
     value_source: SystemSessionEnvironValueSource
     key: str
     scope_id: EntityIdentifier
-    enabled: bool
     created_at: datetime
     updated_at: datetime
+    deleted_at: datetime | None
 
     @override
     def entity_id(self) -> SystemSessionEnvironID:

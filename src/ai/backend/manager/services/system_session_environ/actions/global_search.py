@@ -16,8 +16,6 @@ __all__ = ("GlobalSearchSystemSessionEnvironsAction",)
 class GlobalSearchSystemSessionEnvironsAction(
     GlobalSearcherOpsAction[SystemSessionEnvironRow, SystemSessionEnvironData]
 ):
-    """Page through every system session environ row, at every scope."""
-
     @override
     @classmethod
     def entity_type(cls) -> EntityType:

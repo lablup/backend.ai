@@ -14,15 +14,18 @@ from ai.backend.common.data.entity.system_session_environ import (
     SystemSessionEnvironID,
     SystemSessionEnvironScopeID,
 )
+from ai.backend.common.dto.manager.query import EnumFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     AdminSearchSystemSessionEnvironsInput,
     ScopedSearchSystemSessionEnvironsInput,
     SystemSessionEnvironFilter,
     SystemSessionEnvironOrder,
+    SystemSessionEnvironValueSourceFilter,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
     AdminSearchSystemSessionEnvironsPayload,
+    ListSystemSessionEnvironValueSourcesPayload,
     ScopedSearchSystemSessionEnvironsPayload,
     SystemSessionEnvironNode,
 )
@@ -31,10 +34,14 @@ from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironScope,
     SystemSessionEnvironScopeInfo,
     SystemSessionEnvironScopeType,
+    SystemSessionEnvironValueSource,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
+from ai.backend.manager.errors.system_session_environ import (
+    UnknownSystemSessionEnvironValueSource,
+)
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
 from ai.backend.manager.models.condition_utils import (
     combine_conditions_and,
@@ -61,6 +68,9 @@ from ai.backend.manager.services.system_session_environ.actions.bulk_get import 
 from ai.backend.manager.services.system_session_environ.actions.global_search import (
     GlobalSearchSystemSessionEnvironsAction,
 )
+from ai.backend.manager.services.system_session_environ.actions.public_list_value_sources import (
+    PublicListSystemSessionEnvironValueSourcesAction,
+)
 from ai.backend.manager.services.system_session_environ.actions.scoped_search import (
     ScopedSearchSystemSessionEnvironsAction,
 )
@@ -77,8 +87,6 @@ _SYSTEM_SESSION_ENVIRON_PAGINATION_SPEC = PaginationSpec(
 
 
 class SystemSessionEnvironAdapter(BaseAdapter):
-    """Adapter for the system session environ search and the reads by id."""
-
     _system_session_environ: SystemSessionEnvironProcessors
 
     def __init__(self, system_session_environ: SystemSessionEnvironProcessors) -> None:
@@ -87,7 +95,6 @@ class SystemSessionEnvironAdapter(BaseAdapter):
     async def global_search(
         self, input: AdminSearchSystemSessionEnvironsInput
     ) -> AdminSearchSystemSessionEnvironsPayload:
-        """Search every system session environ row, at every scope (superadmin)."""
         searcher = self._build_searcher(
             SystemSessionEnvironSearcher,
             conditions=self._convert_filter(input.filter) if input.filter else [],
@@ -115,7 +122,6 @@ class SystemSessionEnvironAdapter(BaseAdapter):
     async def scoped_search(
         self, input: ScopedSearchSystemSessionEnvironsInput
     ) -> ScopedSearchSystemSessionEnvironsPayload:
-        """Search the system session environ rows the named scopes reach, combined with OR."""
         searcher = self._build_searcher(
             SystemSessionEnvironSearcher,
             conditions=self._convert_filter(input.filter) if input.filter else [],
@@ -142,10 +148,17 @@ class SystemSessionEnvironAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
+    async def public_list_value_sources(self) -> ListSystemSessionEnvironValueSourcesPayload:
+        result = await self._system_session_environ.public_list_value_sources.run(
+            PublicListSystemSessionEnvironValueSourcesAction()
+        )
+        return ListSystemSessionEnvironValueSourcesPayload(
+            items=[value_source.value for value_source in result.value_sources]
+        )
+
     async def bulk_get_ids(
         self, ids: Sequence[SystemSessionEnvironID]
     ) -> list[SystemSessionEnvironNode | Exception | None]:
-        """Batch load system session environ rows by id for DataLoader use, one answer per id."""
         if not ids:
             return []
         result = await self._system_session_environ.bulk_get_ids.run(
@@ -176,10 +189,14 @@ class SystemSessionEnvironAdapter(BaseAdapter):
         conditions: list[QueryCondition] = [
             *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
             *self.apply_string_filter(filter.key, fields.key.filter),
-            *self.apply_enum_filter(filter.value_source, fields.value_source.filter),
+            *self.apply_enum_filter(
+                self._value_source_filter(filter.value_source), fields.value_source.filter
+            ),
             *self.apply_enum_filter(filter.scope_type, fields.scope_type.filter),
             *self.apply_uuid_filter(filter.scope_id, fields.scope_id.filter),
-            *self.apply_bool_filter(filter.enabled, fields.enabled.filter),
+            *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(filter.updated_at, fields.updated_at.filter),
+            *self.apply_nullable_datetime_filter(filter.deleted_at, fields.deleted_at.filter),
         ]
         if filter.AND:
             for sub_filter in filter.AND:
@@ -199,6 +216,30 @@ class SystemSessionEnvironAdapter(BaseAdapter):
                     conditions.append(negate_conditions(sub_conditions))
         return conditions
 
+    def _value_source_filter(
+        self, value_source_filter: SystemSessionEnvironValueSourceFilter | None
+    ) -> EnumFilter[SystemSessionEnvironValueSource] | None:
+        if value_source_filter is None:
+            return None
+        equals = value_source_filter.equals
+        not_equals = value_source_filter.not_equals
+        return EnumFilter[SystemSessionEnvironValueSource](
+            equals=self._value_source_named(equals) if equals is not None else None,
+            in_=[self._value_source_named(name) for name in value_source_filter.in_]
+            if value_source_filter.in_ is not None
+            else None,
+            not_equals=self._value_source_named(not_equals) if not_equals is not None else None,
+            not_in=[self._value_source_named(name) for name in value_source_filter.not_in]
+            if value_source_filter.not_in is not None
+            else None,
+        )
+
+    def _value_source_named(self, name: str) -> SystemSessionEnvironValueSource:
+        try:
+            return SystemSessionEnvironValueSource(name)
+        except ValueError as e:
+            raise UnknownSystemSessionEnvironValueSource(name) from e
+
     def _convert_orders(self, orders: list[SystemSessionEnvironOrder]) -> list[QueryOrder]:
         return [self._convert_order(order) for order in orders]
 
@@ -212,12 +253,12 @@ class SystemSessionEnvironAdapter(BaseAdapter):
                 return fields.value_source.order.apply(ascending)
             case SystemSessionEnvironOrderField.SCOPE_TYPE:
                 return fields.scope_type.order.apply(ascending)
-            case SystemSessionEnvironOrderField.ENABLED:
-                return fields.enabled.order.apply(ascending)
             case SystemSessionEnvironOrderField.CREATED_AT:
                 return fields.created_at.order.apply(ascending)
             case SystemSessionEnvironOrderField.UPDATED_AT:
                 return fields.updated_at.order.apply(ascending)
+            case SystemSessionEnvironOrderField.DELETED_AT:
+                return fields.deleted_at.order.apply(ascending)
             case _:
                 assert_never(order.field)
 
@@ -226,12 +267,12 @@ class SystemSessionEnvironAdapter(BaseAdapter):
         return SystemSessionEnvironNode(
             entity_id=environ.id,
             key=environ.key,
-            value_source=environ.value_source,
+            value_source=environ.value_source.value,
             scope=SystemSessionEnvironScopeInfo(
                 scope_type=SystemSessionEnvironScopeType.of_owner(environ.scope_id),
                 scope_id=SystemSessionEnvironScopeID(environ.scope_id),
             ),
-            enabled=environ.enabled,
             created_at=environ.created_at,
             updated_at=environ.updated_at,
+            deleted_at=environ.deleted_at,
         )

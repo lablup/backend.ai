@@ -343,12 +343,16 @@ from ai.backend.manager.services.system_session_environ.actions.bulk_get import 
 from ai.backend.manager.services.system_session_environ.actions.global_search import (
     GlobalSearchSystemSessionEnvironsAction,
 )
+from ai.backend.manager.services.system_session_environ.actions.public_list_value_sources import (
+    PublicListSystemSessionEnvironValueSourcesAction,
+)
 from ai.backend.manager.services.system_session_environ.actions.scoped_search import (
     ScopedSearchSystemSessionEnvironsAction,
 )
 from ai.backend.manager.services.system_session_environ.processors import (
     SystemSessionEnvironProcessors,
 )
+from ai.backend.manager.services.system_session_environ.service import SystemSessionEnvironService
 from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.actions.bulk_lookup import BulkLookupUsersAction
 from ai.backend.manager.services.user.processors import UserProcessors
@@ -993,7 +997,9 @@ def test_system_session_environ_reads_keep_their_judged_gates() -> None:
     """The admin search reads every row under the global gate, the scoped search is authorized
     against the named scopes, and the DataLoader reads per named row."""
     registry = _ops_registry()
-    SystemSessionEnvironProcessors(registry.group(GroupMeta(SystemSessionEnvironEntityType())))
+    SystemSessionEnvironProcessors(
+        registry.group(GroupMeta(SystemSessionEnvironEntityType())), SystemSessionEnvironService()
+    )
 
     judged = {
         GlobalSearchSystemSessionEnvironsAction: (
@@ -1018,6 +1024,24 @@ def test_system_session_environ_reads_keep_their_judged_gates() -> None:
         if record.action_cls in judged
     }
     assert recorded == judged
+
+
+def test_system_session_environ_value_source_list_is_public() -> None:
+    """The system session environ value sources are read by any authenticated caller."""
+    registry = _ops_registry()
+    SystemSessionEnvironProcessors(
+        registry.group(GroupMeta(SystemSessionEnvironEntityType())), SystemSessionEnvironService()
+    )
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate)
+        for record in registry.wired_processors()
+    }
+    assert recorded[PublicListSystemSessionEnvironValueSourcesAction] == (
+        SystemSessionEnvironEntityType(),
+        ActionKind.GLOBAL,
+        ActionGate.PUBLIC,
+    )
 
 
 def test_container_registry_loader_read_is_a_partial_permission_read() -> None:

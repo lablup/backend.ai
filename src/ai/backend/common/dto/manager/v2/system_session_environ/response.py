@@ -10,11 +10,11 @@ from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironID
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironScopeInfo,
-    SystemSessionEnvironValueSource,
 )
 
 __all__ = (
     "AdminSearchSystemSessionEnvironsPayload",
+    "ListSystemSessionEnvironValueSourcesPayload",
     "ScopedSearchSystemSessionEnvironsPayload",
     "SystemSessionEnvironNode",
 )
@@ -25,15 +25,19 @@ class SystemSessionEnvironNode(BaseResponseModel):
 
     entity_id: SystemSessionEnvironID = Field(description="The id of the row.")
     key: str = Field(description="The environment variable name the value is injected under.")
-    value_source: SystemSessionEnvironValueSource = Field(
-        description="Which value of the starting session is injected."
+    value_source: str = Field(
+        description=(
+            "Which value of the starting session is injected, as a value source name "
+            "the value source query lists."
+        )
     )
     scope: SystemSessionEnvironScopeInfo = Field(description="The scope the row is bound to.")
-    enabled: bool = Field(
-        description="Whether the row is injected. A disabled row still hides the same key at a broader scope."
-    )
     created_at: datetime = Field(description="When the row was created.")
     updated_at: datetime = Field(description="When the row was last changed.")
+    deleted_at: datetime | None = Field(
+        default=None,
+        description="When the row was soft-deleted, or null if it is not.",
+    )
 
 
 class AdminSearchSystemSessionEnvironsPayload(BaseResponseModel):
@@ -52,3 +56,9 @@ class ScopedSearchSystemSessionEnvironsPayload(BaseResponseModel):
     total_count: int = Field(description="Total number of rows matching the filter.")
     has_next_page: bool = Field(description="Whether there is a next page.")
     has_previous_page: bool = Field(description="Whether there is a previous page.")
+
+
+class ListSystemSessionEnvironValueSourcesPayload(BaseResponseModel):
+    """Every value source a system session environ row can carry."""
+
+    items: list[str] = Field(description="The value source names a row can carry.")

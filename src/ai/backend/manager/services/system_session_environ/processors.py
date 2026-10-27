@@ -4,7 +4,10 @@ from typing import Any
 
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
-from ai.backend.manager.actions.v2.global_scope.processor import GlobalActionProcessor
+from ai.backend.manager.actions.v2.global_scope.processor import (
+    GlobalActionProcessor,
+    PublicActionProcessor,
+)
 from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, ScopedBatchOpsResult
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
@@ -14,19 +17,26 @@ from ai.backend.manager.services.system_session_environ.actions.bulk_get import 
 from ai.backend.manager.services.system_session_environ.actions.global_search import (
     GlobalSearchSystemSessionEnvironsAction,
 )
+from ai.backend.manager.services.system_session_environ.actions.public_list_value_sources import (
+    PublicListSystemSessionEnvironValueSourcesAction,
+    PublicListSystemSessionEnvironValueSourcesActionResult,
+)
 from ai.backend.manager.services.system_session_environ.actions.scoped_search import (
     ScopedSearchSystemSessionEnvironsAction,
 )
+from ai.backend.manager.services.system_session_environ.service import SystemSessionEnvironService
 
 __all__ = ("SystemSessionEnvironProcessors",)
 
 
 class SystemSessionEnvironProcessors:
-    """Every operation runs straight against ops, so this domain has no service."""
-
     global_search: GlobalActionProcessor[
         GlobalSearchSystemSessionEnvironsAction,
         BatchOpsResult[SystemSessionEnvironData],
+    ]
+    public_list_value_sources: PublicActionProcessor[
+        PublicListSystemSessionEnvironValueSourcesAction,
+        PublicListSystemSessionEnvironValueSourcesActionResult,
     ]
     scoped_search: ScopeActionProcessor[
         ScopedSearchSystemSessionEnvironsAction,
@@ -36,7 +46,10 @@ class SystemSessionEnvironProcessors:
         BulkGetSystemSessionEnvironsAction, SystemSessionEnvironData
     ]
 
-    def __init__(self, group: ProcessorGroup[Any]) -> None:
+    def __init__(self, group: ProcessorGroup[Any], service: SystemSessionEnvironService) -> None:
         self.global_search = group.global_searcher_ops(GlobalSearchSystemSessionEnvironsAction)
+        self.public_list_value_sources = group.public(
+            PublicListSystemSessionEnvironValueSourcesAction, service.public_list_value_sources
+        )
         self.scoped_search = group.scoped_search_ops(ScopedSearchSystemSessionEnvironsAction)
         self.bulk_get_ids = group.partial_bulk_get_ops(BulkGetSystemSessionEnvironsAction)

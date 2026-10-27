@@ -13,12 +13,13 @@ from ai.backend.common.data.system_session_environ.types import (
 )
 from ai.backend.manager.data.environ.types import ENVIRON_KEY_PATTERN
 from ai.backend.manager.models.base import GUID, Base, StrEnumType
+from ai.backend.manager.models.mixins.soft_delete import SoftDeleteMixin
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 __all__ = ("SystemSessionEnvironRow",)
 
 
-class SystemSessionEnvironRow(LifecycleTimestampsMixin, Base):
+class SystemSessionEnvironRow(SoftDeleteMixin, LifecycleTimestampsMixin, Base):
     """One value injected under ``key`` into every session of the scope."""
 
     __tablename__ = "system_session_environ"
@@ -56,7 +57,4 @@ class SystemSessionEnvironRow(LifecycleTimestampsMixin, Base):
         "scope_id",
         GUID(SystemSessionEnvironScopeID),
         nullable=False,
-    )
-    enabled: Mapped[bool] = mapped_column(
-        "enabled", sa.Boolean, nullable=False, server_default=sa.true()
     )

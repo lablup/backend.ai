@@ -8,6 +8,7 @@ from uuid import UUID
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.dto.manager.query import NullableDateTimeFilter
 from ai.backend.common.dto.manager.v2.group.request import ScopedSearchProjectsInput
 from ai.backend.common.dto.manager.v2.group.types import ProjectScope
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
@@ -51,6 +52,11 @@ class V2SystemSessionEnvironHandler:
         payload = await self._adapter.global_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
 
+    async def list_value_sources(self) -> APIResponse:
+        """List every value source a system session environ row can carry."""
+        payload = await self._adapter.public_list_value_sources()
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
     async def scoped_search(
         self,
         body: BodyParam[ScopedSearchSystemSessionEnvironsInput],
@@ -63,7 +69,8 @@ class V2SystemSessionEnvironHandler:
         self,
         body: BodyParam[MySearchSystemSessionEnvironsInput],
     ) -> APIResponse:
-        """Search the enabled rows bound to public, the caller's domain and their projects."""
+        """Search the rows bound to public, the caller's domain and the caller's projects,
+        soft-deleted ones excluded."""
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
@@ -77,7 +84,8 @@ class V2SystemSessionEnvironHandler:
                     public=True,
                 ),
                 filter=SystemSessionEnvironFilter(
-                    enabled=True, AND=[my_input.filter] if my_input.filter else None
+                    deleted_at=NullableDateTimeFilter(is_null=True),
+                    AND=[my_input.filter] if my_input.filter else None,
                 ),
                 order=my_input.order,
                 first=my_input.first,

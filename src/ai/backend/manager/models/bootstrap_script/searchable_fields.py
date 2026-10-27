@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from typing import override
 
-from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
 from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
@@ -18,7 +17,7 @@ from ai.backend.manager.models.specs.search.field import SearchableField
 
 
 class _BootstrapScriptOwnFields(RowDataConverter[BootstrapScriptRow, BootstrapScriptData]):
-    """The script's own columns; the script body is user-written, so it is neither filtered nor ordered."""
+    """The script's own columns; its content is in ``bootstrap_script_revisions``."""
 
     field_id = SearchableField(
         BootstrapScriptRow.id,
@@ -35,7 +34,6 @@ class _BootstrapScriptOwnFields(RowDataConverter[BootstrapScriptRow, BootstrapSc
         UUIDConditions(BootstrapScriptRow.entity_id),
         ColumnOrder(BootstrapScriptRow.entity_id),
     )
-    script = SearchableField(BootstrapScriptRow.script, None, None)
     is_default = SearchableField(
         BootstrapScriptRow.is_default,
         BoolConditions(BootstrapScriptRow.is_default),
@@ -46,15 +44,20 @@ class _BootstrapScriptOwnFields(RowDataConverter[BootstrapScriptRow, BootstrapSc
         DateTimeConditions(BootstrapScriptRow.created_at),
         ColumnOrder(BootstrapScriptRow.created_at),
     )
+    deleted_at = SearchableField(
+        BootstrapScriptRow.deleted_at,
+        DateTimeConditions(BootstrapScriptRow.deleted_at),
+        ColumnOrder(BootstrapScriptRow.deleted_at),
+    )
 
     @override
     def to_data(self, row: BootstrapScriptRow) -> BootstrapScriptData:
         return BootstrapScriptData(
             id=self.field_id.read(row),
             entity=RuntimeEntityID(self.entity_type.read(row), self.entity_id.read(row)),
-            script=BootstrapScript(self.script.read(row)),
             is_default=self.is_default.read(row),
             created_at=self.created_at.read(row),
+            deleted_at=self.deleted_at.read(row),
         )
 
 

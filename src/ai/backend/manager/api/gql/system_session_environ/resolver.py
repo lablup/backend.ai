@@ -9,6 +9,7 @@ from strawberry import Info
 from strawberry.relay import PageInfo
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.dto.manager.query import NullableDateTimeFilter
 from ai.backend.common.dto.manager.v2.group.request import ScopedSearchProjectsInput
 from ai.backend.common.dto.manager.v2.group.types import ProjectScope
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
@@ -42,7 +43,7 @@ _MY_PROJECTS_PAGE_SIZE: Final[int] = 100
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Search every system session environ row at every scope, disabled ones included "
+            "Search every system session environ row at every scope, soft-deleted ones included "
             "(superadmin only)."
         ),
     )
@@ -94,8 +95,24 @@ async def admin_system_session_environs(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
+            "List every value source name a system session environ row can carry, the values "
+            "``SystemSessionEnviron.valueSource`` holds."
+        ),
+    )
+)  # type: ignore[misc]
+async def system_session_environ_value_sources(
+    info: Info[StrawberryGQLContext],
+) -> list[str] | None:
+    payload = await info.context.adapters.system_session_environ.public_list_value_sources()
+    return payload.items
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
             "Page through the system session environ rows the named scopes reach, combined "
-            "with OR, disabled ones included. Every scope is authorized before the read runs."
+            "with OR, soft-deleted ones included. Every scope is authorized before the read runs."
         ),
     )
 )  # type: ignore[misc]
@@ -147,8 +164,8 @@ async def scoped_system_session_environs(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Page through the enabled system session environ rows bound to public, the current "
-            "user's domain and the projects the current user belongs to."
+            "Page through the system session environ rows bound to public, the current user's "
+            "domain and the projects the current user belongs to, soft-deleted ones excluded."
         ),
     )
 )  # type: ignore[misc]
@@ -175,7 +192,8 @@ async def my_system_session_environs(
                 public=True,
             ),
             filter=SystemSessionEnvironFilter(
-                enabled=True, AND=[filter.to_pydantic()] if filter else None
+                deleted_at=NullableDateTimeFilter(is_null=True),
+                AND=[filter.to_pydantic()] if filter else None,
             ),
             order=[order.to_pydantic() for order in order_by] if order_by else None,
             first=first,

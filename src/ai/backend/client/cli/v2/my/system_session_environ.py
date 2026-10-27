@@ -38,7 +38,7 @@ def search(
     key_contains: str | None,
     order_by: tuple[str, ...],
 ) -> None:
-    """Search the enabled rows bound to public, my domain and my projects."""
+    """Search the rows bound to public, my domain and my projects, soft-deleted ones excluded."""
     from ai.backend.common.dto.manager.query import StringFilter
     from ai.backend.common.dto.manager.v2.system_session_environ.request import (
         MySearchSystemSessionEnvironsInput,

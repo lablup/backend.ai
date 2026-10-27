@@ -20,6 +20,21 @@ def system_session_environ() -> None:
     """System session environ commands."""
 
 
+@system_session_environ.command(name="value-sources")
+def value_sources() -> None:
+    """List every value source a system session environ row can carry."""
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.system_session_environ.list_value_sources()
+            print_result(result)
+        finally:
+            await registry.close()
+
+    run_async(_run)
+
+
 @system_session_environ.command(name="scoped-search")
 @click.option(
     "--domain",
@@ -47,10 +62,9 @@ def system_session_environ() -> None:
     help="Filter rows whose environment variable name contains this substring.",
 )
 @click.option(
-    "--enabled/--disabled",
-    "enabled",
+    "--deleted/--no-deleted",
     default=None,
-    help="Filter by the enabled flag.",
+    help="Filter by whether the row is soft-deleted.",
 )
 @click.option(
     "--order-by",
@@ -64,11 +78,11 @@ def scoped_search(
     limit: int | None,
     offset: int | None,
     key_contains: str | None,
-    enabled: bool | None,
+    deleted: bool | None,
     order_by: tuple[str, ...],
 ) -> None:
     """Search the system session environ rows the given scopes reach."""
-    from ai.backend.common.dto.manager.query import StringFilter
+    from ai.backend.common.dto.manager.query import NullableDateTimeFilter, StringFilter
     from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
     from ai.backend.common.dto.manager.v2.system_session_environ.request import (
         ScopedSearchSystemSessionEnvironsInput,
@@ -86,10 +100,10 @@ def scoped_search(
         public=public,
     )
     environ_filter: SystemSessionEnvironFilter | None = None
-    if key_contains is not None or enabled is not None:
+    if key_contains is not None or deleted is not None:
         environ_filter = SystemSessionEnvironFilter(
             key=StringFilter(contains=key_contains) if key_contains is not None else None,
-            enabled=enabled,
+            deleted_at=NullableDateTimeFilter(is_null=not deleted) if deleted is not None else None,
         )
     orders = (
         parse_order_options(order_by, SystemSessionEnvironOrderField, SystemSessionEnvironOrder)

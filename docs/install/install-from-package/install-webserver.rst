@@ -34,7 +34,7 @@ would be:
    [service]
    ip = "0.0.0.0"
    port = 8080
-   wsproxy.url = {url = "http://127.0.0.1:5050"}
+   wsproxy.url = ""
 
    # Set or enable it when using reverse proxy for SSL-termination
    # force_endpoint_protocol = "https"
@@ -85,6 +85,7 @@ would be:
    max_count_for_preopen_ports = 10
 
    [webserver]
+   pid-file = "./webserver.pid"
 
    [logging]
    # One of: "NOTSET", "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"
@@ -112,8 +113,7 @@ would be:
    path = "./logs"
    filename = "webserver.log"
 
-   # Set the maximum number of recent container coredumps in the coredump directory.
-   # Oldest coredumps are deleted if there is more than this number of coredumps.
+   # Number of outdated log files to retain.
    backup-count = 10
 
    # The log file size to begin rotation.

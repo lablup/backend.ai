@@ -29,7 +29,6 @@ from ai.backend.common.dto.manager.v2.system_session_environ.response import (
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironOrderField,
     SystemSessionEnvironScopeType,
-    SystemSessionEnvironValueSource,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironScope as SystemSessionEnvironScopeDTO,
@@ -38,7 +37,14 @@ from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironScopeInfo as SystemSessionEnvironScopeInfoDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter, UUIDScopeGQL
+from ai.backend.manager.api.gql.base import (
+    DateTimeFilter,
+    NullableDateTimeFilter,
+    OrderDirection,
+    StringFilter,
+    UUIDFilter,
+    UUIDScopeGQL,
+)
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
@@ -63,16 +69,6 @@ __all__ = (
     "SystemSessionEnvironOrderByGQL",
     "SystemSessionEnvironScopeGQL",
     "SystemSessionEnvironScopeInfoGQL",
-)
-
-
-SystemSessionEnvironValueSourceGQL = gql_enum(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description="Which value of a starting session a system session environ row injects.",
-    ),
-    SystemSessionEnvironValueSource,
-    name="SystemSessionEnvironValueSource",
 )
 
 
@@ -117,8 +113,8 @@ class SystemSessionEnvironScopeInfoGQL(PydanticOutputMixin[SystemSessionEnvironS
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "A system session environ row: the value of a starting session it injects under "
-            "its key into every session of its scope."
+            "A system session environ row: binds a value of a starting session to an "
+            "environment variable name at the public scope, a domain or a project."
         ),
     ),
     name="SystemSessionEnviron",
@@ -127,20 +123,20 @@ class SystemSessionEnvironGQL(PydanticNodeMixin[SystemSessionEnvironNodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
     entity_id: UUID = gql_field(description="The id of the row.")
     key: str = gql_field(description="The environment variable name the value is injected under.")
-    value_source: SystemSessionEnvironValueSourceGQL = gql_field(
-        description="Which value of the starting session is injected."
+    value_source: str = gql_field(
+        description=(
+            "Which value of the starting session is injected, as a value source name "
+            "systemSessionEnvironValueSources lists."
+        )
     )
     scope: SystemSessionEnvironScopeInfoGQL = gql_field(
         description="The scope the row is bound to."
     )
-    enabled: bool = gql_field(
-        description=(
-            "Whether the row is injected. A disabled row still hides the same key at a "
-            "broader scope."
-        )
-    )
     created_at: datetime = gql_field(description="When the row was created.")
     updated_at: datetime = gql_field(description="When the row was last changed.")
+    deleted_at: datetime | None = gql_field(
+        description="When the row was soft-deleted, or null if it is not."
+    )
 
     @classmethod
     @override
@@ -189,23 +185,22 @@ class SystemSessionEnvironConnectionGQL(Connection[SystemSessionEnvironGQL]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Filter for the injected value with equality and membership operators.",
+        description=(
+            "Filter by value source name with equality and membership operators. The names are "
+            "the ones systemSessionEnvironValueSources lists."
+        ),
     ),
     name="SystemSessionEnvironValueSourceFilter",
 )
 class SystemSessionEnvironValueSourceFilterGQL(
     PydanticInputMixin[SystemSessionEnvironValueSourceFilterDTO]
 ):
-    equals: SystemSessionEnvironValueSourceGQL | None = gql_field(
-        description="Exact match.", default=None
-    )
-    in_: list[SystemSessionEnvironValueSourceGQL] | None = gql_field(
+    equals: str | None = gql_field(description="Exact match.", default=None)
+    in_: list[str] | None = gql_field(
         description="Match any of the provided values.", name="in", default=None
     )
-    not_equals: SystemSessionEnvironValueSourceGQL | None = gql_field(
-        description="Exclude an exact match.", default=None
-    )
-    not_in: list[SystemSessionEnvironValueSourceGQL] | None = gql_field(
+    not_equals: str | None = gql_field(description="Exclude an exact match.", default=None)
+    not_in: list[str] | None = gql_field(
         description="Exclude any of the provided values.", default=None
     )
 
@@ -256,7 +251,15 @@ class SystemSessionEnvironFilterGQL(PydanticInputMixin[SystemSessionEnvironFilte
         description="Filter by the id of the public entity, the domain or the project.",
         default=None,
     )
-    enabled: bool | None = gql_field(description="Filter by the enabled flag.", default=None)
+    created_at: DateTimeFilter | None = gql_field(
+        description="Filter by when the row was created.", default=None
+    )
+    updated_at: DateTimeFilter | None = gql_field(
+        description="Filter by when the row was last changed.", default=None
+    )
+    deleted_at: NullableDateTimeFilter | None = gql_field(
+        description="Filter by when the row was soft-deleted.", default=None
+    )
     AND: list[Self] | None = gql_field(
         description="Combine multiple filters with AND logic.", default=None
     )

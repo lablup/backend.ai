@@ -408,7 +408,7 @@ class DomainV2GQL(PydanticNodeMixin[DomainNode]):
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description=(
-                "System session environ rows bound to this domain itself, disabled ones included."
+                "System session environ rows bound to this domain itself, soft-deleted ones included."
             ),
         )
     )  # type: ignore[misc]
