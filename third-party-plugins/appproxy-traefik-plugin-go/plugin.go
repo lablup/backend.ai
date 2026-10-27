@@ -12,16 +12,18 @@ import (
 )
 
 type Config struct {
-	LastUsedMarkerPath string   `yaml:"lastusedmarkerpath"`
-	Id                 string   `yaml:"id"`
-	SessionIds         []string `yaml:"sessionids"`
+	LastUsedMarkerPath       string   `yaml:"lastusedmarkerpath"`
+	Id                       string   `yaml:"id"`
+	SessionIds               []string `yaml:"sessionids"`
+	RejectedContentEncodings []string `yaml:"rejectedcontentencodings"`
 }
 
 func CreateConfig() *Config {
 	return &Config{
-		LastUsedMarkerPath: "",
-		Id:                 "",
-		SessionIds:         []string{},
+		LastUsedMarkerPath:       "",
+		Id:                       "",
+		SessionIds:               []string{},
+		RejectedContentEncodings: []string{},
 	}
 }
 
@@ -84,7 +86,25 @@ func (a *Plugin) MarkInactive() {
 	}
 }
 
+func (a *Plugin) findRejectedContentEncoding(req *http.Request) (string, bool) {
+	for _, headerValue := range req.Header.Values("Content-Encoding") {
+		for _, coding := range strings.Split(headerValue, ",") {
+			trimmedCoding := strings.TrimSpace(coding)
+			for _, rejectedEncoding := range a.config.RejectedContentEncodings {
+				if strings.EqualFold(trimmedCoding, rejectedEncoding) {
+					return strings.ToLower(trimmedCoding), true
+				}
+			}
+		}
+	}
+	return "", false
+}
+
 func (a *Plugin) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	if rejectedEncoding, found := a.findRejectedContentEncoding(req); found {
+		http.Error(rw, fmt.Sprintf("Request bodies encoded with %s are not accepted", rejectedEncoding), http.StatusUnsupportedMediaType)
+		return
+	}
 
 	isWebsocket := strings.ToLower(req.Header.Get("Upgrade")) == "websocket"
 

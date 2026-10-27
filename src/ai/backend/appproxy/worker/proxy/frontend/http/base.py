@@ -118,18 +118,26 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
             and request.headers.get("upgrade", "").lower() == "websocket"
         )
 
-    def _is_brotli_encoded_request(self, request: web.Request) -> bool:
-        return any(
-            coding.strip().lower() == "br"
-            for header_value in request.headers.getall(hdrs.CONTENT_ENCODING, [])
-            for coding in header_value.split(",")
-        )
+    def _find_rejected_content_encoding(self, request: web.Request) -> str | None:
+        rejected_encodings = self.root_context.rejected_content_encodings
+        for header_value in request.headers.getall(hdrs.CONTENT_ENCODING, []):
+            for coding in header_value.split(","):
+                normalized_coding = coding.strip().lower()
+                if normalized_coding in rejected_encodings:
+                    return normalized_coding
+        return None
 
     async def proxy(self, request: web.Request) -> web.StreamResponse | web.WebSocketResponse:
-        # Session images may ship a Brotli decoder vulnerable to CVE-2026-111497.
-        if self._is_brotli_encoded_request(request):
-            log.trace("rejecting a Brotli-encoded request body from {}", request.remote)
-            raise UnsupportedContentEncoding("Brotli-encoded request bodies are not accepted")
+        rejected_encoding = self._find_rejected_content_encoding(request)
+        if rejected_encoding is not None:
+            log.trace(
+                "rejecting a request body encoded with {} from {}",
+                rejected_encoding,
+                request.remote,
+            )
+            raise UnsupportedContentEncoding(
+                f"Request bodies encoded with {rejected_encoding} are not accepted"
+            )
         backend: HTTPBackend = request["backend"]
 
         if self._is_websocket_request(request):

@@ -8,7 +8,14 @@ from pprint import pformat
 from typing import Annotated, Any, Self
 
 import click
-from pydantic import Field, FilePath, IPvAnyNetwork, ValidationError, model_validator
+from pydantic import (
+    Field,
+    FilePath,
+    IPvAnyNetwork,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from ai.backend.appproxy.common.config import (
     BaseSchema,
@@ -282,6 +289,27 @@ class ClientIPStrategyConfig(BaseSchema):
         return self
 
 
+class ContentEncodingConfig(BaseSchema):
+    rejected_encodings: Annotated[
+        list[str],
+        Field(default_factory=list),
+        BackendAIConfigMeta(
+            description=(
+                "Content codings (case-insensitive) that make a request be answered with 415 "
+                "instead of being forwarded to session apps when its Content-Encoding contains "
+                "any of them."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="[]", prod='["br"]'),
+        ),
+    ]
+
+    @field_validator("rejected_encodings")
+    @classmethod
+    def normalize_rejected_encodings(cls, encodings: list[str]) -> list[str]:
+        return [encoding.strip().lower() for encoding in encodings]
+
+
 class TraefikConfig(BaseSchema):
     etcd: Annotated[
         EtcdConfig,
@@ -524,6 +552,19 @@ class ProxyCoordinatorConfig(BaseSchema):
             ),
             added_version="25.9.0",
             example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+
+    content_encoding: Annotated[
+        ContentEncodingConfig,
+        Field(default_factory=lambda: ContentEncodingConfig()),
+        BackendAIConfigMeta(
+            description=(
+                "Rules applied to the Content-Encoding of requests before they are forwarded to "
+                "session apps. Applies to both the built-in proxy workers and Traefik."
+            ),
+            added_version="26.10.0",
+            composite=CompositeType.FIELD,
         ),
     ]
 

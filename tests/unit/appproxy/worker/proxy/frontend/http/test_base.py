@@ -19,8 +19,17 @@ class _ContentEncodingHeaders:
 
 
 @pytest.fixture
-def port_frontend(mocker: pytest_mock.MockerFixture) -> PortFrontend:
-    return PortFrontend(root_context=mocker.MagicMock())
+def port_frontend_rejecting_br_and_zstd(mocker: pytest_mock.MockerFixture) -> PortFrontend:
+    root_context = mocker.MagicMock()
+    root_context.rejected_content_encodings = frozenset({"br", "zstd"})
+    return PortFrontend(root_context=root_context)
+
+
+@pytest.fixture
+def port_frontend_rejecting_no_encoding(mocker: pytest_mock.MockerFixture) -> PortFrontend:
+    root_context = mocker.MagicMock()
+    root_context.rejected_content_encodings = frozenset()
+    return PortFrontend(root_context=root_context)
 
 
 @pytest.fixture
@@ -51,18 +60,19 @@ class TestBaseHTTPFrontendProxy:
             _ContentEncodingHeaders(values=("BR",)),
             _ContentEncodingHeaders(values=("gzip, br",)),
             _ContentEncodingHeaders(values=("gzip", "br")),
+            _ContentEncodingHeaders(values=("zstd",)),
         ],
         ids=lambda headers: " + ".join(headers.values),
         indirect=True,
     )
-    async def test_rejects_brotli_encoded_request_without_forwarding(
+    async def test_rejects_request_with_rejected_encoding_without_forwarding(
         self,
-        port_frontend: PortFrontend,
+        port_frontend_rejecting_br_and_zstd: PortFrontend,
         http_backend: MagicMock,
         request_with_content_encoding: web.Request,
     ) -> None:
         with pytest.raises(UnsupportedContentEncoding):
-            await port_frontend.proxy(request_with_content_encoding)
+            await port_frontend_rejecting_br_and_zstd.proxy(request_with_content_encoding)
 
         http_backend.proxy_http.assert_not_awaited()
 
@@ -77,12 +87,33 @@ class TestBaseHTTPFrontendProxy:
         ids=lambda headers: " + ".join(headers.values) or "none",
         indirect=True,
     )
-    async def test_forwards_request_without_brotli(
+    async def test_forwards_request_without_rejected_encoding(
         self,
-        port_frontend: PortFrontend,
+        port_frontend_rejecting_br_and_zstd: PortFrontend,
         http_backend: MagicMock,
         request_with_content_encoding: web.Request,
     ) -> None:
-        await port_frontend.proxy(request_with_content_encoding)
+        await port_frontend_rejecting_br_and_zstd.proxy(request_with_content_encoding)
+
+        http_backend.proxy_http.assert_awaited_once_with(request_with_content_encoding)
+
+    @pytest.mark.parametrize(
+        "request_with_content_encoding",
+        [
+            _ContentEncodingHeaders(values=("br",)),
+            _ContentEncodingHeaders(values=("gzip, br",)),
+            _ContentEncodingHeaders(values=("gzip",)),
+            _ContentEncodingHeaders(values=()),
+        ],
+        ids=lambda headers: " + ".join(headers.values) or "none",
+        indirect=True,
+    )
+    async def test_forwards_every_request_when_no_encoding_is_rejected(
+        self,
+        port_frontend_rejecting_no_encoding: PortFrontend,
+        http_backend: MagicMock,
+        request_with_content_encoding: web.Request,
+    ) -> None:
+        await port_frontend_rejecting_no_encoding.proxy(request_with_content_encoding)
 
         http_backend.proxy_http.assert_awaited_once_with(request_with_content_encoding)
