@@ -37500,18 +37500,17 @@
             "default": null,
             "description": "Filter by the id of the public entity, the domain or the project."
           },
-          "enabled": {
+          "deleted_at": {
             "anyOf": [
               {
-                "type": "boolean"
+                "$ref": "#/components/schemas/NullableDateTimeFilter"
               },
               {
                 "type": "null"
               }
             ],
             "default": null,
-            "description": "Filter by the enabled flag.",
-            "title": "Enabled"
+            "description": "Filter by when the row was soft-deleted."
           },
           "AND": {
             "anyOf": [
@@ -37588,9 +37587,9 @@
           "key",
           "value_source",
           "scope_type",
-          "enabled",
           "created_at",
-          "updated_at"
+          "updated_at",
+          "deleted_at"
         ],
         "title": "SystemSessionEnvironOrderField",
         "type": "string"

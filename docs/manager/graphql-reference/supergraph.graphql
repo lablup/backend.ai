@@ -20611,7 +20611,7 @@ type Query
   schedulingHandlers: [SchedulingHandlerNode!] @join__field(graph: STRAWBERRY)
 
   """
-  Added in 26.10.0. Search every system session environ row at every scope, disabled ones included (superadmin only).
+  Added in 26.10.0. Search every system session environ row at every scope, soft-deleted ones included (superadmin only).
   """
   adminSystemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection @join__field(graph: STRAWBERRY)
 
@@ -27468,16 +27468,14 @@ type SystemSessionEnviron implements Node
   """The scope the row is bound to."""
   scope: SystemSessionEnvironScopeInfo!
 
-  """
-  Whether the row is injected. A disabled row still hides the same key at a broader scope.
-  """
-  enabled: Boolean!
-
   """When the row was created."""
   createdAt: DateTime!
 
   """When the row was last changed."""
   updatedAt: DateTime!
+
+  """When the row was soft-deleted. Null while the row is injected."""
+  deletedAt: DateTime
 }
 
 """
@@ -27526,8 +27524,8 @@ input SystemSessionEnvironFilter
   """Filter by the id of the public entity, the domain or the project."""
   scopeId: UUIDFilter = null
 
-  """Filter by the enabled flag."""
-  enabled: Boolean = null
+  """Filter by when the row was soft-deleted."""
+  deletedAt: NullableDateTimeFilter = null
 
   """Combine multiple filters with AND logic."""
   AND: [SystemSessionEnvironFilter!] = null
@@ -27561,9 +27559,9 @@ enum SystemSessionEnvironOrderField
   KEY @join__enumValue(graph: STRAWBERRY)
   VALUE_SOURCE @join__enumValue(graph: STRAWBERRY)
   SCOPE_TYPE @join__enumValue(graph: STRAWBERRY)
-  ENABLED @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
   UPDATED_AT @join__enumValue(graph: STRAWBERRY)
+  DELETED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.10.0. The scope a system session environ row is bound to."""
