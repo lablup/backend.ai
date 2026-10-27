@@ -5,7 +5,7 @@ Based on BEP-1033 test scenarios for handler-level testing.
 Test Scenarios:
 - SC-SS-001 ~ SC-SS-005: ScheduleSessionsLifecycleHandler
 - SC-CP-001 ~ SC-CP-006: CheckPreconditionLifecycleHandler
-- SC-ST-001 ~ SC-ST-005: StartSessionsLifecycleHandler
+- SC-ST-001 ~ SC-ST-005, SC-ST-010: StartSessionsLifecycleHandler
 - SC-TE-001 ~ SC-TE-005: TerminateSessionsLifecycleHandler
 """
 
@@ -19,6 +19,7 @@ import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.errors.common import RejectedByHook
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.check_precondition import (
     CheckPreconditionLifecycleHandler,
 )
@@ -568,7 +569,7 @@ class TestCheckPreconditionLifecycleHandler:
 
 
 # =============================================================================
-# StartSessionsLifecycleHandler Tests (SC-ST-001 ~ SC-ST-005)
+# StartSessionsLifecycleHandler Tests (SC-ST-001 ~ SC-ST-005, SC-ST-010)
 # =============================================================================
 
 
@@ -731,6 +732,38 @@ class TestStartSessionsLifecycleHandler:
         # Assert
         assert len(result.successes) == 1
         assert result.successes[0].session_id == prepared_session.session_info.identity.id
+
+    async def test_hook_rejected_session_becomes_failure(
+        self,
+        handler: StartSessionsLifecycleHandler,
+        mock_launcher: AsyncMock,
+        mock_repository: AsyncMock,
+        prepared_sessions_multiple: list[SessionWithKernels],
+        sessions_for_start_factory: Callable[..., SessionsForStartWithImages],
+    ) -> None:
+        """SC-ST-010: A hook-rejected session is reported as a failure.
+
+        Given: Multiple PREPARED sessions, one rejected by a PRE_CREATE_KERNEL hook
+        When: Handler starts the sessions
+        Then: The rejected session is in failures with the error; the others succeed
+        """
+        # Arrange
+        sessions_for_start = sessions_for_start_factory(prepared_sessions_multiple)
+        mock_repository.search_sessions_with_kernels_and_user.return_value = sessions_for_start
+        rejected_info = prepared_sessions_multiple[0].session_info
+        rejection = RejectedByHook(extra_msg="sealing denied", extra_data={"plugins": "x"})
+        mock_launcher.start_sessions_for_handler.return_value = {
+            rejected_info.identity.id: rejection
+        }
+
+        # Act
+        result = await handler.execute(ResourceGroupID(uuid.uuid4()), prepared_sessions_multiple)
+
+        # Assert
+        assert [f.session_id for f in result.failures] == [rejected_info.identity.id]
+        assert result.failures[0].message == "sealing denied"
+        assert result.failures[0].error_code == str(rejection.error_code())
+        assert len(result.successes) == len(prepared_sessions_multiple) - 1
 
 
 # =============================================================================

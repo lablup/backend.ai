@@ -6,21 +6,36 @@ Test Scenarios:
 - SC-LA-001 ~ SC-LA-004: Image Pulling
 - SC-LA-005 ~ SC-LA-008: Kernel Creation
 - SC-LA-009 ~ SC-LA-015: Network Setup
+- SC-LA-024: Partial agent failure
+- SC-LA-016 ~ SC-LA-023: Sealed Kernel Creation (PRE_CREATE_KERNEL hook)
+- SC-LA-025 ~ SC-LA-026: Sealed-launch slot lookup (fail-closed, none sealed)
 """
 
 from __future__ import annotations
 
+import copy
 import logging
+from collections.abc import Callable, Mapping
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 
-from ai.backend.common.types import AutoPullBehavior
+from ai.backend.common.plugin.hook import FIRST_COMPLETED, HookResult, HookResults
+from ai.backend.common.types import (
+    AgentId,
+    AutoPullBehavior,
+    ClusterSSHKeyPair,
+    SessionId,
+)
+from ai.backend.manager.errors.common import RejectedByHook
+from ai.backend.manager.errors.resource import DatabaseConnectionUnavailable
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
 from ai.backend.manager.views.sokovan.image import ImageConfigData
 from ai.backend.manager.views.sokovan.lifecycle import (
+    KernelBindingData,
     SessionDataForPull,
     SessionDataForStart,
 )
@@ -348,6 +363,40 @@ class TestSessionLauncherKernelCreation:
         assert environ["A"] == "test-session"
         assert environ["U"] == "mine"
 
+    async def test_unbuildable_agent_does_not_block_other_agents(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        session_with_kernels_factory: Callable[..., SessionDataForStart],
+        session_kernel_factory: Callable[..., KernelBindingData],
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """SC-LA-024: A non-hook build failure on one agent only fails that agent.
+
+        Given: Two agents, one kernel referencing an unknown image
+        When: Session is started
+        Then: create_kernels awaited once (other agent), the bad agent is recorded
+              as failed, and no session error info is written
+        """
+        # Arrange
+        session = session_with_kernels_factory(
+            session_kernel_factory(agent_id=AgentId("agent-1"), sealed=False),
+            session_kernel_factory(agent_id=AgentId("agent-2"), sealed=False, image_id=uuid4()),
+        )
+
+        # Act
+        with RecorderContext.scope("test", entity_ids=[session.session_id]):
+            await launcher.start_sessions_for_handler([session], image_config_default)
+
+        # Assert
+        mock_agent_client_pool._mock_client.create_kernels.assert_awaited_once()
+        mock_valkey_schedule.record_session_failed_agents.assert_awaited_once_with(
+            session.session_id, [AgentId("agent-2")]
+        )
+        mock_repository.update_session_error_info.assert_not_awaited()
+
 
 # =============================================================================
 # TestSessionLauncherNetworkSetup (SC-LA-009 ~ SC-LA-015)
@@ -533,3 +582,422 @@ class TestSessionLauncherNetworkSetup:
 
         # Assert - Error info should be updated
         mock_repository.update_session_error_info.assert_awaited()
+
+
+# =============================================================================
+# TestSessionLauncherSealedKernel (SC-LA-016 ~ SC-LA-023)
+# =============================================================================
+
+_SEALED_SPEC: dict[str, Any] = {
+    "schema_version": 1,
+    "initdata": "initdata-b64",
+    "sealed": "sealed-b64",
+    "signature": "signature-b64",
+}
+_PASSED_SPEC = HookResult(
+    status=HookResults.PASSED, src_plugin="confidential", result=dict(_SEALED_SPEC)
+)
+
+
+@pytest.mark.usefixtures("patch_sealed_launch_slots")
+class TestSessionLauncherSealedKernel:
+    """Tests for the PRE_CREATE_KERNEL hook applied to sealed-launch kernels."""
+
+    @pytest.fixture
+    def cluster_keypair(
+        self, launcher: SessionLauncher, monkeypatch: pytest.MonkeyPatch
+    ) -> ClusterSSHKeyPair:
+        """Fixed cluster keypair so the shared original can be checked for mutation."""
+        keypair = ClusterSSHKeyPair(public_key="cluster-public", private_key="cluster-private")
+        monkeypatch.setattr(
+            launcher, "_create_cluster_ssh_keypair", AsyncMock(return_value=keypair)
+        )
+        return keypair
+
+    async def _start(
+        self,
+        launcher: SessionLauncher,
+        session: SessionDataForStart,
+        image_configs: dict[UUID, ImageConfigData],
+    ) -> dict[SessionId, RejectedByHook]:
+        with RecorderContext.scope("test", entity_ids=[session.session_id]):
+            return await launcher.start_sessions_for_handler([session], image_configs)
+
+    async def test_non_sealed_kernel_skips_hook(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_hook_plugin_ctx: MagicMock,
+        session_with_kernels_factory: Callable[..., SessionDataForStart],
+        session_kernel_factory: Callable[..., KernelBindingData],
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """SC-LA-016: A kernel without sealed slots is sent untouched.
+
+        Given: Kernel requesting only non-sealed slots
+        When: Session is started
+        Then: Hook not dispatched, config has no confidential key, environ unchanged,
+              nothing reported as rejected
+        """
+        # Arrange
+        session = session_with_kernels_factory(session_kernel_factory(sealed=False))
+
+        # Act
+        rejected = await self._start(launcher, session, image_config_default)
+
+        # Assert
+        assert rejected == {}
+        mock_hook_plugin_ctx.dispatch.assert_not_awaited()
+        sent = mock_agent_client_pool._mock_client.create_kernels.call_args[0][2][0]
+        assert "confidential" not in sent
+        assert sent["environ"]["USER_SECRET"] == session.environ["USER_SECRET"]
+
+    async def test_sealed_kernel_dispatches_hook_and_sends_stripped_config(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_hook_plugin_ctx: MagicMock,
+        session_with_kernels_factory: Callable[..., SessionDataForStart],
+        session_kernel_factory: Callable[..., KernelBindingData],
+        image_config_default: dict[UUID, ImageConfigData],
+        cluster_keypair: ClusterSSHKeyPair,
+    ) -> None:
+        """SC-LA-017: A sealed kernel goes through the hook with stripped secrets.
+
+        Given: Sealed kernel and a confidential hook returning a valid spec
+        When: Session is started
+        Then: Hook gets stripped inputs; the agent gets the same config plus confidential
+        """
+        # Arrange
+        mock_hook_plugin_ctx.dispatch.return_value = _PASSED_SPEC
+        session = session_with_kernels_factory(session_kernel_factory())
+        binding_internal_data = session.kernels[0].internal_data
+        original_internal_data = copy.deepcopy(binding_internal_data)
+
+        # Act
+        await self._start(launcher, session, image_config_default)
+
+        # Assert
+        mock_hook_plugin_ctx.dispatch.assert_awaited_once()
+        call = mock_hook_plugin_ctx.dispatch.await_args
+        assert call.args[0] == "PRE_CREATE_KERNEL"
+        assert call.kwargs == {"return_when": FIRST_COMPLETED, "success_if_no_hook": False}
+        config, cluster_info, payload, extra = call.args[1]
+        assert all(key.startswith("BACKENDAI_") for key in config["environ"])
+        assert config["session_id"] == str(session.session_id)
+        assert config["internal_data"]["ssh_keypair"]["private_key"] == ""
+        assert cluster_info["ssh_keypair"]["private_key"] == ""
+        assert payload == {"schema_version": 1, "environ": session.environ}
+        assert extra == {"domain_id": str(session.domain_id)}
+
+        send_args = mock_agent_client_pool._mock_client.create_kernels.call_args[0]
+        assert send_args[2][0] is config
+        assert config["confidential"] == _SEALED_SPEC
+        assert send_args[3]["ssh_keypair"]["private_key"] == ""
+
+        # Originals are never mutated
+        assert binding_internal_data == original_internal_data
+        assert cluster_keypair["private_key"] == "cluster-private"
+
+    async def test_mixed_kernels_on_one_agent(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_hook_plugin_ctx: MagicMock,
+        session_with_kernels_factory: Callable[..., SessionDataForStart],
+        session_kernel_factory: Callable[..., KernelBindingData],
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """SC-LA-018: A plain kernel next to a sealed one stays unstripped.
+
+        Given: One agent with a sealed kernel and a plain kernel
+        When: Session is started
+        Then: Plain config keeps its environ and has no confidential key;
+              the agent's cluster info is stripped
+        """
+        # Arrange
+        mock_hook_plugin_ctx.dispatch.return_value = _PASSED_SPEC
+        session = session_with_kernels_factory(
+            session_kernel_factory(), session_kernel_factory(sealed=False)
+        )
+
+        # Act
+        await self._start(launcher, session, image_config_default)
+
+        # Assert
+        mock_hook_plugin_ctx.dispatch.assert_awaited_once()
+        send_args = mock_agent_client_pool._mock_client.create_kernels.call_args[0]
+        sealed_config, plain_config = send_args[2]
+        assert "confidential" in sealed_config
+        assert "confidential" not in plain_config
+        assert plain_config["environ"]["USER_SECRET"] == session.environ["USER_SECRET"]
+        assert plain_config["internal_data"] == session.kernels[1].internal_data
+        assert send_args[3]["ssh_keypair"]["private_key"] == ""
+
+    async def _assert_rejected(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        session: SessionDataForStart,
+        image_configs: dict[UUID, ImageConfigData],
+    ) -> None:
+        rejected = await self._start(launcher, session, image_configs)
+
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+        mock_repository.update_session_error_info.assert_awaited()
+        mock_valkey_schedule.record_session_failed_agents.assert_not_awaited()
+        assert isinstance(rejected[session.session_id], RejectedByHook)
+
+    async def test_no_hook_rejects_sealed_kernel(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        session_with_kernels_factory: Callable[..., SessionDataForStart],
+        session_kernel_factory: Callable[..., KernelBindingData],
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """SC-LA-019: No hook handled the event -> fail closed.
+
+        Given: Sealed kernel and no hook plugin (REJECTED, no reason)
+        When: Session is started
+        Then: create_kernels not awaited; error info recorded; rejection returned
+        """
+        # Arrange
+        session = session_with_kernels_factory(session_kernel_factory())
+
+        # Act & Assert
+        await self._assert_rejected(
+            launcher,
+            mock_agent_client_pool,
+            mock_repository,
+            mock_valkey_schedule,
+            session,
+            image_config_default,
+        )
+        error_info = mock_repository.update_session_error_info.await_args.args[1]
+        assert "no PRE_CREATE_KERNEL hook" in str(error_info)
+
+    async def test_other_plugin_result_rejected(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_hook_plugin_ctx: MagicMock,
+        mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        session_with_kernels_factory: Callable[..., SessionDataForStart],
+        session_kernel_factory: Callable[..., KernelBindingData],
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """SC-LA-020: A spec from a plugin other than confidential is refused.
+
+        Given: Sealed kernel and a PASSED result from another plugin
+        When: Session is started
+        Then: create_kernels not awaited; error info recorded
+        """
+        # Arrange
+        mock_hook_plugin_ctx.dispatch.return_value = HookResult(
+            status=HookResults.PASSED, src_plugin="other", result=dict(_SEALED_SPEC)
+        )
+        session = session_with_kernels_factory(session_kernel_factory())
+
+        # Act & Assert
+        await self._assert_rejected(
+            launcher,
+            mock_agent_client_pool,
+            mock_repository,
+            mock_valkey_schedule,
+            session,
+            image_config_default,
+        )
+
+    @pytest.mark.parametrize(
+        "malformed",
+        [
+            None,
+            {"schema_version": 1, "initdata": "a", "sealed": "b"},
+            {**_SEALED_SPEC, "schema_version": "1"},
+            {**_SEALED_SPEC, "schema_version": True},
+            {**_SEALED_SPEC, "signature": 3},
+        ],
+    )
+    async def test_malformed_result_rejected(
+        self,
+        malformed: Mapping[str, Any] | None,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_hook_plugin_ctx: MagicMock,
+        mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        session_with_kernels_factory: Callable[..., SessionDataForStart],
+        session_kernel_factory: Callable[..., KernelBindingData],
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """SC-LA-021: A malformed hook result is refused.
+
+        Given: Sealed kernel and a PASSED result missing a key, None, or wrongly typed
+        When: Session is started
+        Then: create_kernels not awaited; error info recorded
+        """
+        # Arrange
+        mock_hook_plugin_ctx.dispatch.return_value = HookResult(
+            status=HookResults.PASSED, src_plugin="confidential", result=malformed
+        )
+        session = session_with_kernels_factory(session_kernel_factory())
+
+        # Act & Assert
+        await self._assert_rejected(
+            launcher,
+            mock_agent_client_pool,
+            mock_repository,
+            mock_valkey_schedule,
+            session,
+            image_config_default,
+        )
+
+    async def test_hook_error_rejected(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_hook_plugin_ctx: MagicMock,
+        mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        session_with_kernels_factory: Callable[..., SessionDataForStart],
+        session_kernel_factory: Callable[..., KernelBindingData],
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """SC-LA-022: A hook ERROR status fails the sealed kernel.
+
+        Given: Sealed kernel and a hook that raised
+        When: Session is started
+        Then: create_kernels not awaited; error info recorded
+        """
+        # Arrange
+        mock_hook_plugin_ctx.dispatch.return_value = HookResult(
+            status=HookResults.ERROR, src_plugin="confidential", reason="RuntimeError('boom')"
+        )
+        session = session_with_kernels_factory(session_kernel_factory())
+
+        # Act & Assert
+        await self._assert_rejected(
+            launcher,
+            mock_agent_client_pool,
+            mock_repository,
+            mock_valkey_schedule,
+            session,
+            image_config_default,
+        )
+
+    @pytest.mark.parametrize("layout", ["two-agents", "one-agent"])
+    async def test_rejection_sends_nothing_anywhere(
+        self,
+        layout: str,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_hook_plugin_ctx: MagicMock,
+        mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        session_with_kernels_factory: Callable[..., SessionDataForStart],
+        session_kernel_factory: Callable[..., KernelBindingData],
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """SC-LA-023: One rejected kernel prevents every create_kernels RPC.
+
+        Given: Two agents (plain + rejected sealed) or one agent (sealed, then rejected sealed)
+        When: Session is started
+        Then: create_kernels is not awaited on any agent
+        """
+        # Arrange
+        if layout == "two-agents":
+            session = session_with_kernels_factory(
+                session_kernel_factory(agent_id=AgentId("agent-1"), sealed=False),
+                session_kernel_factory(agent_id=AgentId("agent-2")),
+            )
+            mock_hook_plugin_ctx.dispatch.return_value = HookResult(
+                status=HookResults.REJECTED, src_plugin="confidential", reason="denied"
+            )
+        else:
+            session = session_with_kernels_factory(
+                session_kernel_factory(), session_kernel_factory()
+            )
+            mock_hook_plugin_ctx.dispatch.side_effect = [
+                _PASSED_SPEC,
+                HookResult(status=HookResults.REJECTED, src_plugin="confidential", reason="denied"),
+            ]
+
+        # Act & Assert
+        await self._assert_rejected(
+            launcher,
+            mock_agent_client_pool,
+            mock_repository,
+            mock_valkey_schedule,
+            session,
+            image_config_default,
+        )
+
+
+# =============================================================================
+# TestSessionLauncherSealedSlotLookup (SC-LA-025 ~ SC-LA-026)
+# =============================================================================
+
+
+class TestSessionLauncherSealedSlotLookup:
+    """Tests for reading the sealed-launch slot types from the repository."""
+
+    async def test_slot_lookup_failure_fails_closed(
+        self,
+        launcher: SessionLauncher,
+        mock_repository: AsyncMock,
+        mock_agent_client_pool: MagicMock,
+        mock_hook_plugin_ctx: MagicMock,
+        session_with_kernels_factory: Callable[..., SessionDataForStart],
+        session_kernel_factory: Callable[..., KernelBindingData],
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """SC-LA-025: A failed slot lookup never sends the kernel, sealed or not.
+
+        Given: Repository failing to read the sealed-launch slot types
+        When: A session is started
+        Then: No hook dispatch, no create_kernels RPC, the error is recorded once
+        """
+        # Arrange
+        mock_repository.get_sealed_launch_slot_names.side_effect = DatabaseConnectionUnavailable()
+        session = session_with_kernels_factory(session_kernel_factory())
+
+        # Act
+        with RecorderContext.scope("test", entity_ids=[session.session_id]):
+            await launcher.start_sessions_for_handler([session], image_config_default)
+
+        # Assert
+        mock_hook_plugin_ctx.dispatch.assert_not_awaited()
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+        mock_repository.update_session_error_info.assert_awaited_once()
+
+    async def test_no_sealed_slot_in_repository_skips_hook(
+        self,
+        launcher: SessionLauncher,
+        mock_repository: AsyncMock,
+        mock_hook_plugin_ctx: MagicMock,
+        session_with_kernels_factory: Callable[..., SessionDataForStart],
+        session_kernel_factory: Callable[..., KernelBindingData],
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """SC-LA-026: Without any sealed-launch slot type no kernel is sealed.
+
+        Given: Repository reporting no sealed-launch slot type
+        When: A kernel requesting the confidential slot is started
+        Then: Hook is not dispatched
+        """
+        # Arrange
+        mock_repository.get_sealed_launch_slot_names.return_value = frozenset()
+        session = session_with_kernels_factory(session_kernel_factory())
+
+        # Act
+        with RecorderContext.scope("test", entity_ids=[session.session_id]):
+            await launcher.start_sessions_for_handler([session], image_config_default)
+
+        # Assert
+        mock_hook_plugin_ctx.dispatch.assert_not_awaited()
