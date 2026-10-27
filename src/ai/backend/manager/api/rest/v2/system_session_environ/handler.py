@@ -31,8 +31,3 @@ class V2SystemSessionEnvironHandler:
         """Search every system session environ row, at every scope (superadmin only)."""
         payload = await self._adapter.global_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
-
-    async def list_value_sources(self) -> APIResponse:
-        """List every value source a system session environ row can carry."""
-        payload = await self._adapter.public_list_value_sources()
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)

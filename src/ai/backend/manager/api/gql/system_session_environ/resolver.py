@@ -72,19 +72,3 @@ async def admin_system_session_environs(
         ),
         count=payload.total_count,
     )
-
-
-@gql_root_field(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "List every value source name a system session environ row can carry, the values "
-            "``SystemSessionEnviron.valueSource`` holds."
-        ),
-    )
-)  # type: ignore[misc]
-async def system_session_environ_value_sources(
-    info: Info[StrawberryGQLContext],
-) -> list[str] | None:
-    payload = await info.context.adapters.system_session_environ.public_list_value_sources()
-    return payload.items

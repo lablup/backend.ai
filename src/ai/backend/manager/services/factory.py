@@ -274,7 +274,6 @@ from ai.backend.manager.services.stream.service import StreamService
 from ai.backend.manager.services.system_session_environ.processors import (
     SystemSessionEnvironProcessors,
 )
-from ai.backend.manager.services.system_session_environ.service import SystemSessionEnvironService
 from ai.backend.manager.services.template.processors import TemplateProcessors
 from ai.backend.manager.services.template.service import TemplateService
 from ai.backend.manager.services.user.processors import UserProcessors
@@ -558,7 +557,6 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             etcd=args.etcd,
         ),
         events=EventsService(args.db),
-        system_session_environ=SystemSessionEnvironService(),
     )
 
 
@@ -725,8 +723,7 @@ def create_processors(
             services.secret,
         ),
         system_session_environ=SystemSessionEnvironProcessors(
-            session_groups.group(GroupMeta(SystemSessionEnvironEntityType())),
-            services.system_session_environ,
+            session_groups.group(GroupMeta(SystemSessionEnvironEntityType()))
         ),
         user_resource_policy=UserResourcePolicyProcessors(
             resource_policy_groups.group(GroupMeta(UserResourcePolicyEntityType()))

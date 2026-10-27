@@ -38,10 +38,7 @@ def system_session_environ() -> None:
     "--value-source",
     type=str,
     default=None,
-    help=(
-        "Filter by which value of the starting session is injected "
-        "(a name `system-session-environ value-sources` lists)."
-    ),
+    help="Filter by which value of the starting session is injected (a value source name).",
 )
 @click.option(
     "--scope-type",

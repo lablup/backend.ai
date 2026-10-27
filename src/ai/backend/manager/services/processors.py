@@ -280,9 +280,6 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.system_session_environ.processors import (
         SystemSessionEnvironProcessors,
     )
-    from ai.backend.manager.services.system_session_environ.service import (
-        SystemSessionEnvironService,
-    )
     from ai.backend.manager.services.template.processors import (
         TemplateProcessors,
     )
@@ -421,7 +418,6 @@ class Services:
     template: TemplateService
     resource_allocation: ResourceAllocationService
     stream: StreamService
-    system_session_environ: SystemSessionEnvironService
     events: EventsService
 
 

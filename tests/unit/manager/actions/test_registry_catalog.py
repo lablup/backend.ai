@@ -343,13 +343,9 @@ from ai.backend.manager.services.system_session_environ.actions.bulk_get import 
 from ai.backend.manager.services.system_session_environ.actions.global_search import (
     GlobalSearchSystemSessionEnvironsAction,
 )
-from ai.backend.manager.services.system_session_environ.actions.public_list_value_sources import (
-    PublicListSystemSessionEnvironValueSourcesAction,
-)
 from ai.backend.manager.services.system_session_environ.processors import (
     SystemSessionEnvironProcessors,
 )
-from ai.backend.manager.services.system_session_environ.service import SystemSessionEnvironService
 from ai.backend.manager.services.user.actions.bulk_get import BulkGetUsersAction
 from ai.backend.manager.services.user.actions.bulk_lookup import BulkLookupUsersAction
 from ai.backend.manager.services.user.processors import UserProcessors
@@ -991,23 +987,15 @@ def test_vfs_storage_loader_read_is_a_partial_permission_read() -> None:
 
 
 def test_system_session_environ_reads_keep_their_judged_gates() -> None:
-    """The search reads every row under the global gate, the value source list is open to every
-    logged-in user, and the DataLoader reads per named row."""
+    """The search reads every row under the global gate, and the DataLoader reads per named row."""
     registry = _ops_registry()
-    SystemSessionEnvironProcessors(
-        registry.group(GroupMeta(SystemSessionEnvironEntityType())), SystemSessionEnvironService()
-    )
+    SystemSessionEnvironProcessors(registry.group(GroupMeta(SystemSessionEnvironEntityType())))
 
     judged = {
         GlobalSearchSystemSessionEnvironsAction: (
             SystemSessionEnvironEntityType(),
             ActionKind.GLOBAL,
             ActionGate.PERMISSION,
-        ),
-        PublicListSystemSessionEnvironValueSourcesAction: (
-            SystemSessionEnvironEntityType(),
-            ActionKind.GLOBAL,
-            ActionGate.PUBLIC,
         ),
         BulkGetSystemSessionEnvironsAction: (
             SystemSessionEnvironEntityType(),
