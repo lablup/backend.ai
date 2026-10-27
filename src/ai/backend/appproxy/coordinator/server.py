@@ -62,6 +62,7 @@ from ai.backend.appproxy.common.errors import (
     URLNotFound,
 )
 from ai.backend.appproxy.common.events import (
+    AppProxyRejectedContentEncodingsUpdatedEvent,
     DoCheckUnusedPortEvent,
     DoCheckWorkerLostEvent,
     DoReconcileTraefikRoutesEvent,
@@ -690,6 +691,16 @@ async def service_discovery_event_publisher_ctx(root_ctx: RootContext) -> AsyncI
 
 
 @asynccontextmanager
+async def rejected_content_encodings_broadcast_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    await root_ctx.event_producer.broadcast_event(
+        AppProxyRejectedContentEncodingsUpdatedEvent(
+            rejected_content_encodings=root_ctx.local_config.proxy_coordinator.content_encoding.rejected_encodings,
+        )
+    )
+    yield
+
+
+@asynccontextmanager
 async def circuit_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.circuit_manager = CircuitManager(
         root_ctx.event_dispatcher,
@@ -935,6 +946,7 @@ def build_root_app(
         cleanup_contexts = [
             distributed_lock_ctx,
             event_dispatcher_ctx,
+            rejected_content_encodings_broadcast_ctx,
             leader_election_ctx,
             circuit_manager_ctx,
             endpoint_service_ctx,

@@ -51,6 +51,28 @@ class AppProxyCircuitRouteUpdatedEvent(AbstractBroadcastEvent):
         return None
 
 
+class AppProxyRejectedContentEncodingsUpdatedEvent(AbstractBroadcastEvent):
+    rejected_content_encodings: list[str]
+
+    @classmethod
+    @override
+    def event_name(cls) -> str:
+        return "appproxy_rejected_content_encodings_updated_event"
+
+    @classmethod
+    @override
+    def event_domain(cls) -> EventDomain:
+        return EventDomain.MODEL_ROUTE
+
+    @override
+    def domain_id(self) -> str | None:
+        return None
+
+    @override
+    def user_event(self) -> UserEvent | None:
+        return None
+
+
 class GenericWorkerEvent(AbstractAnycastEvent):
     worker_id: str
     reason: str

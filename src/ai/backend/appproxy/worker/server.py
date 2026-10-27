@@ -61,6 +61,7 @@ from ai.backend.appproxy.common.events import (
     AppProxyCircuitCreatedEvent,
     AppProxyCircuitRemovedEvent,
     AppProxyCircuitRouteUpdatedEvent,
+    AppProxyRejectedContentEncodingsUpdatedEvent,
     AppProxyWorkerCircuitAddedEvent,
 )
 from ai.backend.appproxy.common.types import (
@@ -448,6 +449,14 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             AppProxyCircuitRemovedEvent,
         )
     ]
+    handlers.append(
+        root_ctx.event_dispatcher.subscribe(
+            AppProxyRejectedContentEncodingsUpdatedEvent,
+            root_ctx,
+            handle_rejected_content_encodings_updated_event,
+            name="proxy-worker",
+        )
+    )
     try:
         yield
     finally:
@@ -727,6 +736,18 @@ async def readyz(request: web.Request) -> web.Response:
 async def status(request: web.Request) -> web.Response:
     request["do_not_print_access_log"] = True
     return web.json_response({"api_version": "v2"})
+
+
+async def handle_rejected_content_encodings_updated_event(
+    context: RootContext,
+    _agent_id: AgentId,
+    event: AppProxyRejectedContentEncodingsUpdatedEvent,
+) -> None:
+    context.rejected_content_encodings = frozenset(event.rejected_content_encodings)
+    log.info(
+        "applied the rejected content encodings",
+        rejected_content_encodings=sorted(context.rejected_content_encodings),
+    )
 
 
 async def handle_proxy_route_event(
