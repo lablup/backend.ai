@@ -37,6 +37,7 @@ class KernelGroupFilter(BaseRequestModel):
 
     field_id: UUIDFilter | None = Field(default=None, description="Filter by kernel group ID.")
     role: StringFilter | None = Field(default=None, description="Filter by role.")
+    image_id: UUIDFilter | None = Field(default=None, description="Filter by image ID.")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
 
     AND: list[KernelGroupFilter] | None = Field(default=None, description="AND logical combinator.")

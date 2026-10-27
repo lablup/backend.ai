@@ -26,6 +26,7 @@ class KernelGroupOrderField(StrEnum):
     """Fields available for ordering kernel groups."""
 
     ROLE = "role"
+    REQUESTED_STARTS_AT = "requested_starts_at"
     CREATED_AT = "created_at"
 
 

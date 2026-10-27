@@ -30,6 +30,16 @@ class _KernelGroupOwnFields(RowDataConverter[KernelGroupRow, KernelGroupData]):
         StringConditions(KernelGroupRow.role),
         ColumnOrder(KernelGroupRow.role),
     )
+    image_id = SearchableField(
+        KernelGroupRow.image_id,
+        UUIDConditions(KernelGroupRow.image_id),
+        ColumnOrder(KernelGroupRow.image_id),
+    )
+    requested_starts_at = SearchableField(
+        KernelGroupRow.requested_starts_at,
+        DateTimeConditions(KernelGroupRow.requested_starts_at),
+        ColumnOrder(KernelGroupRow.requested_starts_at),
+    )
     created_at = SearchableField(
         KernelGroupRow.created_at,
         DateTimeConditions(KernelGroupRow.created_at),

@@ -802,6 +802,7 @@ class SessionAdapter(BaseAdapter):
         conditions: list[QueryCondition] = [
             *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
             *self.apply_string_filter(f.role, fields.role.filter),
+            *self.apply_uuid_filter(f.image_id, fields.image_id.filter),
             *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
         ]
         if f.AND:
@@ -830,6 +831,8 @@ class SessionAdapter(BaseAdapter):
             match order.field:
                 case KernelGroupOrderField.ROLE:
                     result.append(fields.role.order.apply(ascending))
+                case KernelGroupOrderField.REQUESTED_STARTS_AT:
+                    result.append(fields.requested_starts_at.order.apply(ascending))
                 case KernelGroupOrderField.CREATED_AT:
                     result.append(fields.created_at.order.apply(ascending))
                 case _:

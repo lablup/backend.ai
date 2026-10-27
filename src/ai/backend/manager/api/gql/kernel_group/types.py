@@ -505,6 +505,7 @@ class KernelGroupConnectionGQL(Connection[KernelGroupGQL]):
 class KernelGroupFilterGQL(PydanticInputMixin[KernelGroupFilterDTO]):
     field_id: UUIDFilter | None = gql_field(description="Filter by kernel group ID.", default=None)
     role: StringFilter | None = gql_field(description="Filter by role.", default=None)
+    image_id: UUIDFilter | None = gql_field(description="Filter by image ID.", default=None)
     created_at: DateTimeFilter | None = gql_field(
         description="Filter by creation time.", default=None
     )
