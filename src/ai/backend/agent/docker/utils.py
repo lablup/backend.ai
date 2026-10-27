@@ -1,9 +1,12 @@
 import asyncio
 import gzip
+import hashlib
+import json
 import logging
 import subprocess
 from collections.abc import Mapping
 from contextlib import closing
+from dataclasses import dataclass
 from importlib.resources import files
 from pathlib import Path
 from typing import Any, Final
@@ -19,6 +22,15 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 IMAGE_CHUNK_SIZE: Final[int] = 1 * 1024 * 1024 * 1024  # 1MiB
+
+_CREATION_REQUEST_HASH_LABEL: Final[str] = "ai.backend.creation-request-hash"
+
+
+@dataclass(frozen=True)
+class _ServiceContainerLabelsAndStatus:
+    version: int
+    creation_request_hash: str | None
+    is_running: bool
 
 
 class PersistentServiceContainer:
@@ -54,23 +66,29 @@ class PersistentServiceContainer:
             )
         )
 
-    async def get_container_version_and_status(self) -> tuple[int, bool]:
+    async def get_container_labels_and_status(self) -> _ServiceContainerLabelsAndStatus:
         async with closing_async(Docker()) as docker:
             try:
-                c = docker.containers.container(self.container_name)
-                await c.show()
+                container = docker.containers.container(self.container_name)
+                await container.show()
             except DockerError as e:
                 if e.status == 404:
-                    return 0, False
+                    return _ServiceContainerLabelsAndStatus(
+                        version=0,
+                        creation_request_hash=None,
+                        is_running=False,
+                    )
                 raise
-        if c["Config"].get("Labels", {}).get("ai.backend.system", "0") != "1":
+        container_labels = container["Config"].get("Labels", {})
+        if container_labels.get("ai.backend.system", "0") != "1":
             raise RuntimeError(
-                f'An existing container named "{c["Name"].lstrip("/")}" is not a system container'
-                " spawned by Backend.AI. Please check and remove it."
+                f'An existing container named "{container["Name"].lstrip("/")}" is not a system'
+                " container spawned by Backend.AI. Please check and remove it."
             )
-        return (
-            int(c["Config"].get("Labels", {}).get("ai.backend.version", "0")),
-            c["State"]["Status"].lower() == "running",
+        return _ServiceContainerLabelsAndStatus(
+            version=int(container_labels.get("ai.backend.version", "0")),
+            creation_request_hash=container_labels.get(_CREATION_REQUEST_HASH_LABEL),
+            is_running=container["State"]["Status"].lower() == "running",
         )
 
     async def get_image_version(self) -> int:
@@ -98,8 +116,13 @@ class PersistentServiceContainer:
             )
             await self.install_latest()
             image_version = await self.get_image_version()
-        container_version, is_running = await self.get_container_version_and_status()
-        if container_version == 0 or image_version != container_version or not is_running:
+        container_labels_and_status = await self.get_container_labels_and_status()
+        if (
+            container_labels_and_status.version == 0
+            or container_labels_and_status.version != image_version
+            or not container_labels_and_status.is_running
+            or container_labels_and_status.creation_request_hash != self._creation_request_hash()
+        ):
             log.info("persistent service container recreating", image_name=self.image_ref)
             await self.recreate()
             log.info("persistent service container starting", image_name=self.image_ref)
@@ -131,35 +154,47 @@ class PersistentServiceContainer:
                     stderr,
                 )
 
+    def _creation_request(self) -> dict[str, Any]:
+        creation_request: dict[str, Any] = {
+            "Image": self.image_ref,
+            "Tty": True,
+            "Privileged": False,
+            "AttachStdin": False,
+            "AttachStdout": False,
+            "AttachStderr": False,
+            "HostConfig": {
+                "Init": True,
+                "RestartPolicy": {
+                    "Name": "unless-stopped",  # make it persistent
+                    "MaximumRetryCount": 0,
+                },
+            },
+        }
+        update_nested_dict(creation_request, self.container_config)
+        return creation_request
+
+    def _creation_request_hash(self) -> str:
+        serialized_creation_request = json.dumps(self._creation_request(), sort_keys=True)
+        return hashlib.sha256(serialized_creation_request.encode()).hexdigest()
+
     async def recreate(self) -> None:
         async with closing_async(Docker()) as docker:
             try:
-                c = docker.containers.container(self.container_name)
-                await c.stop()
-                await c.delete(force=True)
+                container = docker.containers.container(self.container_name)
+                await container.stop()
+                await container.delete(force=True)
             except DockerError as e:
                 if (e.status == 409 and "is not running" in e.message) or e.status == 404:
                     pass
                 else:
                     raise
-            container_config: dict[str, Any] = {
-                "Image": self.image_ref,
-                "Tty": True,
-                "Privileged": False,
-                "AttachStdin": False,
-                "AttachStdout": False,
-                "AttachStderr": False,
-                "HostConfig": {
-                    "Init": True,
-                    "RestartPolicy": {
-                        "Name": "unless-stopped",  # make it persistent
-                        "MaximumRetryCount": 0,
-                    },
-                },
+            creation_request = self._creation_request()
+            creation_request["Labels"] = {
+                **creation_request.get("Labels", {}),
+                _CREATION_REQUEST_HASH_LABEL: self._creation_request_hash(),
             }
-            update_nested_dict(container_config, self.container_config)
             try:
-                await docker.containers.create(config=container_config, name=self.container_name)
+                await docker.containers.create(config=creation_request, name=self.container_name)
             except DockerError as e:
                 err_msg = e.args[1].get("message", "")
                 if (
@@ -179,5 +214,5 @@ class PersistentServiceContainer:
 
     async def start(self) -> None:
         async with closing_async(Docker()) as docker:
-            c = docker.containers.container(self.container_name)
-            await c.start()
+            container = docker.containers.container(self.container_name)
+            await container.start()

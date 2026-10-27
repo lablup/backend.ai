@@ -148,10 +148,7 @@ class SocketRelayConfig(BaseConfigSchema):
             description=(
                 "Run socat in the socket relay container as a non-root user. A root agent "
                 "changes the owner of the socket directory to uid/gid 65534 and runs the relay "
-                "as that user; a non-root agent runs the relay as its own user. The setting "
-                "applies when the relay container is created, so remove the "
-                "backendai-socket-relay.<agent id> container before restarting the agent "
-                "after changing it."
+                "as that user; a non-root agent runs the relay as its own user."
             ),
             added_version="26.10.0",
             example=ConfigExample(local="false", prod="false"),
