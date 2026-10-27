@@ -76,6 +76,9 @@ from ai.backend.manager.api.adapters.session_lifecycle_handler.adapter import (
 )
 from ai.backend.manager.api.adapters.storage_host.adapter import StorageHostAdapter
 from ai.backend.manager.api.adapters.storage_namespace.adapter import StorageNamespaceAdapter
+from ai.backend.manager.api.adapters.system_session_environ.adapter import (
+    SystemSessionEnvironAdapter,
+)
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.api.adapters.user.config import UserConfigAdapter
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
@@ -152,6 +155,7 @@ class Adapters:
         session_lifecycle_handler: SessionLifecycleHandlerAdapter,
         storage_host: StorageHostAdapter,
         storage_namespace: StorageNamespaceAdapter,
+        system_session_environ: SystemSessionEnvironAdapter,
         user: UserAdapter,
         user_config: UserConfigAdapter,
         vfolder: VFolderAdapter,
@@ -208,6 +212,7 @@ class Adapters:
         self.session_lifecycle_handler = session_lifecycle_handler
         self.storage_host = storage_host
         self.storage_namespace = storage_namespace
+        self.system_session_environ = system_session_environ
         self.user = user
         self.user_config = user_config
         self.vfolder = vfolder
@@ -325,6 +330,7 @@ class Adapters:
             ),
             storage_host=StorageHostAdapter(processors.vfolder),
             storage_namespace=StorageNamespaceAdapter(processors.storage_namespace),
+            system_session_environ=SystemSessionEnvironAdapter(processors.system_session_environ),
             user=UserAdapter(processors.user, processors.domain, auth_config, key_provider_pool),
             user_config=UserConfigAdapter(processors.user, processors.dotfile),
             vfolder=VFolderAdapter(
