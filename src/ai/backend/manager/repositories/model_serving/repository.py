@@ -1,7 +1,7 @@
 import asyncio
 import uuid
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Collection, Sequence
 from dataclasses import replace
 from decimal import Decimal
 from functools import partial
@@ -442,79 +442,59 @@ class ModelServingRepository:
     async def _to_endpoint_datas(
         self, session: SASession, rows: Sequence[EndpointRow]
     ) -> list[EndpointData]:
-        """Convert ``rows`` with their active revision, user emails and routes, each read
-        by its own query. The current revision wins; the deploying one stands in."""
-        primary_group_ids = [
-            row.primary_replica_group_id for row in rows if row.primary_replica_group_id
-        ]
-        current_result = await session.execute(
-            sa.select(ReplicaGroupRow.id, DeploymentRevisionRow)
-            .join(
-                DeploymentRevisionRow,
-                DeploymentRevisionRow.id == ReplicaGroupRow.current_revision_id,
-            )
-            .where(ReplicaGroupRow.id.in_(primary_group_ids))
-        )
-        current_by_group = {group_id: revision for group_id, revision in current_result}
-        deploying_ids = [row.deploying_revision_id for row in rows if row.deploying_revision_id]
-        deploying_rows = await session.scalars(
-            sa.select(DeploymentRevisionRow).where(DeploymentRevisionRow.id.in_(deploying_ids))
-        )
-        deploying_by_id = {revision.id: revision for revision in deploying_rows}
-        image_ids = {
-            revision.image
-            for revision in (*current_by_group.values(), *deploying_by_id.values())
-            if revision.image is not None
-        }
-        image_rows = await session.scalars(sa.select(ImageRow).where(ImageRow.id.in_(image_ids)))
-        image_by_id = {image.id: ImageSearchableFields.own.to_data(image) for image in image_rows}
-        user_ids = {row.created_user for row in rows} | {row.session_owner for row in rows}
-        email_result = await session.execute(
-            sa.select(UserRow.uuid, UserRow.email).where(UserRow.uuid.in_(user_ids))
-        )
-        email_by_user = {user_id: email for user_id, email in email_result}
-        route_rows = await session.scalars(
-            sa.select(RoutingRow).where(RoutingRow.endpoint.in_([row.id for row in rows]))
-        )
-        routes_by_endpoint: defaultdict[uuid.UUID, list[RoutingData]] = defaultdict(list)
-        for route in route_rows:
-            routes_by_endpoint[route.endpoint].append(
-                ReplicaSearchableFields.own.to_routing_data(route)
-            )
+        """Convert ``rows`` with their active revision, image, user emails and routes, each
+        read by its own query."""
+        deployment_ids = [row.id for row in rows]
+        revisions = await self._read_active_revisions(session, deployment_ids)
+        image_ids: set[uuid.UUID] = set()
+        for served_revision in revisions.values():
+            if served_revision.image is not None:
+                image_ids.add(served_revision.image)
+        images = await self._read_images(session, image_ids)
+        user_ids: set[uuid.UUID] = set()
+        for row in rows:
+            user_ids.add(row.created_user)
+            user_ids.add(row.session_owner)
+        emails = await self._read_user_emails(session, user_ids)
+        routes = await self._read_routes(session, deployment_ids)
+
         datas: list[EndpointData] = []
         for row in rows:
-            current = (
-                current_by_group.get(row.primary_replica_group_id)
-                if row.primary_replica_group_id
-                else None
-            )
-            deploying = (
-                deploying_by_id.get(row.deploying_revision_id)
-                if row.deploying_revision_id
-                else None
-            )
-            revision = current or deploying
+            revision = revisions.get(row.id)
+            image = None
+            resource_slots = ResourceSlot({})
+            model = uuid.UUID(int=0)
+            callback_url = None
+            cluster_mode = ClusterMode.SINGLE_NODE
+            cluster_size = 1
+            runtime_variant_id = None
+            extra_mounts = []
+            if revision is not None:
+                if revision.image is not None:
+                    image = images.get(revision.image)
+                resource_slots = ResourceSlot({
+                    slot_row.slot_name: slot_row.quantity
+                    for slot_row in revision.resource_slot_rows
+                })
+                if revision.model is not None:
+                    model = revision.model
+                if revision.callback_url:
+                    callback_url = yarl.URL(revision.callback_url)
+                cluster_mode = ClusterMode(revision.cluster_mode)
+                cluster_size = revision.cluster_size
+                runtime_variant_id = RuntimeVariantID(revision.runtime_variant_id)
+                extra_mounts = revision.extra_mounts
             datas.append(
                 EndpointData(
                     id=row.id,
                     name=row.name,
-                    image=image_by_id.get(revision.image)
-                    if revision is not None and revision.image is not None
-                    else None,
+                    image=image,
                     domain=row.domain,
                     project=row.project,
                     resource_group=row.resource_group,
-                    resource_slots=ResourceSlot({
-                        r.slot_name: r.quantity for r in revision.resource_slot_rows
-                    })
-                    if revision is not None
-                    else ResourceSlot({}),
+                    resource_slots=resource_slots,
                     url=row.url,
-                    model=(
-                        revision.model or uuid.UUID(int=0)
-                        if revision is not None
-                        else uuid.UUID(int=0)
-                    ),
+                    model=model,
                     model_definition_path=(
                         revision.model_definition_path if revision is not None else None
                     ),
@@ -522,43 +502,100 @@ class ModelServingRepository:
                         revision.model_mount_destination if revision is not None else None
                     ),
                     created_user_id=row.created_user,
-                    created_user_email=email_by_user.get(row.created_user),
+                    created_user_email=emails.get(row.created_user),
                     session_owner_id=row.session_owner,
-                    session_owner_email=email_by_user.get(row.session_owner, ""),
+                    session_owner_email=emails.get(row.session_owner, ""),
                     tag=row.tag,
                     startup_command=revision.startup_command if revision is not None else None,
                     bootstrap_script=revision.bootstrap_script if revision is not None else None,
-                    callback_url=(
-                        yarl.URL(revision.callback_url)
-                        if revision is not None and revision.callback_url
-                        else None
-                    ),
+                    callback_url=callback_url,
                     environ=revision.environ if revision is not None else None,
                     resource_opts=revision.resource_opts if revision is not None else None,
                     replicas=row.replicas,
-                    cluster_mode=(
-                        ClusterMode(revision.cluster_mode)
-                        if revision is not None
-                        else ClusterMode.SINGLE_NODE
-                    ),
-                    cluster_size=revision.cluster_size if revision is not None else 1,
+                    cluster_mode=cluster_mode,
+                    cluster_size=cluster_size,
                     open_to_public=row.open_to_public if row.open_to_public is not None else False,
                     created_at=row.created_at,
                     destroyed_at=row.destroyed_at,
                     retries=row.retries,
                     lifecycle_stage=row.lifecycle_stage,
-                    runtime_variant_id=(
-                        RuntimeVariantID(revision.runtime_variant_id)
-                        if revision is not None
-                        else None
-                    ),
-                    extra_mounts=revision.extra_mounts if revision is not None else [],
+                    runtime_variant_id=runtime_variant_id,
+                    extra_mounts=extra_mounts,
                     scaling_state=row.scaling_state,
                     model_definition=revision.model_definition if revision is not None else None,
-                    routings=routes_by_endpoint[row.id],
+                    routings=routes.get(row.id, []),
                 )
             )
         return datas
+
+    @staticmethod
+    async def _read_active_revisions(
+        session: SASession, deployment_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, DeploymentRevisionRow]:
+        """The revision each deployment serves: the primary group's current revision, or
+        the deploying revision while none is current."""
+        current_query = (
+            sa.select(EndpointRow.id, DeploymentRevisionRow)
+            .join(ReplicaGroupRow, ReplicaGroupRow.id == EndpointRow.primary_replica_group_id)
+            .join(
+                DeploymentRevisionRow,
+                DeploymentRevisionRow.id == ReplicaGroupRow.current_revision_id,
+            )
+            .where(EndpointRow.id.in_(deployment_ids))
+        )
+        deploying_query = (
+            sa.select(EndpointRow.id, DeploymentRevisionRow)
+            .join(
+                DeploymentRevisionRow,
+                DeploymentRevisionRow.id == EndpointRow.deploying_revision_id,
+            )
+            .where(EndpointRow.id.in_(deployment_ids))
+        )
+        revisions: dict[uuid.UUID, DeploymentRevisionRow] = {}
+        for deployment_id, revision in await session.execute(deploying_query):
+            revisions[deployment_id] = revision
+        for deployment_id, revision in await session.execute(current_query):
+            revisions[deployment_id] = revision
+        return revisions
+
+    @staticmethod
+    async def _read_images(
+        session: SASession, image_ids: Collection[uuid.UUID]
+    ) -> dict[uuid.UUID, ImageData]:
+        """The images ``image_ids`` name, by their id."""
+        image_rows = await session.scalars(sa.select(ImageRow).where(ImageRow.id.in_(image_ids)))
+        images: dict[uuid.UUID, ImageData] = {}
+        for image_row in image_rows:
+            images[image_row.id] = ImageSearchableFields.own.to_data(image_row)
+        return images
+
+    @staticmethod
+    async def _read_user_emails(
+        session: SASession, user_ids: Collection[uuid.UUID]
+    ) -> dict[uuid.UUID, str]:
+        """The email of each user in ``user_ids``, by the user id."""
+        result = await session.execute(
+            sa.select(UserRow.uuid, UserRow.email).where(UserRow.uuid.in_(user_ids))
+        )
+        emails: dict[uuid.UUID, str] = {}
+        for user_id, email in result:
+            emails[user_id] = email
+        return emails
+
+    @staticmethod
+    async def _read_routes(
+        session: SASession, deployment_ids: Sequence[uuid.UUID]
+    ) -> dict[uuid.UUID, list[RoutingData]]:
+        """The routes of each deployment, by the deployment id."""
+        route_rows = await session.scalars(
+            sa.select(RoutingRow).where(RoutingRow.endpoint.in_(deployment_ids))
+        )
+        routes: defaultdict[uuid.UUID, list[RoutingData]] = defaultdict(list)
+        for route_row in route_rows:
+            routes[route_row.endpoint].append(
+                ReplicaSearchableFields.own.to_routing_data(route_row)
+            )
+        return routes
 
     async def _validate_endpoint_access(
         self,
