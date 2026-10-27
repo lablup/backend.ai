@@ -1,7 +1,7 @@
 """The revisions and the policy a deployment read fills in.
 
-Every read fills them by the deployment id; a revision whose row is missing leaves its id
-``None``. ``get_endpoint_info`` carries the revision ids and the policy only.
+Every read fills them by the deployment id; a revision whose row is missing leaves its
+id ``None``. ``get_endpoint_info`` carries the revision ids and the policy only.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
-from ai.backend.common.types import ClusterMode, ResourceSlot
+from ai.backend.common.types import AutoScalingMetricSource, ClusterMode, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.data.image.types import ImageType
@@ -38,13 +38,18 @@ from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow, EndpointRow
 from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
 from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
+from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQueryPresetRow
+from ai.backend.manager.models.prometheus_query_preset_category.row import (
+    PrometheusQueryPresetCategoryRow,
+)
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
@@ -66,6 +71,7 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import TableOrORM, with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -92,6 +98,9 @@ _REQUIRED_TABLES: list[TableOrORM] = [
     DeploymentRevisionResourceSlotRow,
     EndpointRow,
     ReplicaGroupRow,
+    PrometheusQueryPresetCategoryRow,
+    PrometheusQueryPresetRow,
+    EndpointAutoScalingRuleRow,
 ]
 
 
@@ -432,3 +441,68 @@ class TestGetDeploymentsByIds:
 
         assert info.deploying_revision_id is None
         assert info.deploying_revision is None
+
+
+class TestGetEndpointInfo:
+    async def test_carries_the_revision_ids_and_the_policy_only(
+        self, deployment_repository: DeploymentRepository, seeder: DeploymentSeeder
+    ) -> None:
+        seeded = await seeder.seed(deploying_revision_exists=True)
+
+        info = await deployment_repository.get_endpoint_info(seeded.endpoint_id)
+
+        assert info.current_revision_id == seeded.current_revision_id
+        assert info.deploying_revision_id == seeded.deploying_revision_id
+        assert info.current_revision is None
+        assert info.deploying_revision is None
+        assert info.policy is not None
+        assert info.policy.strategy == DeploymentStrategy.ROLLING
+
+
+class TestGetModifiedEndpoint:
+    async def test_applies_the_update_and_fills_the_revisions_and_the_policy(
+        self, deployment_repository: DeploymentRepository, seeder: DeploymentSeeder
+    ) -> None:
+        seeded = await seeder.seed(deploying_revision_exists=True)
+
+        info = await deployment_repository.get_modified_endpoint(
+            seeded.endpoint_id,
+            DeploymentUpdater(
+                deployment_id=seeded.endpoint_id, name=OptionalState.update("renamed")
+            ),
+        )
+
+        assert info.metadata.name == "renamed"
+        assert info.current_revision is not None
+        assert info.current_revision.id == seeded.current_revision_id
+        assert info.deploying_revision is not None
+        assert info.deploying_revision.id == seeded.deploying_revision_id
+        assert info.policy is not None
+
+
+class TestGetEndpointsWithAutoscalingRules:
+    async def test_fills_the_revisions_and_the_policy(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        deployment_repository: DeploymentRepository,
+        seeder: DeploymentSeeder,
+    ) -> None:
+        seeded = await seeder.seed(deploying_revision_exists=True)
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                EndpointAutoScalingRuleRow(
+                    endpoint=seeded.endpoint_id,
+                    metric_source=AutoScalingMetricSource.KERNEL,
+                    metric_name="cpu_util",
+                    step_size=1,
+                    cooldown_seconds=300,
+                )
+            )
+
+        (item,) = await deployment_repository.get_endpoints_with_autoscaling_rules()
+
+        assert item.deployment_info.current_revision is not None
+        assert item.deployment_info.current_revision.id == seeded.current_revision_id
+        assert item.deployment_info.deploying_revision is not None
+        assert item.deployment_info.deploying_revision.id == seeded.deploying_revision_id
+        assert item.deployment_info.policy is not None
