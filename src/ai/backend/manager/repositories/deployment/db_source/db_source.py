@@ -27,6 +27,7 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.session_group import SessionGroupID
@@ -422,35 +423,9 @@ class DeploymentDBSource:
     ) -> list[DeploymentInfo]:
         """Convert ``rows`` with their current and deploying revisions and their policy,
         each read by its own query."""
-        revisions = ModelRevisionSearchableFields.own
-        primary_group_ids = [
-            row.primary_replica_group_id for row in rows if row.primary_replica_group_id
-        ]
-        current_result = await db_sess.execute(
-            sa.select(ReplicaGroupRow.id, DeploymentRevisionRow)
-            .join(
-                DeploymentRevisionRow,
-                DeploymentRevisionRow.id == ReplicaGroupRow.current_revision_id,
-            )
-            .where(ReplicaGroupRow.id.in_(primary_group_ids))
-        )
-        current_by_group = {
-            group_id: revisions.to_data(revision) for group_id, revision in current_result
-        }
-        deploying_ids = [row.deploying_revision_id for row in rows if row.deploying_revision_id]
-        deploying_rows = await db_sess.scalars(
-            sa.select(DeploymentRevisionRow).where(DeploymentRevisionRow.id.in_(deploying_ids))
-        )
-        deploying_by_id = {revision.id: revisions.to_data(revision) for revision in deploying_rows}
-        policy_rows = await db_sess.scalars(
-            sa.select(DeploymentPolicyRow).where(
-                DeploymentPolicyRow.endpoint.in_([row.id for row in rows])
-            )
-        )
-        policy_by_endpoint = {
-            policy.endpoint: DeploymentPolicySearchableFields.own.to_data(policy)
-            for policy in policy_rows
-        }
+        current_by_group = await self._read_current_revisions(db_sess, rows)
+        deploying_by_id = await self._read_deploying_revisions(db_sess, rows)
+        policy_by_endpoint = await self._read_endpoint_policies(db_sess, rows)
         infos: list[DeploymentInfo] = []
         for row in rows:
             current = (
@@ -473,6 +448,53 @@ class DeploymentDBSource:
                 )
             )
         return infos
+
+    async def _read_current_revisions(
+        self, db_sess: SASession, rows: Sequence[EndpointRow]
+    ) -> dict[ReplicaGroupID, ModelRevisionData]:
+        """The revision each primary replica group of ``rows`` serves, by the group id."""
+        primary_group_ids = [
+            row.primary_replica_group_id for row in rows if row.primary_replica_group_id
+        ]
+        result = await db_sess.execute(
+            sa.select(ReplicaGroupRow.id, DeploymentRevisionRow)
+            .join(
+                DeploymentRevisionRow,
+                DeploymentRevisionRow.id == ReplicaGroupRow.current_revision_id,
+            )
+            .where(ReplicaGroupRow.id.in_(primary_group_ids))
+        )
+        return {
+            group_id: ModelRevisionSearchableFields.own.to_data(revision)
+            for group_id, revision in result
+        }
+
+    async def _read_deploying_revisions(
+        self, db_sess: SASession, rows: Sequence[EndpointRow]
+    ) -> dict[DeploymentRevisionID, ModelRevisionData]:
+        """The revision each of ``rows`` is deploying, by the revision id."""
+        deploying_ids = [row.deploying_revision_id for row in rows if row.deploying_revision_id]
+        revision_rows = await db_sess.scalars(
+            sa.select(DeploymentRevisionRow).where(DeploymentRevisionRow.id.in_(deploying_ids))
+        )
+        return {
+            revision.id: ModelRevisionSearchableFields.own.to_data(revision)
+            for revision in revision_rows
+        }
+
+    async def _read_endpoint_policies(
+        self, db_sess: SASession, rows: Sequence[EndpointRow]
+    ) -> dict[uuid.UUID, DeploymentPolicyData]:
+        """The policy of each of ``rows`` that has one, by the endpoint id."""
+        policy_rows = await db_sess.scalars(
+            sa.select(DeploymentPolicyRow).where(
+                DeploymentPolicyRow.endpoint.in_([row.id for row in rows])
+            )
+        )
+        return {
+            policy.endpoint: DeploymentPolicySearchableFields.own.to_data(policy)
+            for policy in policy_rows
+        }
 
     async def get_image_id(self, image: ImageIdentifier) -> ImageID:
         """The live image the canonical names for the architecture, or that carries it as an
