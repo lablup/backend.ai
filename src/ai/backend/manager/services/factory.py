@@ -292,6 +292,7 @@ from ai.backend.manager.services.vfolder.services.mount_policy import VFolderMou
 from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
 from ai.backend.manager.services.vfolder_auto_mount.processors import VFolderAutoMountProcessors
+from ai.backend.manager.services.vfolder_auto_mount.service import VFolderAutoMountService
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
 
@@ -380,6 +381,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             repositories.vfolder.repository,
             repositories.rbac.permission_check,
         ),
+        vfolder_auto_mount=VFolderAutoMountService(repositories.vfolder_auto_mount.repository),
         session_group=SessionGroupService(OpsRepository(repositories.v2_ops_provider)),
         session=SessionService(
             SessionServiceArgs(
@@ -688,7 +690,8 @@ def create_processors(
             vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_mount_policy
         ),
         vfolder_auto_mount=VFolderAutoMountProcessors(
-            vfolder_groups.group(GroupMeta(VFolderAutoMountEntityType()))
+            vfolder_groups.group(GroupMeta(VFolderAutoMountEntityType())),
+            services.vfolder_auto_mount,
         ),
         session_group=SessionGroupProcessors(
             session_groups.group(GroupMeta(SessionGroupEntityType())),

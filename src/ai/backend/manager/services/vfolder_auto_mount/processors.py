@@ -3,7 +3,6 @@ from __future__ import annotations
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
-    CreatedEntityOpsResult,
     EntityOpsResult,
     ScopedBatchOpsResult,
 )
@@ -15,6 +14,7 @@ from ai.backend.manager.services.vfolder_auto_mount.actions.bulk_get import (
 )
 from ai.backend.manager.services.vfolder_auto_mount.actions.create import (
     CreateVFolderAutoMountAction,
+    CreateVFolderAutoMountActionResult,
 )
 from ai.backend.manager.services.vfolder_auto_mount.actions.delete import (
     DeleteVFolderAutoMountAction,
@@ -31,17 +31,17 @@ from ai.backend.manager.services.vfolder_auto_mount.actions.search import (
 from ai.backend.manager.services.vfolder_auto_mount.actions.update import (
     UpdateVFolderAutoMountAction,
 )
+from ai.backend.manager.services.vfolder_auto_mount.service import VFolderAutoMountService
 
 __all__ = ("VFolderAutoMountProcessors",)
 
 
 class VFolderAutoMountProcessors:
-    """Every operation runs against ops; the domain keeps no service of its own."""
+    """The create goes through the service, whose spec carries a precondition; every
+    other operation runs against ops."""
 
     bulk_get_ids: PartialBulkActionProcessor[BulkGetVFolderAutoMountsAction, VFolderAutoMountData]
-    create: ScopeActionProcessor[
-        CreateVFolderAutoMountAction, CreatedEntityOpsResult[VFolderAutoMountData]
-    ]
+    create: ScopeActionProcessor[CreateVFolderAutoMountAction, CreateVFolderAutoMountActionResult]
     search: ScopeActionProcessor[
         SearchVFolderAutoMountsAction, ScopedBatchOpsResult[VFolderAutoMountData]
     ]
@@ -58,9 +58,11 @@ class VFolderAutoMountProcessors:
         PurgeVFolderAutoMountAction, EntityOpsResult[VFolderAutoMountData]
     ]
 
-    def __init__(self, group: ProcessorGroup[VFolderAutoMountData]) -> None:
+    def __init__(
+        self, group: ProcessorGroup[VFolderAutoMountData], service: VFolderAutoMountService
+    ) -> None:
         self.bulk_get_ids = group.partial_bulk_get_ops(BulkGetVFolderAutoMountsAction)
-        self.create = group.entity_create_ops(CreateVFolderAutoMountAction)
+        self.create = group.scope(CreateVFolderAutoMountAction, service.create)
         self.search = group.scoped_search_ops(SearchVFolderAutoMountsAction)
         self.update = group.single_update_ops(UpdateVFolderAutoMountAction)
         self.delete = group.single_delete_ops(DeleteVFolderAutoMountAction)

@@ -28,7 +28,6 @@ from ai.backend.manager.models.specs.creator import (
     FieldCreator,
     FieldToCreate,
     GlobalEntityCreator,
-    GuardedEntityCreator,
     NestedFieldCreator,
     RoleManagedEntityCreator,
     RoleManagedGlobalEntityCreator,
@@ -319,7 +318,7 @@ class OpsRepository[TData]:
             fields = await w.atomic_create_field_entities(data.entity_id(), field_creators)
             return EntityWithFieldsResult(data=data, fields=fields)
 
-    async def create_entity(self, creator: GuardedEntityCreator[Any, TData]) -> TData:
+    async def create_entity(self, creator: EntityCreator[Any, TData]) -> TData:
         """Insert one entity row; the write provisions its virtual entity and joins
         the declared memberships. No roles are involved on this path."""
         async with self._ops.write_ops() as w:
