@@ -12,8 +12,8 @@ from pydantic import (
     Field,
     FilePath,
     IPvAnyNetwork,
+    StringConstraints,
     ValidationError,
-    field_validator,
     model_validator,
 )
 
@@ -291,7 +291,7 @@ class ClientIPStrategyConfig(BaseSchema):
 
 class ContentEncodingConfig(BaseSchema):
     rejected_encodings: Annotated[
-        list[str],
+        list[Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True)]],
         Field(default_factory=list),
         BackendAIConfigMeta(
             description=(
@@ -299,15 +299,10 @@ class ContentEncodingConfig(BaseSchema):
                 "instead of being forwarded to session apps when its Content-Encoding contains "
                 "any of them."
             ),
-            added_version="26.10.0",
+            added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="[]", prod='["br"]'),
         ),
     ]
-
-    @field_validator("rejected_encodings")
-    @classmethod
-    def normalize_rejected_encodings(cls, encodings: list[str]) -> list[str]:
-        return [encoding.strip().lower() for encoding in encodings]
 
 
 class TraefikConfig(BaseSchema):
@@ -563,7 +558,7 @@ class ProxyCoordinatorConfig(BaseSchema):
                 "Rules applied to the Content-Encoding of requests before they are forwarded to "
                 "session apps. Applies to both the built-in proxy workers and Traefik."
             ),
-            added_version="26.10.0",
+            added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
     ]
