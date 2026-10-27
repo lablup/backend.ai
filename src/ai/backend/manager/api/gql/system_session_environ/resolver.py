@@ -26,7 +26,7 @@ from ai.backend.manager.api.gql.utils import check_admin_only
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Search every system session environ row at every scope, disabled ones included "
+            "Search every system session environ row at every scope, soft-deleted ones included "
             "(superadmin only)."
         ),
     )

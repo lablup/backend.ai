@@ -34,7 +34,12 @@ from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironScopeInfo as SystemSessionEnvironScopeInfoDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
+from ai.backend.manager.api.gql.base import (
+    NullableDateTimeFilter,
+    OrderDirection,
+    StringFilter,
+    UUIDFilter,
+)
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_connection_type,
@@ -121,14 +126,11 @@ class SystemSessionEnvironGQL(PydanticNodeMixin[SystemSessionEnvironNodeDTO]):
     scope: SystemSessionEnvironScopeInfoGQL = gql_field(
         description="The scope the row is bound to."
     )
-    enabled: bool = gql_field(
-        description=(
-            "Whether the row is injected. A disabled row still hides the same key at a "
-            "broader scope."
-        )
-    )
     created_at: datetime = gql_field(description="When the row was created.")
     updated_at: datetime = gql_field(description="When the row was last changed.")
+    deleted_at: datetime | None = gql_field(
+        description="When the row was soft-deleted. Null while the row is injected."
+    )
 
     @classmethod
     @override
@@ -243,7 +245,9 @@ class SystemSessionEnvironFilterGQL(PydanticInputMixin[SystemSessionEnvironFilte
         description="Filter by the id of the public entity, the domain or the project.",
         default=None,
     )
-    enabled: bool | None = gql_field(description="Filter by the enabled flag.", default=None)
+    deleted_at: NullableDateTimeFilter | None = gql_field(
+        description="Filter by when the row was soft-deleted.", default=None
+    )
     AND: list[Self] | None = gql_field(
         description="Combine multiple filters with AND logic.", default=None
     )

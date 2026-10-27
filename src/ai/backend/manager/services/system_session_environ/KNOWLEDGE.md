@@ -42,7 +42,7 @@ domain repository; this package holds the operations a caller reaches through th
 
 ## The search is global
 
-- It reads every row at every scope, disabled ones included, so it names no scope to check.
+- It reads every row at every scope, soft-deleted ones included, so it names no scope to check.
 - The global gate passes a superadmin, and a monitor for reads.
 
 ## The value source list is public

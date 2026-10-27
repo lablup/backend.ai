@@ -31,11 +31,12 @@ class SystemSessionEnvironNode(BaseResponseModel):
         )
     )
     scope: SystemSessionEnvironScopeInfo = Field(description="The scope the row is bound to.")
-    enabled: bool = Field(
-        description="Whether the row is injected. A disabled row still hides the same key at a broader scope."
-    )
     created_at: datetime = Field(description="When the row was created.")
     updated_at: datetime = Field(description="When the row was last changed.")
+    deleted_at: datetime | None = Field(
+        default=None,
+        description="When the row was soft-deleted. Null while the row is injected.",
+    )
 
 
 class AdminSearchSystemSessionEnvironsPayload(BaseResponseModel):

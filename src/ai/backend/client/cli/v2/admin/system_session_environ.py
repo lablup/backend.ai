@@ -56,10 +56,9 @@ def system_session_environ() -> None:
     help="Filter by the id of the public entity, the domain or the project.",
 )
 @click.option(
-    "--enabled/--disabled",
-    "enabled",
+    "--deleted/--no-deleted",
     default=None,
-    help="Filter by the enabled flag.",
+    help="Filter by whether the row is soft-deleted.",
 )
 @click.option(
     "--order-by",
@@ -73,11 +72,15 @@ def search(
     value_source: str | None,
     scope_type: str | None,
     scope_id: UUID | None,
-    enabled: bool | None,
+    deleted: bool | None,
     order_by: tuple[str, ...],
 ) -> None:
     """Search every system session environ row, at every scope (superadmin only)."""
-    from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+    from ai.backend.common.dto.manager.query import (
+        NullableDateTimeFilter,
+        StringFilter,
+        UUIDFilter,
+    )
     from ai.backend.common.dto.manager.v2.system_session_environ.request import (
         AdminSearchSystemSessionEnvironsInput,
         SystemSessionEnvironFilter,
@@ -91,7 +94,7 @@ def search(
 
     environ_filter: SystemSessionEnvironFilter | None = None
     if any(
-        option is not None for option in (key_contains, value_source, scope_type, scope_id, enabled)
+        option is not None for option in (key_contains, value_source, scope_type, scope_id, deleted)
     ):
         environ_filter = SystemSessionEnvironFilter(
             key=StringFilter(contains=key_contains) if key_contains is not None else None,
@@ -108,7 +111,7 @@ def search(
                 else None
             ),
             scope_id=UUIDFilter(equals=scope_id) if scope_id is not None else None,
-            enabled=enabled,
+            deleted_at=NullableDateTimeFilter(is_null=not deleted) if deleted is not None else None,
         )
 
     orders = (

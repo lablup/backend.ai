@@ -143,7 +143,7 @@ class SystemSessionEnvironAdapter(BaseAdapter):
             ),
             *self.apply_enum_filter(filter.scope_type, fields.scope_type.filter),
             *self.apply_uuid_filter(filter.scope_id, fields.scope_id.filter),
-            *self.apply_bool_filter(filter.enabled, fields.enabled.filter),
+            *self.apply_nullable_datetime_filter(filter.deleted_at, fields.deleted_at.filter),
         ]
         if filter.AND:
             for sub_filter in filter.AND:
@@ -200,12 +200,12 @@ class SystemSessionEnvironAdapter(BaseAdapter):
                 return fields.value_source.order.apply(ascending)
             case SystemSessionEnvironOrderField.SCOPE_TYPE:
                 return fields.scope_type.order.apply(ascending)
-            case SystemSessionEnvironOrderField.ENABLED:
-                return fields.enabled.order.apply(ascending)
             case SystemSessionEnvironOrderField.CREATED_AT:
                 return fields.created_at.order.apply(ascending)
             case SystemSessionEnvironOrderField.UPDATED_AT:
                 return fields.updated_at.order.apply(ascending)
+            case SystemSessionEnvironOrderField.DELETED_AT:
+                return fields.deleted_at.order.apply(ascending)
             case _:
                 assert_never(order.field)
 
@@ -219,7 +219,7 @@ class SystemSessionEnvironAdapter(BaseAdapter):
                 scope_type=SystemSessionEnvironScopeType.of_owner(environ.scope_id),
                 scope_id=SystemSessionEnvironScopeID(environ.scope_id),
             ),
-            enabled=environ.enabled,
             created_at=environ.created_at,
             updated_at=environ.updated_at,
+            deleted_at=environ.deleted_at,
         )

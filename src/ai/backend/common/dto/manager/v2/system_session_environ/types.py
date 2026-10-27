@@ -25,9 +25,9 @@ class SystemSessionEnvironOrderField(StrEnum):
     KEY = "key"
     VALUE_SOURCE = "value_source"
     SCOPE_TYPE = "scope_type"
-    ENABLED = "enabled"
     CREATED_AT = "created_at"
     UPDATED_AT = "updated_at"
+    DELETED_AT = "deleted_at"
 
 
 class SystemSessionEnvironScopeInfo(BaseResponseModel):

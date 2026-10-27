@@ -5,7 +5,12 @@ from __future__ import annotations
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
-from ai.backend.common.dto.manager.query import EnumFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import (
+    EnumFilter,
+    NullableDateTimeFilter,
+    StringFilter,
+    UUIDFilter,
+)
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironOrderField,
@@ -54,7 +59,9 @@ class SystemSessionEnvironFilter(BaseRequestModel):
         default=None,
         description="Filter by the id of the public entity, the domain or the project.",
     )
-    enabled: bool | None = Field(default=None, description="Filter by the enabled flag.")
+    deleted_at: NullableDateTimeFilter | None = Field(
+        default=None, description="Filter by when the row was soft-deleted."
+    )
     AND: list[SystemSessionEnvironFilter] | None = Field(
         default=None, description="Logical AND of multiple filter conditions."
     )
