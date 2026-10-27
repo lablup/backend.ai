@@ -670,28 +670,6 @@ class DeploymentDBSource:
             results.append(DeploymentWithHistory(deployment_info=info, last_history=last_history))
         return results
 
-    async def list_endpoints_by_name(
-        self,
-        session_owner_id: uuid.UUID,
-        name: str | None = None,
-    ) -> list[DeploymentInfo]:
-        """List endpoints owned by a specific user with optional name filter."""
-        async with self._begin_readonly_session_read_committed() as db_sess:
-            # Build query with base conditions
-            query = sa.select(EndpointRow).where(
-                EndpointRow.session_owner == session_owner_id,
-                EndpointRow.lifecycle_stage == EndpointLifecycle.CREATED,
-            )
-
-            # Add name filter if provided
-            if name is not None:
-                query = query.where(EndpointRow.name == name)
-
-            result = await db_sess.execute(query)
-            rows = result.scalars().all()
-
-            return await self._to_deployment_infos(db_sess, rows)
-
     async def update_endpoint_lifecycle(
         self,
         endpoint_id: DeploymentID,
