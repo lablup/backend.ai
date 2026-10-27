@@ -28,7 +28,7 @@ from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import AutoScalingMetricSource, ClusterMode, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.data.deployment.types import DeploymentHandlerCategory, DeploymentInfo
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
@@ -65,6 +65,7 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.scheduling_history.row import DeploymentHistoryRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -101,6 +102,7 @@ _REQUIRED_TABLES: list[TableOrORM] = [
     PrometheusQueryPresetCategoryRow,
     PrometheusQueryPresetRow,
     EndpointAutoScalingRuleRow,
+    DeploymentHistoryRow,
 ]
 
 
@@ -415,6 +417,33 @@ class TestSearchLegacyEndpoints:
 
         assert info.deploying_revision_id is None
         assert info.deploying_revision is None
+
+
+class TestSearchDeploymentsWithLastHistory:
+    async def test_fills_the_revisions_and_the_policy(
+        self, deployment_repository: DeploymentRepository, seeder: DeploymentSeeder
+    ) -> None:
+        seeded = await seeder.seed(deploying_revision_exists=True)
+
+        (deployment,) = await deployment_repository.search_deployments_with_last_history(
+            searcher=DeploymentInfoSearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    DeploymentSearchableFields.own.entity_id.filter.equals(
+                        UUIDEqualMatchSpec(value=seeded.endpoint_id, negated=False)
+                    )
+                ],
+            ),
+            category=DeploymentHandlerCategory.LIFECYCLE,
+        )
+
+        info = deployment.deployment_info
+        assert info.current_revision is not None
+        assert info.current_revision.id == seeded.current_revision_id
+        assert info.deploying_revision is not None
+        assert info.deploying_revision.id == seeded.deploying_revision_id
+        assert info.policy is not None
+        assert info.policy.strategy == DeploymentStrategy.ROLLING
 
 
 class TestGetDeploymentsByIds:
