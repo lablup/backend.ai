@@ -523,7 +523,7 @@ class SessionAdapter(BaseAdapter):
             return []
         result = await self._session.bulk_get.run(BulkGetSessionsAction(ids=list(session_ids)))
         nodes = iter(
-            await self._session_data_to_nodes([
+            await self._session_data_to_node_results([
                 item.value.to_session_data() for item in result.items if item.value is not None
             ])
         )
@@ -740,8 +740,21 @@ class SessionAdapter(BaseAdapter):
         return result
 
     async def _session_data_to_nodes(self, data: Sequence[SessionData]) -> list[SessionNode]:
+        """Convert session data to nodes for a payload, which carries nodes only; the first
+        session that failed to load fails the request."""
+        nodes: list[SessionNode] = []
+        for node in await self._session_data_to_node_results(data):
+            if isinstance(node, Exception):
+                raise node
+            nodes.append(node)
+        return nodes
+
+    async def _session_data_to_node_results(
+        self, data: Sequence[SessionData]
+    ) -> list[SessionNode | Exception]:
         """Convert session data to nodes, batch-loading their slot allocations and
-        designated agents."""
+        designated agents. A session whose allocation or agents fail to load answers
+        with that error instead of a node."""
         session_ids = [SessionID(item.id) for item in data]
         allocations = await self.batch_resource_allocation_by_session(session_ids)
         designated = (
@@ -753,15 +766,17 @@ class SessionAdapter(BaseAdapter):
             if session_ids
             else []
         )
-        nodes: list[SessionNode] = []
+        results: list[SessionNode | Exception] = []
         for item, allocation, agents in zip(data, allocations, designated, strict=True):
             if isinstance(allocation, Exception):
-                raise allocation
+                results.append(allocation)
+                continue
             error = self.batch_load_failure(agents.error)
             if error is not None:
-                raise error
-            nodes.append(self._session_data_to_node(item, allocation, agents.value or []))
-        return nodes
+                results.append(error)
+                continue
+            results.append(self._session_data_to_node(item, allocation, agents.value or []))
+        return results
 
     async def _kernel_infos_to_nodes(self, data: Sequence[KernelInfo]) -> list[KernelNode]:
         """Convert kernel infos to nodes, batch-loading their slot allocations."""
