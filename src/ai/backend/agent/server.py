@@ -52,11 +52,13 @@ from zmq.auth.certs import load_certificate
 
 from ai.backend.agent.errors import (
     AgentInitializationError,
+    KernelCreationInProgressError,
     ResourceError,
 )
 from ai.backend.agent.errors.agent import (
     ImagePullFailedError,
     ImagePullTimeoutError,
+    KernelCreationCancelledError,
     KernelNotFoundError,
 )
 from ai.backend.agent.health.docker import DockerHealthChecker
@@ -166,6 +168,7 @@ from .config.unified import (
     KernelLifecyclesConfig,
 )
 from .types import (
+    CreationAttempt,
     KernelLifecycleStatus,
     KernelOwnershipData,
     LifecycleEvent,
@@ -843,6 +846,9 @@ class AgentRPCServer(aobject):
                 session_id=ownership_data.session_id, kernel_id=ownership_data.kernel_id
             ):
                 log.debug("kernel creating", image_name=kernel_image.canonical)
+                released = False
+                reported = False
+                attempt = CreationAttempt()
                 try:
                     return await agent.create_kernel(
                         ownership_data,
@@ -850,15 +856,46 @@ class AgentRPCServer(aobject):
                         kernel_config,
                         cluster_info,
                         throttle_sema=throttle_sema,
+                        creation_attempt=attempt,
                     )
-                except (TimeoutError, asyncio.CancelledError, ResourceError):
+                except KernelCreationInProgressError:
+                    # The ongoing creation owns the entry.
+                    released = True
+                    raise
+                except (TimeoutError, asyncio.CancelledError, KernelCreationCancelledError):
                     raise
                 except (ImagePullTimeoutError, ImagePullFailedError) as e:
                     log.trace("kernel image pull failed", error_repr=repr(e))
                     raise
                 except Exception:
                     log.exception("kernel creation failed")
+                    unreported = (
+                        ownership_data.kernel_id not in agent.kernel_registry
+                        and ownership_data.kernel_id not in agent.failure_reporting_kernels
+                    )
+                    # Release before awaiting, so a retried RPC's entry is not discarded.
+                    agent.failure_reporting_kernels.discard(ownership_data.kernel_id)
+                    released = True
+                    if unreported:
+                        # No container exists to report the failure for it, so tell the manager
+                        # the kernel is gone instead of leaving the session to its create timeout.
+                        await agent.inject_container_lifecycle_event(
+                            ownership_data.kernel_id,
+                            ownership_data.session_id,
+                            LifecycleEvent.DESTROY,
+                            KernelLifecycleEventReason.FAILED_TO_CREATE,
+                            create_attempt=attempt,
+                        )
+                        reported = True
                     raise
+                finally:
+                    if not released:
+                        agent.failure_reporting_kernels.discard(ownership_data.kernel_id)
+                    if (
+                        not reported
+                        and agent.create_attempts.get(ownership_data.kernel_id) is attempt
+                    ):
+                        del agent.create_attempts[ownership_data.kernel_id]
 
         # Failures raised by `_create_kernel` are logged in their kernel scope; this logs the rest.
         try:

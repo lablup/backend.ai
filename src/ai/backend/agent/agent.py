@@ -253,6 +253,7 @@ from .errors import (
     ContainerStartupTimeoutError,
     ImageArchitectureMismatchError,
     ImagePullTimeoutError,
+    KernelCreationInProgressError,
     ModelDefinitionEmptyError,
     ModelDefinitionNotFoundError,
     ModelFolderNotSpecifiedError,
@@ -282,6 +283,7 @@ from .stats import StatContext, StatModes
 from .types import (
     Container,
     ContainerLifecycleEvent,
+    CreationAttempt,
     KernelLifecycleStatus,
     KernelOwnershipData,
     LifecycleEvent,
@@ -863,6 +865,10 @@ class AbstractAgent[
     # Health monitoring tracking
     _active_pulls: dict[str, PullTaskInfo]  # key: image canonical name
     _active_creates: dict[KernelId, CreateTaskInfo]
+    # Kernels registered by an ongoing `create_kernel`, which reports their failures itself.
+    failure_reporting_kernels: set[KernelId]
+    # The latest creation attempt of each kernel, so a stale failure report can be told apart.
+    create_attempts: dict[KernelId, CreationAttempt]
 
     @contextmanager
     def track_pull(self, image: str) -> Generator[bool, None, None]:
@@ -950,6 +956,8 @@ class AbstractAgent[
         # Initialize health monitoring tracking maps
         self._active_pulls = {}
         self._active_creates = {}
+        self.failure_reporting_kernels = set()
+        self.create_attempts = {}
         self._sync_container_lifecycle_observer = SyncContainerLifecycleObserver.instance()
         self._clean_kernel_registry_task = asyncio.create_task(self._clean_kernel_registry_loop())
 
@@ -1426,6 +1434,12 @@ class AbstractAgent[
 
     async def _handle_destroy_event(self, ev: ContainerLifecycleEvent) -> None:
         log.debug("destroy event handling", container_id=ev.container_id)
+        if ev.create_attempt is not None:
+            if self.create_attempts.get(ev.kernel_id) is not ev.create_attempt:
+                log.debug("stale creation failure report dropped", container_id=ev.container_id)
+                ev.set_done_future_result(None)
+                return
+            del self.create_attempts[ev.kernel_id]
         try:
             current_task = asyncio.current_task()
             if current_task is None:
@@ -1439,16 +1453,22 @@ class AbstractAgent[
                     if ev.container_id is None:
                         await self.reconstruct_resource_usage()
                         if not ev.suppress_events:
+                            # A creation that failed before its container existed keeps its reason.
+                            terminated_reason = (
+                                ev.reason
+                                if ev.reason == KernelLifecycleEventReason.FAILED_TO_CREATE
+                                else KernelLifecycleEventReason.ALREADY_TERMINATED
+                            )
                             await self.anycast_and_broadcast_event(
                                 KernelTerminatedAnycastEvent(
                                     kernel_id=ev.kernel_id,
                                     session_id=ev.session_id,
-                                    reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
+                                    reason=terminated_reason,
                                 ),
                                 KernelTerminatedBroadcastEvent(
                                     kernel_id=ev.kernel_id,
                                     session_id=ev.session_id,
-                                    reason=KernelLifecycleEventReason.ALREADY_TERMINATED,
+                                    reason=terminated_reason,
                                 ),
                             )
                         ev.set_done_future_result(None)
@@ -1672,6 +1692,7 @@ class AbstractAgent[
         exit_code: int | None = None,
         done_future: asyncio.Future[Any] | None = None,
         suppress_events: bool = False,
+        create_attempt: CreationAttempt | None = None,
     ) -> None:
         cid: ContainerId | None = None
         try:
@@ -1731,6 +1752,7 @@ class AbstractAgent[
                 done_future,
                 exit_code,
                 suppress_events,
+                create_attempt,
             ),
         )
 
@@ -2573,6 +2595,7 @@ class AbstractAgent[
         *,
         restarting: bool = False,
         throttle_sema: asyncio.Semaphore | None = None,
+        creation_attempt: CreationAttempt | None = None,
     ) -> KernelCreationResult:
         """
         Create a new kernel.
@@ -2584,7 +2607,9 @@ class AbstractAgent[
         with self.track_create(kernel_id, session_id) as should_proceed:
             if not should_proceed:
                 log.debug("kernel creation already in progress")
-                raise ResourceError("Kernel creation already in progress")
+                raise KernelCreationInProgressError("Kernel creation already in progress")
+            if creation_attempt is not None:
+                self.create_attempts[kernel_id] = creation_attempt
 
             if throttle_sema is None:
                 # make a local semaphore
@@ -2971,6 +2996,8 @@ class AbstractAgent[
                     kernel_obj.session_type = kernel_config["session_type"]
                     async with self.registry_lock:
                         self.kernel_registry[kernel_id] = kernel_obj
+                    if not restarting:
+                        self.failure_reporting_kernels.add(kernel_id)
                     log.debug("kernel container starting")
                     try:
                         container_data = await ctx.start_container(
@@ -3014,7 +3041,19 @@ class AbstractAgent[
                             self.kernel_registry[kernel_id].set_container_id(
                                 container_data["container_id"]
                             )
-                    await kernel_obj.init(self.event_producer)
+                    try:
+                        await kernel_obj.init(self.event_producer)
+                    except (Exception, asyncio.CancelledError):
+                        # The polling below reports its own failures; this covers the gap before it,
+                        # so the manager does not wait for the create timeout.
+                        await self.inject_container_lifecycle_event(
+                            kernel_id,
+                            session_id,
+                            LifecycleEvent.DESTROY,
+                            KernelLifecycleEventReason.FAILED_TO_START,
+                            container_id=ContainerId(container_data["container_id"]),
+                        )
+                        raise
                     log.debug(
                         "kernel object initialized", container_id=container_data.get("container_id")
                     )

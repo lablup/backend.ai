@@ -324,6 +324,33 @@ class TestSessionLauncherKernelCreation:
         assert record.exc_info[1] is error
         mock_valkey_schedule.record_session_failed_agents.assert_awaited_once()
 
+    async def test_agent_kernel_creation_failure_recorded_on_session(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """Kernel creation fails on the agent -> the reason is stored on the session."""
+        mock_agent_client_pool._mock_client.create_kernels.side_effect = RuntimeError(
+            "agent refused kernel creation"
+        )
+
+        session_ids = [session_for_start_single_kernel.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel],
+                image_config_default,
+            )
+
+        mock_valkey_schedule.record_session_failed_agents.assert_awaited_once()
+        mock_repository.update_session_error_info.assert_awaited_once()
+        session_id, error_info = mock_repository.update_session_error_info.await_args.args
+        assert session_id == session_for_start_single_kernel.session_id
+        assert "agent refused kernel creation" in str(error_info)
+
     async def test_system_session_environ_overrides_the_session_environ(
         self,
         launcher: SessionLauncher,
