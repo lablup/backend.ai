@@ -5,7 +5,7 @@ Based on BEP-1033 test scenarios for handler-level testing.
 Test Scenarios:
 - SC-SS-001 ~ SC-SS-005: ScheduleSessionsLifecycleHandler
 - SC-CP-001 ~ SC-CP-006: CheckPreconditionLifecycleHandler
-- SC-ST-001 ~ SC-ST-007: StartSessionsLifecycleHandler
+- SC-ST-001 ~ SC-ST-009: StartSessionsLifecycleHandler
 - SC-TE-001 ~ SC-TE-005: TerminateSessionsLifecycleHandler
 """
 
@@ -571,7 +571,7 @@ class TestCheckPreconditionLifecycleHandler:
 
 
 # =============================================================================
-# StartSessionsLifecycleHandler Tests (SC-ST-001 ~ SC-ST-007)
+# StartSessionsLifecycleHandler Tests (SC-ST-001 ~ SC-ST-009)
 # =============================================================================
 
 
@@ -643,7 +643,7 @@ class TestStartSessionsLifecycleHandler:
         prepared_sessions_multiple: list[SessionWithKernels],
         sessions_for_start_factory: Callable[..., SessionsForStartWithImages],
     ) -> None:
-        """SC-ST-006: A session whose start timed out is terminated, not retried or advanced.
+        """SC-ST-008: A session whose start timed out is terminated, not retried or advanced.
 
         Given: Multiple PREPARED sessions, the launcher reports one as timed out
         When: Handler starts all sessions
@@ -676,7 +676,7 @@ class TestStartSessionsLifecycleHandler:
         sessions_for_start_factory: Callable[..., SessionsForStartWithImages],
         caplog: pytest.LogCaptureFixture,
     ) -> None:
-        """SC-ST-007: A termination failure does not drop the other sessions' transition.
+        """SC-ST-009: A termination failure does not drop the other sessions' transition.
 
         Given: One session timed out and requesting its termination raises
         When: Handler starts all sessions

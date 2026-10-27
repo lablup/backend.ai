@@ -278,7 +278,7 @@ class SessionLauncher:
                 TimeoutError(f"session start timed out after {start_timeout} seconds"),
                 self._config_provider.config.debug.enabled,
             )
-            await self._repository.update_session_error_info(session.session_id, error_info)
+            await self._scheduler_repository.update_session_error_info(session.session_id, error_info)
         except Exception:
             log.exception(
                 "failed to record session start timeout",
@@ -489,7 +489,7 @@ class SessionLauncher:
                 if first_failure is not None:
                     # Keep the agent's reason on the session for the client.
                     try:
-                        await self._repository.update_session_error_info(
+                        await self._scheduler_repository.update_session_error_info(
                             session.session_id,
                             convert_to_status_data(
                                 first_failure, self._config_provider.config.debug.enabled
