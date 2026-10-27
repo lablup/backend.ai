@@ -6,12 +6,8 @@ from ai.backend.common.data.system_session_environ.types import SystemSessionEnv
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
-from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.system_session_environ.scopes import (
     SessionSystemSessionEnvironScope,
-)
-from ai.backend.manager.models.system_session_environ.searchable_fields import (
-    SystemSessionEnvironSearchableFields,
 )
 from ai.backend.manager.models.system_session_environ.searchers import (
     SystemSessionEnvironSearcher,
@@ -41,15 +37,20 @@ class SystemSessionEnvironRepository:
         self._value_resolver_registry = value_resolver_registry
 
     async def resolve(
-        self, sessions: Sequence[SessionDataForStart]
+        self,
+        sessions: Sequence[SessionDataForStart],
+        searcher: SystemSessionEnvironSearcher,
     ) -> Mapping[SessionId, Mapping[str, str]]:
         """The system session environ each starting session receives, keyed by session id."""
-        environs_applied_by_scope = await self._environs_applied_by_scope([
-            SessionSystemSessionEnvironScope(
-                domain_id=session.domain_id, project_id=session.project_id
-            )
-            for session in sessions
-        ])
+        environs_applied_by_scope = await self._environs_applied_by_scope(
+            [
+                SessionSystemSessionEnvironScope(
+                    domain_id=session.domain_id, project_id=session.project_id
+                )
+                for session in sessions
+            ],
+            searcher,
+        )
         resolved_environ_by_session: dict[SessionId, dict[str, str]] = {}
         for session in sessions:
             environs_applied_to_session = environs_applied_by_scope[
@@ -64,19 +65,15 @@ class SystemSessionEnvironRepository:
         return resolved_environ_by_session
 
     async def _environs_applied_by_scope(
-        self, scopes: Sequence[SessionSystemSessionEnvironScope]
+        self,
+        scopes: Sequence[SessionSystemSessionEnvironScope],
+        searcher: SystemSessionEnvironSearcher,
     ) -> Mapping[SessionSystemSessionEnvironScope, list[SystemSessionEnvironData]]:
-        """The live environ each key resolves to at every scope, read in one query.
+        """The environ each key resolves to at every scope among the searched rows, read in one query.
 
         Per key the environ at the most specific scope wins: project, then domain, then public.
         """
-        environs_in_any_scope = await self._db_source.search_in_scopes(
-            scopes,
-            SystemSessionEnvironSearcher(
-                pagination=NoPagination(),
-                conditions=[SystemSessionEnvironSearchableFields.own.deleted_at.filter.is_null()],
-            ),
-        )
+        environs_in_any_scope = await self._db_source.search_in_scopes(scopes, searcher)
         environs_applied_by_scope: dict[
             SessionSystemSessionEnvironScope, list[SystemSessionEnvironData]
         ] = {}

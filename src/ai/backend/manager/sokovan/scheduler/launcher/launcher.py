@@ -39,6 +39,13 @@ from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
 from ai.backend.manager.models.network.row import NetworkType
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.system_session_environ.searchable_fields import (
+    SystemSessionEnvironSearchableFields,
+)
+from ai.backend.manager.models.system_session_environ.searchers import (
+    SystemSessionEnvironSearcher,
+)
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.scheduler.repository import (
     SchedulerRepository,
@@ -214,7 +221,11 @@ class SessionLauncher:
         if not sessions:
             return
         system_session_environ_by_session = await self._system_session_environ_repository.resolve(
-            sessions
+            sessions,
+            SystemSessionEnvironSearcher(
+                pagination=NoPagination(),
+                conditions=[SystemSessionEnvironSearchableFields.own.deleted_at.filter.is_null()],
+            ),
         )
 
         async def start_with_timeout(session: SessionDataForStart) -> None:

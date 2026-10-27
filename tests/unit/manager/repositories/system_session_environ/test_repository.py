@@ -26,7 +26,14 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.permission.global_entity import global_entity_id
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
+from ai.backend.manager.models.system_session_environ.searchable_fields import (
+    SystemSessionEnvironSearchableFields,
+)
+from ai.backend.manager.models.system_session_environ.searchers import (
+    SystemSessionEnvironSearcher,
+)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.system_session_environ.repository import (
@@ -140,6 +147,14 @@ def repository(
     value_resolver_registry: SystemSessionEnvironValueResolverRegistry,
 ) -> SystemSessionEnvironRepository:
     return SystemSessionEnvironRepository(V2DBOpsProvider(database), value_resolver_registry)
+
+
+@pytest.fixture
+def live_row_searcher() -> SystemSessionEnvironSearcher:
+    return SystemSessionEnvironSearcher(
+        pagination=NoPagination(),
+        conditions=[SystemSessionEnvironSearchableFields.own.deleted_at.filter.is_null()],
+    )
 
 
 @pytest.fixture
@@ -361,24 +376,27 @@ class TestResolve:
         self,
         case: _EffectiveRowsCase,
         repository: SystemSessionEnvironRepository,
+        live_row_searcher: SystemSessionEnvironSearcher,
         starting_session: SessionDataForStart,
         case_rows: None,
     ) -> None:
-        resolved_environ_by_session = await repository.resolve([starting_session])
+        resolved_environ_by_session = await repository.resolve(
+            [starting_session], live_row_searcher
+        )
 
         assert resolved_environ_by_session[starting_session.session_id] == case.expected_environ
 
     async def test_resolves_each_session_of_one_call_on_its_own(
         self,
         repository: SystemSessionEnvironRepository,
+        live_row_searcher: SystemSessionEnvironSearcher,
         starting_session: SessionDataForStart,
         session_in_other_project: SessionDataForStart,
         rows_at_two_projects: None,
     ) -> None:
-        resolved_environ_by_session = await repository.resolve([
-            starting_session,
-            session_in_other_project,
-        ])
+        resolved_environ_by_session = await repository.resolve(
+            [starting_session, session_in_other_project], live_row_searcher
+        )
 
         assert resolved_environ_by_session[starting_session.session_id] == {"K": "test-user"}
         assert resolved_environ_by_session[session_in_other_project.session_id] == {
@@ -405,10 +423,13 @@ class TestResolve:
         self,
         case: _ValueSourceCase,
         repository: SystemSessionEnvironRepository,
+        live_row_searcher: SystemSessionEnvironSearcher,
         starting_session: SessionDataForStart,
         value_source_bound_to_key_k: None,
     ) -> None:
-        resolved_environ_by_session = await repository.resolve([starting_session])
+        resolved_environ_by_session = await repository.resolve(
+            [starting_session], live_row_searcher
+        )
 
         assert resolved_environ_by_session[starting_session.session_id] == {
             "K": case.expected_value
