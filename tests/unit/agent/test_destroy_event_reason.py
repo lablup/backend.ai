@@ -36,6 +36,7 @@ class TestHandleDestroyEventForMissingKernel:
         agent.kernel_registry = {}
         agent._ongoing_destruction_tasks = {}
         agent.registry_lock = AsyncMock()
+        agent._cancel_ongoing_create = AsyncMock(return_value=(False, False))
         agent.reconstruct_resource_usage = AsyncMock()
         agent.anycast_and_broadcast_event = AsyncMock()
         kernel_id = KernelId(uuid.uuid4())
@@ -60,6 +61,7 @@ class TestHandleDestroyEventForStaleCreationFailure:
         agent.kernel_registry = {}
         agent._ongoing_destruction_tasks = {}
         agent.registry_lock = asyncio.Lock()
+        agent._cancel_ongoing_create = AsyncMock(return_value=(False, False))
         agent.reconstruct_resource_usage = AsyncMock()
         agent.anycast_and_broadcast_event = AsyncMock()
         agent.destroy_kernel = AsyncMock()

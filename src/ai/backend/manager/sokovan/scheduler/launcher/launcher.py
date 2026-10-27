@@ -278,7 +278,9 @@ class SessionLauncher:
                 TimeoutError(f"session start timed out after {start_timeout} seconds"),
                 self._config_provider.config.debug.enabled,
             )
-            await self._scheduler_repository.update_session_error_info(session.session_id, error_info)
+            await self._scheduler_repository.update_session_error_info(
+                session.session_id, error_info
+            )
         except Exception:
             log.exception(
                 "failed to record session start timeout",
