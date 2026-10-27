@@ -3,11 +3,12 @@ name: agent-container-locator
 type: design-rationale
 description: The container locator — what a network plugin's privileged helper may see of an agent backend's containers, and why it reads them from the runtime rather than from the agent's request
 scope: src/ai/backend/agent/network
-keywords: [ContainerLocator, LiveContainer, DockerContainerLocator, build_container_locator, create_container_locator, ContainerSourceUnwired]
+keywords: [ContainerLocator, LiveContainer, DockerContainerLocator, DummyContainerLocator, build_container_locator, create_container_locator, ContainerSourceUnwired]
 sources:
   - src/ai/backend/agent/network/locator.py
   - src/ai/backend/agent/network/locator_builder.py
   - src/ai/backend/agent/docker/locator.py
+  - src/ai/backend/agent/dummy/locator.py
   - src/ai/backend/agent/types.py
 generated:
   by: claude-code/opus-5.5
@@ -21,7 +22,7 @@ A network plugin may run a privileged helper (root, separate process) that acts 
 network namespaces. The agent asks it to; `ContainerLocator` is how the helper checks the request
 against the runtime instead of trusting it.
 
-## Contract (`locator.py`)
+## The helper acts only on what the runtime reports, never on the agent's request (`locator.py`)
 
 | Member | Answers | Why the helper needs it |
 |---|---|---|
@@ -33,12 +34,13 @@ against the runtime instead of trusting it.
 
 - Labels: `ai.backend.session-id` (every backend with a locator sets it) and `ai.backend.owner` (the placing agent; a node can run more than one).
 
-## Construction
+## A backend without its own locator has none; a locator is never guessed
 
 - `AbstractAgentDiscovery.create_container_locator` has no default: a guessed locator would answer "no such container" for every kernel.
+- Dummy (`dummy/locator.py`) reports no running containers, which is true of a backend that creates none. Kubernetes has no locator.
 - `build_container_locator(agent_config)` validates the agent config and asks that backend's discovery, so a helper does not import the agent's config schema or backend list. A config naming no backend fails validation.
 
-## Docker (`docker/locator.py`)
+## The Docker locator never reads a daemon failure as an absent container (`docker/locator.py`)
 
 - `cgroup_path` is unimplemented: the daemon places its own cgroups.
 - `open` swaps in a new client only after `version()` succeeds, then closes the previous one; a failed re-open keeps the client that was answering.

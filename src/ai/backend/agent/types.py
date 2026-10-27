@@ -83,10 +83,7 @@ class AbstractAgentDiscovery(ABC):
         raise NotImplementedError
 
     def create_container_locator(self, local_config: AgentUnifiedConfig) -> ContainerLocator:
-        """Construct what a network plugin's privileged helper may see of this backend's containers.
-
-        No default on purpose: a guessed locator would answer "no such container" for every kernel.
-        """
+        """The locator a network plugin's privileged helper uses for this backend's containers."""
         raise NotImplementedError(
             f"{type(self).__name__} does not expose a container locator",
         )

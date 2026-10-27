@@ -1,7 +1,4 @@
-"""The ContainerLocator for the Docker backend, answering through the Docker API.
-
-``cgroup_path`` is left unimplemented: the daemon places its own cgroups.
-"""
+"""The ContainerLocator for the Docker backend, answering through the Docker API."""
 
 from __future__ import annotations
 
@@ -30,10 +27,7 @@ class DockerContainerLocator(ContainerLocator):
 
     @override
     async def open(self) -> None:
-        """Connect, and only then close whatever was connected before.
-
-        Held for the caller's lifetime, so an unreachable daemon surfaces at startup.
-        """
+        """Connect, and only then close whatever was connected before."""
         docker = Docker()
         try:
             await docker.version()

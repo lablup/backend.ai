@@ -3,6 +3,8 @@ from decimal import Decimal
 from typing import Any, override
 
 from ai.backend.agent.agent import AbstractAgent
+from ai.backend.agent.config.unified import AgentUnifiedConfig
+from ai.backend.agent.network.locator import ContainerLocator
 from ai.backend.agent.resources import AbstractComputePlugin
 from ai.backend.agent.types import AbstractAgentDiscovery
 from ai.backend.common.etcd import AbstractKVStore
@@ -10,10 +12,15 @@ from ai.backend.common.types import DeviceName, SlotName
 
 from .agent import DummyAgent
 from .kernel import prepare_krunner_env
+from .locator import DummyContainerLocator
 from .resources import load_resources, scan_available_resources
 
 
 class DummyAgentDiscovery(AbstractAgentDiscovery):
+    @override
+    def create_container_locator(self, local_config: AgentUnifiedConfig) -> ContainerLocator:
+        return DummyContainerLocator()
+
     @override
     def get_agent_cls(self) -> type[AbstractAgent[Any, Any]]:
         return DummyAgent

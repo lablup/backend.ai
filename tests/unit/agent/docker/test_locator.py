@@ -1,8 +1,4 @@
-"""The Docker locator: its connection lifetime, and what `container_pid` takes as an answer.
-
-A privileged helper holds one client for its whole life, so the two moments that matter are what
-happens when `open()` is called twice and what happens when it fails.
-"""
+"""The Docker locator: its connection lifetime and what it reads from the daemon."""
 
 from __future__ import annotations
 
@@ -16,6 +12,8 @@ from aiodocker.exceptions import DockerError
 import ai.backend.agent.docker.locator as locator_mod
 from ai.backend.agent.docker.locator import DockerContainerLocator
 from ai.backend.agent.errors.network import ContainerSourceUnwired
+from ai.backend.agent.network.locator import LiveContainer
+from ai.backend.common.docker import LabelName
 
 
 class _FakeDocker:
@@ -59,7 +57,8 @@ class TestOpeningTwice:
         await loc.open()
         await loc.open()
         await loc.close()
-        assert second.closed and not second.versions > 1
+        assert second.closed
+        assert second.versions == 1
 
 
 class TestAnOpenThatFails:
@@ -118,13 +117,18 @@ class TestContainerPid:
 
         assert await self._locator(show).container_pid("cid") == 4242
 
-    async def test_a_stopped_or_processless_container_gives_none(self) -> None:
-        for state in ({"Running": False, "Pid": 4242}, {"Running": True, "Pid": 0}):
+    @pytest.mark.parametrize(
+        "state",
+        [{"Running": False, "Pid": 4242}, {"Running": True, "Pid": 0}],
+        ids=["stopped", "processless"],
+    )
+    async def test_a_stopped_or_processless_container_gives_none(
+        self, state: Mapping[str, Any]
+    ) -> None:
+        async def show() -> Mapping[str, Any]:
+            return {"State": state}
 
-            async def show(state: Mapping[str, Any] = state) -> Mapping[str, Any]:
-                return {"State": state}
-
-            assert await self._locator(show).container_pid("cid") is None, state
+        assert await self._locator(show).container_pid("cid") is None
 
     async def test_a_container_the_daemon_does_not_know_gives_none(self) -> None:
         async def show() -> Mapping[str, Any]:
@@ -138,3 +142,50 @@ class TestContainerPid:
 
         with pytest.raises(DockerError):
             await self._locator(show).container_pid("cid")
+
+
+class _ListedContainer:
+    """One entry of ``containers.list``, as much of it as `live_sessions` reads."""
+
+    def __init__(self, container_id: str, labels: Mapping[str, str] | None) -> None:
+        self.id = container_id
+        self._raw = {"Labels": labels}
+
+    def __getitem__(self, key: str) -> Any:
+        return self._raw[key]
+
+
+class TestLiveSessions:
+    @staticmethod
+    def _locator(entries: list[_ListedContainer]) -> DockerContainerLocator:
+        async def list_(*, all: bool) -> list[_ListedContainer]:
+            assert all is False, "a stopped container has no netns to act on"
+            return entries
+
+        loc = DockerContainerLocator()
+        loc._docker = cast(Any, SimpleNamespace(containers=SimpleNamespace(list=list_)))
+        return loc
+
+    async def test_a_kernel_container_carries_its_session_and_owner(self) -> None:
+        loc = self._locator([
+            _ListedContainer("c1", {LabelName.SESSION_ID: "s1", LabelName.OWNER_AGENT: "i-agent"}),
+        ])
+
+        assert await loc.live_sessions() == {
+            "c1": LiveContainer(session_id="s1", owner_agent_id="i-agent"),
+        }
+
+    async def test_a_container_without_a_session_label_is_not_a_kernel(self) -> None:
+        loc = self._locator([
+            _ListedContainer("other", {"com.example": "x"}),
+            _ListedContainer("unlabeled", None),
+        ])
+
+        assert await loc.live_sessions() == {}
+
+    async def test_a_missing_owner_reads_as_none(self) -> None:
+        loc = self._locator([_ListedContainer("c1", {LabelName.SESSION_ID: "s1"})])
+
+        assert await loc.live_sessions() == {
+            "c1": LiveContainer(session_id="s1", owner_agent_id=None),
+        }
