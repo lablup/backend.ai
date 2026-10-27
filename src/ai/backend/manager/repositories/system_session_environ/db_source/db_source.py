@@ -3,8 +3,6 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
-from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.system_session_environ.scopes import (
     SessionSystemSessionEnvironScope,
 )
@@ -25,13 +23,8 @@ class SystemSessionEnvironDBSource:
     async def search_in_scopes(
         self,
         scopes: Sequence[SessionSystemSessionEnvironScope],
-        conditions: Sequence[QueryCondition],
+        searcher: SystemSessionEnvironSearcher,
     ) -> list[SystemSessionEnvironData]:
         async with self._ops_provider.read_ops() as r:
-            result = await r.search_with_scopes(
-                scopes,
-                SystemSessionEnvironSearcher(
-                    pagination=NoPagination(), conditions=list(conditions)
-                ),
-            )
+            result = await r.search_with_scopes(scopes, searcher)
         return list(result.items)

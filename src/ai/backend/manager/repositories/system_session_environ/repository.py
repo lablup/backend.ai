@@ -6,11 +6,15 @@ from ai.backend.common.data.system_session_environ.types import SystemSessionEnv
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.system_session_environ.scopes import (
     SessionSystemSessionEnvironScope,
 )
 from ai.backend.manager.models.system_session_environ.searchable_fields import (
     SystemSessionEnvironSearchableFields,
+)
+from ai.backend.manager.models.system_session_environ.searchers import (
+    SystemSessionEnvironSearcher,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.system_session_environ.db_source.db_source import (
@@ -67,7 +71,11 @@ class SystemSessionEnvironRepository:
         Per key the environ at the most specific scope wins: project, then domain, then public.
         """
         environs_in_any_scope = await self._db_source.search_in_scopes(
-            scopes, [SystemSessionEnvironSearchableFields.own.deleted_at.filter.is_null()]
+            scopes,
+            SystemSessionEnvironSearcher(
+                pagination=NoPagination(),
+                conditions=[SystemSessionEnvironSearchableFields.own.deleted_at.filter.is_null()],
+            ),
         )
         environs_applied_by_scope: dict[
             SessionSystemSessionEnvironScope, list[SystemSessionEnvironData]
