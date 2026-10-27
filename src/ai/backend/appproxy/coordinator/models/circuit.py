@@ -477,7 +477,9 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
                                 "id": str(self.id),
                                 "sessionids": [str(x) for x in self.session_ids],
                                 "lastusedmarkerpath": self.worker_row.traefik_last_used_marker_path,
-                                "rejectedcontentencodings": local_config.proxy_coordinator.content_encoding.rejected_encodings,
+                                "contentencoding": {
+                                    "rejectedencodings": local_config.proxy_coordinator.content_encoding.rejected_encodings,
+                                },
                             }
                         }
                     },

@@ -11,19 +11,23 @@ import (
 	"time"
 )
 
+type ContentEncodingConfig struct {
+	RejectedEncodings []string `yaml:"rejectedencodings"`
+}
+
 type Config struct {
-	LastUsedMarkerPath       string   `yaml:"lastusedmarkerpath"`
-	Id                       string   `yaml:"id"`
-	SessionIds               []string `yaml:"sessionids"`
-	RejectedContentEncodings []string `yaml:"rejectedcontentencodings"`
+	LastUsedMarkerPath string                `yaml:"lastusedmarkerpath"`
+	Id                 string                `yaml:"id"`
+	SessionIds         []string              `yaml:"sessionids"`
+	ContentEncoding    ContentEncodingConfig `yaml:"contentencoding"`
 }
 
 func CreateConfig() *Config {
 	return &Config{
-		LastUsedMarkerPath:       "",
-		Id:                       "",
-		SessionIds:               []string{},
-		RejectedContentEncodings: []string{},
+		LastUsedMarkerPath: "",
+		Id:                 "",
+		SessionIds:         []string{},
+		ContentEncoding:    ContentEncodingConfig{RejectedEncodings: []string{}},
 	}
 }
 
@@ -90,7 +94,7 @@ func (a *Plugin) findRejectedContentEncoding(req *http.Request) (string, bool) {
 	for _, headerValue := range req.Header.Values("Content-Encoding") {
 		for _, coding := range strings.Split(headerValue, ",") {
 			trimmedCoding := strings.TrimSpace(coding)
-			for _, rejectedEncoding := range a.config.RejectedContentEncodings {
+			for _, rejectedEncoding := range a.config.ContentEncoding.RejectedEncodings {
 				if trimmedCoding == rejectedEncoding {
 					return trimmedCoding, true
 				}

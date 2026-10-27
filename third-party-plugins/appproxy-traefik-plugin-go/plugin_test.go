@@ -40,8 +40,8 @@ func TestServeHTTPContentEncoding(t *testing.T) {
 				forwardedCount++
 			})
 			config := &Config{
-				LastUsedMarkerPath:       t.TempDir() + "/marker.sock",
-				RejectedContentEncodings: tc.rejectedEncodings,
+				LastUsedMarkerPath: t.TempDir() + "/marker.sock",
+				ContentEncoding:    ContentEncodingConfig{RejectedEncodings: tc.rejectedEncodings},
 			}
 			handler, err := New(context.Background(), next, config, "test")
 			if err != nil {
