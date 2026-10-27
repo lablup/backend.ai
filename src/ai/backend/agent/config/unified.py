@@ -257,6 +257,26 @@ class SocketRelayConfig(BaseConfigSchema):
             example=ConfigExample(local="1.0", prod="1.0"),
         ),
     ]
+    enable_healthcheck: Annotated[
+        bool,
+        Field(
+            default=True,
+            validation_alias=AliasChoices("enable-healthcheck", "enable_healthcheck"),
+            serialization_alias="enable-healthcheck",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Add a healthcheck to the socket relay container that reports it unhealthy "
+                "when the agent socket file in the container is missing or not a socket. "
+                "The healthcheck only reports the status and does not restart the container. "
+                "The setting applies when the relay container is created, so remove the "
+                "backendai-socket-relay.<agent id> container before restarting the agent "
+                "after changing it."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="true", prod="true"),
+        ),
+    ]
 
     model_config = ConfigDict(
         arbitrary_types_allowed=True,
