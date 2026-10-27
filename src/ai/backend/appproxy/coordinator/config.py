@@ -291,13 +291,12 @@ class ClientIPStrategyConfig(BaseSchema):
 
 class ContentEncodingConfig(BaseSchema):
     rejected_encodings: Annotated[
-        list[Annotated[str, StringConstraints(strip_whitespace=True, to_lower=True)]],
+        list[Annotated[str, StringConstraints(strip_whitespace=True)]],
         Field(default_factory=list),
         BackendAIConfigMeta(
             description=(
-                "Content codings (case-insensitive) that make a request be answered with 415 "
-                "instead of being forwarded to session apps when its Content-Encoding contains "
-                "any of them."
+                "Content codings that make a request be answered with 415 instead of being "
+                "forwarded to session apps when its Content-Encoding contains any of them."
             ),
             added_version=NEXT_RELEASE_VERSION,
             example=ConfigExample(local="[]", prod='["br"]'),

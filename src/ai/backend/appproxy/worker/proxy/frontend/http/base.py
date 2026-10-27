@@ -122,9 +122,9 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
         rejected_encodings = self.root_context.rejected_content_encodings
         for header_value in request.headers.getall(hdrs.CONTENT_ENCODING, []):
             for coding in header_value.split(","):
-                normalized_coding = coding.strip().lower()
-                if normalized_coding in rejected_encodings:
-                    return normalized_coding
+                trimmed_coding = coding.strip()
+                if trimmed_coding in rejected_encodings:
+                    return trimmed_coding
         return None
 
     async def proxy(self, request: web.Request) -> web.StreamResponse | web.WebSocketResponse:

@@ -277,9 +277,8 @@
   # to session apps. Applies to both the built-in proxy workers and Traefik.
   # Added in 26.10.0
   [proxy_coordinator.content_encoding]
-    # Content codings (case-insensitive) that make a request be answered with 415
-    # instead of being forwarded to session apps when its Content-Encoding
-    # contains any of them.
+    # Content codings that make a request be answered with 415 instead of being
+    # forwarded to session apps when its Content-Encoding contains any of them.
     # Added in 26.10.0
     rejected_encodings = ["br"]
 

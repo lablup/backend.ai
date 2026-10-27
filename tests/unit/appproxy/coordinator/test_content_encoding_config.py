@@ -19,11 +19,11 @@ class TestContentEncodingConfig:
         [
             _RejectedEncodingsCase(configured=[], expected=[]),
             _RejectedEncodingsCase(configured=["br"], expected=["br"]),
-            _RejectedEncodingsCase(configured=["BR", " Zstd "], expected=["br", "zstd"]),
+            _RejectedEncodingsCase(configured=[" br ", "zstd "], expected=["br", "zstd"]),
         ],
         ids=lambda case: ",".join(case.configured) or "empty",
     )
-    def test_normalizes_rejected_encodings(self, case: _RejectedEncodingsCase) -> None:
+    def test_strips_whitespace_from_rejected_encodings(self, case: _RejectedEncodingsCase) -> None:
         config = ContentEncodingConfig.model_validate({"rejected_encodings": case.configured})
 
         assert config.rejected_encodings == case.expected

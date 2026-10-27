@@ -91,8 +91,8 @@ func (a *Plugin) findRejectedContentEncoding(req *http.Request) (string, bool) {
 		for _, coding := range strings.Split(headerValue, ",") {
 			trimmedCoding := strings.TrimSpace(coding)
 			for _, rejectedEncoding := range a.config.RejectedContentEncodings {
-				if strings.EqualFold(trimmedCoding, rejectedEncoding) {
-					return strings.ToLower(trimmedCoding), true
+				if trimmedCoding == rejectedEncoding {
+					return trimmedCoding, true
 				}
 			}
 		}

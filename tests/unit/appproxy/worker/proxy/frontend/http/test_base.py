@@ -57,7 +57,6 @@ class TestBaseHTTPFrontendProxy:
         "request_with_content_encoding",
         [
             _ContentEncodingHeaders(values=("br",)),
-            _ContentEncodingHeaders(values=("BR",)),
             _ContentEncodingHeaders(values=("gzip, br",)),
             _ContentEncodingHeaders(values=("gzip", "br")),
             _ContentEncodingHeaders(values=("zstd",)),
@@ -83,6 +82,7 @@ class TestBaseHTTPFrontendProxy:
             _ContentEncodingHeaders(values=("gzip",)),
             _ContentEncodingHeaders(values=("deflate",)),
             _ContentEncodingHeaders(values=("identity",)),
+            _ContentEncodingHeaders(values=("BR",)),
         ],
         ids=lambda headers: " + ".join(headers.values) or "none",
         indirect=True,
