@@ -20611,6 +20611,11 @@ type Query
   schedulingHandlers: [SchedulingHandlerNode!] @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.10.0. List every value source name a system session environ row can carry.
+  """
+  systemSessionEnvironValueSources: [String!] @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.10.0. List all registered session lifecycle handlers (superadmin only). The returned ``name`` values are valid keys for ``DefaultSessionOptionsInfo.handlerOptions.byHandler``.
   """
   adminSessionLifecycleHandlers: [SessionLifecycleHandlerNode!] @join__field(graph: STRAWBERRY)
