@@ -5,11 +5,11 @@ import logging
 import time
 import uuid
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Final
+from typing import TYPE_CHECKING, Any, Final, override
 
 from aiohttp import web
 
-from ai.backend.appproxy.common.config import get_default_redis_key_ttl
+from ai.backend.appproxy.common.config import ContentEncodingConfig, get_default_redis_key_ttl
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError, MissingTraefikConfigError
@@ -109,6 +109,11 @@ class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
         app.router.add_head("/{key}/mark-active", self.mark_active)
         app.router.add_head("/{key}/mark-inactive", self.mark_inactive)
         self.runner = web.AppRunner(app, access_log=None)
+
+    @override
+    def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
+        # The Go plugin applies the config the coordinator writes to Traefik etcd.
+        pass
 
     async def start(self) -> None:
         if not self.root_context.local_config.proxy_worker.traefik:

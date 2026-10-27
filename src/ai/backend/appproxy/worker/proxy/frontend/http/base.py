@@ -1,11 +1,13 @@
 import logging
 import time
+from typing import override
 
 import aiohttp_jinja2
 import jwt
 from aiohttp import hdrs, web
 from aiohttp_remotes import XForwardedStrict
 
+from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.defs import (
     ERROR_TEMPLATE_NAME,
     MEDIA_TYPE_HTML,
@@ -13,6 +15,7 @@ from ai.backend.appproxy.common.defs import (
     PERMIT_COOKIE_NAME,
 )
 from ai.backend.appproxy.common.errors import ClientIPNotAllowed, InvalidCredentials
+from ai.backend.appproxy.common.errors.http import ContentEncodingNotAllowed
 from ai.backend.appproxy.common.types import RouteInfo, WebRequestHandler
 from ai.backend.appproxy.common.utils import ensure_json_serializable, is_permit_valid, mime_match
 from ai.backend.appproxy.worker.proxy.backend.http import HTTPBackend
@@ -32,9 +35,11 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TCircuitKeyType]):
     root_context: RootContext
     _xff_strict: XForwardedStrict | None
+    _content_encoding: ContentEncodingConfig
 
     def __init__(self, root_context: RootContext) -> None:
         super().__init__(root_context)
+        self._content_encoding = ContentEncodingConfig(rejected_encodings=[])
         # With trusted proxies set, an XForwardedStrict middleware resolves request.remote from X-Forwarded-For.
         # Empty means directly exposed — no middleware.
         trusted_proxies = root_context.local_config.proxy_worker.trusted_proxies
@@ -116,7 +121,35 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
             and request.headers.get("upgrade", "").lower() == "websocket"
         )
 
+    @override
+    def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
+        self._content_encoding = config
+
+    def _find_rejected_content_encoding(self, content_encoding_headers: list[str]) -> str | None:
+        rejected_encodings = self._content_encoding.rejected_encodings
+        # Each header line may list several codings, e.g. "gzip, br" (RFC 9110 section 8.4).
+        # Codings are case-insensitive (RFC 9110 section 8.4.1), and some session apps decode
+        # "BR" as brotli, so the header is lowercased like the configured codings.
+        for header_value in content_encoding_headers:
+            for coding in header_value.split(","):
+                lowercased_coding = coding.strip().lower()
+                if lowercased_coding in rejected_encodings:
+                    return lowercased_coding
+        return None
+
     async def proxy(self, request: web.Request) -> web.StreamResponse | web.WebSocketResponse:
+        rejected_encoding = self._find_rejected_content_encoding(
+            request.headers.getall(hdrs.CONTENT_ENCODING, [])
+        )
+        if rejected_encoding is not None:
+            log.trace(
+                "rejecting a request body encoded with {} from {}",
+                rejected_encoding,
+                request.remote,
+            )
+            raise ContentEncodingNotAllowed(
+                f"Request bodies encoded with {rejected_encoding} are not accepted"
+            )
         backend: HTTPBackend = request["backend"]
 
         if self._is_websocket_request(request):

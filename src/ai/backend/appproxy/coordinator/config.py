@@ -8,10 +8,17 @@ from pprint import pformat
 from typing import Annotated, Any, Self
 
 import click
-from pydantic import Field, FilePath, IPvAnyNetwork, ValidationError, model_validator
+from pydantic import (
+    Field,
+    FilePath,
+    IPvAnyNetwork,
+    ValidationError,
+    model_validator,
+)
 
 from ai.backend.appproxy.common.config import (
     BaseSchema,
+    ContentEncodingConfig,
     DebugConfig,
     GroupIDValidator,
     HostPortPair,
@@ -31,6 +38,7 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -528,6 +536,20 @@ class ProxyCoordinatorConfig(BaseSchema):
             ),
             added_version="25.9.0",
             example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+
+    content_encoding: Annotated[
+        ContentEncodingConfig,
+        Field(default_factory=lambda: ContentEncodingConfig()),
+        BackendAIConfigMeta(
+            description=(
+                "Rules applied to the Content-Encoding of requests before they are forwarded to "
+                "session apps. Applies to both the built-in proxy workers and Traefik. Built-in "
+                "workers read it when they register, so restart them after changing it."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
         ),
     ]
 

@@ -1,9 +1,11 @@
 import logging
+from dataclasses import dataclass
 from typing import Any, cast
 
 import aiohttp
 from aiohttp.client_exceptions import ClientConnectorError
 
+from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.errors import (
     CoordinatorConnectionError,
     InternalServerError,
@@ -93,7 +95,13 @@ async def destroy_circuit(root_ctx: RootContext, request_id: str, circuit_id: st
         raise InternalServerError from e
 
 
-async def register_worker(root_ctx: RootContext, request_id: str) -> list[Slot]:
+@dataclass(frozen=True)
+class WorkerRegistration:
+    slots: list[Slot]
+    content_encoding: ContentEncodingConfig
+
+
+async def register_worker(root_ctx: RootContext, request_id: str) -> WorkerRegistration:
     local_config = root_ctx.local_config
     sess = _get_coordinator_session(root_ctx)
     headers = _get_request_headers(root_ctx, request_id)
@@ -172,7 +180,12 @@ async def register_worker(root_ctx: RootContext, request_id: str) -> list[Slot]:
                 "Joined to coordinator {}",
                 root_ctx.local_config.proxy_worker.coordinator_endpoint,
             )
-            return cast(list[Slot], body["slots"])
+            return WorkerRegistration(
+                slots=cast(list[Slot], body["slots"]),
+                content_encoding=ContentEncodingConfig.model_validate(
+                    body.get("content_encoding", {})
+                ),
+            )
     except aiohttp.ClientResponseError as e:
         log.exception("")
         if e.status == 400:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, override
 
 from aiohttp import web
 
@@ -132,6 +132,22 @@ class ClientIPNotAllowed(BackendAIError, web.HTTPForbidden):
             domain=ErrorDomain.APPPROXY,
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.FORBIDDEN,
+        )
+
+
+class ContentEncodingNotAllowed(BackendAIError, web.HTTPUnsupportedMediaType):
+    """Raised when a request's Content-Encoding contains a coding listed in
+    ``rejected_encodings``."""
+
+    error_type = "https://api.backend.ai/probs/content-encoding-not-allowed"
+    error_title = "Content encoding not allowed."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.REQUEST,
+            error_detail=ErrorDetail.BAD_REQUEST,
         )
 
 
