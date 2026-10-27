@@ -15,6 +15,7 @@ type Config struct {
 	LastUsedMarkerPath string   `yaml:"lastusedmarkerpath"`
 	Id                 string   `yaml:"id"`
 	SessionIds         []string `yaml:"sessionids"`
+	RejectBrotli       bool     `yaml:"rejectbrotli"`
 }
 
 func CreateConfig() *Config {
@@ -22,6 +23,7 @@ func CreateConfig() *Config {
 		LastUsedMarkerPath: "",
 		Id:                 "",
 		SessionIds:         []string{},
+		RejectBrotli:       false,
 	}
 }
 
@@ -84,7 +86,22 @@ func (a *Plugin) MarkInactive() {
 	}
 }
 
+func (a *Plugin) isBrotliEncoded(req *http.Request) bool {
+	for _, headerValue := range req.Header.Values("Content-Encoding") {
+		for _, coding := range strings.Split(headerValue, ",") {
+			if strings.EqualFold(strings.TrimSpace(coding), "br") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func (a *Plugin) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
+	if a.config.RejectBrotli && a.isBrotliEncoded(req) {
+		http.Error(rw, "Brotli-encoded request bodies are not accepted", http.StatusUnsupportedMediaType)
+		return
+	}
 
 	isWebsocket := strings.ToLower(req.Header.Get("Upgrade")) == "websocket"
 
