@@ -65463,6 +65463,26 @@
         "description": "Search every system session environ row, at every scope (superadmin only).\n\n**Preconditions:**\n* Superadmin privilege required.\n"
       }
     },
+    "/v2/system-session-environs/value-sources": {
+      "get": {
+        "operationId": "v2/system-session-environs.list_value_sources",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [],
+        "description": "List every value source a system session environ row can carry.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/users/search": {
       "post": {
         "operationId": "v2/users.admin_search",

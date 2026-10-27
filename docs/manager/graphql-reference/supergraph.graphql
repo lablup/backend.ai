@@ -20616,6 +20616,11 @@ type Query
   adminSystemSessionEnvirons(filter: SystemSessionEnvironFilter = null, orderBy: [SystemSessionEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SystemSessionEnvironConnection @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.10.0. List every value source name a system session environ row can carry, the values ``SystemSessionEnviron.valueSource`` holds.
+  """
+  systemSessionEnvironValueSources: [String!] @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.10.0. List all registered session lifecycle handlers (superadmin only). The returned ``name`` values are valid keys for ``DefaultSessionOptionsInfo.handlerOptions.byHandler``.
   """
   adminSessionLifecycleHandlers: [SessionLifecycleHandlerNode!] @join__field(graph: STRAWBERRY)
@@ -27456,7 +27461,7 @@ type SystemSessionEnviron implements Node
   key: String!
 
   """
-  Which value of the starting session is injected, as a value source name.
+  Which value of the starting session is injected, as a value source name systemSessionEnvironValueSources lists.
   """
   valueSource: String!
 
@@ -27609,7 +27614,7 @@ input SystemSessionEnvironScopeTypeFilter
 }
 
 """
-Added in 26.10.0. Filter by value source name with equality and membership operators.
+Added in 26.10.0. Filter by value source name with equality and membership operators. The names are the ones systemSessionEnvironValueSources lists.
 """
 input SystemSessionEnvironValueSourceFilter
   @join__type(graph: STRAWBERRY)
