@@ -42,6 +42,10 @@ from ai.backend.manager.services.session.resource_allocation.actions.get_user_co
     GetUserConcurrencyAction,
     GetUserConcurrencyActionResult,
 )
+from ai.backend.manager.services.session.resource_allocation.actions.get_user_usage import (
+    GetUserUsageAction,
+    GetUserUsageActionResult,
+)
 from ai.backend.manager.services.session.resource_allocation.actions.resolve_keypair_context import (
     ResolveKeypairContextAction,
     ResolveKeypairContextActionResult,
@@ -92,6 +96,11 @@ class ResourceAllocationService:
             resource_policy=action.resource_policy,
         )
         return GetKeypairUsageActionResult(usage=usage)
+
+    async def get_user_usage(self, action: GetUserUsageAction) -> GetUserUsageActionResult:
+        """Get a user's resource usage across all their keypairs."""
+        usage = await self._resource_allocation_repository.get_user_usage(action.user_id)
+        return GetUserUsageActionResult(usage=usage)
 
     async def get_project_usage(self, action: GetProjectUsageAction) -> GetProjectUsageActionResult:
         """Get project resource usage."""

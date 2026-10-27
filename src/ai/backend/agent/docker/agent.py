@@ -1698,9 +1698,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
                     relay_user = f"{os.geteuid()}:{os.getegid()}"
             else:
                 relay_user = None
-            listen_address = (
-                f"UNIX-LISTEN:/ipc/{self.agent_sockpath.name},unlink-early,fork,mode=777"
-            )
+            relay_container_sockpath = f"/ipc/{self.agent_sockpath.name}"
+            listen_address = f"UNIX-LISTEN:{relay_container_sockpath},unlink-early,fork,mode=777"
             relay_host_config: dict[str, Any] = {
                 "Mounts": [
                     {
@@ -1735,6 +1734,14 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
             }
             if relay_user is not None:
                 relay_container_config["User"] = relay_user
+            relay_health_check_config = relay_config.health_check
+            if relay_health_check_config.enable:
+                relay_container_config["Healthcheck"] = {
+                    "Test": ["CMD", "test", "-S", relay_container_sockpath],
+                    "Interval": int(relay_health_check_config.interval * 1_000_000_000),
+                    "Timeout": int(relay_health_check_config.timeout * 1_000_000_000),
+                    "Retries": relay_health_check_config.retries,
+                }
             socket_relay_name = f"backendai-socket-relay.{self.id}"
             socket_relay_container = PersistentServiceContainer(
                 "backendai-socket-relay:latest",

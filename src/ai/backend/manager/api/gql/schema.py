@@ -466,6 +466,7 @@ from ai.backend.manager.api.gql.resource_allocation.resolver import (
     effective_resource_allocation_v2,
     my_concurrency,
     my_keypair_resource_allocation_v2,
+    my_user_resource_allocation_v2,
     project_resource_allocation_v2,
     resource_group_resource_allocation_v2,
 )
@@ -689,6 +690,12 @@ from ai.backend.manager.api.gql.user.resolver.query import (
     my_user_v2,
     project_users_v2,
     scoped_users_v2,
+)
+from ai.backend.manager.api.gql.vfolder_auto_mount.resolver import (
+    create_vfolder_auto_mount,
+    delete_vfolder_auto_mount,
+    scoped_vfolder_auto_mounts,
+    update_vfolder_auto_mount,
 )
 from ai.backend.manager.api.gql.vfolder_v2.resolver.mutation import (
     bulk_delete_vfolders_v2,
@@ -915,6 +922,7 @@ class Query:
     session_group = session_group
     admin_session_groups = admin_session_groups
     scoped_session_groups = scoped_session_groups
+    scoped_vfolder_auto_mounts = scoped_vfolder_auto_mounts
     project_deployments = project_deployments
     scoped_deployments = scoped_deployments
     my_deployments = my_deployments
@@ -1070,6 +1078,7 @@ class Query:
     model_card_available_presets = model_card_available_presets
     # Resource Allocation V2 APIs
     my_keypair_resource_allocation_v2 = my_keypair_resource_allocation_v2
+    my_user_resource_allocation_v2 = my_user_resource_allocation_v2
     project_resource_allocation_v2 = project_resource_allocation_v2
     admin_domain_resource_allocation_v2 = admin_domain_resource_allocation_v2
     resource_group_resource_allocation_v2 = resource_group_resource_allocation_v2
@@ -1534,6 +1543,10 @@ class Mutation:
     update_session_group = update_session_group
     create_session_group = create_session_group
     purge_session_group = purge_session_group
+    # VFolder Auto-Mount mutations
+    create_vfolder_auto_mount = create_vfolder_auto_mount
+    update_vfolder_auto_mount = update_vfolder_auto_mount
+    delete_vfolder_auto_mount = delete_vfolder_auto_mount
     # Entity Label mutations
     upsert_entity_label = upsert_entity_label
     partial_bulk_upsert_entity_labels = partial_bulk_upsert_entity_labels

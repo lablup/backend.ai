@@ -31,6 +31,7 @@ from ai.backend.common.dto.manager.v2.resource_allocation.response import (
     ResourceGroupUsageNode,
     ScopeResourceUsageNode,
     UserConcurrencyPayload,
+    UserResourceAllocationPayload,
 )
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import AccessKey, BinarySize, SlotQuantity
@@ -65,6 +66,9 @@ from ai.backend.manager.services.session.resource_allocation.actions.get_resourc
 )
 from ai.backend.manager.services.session.resource_allocation.actions.get_user_concurrency import (
     GetUserConcurrencyAction,
+)
+from ai.backend.manager.services.session.resource_allocation.actions.get_user_usage import (
+    GetUserUsageAction,
 )
 from ai.backend.manager.services.session.resource_allocation.actions.resolve_keypair_context import (
     ResolveKeypairContextAction,
@@ -202,6 +206,16 @@ class ResourceAllocationAdapter(BaseAdapter):
             session_count=result.concurrency.session_count,
             private_session_count=result.concurrency.private_session_count,
         )
+
+    async def my_user_usage(self) -> UserResourceAllocationPayload:
+        """Get the current user's resource usage across all their keypairs."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
+        result = await self._session.resource_allocation.get_user_usage.run(
+            GetUserUsageAction(user_id=UserID(me.user_id))
+        )
+        return UserResourceAllocationPayload(user=_scope_usage_to_node(result.usage))
 
     async def _keypair_owner(self, access_key: AccessKey) -> UserID:
         result = await self._user.lookup_keypair_owner.run(

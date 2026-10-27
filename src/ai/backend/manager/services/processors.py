@@ -320,6 +320,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.vfolder_auto_mount.processors import (
         VFolderAutoMountProcessors,
     )
+    from ai.backend.manager.services.vfolder_auto_mount.service import (
+        VFolderAutoMountService,
+    )
     from ai.backend.manager.services.vfs_storage.processors import (
         VFSStorageProcessors,
     )
@@ -386,6 +389,7 @@ class Services:
     vfolder_invite: VFolderInviteService
     vfolder_sharing: VFolderSharingService
     vfolder_mount_policy: VFolderMountPolicyService
+    vfolder_auto_mount: VFolderAutoMountService
     session: SessionService
     session_group: SessionGroupService
     manager_admin: ManagerAdminService
