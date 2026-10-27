@@ -1,7 +1,7 @@
 """The revisions and the policy a deployment read fills in.
 
-``search_legacy_endpoints`` fills them in the read ops of its search;
-``get_deployments_by_ids`` fills them in its own session.
+Every read fills them by the deployment id; a revision whose row is missing leaves its id
+``None``. ``get_endpoint_info`` carries the revision ids and the policy only.
 """
 
 from __future__ import annotations
@@ -397,14 +397,14 @@ class TestSearchLegacyEndpoints:
         assert info.policy is not None
         assert info.policy.strategy == DeploymentStrategy.ROLLING
 
-    async def test_keeps_the_id_of_a_missing_revision(
+    async def test_drops_the_id_of_a_missing_revision(
         self, deployment_repository: DeploymentRepository, seeder: DeploymentSeeder
     ) -> None:
         seeded = await seeder.seed(deploying_revision_exists=False)
 
         info = await self._search(deployment_repository, seeded.endpoint_id)
 
-        assert info.deploying_revision_id == seeded.deploying_revision_id
+        assert info.deploying_revision_id is None
         assert info.deploying_revision is None
 
 
