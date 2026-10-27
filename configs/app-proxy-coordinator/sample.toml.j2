@@ -1,6 +1,9 @@
 # Backend.AI AppProxy Coordinator Configuration (PROD Environment)
 #
-# This is a sample configuration file for the Backend.AI AppProxy Coordinator.
+# This is a sample configuration template for the Backend.AI AppProxy
+# Coordinator.
+# Write a configuration file with `./backend.ai app-proxy-coordinator config
+# render -t <template> -a NAME=VALUE -o <output>`.
 # All configuration options are documented with their descriptions,
 # default values, and environment-specific examples.
 #
@@ -576,8 +579,8 @@
 
   # Additional labels for service categorization and filtering.
   # Added in 26.3.0
-  # Replace <name> with your actual key (e.g., 'default', 'local')
-  [service_discovery.extra-labels.<name>]
+  [service_discovery.extra-labels]
+    ## key = "value"
 
   # List of endpoints exposed by this service instance.
   # Added in 26.3.0
@@ -601,8 +604,8 @@
 
     # Additional metadata for the endpoint.
     # Added in 26.3.0
-    # Replace <name> with your actual key (e.g., 'default', 'local')
-    [service_discovery.endpoints.metadata.<name>]
+    [service_discovery.endpoints.metadata]
+      ## key = "value"
 
 # etcd connection configuration for distributed coordination and configuration
 # management. Used for service discovery (if etcd-based) and Traefik

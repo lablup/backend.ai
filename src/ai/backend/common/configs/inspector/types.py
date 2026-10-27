@@ -47,6 +47,9 @@ class FieldTypeInfo:
     Used by generators to produce proper output format for nested structures.
     """
 
+    template_arg: str | None = None
+    """Template argument naming the key of a DICT entry, from ``BackendAIConfigMeta``."""
+
 
 @dataclass(frozen=True)
 class FieldDocumentation:

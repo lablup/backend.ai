@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import tomllib
 from enum import Enum
 from typing import Annotated
 
+import jinja2
 import pytest
 from pydantic import Field
 
@@ -20,6 +22,8 @@ from ai.backend.common.configs.generator import (
     generate_halfstack_toml,
     generate_sample_toml,
 )
+from ai.backend.common.configs.generator.template import render_config_template
+from ai.backend.common.configs.generator.toml import ConfigTemplateArgMissing
 from ai.backend.common.configs.inspector import FieldDocumentation, FieldSchema, FieldTypeInfo
 from ai.backend.common.meta import (
     BackendAIConfigMeta,
@@ -259,7 +263,7 @@ class TestTOMLGenerator:
         result = generator.generate(SimpleConfig)
 
         assert "name" in result
-        # Example value is used for sample.toml generation
+        # Example value is used for sample template generation
         assert "local-name" in result
         assert "# The configuration name" in result
 
@@ -486,7 +490,7 @@ class TestConvenienceFunctions:
             ]
 
         result = generate_sample_toml(SampleConfig)
-        # sample.toml uses LOCAL (dev) environment, so local example is used
+        # The sample template uses LOCAL (dev) environment, so local example is used
         assert "local" in result
 
     def test_generate_halfstack_toml(self) -> None:
@@ -504,3 +508,63 @@ class TestConvenienceFunctions:
         result = generate_halfstack_toml(HalfstackConfig)
         # halfstack.toml uses LOCAL environment, so local example is used
         assert "local" in result
+
+
+class _VolumeConfig(BackendAISchema):
+    path: Annotated[
+        str,
+        Field(default="/vfroot"),
+        BackendAIConfigMeta(
+            description="Mount path; a {{nonce}} in text stays as written.",
+            added_version="25.1.0",
+            example=ConfigExample(local="/vfroot", prod="/vfroot"),
+        ),
+    ]
+
+
+class _VolumesConfig(BackendAISchema):
+    volume: Annotated[
+        dict[str, _VolumeConfig],
+        Field(default_factory=dict),
+        BackendAIConfigMeta(
+            description="Volumes.",
+            added_version="25.1.0",
+            composite=CompositeType.DICT,
+            template_arg="volume_name",
+        ),
+    ]
+
+
+class _UnnamedVolumesConfig(BackendAISchema):
+    volume: Annotated[
+        dict[str, _VolumeConfig],
+        Field(default_factory=dict),
+        BackendAIConfigMeta(
+            description="Volumes.",
+            added_version="25.1.0",
+            composite=CompositeType.DICT,
+        ),
+    ]
+
+
+class TestSampleTemplate:
+    def test_template_argument_is_filled_only_when_rendered(self) -> None:
+        template = TOMLGenerator().generate(_VolumesConfig)
+
+        assert "[volume.{{ volume_name }}]" in template
+        with pytest.raises(tomllib.TOMLDecodeError):
+            tomllib.loads(template)
+        with pytest.raises(jinja2.UndefinedError):
+            render_config_template(template, {})
+        rendered = tomllib.loads(render_config_template(template, {"volume_name": "local"}))
+        assert rendered["volume"]["local"]["path"] == "/vfroot"
+
+    def test_dict_of_tables_without_template_arg_fails(self) -> None:
+        with pytest.raises(ConfigTemplateArgMissing):
+            TOMLGenerator().generate(_UnnamedVolumesConfig)
+
+    def test_jinja_syntax_in_text_survives_rendering(self) -> None:
+        template = TOMLGenerator().generate(_VolumesConfig)
+
+        rendered = render_config_template(template, {"volume_name": "local"})
+        assert "a {{nonce}} in text stays as written" in rendered
