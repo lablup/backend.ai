@@ -4728,6 +4728,14 @@ type DeleteStorageVolumePayload {
   item: StorageVolumeV2!
 }
 
+"""
+Added in 26.10.0. Payload for a system session environ row soft delete.
+"""
+type DeleteSystemSessionEnvironPayload {
+  """The soft-deleted row."""
+  systemSessionEnviron: SystemSessionEnviron!
+}
+
 """Added in 26.4.2. Payload for user resource policy deletion."""
 type DeleteUserResourcePolicyPayload {
   """Name of the deleted policy."""
@@ -10995,7 +11003,13 @@ type Mutation {
   """
   Added in 26.10.0. Change a system session environ row's key. Only provided fields are updated.
   """
-  updateSystemSessionEnviron(input: UpdateSystemSessionEnvironInput!): UpdateSystemSessionEnvironPayload!
+  updateSystemSessionEnviron(input: UpdateSystemSessionEnvironInput!): UpdateSystemSessionEnvironPayload
+
+  """Added in 26.10.0. Soft-delete a system session environ row."""
+  deleteSystemSessionEnviron(id: UUID!): DeleteSystemSessionEnvironPayload
+
+  """Added in 26.10.0. Restore a soft-deleted system session environ row."""
+  restoreSystemSessionEnviron(id: UUID!): RestoreSystemSessionEnvironPayload
 
   """
   Added in 26.10.0. Purge a runtime variant with the presets in its catalog.
@@ -17596,6 +17610,12 @@ Added in 26.10.0. Payload returned after restoring a soft-deleted storage volume
 type RestoreStorageVolumePayload {
   """The restored storage volume."""
   item: StorageVolumeV2!
+}
+
+"""Added in 26.10.0. Payload for a system session environ row restore."""
+type RestoreSystemSessionEnvironPayload {
+  """The restored row."""
+  systemSessionEnviron: SystemSessionEnviron!
 }
 
 """Added in 26.9.0. Payload for single user restore mutation."""

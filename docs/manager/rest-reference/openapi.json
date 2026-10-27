@@ -66048,6 +66048,64 @@
         "description": "Change a system session environ row's key.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/v2/system-session-environs/{environ_id}/delete": {
+      "post": {
+        "operationId": "v2/system-session-environs.delete",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "environ_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Soft-delete a system session environ row.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/system-session-environs/{environ_id}/restore": {
+      "post": {
+        "operationId": "v2/system-session-environs.restore",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "environ_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Restore a soft-deleted system session environ row.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/users/search": {
       "post": {
         "operationId": "v2/users.admin_search",
