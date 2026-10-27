@@ -167,6 +167,7 @@ class V2SeedWriteOps(V2RelationWriteOps, V2RosterWriteOps, V2ResourcePolicyWrite
             upserter.build_insert_values(),
             values,
             upserter.integrity_error_checks(),
+            upserter.index_where(),
         )
         return bool(values)
 

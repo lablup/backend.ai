@@ -16,10 +16,11 @@ from ai.backend.manager.errors.repository import (
 )
 from ai.backend.manager.errors.system_session_environ import (
     InvalidSystemSessionEnvironKey,
+    SystemSessionEnvironDeleted,
     SystemSessionEnvironKeyConflict,
 )
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
+from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
 from ai.backend.manager.models.system_session_environ.searchable_fields import (
     SystemSessionEnvironSearchableFields,
@@ -30,7 +31,9 @@ __all__ = ("SystemSessionEnvironUpdater",)
 
 
 @dataclass
-class SystemSessionEnvironUpdater(DataUpdater[SystemSessionEnvironRow, SystemSessionEnvironData]):
+class SystemSessionEnvironUpdater(
+    GuardedDataUpdater[SystemSessionEnvironRow, SystemSessionEnvironData]
+):
     environ_id: SystemSessionEnvironID
     key: OptionalState[str] = field(default_factory=OptionalState[str].nop)
 
@@ -47,13 +50,24 @@ class SystemSessionEnvironUpdater(DataUpdater[SystemSessionEnvironRow, SystemSes
     def target_id_value(self) -> SystemSessionEnvironID:
         return self.environ_id
 
+    @override
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=SystemSessionEnvironSearchableFields.own.deleted_at.filter.is_null(),
+                error=SystemSessionEnvironDeleted(
+                    f"System session environ is deleted: {self.environ_id}"
+                ),
+            ),
+        )
+
     @property
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
         return (
             IntegrityErrorCheck(
                 violation_type=UniqueConstraintViolationError,
-                constraint_name="uq_system_session_environ_key",
+                constraint_name="uq_system_session_environ_live_key",
                 error=SystemSessionEnvironKeyConflict(),
             ),
             IntegrityErrorCheck(

@@ -268,20 +268,26 @@ class V2WriteOpsBase(V2OpsBase):
         insert_values: dict[str, Any],
         update_values: dict[str, Any],
         checks: Sequence[IntegrityErrorCheck],
+        index_where: sa.ColumnElement[bool] | None = None,
     ) -> TRow:
         """Insert the row, or update it with ``update_values`` where a row holds its
-        ``index_elements``. With no update values the row there is left as it stands."""
+        ``index_elements``. With no update values the row there is left as it stands.
+        ``index_where`` is the predicate of a partial unique index."""
         if not update_values:
             inserted = await self._insert_row_if_absent(
-                row_class, index_elements, insert_values, checks
+                row_class, index_elements, insert_values, checks, index_where
             )
             if inserted is not None:
                 return inserted
-            return await self._row_holding_key(row_class, index_elements, insert_values)
+            return await self._row_holding_key(
+                row_class, index_elements, insert_values, index_where
+            )
         stmt = (
             pg_insert(row_class.__table__)
             .values(insert_values)
-            .on_conflict_do_update(index_elements=index_elements, set_=update_values)
+            .on_conflict_do_update(
+                index_elements=index_elements, index_where=index_where, set_=update_values
+            )
             .returning(*row_class.__table__.columns)
         )
         row = await self._returned_row(row_class, stmt, checks)
@@ -295,27 +301,32 @@ class V2WriteOpsBase(V2OpsBase):
         index_elements: list[str],
         insert_values: dict[str, Any],
         checks: Sequence[IntegrityErrorCheck],
+        index_where: sa.ColumnElement[bool] | None = None,
     ) -> TRow | None:
         """Insert the row unless a row holds its ``index_elements``, answering the row
         inserted, or ``None`` where it was left out."""
         stmt = (
             pg_insert(row_class.__table__)
             .values(insert_values)
-            .on_conflict_do_nothing(index_elements=index_elements)
+            .on_conflict_do_nothing(index_elements=index_elements, index_where=index_where)
             .returning(*row_class.__table__.columns)
         )
         return await self._returned_row(row_class, stmt, checks)
 
     async def _row_holding_key[TRow: Base](
-        self, row_class: type[TRow], index_elements: list[str], insert_values: dict[str, Any]
+        self,
+        row_class: type[TRow],
+        index_elements: list[str],
+        insert_values: dict[str, Any],
+        index_where: sa.ColumnElement[bool] | None = None,
     ) -> TRow:
-        """The row holding the ``index_elements`` values an insert named."""
+        """The row holding the ``index_elements`` values an insert named, among the rows
+        ``index_where`` admits."""
         table = row_class.__table__
-        stmt = (
-            sa.select(row_class)
-            .where(*(table.c[column] == insert_values[column] for column in index_elements))
-            .execution_options(populate_existing=True)
-        )
+        key_conditions = [table.c[column] == insert_values[column] for column in index_elements]
+        if index_where is not None:
+            key_conditions.append(index_where)
+        stmt = sa.select(row_class).where(*key_conditions).execution_options(populate_existing=True)
         return (await self._sess.scalars(stmt)).one()
 
     async def _returned_row[TRow: Base](

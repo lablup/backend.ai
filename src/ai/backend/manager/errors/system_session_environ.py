@@ -38,6 +38,19 @@ class SystemSessionEnvironKeyConflict(EntityError, web.HTTPConflict):
         )
 
 
+class SystemSessionEnvironDeleted(EntityError, web.HTTPConflict):
+    """Raised when an update names a soft-deleted row; restore it first."""
+
+    error_type = "https://api.backend.ai/probs/system-session-environ-deleted"
+    error_title = "The system session environ row is deleted."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            SystemSessionEnvironEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT
+        )
+
+
 class InvalidSystemSessionEnvironKey(EntityError, web.HTTPBadRequest):
     """Raised when the key is not an environment variable name."""
 

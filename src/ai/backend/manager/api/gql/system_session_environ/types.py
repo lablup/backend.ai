@@ -27,6 +27,12 @@ from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     UpdateSystemSessionEnvironInput as UpdateSystemSessionEnvironInputDTO,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
+    DeleteSystemSessionEnvironPayload as DeleteSystemSessionEnvironPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.system_session_environ.response import (
+    RestoreSystemSessionEnvironPayload as RestoreSystemSessionEnvironPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.system_session_environ.response import (
     SystemSessionEnvironNode as SystemSessionEnvironNodeDTO,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
@@ -72,6 +78,8 @@ __all__ = (
     "SystemSessionEnvironScopeInfoGQL",
     "UpdateSystemSessionEnvironInputGQL",
     "UpdateSystemSessionEnvironPayloadGQL",
+    "DeleteSystemSessionEnvironPayloadGQL",
+    "RestoreSystemSessionEnvironPayloadGQL",
 )
 
 
@@ -310,3 +318,31 @@ class UpdateSystemSessionEnvironPayloadGQL(
     PydanticOutputMixin[UpdateSystemSessionEnvironPayloadDTO]
 ):
     system_session_environ: SystemSessionEnvironGQL = gql_field(description="The updated row.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for a system session environ row soft delete.",
+    ),
+    model=DeleteSystemSessionEnvironPayloadDTO,
+    name="DeleteSystemSessionEnvironPayload",
+)
+class DeleteSystemSessionEnvironPayloadGQL(
+    PydanticOutputMixin[DeleteSystemSessionEnvironPayloadDTO]
+):
+    system_session_environ: SystemSessionEnvironGQL = gql_field(description="The soft-deleted row.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for a system session environ row restore.",
+    ),
+    model=RestoreSystemSessionEnvironPayloadDTO,
+    name="RestoreSystemSessionEnvironPayload",
+)
+class RestoreSystemSessionEnvironPayloadGQL(
+    PydanticOutputMixin[RestoreSystemSessionEnvironPayloadDTO]
+):
+    system_session_environ: SystemSessionEnvironGQL = gql_field(description="The restored row.")

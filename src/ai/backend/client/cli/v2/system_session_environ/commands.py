@@ -59,3 +59,41 @@ def update(environ_id: UUID, key: str | None) -> None:
             await registry.close()
 
     run_async(_run)
+
+
+@system_session_environ.command()
+@click.argument("environ_id", type=click.UUID)
+def delete(environ_id: UUID) -> None:
+    """Soft-delete a system session environ row."""
+    from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironID
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.system_session_environ.delete(
+                SystemSessionEnvironID(environ_id)
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    run_async(_run)
+
+
+@system_session_environ.command()
+@click.argument("environ_id", type=click.UUID)
+def restore(environ_id: UUID) -> None:
+    """Restore a soft-deleted system session environ row."""
+    from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironID
+
+    async def _run() -> None:
+        registry = await create_v2_registry(load_v2_config())
+        try:
+            result = await registry.system_session_environ.restore(
+                SystemSessionEnvironID(environ_id)
+            )
+            print_result(result)
+        finally:
+            await registry.close()
+
+    run_async(_run)

@@ -31,8 +31,9 @@ class SystemSessionEnvironUpserter(
 ):
     """Upserter for a binding at its owner: the public entity, a domain or a project.
 
-    Conflict key: ``(key, scope_type, scope_id)``. A ``public`` binding is created in the
-    `global` and `public` scopes, a domain's or a project's in that owner.
+    Conflict key: ``(key, scope_type, scope_id)`` among the rows not soft-deleted. A
+    ``public`` binding is created in the `global` and `public` scopes, a domain's or a
+    project's in that owner.
     """
 
     owner: EntityIdentifier
@@ -61,6 +62,10 @@ class SystemSessionEnvironUpserter(
     @override
     def index_elements(self) -> list[str]:
         return ["key", "scope_type", "scope_id"]
+
+    @override
+    def index_where(self) -> sa.ColumnElement[bool]:
+        return SystemSessionEnvironRow.deleted_at.is_(None)
 
     @override
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

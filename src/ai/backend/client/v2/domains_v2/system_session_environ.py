@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironID
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     AdminSearchSystemSessionEnvironsInput,
     UpdateSystemSessionEnvironInput,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
     AdminSearchSystemSessionEnvironsPayload,
+    DeleteSystemSessionEnvironPayload,
     ListSystemSessionEnvironValueSourcesPayload,
+    RestoreSystemSessionEnvironPayload,
     UpdateSystemSessionEnvironPayload,
 )
 
@@ -47,4 +50,22 @@ class V2SystemSessionEnvironClient(BaseDomainClient):
             f"{_PATH}/{request.id}",
             request=request,
             response_model=UpdateSystemSessionEnvironPayload,
+        )
+
+    async def delete(self, environ_id: SystemSessionEnvironID) -> DeleteSystemSessionEnvironPayload:
+        """Soft-delete a system session environ row."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{environ_id}/delete",
+            response_model=DeleteSystemSessionEnvironPayload,
+        )
+
+    async def restore(
+        self, environ_id: SystemSessionEnvironID
+    ) -> RestoreSystemSessionEnvironPayload:
+        """Restore a soft-deleted system session environ row."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{environ_id}/restore",
+            response_model=RestoreSystemSessionEnvironPayload,
         )

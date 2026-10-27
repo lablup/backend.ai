@@ -23,7 +23,9 @@ from ai.backend.common.dto.manager.v2.system_session_environ.request import (
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
     AdminSearchSystemSessionEnvironsPayload,
+    DeleteSystemSessionEnvironPayload,
     ListSystemSessionEnvironValueSourcesPayload,
+    RestoreSystemSessionEnvironPayload,
     SystemSessionEnvironNode,
     UpdateSystemSessionEnvironPayload,
 )
@@ -46,6 +48,7 @@ from ai.backend.manager.models.condition_utils import (
     negate_conditions,
 )
 from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.models.specs.soft_delete import RestoreUpdater, SoftDeleteUpdater
 from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
 from ai.backend.manager.models.system_session_environ.searchable_fields import (
     SystemSessionEnvironSearchableFields,
@@ -59,11 +62,17 @@ from ai.backend.manager.models.system_session_environ.updaters import (
 from ai.backend.manager.services.system_session_environ.actions.bulk_get import (
     BulkGetSystemSessionEnvironsAction,
 )
+from ai.backend.manager.services.system_session_environ.actions.delete import (
+    DeleteSystemSessionEnvironAction,
+)
 from ai.backend.manager.services.system_session_environ.actions.global_search import (
     GlobalSearchSystemSessionEnvironsAction,
 )
 from ai.backend.manager.services.system_session_environ.actions.public_list_value_sources import (
     PublicListSystemSessionEnvironValueSourcesAction,
+)
+from ai.backend.manager.services.system_session_environ.actions.restore import (
+    RestoreSystemSessionEnvironAction,
 )
 from ai.backend.manager.services.system_session_environ.actions.update import (
     UpdateSystemSessionEnvironAction,
@@ -135,6 +144,40 @@ class SystemSessionEnvironAdapter(BaseAdapter):
             )
         )
         return UpdateSystemSessionEnvironPayload(
+            system_session_environ=self._data_to_node(result.data)
+        )
+
+    async def delete(self, environ_id: SystemSessionEnvironID) -> DeleteSystemSessionEnvironPayload:
+        """Soft-delete a system session environ row."""
+        result = await self._system_session_environ.delete.run(
+            DeleteSystemSessionEnvironAction(
+                updater=SoftDeleteUpdater(
+                    target_row=SystemSessionEnvironRow,
+                    target_column=SystemSessionEnvironRow.id,
+                    target_id=environ_id,
+                    converter=SystemSessionEnvironSearchableFields.own,
+                )
+            )
+        )
+        return DeleteSystemSessionEnvironPayload(
+            system_session_environ=self._data_to_node(result.data)
+        )
+
+    async def restore(
+        self, environ_id: SystemSessionEnvironID
+    ) -> RestoreSystemSessionEnvironPayload:
+        """Restore a soft-deleted system session environ row."""
+        result = await self._system_session_environ.restore.run(
+            RestoreSystemSessionEnvironAction(
+                updater=RestoreUpdater(
+                    target_row=SystemSessionEnvironRow,
+                    target_column=SystemSessionEnvironRow.id,
+                    target_id=environ_id,
+                    converter=SystemSessionEnvironSearchableFields.own,
+                )
+            )
+        )
+        return RestoreSystemSessionEnvironPayload(
             system_session_environ=self._data_to_node(result.data)
         )
 

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from strawberry import Info
 from strawberry.relay import PageInfo
 
+from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironID
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     AdminSearchSystemSessionEnvironsInput,
 )
@@ -12,6 +15,8 @@ from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.system_session_environ.types import (
+    DeleteSystemSessionEnvironPayloadGQL,
+    RestoreSystemSessionEnvironPayloadGQL,
     SystemSessionEnvironConnectionGQL,
     SystemSessionEnvironEdgeGQL,
     SystemSessionEnvironFilterGQL,
@@ -103,6 +108,34 @@ async def system_session_environ_value_sources(
 async def update_system_session_environ(
     info: Info[StrawberryGQLContext],
     input: UpdateSystemSessionEnvironInputGQL,
-) -> UpdateSystemSessionEnvironPayloadGQL:
+) -> UpdateSystemSessionEnvironPayloadGQL | None:
     payload = await info.context.adapters.system_session_environ.update(input.to_pydantic())
     return UpdateSystemSessionEnvironPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Soft-delete a system session environ row.",
+    )
+)
+async def delete_system_session_environ(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> DeleteSystemSessionEnvironPayloadGQL | None:
+    payload = await info.context.adapters.system_session_environ.delete(SystemSessionEnvironID(id))
+    return DeleteSystemSessionEnvironPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Restore a soft-deleted system session environ row.",
+    )
+)
+async def restore_system_session_environ(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> RestoreSystemSessionEnvironPayloadGQL | None:
+    payload = await info.context.adapters.system_session_environ.restore(SystemSessionEnvironID(id))
+    return RestoreSystemSessionEnvironPayloadGQL.from_pydantic(payload)

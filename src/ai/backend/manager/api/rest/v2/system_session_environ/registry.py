@@ -33,5 +33,7 @@ def register_v2_system_session_environ_routes(
         middlewares=[auth_required],
     )
     registry.add("PATCH", "/{environ_id}", handler.update, middlewares=[auth_required])
+    registry.add("POST", "/{environ_id}/delete", handler.delete, middlewares=[auth_required])
+    registry.add("POST", "/{environ_id}/restore", handler.restore, middlewares=[auth_required])
 
     return registry

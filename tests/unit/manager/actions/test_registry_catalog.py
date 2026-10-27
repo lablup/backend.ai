@@ -340,11 +340,17 @@ from ai.backend.manager.services.session_group.processors import SessionGroupPro
 from ai.backend.manager.services.system_session_environ.actions.bulk_get import (
     BulkGetSystemSessionEnvironsAction,
 )
+from ai.backend.manager.services.system_session_environ.actions.delete import (
+    DeleteSystemSessionEnvironAction,
+)
 from ai.backend.manager.services.system_session_environ.actions.global_search import (
     GlobalSearchSystemSessionEnvironsAction,
 )
 from ai.backend.manager.services.system_session_environ.actions.public_list_value_sources import (
     PublicListSystemSessionEnvironValueSourcesAction,
+)
+from ai.backend.manager.services.system_session_environ.actions.restore import (
+    RestoreSystemSessionEnvironAction,
 )
 from ai.backend.manager.services.system_session_environ.actions.update import (
     UpdateSystemSessionEnvironAction,
@@ -993,9 +999,9 @@ def test_vfs_storage_loader_read_is_a_partial_permission_read() -> None:
     )
 
 
-def test_system_session_environ_reads_keep_their_judged_gates() -> None:
-    """The search reads every row under the global gate; the DataLoader and the update are
-    checked per named row."""
+def test_system_session_environ_operations_keep_their_judged_gates() -> None:
+    """The search reads every row under the global gate; the DataLoader, the update, the
+    soft delete and the restore are checked per named row."""
     registry = _ops_registry()
     SystemSessionEnvironProcessors(
         registry.group(GroupMeta(SystemSessionEnvironEntityType())), SystemSessionEnvironService()
@@ -1013,6 +1019,16 @@ def test_system_session_environ_reads_keep_their_judged_gates() -> None:
             ActionGate.PERMISSION,
         ),
         UpdateSystemSessionEnvironAction: (
+            SystemSessionEnvironEntityType(),
+            ActionKind.SINGLE_ENTITY,
+            ActionGate.PERMISSION,
+        ),
+        DeleteSystemSessionEnvironAction: (
+            SystemSessionEnvironEntityType(),
+            ActionKind.SINGLE_ENTITY,
+            ActionGate.PERMISSION,
+        ),
+        RestoreSystemSessionEnvironAction: (
             SystemSessionEnvironEntityType(),
             ActionKind.SINGLE_ENTITY,
             ActionGate.PERMISSION,

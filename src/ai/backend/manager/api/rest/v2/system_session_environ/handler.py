@@ -54,3 +54,13 @@ class V2SystemSessionEnvironHandler:
         merged = body.parsed.model_copy(update={"id": path.parsed.environ_id})
         payload = await self._adapter.update(merged)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
+    async def delete(self, path: PathParam[SystemSessionEnvironIdPathParam]) -> APIResponse:
+        """Soft-delete a system session environ row."""
+        payload = await self._adapter.delete(path.parsed.environ_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
+    async def restore(self, path: PathParam[SystemSessionEnvironIdPathParam]) -> APIResponse:
+        """Restore a soft-deleted system session environ row."""
+        payload = await self._adapter.restore(path.parsed.environ_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)

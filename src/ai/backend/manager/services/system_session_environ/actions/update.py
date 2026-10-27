@@ -14,7 +14,7 @@ from ai.backend.manager.models.system_session_environ.updaters import (
 __all__ = ("UpdateSystemSessionEnvironAction",)
 
 
-@dataclass
+@dataclass(frozen=True)
 class UpdateSystemSessionEnvironAction(
     UpdateSingleEntityOpsAction[SystemSessionEnvironRow, SystemSessionEnvironData]
 ):
