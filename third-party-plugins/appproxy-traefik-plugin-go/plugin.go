@@ -114,7 +114,8 @@ func (a *Plugin) findRejectedContentEncoding(contentEncodingHeaders []string) (s
 }
 
 func (a *Plugin) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	rejectedEncoding, found := a.findRejectedContentEncoding(req.Header.Values("Content-Encoding"))
+	contentEncodingHeaders := req.Header.Values("Content-Encoding")
+	rejectedEncoding, found := a.findRejectedContentEncoding(contentEncodingHeaders)
 	if found {
 		http.Error(rw, fmt.Sprintf("Request bodies encoded with %s are not accepted", rejectedEncoding), http.StatusUnsupportedMediaType)
 		return
