@@ -6,7 +6,12 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.typed_validators import HostPortPair
-from ai.backend.manager.config.unified import DatabaseConfig, ManagerConfig, MetricConfig
+from ai.backend.manager.config.unified import (
+    DatabaseConfig,
+    ManagerConfig,
+    MetricConfig,
+    SessionConfig,
+)
 
 CONFIG_LOGGER = "ai.backend.common.config"
 
@@ -116,3 +121,18 @@ class TestDatabaseConfigAddrs:
         assert connect_args["port"] == expected_port
         assert connect_args["password"] == "p@ss:/w"
         assert connect_args["target_session_attrs"] == "primary"
+
+
+class TestSessionStartTimeout:
+    def test_default_is_unchanged(self) -> None:
+        assert SessionConfig.model_validate({}).start_timeout == 1800.0
+
+    @pytest.mark.parametrize("key", ["start_timeout", "start-timeout"])
+    def test_accepts_field_name_and_alias(self, key: str) -> None:
+        config = SessionConfig.model_validate({key: 900}, by_name=True)
+        assert config.start_timeout == 900.0
+
+    @pytest.mark.parametrize("value", [0, -1])
+    def test_rejects_non_positive(self, value: float) -> None:
+        with pytest.raises(BackendAISchemaValidationFailed):
+            SessionConfig.model_validate({"start-timeout": value}, by_name=True)
