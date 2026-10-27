@@ -3,6 +3,7 @@ import logging
 from asyncio import subprocess
 from typing import Any
 
+from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend
 from ai.backend.appproxy.worker.proxy.frontend.base import BaseFrontend
@@ -26,6 +27,11 @@ class H2Frontend[TCircuitKeyType: (int, str)](BaseFrontend[H2Backend, TCircuitKe
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
         # We can't measure activeness of HTTP/2 circuits
         return []
+
+    @override
+    def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
+        # nghttpx forwards request bodies without passing them through the worker.
+        pass
 
     async def _log_monitor_task(
         self, stream: asyncio.StreamReader, log_header_postfix: str = ""

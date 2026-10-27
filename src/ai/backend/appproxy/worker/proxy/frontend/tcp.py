@@ -7,6 +7,7 @@ from typing import Any
 
 from aiohttp import web
 
+from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.errors import (
     ServerMisconfiguredError,
 )
@@ -37,6 +38,15 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
         self.servers = []
         self.server_tasks = []
 
+<<<<<<< HEAD
+=======
+    @override
+    def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
+        # A raw TCP stream carries no Content-Encoding.
+        pass
+
+    @override
+>>>>>>> f2da0d86d (feat(BA-8693): reject configured request content codings at the App Proxy (#16041))
     async def start(self) -> None:
         proxy_worker_config = self.root_context.local_config.proxy_worker
         port_proxy_config = proxy_worker_config.port_proxy
