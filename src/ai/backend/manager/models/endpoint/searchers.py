@@ -117,7 +117,7 @@ class DeploymentInfoSearcher(Searcher[EndpointRow, DeploymentInfo]):
     """Deployment rows read with the current and deploying revision ids.
 
     The revision rows and the policy are not loaded; the caller fills them with
-    ``attach_revisions_and_policy`` (repositories/deployment/db_source).
+    ``DeploymentDBSource._attach_revisions_and_policy``.
     """
 
     @override

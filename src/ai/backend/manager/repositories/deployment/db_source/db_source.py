@@ -262,62 +262,6 @@ def _project_preset_slots(
     ]
 
 
-async def attach_revisions_and_policy(
-    r: V2ReadOps, infos: Sequence[DeploymentInfo]
-) -> list[DeploymentInfo]:
-    """Fill the current and deploying revisions and the policy of ``infos``, which carry
-    the revision ids only, in the transaction of ``r``."""
-    revision_ids = [
-        revision_id
-        for info in infos
-        for revision_id in (info.current_revision_id, info.deploying_revision_id)
-        if revision_id is not None
-    ]
-    revisions = (
-        await r.search_in_global(
-            ModelRevisionSearcher(
-                pagination=NoPagination(),
-                conditions=[
-                    ModelRevisionSearchableFields.own.field_id.filter.in_(
-                        UUIDInMatchSpec(values=revision_ids, negated=False)
-                    )
-                ],
-            )
-        )
-        if revision_ids
-        else None
-    )
-    revision_by_id = {revision.id: revision for revision in revisions.items} if revisions else {}
-    policies = (
-        await r.search_in_global(
-            DeploymentPolicySearcher(
-                pagination=NoPagination(),
-                conditions=[
-                    DeploymentPolicySearchableFields.own.endpoint.filter.in_(
-                        UUIDInMatchSpec(values=[info.id for info in infos], negated=False)
-                    )
-                ],
-            )
-        )
-        if infos
-        else None
-    )
-    policy_by_endpoint = {policy.endpoint: policy for policy in policies.items} if policies else {}
-    return [
-        replace(
-            info,
-            current_revision=revision_by_id.get(info.current_revision_id)
-            if info.current_revision_id is not None
-            else None,
-            deploying_revision=revision_by_id.get(info.deploying_revision_id)
-            if info.deploying_revision_id is not None
-            else None,
-            policy=policy_by_endpoint.get(info.id),
-        )
-        for info in infos
-    ]
-
-
 class DeploymentDBSource:
     """Database source for deployment-related operations."""
 
@@ -533,6 +477,66 @@ class DeploymentDBSource:
             )
         return infos
 
+    @staticmethod
+    async def _attach_revisions_and_policy(
+        r: V2ReadOps, infos: Sequence[DeploymentInfo]
+    ) -> list[DeploymentInfo]:
+        """Fill the current and deploying revisions and the policy of ``infos``, which carry
+        the revision ids only, in the transaction of ``r``."""
+        revision_ids = [
+            revision_id
+            for info in infos
+            for revision_id in (info.current_revision_id, info.deploying_revision_id)
+            if revision_id is not None
+        ]
+        revisions = (
+            await r.search_in_global(
+                ModelRevisionSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        ModelRevisionSearchableFields.own.field_id.filter.in_(
+                            UUIDInMatchSpec(values=revision_ids, negated=False)
+                        )
+                    ],
+                )
+            )
+            if revision_ids
+            else None
+        )
+        revision_by_id = (
+            {revision.id: revision for revision in revisions.items} if revisions else {}
+        )
+        policies = (
+            await r.search_in_global(
+                DeploymentPolicySearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        DeploymentPolicySearchableFields.own.endpoint.filter.in_(
+                            UUIDInMatchSpec(values=[info.id for info in infos], negated=False)
+                        )
+                    ],
+                )
+            )
+            if infos
+            else None
+        )
+        policy_by_endpoint = (
+            {policy.endpoint: policy for policy in policies.items} if policies else {}
+        )
+        return [
+            replace(
+                info,
+                current_revision=revision_by_id.get(info.current_revision_id)
+                if info.current_revision_id is not None
+                else None,
+                deploying_revision=revision_by_id.get(info.deploying_revision_id)
+                if info.deploying_revision_id is not None
+                else None,
+                policy=policy_by_endpoint.get(info.id),
+            )
+            for info in infos
+        ]
+
     async def get_image_id(self, image: ImageIdentifier) -> ImageID:
         """The live image the canonical names for the architecture, or that carries it as an
         alias."""
@@ -705,7 +709,7 @@ class DeploymentDBSource:
         """
         async with self._reconcile_ops.read_ops() as r:
             result = await r.search_in_global(searcher)
-            deployments = await attach_revisions_and_policy(r, result.items)
+            deployments = await self._attach_revisions_and_policy(r, result.items)
         if not deployments:
             return []
         async with self._begin_readonly_session_read_committed() as db_sess:
@@ -1284,7 +1288,7 @@ class DeploymentDBSource:
         """
         async with self._reconcile_ops.read_ops() as r:
             result = await r.search_in_global(searcher)
-            items = await attach_revisions_and_policy(r, result.items)
+            items = await self._attach_revisions_and_policy(r, result.items)
         return DeploymentInfoSearchResult(
             items=items,
             total_count=result.total_count,
