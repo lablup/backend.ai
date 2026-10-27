@@ -86,6 +86,31 @@ class EtcdConfig(BaseConfigSchema):
             example=ConfigExample(local="", prod="ETCD_PASSWORD"),
         ),
     ]
+    keep_alive_interval: Annotated[
+        float,
+        Field(default=5.0, gt=0),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds without a frame from an etcd member before a keep-alive ping is sent "
+                "on a connection with requests in flight. "
+                "Must not be below the server's --grpc-keepalive-min-time (5 seconds by default)."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="5.0", prod="5.0"),
+        ),
+    ]
+    keep_alive_timeout: Annotated[
+        float,
+        Field(default=3.0, gt=0),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds to wait for a keep-alive ping reply before the connection to that "
+                "etcd member is closed and its requests go to the other members."
+            ),
+            added_version="26.10.0",
+            example=ConfigExample(local="3.0", prod="3.0"),
+        ),
+    ]
 
     @model_validator(mode="before")
     @classmethod
@@ -106,4 +131,6 @@ class EtcdConfig(BaseConfigSchema):
             addrs=self.addrs,
             user=self.user,
             password=self.password,
+            keep_alive_interval=self.keep_alive_interval,
+            keep_alive_timeout=self.keep_alive_timeout,
         )

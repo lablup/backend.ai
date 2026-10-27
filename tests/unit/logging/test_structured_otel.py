@@ -34,6 +34,10 @@ class _CollectingExporter(LogRecordExporter):
     def shutdown(self) -> None:
         pass
 
+    @override
+    def force_flush(self, timeout_millis: int = 30000) -> bool:
+        return True
+
     def delivered(self) -> list[ReadableLogRecord]:
         return list(self._records)
 

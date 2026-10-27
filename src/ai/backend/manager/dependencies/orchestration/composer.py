@@ -35,6 +35,9 @@ from ai.backend.manager.repositories.resource_usage_history.repository import (
 from ai.backend.manager.repositories.retention.repository import RetentionRepository
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.repositories.system_session_environ.repository import (
+    SystemSessionEnvironRepository,
+)
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
@@ -77,6 +80,7 @@ class OrchestrationInput:
     fair_share_repository: FairShareRepository
     resource_usage_repository: ResourceUsageHistoryRepository
     retention_repository: RetentionRepository
+    system_session_environ_repository: SystemSessionEnvironRepository
     agent_client_pool: AgentClientPool
     appproxy_client_pool: AppProxyClientPool
     network_plugin_ctx: NetworkPluginContext
@@ -159,6 +163,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             metric_repository=setup_input.metric_repository,
             fair_share_repository=setup_input.fair_share_repository,
             resource_usage_repository=setup_input.resource_usage_repository,
+            system_session_environ_repository=setup_input.system_session_environ_repository,
             config_provider=setup_input.config_provider,
             agent_client_pool=setup_input.agent_client_pool,
             appproxy_client_pool=setup_input.appproxy_client_pool,

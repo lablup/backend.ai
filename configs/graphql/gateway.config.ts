@@ -5,8 +5,13 @@ import {
   WSTransportOptions,
   type GatewayPlugin,
 } from '@graphql-hive/gateway';
+import { Agent as HttpAgent } from 'node:http';
+import { Agent as HttpsAgent } from 'node:https';
+import type { Socket } from 'node:net';
 
 const MANAGER_PROBE_PATH = '/health/readyz';
+// WebSocket close code for a connection dropped without a close frame
+const WS_ABNORMAL_CLOSURE = 1006;
 
 // Returns the default when the variable is unset; rejects anything but a positive number
 const readPositiveNumberEnv = (name: string, defaultValue: number): number => {
@@ -28,6 +33,31 @@ const managerEndpoints = (process.env.BACKENDAI_MANAGER_ENDPOINTS || '')
   .map((endpoint) => new URL(endpoint).origin);
 const managerRequestTimeoutMs = readPositiveNumberEnv('BACKENDAI_MANAGER_REQUEST_TIMEOUT', 60) * 1000;
 
+// Errors raised before the connection to the manager is established, so the request never reached it
+const isConnectFailure = (error: any): boolean => error?.syscall === 'connect';
+
+// Destroys a socket that has not connected within timeoutMs with an error isConnectFailure accepts
+const withConnectTimeout = <T extends HttpAgent>(agent: T, timeoutMs: number): T => {
+  const createConnection = (agent as any).createConnection.bind(agent);
+  (agent as any).createConnection = (options: any, callback: any) => {
+    const socket: Socket = createConnection(options, callback);
+    if (socket.connecting) {
+      const timer = setTimeout(() => {
+        socket.destroy(
+          Object.assign(new Error(`connect ETIMEDOUT ${options.host}:${options.port}`), {
+            code: 'ETIMEDOUT',
+            syscall: 'connect',
+          }),
+        );
+      }, timeoutMs);
+      socket.once('connect', () => clearTimeout(timer));
+      socket.once('close', () => clearTimeout(timer));
+    }
+    return socket;
+  };
+  return agent;
+};
+
 // Opens each subgraph request or subscription on a ready manager in BACKENDAI_MANAGER_ENDPOINTS
 // (comma-separated origins). Without the list, the transportEntries locations are used as is.
 const useManagerPoolPlugin = (): GatewayPlugin => {
@@ -38,11 +68,16 @@ const useManagerPoolPlugin = (): GatewayPlugin => {
   const intervalMs = readPositiveNumberEnv('BACKENDAI_MANAGER_HEALTH_CHECK_INTERVAL', 10) * 1000;
   const probeTimeoutMs = readPositiveNumberEnv('BACKENDAI_MANAGER_HEALTH_CHECK_PROBE_TIMEOUT', 3) * 1000;
   const failureThreshold = readPositiveNumberEnv('BACKENDAI_MANAGER_HEALTH_CHECK_FAILURE_THRESHOLD', 3);
+  const connectTimeoutMs = readPositiveNumberEnv('BACKENDAI_MANAGER_CONNECT_TIMEOUT', 3) * 1000;
+  const httpAgent = withConnectTimeout(new HttpAgent({ keepAlive: true }), connectTimeoutMs);
+  const httpsAgent = withConnectTimeout(new HttpsAgent({ keepAlive: true }), connectTimeoutMs);
   const readyManagers = new Set<string>(managers);
   const failureCounts = new Map<string, number>(managers.map((manager) => [manager, 0]));
   const probingManagers = new Set<string>();
   // Keyed by the manager-specific subscription location
   const wsExecutors = new Map<string, any>();
+  // Callbacks that end the subscriptions open on each subscription location
+  const subscriptionClosers = new Map<string, Set<() => void>>();
   let cursor = 0;
   let timer: ReturnType<typeof setInterval> | undefined;
 
@@ -57,6 +92,48 @@ const useManagerPoolPlugin = (): GatewayPlugin => {
     const url = new URL(location);
     return `${manager}${url.pathname}${url.search}`;
   };
+  // The health check returns the manager to the pool once it responds
+  const dropManager = (manager: string) => {
+    readyManagers.delete(manager);
+  };
+  const closeSubscriptions = (location: string) => {
+    const closers = subscriptionClosers.get(location);
+    subscriptionClosers.delete(location);
+    closers?.forEach((close) => close());
+  };
+  // Ends the subscription with an error when the WS connection to its manager drops,
+  // instead of waiting for the WS client to retry the same manager
+  const subscribeOnManager = (executor: any, location: string) =>
+    async function* (executionRequest: any) {
+      const source = await executor(executionRequest);
+      if (!source?.[Symbol.asyncIterator]) {
+        yield source;
+        return;
+      }
+      const iterator = source[Symbol.asyncIterator]();
+      // The WS transport's iterator ends a pending next() with the error passed to throw()
+      const close = () => {
+        void iterator.throw?.(new Error('Lost the connection to the manager'));
+      };
+      let closers = subscriptionClosers.get(location);
+      if (!closers) {
+        closers = new Set();
+        subscriptionClosers.set(location, closers);
+      }
+      closers.add(close);
+      try {
+        while (true) {
+          const result = await iterator.next();
+          if (result.done) {
+            return;
+          }
+          yield result.value;
+        }
+      } finally {
+        subscriptionClosers.get(location)?.delete(close);
+        await iterator.return?.();
+      }
+    };
   // A 503 removes the manager at once; other failures remove it after the threshold
   const probe = async (manager: string) => {
     if (probingManagers.has(manager)) {
@@ -93,11 +170,41 @@ const useManagerPoolPlugin = (): GatewayPlugin => {
       void probeAll();
       timer = setInterval(probeAll, intervalMs);
     },
-    onFetch({ url, setURL, executionRequest }) {
+    onFetch({ url, setURL, fetchFn, setFetchFn, executionRequest }) {
       if (!executionRequest) {
         return;
       }
-      setURL(relocate(url, pickManager()));
+      let manager: string;
+      try {
+        manager = pickManager();
+      } catch (error) {
+        // A throw from this hook leaves the upstream timeout's rejection unhandled and ends the process
+        setFetchFn(() => Promise.reject(error));
+        return;
+      }
+      setURL(relocate(url, manager));
+      // A request that could not connect is resent once to another manager
+      setFetchFn(async (targetUrl: string, options: any, ...rest: any[]) => {
+        const agent = targetUrl.startsWith('https:') ? httpsAgent : httpAgent;
+        const fetchOnManager = async (target: string) => {
+          try {
+            return await fetchFn(relocate(targetUrl, target), { ...options, agent }, ...rest);
+          } catch (error) {
+            if (isConnectFailure(error)) {
+              dropManager(target);
+            }
+            throw error;
+          }
+        };
+        try {
+          return await fetchOnManager(manager);
+        } catch (error) {
+          if (!isConnectFailure(error) || readyManagers.size === 0) {
+            throw error;
+          }
+          return fetchOnManager(pickManager());
+        }
+      });
     },
     onSubgraphExecute({ executionRequest, transportEntry, setExecutor, log }) {
       const subscriptions = transportEntry?.options?.subscriptions;
@@ -108,7 +215,8 @@ const useManagerPoolPlugin = (): GatewayPlugin => {
       ) {
         return;
       }
-      const location = relocate(transportEntry.location, pickManager());
+      const manager = pickManager();
+      const location = relocate(transportEntry.location, manager);
       let executor = wsExecutors.get(location);
       if (!executor) {
         // Same entry the HTTP transport hands to the WS transport for subscriptions
@@ -125,10 +233,17 @@ const useManagerPoolPlugin = (): GatewayPlugin => {
             },
           },
           log,
-        } as any);
+        } as any, (client: any) => {
+          client.on('closed', (event: any) => {
+            if (event?.code === WS_ABNORMAL_CLOSURE) {
+              dropManager(manager);
+              closeSubscriptions(location);
+            }
+          });
+        });
         wsExecutors.set(location, executor);
       }
-      setExecutor(executor);
+      setExecutor(subscribeOnManager(executor, location));
     },
     async onDispose() {
       clearInterval(timer);

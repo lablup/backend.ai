@@ -1083,9 +1083,9 @@ setup_environment() {
   show_info "Pre-pulling frequently used kernel images..."
   echo "NOTE: Other images will be downloaded from the docker registry when requested.\n"
   if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-    $docker_sudo docker pull "cr.backend.ai/multiarch/python:3.9-ubuntu20.04"
+    $docker_sudo docker pull "cr.backend.ai/stable/python:3.13-ubuntu24.04-arm64"
   else
-    $docker_sudo docker pull "cr.backend.ai/stable/python:3.9-ubuntu20.04"
+    $docker_sudo docker pull "cr.backend.ai/stable/python:3.13-ubuntu24.04-amd64"
   fi
 }
 
@@ -1342,9 +1342,9 @@ configure_backendai() {
   show_info "Scanning the image registry..."
   ./backend.ai mgr image rescan cr.backend.ai
   if [ "$(uname -m)" = "arm64" ] || [ "$(uname -m)" = "aarch64" ]; then
-    ./backend.ai mgr image alias python "cr.backend.ai/multiarch/python:3.9-ubuntu20.04" aarch64
+    ./backend.ai mgr image alias python "cr.backend.ai/stable/python:3.13-ubuntu24.04-arm64" aarch64
   else
-    ./backend.ai mgr image alias python "cr.backend.ai/stable/python:3.9-ubuntu20.04" x86_64
+    ./backend.ai mgr image alias python "cr.backend.ai/stable/python:3.13-ubuntu24.04-amd64" x86_64
   fi
 
   # Virtual folder setup

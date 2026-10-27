@@ -137,6 +137,8 @@ def build_v2_routes(
     from .storage_host.registry import register_v2_storage_host_routes
     from .storage_namespace.handler import V2StorageNamespaceHandler
     from .storage_namespace.registry import register_v2_storage_namespace_routes
+    from .system_session_environ.handler import V2SystemSessionEnvironHandler
+    from .system_session_environ.registry import register_v2_system_session_environ_routes
     from .user.handler import V2UserHandler
     from .user.registry import register_v2_user_routes
     from .vfolder.handler import V2VFolderHandler
@@ -215,6 +217,9 @@ def build_v2_routes(
     )
     storage_host_handler = V2StorageHostHandler(adapter=adapters.storage_host)
     storage_namespace_handler = V2StorageNamespaceHandler(adapter=adapters.storage_namespace)
+    system_session_environ_handler = V2SystemSessionEnvironHandler(
+        adapter=adapters.system_session_environ
+    )
     user_handler = V2UserHandler(adapter=adapters.user)
     vfolder_handler = V2VFolderHandler(adapter=adapters.vfolder)
     vfs_storage_handler = V2VFSStorageHandler(adapter=adapters.vfs_storage)
@@ -321,6 +326,9 @@ def build_v2_routes(
     v2_reg.add_subregistry(register_v2_storage_host_routes(storage_host_handler, route_deps))
     v2_reg.add_subregistry(
         register_v2_storage_namespace_routes(storage_namespace_handler, route_deps)
+    )
+    v2_reg.add_subregistry(
+        register_v2_system_session_environ_routes(system_session_environ_handler, route_deps)
     )
     v2_reg.add_subregistry(register_v2_user_routes(user_handler, route_deps))
     v2_reg.add_subregistry(register_v2_vfolder_routes(vfolder_handler, route_deps))

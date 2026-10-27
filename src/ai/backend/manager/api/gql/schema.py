@@ -661,6 +661,10 @@ from ai.backend.manager.api.gql.storage_volume.resolver import (
 from ai.backend.manager.api.gql.storage_volume_service_attachment.resolver import (
     admin_storage_volume_service_attachments,
 )
+from ai.backend.manager.api.gql.system_session_environ.resolver import (
+    admin_system_session_environs,
+    system_session_environ_value_sources,
+)
 from ai.backend.manager.api.gql.user.resolver.mutation import (
     admin_bulk_create_users_v2,
     admin_bulk_create_users_with_keypair_v2,
@@ -855,6 +859,8 @@ class Query:
     scoped_resource_groups = scoped_resource_groups
     admin_resource_group_v2 = admin_resource_group_v2
     scheduling_handlers = scheduling_handlers
+    admin_system_session_environs = admin_system_session_environs
+    system_session_environ_value_sources = system_session_environ_value_sources
     admin_session_lifecycle_handlers = admin_session_lifecycle_handlers
     compute_schedule = compute_schedule
     admin_allowed_resource_groups_for_domain_v2 = admin_allowed_resource_groups_for_domain_v2
