@@ -67,7 +67,11 @@ class PortFrontend(BaseHTTPFrontend[int]):
                 template_path = f / "templates"
                 aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(template_path))
 
-            runner = web.AppRunner(app, keepalive_timeout=30.0)
+            runner = web.AppRunner(
+                app,
+                keepalive_timeout=30.0,
+                auto_decompress=False,  # transparently pass the request body
+            )
             await runner.setup()
             service_host = port_proxy_config.bind_host
             site = web.TCPSite(
