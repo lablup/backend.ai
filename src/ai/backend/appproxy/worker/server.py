@@ -37,7 +37,7 @@ from aiohttp.web_app import CleanupError
 from setproctitle import setproctitle
 from tenacity import AsyncRetrying, TryAgain, retry_if_exception_type, wait_exponential
 
-from ai.backend.appproxy.common.config import ContentEncodingConfig, get_default_redis_key_ttl
+from ai.backend.appproxy.common.config import get_default_redis_key_ttl
 from ai.backend.appproxy.common.defs import (
     AGENTID_WORKER,
     APPPROXY_ANYCAST_STREAM_KEY,
@@ -527,7 +527,7 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ):
         with attempt:
             try:
-                await register_worker(root_ctx, str(uuid.uuid4()))
+                registration = await register_worker(root_ctx, str(uuid.uuid4()))
             except CoordinatorConnectionError as e:
                 log.warning(
                     "failed to connect to the coordinator; retrying",
@@ -536,6 +536,7 @@ async def worker_registration_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                     ),
                 )
                 raise TryAgain from e
+            root_ctx.proxy_frontend.apply_content_encoding_config(registration.content_encoding)
 
     circuits = await list_worker_circuits(root_ctx, str(uuid.uuid4()))
     for circuit in circuits:
@@ -743,10 +744,10 @@ async def handle_content_encoding_config_updated_event(
     _agent_id: AgentId,
     event: AppProxyContentEncodingConfigUpdatedEvent,
 ) -> None:
-    context.content_encoding = event.content_encoding
+    context.proxy_frontend.apply_content_encoding_config(event.content_encoding)
     log.info(
         "applied the content encoding config",
-        rejected_encodings=",".join(context.content_encoding.rejected_encodings),
+        rejected_encodings=",".join(event.content_encoding.rejected_encodings),
     )
 
 
@@ -856,7 +857,6 @@ def build_root_app(
     subapp_pkgs: Sequence[str] = (),
 ) -> web.Application:
     root_ctx = RootContext()
-    root_ctx.content_encoding = ContentEncodingConfig(rejected_encodings=[])
     root_ctx.metrics = WorkerMetricRegistry.instance()
 
     app = web.Application(

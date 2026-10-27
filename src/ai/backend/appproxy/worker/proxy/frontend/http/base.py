@@ -7,6 +7,7 @@ import jwt
 from aiohttp import hdrs, web
 from aiohttp_remotes import XForwardedStrict
 
+from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.defs import (
     ERROR_TEMPLATE_NAME,
     MEDIA_TYPE_HTML,
@@ -34,9 +35,11 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TCircuitKeyType]):
     root_context: RootContext
     _xff_strict: XForwardedStrict | None
+    _content_encoding: ContentEncodingConfig
 
     def __init__(self, root_context: RootContext) -> None:
         super().__init__(root_context)
+        self._content_encoding = ContentEncodingConfig(rejected_encodings=[])
         # With trusted proxies set, an XForwardedStrict middleware resolves request.remote from X-Forwarded-For.
         # Empty means directly exposed — no middleware.
         trusted_proxies = root_context.local_config.proxy_worker.trusted_proxies
@@ -118,8 +121,12 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
             and request.headers.get("upgrade", "").lower() == "websocket"
         )
 
+    @override
+    def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
+        self._content_encoding = config
+
     def _find_rejected_content_encoding(self, request: web.Request) -> str | None:
-        rejected_encodings = self.root_context.content_encoding.rejected_encodings
+        rejected_encodings = self._content_encoding.rejected_encodings
         for header_value in request.headers.getall(hdrs.CONTENT_ENCODING, []):
             for coding in header_value.split(","):
                 trimmed_coding = coding.strip()

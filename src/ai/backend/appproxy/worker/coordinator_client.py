@@ -1,4 +1,5 @@
 import logging
+from dataclasses import dataclass
 from typing import Any, cast
 
 import aiohttp
@@ -97,7 +98,13 @@ async def destroy_circuit(root_ctx: RootContext, request_id: str, circuit_id: st
         raise InternalServerError from e
 
 
-async def register_worker(root_ctx: RootContext, request_id: str) -> list[Slot]:
+@dataclass(frozen=True)
+class WorkerRegistration:
+    slots: list[Slot]
+    content_encoding: ContentEncodingConfig
+
+
+async def register_worker(root_ctx: RootContext, request_id: str) -> WorkerRegistration:
     local_config = root_ctx.local_config
     sess = _get_coordinator_session(root_ctx)
     headers = _get_request_headers(root_ctx, request_id)
@@ -172,15 +179,17 @@ async def register_worker(root_ctx: RootContext, request_id: str) -> list[Slot]:
             resp.raise_for_status()
             body = await resp.json()
             root_ctx.worker_id = body["id"]
-            root_ctx.content_encoding = ContentEncodingConfig.model_validate(
-                body.get("content_encoding", {})
-            )
             log.info(
                 "joined the coordinator",
                 worker_id=root_ctx.worker_id,
                 coordinator_endpoint=str(root_ctx.local_config.proxy_worker.coordinator_endpoint),
             )
-            return cast(list[Slot], body["slots"])
+            return WorkerRegistration(
+                slots=cast(list[Slot], body["slots"]),
+                content_encoding=ContentEncodingConfig.model_validate(
+                    body.get("content_encoding", {})
+                ),
+            )
     except aiohttp.ClientResponseError as e:
         raise WorkerRegistrationError(
             extra_data={

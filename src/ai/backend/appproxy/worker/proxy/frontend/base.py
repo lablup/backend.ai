@@ -4,6 +4,7 @@ import asyncio
 import logging
 from abc import ABCMeta, abstractmethod
 
+from ai.backend.appproxy.common.config import ContentEncodingConfig
 from ai.backend.appproxy.common.types import (
     RouteInfo,
 )
@@ -23,6 +24,9 @@ class BaseFrontend[TBackend: BaseBackend, TCircuitKeyType: (int, str)](metaclass
         self.root_context = root_context
         self.circuits = {}
         self.backends = {}
+
+    def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
+        pass
 
     async def register_circuit(self, circuit: Circuit, routes: list[RouteInfo]) -> None:
         metrics = self.root_context.metrics

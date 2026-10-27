@@ -21,16 +21,14 @@ class _ContentEncodingHeaders:
 
 @pytest.fixture
 def port_frontend_rejecting_br_and_zstd(mocker: pytest_mock.MockerFixture) -> PortFrontend:
-    root_context = mocker.MagicMock()
-    root_context.content_encoding = ContentEncodingConfig(rejected_encodings=["br", "zstd"])
-    return PortFrontend(root_context=root_context)
+    frontend = PortFrontend(root_context=mocker.MagicMock())
+    frontend.apply_content_encoding_config(ContentEncodingConfig(rejected_encodings=["br", "zstd"]))
+    return frontend
 
 
 @pytest.fixture
 def port_frontend_rejecting_no_encoding(mocker: pytest_mock.MockerFixture) -> PortFrontend:
-    root_context = mocker.MagicMock()
-    root_context.content_encoding = ContentEncodingConfig(rejected_encodings=[])
-    return PortFrontend(root_context=root_context)
+    return PortFrontend(root_context=mocker.MagicMock())
 
 
 @pytest.fixture
