@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from enum import StrEnum
 
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_enum
 
 
@@ -52,12 +53,16 @@ class VFolderOwnershipTypeGQL(StrEnum):
 @gql_enum(
     BackendAIGQLMeta(
         added_version="26.4.2",
-        description="Operation status of a virtual folder.",
+        description=(
+            "Operation status of a virtual folder. "
+            f"CREATING (added in {NEXT_RELEASE_VERSION}) is set while the storage folder is being created."
+        ),
     ),
     name="VFolderOperationStatus",
 )
 class VFolderOperationStatusGQL(StrEnum):
     READY = "ready"
+    CREATING = "creating"
     CLONING = "cloning"
     DELETE_PENDING = "delete-pending"
     DELETE_ONGOING = "delete-ongoing"
