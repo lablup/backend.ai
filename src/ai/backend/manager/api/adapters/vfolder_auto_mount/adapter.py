@@ -5,8 +5,10 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountID
+from ai.backend.common.data.vfolder_auto_mount.types import VFolderAutoMountScopeType
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
     CreateVFolderAutoMountInput,
@@ -39,11 +41,15 @@ from ai.backend.manager.models.condition_utils import (
     combine_conditions_or,
     negate_conditions,
 )
+from ai.backend.manager.models.scopes import ScopeTarget
 from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.models.specs.soft_delete import SoftDeleteUpdater
 from ai.backend.manager.models.vfolder_auto_mount.creators import VFolderAutoMountCreator
 from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
-from ai.backend.manager.models.vfolder_auto_mount.scopes import ProjectVFolderAutoMountTarget
+from ai.backend.manager.models.vfolder_auto_mount.scopes import (
+    ProjectVFolderAutoMountTarget,
+    UserVFolderAutoMountTarget,
+)
 from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
     VFolderAutoMountSearchableFields,
 )
@@ -76,7 +82,8 @@ _VFOLDER_AUTO_MOUNT_PAGINATION_SPEC = PaginationSpec(
 
 
 class VFolderAutoMountAdapter(BaseAdapter):
-    """Adapter for adding, updating, deleting and reading the vfolder auto-mounts of projects."""
+    """Adapter for adding, updating, deleting and reading the vfolder auto-mounts of projects
+    and users."""
 
     _vfolder_auto_mount: VFolderAutoMountProcessors
 
@@ -102,7 +109,15 @@ class VFolderAutoMountAdapter(BaseAdapter):
     async def scoped_search(
         self, input: ScopedSearchVFolderAutoMountsInput
     ) -> SearchVFolderAutoMountsPayload:
-        """Search the auto-mounts of the named projects, combined with OR."""
+        """Search the auto-mounts of the named projects and users, combined with OR."""
+        scopes: list[ScopeTarget] = [
+            ProjectVFolderAutoMountTarget(project_id=ProjectID(entry.value))
+            for entry in input.scope.project or []
+        ]
+        scopes.extend(
+            UserVFolderAutoMountTarget(user_id=UserID(entry.value))
+            for entry in input.scope.user or []
+        )
         searcher = self._build_searcher(
             VFolderAutoMountSearcher,
             conditions=self._search_conditions(input.filter),
@@ -117,22 +132,16 @@ class VFolderAutoMountAdapter(BaseAdapter):
         )
         result = await self._vfolder_auto_mount.search.run(
             SearchVFolderAutoMountsAction(
-                searcher=ScopedSearcher(
-                    scopes=[
-                        ProjectVFolderAutoMountTarget(project_id=ProjectID(entry.value))
-                        for entry in input.scope.project
-                    ],
-                    used_by=(),
-                    searcher=searcher,
-                )
+                searcher=ScopedSearcher(scopes=scopes, used_by=(), searcher=searcher)
             )
         )
         return self._to_payload(result)
 
     async def create(self, input: CreateVFolderAutoMountInput) -> CreateVFolderAutoMountPayload:
-        """Auto-mount a vfolder of a project into every session created in it."""
+        """Auto-mount a vfolder of a project, or one a user owns, into every session created
+        in that project or by that user."""
         creator = VFolderAutoMountCreator(
-            scope=ProjectID(input.project_id),
+            scope=input.scope.scope_type.to_owner(input.scope.scope_id),
             spec=VFolderAutoMountSpec(
                 vfolder_id=VFolderUUID(input.vfolder_id),
                 mount_destination=input.mount_destination,
@@ -188,7 +197,8 @@ class VFolderAutoMountAdapter(BaseAdapter):
         fields = VFolderAutoMountSearchableFields.own
         conditions = [
             *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
-            *self.apply_uuid_filter(filter.project_id, fields.scope_id.filter),
+            *self.apply_enum_filter(filter.scope_type, fields.scope_type.filter),
+            *self.apply_uuid_filter(filter.scope_id, fields.scope_id.filter),
             *self.apply_uuid_filter(filter.vfolder_id, fields.vfolder_id.filter),
             *self.apply_string_filter(filter.mount_destination, fields.mount_destination.filter),
             *self.apply_enum_filter(filter.mount_permission, fields.mount_permission.filter),
@@ -247,7 +257,8 @@ class VFolderAutoMountAdapter(BaseAdapter):
         return VFolderAutoMountNode(
             id=data.id,
             entity_id=data.entity_id(),
-            project_id=data.scope,
+            scope_type=VFolderAutoMountScopeType.of_owner(data.scope),
+            scope_id=data.scope,
             vfolder_id=data.vfolder_id,
             mount_destination=data.mount_destination,
             subpath=data.subpath,

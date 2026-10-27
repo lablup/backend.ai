@@ -22,6 +22,8 @@ from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.vfolder_auto_mount.types import (
     VFolderAutoMountOrderField,
     VFolderAutoMountScope,
+    VFolderAutoMountScopeRef,
+    VFolderAutoMountScopeType,
 )
 from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import MountPermission
@@ -34,11 +36,16 @@ __all__ = (
     "VFolderAutoMountFilter",
     "VFolderAutoMountOrder",
     "VFolderAutoMountPermissionFilter",
+    "VFolderAutoMountScopeTypeFilter",
 )
 
 
 class VFolderAutoMountPermissionFilter(EnumFilter[MountPermission]):
     """Filter for the permission a vfolder is auto-mounted with."""
+
+
+class VFolderAutoMountScopeTypeFilter(EnumFilter[VFolderAutoMountScopeType]):
+    """Filter for the kind of scope an auto-mount is set on."""
 
 
 class VFolderAutoMountFilter(BaseRequestModel):
@@ -49,7 +56,12 @@ class VFolderAutoMountFilter(BaseRequestModel):
     """
 
     entity_id: UUIDFilter | None = Field(default=None, description="Filter by auto-mount ID.")
-    project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID.")
+    scope_type: VFolderAutoMountScopeTypeFilter | None = Field(
+        default=None, description="Filter by the kind of scope the auto-mount is set on."
+    )
+    scope_id: UUIDFilter | None = Field(
+        default=None, description="Filter by the ID of the project or the user."
+    )
     vfolder_id: UUIDFilter | None = Field(default=None, description="Filter by vfolder ID.")
     mount_destination: StringFilter | None = Field(
         default=None, description="Filter by mount destination."
@@ -107,13 +119,14 @@ class ScopedSearchVFolderAutoMountsInput(BaseRequestModel):
 
 
 class CreateVFolderAutoMountInput(BaseRequestModel):
-    """Input for auto-mounting a vfolder into every session created in a project.
+    """Input for auto-mounting a vfolder into every session created in a project or by a user.
 
-    The vfolder must belong to that project; for a personal project, that is the
-    owner's personal vfolders.
+    The vfolder must belong to that project, or be owned by that user.
     """
 
-    project_id: UUID = Field(description="ID of the project the vfolder is auto-mounted in.")
+    scope: VFolderAutoMountScopeRef = Field(
+        description="The project or the user the vfolder is auto-mounted for."
+    )
     vfolder_id: UUID = Field(description="ID of the vfolder to auto-mount.")
     mount_destination: str = Field(
         min_length=1, description="Path in the session container the vfolder is mounted at."

@@ -30,7 +30,8 @@ class V2VFolderAutoMountHandler:
         self,
         body: BodyParam[CreateVFolderAutoMountInput],
     ) -> APIResponse:
-        """Auto-mount a vfolder of a project into every session created in it."""
+        """Auto-mount a vfolder of a project or a user into every session created in that
+        project or by that user."""
         result = await self._adapter.create(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=result)
 
@@ -38,7 +39,7 @@ class V2VFolderAutoMountHandler:
         self,
         body: BodyParam[ScopedSearchVFolderAutoMountsInput],
     ) -> APIResponse:
-        """Search the auto-mounts of the named projects, combined with OR."""
+        """Search the auto-mounts of the named projects and users, combined with OR."""
         result = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 

@@ -4,7 +4,6 @@ from typing import override
 
 import sqlalchemy as sa
 
-from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
 from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountID
 from ai.backend.common.data.vfolder_auto_mount.types import VFolderAutoMountScopeType
@@ -34,12 +33,12 @@ from ai.backend.manager.models.vfolder_auto_mount.searchable_fields import (
 
 @dataclass(frozen=True)
 class VFolderAutoMountCreator(GuardedEntityCreator[VFolderAutoMountRow, VFolderAutoMountData]):
-    """Add one vfolder to the auto-mounts of a project; the vfolder must belong to it.
+    """Add one vfolder to the auto-mounts of a project or a user; the vfolder must belong to it.
 
-    The row carries the project; the own and govern edges are derived from it.
+    The row carries the scope; the own and govern edges are derived from it.
     """
 
-    scope: ProjectID
+    scope: EntityIdentifier
     spec: VFolderAutoMountSpec
 
     @override
@@ -50,13 +49,20 @@ class VFolderAutoMountCreator(GuardedEntityCreator[VFolderAutoMountRow, VFolderA
     def created_in(self, row: VFolderAutoMountRow) -> Collection[EntityIdentifier]:
         return (RuntimeEntityID(EntityType(row.scope_type), row.scope_id),)
 
+    def _vfolder_outside_scope(self) -> sa.ColumnElement[bool]:
+        match VFolderAutoMountScopeType.of_owner(self.scope):
+            case VFolderAutoMountScopeType.PROJECT:
+                return VFolderRow.group.is_distinct_from(self.scope)
+            case VFolderAutoMountScopeType.USER:
+                return VFolderRow.user.is_distinct_from(self.scope)
+
     @override
     def precondition_checks(self) -> Sequence[PreconditionCheck]:
         return (
             PreconditionCheck(
                 finder=sa.select(VFolderRow.id).where(
                     VFolderRow.id == self.spec.vfolder_id,
-                    VFolderRow.group.is_distinct_from(self.scope),
+                    self._vfolder_outside_scope(),
                 ),
                 error=VFolderAutoMountVFolderOutsideScope(),
             ),
@@ -93,7 +99,7 @@ class VFolderAutoMountCreator(GuardedEntityCreator[VFolderAutoMountRow, VFolderA
     @override
     def build_row(self) -> VFolderAutoMountRow:
         return VFolderAutoMountRow(
-            scope_type=VFolderAutoMountScopeType.PROJECT,
+            scope_type=VFolderAutoMountScopeType.of_owner(self.scope),
             scope_id=self.scope,
             vfolder_id=self.spec.vfolder_id,
             mount_destination=self.spec.mount_destination,
