@@ -38,6 +38,7 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
