@@ -31188,9 +31188,7 @@ type VFolderMountPolicy
   updatedAt: DateTime!
 }
 
-"""
-Added in 26.4.2. Operation status of a virtual folder. CREATING (added in 26.10.0) is set while the storage folder is being created.
-"""
+"""Added in 26.4.2. Operation status of a virtual folder."""
 enum VFolderOperationStatus
   @join__type(graph: STRAWBERRY)
 {
