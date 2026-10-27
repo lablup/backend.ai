@@ -12,18 +12,18 @@ import (
 )
 
 type Config struct {
-	LastUsedMarkerPath string   `yaml:"lastusedmarkerpath"`
-	Id                 string   `yaml:"id"`
-	SessionIds         []string `yaml:"sessionids"`
-	RejectBrotli       bool     `yaml:"rejectbrotli"`
+	LastUsedMarkerPath       string   `yaml:"lastusedmarkerpath"`
+	Id                       string   `yaml:"id"`
+	SessionIds               []string `yaml:"sessionids"`
+	RejectedContentEncodings []string `yaml:"rejectedcontentencodings"`
 }
 
 func CreateConfig() *Config {
 	return &Config{
-		LastUsedMarkerPath: "",
-		Id:                 "",
-		SessionIds:         []string{},
-		RejectBrotli:       false,
+		LastUsedMarkerPath:       "",
+		Id:                       "",
+		SessionIds:               []string{},
+		RejectedContentEncodings: []string{},
 	}
 }
 
@@ -86,20 +86,23 @@ func (a *Plugin) MarkInactive() {
 	}
 }
 
-func (a *Plugin) isBrotliEncoded(req *http.Request) bool {
+func (a *Plugin) findRejectedContentEncoding(req *http.Request) (string, bool) {
 	for _, headerValue := range req.Header.Values("Content-Encoding") {
 		for _, coding := range strings.Split(headerValue, ",") {
-			if strings.EqualFold(strings.TrimSpace(coding), "br") {
-				return true
+			trimmedCoding := strings.TrimSpace(coding)
+			for _, rejectedEncoding := range a.config.RejectedContentEncodings {
+				if strings.EqualFold(trimmedCoding, rejectedEncoding) {
+					return strings.ToLower(trimmedCoding), true
+				}
 			}
 		}
 	}
-	return false
+	return "", false
 }
 
 func (a *Plugin) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if a.config.RejectBrotli && a.isBrotliEncoded(req) {
-		http.Error(rw, "Brotli-encoded request bodies are not accepted", http.StatusUnsupportedMediaType)
+	if rejectedEncoding, found := a.findRejectedContentEncoding(req); found {
+		http.Error(rw, fmt.Sprintf("Request bodies encoded with %s are not accepted", rejectedEncoding), http.StatusUnsupportedMediaType)
 		return
 	}
 

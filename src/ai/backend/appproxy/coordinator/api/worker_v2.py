@@ -112,10 +112,10 @@ class WorkerResponseModel(WorkerModel):
 
 
 class WorkerRegistrationResponseModel(WorkerResponseModel):
-    reject_brotli_request_body: Annotated[
-        bool,
+    rejected_content_encodings: Annotated[
+        list[str],
         Field(
-            description="Whether the worker must reject requests whose Content-Encoding contains br."
+            description="Content codings the worker must reject when a request's Content-Encoding contains any of them."
         ),
     ]
 
@@ -270,7 +270,7 @@ async def update_worker(
         result = await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
     return PydanticResponse(
         WorkerRegistrationResponseModel(
-            reject_brotli_request_body=root_ctx.local_config.proxy_coordinator.content_encoding.reject_brotli,
+            rejected_content_encodings=root_ctx.local_config.proxy_coordinator.content_encoding.rejected_encodings,
             **result,
         )
     )
@@ -341,7 +341,7 @@ async def heartbeat_worker(
     request["do_not_print_access_log"] = True
     return PydanticResponse(
         WorkerRegistrationResponseModel(
-            reject_brotli_request_body=root_ctx.local_config.proxy_coordinator.content_encoding.reject_brotli,
+            rejected_content_encodings=root_ctx.local_config.proxy_coordinator.content_encoding.rejected_encodings,
             **result,
         )
     )

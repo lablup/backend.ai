@@ -277,10 +277,11 @@
   # to session apps. Applies to both the built-in proxy workers and Traefik.
   # Added in 26.10.0
   [proxy_coordinator.content_encoding]
-    # Reject requests whose Content-Encoding contains br with 415 instead of
-    # forwarding them to session apps.
+    # Content codings (case-insensitive) that make a request be answered with 415
+    # instead of being forwarded to session apps when its Content-Encoding
+    # contains any of them.
     # Added in 26.10.0
-    reject_brotli = false
+    rejected_encodings = ["br"]
 
   # Configuration for Traefik integration when enable_traefik is true. Includes
   # the etcd connection settings that Traefik uses as its configuration backend.

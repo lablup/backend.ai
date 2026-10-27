@@ -8,7 +8,14 @@ from pprint import pformat
 from typing import Annotated, Any, Self
 
 import click
-from pydantic import Field, FilePath, IPvAnyNetwork, ValidationError, model_validator
+from pydantic import (
+    Field,
+    FilePath,
+    IPvAnyNetwork,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 from ai.backend.appproxy.common.config import (
     BaseSchema,
@@ -283,18 +290,24 @@ class ClientIPStrategyConfig(BaseSchema):
 
 
 class ContentEncodingConfig(BaseSchema):
-    reject_brotli: Annotated[
-        bool,
-        Field(default=False),
+    rejected_encodings: Annotated[
+        list[str],
+        Field(default_factory=list),
         BackendAIConfigMeta(
             description=(
-                "Reject requests whose Content-Encoding contains br with 415 instead of "
-                "forwarding them to session apps."
+                "Content codings (case-insensitive) that make a request be answered with 415 "
+                "instead of being forwarded to session apps when its Content-Encoding contains "
+                "any of them."
             ),
             added_version="26.10.0",
-            example=ConfigExample(local="false", prod="false"),
+            example=ConfigExample(local="[]", prod='["br"]'),
         ),
     ]
+
+    @field_validator("rejected_encodings")
+    @classmethod
+    def normalize_rejected_encodings(cls, encodings: list[str]) -> list[str]:
+        return [encoding.strip().lower() for encoding in encodings]
 
 
 class TraefikConfig(BaseSchema):
