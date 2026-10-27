@@ -16,14 +16,17 @@ from sqlalchemy.orm import load_only, noload
 from sqlalchemy.sql.expression import bindparam
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptRevisionData
 from ai.backend.manager.data.common.bulk import BulkCreateFailure, BulkUpdateFailure
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.keypair.types import (
@@ -43,6 +46,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderStorageTarget,
     vfolder_status_map,
 )
+from ai.backend.manager.errors.bootstrap_script import DefaultBootstrapScriptNotFound
 from ai.backend.manager.errors.keypair import NoDefaultKeypairResourcePolicy
 from ai.backend.manager.errors.resource import PersonalProjectNotFound
 from ai.backend.manager.errors.user import (
@@ -55,6 +59,18 @@ from ai.backend.manager.errors.user import (
     UserPurgeInProgress,
 )
 from ai.backend.manager.models.bootstrap_script.purgers import BootstrapScriptPurger
+from ai.backend.manager.models.bootstrap_script.searchable_fields import (
+    BootstrapScriptSearchableFields,
+)
+from ai.backend.manager.models.bootstrap_script_revision.creators import (
+    BootstrapScriptRevisionCreator,
+)
+from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
+    BootstrapScriptRevisionSearchableFields,
+)
+from ai.backend.manager.models.bootstrap_script_revision.searchers import (
+    BootstrapScriptRevisionSearcher,
+)
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.purgers import UserEndpointPurger
 from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
@@ -89,6 +105,7 @@ from ai.backend.manager.models.session.row import (
     by_user_id,
 )
 from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.types import QueryCondition, QueryOption, join_by_related_field
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.purgers import (
@@ -108,6 +125,7 @@ from ai.backend.manager.models.vfolder.row import (
     vfolders,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
@@ -148,6 +166,49 @@ class UserDBSource:
         self._policy_ops = policy_ops_provider
         self._user_ops_provider = UserOpsProvider(db)
         self._key_provider_pool = key_provider_pool
+
+    async def current_default_bootstrap_script(
+        self, user_id: UserID
+    ) -> BootstrapScriptRevisionData | None:
+        async with self._v2_ops.read_ops() as r:
+            return await self._current_default_revision(r, user_id)
+
+    async def add_default_bootstrap_script_revision(
+        self, user_id: UserID, script: BootstrapScript, creator_id: UserID
+    ) -> None:
+        """Append the next revision to the user's live default script."""
+        async with self._v2_ops.write_ops() as w:
+            current = await self._current_default_revision(w, user_id)
+            if current is None:
+                raise DefaultBootstrapScriptNotFound(f"{user_id} has no default bootstrap script")
+            await w.create_dangling_field(
+                BootstrapScriptRevisionCreator(
+                    script_id=current.script_id,
+                    script=script,
+                    creator_id=creator_id,
+                )
+            )
+
+    async def _current_default_revision(
+        self, ops: V2ReadOps, user_id: UserID
+    ) -> BootstrapScriptRevisionData | None:
+        script = BootstrapScriptSearchableFields.own
+        revision = BootstrapScriptRevisionSearchableFields.own
+        result = await ops.search_in_global(
+            BootstrapScriptRevisionSearcher(
+                pagination=OffsetPagination(limit=1),
+                conditions=[
+                    script.entity_type.filter.equals(
+                        StringMatchSpec(UserEntityType(), case_insensitive=False, negated=False)
+                    ),
+                    script.entity_id.filter.equals(UUIDEqualMatchSpec(user_id, negated=False)),
+                    script.is_default.filter.equals(True),
+                    script.deleted_at.filter.is_null(),
+                ],
+                orders=[revision.revision_number.order.apply(ascending=False)],
+            )
+        )
+        return result.items[0] if result.items else None
 
     async def get_user_by_uuid(self, user_uuid: UUID) -> UserData:
         """

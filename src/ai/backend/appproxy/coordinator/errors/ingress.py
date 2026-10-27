@@ -73,3 +73,18 @@ class ApiDeliveryWorkerPushFailedError(BackendAIError, web.HTTPBadGateway):
             operation=ErrorOperation.REQUEST,
             error_detail=ErrorDetail.UNAVAILABLE,
         )
+
+
+class TraefikWildcardDomainMissingError(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a wildcard ingress targets a worker registered without a wildcard domain."""
+
+    error_type = "https://api.backend.ai/probs/appproxy-coordinator/traefik-wildcard-domain-missing"
+    error_title = "The worker has no wildcard domain to route a wildcard ingress."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.UPSERT,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
+        )

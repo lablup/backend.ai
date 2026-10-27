@@ -75,6 +75,14 @@ Skills source: `.claude/skills/{name}/SKILL.md`
 - **re-export**: Where possible, do NOT use `__init__.py` re-exports; import modules directly.
 - **Class fields**: Declare the instance fields a class uses at the top of the class body with their types (assign them in `__init__`).
 
+**Version metadata:**
+- A new GQL type/field, config field, or DTO field records its version as `NEXT_RELEASE_VERSION`
+  (`ai.backend.common.meta.meta`): `added_version=NEXT_RELEASE_VERSION`, or `f"Added in {NEXT_RELEASE_VERSION}."`
+  in a description. Do NOT write the version literal; `scripts/release.sh` freezes it at release.
+- Do not change a literal version that is already released.
+- On a version branch (`YY.S`), write the literal version the branch will ship instead — CI rejects new
+  `NEXT_RELEASE_VERSION` references there.
+
 **BUILD files:**
 - ❌ Do NOT add BUILD files to the `src/` directory.
 - ✅ MUST add BUILD files to new test directories.

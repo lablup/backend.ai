@@ -35,7 +35,7 @@ def common_scie_config(
     return {
         "extra_build_args": [
             f"--scie={build_style}",
-            "--scie-python-version=3.13.7",
+            "--scie-python-version=3.13.18",
             "--scie-pbs-release=20250818",
             "--scie-pbs-stripped",
             # WARNING: PEX 2.18 or later offers `--scie-name-style` and `--scie-only` option, but we
