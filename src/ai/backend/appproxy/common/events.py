@@ -5,7 +5,6 @@ from typing import override
 from ai.backend.common.events.types import AbstractAnycastEvent, AbstractBroadcastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 
-from .config import ContentEncodingConfig
 from .types import RouteInfo
 from .types import SerializableCircuit as Circuit
 
@@ -46,28 +45,6 @@ class AppProxyCircuitRouteUpdatedEvent(AbstractBroadcastEvent):
     @override
     def domain_id(self) -> str | None:
         return str(self.circuit.id)
-
-    @override
-    def user_event(self) -> UserEvent | None:
-        return None
-
-
-class AppProxyContentEncodingConfigUpdatedEvent(AbstractBroadcastEvent):
-    content_encoding: ContentEncodingConfig
-
-    @classmethod
-    @override
-    def event_name(cls) -> str:
-        return "appproxy_content_encoding_config_updated_event"
-
-    @classmethod
-    @override
-    def event_domain(cls) -> EventDomain:
-        return EventDomain.MODEL_ROUTE
-
-    @override
-    def domain_id(self) -> str | None:
-        return None
 
     @override
     def user_event(self) -> UserEvent | None:

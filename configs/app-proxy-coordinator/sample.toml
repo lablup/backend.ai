@@ -275,6 +275,8 @@
 
   # Rules applied to the Content-Encoding of requests before they are forwarded
   # to session apps. Applies to both the built-in proxy workers and Traefik.
+  # Built-in workers read it when they register, so restart them after changing
+  # it.
   # Added in 26.10.0
   [proxy_coordinator.content_encoding]
     # Content codings that make a request be answered with 415 instead of being

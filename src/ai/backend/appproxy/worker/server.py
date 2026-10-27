@@ -61,7 +61,6 @@ from ai.backend.appproxy.common.events import (
     AppProxyCircuitCreatedEvent,
     AppProxyCircuitRemovedEvent,
     AppProxyCircuitRouteUpdatedEvent,
-    AppProxyContentEncodingConfigUpdatedEvent,
     AppProxyWorkerCircuitAddedEvent,
 )
 from ai.backend.appproxy.common.types import (
@@ -449,14 +448,6 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
             AppProxyCircuitRemovedEvent,
         )
     ]
-    handlers.append(
-        root_ctx.event_dispatcher.subscribe(
-            AppProxyContentEncodingConfigUpdatedEvent,
-            root_ctx,
-            handle_content_encoding_config_updated_event,
-            name="proxy-worker",
-        )
-    )
     try:
         yield
     finally:
@@ -737,18 +728,6 @@ async def readyz(request: web.Request) -> web.Response:
 async def status(request: web.Request) -> web.Response:
     request["do_not_print_access_log"] = True
     return web.json_response({"api_version": "v2"})
-
-
-async def handle_content_encoding_config_updated_event(
-    context: RootContext,
-    _agent_id: AgentId,
-    event: AppProxyContentEncodingConfigUpdatedEvent,
-) -> None:
-    context.proxy_frontend.apply_content_encoding_config(event.content_encoding)
-    log.info(
-        "applied the content encoding config",
-        rejected_encodings=",".join(event.content_encoding.rejected_encodings),
-    )
 
 
 async def handle_proxy_route_event(

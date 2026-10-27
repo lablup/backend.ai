@@ -540,7 +540,8 @@ class ProxyCoordinatorConfig(BaseSchema):
         BackendAIConfigMeta(
             description=(
                 "Rules applied to the Content-Encoding of requests before they are forwarded to "
-                "session apps. Applies to both the built-in proxy workers and Traefik."
+                "session apps. Applies to both the built-in proxy workers and Traefik. Built-in "
+                "workers read it when they register, so restart them after changing it."
             ),
             added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
