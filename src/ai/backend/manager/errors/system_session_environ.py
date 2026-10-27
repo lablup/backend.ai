@@ -23,3 +23,29 @@ class UnknownSystemSessionEnvironValueSource(EntityError, web.HTTPBadRequest):
         return EntityErrorCode(
             SystemSessionEnvironEntityType(), ActionOperationType.SEARCH, ErrorDetail.BAD_REQUEST
         )
+
+
+class SystemSessionEnvironKeyConflict(EntityError, web.HTTPConflict):
+    """Raised when another row at the same scope already holds the key."""
+
+    error_type = "https://api.backend.ai/probs/system-session-environ-key-conflict"
+    error_title = "Another system session environ row at the same scope already holds the key."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            SystemSessionEnvironEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT
+        )
+
+
+class InvalidSystemSessionEnvironKey(EntityError, web.HTTPBadRequest):
+    """Raised when the key is not an environment variable name."""
+
+    error_type = "https://api.backend.ai/probs/invalid-system-session-environ-key"
+    error_title = "The key must be an environment variable name."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            SystemSessionEnvironEntityType(), ActionOperationType.UPDATE, ErrorDetail.BAD_REQUEST
+        )

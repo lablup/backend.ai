@@ -5,10 +5,12 @@ from __future__ import annotations
 from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     AdminSearchSystemSessionEnvironsInput,
+    UpdateSystemSessionEnvironInput,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
     AdminSearchSystemSessionEnvironsPayload,
     ListSystemSessionEnvironValueSourcesPayload,
+    UpdateSystemSessionEnvironPayload,
 )
 
 _PATH = "/v2/system-session-environs"
@@ -34,4 +36,15 @@ class V2SystemSessionEnvironClient(BaseDomainClient):
             "GET",
             f"{_PATH}/value-sources",
             response_model=ListSystemSessionEnvironValueSourcesPayload,
+        )
+
+    async def update(
+        self, request: UpdateSystemSessionEnvironInput
+    ) -> UpdateSystemSessionEnvironPayload:
+        """Change a system session environ row's key."""
+        return await self._client.typed_request(
+            "PATCH",
+            f"{_PATH}/{request.id}",
+            request=request,
+            response_model=UpdateSystemSessionEnvironPayload,
         )

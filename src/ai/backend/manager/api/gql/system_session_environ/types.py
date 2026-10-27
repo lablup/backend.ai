@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any, Self, cast, override
 from uuid import UUID
 
-from strawberry import Info
+from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironID
@@ -23,8 +23,14 @@ from ai.backend.common.dto.manager.v2.system_session_environ.request import (
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     SystemSessionEnvironValueSourceFilter as SystemSessionEnvironValueSourceFilterDTO,
 )
+from ai.backend.common.dto.manager.v2.system_session_environ.request import (
+    UpdateSystemSessionEnvironInput as UpdateSystemSessionEnvironInputDTO,
+)
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
     SystemSessionEnvironNode as SystemSessionEnvironNodeDTO,
+)
+from ai.backend.common.dto.manager.v2.system_session_environ.response import (
+    UpdateSystemSessionEnvironPayload as UpdateSystemSessionEnvironPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironOrderField,
@@ -64,6 +70,8 @@ __all__ = (
     "SystemSessionEnvironGQL",
     "SystemSessionEnvironOrderByGQL",
     "SystemSessionEnvironScopeInfoGQL",
+    "UpdateSystemSessionEnvironInputGQL",
+    "UpdateSystemSessionEnvironPayloadGQL",
 )
 
 
@@ -276,3 +284,29 @@ class SystemSessionEnvironOrderByGQL(PydanticInputMixin[SystemSessionEnvironOrde
     direction: OrderDirection = gql_field(
         description="Order direction.", default=OrderDirection.ASC
     )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for changing a system session environ row's key.",
+    ),
+    name="UpdateSystemSessionEnvironInput",
+)
+class UpdateSystemSessionEnvironInputGQL(PydanticInputMixin[UpdateSystemSessionEnvironInputDTO]):
+    id: UUID = gql_field(description="The id of the row to update.")
+    key: str | None = gql_field(default=UNSET, description="New environment variable name.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for a system session environ row update.",
+    ),
+    model=UpdateSystemSessionEnvironPayloadDTO,
+    name="UpdateSystemSessionEnvironPayload",
+)
+class UpdateSystemSessionEnvironPayloadGQL(
+    PydanticOutputMixin[UpdateSystemSessionEnvironPayloadDTO]
+):
+    system_session_environ: SystemSessionEnvironGQL = gql_field(description="The updated row.")

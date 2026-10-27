@@ -10,13 +10,15 @@ from ai.backend.common.dto.manager.v2.system_session_environ.request import (
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
-from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_root_field
+from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.system_session_environ.types import (
     SystemSessionEnvironConnectionGQL,
     SystemSessionEnvironEdgeGQL,
     SystemSessionEnvironFilterGQL,
     SystemSessionEnvironGQL,
     SystemSessionEnvironOrderByGQL,
+    UpdateSystemSessionEnvironInputGQL,
+    UpdateSystemSessionEnvironPayloadGQL,
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
@@ -88,3 +90,19 @@ async def system_session_environ_value_sources(
 ) -> list[str] | None:
     payload = await info.context.adapters.system_session_environ.public_list_value_sources()
     return payload.items
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Change a system session environ row's key. Only provided fields are updated."
+        ),
+    )
+)
+async def update_system_session_environ(
+    info: Info[StrawberryGQLContext],
+    input: UpdateSystemSessionEnvironInputGQL,
+) -> UpdateSystemSessionEnvironPayloadGQL:
+    payload = await info.context.adapters.system_session_environ.update(input.to_pydantic())
+    return UpdateSystemSessionEnvironPayloadGQL.from_pydantic(payload)

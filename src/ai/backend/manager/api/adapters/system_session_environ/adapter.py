@@ -19,11 +19,13 @@ from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     SystemSessionEnvironFilter,
     SystemSessionEnvironOrder,
     SystemSessionEnvironValueSourceFilter,
+    UpdateSystemSessionEnvironInput,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
     AdminSearchSystemSessionEnvironsPayload,
     ListSystemSessionEnvironValueSourcesPayload,
     SystemSessionEnvironNode,
+    UpdateSystemSessionEnvironPayload,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironOrderField,
@@ -51,6 +53,9 @@ from ai.backend.manager.models.system_session_environ.searchable_fields import (
 from ai.backend.manager.models.system_session_environ.searchers import (
     SystemSessionEnvironSearcher,
 )
+from ai.backend.manager.models.system_session_environ.updaters import (
+    SystemSessionEnvironUpdater,
+)
 from ai.backend.manager.services.system_session_environ.actions.bulk_get import (
     BulkGetSystemSessionEnvironsAction,
 )
@@ -60,9 +65,13 @@ from ai.backend.manager.services.system_session_environ.actions.global_search im
 from ai.backend.manager.services.system_session_environ.actions.public_list_value_sources import (
     PublicListSystemSessionEnvironValueSourcesAction,
 )
+from ai.backend.manager.services.system_session_environ.actions.update import (
+    UpdateSystemSessionEnvironAction,
+)
 from ai.backend.manager.services.system_session_environ.processors import (
     SystemSessionEnvironProcessors,
 )
+from ai.backend.manager.types import OptionalState
 
 __all__ = ("SystemSessionEnvironAdapter",)
 
@@ -111,6 +120,22 @@ class SystemSessionEnvironAdapter(BaseAdapter):
         )
         return ListSystemSessionEnvironValueSourcesPayload(
             items=[value_source.value for value_source in result.value_sources]
+        )
+
+    async def update(
+        self, input: UpdateSystemSessionEnvironInput
+    ) -> UpdateSystemSessionEnvironPayload:
+        """Change a system session environ row's key."""
+        result = await self._system_session_environ.update.run(
+            UpdateSystemSessionEnvironAction(
+                updater=SystemSessionEnvironUpdater(
+                    environ_id=input.id,
+                    key=OptionalState.from_unset(input.key),
+                )
+            )
+        )
+        return UpdateSystemSessionEnvironPayload(
+            system_session_environ=self._data_to_node(result.data)
         )
 
     async def bulk_get_ids(

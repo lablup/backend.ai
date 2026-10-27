@@ -16,6 +16,7 @@ __all__ = (
     "AdminSearchSystemSessionEnvironsPayload",
     "ListSystemSessionEnvironValueSourcesPayload",
     "SystemSessionEnvironNode",
+    "UpdateSystemSessionEnvironPayload",
 )
 
 
@@ -52,3 +53,9 @@ class ListSystemSessionEnvironValueSourcesPayload(BaseResponseModel):
     """Every value source a system session environ row can carry."""
 
     items: list[str] = Field(description="The value source names a row can carry.")
+
+
+class UpdateSystemSessionEnvironPayload(BaseResponseModel):
+    """The system session environ row after the update."""
+
+    system_session_environ: SystemSessionEnvironNode = Field(description="The updated row.")

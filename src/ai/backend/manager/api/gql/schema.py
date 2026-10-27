@@ -665,6 +665,7 @@ from ai.backend.manager.api.gql.storage_volume_service_attachment.resolver impor
 from ai.backend.manager.api.gql.system_session_environ.resolver import (
     admin_system_session_environs,
     system_session_environ_value_sources,
+    update_system_session_environ,
 )
 from ai.backend.manager.api.gql.user.resolver.mutation import (
     admin_bulk_create_users_v2,
@@ -1454,6 +1455,7 @@ class Mutation:
     admin_delete_runtime_variant = admin_delete_runtime_variant
     admin_delete_runtime_variants = admin_delete_runtime_variants
     update_runtime_variant = update_runtime_variant
+    update_system_session_environ = update_system_session_environ
     purge_runtime_variant = purge_runtime_variant
     partial_bulk_update_runtime_variants = partial_bulk_update_runtime_variants
     partial_bulk_purge_runtime_variants = partial_bulk_purge_runtime_variants
