@@ -49,6 +49,7 @@ from ai.backend.manager.errors.agent import (
     AgentNotFound,
 )
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
+from ai.backend.manager.errors.resource_slot import ResourceSlotTypeNotFound
 from ai.backend.manager.models.agent import AgentRow
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater
 from ai.backend.manager.models.container_registry import ContainerRegistryRow
@@ -638,6 +639,35 @@ class TestAgentRepositoryDB:
 
         assert result.need_resource_slot_update is True
         mock_config_provider.legacy_etcd_config_loader.update_resource_slots.assert_called_once()
+
+    async def test_sync_agent_heartbeat_unregistered_slot_type_names_the_slot(
+        self,
+        agent_repository: AgentRepository,
+        sample_agent_info: AgentInfo,
+    ) -> None:
+        agent_id = AgentId("agent-unregistered-slot")
+        agent_info = sample_agent_info.model_copy(
+            update={
+                "available_resource_slots": [
+                    *sample_agent_info.available_resource_slots,
+                    ResourceSlotEntry(
+                        resource_type=ResourceSlotName("tt-n300.device"), quantity="0"
+                    ),
+                ],
+                "slot_key_and_units": {
+                    **sample_agent_info.slot_key_and_units,
+                    ResourceSlotName("tt-n300.device"): SlotTypes.COUNT,
+                },
+            }
+        )
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=agent_id,
+            agent_info=agent_info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        with pytest.raises(ResourceSlotTypeNotFound, match=r"'tt-n300\.device'"):
+            await agent_repository.sync_agent_heartbeat(agent_id, upsert_data)
 
     # ==================== upsert_agent_with_state tests ====================
 
