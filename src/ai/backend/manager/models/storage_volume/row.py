@@ -69,10 +69,7 @@ class StorageVolumeRow(LifecycleTimestampsMixin, Base):
 
 
 class StorageVolumeServiceHoldingRow(LifecycleTimestampsMixin, Base):
-    """A storage volume as one service holds it.
-
-    The status is what the service's volume implementation derives from its mounts.
-    """
+    """A storage volume as one service holds it, and whether the service has checked it."""
 
     __tablename__ = "storage_volume_service_holdings"
 
