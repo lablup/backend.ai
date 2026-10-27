@@ -30,6 +30,7 @@ from ai.backend.manager.models.specs.purger import (
 from ai.backend.manager.models.specs.querier import (
     BulkEntityQuerier,
     BulkFieldQuerier,
+    BulkNestedFieldQuerier,
     DataQuerier,
     FieldQuerier,
     OwnedFieldQuerier,
@@ -67,6 +68,7 @@ __all__ = (
     "GlobalEntityPartialBulkPurgeOpsAction",
     "EntityPartialBulkPurgeOpsAction",
     "FieldPartialBulkPurgeOpsAction",
+    "FieldPartialBulkNestedGetOpsAction",
     "GlobalEntityUpsertOpsAction",
     "EntityUpsertOpsAction",
     "FieldUpsertOpsAction",
@@ -113,6 +115,7 @@ __all__ = (
     "GetGlobalOpsAction",
     "OwnedFieldGetOpsAction",
     "BulkGetOwnedFieldOpsAction",
+    "PartialBulkGetOwnedFieldOpsAction",
     "EntityPartialBulkGetOpsAction",
     "PartialBulkGetEntityOpsAction",
 )
@@ -484,6 +487,16 @@ class FieldPartialBulkGetOpsAction[TRow: Base, TData: FieldData](OpsBackendActio
         raise NotImplementedError
 
 
+class FieldPartialBulkNestedGetOpsAction[TRow: Base, TData](OpsBackendAction):
+    """A read of the rows nested under each field row the caller named, each parent
+    answered for separately; authorized through the entities owning the parents."""
+
+    @abstractmethod
+    def to_querier(self) -> BulkNestedFieldQuerier[TRow, TData]:
+        """Return the read spec this action executes."""
+        raise NotImplementedError
+
+
 class GlobalEntityUpsertOpsAction[TRow: Base, TData](OpsBackendAction):
     """A create-or-update of an entity created in the global scope."""
 
@@ -750,6 +763,21 @@ class BulkGetOwnedFieldOpsAction[TOwnerID: EntityIdentifier, TRow: Base, TData: 
     Bulk-shaped like :class:`BulkScopedSearchOpsAction` and for the same reason — the
     owners are named rather than being a scope — while the answer is one row per owner
     instead of a page.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+
+class PartialBulkGetOwnedFieldOpsAction[TOwnerID: EntityIdentifier, TRow: Base, TData: FieldData](
+    BasePartialBulkAction, OwnedFieldGetOpsAction[TOwnerID, TRow, TData], ABC
+):
+    """The row each named entity designates, each entity answered for on its own.
+
+    Partial counterpart of :class:`BulkGetOwnedFieldOpsAction`: an entity the caller may
+    not read is one failed item, and one designating no row answers nothing.
     """
 
     @override

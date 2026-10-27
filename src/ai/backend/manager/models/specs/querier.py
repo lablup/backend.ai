@@ -172,3 +172,26 @@ class BulkFieldQuerier[TRow: Base, TData: FieldData](ABC):
     def to_data(self, row: TRow) -> TData:
         """Convert one fetched row into its ``data/`` type."""
         raise NotImplementedError
+
+
+class BulkNestedFieldQuerier[TRow: Base, TData](ABC):
+    """Reads the rows nested under each named field row, a list per parent.
+
+    What makes a row one of the nested ones belongs in ``build_select``; the ops layer
+    adds the parent filter and groups the answer by ``parent_id_column``.
+    """
+
+    @abstractmethod
+    def build_select(self) -> sa.sql.Select[Any]:
+        """Build the SELECT of the nested rows, without the parent filter."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def parent_id_column(self) -> InstrumentedAttribute[Any]:
+        """Return the column naming the field row a nested row sits under."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def to_data(self, row: TRow) -> TData:
+        """Convert one nested row into its ``data/`` type."""
+        raise NotImplementedError

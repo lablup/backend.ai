@@ -35,6 +35,7 @@ from ai.backend.manager.models.specs.owner_candidates import FieldOwnerCandidate
 from ai.backend.manager.models.specs.querier import (
     BulkEntityQuerier,
     BulkFieldQuerier,
+    BulkNestedFieldQuerier,
     DataQuerier,
     FieldQuerier,
     OwnedFieldQuerier,
@@ -270,6 +271,26 @@ class V2ReadOps(V2GraphReadOpsBase):
         ).all()
         found = {getattr(row, id_column.key): querier.to_data(row) for row in rows}
         return {field_id: found[field_id] for field_id in field_ids if field_id in found}
+
+    async def query_bulk_nested_field_data[TRow: Base, TData](
+        self,
+        querier: BulkNestedFieldQuerier[TRow, TData],
+        field_ids: Sequence[FieldIdentifier],
+    ) -> Mapping[FieldIdentifier, list[TData]]:
+        """Read the rows nested under each named field row, grouped by that row.
+
+        Every id the caller passed is a key; one holding no nested rows maps to an empty list.
+        """
+        if not field_ids:
+            return {}
+        parent_column = querier.parent_id_column()
+        rows = (
+            await self._sess.scalars(querier.build_select().where(parent_column.in_(field_ids)))
+        ).all()
+        nested: dict[FieldIdentifier, list[TData]] = {field_id: [] for field_id in field_ids}
+        for row in rows:
+            nested[getattr(row, parent_column.key)].append(querier.to_data(row))
+        return nested
 
     async def search_with_scopes[TRow: Base, TData](
         self,

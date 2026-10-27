@@ -38,6 +38,7 @@ from ai.backend.manager.actions.v2.field.ops import (
     GetFieldOpsAction,
     NestedFieldSearchOpsAction,
     PartialBulkGetFieldOpsAction,
+    PartialBulkGetNestedFieldOpsAction,
     PartialBulkGetOwnerCandidatesFieldOpsAction,
     PartialBulkPurgeFieldOpsAction,
     PurgeFieldOpsAction,
@@ -64,6 +65,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     CreateFieldOpsAction,
     GlobalSearcherOpsAction,
     OperationScopeOpsAction,
+    PartialBulkGetOwnedFieldOpsAction,
     PartialBulkUpsertFieldOpsAction,
     UpsertFieldOpsAction,
 )
@@ -95,11 +97,13 @@ from ai.backend.manager.services.ops.service import (
     FieldGetService,
     FieldOwnerCandidatesService,
     FieldPartialBulkGetService,
+    FieldPartialBulkNestedGetService,
     FieldPartialBulkPurgeService,
     FieldPartialBulkUpsertService,
     FieldPurgeService,
     FieldUpsertService,
     GlobalSearcherService,
+    PartialBulkOwnedFieldGetService,
     RestoreService,
     SearchFieldsService,
     UpdateService,
@@ -229,6 +233,26 @@ class FieldGroup[TFieldData: FieldData]:
             AtomicEntityResultJudge(),
             monitors=(*self._deps.monitors.bulk, *monitors),
             validators=(*self._deps.validators.atomic_bulk, *validators),
+        )
+
+    def partial_bulk_get_owned_ops[TAction: PartialBulkGetOwnedFieldOpsAction[Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[PartialBulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> PartialBulkActionProcessor[TAction, TFieldData]:
+        """The one row each entity the caller named designates, one permission check per
+        entity.
+
+        The partial counterpart of :meth:`atomic_bulk_get_ops`: a denied entity is one
+        failed item beside the entities that were read.
+        """
+        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return PartialBulkActionProcessor(
+            PartialBulkOwnedFieldGetService[TFieldData](self._deps.repository).execute,
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            partial_validators=(*self._deps.validators.partial_bulk, *validators),
         )
 
     def global_scope[TAction: BaseGlobalAction, TResult](
@@ -534,6 +558,32 @@ class LookupFieldGroup[TFieldData: FieldData](FieldGroup[TFieldData]):
         self._record_partial_owner_lookup()
         return PartialBulkFieldActionProcessor(
             FieldPartialBulkGetService(self._deps.repository).execute,
+            self._partial_bulk_owner_lookup,
+            monitors=(*self._deps.monitors.bulk, *monitors),
+            partial_validators=(*self._deps.validators.partial_bulk, *validators),
+        )
+
+    def partial_bulk_get_nested_ops[
+        TAction: PartialBulkGetNestedFieldOpsAction[Any, Any, Any, Any],
+        TNestedData,
+    ](
+        self,
+        action_cls: type[TAction],
+        nested_data_cls: type[TNestedData],
+        *,
+        validators: Sequence[PartialBulkActionValidator] = (),
+        monitors: Sequence[BulkActionMonitor] = (),
+    ) -> PartialBulkFieldActionProcessor[TAction, list[TNestedData]]:
+        """Read the rows nested under each row the caller named, one permission check per
+        entity owning the named row.
+
+        An owner the caller may not read puts the rows it owns into the answer as denied
+        items; a named row holding no nested rows answers an empty list.
+        """
+        self._record(action_cls, ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        self._record_partial_owner_lookup()
+        return PartialBulkFieldActionProcessor(
+            FieldPartialBulkNestedGetService[TNestedData](self._deps.repository).execute,
             self._partial_bulk_owner_lookup,
             monitors=(*self._deps.monitors.bulk, *monitors),
             partial_validators=(*self._deps.validators.partial_bulk, *validators),

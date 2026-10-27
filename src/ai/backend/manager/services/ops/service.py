@@ -42,6 +42,7 @@ from ai.backend.manager.actions.v2.field.lookup import (
 )
 from ai.backend.manager.actions.v2.field.ops import (
     PartialBulkGetFieldOpsAction,
+    PartialBulkGetNestedFieldOpsAction,
     PartialBulkGetOwnerCandidatesFieldOpsAction,
 )
 from ai.backend.manager.actions.v2.lookup.bulk_base import BulkLookupKeyResult
@@ -78,6 +79,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     GlobalSearchOpsAction,
     LookupOpsAction,
     PartialBulkGetEntityOpsAction,
+    PartialBulkGetOwnedFieldOpsAction,
     PartialBulkUpdateOpsAction,
     RoleManagedEntityAtomicCreateOpsAction,
     RoleManagedEntityCreateOpsAction,
@@ -112,6 +114,7 @@ __all__ = (
     "GetService",
     "PartialBulkGetService",
     "BulkOwnedFieldGetService",
+    "PartialBulkOwnedFieldGetService",
     "LookupService",
     "BulkFieldOwnerLookupService",
     "FieldKeyLookupService",
@@ -134,6 +137,7 @@ __all__ = (
     "GlobalPartialBulkPurgeService",
     "EntityPartialBulkPurgeService",
     "FieldPartialBulkGetService",
+    "FieldPartialBulkNestedGetService",
     "FieldPartialBulkPurgeService",
     "FieldPartialBulkUpsertService",
     "GlobalUpsertService",
@@ -213,6 +217,33 @@ class BulkOwnedFieldGetService[TFieldData: FieldData]:
     ) -> OwnedFieldsOpsResult[Any, TFieldData]:
         designated = await self._repository.owned_fields(action.to_querier(), action.owner_ids())
         return OwnedFieldsOpsResult(designated=designated)
+
+
+class PartialBulkOwnedFieldGetService[TFieldData: FieldData]:
+    """Reads the field row each entity the action names designates, answering for each one.
+
+    The entities the caller may not read are gone from the action by the time this runs;
+    one designating no row answers nothing.
+    """
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: PartialBulkGetOwnedFieldOpsAction[Any, Any, TFieldData]
+    ) -> PartialBulkResult[TFieldData]:
+        owner_ids = action.owner_ids()
+        designated = await self._repository.owned_fields(action.to_querier(), owner_ids)
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[TFieldData].succeeded(owner_id, designated[owner_id])
+                if owner_id in designated
+                else PartialBulkEntityResult[TFieldData].nothing(owner_id)
+                for owner_id in owner_ids
+            ]
+        )
 
 
 class PartialBulkGetService[TData]:
@@ -860,6 +891,27 @@ class FieldPartialBulkGetService[TData: FieldData]:
                 if field_id not in found
             },
         )
+
+
+class FieldPartialBulkNestedGetService[TNestedData]:
+    """Reads the rows nested under each field row the action names, a list per row.
+
+    The rows whose owner the caller may not read are gone from the action by the time
+    this runs; a row holding no nested rows answers an empty list.
+    """
+
+    _repository: OpsRepository[Any]
+
+    def __init__(self, repository: OpsRepository[Any]) -> None:
+        self._repository = repository
+
+    async def execute(
+        self, action: PartialBulkGetNestedFieldOpsAction[Any, Any, Any, TNestedData]
+    ) -> BulkFieldOpsResult[list[TNestedData]]:
+        nested = await self._repository.bulk_get_nested_fields(
+            action.to_querier(), action.field_ids()
+        )
+        return BulkFieldOpsResult(successes=dict(nested), errors={})
 
 
 class FieldPartialBulkPurgeService[TData: FieldData]:

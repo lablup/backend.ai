@@ -18,6 +18,7 @@ from ai.backend.manager.actions.v2.field.bulk_base import (
 from ai.backend.manager.actions.v2.ops.base import (
     FieldGetOpsAction,
     FieldPartialBulkGetOpsAction,
+    FieldPartialBulkNestedGetOpsAction,
     FieldPartialBulkPurgeOpsAction,
     FieldPurgeOpsAction,
     SearchOpsAction,
@@ -34,6 +35,7 @@ __all__ = (
     "PartialBulkGetFieldOpsAction",
     "PartialBulkPurgeFieldOpsAction",
     "NestedFieldSearchOpsAction",
+    "PartialBulkGetNestedFieldOpsAction",
     "PartialBulkGetOwnerCandidatesFieldOpsAction",
 )
 
@@ -163,6 +165,28 @@ class PartialBulkGetFieldOpsAction[
     Partial rather than atomic, like :class:`PartialBulkGetEntityOpsAction`: a row
     whose owner the caller may not read and a row matching nothing are both one failed
     item, told apart by the error each carries.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.GET
+
+
+class PartialBulkGetNestedFieldOpsAction[
+    TFieldID: FieldIdentifier,
+    TOwnerID: EntityIdentifier,
+    TRow: Base,
+    TData,
+](
+    BasePartialBulkFieldAction[TFieldID, TOwnerID],
+    FieldPartialBulkNestedGetOpsAction[TRow, TData],
+    ABC,
+):
+    """A read of the rows nested under each field row the caller named, a list per row.
+
+    Checked per entity owning the named row, like :class:`PartialBulkGetFieldOpsAction`:
+    a denied owner fails only the rows it owns.
     """
 
     @override

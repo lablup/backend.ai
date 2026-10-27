@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import inspect
 import re
-from typing import Any
+from collections.abc import Sequence
+from dataclasses import dataclass, replace
+from typing import Any, Self, override
 from unittest.mock import MagicMock
 
 from ai.backend.common.data.entity.agent import AgentEntityType
@@ -32,7 +34,7 @@ from ai.backend.common.data.entity.entity_label import EntityLabelFieldType
 from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.image_alias import ImageAliasFieldType
-from ai.backend.common.data.entity.kernel import KernelFieldType
+from ai.backend.common.data.entity.kernel import KernelFieldType, KernelID
 from ai.backend.common.data.entity.notification import (
     NotificationChannelEntityType,
     NotificationRuleEntityType,
@@ -40,10 +42,10 @@ from ai.backend.common.data.entity.notification import (
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.resource_preset import ResourcePresetEntityType
-from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.data.entity.session_group import SessionGroupEntityType
 from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironEntityType
-from ai.backend.common.data.entity.types import GlobalEntityType
+from ai.backend.common.data.entity.types import EntityIdentifier, GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
@@ -68,6 +70,7 @@ from ai.backend.manager.actions.v2.field.bulk_base import (
     BaseBulkFieldAction,
     BasePartialBulkOwnerCandidatesFieldAction,
 )
+from ai.backend.manager.actions.v2.field.ops import PartialBulkGetNestedFieldOpsAction
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
     RefusingGlobalActionValidator,
@@ -76,6 +79,7 @@ from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction
 from ai.backend.manager.actions.v2.lookup.bulk_base import BaseBulkLookupAction
 from ai.backend.manager.actions.v2.membership.base import BaseMembershipAction
 from ai.backend.manager.actions.v2.ops.backend import OpsBackendAction
+from ai.backend.manager.actions.v2.ops.base import PartialBulkGetOwnedFieldOpsAction
 from ai.backend.manager.actions.v2.relation.base import BaseRelationAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
@@ -90,6 +94,8 @@ from ai.backend.manager.models.audit_log.owner_candidates import (
     AuditLogOwnerCandidates,
     AuditLogScopeOwnerCandidates,
 )
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.specs.querier import BulkNestedFieldQuerier, OwnedFieldQuerier
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.services.agent.actions.bulk_get import BulkGetAgentsAction
 from ai.backend.manager.services.agent.actions.bulk_load_container_counts import (
@@ -1177,6 +1183,89 @@ def test_owner_candidates_field_group_records_no_lookup_under_its_concern() -> N
     records = registry.wired_processors()
     assert [record for record in records if record.kind == ActionKind.LOOKUP] == []
     assert {record.concern for record in records} == {Concern.VISIBILITY}
+
+
+@dataclass
+class _PartialBulkGetSessionMainKernelsAction(
+    PartialBulkGetOwnedFieldOpsAction[SessionID, KernelRow, KernelInfo]
+):
+    session_ids: Sequence[SessionID]
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "partial_bulk_get_session_main_kernels"
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(self.session_ids)
+
+    @override
+    def owner_ids(self) -> Sequence[SessionID]:
+        return tuple(self.session_ids)
+
+    @override
+    def narrowed_to(self, entity_ids: Sequence[EntityIdentifier]) -> Self:
+        allowed = frozenset(entity_ids)
+        return replace(self, session_ids=[i for i in self.session_ids if i in allowed])
+
+    @override
+    def to_querier(self) -> OwnedFieldQuerier[SessionID, KernelRow, KernelInfo]:
+        raise NotImplementedError
+
+
+@dataclass
+class _PartialBulkGetKernelSiblingsAction(
+    PartialBulkGetNestedFieldOpsAction[KernelID, SessionID, KernelRow, KernelInfo]
+):
+    kernel_ids: Sequence[KernelID]
+
+    @override
+    @classmethod
+    def action_name(cls) -> str:
+        return "partial_bulk_get_kernel_siblings"
+
+    @override
+    def field_ids(self) -> Sequence[KernelID]:
+        return tuple(self.kernel_ids)
+
+    @override
+    def to_owner_lookup_action(self) -> LookupBulkKernelOwnerAction:
+        return LookupBulkKernelOwnerAction(kernel_ids=self.kernel_ids)
+
+    @override
+    def narrowed_to(self, field_ids: Sequence[KernelID]) -> Self:
+        allowed = frozenset(field_ids)
+        return replace(self, kernel_ids=[i for i in self.kernel_ids if i in allowed])
+
+    @override
+    def to_querier(self) -> BulkNestedFieldQuerier[KernelRow, KernelInfo]:
+        raise NotImplementedError
+
+
+def test_partial_owned_and_nested_field_reads_are_partial_permission_reads() -> None:
+    """Both read per named entity or row, checked per owning entity; the nested read runs
+    the public owner lookup first."""
+    registry = _ops_registry()
+    kernels = _kernels(registry)
+    kernels.partial_bulk_get_owned_ops(_PartialBulkGetSessionMainKernelsAction)
+    kernels.partial_bulk_get_nested_ops(_PartialBulkGetKernelSiblingsAction, KernelInfo)
+
+    recorded = {
+        record.action_cls: (record.entity_type, record.kind, record.gate, record.backing)
+        for record in registry.wired_processors()
+        if record.kind == ActionKind.BULK
+    }
+    partial = (SessionEntityType(), ActionKind.BULK, ActionGate.PERMISSION, ActionBacking.GENERIC)
+    assert recorded[_PartialBulkGetSessionMainKernelsAction] == partial
+    assert recorded[_PartialBulkGetKernelSiblingsAction] == partial
+
+    lookup_gates = {
+        (record.action_cls, record.gate)
+        for record in registry.wired_processors()
+        if record.kind == ActionKind.LOOKUP
+    }
+    assert (LookupBulkKernelOwnerAction, ActionGate.PUBLIC) in lookup_gates
 
 
 # An ops-family action wired through a service function, and why the generic service

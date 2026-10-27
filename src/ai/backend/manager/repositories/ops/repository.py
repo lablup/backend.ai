@@ -50,6 +50,7 @@ from ai.backend.manager.models.specs.purger import (
 from ai.backend.manager.models.specs.querier import (
     BulkEntityQuerier,
     BulkFieldQuerier,
+    BulkNestedFieldQuerier,
     DataQuerier,
     FieldQuerier,
     OwnedFieldQuerier,
@@ -152,6 +153,16 @@ class OpsRepository[TData]:
         """Read the named field rows; one that is gone is absent instead of raising."""
         async with self._ops.read_ops() as r:
             return await r.query_bulk_field_data(querier, field_ids)
+
+    async def bulk_get_nested_fields[TNestedData](
+        self,
+        querier: BulkNestedFieldQuerier[Any, TNestedData],
+        field_ids: Sequence[FieldIdentifier],
+    ) -> Mapping[FieldIdentifier, list[TNestedData]]:
+        """Read the rows nested under each named field row; one holding none maps to an
+        empty list."""
+        async with self._ops.read_ops() as r:
+            return await r.query_bulk_nested_field_data(querier, field_ids)
 
     async def owned_fields[TOwnerID: EntityIdentifier, TFieldData: FieldData](
         self,
