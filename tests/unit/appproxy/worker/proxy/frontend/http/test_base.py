@@ -29,7 +29,7 @@ def port_frontend_rejecting_br_and_zstd(mocker: pytest_mock.MockerFixture) -> Po
 @pytest.fixture
 def port_frontend_rejecting_no_encoding(mocker: pytest_mock.MockerFixture) -> PortFrontend:
     root_context = mocker.MagicMock()
-    root_context.content_encoding = ContentEncodingConfig()
+    root_context.content_encoding = ContentEncodingConfig(rejected_encodings=[])
     return PortFrontend(root_context=root_context)
 
 

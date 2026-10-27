@@ -746,7 +746,7 @@ async def handle_content_encoding_config_updated_event(
     context.content_encoding = event.content_encoding
     log.info(
         "applied the content encoding config",
-        rejected_encodings=context.content_encoding.rejected_encodings,
+        rejected_encodings=",".join(context.content_encoding.rejected_encodings),
     )
 
 
@@ -856,7 +856,7 @@ def build_root_app(
     subapp_pkgs: Sequence[str] = (),
 ) -> web.Application:
     root_ctx = RootContext()
-    root_ctx.content_encoding = ContentEncodingConfig()
+    root_ctx.content_encoding = ContentEncodingConfig(rejected_encodings=[])
     root_ctx.metrics = WorkerMetricRegistry.instance()
 
     app = web.Application(
