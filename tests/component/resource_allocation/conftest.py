@@ -43,6 +43,9 @@ from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_allocation.provider import (
+    ResourceAllocationOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
     ResourcePolicyOpsProvider,
 )
@@ -78,6 +81,7 @@ def resource_allocation_processors(
     """Build real resource allocation processors with real DB and config."""
     ra_repo = ResourceAllocationRepository(
         db=database_engine,
+        ops_provider=ResourceAllocationOpsProvider(database_engine),
         config_provider=config_provider,
     )
     rp_repo = ResourcePresetRepository(

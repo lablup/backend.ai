@@ -466,6 +466,7 @@ from ai.backend.manager.api.gql.resource_allocation.resolver import (
     effective_resource_allocation_v2,
     my_concurrency,
     my_keypair_resource_allocation_v2,
+    my_user_resource_allocation_v2,
     project_resource_allocation_v2,
     resource_group_resource_allocation_v2,
 )
@@ -1066,6 +1067,7 @@ class Query:
     model_card_available_presets = model_card_available_presets
     # Resource Allocation V2 APIs
     my_keypair_resource_allocation_v2 = my_keypair_resource_allocation_v2
+    my_user_resource_allocation_v2 = my_user_resource_allocation_v2
     project_resource_allocation_v2 = project_resource_allocation_v2
     admin_domain_resource_allocation_v2 = admin_domain_resource_allocation_v2
     resource_group_resource_allocation_v2 = resource_group_resource_allocation_v2

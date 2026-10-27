@@ -25,6 +25,7 @@ from .types import (
     ProjectResourceAllocationPayloadGQL,
     ResourceGroupResourceAllocationPayloadGQL,
     UserConcurrencyPayloadGQL,
+    UserResourceAllocationPayloadGQL,
 )
 
 
@@ -32,13 +33,32 @@ from .types import (
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Get my keypair resource allocation (current user).",
-    )
+        deprecated_version=NEXT_RELEASE_VERSION,
+        deprecation_hint="`myUserResourceAllocationV2`",
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `myUserResourceAllocationV2`, "
+        "which counts sessions from all of the user's keypairs."
+    ),
 )  # type: ignore[misc]
 async def my_keypair_resource_allocation_v2(
     info: Info[StrawberryGQLContext],
 ) -> KeypairResourceAllocationPayloadGQL | None:
     payload = await info.context.adapters.resource_allocation.my_keypair_usage_for_current_user()
     return KeypairResourceAllocationPayloadGQL.from_pydantic(payload)
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Get my resource allocation summed across all of my keypairs.",
+    )
+)  # type: ignore[misc]
+async def my_user_resource_allocation_v2(
+    info: Info[StrawberryGQLContext],
+) -> UserResourceAllocationPayloadGQL | None:
+    payload = await info.context.adapters.resource_allocation.my_user_usage()
+    return UserResourceAllocationPayloadGQL.from_pydantic(payload)
 
 
 @gql_root_field(
