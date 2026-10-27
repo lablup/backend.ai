@@ -39073,6 +39073,7 @@
       "VFolderOperationStatusField": {
         "enum": [
           "ready",
+          "creating",
           "performing",
           "cloning",
           "mounted",
