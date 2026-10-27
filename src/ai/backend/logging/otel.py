@@ -3,11 +3,15 @@ import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from aiohttp.typedefs import Middleware
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc._log_exporter import OTLPLogExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.aiohttp_client import AioHttpClientInstrumentor
-from opentelemetry.instrumentation.aiohttp_server import AioHttpServerInstrumentor
+from opentelemetry.instrumentation.aiohttp_server import (
+    AioHttpServerInstrumentor,
+    create_aiohttp_middleware,
+)
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
 from opentelemetry.sdk._logs.export import BatchLogRecordProcessor
 from opentelemetry.sdk.resources import Resource
@@ -77,6 +81,12 @@ def apply_otel_tracer(spec: OpenTelemetrySpec) -> None:
 def instrument_aiohttp_server() -> None:
     AioHttpServerInstrumentor().instrument()
     logging.info("OpenTelemetry tracing for aiohttp server initialized successfully.")
+
+
+def build_otel_server_middleware() -> Middleware:
+    """Build the aiohttp server tracing middleware from the tracer provider set at call time."""
+    middleware: Middleware = create_aiohttp_middleware(tracer_provider=trace.get_tracer_provider())
+    return middleware
 
 
 def instrument_aiohttp_client() -> None:
