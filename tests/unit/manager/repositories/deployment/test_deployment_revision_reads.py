@@ -1,7 +1,7 @@
-"""The revisions and the policy a single deployment read fills in with its own queries.
+"""The revisions and the policy a deployment read fills in.
 
-A revision whose row is missing leaves its id ``None``. ``get_endpoint_info`` carries the
-revision ids and the policy only.
+Every read fills them by the deployment id; a revision whose row is missing leaves its
+id ``None``. ``get_endpoint_info`` carries the revision ids and the policy only.
 """
 
 from __future__ import annotations
@@ -23,10 +23,12 @@ from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import AutoScalingMetricSource, ClusterMode, ResourceSlot
 from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
@@ -37,6 +39,8 @@ from ai.backend.manager.models.deployment_revision.row import DeploymentRevision
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow, EndpointRow
+from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
+from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
@@ -61,6 +65,7 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceSlotTypeRow,
 )
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
@@ -368,6 +373,48 @@ def deployment_repository(db_with_cleanup: ExtendedAsyncSAEngine) -> DeploymentR
         valkey_schedule=AsyncMock(),
         permission_check=AsyncMock(),
     )
+
+
+class TestSearchLegacyEndpoints:
+    async def _search(
+        self, repository: DeploymentRepository, endpoint_id: DeploymentID
+    ) -> DeploymentInfo:
+        result = await repository.search_legacy_endpoints(
+            DeploymentInfoSearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    DeploymentSearchableFields.own.entity_id.filter.equals(
+                        UUIDEqualMatchSpec(value=endpoint_id, negated=False)
+                    )
+                ],
+            )
+        )
+        (info,) = result.items
+        return info
+
+    async def test_fills_the_revisions_and_the_policy(
+        self, deployment_repository: DeploymentRepository, seeder: DeploymentSeeder
+    ) -> None:
+        seeded = await seeder.seed(deploying_revision_exists=True)
+
+        info = await self._search(deployment_repository, seeded.endpoint_id)
+
+        assert info.current_revision is not None
+        assert info.current_revision.id == seeded.current_revision_id
+        assert info.deploying_revision is not None
+        assert info.deploying_revision.id == seeded.deploying_revision_id
+        assert info.policy is not None
+        assert info.policy.strategy == DeploymentStrategy.ROLLING
+
+    async def test_drops_the_id_of_a_missing_revision(
+        self, deployment_repository: DeploymentRepository, seeder: DeploymentSeeder
+    ) -> None:
+        seeded = await seeder.seed(deploying_revision_exists=False)
+
+        info = await self._search(deployment_repository, seeded.endpoint_id)
+
+        assert info.deploying_revision_id is None
+        assert info.deploying_revision is None
 
 
 class TestGetDeploymentsByIds:

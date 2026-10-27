@@ -65,6 +65,10 @@ from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.resource import DomainNotFound
 from ai.backend.manager.errors.service import EndpointNotFound
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision.searchable_fields import (
+    ModelRevisionSearchableFields,
+)
+from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
 from ai.backend.manager.models.domain.lookups import DomainNameLookup
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
 from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow, EndpointRow
@@ -852,6 +856,28 @@ class ModelServingRepository:
                 if deployments
                 else []
             )
+            revision_ids = [
+                info.current_revision_id
+                for info in deployments
+                if info.current_revision_id is not None
+            ]
+            revisions = (
+                (
+                    await r.search_in_global(
+                        ModelRevisionSearcher(
+                            pagination=NoPagination(),
+                            conditions=[
+                                ModelRevisionSearchableFields.own.field_id.filter.in_(
+                                    UUIDInMatchSpec(values=revision_ids, negated=False)
+                                )
+                            ],
+                        )
+                    )
+                ).items
+                if revision_ids
+                else []
+            )
+        revision_by_id = {revision.id: revision for revision in revisions}
         routes_by_deployment: defaultdict[uuid.UUID, list[RoutingData]] = defaultdict(list)
         for route in routes:
             routes_by_deployment[route.endpoint].append(route)
@@ -859,7 +885,11 @@ class ModelServingRepository:
         items: list[ServiceSearchItem] = []
         for info in deployments:
             deployment_routes = routes_by_deployment[info.id]
-            current_rev = info.current_revision
+            current_rev = (
+                revision_by_id.get(info.current_revision_id)
+                if info.current_revision_id is not None
+                else None
+            )
             items.append(
                 ServiceSearchItem(
                     id=info.id,
