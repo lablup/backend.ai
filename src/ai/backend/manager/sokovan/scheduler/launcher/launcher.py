@@ -403,7 +403,7 @@ class SessionLauncher:
             for img_id, img_cfg in image_configs.items():
                 image_configs_by_id[img_id] = img_cfg.to_image_config(auto_pull)
 
-            sealed_slot_names = await self._repository.get_sealed_launch_slot_names()
+            sealed_slot_names = await self._scheduler_repository.get_sealed_launch_slot_names()
 
             # Build the kernel creation request of each agent (no RPC is sent here)
             async def build_agent_request(

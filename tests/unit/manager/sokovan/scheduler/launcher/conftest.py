@@ -314,14 +314,13 @@ def _create_session_for_start(
         user_uuid=uuid4(),
         user_email="test@example.com",
         user_name="testuser",
-        domain_id=DomainID(uuid4()),
+        domain_id=_DOMAIN_ID,
         project_id=ProjectID(uuid4()),
         cluster_mode=cluster_mode,
         network_type=network_type or NetworkType.VOLATILE,
         network_id=network_id,
         kernels=kernels,
         environ=environ or {},
-        domain_id=_DOMAIN_ID,
     )
 
 
