@@ -464,8 +464,7 @@ class DeploymentDBSource:
                 else None
             )
             infos.append(
-                replace(
-                    row.to_bare_deployment_info(),
+                row.to_bare_deployment_info().with_revisions_and_policy(
                     current_revision_id=current.id if current else None,
                     deploying_revision_id=deploying.id if deploying else None,
                     current_revision=current,
@@ -520,10 +519,11 @@ class DeploymentDBSource:
             policy = await db_sess.scalar(
                 sa.select(DeploymentPolicyRow).where(DeploymentPolicyRow.endpoint == endpoint_id)
             )
-            return replace(
-                row.to_bare_deployment_info(),
+            return row.to_bare_deployment_info().with_revisions_and_policy(
                 current_revision_id=row.current_revision_id,
                 deploying_revision_id=row.deploying_revision_id,
+                current_revision=None,
+                deploying_revision=None,
                 policy=DeploymentPolicySearchableFields.own.to_data(policy)
                 if policy is not None
                 else None,
@@ -727,8 +727,7 @@ class DeploymentDBSource:
             # Apply the values to the loaded row without writing them.
             for column, value in updater.build_values().items():
                 setattr(existing_row, column, value)
-            return replace(
-                existing_row.to_bare_deployment_info(),
+            return existing_row.to_bare_deployment_info().with_revisions_and_policy(
                 current_revision_id=loaded.current_revision_id,
                 deploying_revision_id=loaded.deploying_revision_id,
                 current_revision=loaded.current_revision,
