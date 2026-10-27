@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import Annotated, Any
+from typing import Annotated, Any, Self
 
-from pydantic import AliasChoices, Field, field_serializer, field_validator
+from pydantic import AliasChoices, Field, field_serializer, field_validator, model_validator
 
 from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -147,6 +148,18 @@ class SingleRedisConfig(BackendAISchema):
             example=ConfigExample(local="mymaster", prod="backend-ai"),
         ),
     ]
+    username: Annotated[
+        str | None,
+        Field(default=None),
+        BackendAIConfigMeta(
+            description=(
+                "ACL user name for authenticating with Redis master together with `password`. "
+                "Leave unset to authenticate as the default user. Requires `password`."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="", prod="REDIS_USERNAME"),
+        ),
+    ]
     password: Annotated[
         str | None,
         Field(default=None),
@@ -256,6 +269,12 @@ class SingleRedisConfig(BackendAISchema):
             return entries
         raise TypeError("sentinel must be list or 'host:port,host:port' string")
 
+    @model_validator(mode="after")
+    def _validate_username_requires_password(self) -> Self:
+        if self.username and not self.password:
+            raise ValueError("`username` requires `password` to be set to a non-empty value.")
+        return self
+
     @field_serializer("addr")
     def _serialize_addr(self, addr: HostPortPairModel | None, _info: Any) -> str | None:
         return None if addr is None else f"{addr.host}:{addr.port}"
@@ -282,6 +301,7 @@ class SingleRedisConfig(BackendAISchema):
             addr=addr,
             sentinel=sentinel_addrs,
             service_name=self.service_name,
+            username=self.username,
             password=self.password,
             sentinel_password=self.sentinel_password,
             redis_helper_config=self.redis_helper_config.to_dict(),
@@ -301,6 +321,7 @@ class SingleRedisConfig(BackendAISchema):
             addr=addr,
             sentinel=sentinel_addrs,
             service_name=self.service_name,
+            username=self.username,
             password=self.password,
             sentinel_password=self.sentinel_password,
             request_timeout=self.request_timeout,
@@ -344,6 +365,7 @@ class RedisConfig(SingleRedisConfig):
             addr=addr,
             sentinel=sentinel_addrs,
             service_name=self.service_name,
+            username=self.username,
             password=self.password,
             sentinel_password=self.sentinel_password,
             redis_helper_config=self.redis_helper_config.to_dict(),
@@ -367,6 +389,7 @@ class RedisConfig(SingleRedisConfig):
             addr=addr,
             sentinel=sentinel_addrs,
             service_name=self.service_name,
+            username=self.username,
             password=self.password,
             sentinel_password=self.sentinel_password,
             override_targets=override_targets,

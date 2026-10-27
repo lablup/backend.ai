@@ -2539,9 +2539,11 @@ class AgentGlobalConfig(BaseConfigSchema):
         Field(default=None),
         BackendAIConfigMeta(
             description=(
-                "Redis configuration injected at runtime from etcd. "
+                "Redis configuration. "
                 "Redis is used for inter-agent communication, caching, and pub/sub messaging. "
-                "This field should not be manually configured as it is injected from etcd settings."
+                "If this section is set, it is used as-is and etcd config/redis is not read "
+                f"(honored from {NEXT_RELEASE_VERSION}). "
+                "If omitted, it is injected at runtime from etcd config/redis."
             ),
             added_version="25.12.0",
             composite=CompositeType.FIELD,
