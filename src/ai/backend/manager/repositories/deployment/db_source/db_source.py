@@ -427,9 +427,41 @@ class DeploymentDBSource:
         deployment id. A revision whose row is missing leaves its id ``None`` as well."""
         if not infos:
             return []
-        revisions = ModelRevisionSearchableFields.own
         deployment_ids = [info.id for info in infos]
-        current_result = await db_sess.execute(
+        current_revisions = await DeploymentDBSource._read_current_revisions(
+            db_sess, deployment_ids
+        )
+        deploying_revisions = await DeploymentDBSource._read_deploying_revisions(
+            db_sess, deployment_ids
+        )
+        policies = await DeploymentDBSource._read_policies(db_sess, deployment_ids)
+
+        attached: list[DeploymentInfo] = []
+        for info in infos:
+            current_revision = current_revisions.get(info.id)
+            deploying_revision = deploying_revisions.get(info.id)
+            current_revision_id = current_revision.id if current_revision is not None else None
+            deploying_revision_id = (
+                deploying_revision.id if deploying_revision is not None else None
+            )
+            attached.append(
+                replace(
+                    info,
+                    current_revision_id=current_revision_id,
+                    deploying_revision_id=deploying_revision_id,
+                    current_revision=current_revision,
+                    deploying_revision=deploying_revision,
+                    policy=policies.get(info.id),
+                )
+            )
+        return attached
+
+    @staticmethod
+    async def _read_current_revisions(
+        db_sess: SASession, deployment_ids: Sequence[DeploymentID]
+    ) -> dict[DeploymentID, ModelRevisionData]:
+        """The revision each deployment's primary replica group serves."""
+        query = (
             sa.select(EndpointRow.id, DeploymentRevisionRow)
             .join(ReplicaGroupRow, ReplicaGroupRow.id == EndpointRow.primary_replica_group_id)
             .join(
@@ -438,10 +470,18 @@ class DeploymentDBSource:
             )
             .where(EndpointRow.id.in_(deployment_ids))
         )
-        current_by_deployment = {
-            deployment_id: revisions.to_data(revision) for deployment_id, revision in current_result
-        }
-        deploying_result = await db_sess.execute(
+        result = await db_sess.execute(query)
+        revisions: dict[DeploymentID, ModelRevisionData] = {}
+        for deployment_id, revision_row in result:
+            revisions[deployment_id] = ModelRevisionSearchableFields.own.to_data(revision_row)
+        return revisions
+
+    @staticmethod
+    async def _read_deploying_revisions(
+        db_sess: SASession, deployment_ids: Sequence[DeploymentID]
+    ) -> dict[DeploymentID, ModelRevisionData]:
+        """The revision each deployment is rolling out."""
+        query = (
             sa.select(EndpointRow.id, DeploymentRevisionRow)
             .join(
                 DeploymentRevisionRow,
@@ -449,32 +489,25 @@ class DeploymentDBSource:
             )
             .where(EndpointRow.id.in_(deployment_ids))
         )
-        deploying_by_deployment = {
-            deployment_id: revisions.to_data(revision)
-            for deployment_id, revision in deploying_result
-        }
-        policy_rows = await db_sess.scalars(
-            sa.select(DeploymentPolicyRow).where(DeploymentPolicyRow.endpoint.in_(deployment_ids))
+        result = await db_sess.execute(query)
+        revisions: dict[DeploymentID, ModelRevisionData] = {}
+        for deployment_id, revision_row in result:
+            revisions[deployment_id] = ModelRevisionSearchableFields.own.to_data(revision_row)
+        return revisions
+
+    @staticmethod
+    async def _read_policies(
+        db_sess: SASession, deployment_ids: Sequence[DeploymentID]
+    ) -> dict[DeploymentID, DeploymentPolicyData]:
+        """The policy of each deployment that has one."""
+        query = sa.select(DeploymentPolicyRow).where(
+            DeploymentPolicyRow.endpoint.in_(deployment_ids)
         )
-        policy_by_deployment = {
-            policy.endpoint: DeploymentPolicySearchableFields.own.to_data(policy)
-            for policy in policy_rows
-        }
-        attached: list[DeploymentInfo] = []
-        for info in infos:
-            current = current_by_deployment.get(info.id)
-            deploying = deploying_by_deployment.get(info.id)
-            attached.append(
-                replace(
-                    info,
-                    current_revision_id=current.id if current else None,
-                    deploying_revision_id=deploying.id if deploying else None,
-                    current_revision=current,
-                    deploying_revision=deploying,
-                    policy=policy_by_deployment.get(info.id),
-                )
-            )
-        return attached
+        policy_rows = await db_sess.scalars(query)
+        policies: dict[DeploymentID, DeploymentPolicyData] = {}
+        for policy_row in policy_rows:
+            policies[policy_row.endpoint] = DeploymentPolicySearchableFields.own.to_data(policy_row)
+        return policies
 
     async def get_image_id(self, image: ImageIdentifier) -> ImageID:
         """The live image the canonical names for the architecture, or that carries it as an
