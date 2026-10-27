@@ -21,8 +21,10 @@ from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
-from ai.backend.manager.errors.session_group import SessionGroupInUseForEnqueue
+from ai.backend.manager.errors.session_group import (
+    SessionGroupInUseForEnqueue,
+    SessionGroupNotFound,
+)
 from ai.backend.manager.services.session.actions.enqueue_session import (
     EnqueueSessionAction,
     ResourceSlotEntry,
@@ -133,7 +135,7 @@ class TestEnqueueSessionGroup:
     ) -> None:
         scheduler_repository.search_session_groups = AsyncMock(side_effect=[[]])
 
-        with pytest.raises(EntityNotFoundError):
+        with pytest.raises(SessionGroupNotFound):
             await session_service.enqueue_session(action)
 
         scheduling_controller.enqueue_session_from_draft.assert_not_called()

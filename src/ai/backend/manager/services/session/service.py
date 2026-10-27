@@ -26,7 +26,6 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.data.entity.session_group import SessionGroupEntityType
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.session.types import CustomizedImageVisibilityScope
@@ -82,7 +81,6 @@ from ai.backend.manager.data.session.options import (
 from ai.backend.manager.data.session.types import SessionTerminationStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.agent import AgentNotAllocated
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.common import (
     InternalServerError,
     ServiceUnavailable,
@@ -101,7 +99,10 @@ from ai.backend.manager.errors.resource import (
     NoCurrentTaskContext,
     SessionTemplateNotFound,
 )
-from ai.backend.manager.errors.session_group import SessionGroupInUseForEnqueue
+from ai.backend.manager.errors.session_group import (
+    SessionGroupInUseForEnqueue,
+    SessionGroupNotFound,
+)
 from ai.backend.manager.errors.storage import VFolderBadRequest
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.session.row import (
@@ -1510,10 +1511,7 @@ class SessionService:
             if not await self._scheduler_repository.search_session_groups(
                 owned_session_group_searcher
             ):
-                raise EntityNotFoundError(
-                    f"Session group {action.session_group_id} not found",
-                    entity_type=SessionGroupEntityType(),
-                )
+                raise SessionGroupNotFound(f"Session group {action.session_group_id} not found")
             if await self._scheduler_repository.search_session_groups(held_session_group_searcher):
                 raise SessionGroupInUseForEnqueue(
                     f"Session group {action.session_group_id} is used by a replica group"

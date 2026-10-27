@@ -12,7 +12,27 @@ from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.data.entity.session_group import SessionGroupEntityType
 from ai.backend.common.exception import ErrorDetail
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.errors.base.entity import EntityError, EntityErrorCode
+from ai.backend.manager.errors.base.entity import (
+    EntityError,
+    EntityErrorCode,
+    EntityNotFoundError,
+)
+
+
+class SessionGroupNotFound(EntityNotFoundError):
+    """Raised when an operation names a session group that does not exist or that the
+    caller may not use."""
+
+    error_type = "https://api.backend.ai/probs/session-group-not-found"
+    error_title = "The session group does not exist."
+
+    def __init__(
+        self,
+        extra_msg: str | None = None,
+        *,
+        operation: ActionOperationType = ActionOperationType.GET,
+    ) -> None:
+        super().__init__(extra_msg, entity_type=SessionGroupEntityType(), operation=operation)
 
 
 class SessionGroupInUse(EntityError, web.HTTPConflict):
