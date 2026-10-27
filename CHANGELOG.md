@@ -16,6 +16,18 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.17 (2026-10-27)
+
+### Features
+* Add the `[proxy_coordinator.content_encoding] rejected_encodings` App Proxy coordinator option, which makes workers and Traefik answer 415 to requests whose `Content-Encoding` contains a listed coding (for example `["br"]`) instead of forwarding them to session apps. ([#16041](https://github.com/lablup/backend.ai/issues/16041))
+
+### Fixes
+* Fix manager answering every request with 500 when OpenTelemetry is enabled, by building its OpenTelemetry server middleware after the tracer provider is set ([#16112](https://github.com/lablup/backend.ai/issues/16112))
+
+### Miscellaneous
+* Publish a release with the scies that did build instead of withholding it when one platform fails, and let that platform be added later by re-running only its build job ([#16084](https://github.com/lablup/backend.ai/issues/16084))
+
+
 ## 26.4.16 (2026-10-27)
 
 ### Fixes

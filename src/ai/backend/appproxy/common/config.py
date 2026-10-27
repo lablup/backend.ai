@@ -18,7 +18,6 @@ from pydantic.json_schema import JsonSchemaValue
 from pydantic_core import PydanticUndefined, core_schema
 
 from ai.backend.common.meta import (
-    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -327,7 +326,7 @@ class ContentEncodingConfig(BaseSchema):
                 "Content codings that make a request be answered with 415 instead of being "
                 "forwarded to session apps when its Content-Encoding contains any of them."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.17",
             example=ConfigExample(local="[]", prod='["br"]'),
         ),
     ]

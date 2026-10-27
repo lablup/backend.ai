@@ -38,7 +38,6 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.meta import (
-    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -548,7 +547,7 @@ class ProxyCoordinatorConfig(BaseSchema):
                 "session apps. Applies to both the built-in proxy workers and Traefik. Built-in "
                 "workers read it when they register, so restart them after changing it."
             ),
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.4.17",
             composite=CompositeType.FIELD,
         ),
     ]
