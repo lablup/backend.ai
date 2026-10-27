@@ -20,6 +20,7 @@ from ai.backend.appproxy.common.errors import ObjectNotFound
 from ai.backend.appproxy.common.events import DoCheckWorkerLostEvent, WorkerLostEvent
 from ai.backend.appproxy.common.types import (
     AppMode,
+    ContentEncodingPolicy,
     CORSOptions,
     FrontendMode,
     ProxyProtocol,
@@ -112,12 +113,7 @@ class WorkerResponseModel(WorkerModel):
 
 
 class WorkerRegistrationResponseModel(WorkerResponseModel):
-    rejected_content_encodings: Annotated[
-        list[str],
-        Field(
-            description="Content codings the worker must reject when a request's Content-Encoding contains any of them."
-        ),
-    ]
+    content_encoding: ContentEncodingPolicy
 
 
 class WorkerListResponseModel(BackendAISchema):
@@ -270,7 +266,9 @@ async def update_worker(
         result = await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
     return PydanticResponse(
         WorkerRegistrationResponseModel(
-            rejected_content_encodings=root_ctx.local_config.proxy_coordinator.content_encoding.rejected_encodings,
+            content_encoding=ContentEncodingPolicy(
+                rejected_encodings=root_ctx.local_config.proxy_coordinator.content_encoding.rejected_encodings,
+            ),
             **result,
         )
     )

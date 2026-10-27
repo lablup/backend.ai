@@ -5,7 +5,7 @@ from typing import override
 from ai.backend.common.events.types import AbstractAnycastEvent, AbstractBroadcastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 
-from .types import RouteInfo
+from .types import ContentEncodingPolicy, RouteInfo
 from .types import SerializableCircuit as Circuit
 
 
@@ -51,13 +51,13 @@ class AppProxyCircuitRouteUpdatedEvent(AbstractBroadcastEvent):
         return None
 
 
-class AppProxyRejectedContentEncodingsUpdatedEvent(AbstractBroadcastEvent):
-    rejected_content_encodings: list[str]
+class AppProxyContentEncodingPolicyUpdatedEvent(AbstractBroadcastEvent):
+    content_encoding: ContentEncodingPolicy
 
     @classmethod
     @override
     def event_name(cls) -> str:
-        return "appproxy_rejected_content_encodings_updated_event"
+        return "appproxy_content_encoding_policy_updated_event"
 
     @classmethod
     @override

@@ -61,11 +61,12 @@ from ai.backend.appproxy.common.events import (
     AppProxyCircuitCreatedEvent,
     AppProxyCircuitRemovedEvent,
     AppProxyCircuitRouteUpdatedEvent,
-    AppProxyRejectedContentEncodingsUpdatedEvent,
+    AppProxyContentEncodingPolicyUpdatedEvent,
     AppProxyWorkerCircuitAddedEvent,
 )
 from ai.backend.appproxy.common.types import (
     AppCreator,
+    ContentEncodingPolicy,
     EventLoopType,
     FrontendMode,
     FrontendServerMode,
@@ -451,9 +452,9 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     ]
     handlers.append(
         root_ctx.event_dispatcher.subscribe(
-            AppProxyRejectedContentEncodingsUpdatedEvent,
+            AppProxyContentEncodingPolicyUpdatedEvent,
             root_ctx,
-            handle_rejected_content_encodings_updated_event,
+            handle_content_encoding_policy_updated_event,
             name="proxy-worker",
         )
     )
@@ -738,15 +739,15 @@ async def status(request: web.Request) -> web.Response:
     return web.json_response({"api_version": "v2"})
 
 
-async def handle_rejected_content_encodings_updated_event(
+async def handle_content_encoding_policy_updated_event(
     context: RootContext,
     _agent_id: AgentId,
-    event: AppProxyRejectedContentEncodingsUpdatedEvent,
+    event: AppProxyContentEncodingPolicyUpdatedEvent,
 ) -> None:
-    context.rejected_content_encodings = frozenset(event.rejected_content_encodings)
+    context.content_encoding = event.content_encoding
     log.info(
-        "applied the rejected content encodings",
-        rejected_content_encodings=sorted(context.rejected_content_encodings),
+        "applied the content encoding policy",
+        rejected_encodings=context.content_encoding.rejected_encodings,
     )
 
 
@@ -856,7 +857,7 @@ def build_root_app(
     subapp_pkgs: Sequence[str] = (),
 ) -> web.Application:
     root_ctx = RootContext()
-    root_ctx.rejected_content_encodings = frozenset()
+    root_ctx.content_encoding = ContentEncodingPolicy()
     root_ctx.metrics = WorkerMetricRegistry.instance()
 
     app = web.Application(

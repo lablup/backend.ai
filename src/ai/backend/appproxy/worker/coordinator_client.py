@@ -13,6 +13,7 @@ from ai.backend.appproxy.common.errors import (
     WorkerRegistrationError,
 )
 from ai.backend.appproxy.common.types import (
+    ContentEncodingPolicy,
     FrontendMode,
     FrontendServerMode,
     SerializableCircuit,
@@ -171,8 +172,8 @@ async def register_worker(root_ctx: RootContext, request_id: str) -> list[Slot]:
             resp.raise_for_status()
             body = await resp.json()
             root_ctx.worker_id = body["id"]
-            root_ctx.rejected_content_encodings = frozenset(
-                body.get("rejected_content_encodings", [])
+            root_ctx.content_encoding = ContentEncodingPolicy.model_validate(
+                body.get("content_encoding", {})
             )
             log.info(
                 "joined the coordinator",

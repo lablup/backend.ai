@@ -92,6 +92,16 @@ type AppCreator = Callable[
 ]
 
 
+class ContentEncodingPolicy(BackendAISchema):
+    rejected_encodings: Annotated[
+        list[str],
+        Field(
+            default_factory=list,
+            description="Content codings rejected with 415 when a request's Content-Encoding contains any of them.",
+        ),
+    ]
+
+
 class RouteInfo(BackendAISchema):
     """Information about a route within a circuit.
 

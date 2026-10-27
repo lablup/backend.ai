@@ -119,7 +119,7 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
         )
 
     def _find_rejected_content_encoding(self, request: web.Request) -> str | None:
-        rejected_encodings = self.root_context.rejected_content_encodings
+        rejected_encodings = self.root_context.content_encoding.rejected_encodings
         for header_value in request.headers.getall(hdrs.CONTENT_ENCODING, []):
             for coding in header_value.split(","):
                 trimmed_coding = coding.strip()

@@ -24,6 +24,7 @@ import prometheus_client
 
 from ai.backend.appproxy.common.types import (
     AppMode,
+    ContentEncodingPolicy,
     FrontendMode,
     ProxyProtocol,
     SerializableCircuit,
@@ -346,7 +347,7 @@ class RootContext:
     valkey_stat: ValkeyStatClient
     http_client_pool: ClientPool
     worker_id: UUID
-    rejected_content_encodings: frozenset[str]
+    content_encoding: ContentEncodingPolicy
     local_config: ServerConfig
     last_used_time_marker_redis_queue: asyncio.Queue[tuple[list[str], float]]
     request_counter_redis_queue: asyncio.Queue[str]
