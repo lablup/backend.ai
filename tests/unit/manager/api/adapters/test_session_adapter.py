@@ -33,6 +33,7 @@ from ai.backend.common.types import (
     ClusterMode,
     KernelId,
     ResourceSlot,
+    SessionId,
     SessionResult,
     SessionTypes,
 )
@@ -406,6 +407,92 @@ class TestBatchLoadSessions:
     ) -> None:
         assert await adapter.batch_load_by_ids([]) == []
         processors.bulk_get.run.assert_not_awaited()
+
+
+class TestSessionFailingToLoadItsAgents:
+    """A session whose designated agents fail to load: the DataLoader answers with the
+    error for that session alone, and a payload read fails."""
+
+    @pytest.fixture
+    def loaded(self) -> SessionData:
+        return _create_session_data()
+
+    @pytest.fixture
+    def failing(self) -> SessionData:
+        return _create_session_data()
+
+    @pytest.fixture
+    def denial(self) -> GenericForbidden:
+        return GenericForbidden("no read on this session's agents")
+
+    @pytest.fixture
+    def processors(
+        self, loaded: SessionData, failing: SessionData, denial: GenericForbidden
+    ) -> MagicMock:
+        loaded_entity = MagicMock(spec=SessionEntityData)
+        loaded_entity.to_session_data.return_value = loaded
+        failing_entity = MagicMock(spec=SessionEntityData)
+        failing_entity.to_session_data.return_value = failing
+        processors = MagicMock()
+        processors.bulk_get.run = AsyncMock(
+            return_value=PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[SessionEntityData].succeeded(
+                        SessionID(loaded.id), loaded_entity
+                    ),
+                    PartialBulkEntityResult[SessionEntityData].succeeded(
+                        SessionID(failing.id), failing_entity
+                    ),
+                ]
+            )
+        )
+        processors.get_session.run = AsyncMock(return_value=MagicMock(session_data=failing))
+        processors.batch_get_session_resource_allocation.run = AsyncMock(
+            side_effect=_no_allocations
+        )
+
+        async def _designations(
+            action: BulkGetSessionDesignatedAgentIdsAction,
+        ) -> PartialBulkResult[list[AgentId]]:
+            return PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[list[AgentId]].denied(sid, denial)
+                    if sid == SessionID(failing.id)
+                    else PartialBulkEntityResult[list[AgentId]].succeeded(sid, [])
+                    for sid in action.session_ids
+                ]
+            )
+
+        processors.bulk_get_session_designated_agent_ids.run = AsyncMock(side_effect=_designations)
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> SessionAdapter:
+        return SessionAdapter(processors, MagicMock())
+
+    async def test_the_data_loader_answers_that_session_with_its_error(
+        self,
+        adapter: SessionAdapter,
+        loaded: SessionData,
+        failing: SessionData,
+        denial: GenericForbidden,
+    ) -> None:
+        node, refused = await adapter.batch_load_by_ids([
+            SessionID(loaded.id),
+            SessionID(failing.id),
+        ])
+
+        assert node is not None and not isinstance(node, Exception)
+        assert node.id == loaded.id
+        assert refused is denial
+
+    async def test_a_payload_read_raises_the_error(
+        self, adapter: SessionAdapter, failing: SessionData, denial: GenericForbidden
+    ) -> None:
+        with pytest.raises(GenericForbidden) as raised:
+            await adapter.get(SessionId(failing.id))
+
+        assert raised.value is denial
 
 
 class TestBatchResourceAllocationBySession:
