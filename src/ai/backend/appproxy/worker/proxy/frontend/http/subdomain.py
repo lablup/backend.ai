@@ -61,16 +61,11 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
             template_path = f / "templates"
             aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(template_path))
 
-<<<<<<< HEAD
-        runner = web.AppRunner(app, keepalive_timeout=30.0)
-=======
         runner = web.AppRunner(
             app,
             keepalive_timeout=30.0,
-            max_field_size=self.root_context.local_config.proxy_worker.max_header_field_size,
             auto_decompress=False,  # transparently pass the request body
         )
->>>>>>> 2010df23 (chore(BA-8691): pass compressed request bodies through the app-proxy worker (#16037))
         await runner.setup()
         service_addr = self.wildcard_config.bind_addr
         site = web.TCPSite(

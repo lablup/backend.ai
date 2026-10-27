@@ -41,7 +41,6 @@ async def serving_subdomain_frontend(
     proxy_worker_config = root_context.local_config.proxy_worker
     proxy_worker_config.tls_listen = False
     proxy_worker_config.trusted_proxies = []
-    proxy_worker_config.max_header_field_size = 8190
     proxy_worker_config.wildcard_domain.bind_addr.host = "127.0.0.1"
     proxy_worker_config.wildcard_domain.bind_addr.port = unused_tcp_port
     proxy_worker_config.wildcard_domain.domain = _WILDCARD_DOMAIN
