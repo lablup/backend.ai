@@ -53,6 +53,12 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 		},
 	}
 
+	rejectedEncodings := make([]string, 0, len(config.ContentEncoding.RejectedEncodings))
+	for _, rejectedEncoding := range config.ContentEncoding.RejectedEncodings {
+		rejectedEncodings = append(rejectedEncodings, strings.ToLower(strings.TrimSpace(rejectedEncoding)))
+	}
+	config.ContentEncoding.RejectedEncodings = rejectedEncodings
+
 	return &Plugin{
 		config:     config,
 		next:       next,
@@ -90,15 +96,16 @@ func (a *Plugin) MarkInactive() {
 	}
 }
 
-func (a *Plugin) findRejectedContentEncoding(req *http.Request) (string, bool) {
-	for _, headerValue := range req.Header.Values("Content-Encoding") {
+func (a *Plugin) findRejectedContentEncoding(contentEncodingHeaders []string) (string, bool) {
+	// Each header line may list several codings, e.g. "gzip, br" (RFC 9110 section 8.4).
+	// Codings are case-insensitive (RFC 9110 section 8.4.1), and some session apps decode
+	// "BR" as brotli, so the header is lowercased like the configured codings.
+	for _, headerValue := range contentEncodingHeaders {
 		for _, coding := range strings.Split(headerValue, ",") {
-			trimmedCoding := strings.TrimSpace(coding)
+			lowercasedCoding := strings.ToLower(strings.TrimSpace(coding))
 			for _, rejectedEncoding := range a.config.ContentEncoding.RejectedEncodings {
-				// Codings are case-insensitive (RFC 9110 section 8.4.1), and some session apps
-				// decode "BR" as brotli.
-				if strings.EqualFold(trimmedCoding, rejectedEncoding) {
-					return trimmedCoding, true
+				if lowercasedCoding == rejectedEncoding {
+					return lowercasedCoding, true
 				}
 			}
 		}
@@ -107,7 +114,7 @@ func (a *Plugin) findRejectedContentEncoding(req *http.Request) (string, bool) {
 }
 
 func (a *Plugin) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	if rejectedEncoding, found := a.findRejectedContentEncoding(req); found {
+	if rejectedEncoding, found := a.findRejectedContentEncoding(req.Header.Values("Content-Encoding")); found {
 		http.Error(rw, fmt.Sprintf("Request bodies encoded with %s are not accepted", rejectedEncoding), http.StatusUnsupportedMediaType)
 		return
 	}
