@@ -149,6 +149,7 @@ BEP numbers start from 1000.
 | [1076](BEP-1076-project-membership.md) | Project Membership | HyeokJin Kim | Draft |
 | [1077](BEP-1077-project-scoped-ownership.md) | Project-Scoped Ownership and Access | HyeokJin Kim | Draft |
 | [1078](BEP-1078-storage-proxy-enhancement.md) | Storage Proxy Enhancement | Sanghun Lee | Draft |
+| [1080](BEP-1080-batch-session-retry-policy.md) | Batch Session Retry Policy | Jeongseok Kang | Draft |
 | _next_ | _(reserve your number here)_ | | |
 
 ## File Structure
