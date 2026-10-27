@@ -37500,6 +37500,30 @@
             "default": null,
             "description": "Filter by the id of the public entity, the domain or the project."
           },
+          "created_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by when the row was created."
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DateTimeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by when the row was last changed."
+          },
           "deleted_at": {
             "anyOf": [
               {

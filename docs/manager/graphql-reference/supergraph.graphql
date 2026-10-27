@@ -27445,7 +27445,7 @@ type SyncReplicaPayload
 }
 
 """
-Added in 26.10.0. A system session environ row: the value of a starting session it injects under its key into every session of its scope.
+Added in 26.10.0. A system session environ row: binds a value of a starting session to an environment variable name at the public scope, a domain or a project.
 """
 type SystemSessionEnviron implements Node
   @join__implements(graph: STRAWBERRY, interface: "Node")
@@ -27474,7 +27474,7 @@ type SystemSessionEnviron implements Node
   """When the row was last changed."""
   updatedAt: DateTime!
 
-  """When the row was soft-deleted. Null while the row is injected."""
+  """When the row was soft-deleted, or null if it is not."""
   deletedAt: DateTime
 }
 
@@ -27523,6 +27523,12 @@ input SystemSessionEnvironFilter
 
   """Filter by the id of the public entity, the domain or the project."""
   scopeId: UUIDFilter = null
+
+  """Filter by when the row was created."""
+  createdAt: DateTimeFilter = null
+
+  """Filter by when the row was last changed."""
+  updatedAt: DateTimeFilter = null
 
   """Filter by when the row was soft-deleted."""
   deletedAt: NullableDateTimeFilter = null
