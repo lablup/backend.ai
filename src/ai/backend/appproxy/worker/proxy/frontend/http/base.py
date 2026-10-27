@@ -125,9 +125,9 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
     def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
         self._content_encoding = config
 
-    def _find_rejected_content_encoding(self, request: web.Request) -> str | None:
+    def _find_rejected_content_encoding(self, content_encoding_headers: list[str]) -> str | None:
         rejected_encodings = self._content_encoding.rejected_encodings
-        for header_value in request.headers.getall(hdrs.CONTENT_ENCODING, []):
+        for header_value in content_encoding_headers:
             for coding in header_value.split(","):
                 trimmed_coding = coding.strip()
                 if trimmed_coding in rejected_encodings:
@@ -135,7 +135,9 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
         return None
 
     async def proxy(self, request: web.Request) -> web.StreamResponse | web.WebSocketResponse:
-        rejected_encoding = self._find_rejected_content_encoding(request)
+        rejected_encoding = self._find_rejected_content_encoding(
+            request.headers.getall(hdrs.CONTENT_ENCODING, [])
+        )
         if rejected_encoding is not None:
             log.trace(
                 "rejecting a request body encoded with {} from {}",
