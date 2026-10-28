@@ -387,7 +387,7 @@ class AuthDBSource:
         async with self._v2_ops.read_ops() as r:
             return await r.query_data(querier)
 
-    async def _check_password(
+    def _check_password(
         self,
         row: sa.Row[Any],
         target_password_info: PasswordInfo,
@@ -488,7 +488,7 @@ class AuthDBSource:
             if row is None:
                 raise AuthorizationFailed("User credential mismatch.")
 
-            await self._check_password(row, target_password_info)
+            self._check_password(row, target_password_info)
             await self._migrate_password_hash(conn, row, domain_name, email, target_password_info)
 
             # Fetch active sessions for the user within the same connection
