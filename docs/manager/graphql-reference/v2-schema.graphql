@@ -11003,7 +11003,7 @@ type Mutation {
   """
   Added in 26.10.0. Change a system session environ row's key. Only provided fields are updated.
   """
-  updateSystemSessionEnviron(input: UpdateSystemSessionEnvironInput!): UpdateSystemSessionEnvironPayload
+  updateSystemSessionEnviron(id: UUID!, input: UpdateSystemSessionEnvironInput!): UpdateSystemSessionEnvironPayload
 
   """Added in 26.10.0. Soft-delete a system session environ row."""
   deleteSystemSessionEnviron(id: UUID!): DeleteSystemSessionEnvironPayload
@@ -22511,9 +22511,6 @@ type UpdateStorageVolumePayload {
 Added in 26.10.0. Input for changing a system session environ row's key.
 """
 input UpdateSystemSessionEnvironInput {
-  """The id of the row to update."""
-  id: UUID!
-
   """New environment variable name."""
   key: String
 }

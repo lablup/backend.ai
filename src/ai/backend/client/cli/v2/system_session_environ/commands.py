@@ -49,10 +49,8 @@ def update(environ_id: UUID, key: str | None) -> None:
         registry = await create_v2_registry(load_v2_config())
         try:
             result = await registry.system_session_environ.update(
-                UpdateSystemSessionEnvironInput(
-                    id=SystemSessionEnvironID(environ_id),
-                    key=key if key is not None else UNSET,
-                ),
+                SystemSessionEnvironID(environ_id),
+                UpdateSystemSessionEnvironInput(key=key if key is not None else UNSET),
             )
             print_result(result)
         finally:

@@ -37875,12 +37875,6 @@
       "UpdateSystemSessionEnvironInput": {
         "description": "Input for changing a system session environ row's key.",
         "properties": {
-          "id": {
-            "description": "The id of the row to update.",
-            "format": "uuid",
-            "title": "Id",
-            "type": "string"
-          },
           "key": {
             "anyOf": [
               {
@@ -37896,9 +37890,6 @@
             "title": "Key"
           }
         },
-        "required": [
-          "id"
-        ],
         "title": "UpdateSystemSessionEnvironInput",
         "type": "object"
       },

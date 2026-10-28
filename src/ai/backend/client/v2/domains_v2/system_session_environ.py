@@ -42,12 +42,12 @@ class V2SystemSessionEnvironClient(BaseDomainClient):
         )
 
     async def update(
-        self, request: UpdateSystemSessionEnvironInput
+        self, environ_id: SystemSessionEnvironID, request: UpdateSystemSessionEnvironInput
     ) -> UpdateSystemSessionEnvironPayload:
         """Change a system session environ row's key."""
         return await self._client.typed_request(
             "PATCH",
-            f"{_PATH}/{request.id}",
+            f"{_PATH}/{environ_id}",
             request=request,
             response_model=UpdateSystemSessionEnvironPayload,
         )

@@ -132,13 +132,13 @@ class SystemSessionEnvironAdapter(BaseAdapter):
         )
 
     async def update(
-        self, input: UpdateSystemSessionEnvironInput
+        self, environ_id: SystemSessionEnvironID, input: UpdateSystemSessionEnvironInput
     ) -> UpdateSystemSessionEnvironPayload:
         """Change a system session environ row's key."""
         result = await self._system_session_environ.update.run(
             UpdateSystemSessionEnvironAction(
                 updater=SystemSessionEnvironUpdater(
-                    environ_id=input.id,
+                    environ_id=environ_id,
                     key=OptionalState.from_unset(input.key),
                 )
             )

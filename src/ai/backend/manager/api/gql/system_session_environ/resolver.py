@@ -107,9 +107,12 @@ async def system_session_environ_value_sources(
 )
 async def update_system_session_environ(
     info: Info[StrawberryGQLContext],
+    id: UUID,
     input: UpdateSystemSessionEnvironInputGQL,
 ) -> UpdateSystemSessionEnvironPayloadGQL | None:
-    payload = await info.context.adapters.system_session_environ.update(input.to_pydantic())
+    payload = await info.context.adapters.system_session_environ.update(
+        SystemSessionEnvironID(id), input.to_pydantic()
+    )
     return UpdateSystemSessionEnvironPayloadGQL.from_pydantic(payload)
 
 

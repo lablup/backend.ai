@@ -15446,7 +15446,7 @@ type Mutation
   """
   Added in 26.10.0. Change a system session environ row's key. Only provided fields are updated.
   """
-  updateSystemSessionEnviron(input: UpdateSystemSessionEnvironInput!): UpdateSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
+  updateSystemSessionEnviron(id: UUID!, input: UpdateSystemSessionEnvironInput!): UpdateSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
 
   """Added in 26.10.0. Soft-delete a system session environ row."""
   deleteSystemSessionEnviron(id: UUID!): DeleteSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
@@ -29407,9 +29407,6 @@ Added in 26.10.0. Input for changing a system session environ row's key.
 input UpdateSystemSessionEnvironInput
   @join__type(graph: STRAWBERRY)
 {
-  """The id of the row to update."""
-  id: UUID!
-
   """New environment variable name."""
   key: String
 }

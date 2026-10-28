@@ -51,8 +51,7 @@ class V2SystemSessionEnvironHandler:
         body: BodyParam[UpdateSystemSessionEnvironInput],
     ) -> APIResponse:
         """Change a system session environ row's key."""
-        merged = body.parsed.model_copy(update={"id": path.parsed.environ_id})
-        payload = await self._adapter.update(merged)
+        payload = await self._adapter.update(path.parsed.environ_id, body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
 
     async def delete(self, path: PathParam[SystemSessionEnvironIdPathParam]) -> APIResponse:

@@ -302,7 +302,6 @@ class SystemSessionEnvironOrderByGQL(PydanticInputMixin[SystemSessionEnvironOrde
     name="UpdateSystemSessionEnvironInput",
 )
 class UpdateSystemSessionEnvironInputGQL(PydanticInputMixin[UpdateSystemSessionEnvironInputDTO]):
-    id: UUID = gql_field(description="The id of the row to update.")
     key: str | None = gql_field(default=UNSET, description="New environment variable name.")
 
 
