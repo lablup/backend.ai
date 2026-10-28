@@ -13,7 +13,11 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.errors.bootstrap_script import BootstrapScriptNotFound
 from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
+from ai.backend.manager.models.bootstrap_script_revision.creators import (
+    BootstrapScriptRevisionCreator,
+)
 from ai.backend.manager.models.bootstrap_script_revision.row import BootstrapScriptRevisionRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
@@ -192,3 +196,21 @@ class TestBootstrapScriptRevision:
 
         assert current is not None
         assert current.script == "echo replacement"
+
+    async def test_revision_is_refused_on_a_soft_deleted_script(
+        self,
+        db: ExtendedAsyncSAEngine,
+        user_id: UserID,
+        deleted_default_script: BootstrapScriptID,
+    ) -> None:
+        with pytest.raises(BootstrapScriptNotFound):
+            async with V2DBOpsProvider(db).write_ops() as w:
+                await w.create_dangling_field(
+                    BootstrapScriptRevisionCreator(
+                        script_id=deleted_default_script,
+                        script=BootstrapScript("echo 2"),
+                        creator_id=user_id,
+                    )
+                )
+
+        assert await self._revisions(db, deleted_default_script) == [(1, "echo 1", None)]

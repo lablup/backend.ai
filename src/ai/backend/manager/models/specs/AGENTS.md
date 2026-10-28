@@ -64,11 +64,13 @@ values (`row_class`, `pk_value`, ...).
 
 ## A single-row write carries its guard on the root
 
-- `GuardedEntityCreator.precondition_checks()`, `GuardedDataUpdater.guard_checks()`,
-  `GuardedEntityPurger.guard_checks()` and `GuardedFieldPurger.guard_checks()` are
-  abstract on the root. `EntityCreator`, `DataUpdater`, `EntityPurger` and `FieldPurger`
-  answer an empty list under `@final`; a spec that refuses inherits the guarded root
-  directly.
+- `GuardedEntityCreator.precondition_checks()`, `GuardedDanglingFieldCreator.precondition_checks()`,
+  `GuardedDataUpdater.guard_checks()`, `GuardedEntityPurger.guard_checks()` and
+  `GuardedFieldPurger.guard_checks()` are abstract on the root. `EntityCreator`,
+  `DanglingFieldCreator`, `DataUpdater`, `EntityPurger` and `FieldPurger` answer an empty
+  list under `@final`; a spec that refuses inherits the guarded root directly.
+- Only the single-row create runs preconditions. The batch dangling creates take
+  `DanglingFieldCreator`, so a guarded spec cannot reach them.
 - A `GuardCheck` is a condition on the row already named, paired with the error to
   raise when it fails. It rides on the UPDATE / DELETE statement; ops tells a missing
   row (`EntityNotFoundError`) from a refusing one (the first failing check's error)
