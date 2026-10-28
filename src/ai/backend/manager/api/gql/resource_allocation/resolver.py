@@ -44,7 +44,7 @@ from .types import (
 async def my_keypair_resource_allocation_v2(
     info: Info[StrawberryGQLContext],
 ) -> KeypairResourceAllocationPayloadGQL | None:
-    payload = await info.context.adapters.resource_allocation.my_keypair_usage_for_current_user()
+    payload = await info.context.adapters.resource_allocation.my_keypair_usage()
     return KeypairResourceAllocationPayloadGQL.from_pydantic(payload)
 
 
