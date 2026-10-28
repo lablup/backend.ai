@@ -45,8 +45,6 @@ from ai.backend.common.data.entity.image import ImageEntityType, ImageID
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.kernel_group import KernelGroupID
-from ai.backend.common.data.entity.kernel_group_environ import KernelGroupEnvironID
-from ai.backend.common.data.entity.kernel_group_resource_slot import KernelGroupResourceSlotID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
@@ -174,9 +172,7 @@ if TYPE_CHECKING:
         ResourceAllocationGQL,
     )
     from ai.backend.manager.api.gql.kernel_group.types import (  # pants: no-infer-dep
-        KernelGroupEnvironGQL,
         KernelGroupGQL,
-        KernelGroupResourceSlotGQL,
     )
     from ai.backend.manager.api.gql.keypair.types.node import KeyPairGQL  # pants: no-infer-dep
     from ai.backend.manager.api.gql.login_client_type.types import (  # pants: no-infer-dep
@@ -912,48 +908,6 @@ class DataLoaders:
 
             dtos = await adapter.batch_load_main_kernel_groups(session_ids)
             return [KGG.from_pydantic(dto) if dto is not None else None for dto in dtos]
-
-        return DataLoader(load_fn=load_fn)
-
-    @cached_property
-    def kernel_group_environ_loader(
-        self,
-    ) -> DataLoader[KernelGroupEnvironID, KernelGroupEnvironGQL | None]:
-        adapter = self._adapters.session
-
-        async def load_fn(
-            ids: list[KernelGroupEnvironID],
-        ) -> list[KernelGroupEnvironGQL | Exception | None]:
-            from ai.backend.manager.api.gql.kernel_group.types import (  # pants: no-infer-dep
-                KernelGroupEnvironGQL as KGE,
-            )
-
-            dtos = await adapter.batch_load_kernel_group_environs_by_ids(ids)
-            return [
-                dto if dto is None or isinstance(dto, Exception) else KGE.from_pydantic(dto)
-                for dto in dtos
-            ]
-
-        return DataLoader(load_fn=load_fn)
-
-    @cached_property
-    def kernel_group_resource_slot_loader(
-        self,
-    ) -> DataLoader[KernelGroupResourceSlotID, KernelGroupResourceSlotGQL | None]:
-        adapter = self._adapters.session
-
-        async def load_fn(
-            ids: list[KernelGroupResourceSlotID],
-        ) -> list[KernelGroupResourceSlotGQL | Exception | None]:
-            from ai.backend.manager.api.gql.kernel_group.types import (  # pants: no-infer-dep
-                KernelGroupResourceSlotGQL as KGRS,
-            )
-
-            dtos = await adapter.batch_load_kernel_group_resource_slots_by_ids(ids)
-            return [
-                dto if dto is None or isinstance(dto, Exception) else KGRS.from_pydantic(dto)
-                for dto in dtos
-            ]
 
         return DataLoader(load_fn=load_fn)
 

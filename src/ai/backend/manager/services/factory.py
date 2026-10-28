@@ -27,10 +27,6 @@ from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.image_alias import ImageAliasFieldType
 from ai.backend.common.data.entity.kernel import KernelFieldType
 from ai.backend.common.data.entity.kernel_group import KernelGroupFieldType
-from ai.backend.common.data.entity.kernel_group_environ import KernelGroupEnvironFieldType
-from ai.backend.common.data.entity.kernel_group_resource_slot import (
-    KernelGroupResourceSlotFieldType,
-)
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.notification import (
@@ -97,11 +93,7 @@ from ai.backend.manager.data.fair_share.types import (
 )
 from ai.backend.manager.data.image.types import ImageAliasData
 from ai.backend.manager.data.kernel.types import KernelInfo
-from ai.backend.manager.data.kernel_group.types import (
-    KernelGroupData,
-    KernelGroupEnvironData,
-    KernelGroupResourceSlotData,
-)
+from ai.backend.manager.data.kernel_group.types import KernelGroupData
 from ai.backend.manager.data.resource_usage_history.types import (
     DomainUsageBucketData,
     ProjectUsageBucketData,
@@ -265,14 +257,8 @@ from ai.backend.manager.services.secret.processors import SecretProcessors
 from ai.backend.manager.services.secret.service import SecretService
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
 from ai.backend.manager.services.service_catalog.service import ServiceCatalogService
-from ai.backend.manager.services.session.actions.lookup_bulk_kernel_group_environ_owner import (
-    LookupBulkKernelGroupEnvironOwnerAction,
-)
 from ai.backend.manager.services.session.actions.lookup_bulk_kernel_group_owner import (
     LookupBulkKernelGroupOwnerAction,
-)
-from ai.backend.manager.services.session.actions.lookup_bulk_kernel_group_resource_slot_owner import (
-    LookupBulkKernelGroupResourceSlotOwnerAction,
 )
 from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
     LookupBulkKernelOwnerAction,
@@ -280,14 +266,8 @@ from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import
 from ai.backend.manager.services.session.actions.lookup_kernel_field_owner import (
     LookupKernelFieldOwnerAction,
 )
-from ai.backend.manager.services.session.actions.lookup_kernel_group_environ_field_owner import (
-    LookupKernelGroupEnvironFieldOwnerAction,
-)
 from ai.backend.manager.services.session.actions.lookup_kernel_group_field_owner import (
     LookupKernelGroupFieldOwnerAction,
-)
-from ai.backend.manager.services.session.actions.lookup_kernel_group_resource_slot_field_owner import (
-    LookupKernelGroupResourceSlotFieldOwnerAction,
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
@@ -745,18 +725,6 @@ def create_processors(
                 KernelGroupData,
                 LookupKernelGroupFieldOwnerAction,
                 LookupBulkKernelGroupOwnerAction,
-            ),
-            session_groups.group(GroupMeta(SessionEntityType())).field_group(
-                FieldGroupMeta(KernelGroupEnvironFieldType()),
-                KernelGroupEnvironData,
-                LookupKernelGroupEnvironFieldOwnerAction,
-                LookupBulkKernelGroupEnvironOwnerAction,
-            ),
-            session_groups.group(GroupMeta(SessionEntityType())).field_group(
-                FieldGroupMeta(KernelGroupResourceSlotFieldType()),
-                KernelGroupResourceSlotData,
-                LookupKernelGroupResourceSlotFieldOwnerAction,
-                LookupBulkKernelGroupResourceSlotOwnerAction,
             ),
             ResourceAllocationProcessors(
                 resource_group_groups.group(GroupMeta(UserEntityType())),

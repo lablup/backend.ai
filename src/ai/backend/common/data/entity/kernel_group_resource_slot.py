@@ -7,10 +7,7 @@ from ai.backend.common.data.entity.types import (
     FieldType,
 )
 
-__all__ = (
-    "KernelGroupResourceSlotFieldType",
-    "KernelGroupResourceSlotID",
-)
+__all__ = ("KernelGroupResourceSlotID",)
 
 
 class KernelGroupResourceSlotFieldType(FieldType):

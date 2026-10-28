@@ -8,7 +8,6 @@ from sqlalchemy.orm import Mapped, mapped_column
 from ai.backend.common.data.entity.kernel_group import KernelGroupID
 from ai.backend.common.data.entity.kernel_group_environ import KernelGroupEnvironID
 from ai.backend.common.data.environ.types import ENVIRON_KEY_PATTERN
-from ai.backend.manager.data.kernel_group.types import KernelGroupEnvironData
 from ai.backend.manager.models.base import GUID, Base
 
 __all__ = ("KernelGroupEnvironRow",)
@@ -40,11 +39,3 @@ class KernelGroupEnvironRow(Base):
     )
     key: Mapped[str] = mapped_column("key", sa.String(length=256), nullable=False)
     value: Mapped[str] = mapped_column("value", sa.Text, nullable=False)
-
-    def to_data(self) -> KernelGroupEnvironData:
-        return KernelGroupEnvironData(
-            id=self.id,
-            kernel_group_id=self.kernel_group_id,
-            key=self.key,
-            value=self.value,
-        )
