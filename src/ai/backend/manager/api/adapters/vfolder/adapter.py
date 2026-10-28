@@ -592,7 +592,7 @@ class VFolderAdapter(BaseAdapter):
         Very slow: every call is a round-trip to the storage proxy, and the
         measurement cost depends on the storage backend (e.g., a full directory
         walk on vfs). Returns ``None`` for unmanaged vfolders, which have no
-        storage-proxy backing.
+        storage-proxy backing, and for hard-deleted vfolders, whose storage is gone.
         """
         result = await self._vfolder.get_folder_usage.run(
             GetVFolderUsageAction(vfolder_uuid=VFolderUUID(vfolder_id))

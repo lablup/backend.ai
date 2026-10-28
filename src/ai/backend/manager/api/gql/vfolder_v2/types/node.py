@@ -111,7 +111,8 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
                 "operation: every selection makes a round-trip to the storage proxy, "
                 "and the measurement cost depends on the storage backend (e.g., a "
                 "full directory walk on vfs). Select only when needed. "
-                "Null for unmanaged vfolders."
+                "Null for unmanaged vfolders and for vfolders in DELETE_COMPLETE "
+                "or DELETE_ERROR status, whose storage is gone."
             ),
         )
     )  # type: ignore[misc]
