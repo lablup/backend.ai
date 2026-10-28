@@ -10752,12 +10752,6 @@ type KernelGroup implements Node
 
   """The image the group's kernels run."""
   image: ImageV2
-
-  """Environment variables requested on the group."""
-  environ: EnvironmentVariables
-
-  """Resource slots requested on each kernel of the group."""
-  resourceSlots: ResourceSlot
 }
 
 """Added in 26.10.0. Paginated connection for kernel groups."""
@@ -10767,14 +10761,14 @@ type KernelGroupConnection
   """Pagination data for this connection"""
   pageInfo: PageInfo!
 
-  """Contains the nodes in this connection"""
+  """Contains the nodes in this connection."""
   edges: [KernelGroupEdge!]!
 
   """Total number of kernel groups matching the query."""
   count: Int!
 }
 
-"""An edge in a connection."""
+"""Added in 26.10.0. One kernel group within a connection."""
 type KernelGroupEdge
   @join__type(graph: STRAWBERRY)
 {
@@ -10794,6 +10788,9 @@ input KernelGroupFilter
 
   """Filter by role."""
   role: StringFilter = null
+
+  """Filter by image ID."""
+  imageId: UUIDFilter = null
 
   """Filter by creation time."""
   createdAt: DateTimeFilter = null
@@ -10824,6 +10821,7 @@ enum KernelGroupOrderField
   @join__type(graph: STRAWBERRY)
 {
   ROLE @join__enumValue(graph: STRAWBERRY)
+  REQUESTED_STARTS_AT @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
 }
 
@@ -11072,7 +11070,7 @@ type KernelV2 implements Node
   kernelGroupId: UUID
 
   """Startup command executed when the kernel starts."""
-  startupCommand: String @deprecated(reason: "Deprecated since 26.10.0. Use `kernelGroup.startupCommand`.")
+  startupCommand: String
 
   """Information about the session this kernel belongs to."""
   sessionInfo: KernelV2SessionInfo!
@@ -11218,7 +11216,7 @@ type KernelV2NetworkInfo
   servicePorts: ServicePorts
 
   """List of ports that are pre-opened for this kernel."""
-  preopenPorts: [Int!] @deprecated(reason: "Deprecated since 26.10.0. Use `kernelGroup.preopenPorts`.")
+  preopenPorts: [Int!]
 }
 
 """Added in 26.2.0. Ordering specification for kernels."""
@@ -11265,7 +11263,7 @@ type KernelV2ResourceInfo
   shares: ResourceSlot!
 
   """Additional resource options and configurations for this kernel."""
-  resourceOpts: ResourceOpts @deprecated(reason: "Deprecated since 26.10.0. Use `kernelGroup.shmem`.")
+  resourceOpts: ResourceOpts
 }
 
 """Added in 26.2.0. Information about the session this kernel belongs to."""
@@ -26909,10 +26907,10 @@ type SessionV2LifecycleInfo
   """
   Added in 26.10.0. Reserved start time requested at creation. The scheduler honors it only for batch sessions.
   """
-  requestedStartsAt: DateTime @deprecated(reason: "Deprecated since 26.10.0. Use `mainKernelGroup.requestedStartsAt`.")
+  requestedStartsAt: DateTime
 
   """Batch execution timeout in seconds. Applicable to batch sessions."""
-  batchTimeout: Int @deprecated(reason: "Deprecated since 26.10.0. Use `mainKernelGroup.batchTimeout`.")
+  batchTimeout: Int
 }
 
 """Added in 26.3.0. Metadata information for a session."""
@@ -27090,13 +27088,13 @@ type SessionV2RuntimeInfo
   @join__type(graph: STRAWBERRY)
 {
   """Environment variables for the session."""
-  environ: EnvironmentVariables @deprecated(reason: "Deprecated since 26.10.0. Use `mainKernelGroup.environ`.")
+  environ: EnvironmentVariables
 
   """Bootstrap script to run before the main process."""
   bootstrapScript: String
 
   """Startup command to execute when the session starts."""
-  startupCommand: String @deprecated(reason: "Deprecated since 26.10.0. Use `mainKernelGroup.startupCommand`.")
+  startupCommand: String
 
   """
   URL to call back when the session completes (e.g., for batch sessions).
