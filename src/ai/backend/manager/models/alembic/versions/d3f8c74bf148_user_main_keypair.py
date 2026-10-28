@@ -6,14 +6,16 @@ Create Date: 2023-12-06 12:20:11.537908
 
 """
 
+import base64
 import enum
+import secrets
 from typing import Any, cast
 
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.orm import registry, relationship, selectinload, sessionmaker
 
-from ai.backend.common.auth.utils import generate_keypair, generate_ssh_keypair
+from ai.backend.common.auth.utils import generate_ssh_keypair
 from ai.backend.manager.defs import DEFAULT_KEYPAIR_RATE_LIMIT, DEFAULT_KEYPAIR_RESOURCE_POLICY_NAME
 from ai.backend.manager.models.base import GUID, EnumValueType, convention
 
@@ -119,7 +121,8 @@ def upgrade() -> None:
         user_id: Any,
         user_role: UserRole,
     ) -> dict[str, Any]:
-        ak, sk = generate_keypair()
+        ak = "AKIA" + base64.b32encode(secrets.token_bytes(10)).decode("ascii")
+        sk = secrets.token_urlsafe(30)
         pubkey, privkey = generate_ssh_keypair()
         return {
             "user_id": user_email,
