@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
@@ -21,7 +22,6 @@ from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import BinarySize, ResourceSlot
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
     ReplicaGroupHandlerCategory,
     ReplicaGroupLifecycle,
@@ -31,7 +31,6 @@ from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.errors.deployment import EndpointNotFound
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow

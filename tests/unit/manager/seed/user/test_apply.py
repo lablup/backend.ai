@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_policy import (
     KeyPairResourcePolicyUUID,
@@ -15,15 +16,14 @@ from ai.backend.common.data.entity.resource_policy import (
 )
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
-from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
 from ai.backend.manager.models.keypair.creators import DefaultKeypairCreator
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.user.creators import UserCreator
-from ai.backend.manager.models.user.row import UserRow, compare_to_hashed_password
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow

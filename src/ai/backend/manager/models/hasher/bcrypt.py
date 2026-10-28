@@ -8,8 +8,9 @@ from typing import override
 
 import bcrypt
 
+from ai.backend.common.auth.password import HashInfo, PasswordInfo
+
 from .base import PasswordHasher
-from .types import HashInfo, PasswordInfo
 
 
 class BcryptHasher(PasswordHasher):
