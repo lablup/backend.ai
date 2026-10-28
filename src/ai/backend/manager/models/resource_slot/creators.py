@@ -50,6 +50,9 @@ class ResourceSlotTypeCreator(
     display_icon: str
     number_format: NumberFormat
     rank: int
+    sealed_launch: bool
+    max_per_session: Decimal | None
+    single_node_only: bool
 
     @override
     def entity_id(self, row: ResourceSlotTypeRow) -> ResourceSlotTypeUUID:
@@ -79,6 +82,9 @@ class ResourceSlotTypeCreator(
             display_icon=self.display_icon,
             number_format=self.number_format,
             rank=self.rank,
+            sealed_launch=self.sealed_launch,
+            max_per_session=self.max_per_session,
+            single_node_only=self.single_node_only,
         )
 
     @override
