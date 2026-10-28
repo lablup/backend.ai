@@ -90,6 +90,18 @@ from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
 )
+from ai.backend.manager.services.user.bootstrap_script.actions.add_revision import (
+    AddBootstrapScriptRevisionAction,
+    AddBootstrapScriptRevisionActionResult,
+)
+from ai.backend.manager.services.user.bootstrap_script.actions.create import (
+    CreateBootstrapScriptAction,
+    CreateBootstrapScriptActionResult,
+)
+from ai.backend.manager.services.user.bootstrap_script.actions.switch_default import (
+    SwitchDefaultBootstrapScriptAction,
+    SwitchDefaultBootstrapScriptActionResult,
+)
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
@@ -381,3 +393,23 @@ class UserService:
             action.user_id, action.script, action.creator_id
         )
         return UpdateDefaultBootstrapScriptActionResult()
+
+    async def create_bootstrap_script(
+        self, action: CreateBootstrapScriptAction
+    ) -> CreateBootstrapScriptActionResult:
+        revision = await self._user_repository.create_bootstrap_script(
+            action.user_id, action.script, action.creator_id
+        )
+        return CreateBootstrapScriptActionResult(revision=revision)
+
+    async def add_bootstrap_script_revision(
+        self, action: AddBootstrapScriptRevisionAction
+    ) -> AddBootstrapScriptRevisionActionResult:
+        revision = await self._user_repository.add_bootstrap_script_revision(action.creator)
+        return AddBootstrapScriptRevisionActionResult(revision=revision)
+
+    async def switch_default_bootstrap_script(
+        self, action: SwitchDefaultBootstrapScriptAction
+    ) -> SwitchDefaultBootstrapScriptActionResult:
+        script = await self._user_repository.switch_default_bootstrap_script(action.script_id)
+        return SwitchDefaultBootstrapScriptActionResult(script=script)
