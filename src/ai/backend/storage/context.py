@@ -24,7 +24,7 @@ from ai.backend.common.events.dispatcher import (
 )
 from ai.backend.common.health_checker.probe import HealthProbe
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.common.storage.probe.registry import VolumeStatusCheckRegistry
+from ai.backend.common.storage.probe.registry import VolumeStatusReporterRegistry
 from ai.backend.logging.structured import StructuredLogger
 
 from .client.manager import ManagerHTTPClientPool
@@ -80,7 +80,7 @@ class RootContext:
     health_probe: HealthProbe
     volume_stats_observer: VolumeStatsObserver
     volume_stats_state: VolumeState
-    volume_status_check_registry: VolumeStatusCheckRegistry
+    volume_status_reporter_registry: VolumeStatusReporterRegistry
 
     # volume backend states
     backends: MutableMapping[str, type[AbstractVolume]]

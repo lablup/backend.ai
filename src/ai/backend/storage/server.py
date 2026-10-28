@@ -363,7 +363,7 @@ async def server_main(
             health_probe=dep_resources.system.health_probe,
             volume_stats_observer=dep_resources.storage.volume_stats.observer,
             volume_stats_state=dep_resources.storage.volume_stats.state,
-            volume_status_check_registry=dep_resources.storage.status_probe.registry,
+            volume_status_reporter_registry=dep_resources.storage.status_probe.registry,
             backends={**dep_resources.plugins.backends},
             artifact_verifier_ctx=ArtifactVerifierContext(),
         )

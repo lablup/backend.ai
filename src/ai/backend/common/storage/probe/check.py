@@ -3,8 +3,6 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from collections.abc import Hashable
 
-from ai.backend.common.data.storage.types import StorageStatusResult
-
 
 class AbstractProbeCheck[TID: Hashable](metaclass=ABCMeta):
     """
@@ -39,7 +37,7 @@ class AbstractProbeCheck[TID: Hashable](metaclass=ABCMeta):
         raise NotImplementedError
 
 
-class AbstractStatusCheck[TID: Hashable, TResult: StorageStatusResult](AbstractProbeCheck[TID]):
+class AbstractStatusCheck[TID: Hashable, TResult](AbstractProbeCheck[TID]):
     """A probe check that keeps its last observation for whoever reports it to read."""
 
     @abstractmethod

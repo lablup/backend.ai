@@ -3,20 +3,21 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
-from ai.backend.common.data.storage.types import StorageStatusResult
-from ai.backend.common.storage.probe.volume import AbstractVolumeStatusCheck
-
-type VolumeStatusCheck = AbstractVolumeStatusCheck[StorageStatusResult]
+from ai.backend.common.data.storage.types import StorageStatusResultData
+from ai.backend.common.storage.probe.reporter import AbstractVolumeStatusReporter
 
 
-class VolumeStatusCheckRegistry:
-    """Every volume status check a service runs, and the latest observation of each."""
+class VolumeStatusReporterRegistry:
+    """Every volume status reporter a service runs, and the latest observation of each."""
 
-    _checks: Sequence[VolumeStatusCheck]
+    _reporters: Sequence[AbstractVolumeStatusReporter]
 
-    def __init__(self, checks: Sequence[VolumeStatusCheck]) -> None:
-        self._checks = checks
+    def __init__(self, reporters: Sequence[AbstractVolumeStatusReporter]) -> None:
+        self._reporters = reporters
 
-    def snapshot(self) -> Mapping[StorageVolumeName, StorageStatusResult | None]:
-        """The last observation of every check, None where one has not run yet."""
-        return {check.id(): check.latest() for check in self._checks}
+    def snapshot(self) -> Mapping[StorageVolumeName, StorageStatusResultData]:
+        """The last observation of every reporter, in the shape it is reported in."""
+        snapshot: dict[StorageVolumeName, StorageStatusResultData] = {}
+        for reporter in self._reporters:
+            snapshot.update(reporter.report())
+        return snapshot

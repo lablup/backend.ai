@@ -11,7 +11,8 @@ from ai.backend.common.data.storage.types import (
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE, NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
-from ai.backend.common.storage.probe.registry import VolumeStatusCheck
+from ai.backend.common.storage.probe.check import AbstractProbeCheck
+from ai.backend.common.storage.probe.reporter import AbstractVolumeStatusReporter
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.storage.types import (
     CapacityUsage,
@@ -158,7 +159,11 @@ class NoopVolume(AbstractVolume):
         return NoopFSOpModel()
 
     @override
-    def volume_status_checker(self) -> VolumeStatusCheck | None:
+    def volume_status_check(self) -> AbstractProbeCheck[StorageVolumeName] | None:
+        return None
+
+    @override
+    def volume_status_reporter(self) -> AbstractVolumeStatusReporter | None:
         return None
 
     # ------ volume operations -------

@@ -94,36 +94,43 @@ class StorageVolumeUsageExposure(BackendAISchema):
     )
 
 
-class ServiceStorageStatus(enum.StrEnum):
-    """How a service currently sees a storage backend or volume it relates to.
+class StorageCheckState(enum.StrEnum):
+    """Whether a service has checked a storage backend or volume it relates to.
 
     not_checked: declared, but no check has run yet.
-    healthy: the last check found no problem.
-    unhealthy: the check found a problem.
-    lost: the service no longer declares it.
+    checked: a check has run.
     """
 
     NOT_CHECKED = "not_checked"
-    HEALTHY = "healthy"
-    UNHEALTHY = "unhealthy"
-    LOST = "lost"
+    CHECKED = "checked"
+
+
+class StorageAnomaly(enum.StrEnum):
+    """Whether an anomaly was detected in a storage backend's or volume's reports."""
+
+    NONE = "none"
+    DETECTED = "detected"
 
 
 @dataclass(frozen=True)
-class StorageStatusResult:
-    """What one status check observed, when it started and how long it took.
+class VfsVolumeStatusResult:
+    """What one check of a vfs volume's mount observed, when it started and how long it
+    took. ``error_msg`` is null where the observation succeeded, ``device_id`` where it
+    failed."""
 
-    ``error_msg`` is null where the observation itself succeeded, which says nothing
-    about whether the subject is in order; reading the observation decides that.
-    """
-
+    check_state: StorageCheckState
     check_started_at: datetime
     duration: timedelta | None
     error_msg: str | None
+    device_id: int | None
 
 
 @dataclass(frozen=True)
-class VfsVolumeStatusResult(StorageStatusResult):
-    """What a vfs volume's mount looked like, null where the observation failed."""
+class StorageStatusResultData:
+    """A check's result as reported, the fields of every result type in one shape."""
 
+    check_started_at: datetime | None
+    check_state: StorageCheckState
+    duration: timedelta | None
+    error_msg: str | None
     device_id: int | None

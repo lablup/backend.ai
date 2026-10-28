@@ -10,7 +10,8 @@ from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
-from ai.backend.common.storage.probe.registry import VolumeStatusCheck
+from ai.backend.common.storage.probe.check import AbstractProbeCheck
+from ai.backend.common.storage.probe.reporter import AbstractVolumeStatusReporter
 from ai.backend.common.types import VolumeID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.config.unified import StorageProxyUnifiedConfig, VolumeInfoConfig
@@ -34,7 +35,8 @@ def _parse_volume_id(volume_name: StorageVolumeName) -> VolumeID | None:
 class VolumePool:
     _volumes: Mapping[StorageVolumeName, AbstractVolume]
     _volumes_by_id: Mapping[VolumeID, AbstractVolume]
-    _volume_status_checks: Sequence[VolumeStatusCheck]
+    _volume_status_checks: Sequence[AbstractProbeCheck[StorageVolumeName]]
+    _volume_status_reporters: Sequence[AbstractVolumeStatusReporter]
 
     def __init__(self, volumes: Mapping[StorageVolumeName, AbstractVolume]) -> None:
         self._volumes = volumes
@@ -46,7 +48,12 @@ class VolumePool:
         self._volume_status_checks = [
             check
             for volume in volumes.values()
-            if (check := volume.volume_status_checker()) is not None
+            if (check := volume.volume_status_check()) is not None
+        ]
+        self._volume_status_reporters = [
+            reporter
+            for volume in volumes.values()
+            if (reporter := volume.volume_status_reporter()) is not None
         ]
 
     @classmethod
@@ -106,8 +113,11 @@ class VolumePool:
         for volume in self._volumes.values():
             await volume.shutdown()
 
-    def volume_status_checks(self) -> Sequence[VolumeStatusCheck]:
+    def volume_status_checks(self) -> Sequence[AbstractProbeCheck[StorageVolumeName]]:
         return self._volume_status_checks
+
+    def volume_status_reporters(self) -> Sequence[AbstractVolumeStatusReporter]:
+        return self._volume_status_reporters
 
     def list_volumes(self) -> Mapping[StorageVolumeName, VolumeInfo]:
         return {

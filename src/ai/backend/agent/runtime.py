@@ -20,7 +20,9 @@ from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import
 from ai.backend.common.cron import LocalCron
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.storage.probe.registry import VolumeStatusCheck, VolumeStatusCheckRegistry
+from ai.backend.common.storage.probe.check import AbstractProbeCheck
+from ai.backend.common.storage.probe.registry import VolumeStatusReporterRegistry
+from ai.backend.common.storage.probe.reporter import AbstractVolumeStatusReporter
 from ai.backend.common.storage.probe.runner import ProbeCheckRunner, ProbeCheckRunnerArgs
 from ai.backend.common.types import AgentId, DeviceName, SlotName
 
@@ -38,7 +40,7 @@ class AgentRuntime:
     _metadata_server: MetadataServer | None
 
     _stop_signal: signal.Signals
-    _volume_status_check_registry: VolumeStatusCheckRegistry
+    _volume_status_reporter_registry: VolumeStatusReporterRegistry
     _probe_check_runner: ProbeCheckRunner[StorageVolumeName]
     _local_cron: LocalCron
 
@@ -173,8 +175,11 @@ class AgentRuntime:
         self._metadata_server = metadata_server
 
         self._stop_signal = signal.SIGTERM
-        volume_status_checks: list[VolumeStatusCheck] = []
-        self._volume_status_check_registry = VolumeStatusCheckRegistry(volume_status_checks)
+        volume_status_checks: list[AbstractProbeCheck[StorageVolumeName]] = []
+        volume_status_reporters: list[AbstractVolumeStatusReporter] = []
+        self._volume_status_reporter_registry = VolumeStatusReporterRegistry(
+            volume_status_reporters
+        )
         self._probe_check_runner = ProbeCheckRunner(
             ProbeCheckRunnerArgs(checks=volume_status_checks)
         )

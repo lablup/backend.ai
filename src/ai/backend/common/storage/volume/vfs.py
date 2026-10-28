@@ -12,7 +12,15 @@ from typing import Self, override
 
 from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
-from ai.backend.common.data.storage.types import VfsVolumeStatusResult
+from ai.backend.common.data.storage.types import (
+    StorageAnomaly,
+    StorageCheckState,
+    StorageStatusResultData,
+    VfsVolumeStatusResult,
+)
+from ai.backend.common.storage.probe.anomaly import AbstractStatusAnomalyDetector
+from ai.backend.common.storage.probe.exceptions import InvalidStorageStatusObservation
+from ai.backend.common.storage.probe.parser import AbstractStatusDataParser
 from ai.backend.common.storage.probe.volume import AbstractVolumeStatusCheck
 from ai.backend.logging.structured import StructuredLogger
 
@@ -26,6 +34,64 @@ class VfsVolumeStatusCheckArgs:
     interval: float
     initial_delay: float
     executor: Executor
+
+
+class VfsVolumeStatusDataParser(AbstractStatusDataParser[VfsVolumeStatusResult]):
+    """Converts a vfs volume's result to the shape it is reported in, and back."""
+
+    @override
+    def to_result_data(self, result: VfsVolumeStatusResult | None) -> StorageStatusResultData:
+        if result is None:
+            return StorageStatusResultData(
+                check_started_at=None,
+                check_state=StorageCheckState.NOT_CHECKED,
+                duration=None,
+                error_msg=None,
+                device_id=None,
+            )
+        if result.error_msg is None and result.device_id is None:
+            raise InvalidStorageStatusObservation("carries neither a device id nor an error")
+        return StorageStatusResultData(
+            check_started_at=result.check_started_at,
+            check_state=result.check_state,
+            duration=result.duration,
+            error_msg=result.error_msg,
+            device_id=result.device_id,
+        )
+
+    @override
+    def parse(self, data: StorageStatusResultData) -> VfsVolumeStatusResult | None:
+        if data.check_state == StorageCheckState.NOT_CHECKED or data.check_started_at is None:
+            return None
+        if data.error_msg is None and data.device_id is None:
+            raise InvalidStorageStatusObservation("carries neither a device id nor an error")
+        return VfsVolumeStatusResult(
+            check_state=data.check_state,
+            check_started_at=data.check_started_at,
+            duration=data.duration,
+            error_msg=data.error_msg,
+            device_id=data.device_id,
+        )
+
+
+class VfsVolumeAnomalyDetector(AbstractStatusAnomalyDetector[VfsVolumeStatusResult]):
+    """Detects an anomaly in a vfs volume's result."""
+
+    @override
+    def detect(
+        self, latest: VfsVolumeStatusResult | None, current: VfsVolumeStatusResult
+    ) -> StorageAnomaly:
+        """Detected when the mount could not be read, or when its device id differs from
+        the latest one read, as a mount that fell off serves the parent filesystem."""
+        if current.error_msg is not None or current.device_id is None:
+            return StorageAnomaly.DETECTED
+        if (
+            latest is not None
+            and latest.device_id is not None
+            and latest.device_id != current.device_id
+        ):
+            return StorageAnomaly.DETECTED
+        return StorageAnomaly.NONE
 
 
 class VfsVolumeStatusCheck(AbstractVolumeStatusCheck[VfsVolumeStatusResult]):
@@ -109,6 +175,7 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck[VfsVolumeStatusResult]):
             )
             error_msg = str(e)
         self._latest = VfsVolumeStatusResult(
+            check_state=StorageCheckState.CHECKED,
             check_started_at=started_at,
             duration=timedelta(seconds=time.perf_counter() - start_counter),
             error_msg=error_msg,

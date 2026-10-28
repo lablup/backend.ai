@@ -31,7 +31,7 @@ from ai.backend.common.events.dispatcher import (
 from ai.backend.common.health_checker.probe import HealthProbe, HealthProbeOptions
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
 from ai.backend.common.metrics.metric import CommonMetricRegistry
-from ai.backend.common.storage.probe.registry import VolumeStatusCheckRegistry
+from ai.backend.common.storage.probe.registry import VolumeStatusReporterRegistry
 from ai.backend.common.types import AGENTID_STORAGE
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.structured import StructuredLogger
@@ -304,7 +304,7 @@ async def check_and_upgrade(
         health_probe=health_probe,
         volume_stats_observer=None,  # type: ignore[arg-type]
         volume_stats_state=None,  # type: ignore[arg-type]
-        volume_status_check_registry=VolumeStatusCheckRegistry([]),
+        volume_status_reporter_registry=VolumeStatusReporterRegistry([]),
     )
 
     volumes_to_upgrade = await check_latest(ctx)
