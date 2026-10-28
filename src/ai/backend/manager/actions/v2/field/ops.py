@@ -17,7 +17,6 @@ from ai.backend.manager.actions.v2.field.bulk_base import (
 )
 from ai.backend.manager.actions.v2.ops.base import (
     FieldGetOpsAction,
-    FieldPartialBulkGetNestedOpsAction,
     FieldPartialBulkGetOpsAction,
     FieldPartialBulkPurgeOpsAction,
     FieldPurgeOpsAction,
@@ -33,7 +32,6 @@ __all__ = (
     "RestoreFieldOpsAction",
     "PurgeFieldOpsAction",
     "PartialBulkGetFieldOpsAction",
-    "PartialBulkGetNestedFieldOpsAction",
     "PartialBulkPurgeFieldOpsAction",
     "NestedFieldSearchOpsAction",
     "PartialBulkGetOwnerCandidatesFieldOpsAction",
@@ -166,25 +164,6 @@ class PartialBulkGetFieldOpsAction[
     whose owner the caller may not read and a row matching nothing are both one failed
     item, told apart by the error each carries.
     """
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.GET
-
-
-class PartialBulkGetNestedFieldOpsAction[
-    TFieldID: FieldIdentifier,
-    TOwnerID: EntityIdentifier,
-    TRow: Base,
-    TData: FieldData,
-](
-    BasePartialBulkFieldAction[TFieldID, TOwnerID],
-    FieldPartialBulkGetNestedOpsAction[TRow, TData],
-    ABC,
-):
-    """A read of the rows nested under each field row the caller named, each answered for
-    by the entity owning that row; a row holding nothing nested answers an empty list."""
 
     @override
     @classmethod

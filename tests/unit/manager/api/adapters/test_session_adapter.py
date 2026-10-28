@@ -40,7 +40,7 @@ from ai.backend.manager.actions.v2.bulk.result import (
     PartialBulkEntityResult,
     PartialBulkResult,
 )
-from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult, OwnedFieldsOpsResult
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.data.kernel.types import (
     ClusterConfig,
@@ -230,14 +230,9 @@ async def _no_allocations(
 
 async def _no_main_kernel_groups(
     action: BulkGetMainKernelGroupsAction,
-) -> PartialBulkResult[KernelGroupData]:
+) -> OwnedFieldsOpsResult[SessionID, KernelGroupData]:
     """The read answers for every session named, none holding a main kernel group."""
-    return PartialBulkResult(
-        items=[
-            PartialBulkEntityResult[KernelGroupData].nothing(SessionID(sid))
-            for sid in action.session_ids
-        ]
-    )
+    return OwnedFieldsOpsResult(designated={})
 
 
 def _create_kernel_info(kernel_id: KernelId) -> KernelInfo:

@@ -334,9 +334,6 @@ from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessions
 from ai.backend.manager.services.session.actions.bulk_get_kernel_group_environs import (
     BulkGetKernelGroupEnvironsAction,
 )
-from ai.backend.manager.services.session.actions.bulk_get_kernel_group_environs_by_group import (
-    BulkGetKernelGroupEnvironsByGroupAction,
-)
 from ai.backend.manager.services.session.actions.bulk_get_kernel_group_resource_slots import (
     BulkGetKernelGroupResourceSlotsAction,
 )
@@ -888,7 +885,6 @@ def test_session_and_kernel_data_loader_reads_are_checked_per_session() -> None:
     assert recorded[BulkGetKernelsAction] == partial
     assert recorded[BulkGetMainKernelGroupsAction] == partial
     assert recorded[BulkGetKernelGroupsAction] == partial
-    assert recorded[BulkGetKernelGroupEnvironsByGroupAction] == partial
     assert recorded[BulkGetKernelGroupEnvironsAction] == partial
     assert recorded[BulkGetKernelGroupResourceSlotsAction] == partial
 

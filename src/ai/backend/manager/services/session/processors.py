@@ -12,6 +12,7 @@ from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
 from ai.backend.manager.actions.v2.ops.result import (
     BatchOpsResult,
     LookupOpsResult,
+    OwnedFieldsOpsResult,
     ScopedBatchOpsResult,
     ScopedFieldsOpsResult,
 )
@@ -36,9 +37,6 @@ from ai.backend.manager.services.session.actions.batch_get_session_resource_allo
 from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
 from ai.backend.manager.services.session.actions.bulk_get_kernel_group_environs import (
     BulkGetKernelGroupEnvironsAction,
-)
-from ai.backend.manager.services.session.actions.bulk_get_kernel_group_environs_by_group import (
-    BulkGetKernelGroupEnvironsByGroupAction,
 )
 from ai.backend.manager.services.session.actions.bulk_get_kernel_group_resource_slots import (
     BulkGetKernelGroupResourceSlotsAction,
@@ -264,15 +262,11 @@ class SessionProcessors:
     bulk_get_kernel_groups: PartialBulkFieldActionProcessor[
         BulkGetKernelGroupsAction, KernelGroupData
     ]
-    bulk_get_main_kernel_groups: PartialBulkActionProcessor[
-        BulkGetMainKernelGroupsAction, KernelGroupData
+    bulk_get_main_kernel_groups: BulkActionProcessor[
+        BulkGetMainKernelGroupsAction, OwnedFieldsOpsResult[SessionID, KernelGroupData]
     ]
     scoped_search_kernel_groups: BulkActionProcessor[
         ScopedSearchKernelGroupsAction, ScopedFieldsOpsResult[KernelGroupData]
-    ]
-    # What the deprecated session environ reads: every environ row of each named group.
-    bulk_get_kernel_group_environs_by_group: PartialBulkFieldActionProcessor[
-        BulkGetKernelGroupEnvironsByGroupAction, list[KernelGroupEnvironData]
     ]
     bulk_get_kernel_group_environs: PartialBulkFieldActionProcessor[
         BulkGetKernelGroupEnvironsAction, KernelGroupEnvironData
@@ -382,14 +376,11 @@ class SessionProcessors:
             service.batch_get_kernel_resource_allocation,
         )
         self.bulk_get_kernel_groups = kernel_groups.partial_bulk_get_ops(BulkGetKernelGroupsAction)
-        self.bulk_get_main_kernel_groups = kernel_groups.partial_bulk_get_owned_ops(
+        self.bulk_get_main_kernel_groups = kernel_groups.atomic_bulk_get_ops(
             BulkGetMainKernelGroupsAction
         )
         self.scoped_search_kernel_groups = kernel_groups.atomic_bulk_scoped_search_ops(
             ScopedSearchKernelGroupsAction
-        )
-        self.bulk_get_kernel_group_environs_by_group = kernel_groups.partial_bulk_get_nested_ops(
-            BulkGetKernelGroupEnvironsByGroupAction, KernelGroupEnvironData
         )
         self.bulk_get_kernel_group_environs = kernel_group_environs.partial_bulk_get_ops(
             BulkGetKernelGroupEnvironsAction

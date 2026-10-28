@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import assert_never
@@ -25,7 +25,7 @@ from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDInMatchSpec
 from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment.types import (
     EnvironmentVariableEntryInfoDTO,
@@ -192,6 +192,7 @@ from ai.backend.manager.models.session.scopes import (
 )
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import SessionSearcher
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.models.user.row import UserRole
@@ -212,9 +213,6 @@ from ai.backend.manager.services.session.actions.batch_get_session_resource_allo
 from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
 from ai.backend.manager.services.session.actions.bulk_get_kernel_group_environs import (
     BulkGetKernelGroupEnvironsAction,
-)
-from ai.backend.manager.services.session.actions.bulk_get_kernel_group_environs_by_group import (
-    BulkGetKernelGroupEnvironsByGroupAction,
 )
 from ai.backend.manager.services.session.actions.bulk_get_kernel_group_resource_slots import (
     BulkGetKernelGroupResourceSlotsAction,
@@ -681,17 +679,14 @@ class SessionAdapter(BaseAdapter):
 
     async def _batch_main_kernel_group(
         self, session_ids: Sequence[SessionID]
-    ) -> list[KernelGroupData | Exception | None]:
+    ) -> list[KernelGroupData | None]:
         """The main kernel group of each session, in the order of the ids."""
         if not session_ids:
             return []
         action_result = await self._session.bulk_get_main_kernel_groups.run(
             BulkGetMainKernelGroupsAction(session_ids=list(session_ids))
         )
-        return [
-            item.value if item.value is not None else self.batch_load_failure(item.error)
-            for item in action_result.items
-        ]
+        return [action_result.designated.get(session_id) for session_id in session_ids]
 
     async def _batch_kernel_groups(
         self, kernel_group_ids: Sequence[KernelGroupID]
@@ -708,10 +703,10 @@ class SessionAdapter(BaseAdapter):
 
     async def batch_load_main_kernel_groups(
         self, session_ids: Sequence[SessionID]
-    ) -> list[KernelGroupNode | Exception | None]:
+    ) -> list[KernelGroupNode | None]:
         """The main kernel group of each session for a DataLoader, in the order of the ids."""
         return [
-            self._kernel_group_data_to_node(group) if isinstance(group, KernelGroupData) else group
+            self._kernel_group_data_to_node(group) if group is not None else None
             for group in await self._batch_main_kernel_group(session_ids)
         ]
 
@@ -724,20 +719,37 @@ class SessionAdapter(BaseAdapter):
             for group in await self._batch_kernel_groups(kernel_group_ids)
         ]
 
-    async def batch_load_kernel_group_environs(
-        self, kernel_group_ids: Sequence[KernelGroupID]
-    ) -> list[EnvironmentVariablesInfoDTO | Exception | None]:
-        """The environ of each kernel group for a DataLoader, in the order of the ids."""
-        if not kernel_group_ids:
-            return []
-        return await self.batch_load_fields(
-            self._session.bulk_get_kernel_group_environs_by_group,
-            BulkGetKernelGroupEnvironsByGroupAction(kernel_group_ids=list(kernel_group_ids)),
-            kernel_group_ids,
-            lambda rows: EnvironmentVariablesInfoDTO(
-                entries=[EnvironmentVariableEntryInfoDTO(name=r.key, value=r.value) for r in rows]
-            ),
+    async def _batch_kernel_group_environs(
+        self, session_by_group: Mapping[KernelGroupID, SessionID]
+    ) -> dict[KernelGroupID, EnvironmentVariablesInfoDTO]:
+        """The environ of each kernel group, read under the session owning it."""
+        if not session_by_group:
+            return {}
+        action_result = await self._session.scoped_search_kernel_group_environs.run(
+            ScopedSearchKernelGroupEnvironsAction(
+                session_ids=list(dict.fromkeys(session_by_group.values())),
+                searcher=KernelGroupEnvironSearcher(
+                    pagination=NoPagination(),
+                    conditions=[
+                        KernelGroupEnvironSearchableFields.own.kernel_group_id.filter.in_(
+                            UUIDInMatchSpec(values=list(session_by_group), negated=False)
+                        )
+                    ],
+                    orders=[KernelGroupEnvironSearchableFields.own.key.order.apply(ascending=True)],
+                ),
+            )
         )
+        entries: dict[KernelGroupID, list[EnvironmentVariableEntryInfoDTO]] = {
+            group_id: [] for group_id in session_by_group
+        }
+        for row in action_result.items:
+            entries[row.kernel_group_id].append(
+                EnvironmentVariableEntryInfoDTO(name=row.key, value=row.value)
+            )
+        return {
+            group_id: EnvironmentVariablesInfoDTO(entries=group_entries)
+            for group_id, group_entries in entries.items()
+        }
 
     async def batch_load_kernel_group_environs_by_ids(
         self, ids: Sequence[KernelGroupEnvironID]
@@ -993,19 +1005,14 @@ class SessionAdapter(BaseAdapter):
         session_ids = [SessionID(item.id) for item in data]
         allocations = await self.batch_resource_allocation_by_session(session_ids)
         main_groups = await self._batch_main_kernel_group(session_ids)
-        group_ids = [group.id for group in main_groups if isinstance(group, KernelGroupData)]
-        environs = dict(
-            zip(group_ids, await self.batch_load_kernel_group_environs(group_ids), strict=True)
-        )
+        environs = await self._batch_kernel_group_environs({
+            group.id: group.session_id for group in main_groups if group is not None
+        })
         nodes: list[SessionNode] = []
         for item, allocation, main_group in zip(data, allocations, main_groups, strict=True):
             if isinstance(allocation, Exception):
                 raise allocation
-            if isinstance(main_group, Exception):
-                raise main_group
             environ = environs.get(main_group.id) if main_group is not None else None
-            if isinstance(environ, Exception):
-                raise environ
             nodes.append(self._session_data_to_node(item, allocation, environ))
         return nodes
 

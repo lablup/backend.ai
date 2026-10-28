@@ -849,7 +849,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
         )
     )  # type: ignore[misc]
     async def main_kernel_group(self, info: Info[StrawberryGQLContext]) -> KernelGroupGQL | None:
-        return await info.context.data_loaders.main_kernel_group_loader.load(
+        return await info.context.data_loaders.main_kernel_group_by_session_id_loader.load(
             SessionID(UUID(str(self.id)))
         )
 

@@ -2,10 +2,9 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/session/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/session/adapter.py)
 
-시나리오: 미완 29 / 31
+시나리오: 미완 28 / 30
 
-- ops 로 구성 (8)
-  - batch_load_kernel_group_environs — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+- ops 로 구성 (7)
   - batch_load_kernel_group_environs_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - batch_load_kernel_group_resource_slots_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - batch_load_kernel_groups_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
@@ -14,19 +13,19 @@
   - scoped_search_kernel_group_resource_slots — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - scoped_search_kernel_groups — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
 - ops + 직접 구현 (13)
-  - admin_search — 성공 있음 3 · 실패 있음 1 (global_searcher_ops, partial_bulk, partial_bulk_get_nested_ops, partial_bulk_get_owned_ops)
+  - admin_search — 성공 있음 3 · 실패 있음 1 (global_searcher_ops, partial_bulk)
   - admin_search_kernels — 성공 없음 · 실패 없음 (atomic_bulk_field, global_searcher_ops, partial_bulk_get_ops) — SCENARIO-GAP
-  - batch_load_by_ids — 성공 없음 · 실패 없음 (partial_bulk, partial_bulk_get_nested_ops, partial_bulk_get_ops, partial_bulk_get_owned_ops) — SCENARIO-GAP
+  - batch_load_by_ids — 성공 없음 · 실패 없음 (partial_bulk, partial_bulk_get_ops) — SCENARIO-GAP
   - batch_load_kernels_by_ids — 성공 없음 · 실패 없음 (atomic_bulk_field, partial_bulk_get_ops) — SCENARIO-GAP
-  - enqueue — 성공 없음 · 실패 없음 (partial_bulk, partial_bulk_get_nested_ops, partial_bulk_get_owned_ops, scope) — SCENARIO-GAP
-  - get — 성공 없음 · 실패 없음 (partial_bulk, partial_bulk_get_nested_ops, partial_bulk_get_owned_ops, single_entity) — SCENARIO-GAP
-  - gql_search_by_project — 성공 없음 · 실패 없음 (partial_bulk, partial_bulk_get_nested_ops, partial_bulk_get_owned_ops, scoped_search_ops) — SCENARIO-GAP
-  - project_search — 성공 없음 · 실패 없음 (partial_bulk, partial_bulk_get_nested_ops, partial_bulk_get_owned_ops, scoped_search_ops) — SCENARIO-GAP
-  - scoped_search — 성공 없음 · 실패 없음 (partial_bulk, partial_bulk_get_nested_ops, partial_bulk_get_owned_ops, scoped_search_ops) — SCENARIO-GAP
+  - enqueue — 성공 없음 · 실패 없음 (partial_bulk, scope) — SCENARIO-GAP
+  - get — 성공 없음 · 실패 없음 (partial_bulk, single_entity) — SCENARIO-GAP
+  - gql_search_by_project — 성공 없음 · 실패 없음 (partial_bulk, scoped_search_ops) — SCENARIO-GAP
+  - project_search — 성공 없음 · 실패 없음 (partial_bulk, scoped_search_ops) — SCENARIO-GAP
+  - scoped_search — 성공 없음 · 실패 없음 (partial_bulk, scoped_search_ops) — SCENARIO-GAP
   - search_kernels_by_agent — 성공 없음 · 실패 없음 (atomic_bulk_field, global_searcher_ops, partial_bulk_get_ops) — SCENARIO-GAP
   - search_kernels_by_session — 성공 없음 · 실패 없음 (atomic_bulk_field, atomic_bulk_scoped_search_ops, partial_bulk_get_ops) — SCENARIO-GAP
-  - search_sessions_by_agent — 성공 없음 · 실패 없음 (global_searcher_ops, partial_bulk, partial_bulk_get_nested_ops, partial_bulk_get_owned_ops) — SCENARIO-GAP
-  - update — 성공 없음 · 실패 없음 (partial_bulk, partial_bulk_get_nested_ops, partial_bulk_get_owned_ops, single_entity) — SCENARIO-GAP
+  - search_sessions_by_agent — 성공 없음 · 실패 없음 (global_searcher_ops, partial_bulk) — SCENARIO-GAP
+  - update — 성공 없음 · 실패 없음 (partial_bulk, single_entity) — SCENARIO-GAP
 - 직접 구현 (10)
   - batch_resource_allocation_by_kernel — 성공 없음 · 실패 없음 (atomic_bulk_field) — SCENARIO-GAP
   - batch_resource_allocation_by_session — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP

@@ -900,21 +900,18 @@ class DataLoaders:
         return DataLoader(load_fn=load_fn)
 
     @cached_property
-    def main_kernel_group_loader(
+    def main_kernel_group_by_session_id_loader(
         self,
     ) -> DataLoader[SessionID, KernelGroupGQL | None]:
         adapter = self._adapters.session
 
-        async def load_fn(session_ids: list[SessionID]) -> list[KernelGroupGQL | Exception | None]:
+        async def load_fn(session_ids: list[SessionID]) -> list[KernelGroupGQL | None]:
             from ai.backend.manager.api.gql.kernel_group.types import (  # pants: no-infer-dep
                 KernelGroupGQL as KGG,
             )
 
             dtos = await adapter.batch_load_main_kernel_groups(session_ids)
-            return [
-                dto if dto is None or isinstance(dto, Exception) else KGG.from_pydantic(dto)
-                for dto in dtos
-            ]
+            return [KGG.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
 
