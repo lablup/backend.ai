@@ -10,12 +10,12 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.models.alembic.versions.e7d2a9c41b60_assign_every_user_their_domain_member_role import (
     _PRESET_ID,
@@ -23,7 +23,6 @@ from ai.backend.manager.models.alembic.versions.e7d2a9c41b60_assign_every_user_t
     mark_auto_assign,
 )
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (

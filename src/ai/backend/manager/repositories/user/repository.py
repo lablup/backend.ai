@@ -47,7 +47,6 @@ from ai.backend.manager.models.dotfile.updaters import (
 from ai.backend.manager.models.keypair.creators import KeypairCreator
 from ai.backend.manager.models.keypair.purgers import NonDefaultKeypairPurger
 from ai.backend.manager.models.keypair.queriers import DefaultKeypairQuerier
-from ai.backend.manager.models.keypair.row import generate_keypair_data
 from ai.backend.manager.models.keypair.updaters import KeypairUpdater
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
@@ -56,6 +55,7 @@ from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.searchers import UserSearcher
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (

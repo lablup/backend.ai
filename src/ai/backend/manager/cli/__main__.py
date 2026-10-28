@@ -189,7 +189,9 @@ def generate_api_keypair(_cli_ctx: CLIContext) -> None:
     """
     Generate a manager API keypair and print it out to stdout.
     """
-    from ai.backend.manager.models.keypair.row import generate_keypair as _gen_keypair
+    from ai.backend.manager.repositories.auth.keypair_secrets import (
+        generate_keypair as _gen_keypair,
+    )
 
     _get_logger().info("generating a manager API keypair")
     ak, sk = _gen_keypair()
