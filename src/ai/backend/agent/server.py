@@ -877,8 +877,12 @@ class AgentRPCServer(aobject):
                 except (ImagePullTimeoutError, ImagePullFailedError) as e:
                     log.trace("kernel image pull failed", error_repr=repr(e))
                     raise
-                except Exception:
-                    log.exception("kernel creation failed")
+                except Exception as e:
+                    if isinstance(e, ResourceError):
+                        # An expected scenario: reported below, but not logged as an exception.
+                        log.info("kernel creation failed on resources", error_repr=repr(e))
+                    else:
+                        log.exception("kernel creation failed")
                     unreported = (
                         ownership_data.kernel_id not in agent.kernel_registry
                         and ownership_data.kernel_id not in agent.failure_reporting_kernels

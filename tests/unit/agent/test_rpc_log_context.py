@@ -546,3 +546,31 @@ class TestCreateKernels:
         assert [r.getMessage() for r in capture.records if r.levelno == TRACE_LEVEL] == [
             "kernel image pull failed"
         ]
+
+    async def test_allocation_failure_is_reported_without_an_exception_log(
+        self, capture: pytest.LogCaptureFixture
+    ) -> None:
+        kernel_id = uuid.uuid4()
+        agent = MagicMock()
+        agent.id = PRIMARY_AGENT_ID
+        agent.local_config.agent.kernel_creation_concurrency = 1
+        agent.kernel_registry = {}
+        agent.create_kernel = AsyncMock(side_effect=ResourceError("allocation failed"))
+        agent.inject_container_lifecycle_event = AsyncMock()
+        image_ref = MagicMock()
+        image_ref.canonical = "cr.backend.ai/stable/python:latest"
+
+        with pytest.raises(ResourceError):
+            await AgentRPCServer.create_kernels(
+                _server(agent),
+                _request(
+                    "create_kernels",
+                    (str(uuid.uuid4()), [str(kernel_id)], [{}], {}, {kernel_id: image_ref}),
+                ),
+            )
+
+        assert [r for r in capture.records if r.levelno >= logging.WARNING] == []
+        assert [r.getMessage() for r in capture.records if r.levelno == logging.INFO] == [
+            "kernel creation failed on resources"
+        ]
+        agent.inject_container_lifecycle_event.assert_awaited_once()
