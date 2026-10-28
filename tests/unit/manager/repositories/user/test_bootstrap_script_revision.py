@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import AsyncGenerator
 
@@ -214,3 +215,29 @@ class TestBootstrapScriptRevision:
                 )
 
         assert await self._revisions(db, deleted_default_script) == [(1, "echo 1", None)]
+
+    async def test_concurrent_switches_leave_one_default(
+        self,
+        db: ExtendedAsyncSAEngine,
+        repository: UserRepository,
+        user_id: UserID,
+        default_script: BootstrapScriptID,
+    ) -> None:
+        async with db.begin_session() as session:
+            rows = [
+                BootstrapScriptRow(entity_type=UserEntityType(), entity_id=user_id)
+                for _ in range(8)
+            ]
+            session.add_all(rows)
+            await session.flush()
+            targets = [row.id for row in rows]
+
+        await asyncio.gather(*(repository.switch_default_bootstrap_script(t) for t in targets))
+
+        async with db.begin_readonly_session() as session:
+            defaults = await session.scalars(
+                sa.select(BootstrapScriptRow.is_default).where(
+                    BootstrapScriptRow.entity_id == user_id
+                )
+            )
+            assert list(defaults).count(True) == 1

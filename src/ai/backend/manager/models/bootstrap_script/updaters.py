@@ -2,9 +2,11 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
+import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
 from ai.backend.manager.errors.bootstrap_script import BootstrapScriptNotFound
 from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
@@ -61,8 +63,12 @@ class MarkDefaultBootstrapScriptUpdater(
         return BootstrapScriptSearchableFields.own.to_data(row)
 
 
+@dataclass
 class ClearDefaultBootstrapScriptUpdater(DataBatchUpdater[BootstrapScriptRow, BootstrapScriptData]):
-    """Clears the default mark within the scope it runs in."""
+    """Clear the default across the user's scripts. The rows are locked in id order first,
+    so a concurrent switch waits and then sees the mark this one set."""
+
+    user_id: UserID
 
     @property
     @override
@@ -71,7 +77,21 @@ class ClearDefaultBootstrapScriptUpdater(DataBatchUpdater[BootstrapScriptRow, Bo
 
     @override
     def conditions(self) -> list[QueryCondition]:
-        return [lambda: BootstrapScriptRow.is_default.is_(True)]
+        user_id = self.user_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            locked = (
+                sa.select(BootstrapScriptRow.id)
+                .where(
+                    BootstrapScriptRow.entity_type == user_id.entity_type(),
+                    BootstrapScriptRow.entity_id == user_id,
+                )
+                .order_by(BootstrapScriptRow.id)
+                .with_for_update()
+            )
+            return BootstrapScriptRow.id.in_(locked)
+
+        return [inner]
 
     @override
     def build_values(self) -> dict[str, Any]:

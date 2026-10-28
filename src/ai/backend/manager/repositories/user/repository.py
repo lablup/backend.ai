@@ -160,9 +160,11 @@ class UserRepository:
             target = await w.query_field_data(BootstrapScriptQuerier(script_id=script_id))
             if target is None:
                 raise BootstrapScriptNotFound(f"Bootstrap script {script_id} not found")
+            user_id = UserID(target.entity)
+            # The clear locks the user's scripts, so a concurrent switch waits for this one.
             await w.batch_update_in_scopes(
-                [UserBootstrapScriptTarget(user_id=target.entity)],
-                ClearDefaultBootstrapScriptUpdater(),
+                [UserBootstrapScriptTarget(user_id=user_id)],
+                ClearDefaultBootstrapScriptUpdater(user_id=user_id),
             )
             marked = await w.update_data(MarkDefaultBootstrapScriptUpdater(script_id=script_id))
             if marked is None:
