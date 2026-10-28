@@ -20,7 +20,7 @@ __all__ = (
 
 @dataclass(frozen=True)
 class CreateVFolderAutoMountAction(BaseScopeAction):
-    """Add a vfolder to the auto-mounts of a project."""
+    """Add a vfolder to the auto-mounts of a project or a user."""
 
     creator: VFolderAutoMountCreator
 

@@ -12,6 +12,7 @@ from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountID
 from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
@@ -32,6 +33,9 @@ from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
 from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
     VFolderAutoMountPermissionFilter as VFolderAutoMountPermissionFilterDTO,
 )
+from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
+    VFolderAutoMountScopeTypeFilter as VFolderAutoMountScopeTypeFilterDTO,
+)
 from ai.backend.common.dto.manager.v2.vfolder_auto_mount.response import (
     CreateVFolderAutoMountPayload as CreateVFolderAutoMountPayloadDTO,
 )
@@ -49,6 +53,12 @@ from ai.backend.common.dto.manager.v2.vfolder_auto_mount.types import (
 )
 from ai.backend.common.dto.manager.v2.vfolder_auto_mount.types import (
     VFolderAutoMountScope as VFolderAutoMountScopeDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder_auto_mount.types import (
+    VFolderAutoMountScopeRef as VFolderAutoMountScopeRefDTO,
+)
+from ai.backend.common.dto.manager.v2.vfolder_auto_mount.types import (
+    VFolderAutoMountScopeType,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
@@ -78,6 +88,7 @@ from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
+    from ai.backend.manager.api.gql.user.types.node import UserV2GQL
     from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderGQL
 
 __all__ = (
@@ -91,6 +102,7 @@ __all__ = (
     "VFolderAutoMountGQL",
     "VFolderAutoMountOrderByGQL",
     "VFolderAutoMountScopeGQL",
+    "VFolderAutoMountScopeRefGQL",
 )
 
 
@@ -104,12 +116,22 @@ VFolderAutoMountOrderFieldGQL: type[VFolderAutoMountOrderFieldDTO] = gql_enum(
 )
 
 
+VFolderAutoMountScopeTypeGQL: type[VFolderAutoMountScopeType] = gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Whether an auto-mount is set on a project or on a user.",
+    ),
+    VFolderAutoMountScopeType,
+    name="VFolderAutoMountScopeType",
+)
+
+
 @gql_node_type(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "A vfolder mounted into every session created in a project, a personal "
-            "project included."
+            "project included, or by a user."
         ),
     ),
     name="VFolderAutoMount",
@@ -117,7 +139,10 @@ VFolderAutoMountOrderFieldGQL: type[VFolderAutoMountOrderFieldDTO] = gql_enum(
 class VFolderAutoMountGQL(PydanticNodeMixin[VFolderAutoMountNodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
     entity_id: UUID = gql_field(description="ID of the auto-mount.")
-    project_id: UUID = gql_field(description="ID of the project the vfolder is auto-mounted in.")
+    scope_type: VFolderAutoMountScopeTypeGQL = gql_field(
+        description="Kind of the scope the auto-mount is set on."
+    )
+    scope_id: UUID = gql_field(description="ID of the project or the user.")
     vfolder_id: UUID = gql_field(description="ID of the auto-mounted vfolder.")
     mount_destination: str = gql_field(
         description="Path in the session container the vfolder is mounted at."
@@ -132,7 +157,7 @@ class VFolderAutoMountGQL(PydanticNodeMixin[VFolderAutoMountNodeDTO]):
         description="Deletion timestamp. Null while the auto-mount is in use."
     )
 
-    @gql_field(description="The project the vfolder is auto-mounted in.")  # type: ignore[misc]
+    @gql_field(description="The project the vfolder is auto-mounted in. Null for a user one.")  # type: ignore[misc]
     async def project(
         self,
         info: Info[StrawberryGQLContext],
@@ -143,7 +168,24 @@ class VFolderAutoMountGQL(PydanticNodeMixin[VFolderAutoMountNodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.project_loader.load(ProjectID(self.project_id))
+        if self.scope_type != VFolderAutoMountScopeType.PROJECT:
+            return None
+        return await info.context.data_loaders.project_loader.load(ProjectID(self.scope_id))
+
+    @gql_field(description="The user the vfolder is auto-mounted for. Null for a project one.")  # type: ignore[misc]
+    async def user(
+        self,
+        info: Info[StrawberryGQLContext],
+    ) -> (
+        Annotated[
+            UserV2GQL,
+            strawberry.lazy("ai.backend.manager.api.gql.user.types.node"),
+        ]
+        | None
+    ):
+        if self.scope_type != VFolderAutoMountScopeType.USER:
+            return None
+        return await info.context.data_loaders.user_loader.load(UserID(self.scope_id))
 
     @gql_field(description="The auto-mounted vfolder.")  # type: ignore[misc]
     async def vfolder(
@@ -214,6 +256,28 @@ class VFolderAutoMountPermissionFilterGQL(PydanticInputMixin[VFolderAutoMountPer
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
+        description="Filter for the scope type with equality and membership operators.",
+    ),
+    name="VFolderAutoMountScopeTypeFilter",
+)
+class VFolderAutoMountScopeTypeFilterGQL(PydanticInputMixin[VFolderAutoMountScopeTypeFilterDTO]):
+    equals: VFolderAutoMountScopeTypeGQL | None = gql_field(
+        description="Exact match.", default=None
+    )
+    in_: list[VFolderAutoMountScopeTypeGQL] | None = gql_field(
+        description="Match any of the provided values.", name="in", default=None
+    )
+    not_equals: VFolderAutoMountScopeTypeGQL | None = gql_field(
+        description="Exclude an exact match.", default=None
+    )
+    not_in: list[VFolderAutoMountScopeTypeGQL] | None = gql_field(
+        description="Exclude any of the provided values.", default=None
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
         description=(
             "Filter for vfolder auto-mounts. Auto-mounts marked deleted are left out unless "
             "the top-level filter gives `deletedAt`; one inside AND, OR or NOT does not lift that."
@@ -223,7 +287,12 @@ class VFolderAutoMountPermissionFilterGQL(PydanticInputMixin[VFolderAutoMountPer
 )
 class VFolderAutoMountFilterGQL(PydanticInputMixin[VFolderAutoMountFilterDTO]):
     entity_id: UUIDFilter | None = gql_field(description="Filter by auto-mount ID.", default=None)
-    project_id: UUIDFilter | None = gql_field(description="Filter by project ID.", default=None)
+    scope_type: VFolderAutoMountScopeTypeFilterGQL | None = gql_field(
+        description="Filter by the kind of scope the auto-mount is set on.", default=None
+    )
+    scope_id: UUIDFilter | None = gql_field(
+        description="Filter by the ID of the project or the user.", default=None
+    )
     vfolder_id: UUIDFilter | None = gql_field(description="Filter by vfolder ID.", default=None)
     mount_destination: StringFilter | None = gql_field(
         description="Filter by mount destination.", default=None
@@ -268,29 +337,51 @@ class VFolderAutoMountOrderByGQL(PydanticInputMixin[VFolderAutoMountOrderDTO]):
         added_version=NEXT_RELEASE_VERSION,
         description=(
             "Scope for the scoped vfolder auto-mount query. The items are OR'd, and every "
-            "scope named is authorized before the read runs."
+            "scope named is authorized before the read runs. At least one of `project` and "
+            "`user` must be non-empty."
         ),
     ),
     name="VFolderAutoMountScope",
 )
 class VFolderAutoMountScopeGQL(PydanticInputMixin[VFolderAutoMountScopeDTO]):
-    project: list[UUIDScopeGQL] = gql_field(
-        description="Projects whose auto-mounts are being read. A personal project included."
+    project: list[UUIDScopeGQL] | None = gql_field(
+        description="Projects whose auto-mounts are being read. A personal project included.",
+        default=None,
+    )
+    user: list[UUIDScopeGQL] | None = gql_field(
+        description=(
+            "Users whose own auto-mounts are being read; those of a personal project are not."
+        ),
+        default=None,
     )
 
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
+        description="The one project or user an auto-mount is set on.",
+    ),
+    name="VFolderAutoMountScopeRef",
+)
+class VFolderAutoMountScopeRefGQL(PydanticInputMixin[VFolderAutoMountScopeRefDTO]):
+    scope_type: VFolderAutoMountScopeTypeGQL = gql_field(description="Kind of the scope.")
+    scope_id: UUID = gql_field(description="ID of the project or the user.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
         description=(
-            "Input for auto-mounting a vfolder into every session created in a project. The "
-            "vfolder must belong to that project."
+            "Input for auto-mounting a vfolder into every session created in a project or by a "
+            "user. The vfolder must belong to that project, or be owned by that user."
         ),
     ),
     name="CreateVFolderAutoMountInput",
 )
 class CreateVFolderAutoMountInputGQL(PydanticInputMixin[CreateVFolderAutoMountInputDTO]):
-    project_id: UUID = gql_field(description="ID of the project the vfolder is auto-mounted in.")
+    scope: VFolderAutoMountScopeRefGQL = gql_field(
+        description="The project or the user the vfolder is auto-mounted for."
+    )
     vfolder_id: UUID = gql_field(description="ID of the vfolder to auto-mount.")
     mount_destination: str = gql_field(
         description="Path in the session container the vfolder is mounted at."

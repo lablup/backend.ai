@@ -21,7 +21,7 @@ class VFolderAutoMountAlreadyExists(EntityError, web.HTTPConflict):
 
 class VFolderAutoMountVFolderOutsideScope(EntityError, web.HTTPBadRequest):
     error_type = "https://api.backend.ai/probs/vfolder-auto-mount-vfolder-outside-scope"
-    error_title = "The vfolder does not belong to the project it is to be auto-mounted in."
+    error_title = "The vfolder does not belong to the project or user it is to be auto-mounted in."
 
     @override
     def entity_error_code(self) -> EntityErrorCode:
