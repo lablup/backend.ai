@@ -38,6 +38,7 @@ class AgentBackend(enum.StrEnum):
     DOCKER = "docker"
     KUBERNETES = "kubernetes"
     DUMMY = "dummy"
+    CONTAINERD = "containerd"
 
 
 class AbstractAgentDiscovery(ABC):
