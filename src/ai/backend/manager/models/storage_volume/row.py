@@ -69,7 +69,8 @@ class StorageVolumeRow(LifecycleTimestampsMixin, Base):
 
 
 class StorageVolumeServiceHoldingRow(LifecycleTimestampsMixin, Base):
-    """A storage volume as one service holds it, and whether the service has checked it."""
+    """A storage volume as one service holds it, when the service last checked it, and
+    whether the volume is in order."""
 
     __tablename__ = "storage_volume_service_holdings"
 

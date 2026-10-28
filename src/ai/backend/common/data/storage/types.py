@@ -8,6 +8,7 @@ from typing import Any, Final, NewType
 
 from pydantic import ConfigDict, Field
 
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.type_adapters import VFolderIDField
 from ai.backend.common.types import BackendAISchema
 

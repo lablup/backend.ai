@@ -38,6 +38,10 @@ class StorageStatusObservation(BackendAISchema):
     extra: dict[str, Any] | None = Field(
         default=None, description="What only the check type records."
     )
+    device_id: int | None = Field(
+        default=None,
+        description="Device id of the mount a vfs volume is served from, null otherwise.",
+    )
 
 
 class StorageStatusReportEvent(BackendAISchema, AbstractAnycastEvent):

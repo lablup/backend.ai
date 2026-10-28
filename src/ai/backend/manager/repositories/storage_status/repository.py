@@ -6,7 +6,7 @@ from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPoli
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.manager.repositories.ops.v2.storage_status.provider import StorageStatusOpsProvider
-from ai.backend.manager.repositories.ops.v2.storage_status.types import VolumeStatusReportWrite
+from ai.backend.manager.repositories.ops.v2.storage_status.types import ServiceVolumeStatusReport
 
 __all__ = ("StorageStatusRepository",)
 
@@ -34,7 +34,7 @@ class StorageStatusRepository:
         self._ops = ops_provider
 
     @storage_status_repository_resilience.apply()
-    async def record_volume_status_report(self, report: VolumeStatusReportWrite) -> None:
+    async def record_volume_status_report(self, report: ServiceVolumeStatusReport) -> None:
         """Write the volumes one service reported, in one transaction."""
         async with self._ops.write_ops() as w:
             await w.record_volume_status_report(report)

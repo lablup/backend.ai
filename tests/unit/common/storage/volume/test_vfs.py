@@ -12,6 +12,7 @@ from ai.backend.common.data.storage.types import StorageCheckState, StorageStatu
 from ai.backend.common.storage.volume.vfs import (
     VfsVolumeStatusCheck,
     VfsVolumeStatusCheckArgs,
+    VfsVolumeStatusDataParser,
 )
 
 
@@ -23,6 +24,7 @@ def _make_check(mount_path: Path, executor: Executor) -> VfsVolumeStatusCheck:
             interval=60.0,
             initial_delay=5.0,
             executor=executor,
+            data_parser=VfsVolumeStatusDataParser(),
         )
     )
 

@@ -6,6 +6,7 @@ from ai.backend.common.clients.valkey_client.valkey_container_log.client import 
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
+from ai.backend.common.data.storage.types import StorageBackendType
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import (
     CoalescingOptions,
@@ -114,6 +115,7 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
 )
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.event import EventDispatcherPluginContext
+from ai.backend.common.storage.volume.vfs import VfsVolumeStatusDataParser
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.event_dispatcher.handlers.artifact import ArtifactEventHandler
@@ -144,7 +146,10 @@ from .handlers.kernel import KernelEventHandler
 from .handlers.notification import NotificationEventHandler
 from .handlers.service_catalog import ServiceCatalogEventHandler
 from .handlers.session import SessionEventHandler
-from .handlers.storage_status import StorageStatusEventHandler
+from .handlers.storage_status import (
+    StorageStatusDataParserRegistry,
+    StorageStatusEventHandler,
+)
 from .handlers.stream_cleanup import StreamCleanupEventHandler
 from .handlers.vfolder import VFolderEventHandler
 from .reporters import EventLogger
@@ -259,7 +264,10 @@ class Dispatchers:
             args.db, args.repositories.service_catalog.repository
         )
         self._storage_status_event_handler = StorageStatusEventHandler(
-            args.repositories.storage_status.repository
+            args.repositories.storage_status.repository,
+            StorageStatusDataParserRegistry({
+                StorageBackendType("vfs"): VfsVolumeStatusDataParser(),
+            }),
         )
         self.stream_cleanup_handler = StreamCleanupEventHandler(args.db)
 

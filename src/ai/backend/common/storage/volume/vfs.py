@@ -4,6 +4,7 @@ import asyncio
 import logging
 import os
 import time
+from collections.abc import Sequence
 from concurrent.futures import Executor, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -32,6 +33,43 @@ class VfsVolumeStatusCheckArgs:
     interval: float
     initial_delay: float
     executor: Executor
+    data_parser: VfsVolumeStatusDataParser
+
+
+class VfsVolumeStatusDataParser(AbstractStatusDataParser[VfsVolumeStatusResult]):
+    """Converts a vfs volume's result to the shape it is reported in, and back."""
+
+    @override
+    def to_result_data(self, result: StorageStatusResult | None) -> StorageStatusResultData:
+        if result is None:
+            return StorageStatusResultData(
+                check_started_at=None,
+                status=ServiceStorageStatus.NOT_CHECKED,
+                duration=None,
+                error_msg=None,
+                device_id=None,
+            )
+        return StorageStatusResultData(
+            check_started_at=result.check_started_at,
+            status=result.status,
+            duration=result.duration,
+            error_msg=result.error_msg,
+            device_id=result.device_id if isinstance(result, VfsVolumeStatusResult) else None,
+        )
+
+    @override
+    def parse(self, data: StorageStatusResultData) -> VfsVolumeStatusResult | None:
+        if data.status == ServiceStorageStatus.NOT_CHECKED or data.check_started_at is None:
+            return None
+        if data.error_msg is None and data.device_id is None:
+            raise InvalidStorageStatusObservation("carries neither a device id nor an error")
+        return VfsVolumeStatusResult(
+            status=data.status,
+            check_started_at=data.check_started_at,
+            duration=data.duration,
+            error_msg=data.error_msg,
+            device_id=data.device_id,
+        )
 
 
 class VfsVolumeAnomalyDetector(AbstractStatusAnomalyDetector):
@@ -102,6 +140,7 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck):
                 executor=ThreadPoolExecutor(
                     max_workers=1, thread_name_prefix=f"vfs-volume-status-{volume_name}"
                 ),
+                data_parser=VfsVolumeStatusDataParser(),
             )
         )
 
@@ -120,6 +159,26 @@ class VfsVolumeStatusCheck(AbstractVolumeStatusCheck):
     @override
     def latest(self) -> StorageStatusResultData:
         return self._latest
+
+    @override
+    def data_parser(self) -> VfsVolumeStatusDataParser:
+        return self._data_parser
+
+    @classmethod
+    @override
+    def judge_health(
+        cls, history: Sequence[VfsVolumeStatusResult], current: VfsVolumeStatusResult
+    ) -> StorageHealthStatus:
+        """Unhealthy when the mount could not be read, or when its device id differs from
+        the last one read, as a mount that fell off serves the parent filesystem."""
+        if current.error_msg is not None or current.device_id is None:
+            return StorageHealthStatus.UNHEALTHY
+        previous_device_ids = [
+            result.device_id for result in history if result.device_id is not None
+        ]
+        if previous_device_ids and previous_device_ids[-1] != current.device_id:
+            return StorageHealthStatus.UNHEALTHY
+        return StorageHealthStatus.HEALTHY
 
     @override
     async def check_status(self) -> None:

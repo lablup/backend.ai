@@ -9,7 +9,6 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.data.entity.storage_volume import StorageVolumeID
-from ai.backend.common.data.storage.types import ServiceStorageStatus
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater
@@ -22,11 +21,11 @@ __all__ = ("StorageVolumeHoldingStatusUpdater",)
 class StorageVolumeHoldingStatusUpdater(
     DataBatchUpdater[StorageVolumeServiceHoldingRow, StorageVolumeID]
 ):
-    """Write whether and when a service last checked a volume it holds."""
+    """Write when a service last checked a volume it holds, or only touch the holding
+    while ``status_checked_at`` is None."""
 
     service_catalog_id: ServiceCatalogID
     storage_volume_id: StorageVolumeID
-    status: ServiceStorageStatus
     status_checked_at: datetime | None
 
     @property
@@ -45,7 +44,9 @@ class StorageVolumeHoldingStatusUpdater(
 
     @override
     def build_values(self) -> dict[str, Any]:
-        return {"status": self.status, "status_checked_at": self.status_checked_at}
+        if self.status_checked_at is None:
+            return {"updated_at": sa.func.now()}
+        return {"status_checked_at": self.status_checked_at}
 
     @property
     @override

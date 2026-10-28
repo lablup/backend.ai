@@ -6,7 +6,7 @@ from typing import override
 
 from ai.backend.common.cron.base import PeriodicTask
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
-from ai.backend.common.data.storage.types import StorageBackendType, StorageStatusResult
+from ai.backend.common.data.storage.types import StorageBackendType, StorageStatusResultData
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.storage_status.anycast import (
     StorageStatusObservation,
@@ -70,26 +70,25 @@ class StorageStatusReportTask(PeriodicTask):
     @override
     async def run(self) -> None:
         event = StorageStatusReportEvent(
-            instance_id=self._instance_id,
-            service_group=self._service_group,
+            service_catalog_instance_id=self._instance_id,
+            service_catalog_service_group=self._service_group,
             observations=[
-                self._volume_observation(volume_name, result)
-                for volume_name, result in self._registry.snapshot().items()
+                self._volume_observation(volume_name, data)
+                for volume_name, data in self._registry.snapshot().items()
             ],
         )
         await self._event_producer.anycast_event(event)
 
     def _volume_observation(
-        self, volume_name: StorageVolumeName, result: StorageStatusResult | None
+        self, volume_name: StorageVolumeName, data: StorageStatusResultData
     ) -> StorageStatusObservation:
-        subject = StorageVolumeSubject(
-            name=volume_name, backend_type=self._backend_types[volume_name]
-        )
-        if result is None:
-            return StorageStatusObservation(subject=subject)
         return StorageStatusObservation(
-            subject=subject,
-            check_started_at=result.check_started_at,
-            duration=result.duration,
-            error_msg=result.error_msg,
+            subject=StorageVolumeSubject(
+                name=volume_name, backend_type=self._backend_types[volume_name]
+            ),
+            status=data.status,
+            check_started_at=data.check_started_at,
+            duration=data.duration,
+            error_msg=data.error_msg,
+            device_id=data.device_id,
         )
