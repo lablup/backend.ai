@@ -23754,6 +23754,11 @@ type VFolder implements Node {
   Added in 26.9.0. The permission bits the current user holds on this vfolder.
   """
   permissions: [PermissionBit!]!
+
+  """
+  Added in 26.10.0. The level the current user mounts this vfolder at: NONE without read access, READ_WRITE on a personal folder they own, otherwise their own mount policy or the folder's default (`accessControl.permission`).
+  """
+  effectiveMountPermission: VFolderMountPermission
 }
 
 """

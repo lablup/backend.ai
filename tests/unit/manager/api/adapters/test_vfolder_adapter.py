@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -12,6 +13,7 @@ import pytest
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     ScopedSearchVFoldersInput,
@@ -379,3 +381,66 @@ class TestVFolderAdapterBatchLoadByIds:
     ) -> None:
         assert await adapter.batch_load_by_ids([]) == []
         mock_processors.vfolder.bulk_get.run.assert_not_awaited()
+
+
+@dataclass(frozen=True)
+class _MountPermissionLoadOverReadableDeniedAndMissing:
+    adapter: VFolderAdapter
+    readable_id: VFolderUUID
+    denied_id: VFolderUUID
+    missing_id: VFolderUUID
+    denial: GenericForbidden
+
+
+class TestVFolderAdapterBatchLoadMountPermissions:
+    """Tests for VFolderAdapter.batch_load_mount_permissions()."""
+
+    @pytest.fixture
+    def readable_denied_and_missing(self) -> _MountPermissionLoadOverReadableDeniedAndMissing:
+        readable_id = VFolderUUID(uuid4())
+        denied_id = VFolderUUID(uuid4())
+        missing_id = VFolderUUID(uuid4())
+        denial = GenericForbidden("no read on this vfolder")
+        processors = MagicMock()
+        processors.vfolder.bulk_load_mount_levels.run = AsyncMock(
+            return_value=PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[VFolderMountPolicy].succeeded(
+                        readable_id, VFolderMountPolicy.READ_ONLY
+                    ),
+                    PartialBulkEntityResult[VFolderMountPolicy].denied(denied_id, denial),
+                    PartialBulkEntityResult[VFolderMountPolicy].nothing(missing_id),
+                ]
+            )
+        )
+        return _MountPermissionLoadOverReadableDeniedAndMissing(
+            adapter=VFolderAdapter(
+                processors.vfolder,
+                processors.vfolder_file,
+                processors.vfolder_admin,
+                processors.deployment,
+                processors.vfolder_mount_policy,
+            ),
+            readable_id=readable_id,
+            denied_id=denied_id,
+            missing_id=missing_id,
+            denial=denial,
+        )
+
+    async def test_answers_per_id(
+        self, readable_denied_and_missing: _MountPermissionLoadOverReadableDeniedAndMissing
+    ) -> None:
+        situation = readable_denied_and_missing
+
+        mount_permissions = await situation.adapter.batch_load_mount_permissions([
+            situation.readable_id,
+            situation.denied_id,
+            situation.missing_id,
+        ])
+
+        assert mount_permissions == [VFolderPermissionField.READ_ONLY, situation.denial, None]
+
+    async def test_no_ids_read_nothing(
+        self, readable_denied_and_missing: _MountPermissionLoadOverReadableDeniedAndMissing
+    ) -> None:
+        assert await readable_denied_and_missing.adapter.batch_load_mount_permissions([]) == []
