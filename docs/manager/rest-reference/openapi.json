@@ -37872,6 +37872,48 @@
         "title": "AdminSearchSystemSessionEnvironsInput",
         "type": "object"
       },
+      "CreateSystemSessionEnvironInput": {
+        "description": "Input for binding a value source to an environment variable name at one scope.",
+        "properties": {
+          "key": {
+            "description": "The environment variable name the value is injected under.",
+            "maxLength": 256,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+            "title": "Key",
+            "type": "string"
+          },
+          "value_source": {
+            "description": "Which value of the starting session is injected, as a value source name the value source query lists.",
+            "title": "Value Source",
+            "type": "string"
+          },
+          "scope_type": {
+            "$ref": "#/components/schemas/SystemSessionEnvironScopeType",
+            "description": "Whether the row applies to every session, a domain's or a project's."
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The id of the domain or the project. Left out for public.",
+            "title": "Scope Id"
+          }
+        },
+        "required": [
+          "key",
+          "value_source",
+          "scope_type"
+        ],
+        "title": "CreateSystemSessionEnvironInput",
+        "type": "object"
+      },
       "UpdateSystemSessionEnvironInput": {
         "description": "Input for changing a system session environ row's key.",
         "properties": {
@@ -66125,6 +66167,35 @@
         "description": "List every value source a system session environ row can carry.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/v2/system-session-environs": {
+      "post": {
+        "operationId": "v2/system-session-environs.create",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSystemSessionEnvironInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Bind a value source to an environment variable name at one scope.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/system-session-environs/{environ_id}": {
       "patch": {
         "operationId": "v2/system-session-environs.update",
@@ -66219,6 +66290,35 @@
           }
         ],
         "description": "Restore a soft-deleted system session environ row.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/system-session-environs/{environ_id}/purge": {
+      "post": {
+        "operationId": "v2/system-session-environs.purge",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "environ_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Remove a system session environ row for good, soft-deleted or not.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/users/search": {

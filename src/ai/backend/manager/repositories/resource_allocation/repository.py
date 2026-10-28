@@ -62,16 +62,10 @@ class ResourceAllocationRepository:
         """Get known slot types from etcd config."""
         return await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
 
-    async def get_keypair_usage(
-        self,
-        access_key: AccessKey,
-        resource_policy: Mapping[str, Any],
-    ) -> ScopeUsageData:
-        """Get keypair resource usage (limits, used, assignable)."""
-        known_slot_types = await self._get_known_slot_types()
-        return await self._db_source.get_keypair_usage(
-            access_key, resource_policy, known_slot_types
-        )
+    async def get_keypair_usage(self, user_id: UserID) -> ScopeUsageData:
+        """Get the usage of a user's default keypair (limits, used, assignable)."""
+        async with self._ops_provider.read_ops() as ops:
+            return await ops.keypair_usage(user_id)
 
     async def get_user_usage(self, user_id: UserID) -> ScopeUsageData:
         """Get a user's resource usage across all their keypairs (limits, used, assignable)."""

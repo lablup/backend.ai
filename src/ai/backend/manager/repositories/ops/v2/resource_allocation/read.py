@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from decimal import Decimal
 from uuid import UUID
 
@@ -10,6 +11,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
+    AccessKey,
     DefaultForUnspecified,
     ResourceSlot,
     SessionTypes,
@@ -50,6 +52,7 @@ from ai.backend.manager.models.resource_slot.row import (
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.resource_preset.db_source.types import (
+    AccessKeyFilter,
     DomainNameFilter,
     GroupIdFilter,
     NonPrivateSessionFilter,
@@ -64,16 +67,22 @@ from ai.backend.manager.repositories.resource_slot.types import (
 )
 
 
+@dataclass(frozen=True)
+class _DefaultKeypair:
+    access_key: AccessKey
+    resource_policy: KeyPairResourcePolicyData
+
+
 class ResourceAllocationReadOps(V2ReadOps):
     """The general v2 read ops plus the resource allocation usage reads."""
 
     async def user_usage(self, user_id: UserID) -> ScopeUsageData:
         """A user's usage across all their keypairs, counted as the scheduler does."""
         known_slot_types = await self._known_slot_types()
-        resource_policy = await self._default_keypair_resource_policy(user_id)
+        keypair = await self._default_keypair(user_id)
         limits = self._limits_from_policy(
-            resource_policy.total_resource_slots,
-            resource_policy.default_for_unspecified,
+            keypair.resource_policy.total_resource_slots,
+            keypair.resource_policy.default_for_unspecified,
             known_slot_types,
         )
         used = await self._resource_occupancy(
@@ -103,6 +112,24 @@ class ResourceAllocationReadOps(V2ReadOps):
         return UserConcurrencyData(
             session_count=row.session_count,
             private_session_count=row.private_session_count,
+        )
+
+    async def keypair_usage(self, user_id: UserID) -> ScopeUsageData:
+        """The usage of the user's default keypair."""
+        known_slot_types = await self._known_slot_types()
+        keypair = await self._default_keypair(user_id)
+        limits = self._limits_from_policy(
+            keypair.resource_policy.total_resource_slots,
+            keypair.resource_policy.default_for_unspecified,
+            known_slot_types,
+        )
+        used = await self._resource_occupancy(
+            known_slot_types, filters=[AccessKeyFilter(keypair.access_key)]
+        )
+        return ScopeUsageData(
+            limits=limits,
+            used=used,
+            assignable=subtract_quantities(limits, used),
         )
 
     async def project_usage(self, project_id: UUID) -> ScopeUsageData:
@@ -229,16 +256,23 @@ class ResourceAllocationReadOps(V2ReadOps):
         ).all()
         return {SlotName(row.slot_name): SlotTypes(row.slot_type) for row in rows}
 
-    async def _default_keypair_resource_policy(self, user_id: UserID) -> KeyPairResourcePolicyData:
-        """The resource policy of the user's default keypair."""
-        row = await self._sess.scalar(
-            sa.select(KeyPairResourcePolicyRow)
-            .join(KeyPairRow, KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name)
-            .where(KeyPairRow.user == user_id, KeyPairRow.is_default)
-        )
+    async def _default_keypair(self, user_id: UserID) -> _DefaultKeypair:
+        """The access key and resource policy of the user's default keypair."""
+        row = (
+            await self._sess.execute(
+                sa.select(KeyPairRow.access_key, KeyPairResourcePolicyRow)
+                .join(KeyPairRow, KeyPairRow.resource_policy == KeyPairResourcePolicyRow.name)
+                .where(KeyPairRow.user == user_id, KeyPairRow.is_default)
+            )
+        ).first()
         if row is None:
             raise KeyPairNotFound(f"User {user_id} holds no default keypair")
-        return KeyPairResourcePolicySearchableFields.own.to_data(row)
+        return _DefaultKeypair(
+            access_key=AccessKey(row.access_key),
+            resource_policy=KeyPairResourcePolicySearchableFields.own.to_data(
+                row.KeyPairResourcePolicyRow
+            ),
+        )
 
     def _limits_from_policy(
         self,

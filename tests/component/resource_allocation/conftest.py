@@ -158,7 +158,6 @@ def server_module_registries(
     adapter = ResourceAllocationAdapter(
         processors.session,
         processors.domain,
-        processors.user,
         config_provider=config_provider,
     )
     handler = V2ResourceAllocationHandler(adapter=adapter)

@@ -6,12 +6,15 @@ from ai.backend.client.v2.base_domain import BaseDomainClient
 from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironID
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     AdminSearchSystemSessionEnvironsInput,
+    CreateSystemSessionEnvironInput,
     UpdateSystemSessionEnvironInput,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
     AdminSearchSystemSessionEnvironsPayload,
+    CreateSystemSessionEnvironPayload,
     DeleteSystemSessionEnvironPayload,
     ListSystemSessionEnvironValueSourcesPayload,
+    PurgeSystemSessionEnvironPayload,
     RestoreSystemSessionEnvironPayload,
     UpdateSystemSessionEnvironPayload,
 )
@@ -41,6 +44,17 @@ class V2SystemSessionEnvironClient(BaseDomainClient):
             response_model=ListSystemSessionEnvironValueSourcesPayload,
         )
 
+    async def create(
+        self, request: CreateSystemSessionEnvironInput
+    ) -> CreateSystemSessionEnvironPayload:
+        """Bind a value source to an environment variable name at one scope."""
+        return await self._client.typed_request(
+            "POST",
+            _PATH,
+            request=request,
+            response_model=CreateSystemSessionEnvironPayload,
+        )
+
     async def update(
         self, environ_id: SystemSessionEnvironID, request: UpdateSystemSessionEnvironInput
     ) -> UpdateSystemSessionEnvironPayload:
@@ -68,4 +82,12 @@ class V2SystemSessionEnvironClient(BaseDomainClient):
             "POST",
             f"{_PATH}/{environ_id}/restore",
             response_model=RestoreSystemSessionEnvironPayload,
+        )
+
+    async def purge(self, environ_id: SystemSessionEnvironID) -> PurgeSystemSessionEnvironPayload:
+        """Remove a system session environ row for good, soft-deleted or not."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/{environ_id}/purge",
+            response_model=PurgeSystemSessionEnvironPayload,
         )

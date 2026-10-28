@@ -340,6 +340,9 @@ from ai.backend.manager.services.session_group.processors import SessionGroupPro
 from ai.backend.manager.services.system_session_environ.actions.bulk_get import (
     BulkGetSystemSessionEnvironsAction,
 )
+from ai.backend.manager.services.system_session_environ.actions.create import (
+    CreateSystemSessionEnvironAction,
+)
 from ai.backend.manager.services.system_session_environ.actions.delete import (
     DeleteSystemSessionEnvironAction,
 )
@@ -348,6 +351,9 @@ from ai.backend.manager.services.system_session_environ.actions.global_search im
 )
 from ai.backend.manager.services.system_session_environ.actions.public_list_value_sources import (
     PublicListSystemSessionEnvironValueSourcesAction,
+)
+from ai.backend.manager.services.system_session_environ.actions.purge import (
+    PurgeSystemSessionEnvironAction,
 )
 from ai.backend.manager.services.system_session_environ.actions.restore import (
     RestoreSystemSessionEnvironAction,
@@ -1000,11 +1006,13 @@ def test_vfs_storage_loader_read_is_a_partial_permission_read() -> None:
 
 
 def test_system_session_environ_operations_keep_their_judged_gates() -> None:
-    """The search reads every row under the global gate; the DataLoader, the update, the
-    soft delete and the restore are checked per named row."""
+    """The search reads every row under the global gate, the create against the scope it
+    writes in; the DataLoader, the update, the soft delete, the restore and the purge are
+    checked per named row."""
     registry = _ops_registry()
     SystemSessionEnvironProcessors(
-        registry.group(GroupMeta(SystemSessionEnvironEntityType())), SystemSessionEnvironService()
+        registry.group(GroupMeta(SystemSessionEnvironEntityType())),
+        SystemSessionEnvironService(MagicMock()),
     )
 
     judged = {
@@ -1016,6 +1024,11 @@ def test_system_session_environ_operations_keep_their_judged_gates() -> None:
         BulkGetSystemSessionEnvironsAction: (
             SystemSessionEnvironEntityType(),
             ActionKind.BULK,
+            ActionGate.PERMISSION,
+        ),
+        CreateSystemSessionEnvironAction: (
+            SystemSessionEnvironEntityType(),
+            ActionKind.SCOPE,
             ActionGate.PERMISSION,
         ),
         UpdateSystemSessionEnvironAction: (
@@ -1033,6 +1046,11 @@ def test_system_session_environ_operations_keep_their_judged_gates() -> None:
             ActionKind.SINGLE_ENTITY,
             ActionGate.PERMISSION,
         ),
+        PurgeSystemSessionEnvironAction: (
+            SystemSessionEnvironEntityType(),
+            ActionKind.SINGLE_ENTITY,
+            ActionGate.PERMISSION,
+        ),
     }
     recorded = {
         record.action_cls: (record.entity_type, record.kind, record.gate)
@@ -1046,7 +1064,8 @@ def test_system_session_environ_value_source_list_is_public() -> None:
     """The system session environ value sources are read by any authenticated caller."""
     registry = _ops_registry()
     SystemSessionEnvironProcessors(
-        registry.group(GroupMeta(SystemSessionEnvironEntityType())), SystemSessionEnvironService()
+        registry.group(GroupMeta(SystemSessionEnvironEntityType())),
+        SystemSessionEnvironService(MagicMock()),
     )
 
     recorded = {

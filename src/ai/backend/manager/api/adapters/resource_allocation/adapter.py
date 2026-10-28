@@ -73,10 +73,6 @@ from ai.backend.manager.services.session.resource_allocation.actions.get_user_us
 from ai.backend.manager.services.session.resource_allocation.actions.resolve_keypair_context import (
     ResolveKeypairContextAction,
 )
-from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
-    LookupKeypairOwnerByAccessKeyAction,
-)
-from ai.backend.manager.services.user.processors import UserProcessors
 
 
 class ResourceAllocationAdapter(BaseAdapter):
@@ -84,19 +80,16 @@ class ResourceAllocationAdapter(BaseAdapter):
 
     _session: SessionProcessors
     _domain: DomainProcessors
-    _user: UserProcessors
     _config_provider: ManagerConfigProvider | None
 
     def __init__(
         self,
         session: SessionProcessors,
         domain: DomainProcessors,
-        user: UserProcessors,
         config_provider: ManagerConfigProvider | None,
     ) -> None:
         self._session = session
         self._domain = domain
-        self._user = user
         self._config_provider = config_provider
 
     def _visibility_settings(self) -> tuple[bool, bool]:
@@ -123,23 +116,6 @@ class ResourceAllocationAdapter(BaseAdapter):
             ResolveKeypairContextAction(user_id=UserID(user_id))
         )
         return str(result.access_key), result.resource_policy
-
-    async def my_keypair_usage_for_current_user(
-        self,
-    ) -> KeypairResourceAllocationPayload:
-        """Get keypair resource usage for the current user.
-
-        Resolves access_key and resource_policy internally from current_user().
-        Intended for GQL resolvers where request context lacks keypair info.
-        """
-        me = current_user()
-        if me is None:
-            raise PermissionError("Not authenticated")
-        access_key, resource_policy = await self._resolve_keypair_context(me.user_id)
-        return await self.my_keypair_usage(
-            access_key=access_key,
-            resource_policy=resource_policy,
-        )
 
     async def effective_allocation_for_current_user(
         self,
@@ -217,24 +193,13 @@ class ResourceAllocationAdapter(BaseAdapter):
         )
         return UserResourceAllocationPayload(user=_scope_usage_to_node(result.usage))
 
-    async def _keypair_owner(self, access_key: AccessKey) -> UserID:
-        result = await self._user.lookup_keypair_owner.run(
-            LookupKeypairOwnerByAccessKeyAction(access_key=access_key)
-        )
-        return UserID(result.entity_id())
-
-    async def my_keypair_usage(
-        self,
-        access_key: str,
-        resource_policy: Mapping[str, Any],
-    ) -> KeypairResourceAllocationPayload:
-        """Get keypair resource usage for the current user."""
+    async def my_keypair_usage(self) -> KeypairResourceAllocationPayload:
+        """Get the usage of the current user's default keypair."""
+        me = current_user()
+        if me is None:
+            raise UnreachableError("User context is not available")
         result = await self._session.resource_allocation.get_keypair_usage.run(
-            GetKeypairUsageAction(
-                user_id=await self._keypair_owner(AccessKey(access_key)),
-                access_key=AccessKey(access_key),
-                resource_policy=resource_policy,
-            )
+            GetKeypairUsageAction(user_id=UserID(me.user_id))
         )
         return KeypairResourceAllocationPayload(
             keypair=_scope_usage_to_node(result.usage),
