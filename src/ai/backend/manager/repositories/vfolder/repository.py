@@ -34,6 +34,7 @@ from ai.backend.manager.data.entity_share.types import EntityShareData, EntitySh
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.project.types import ProjectResourceInfo
+from ai.backend.manager.data.user.types import UserResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     VFolderCloneInfo,
@@ -434,8 +435,7 @@ class VfolderRepository:
         user_info = await self.get_user_resource_info(creator.creator_id)
         if user_info is None:
             raise UserNotFound(f"User with {creator.creator_id} not found.")
-        _, max_quota_scope_size, container_uid = user_info
-        return max_quota_scope_size, container_uid
+        return user_info.max_quota_scope_size, user_info.container_uid
 
     @vfolder_repository_resilience.apply()
     async def mark_vfolder_ready(self, vfolder_id: VFolderUUID) -> VFolderData:
@@ -1091,12 +1091,9 @@ class VfolderRepository:
             )
 
     @vfolder_repository_resilience.apply()
-    async def get_user_resource_info(
-        self, user_id: uuid.UUID
-    ) -> tuple[int, int, int | None] | None:
+    async def get_user_resource_info(self, user_id: uuid.UUID) -> UserResourceInfo | None:
         """
-        Get user resource information.
-        Returns (max_vfolder_count, max_quota_scope_size, container_uid) or None.
+        Get user resource information, or None when the user is not found.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             query = (
@@ -1114,7 +1111,11 @@ class VfolderRepository:
             if row is None:
                 return None
 
-            return (row.max_vfolder_count, row.max_quota_scope_size, row.container_uid)
+            return UserResourceInfo(
+                max_vfolder_count=row.max_vfolder_count,
+                max_quota_scope_size=row.max_quota_scope_size,
+                container_uid=row.container_uid,
+            )
 
     async def _get_vfolder_by_id(
         self, session: SASession, vfolder_id: uuid.UUID

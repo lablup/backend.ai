@@ -40,6 +40,7 @@ from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.user.types import UserResourceInfo
 from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -2727,7 +2728,11 @@ class TestVfolderRepositoryResourcePolicyReads:
     ) -> None:
         info = await vfolder_repository.get_user_resource_info(test_user)
 
-        assert info == (7, BinarySize.finite_from_str("3GiB"), 2000)
+        assert info == UserResourceInfo(
+            max_vfolder_count=7,
+            max_quota_scope_size=BinarySize.finite_from_str("3GiB"),
+            container_uid=2000,
+        )
 
     async def test_an_unknown_user_has_no_resource_info(
         self,

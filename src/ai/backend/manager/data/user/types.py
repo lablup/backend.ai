@@ -93,6 +93,13 @@ class SessionOwnerContext:
     owner_role: UserRole
 
 
+@dataclass(frozen=True)
+class UserResourceInfo:
+    max_vfolder_count: int
+    max_quota_scope_size: int
+    container_uid: int | None
+
+
 @dataclass
 class UserData(EntityData):
     id: UUID = field(compare=False)

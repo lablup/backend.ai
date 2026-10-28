@@ -21,6 +21,7 @@ from ai.backend.common.types import (
     VFolderUsageMode,
 )
 from ai.backend.manager.data.project.types import ProjectResourceInfo
+from ai.backend.manager.data.user.types import UserResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     VFolderData,
@@ -203,7 +204,11 @@ class TestCreateVFolderAction:
         project_info: ProjectResourceInfo,
     ) -> None:
         repository.get_group_resource_info = AsyncMock(return_value=project_info)
-        repository.get_user_resource_info = AsyncMock(return_value=(10, 0, None))
+        repository.get_user_resource_info = AsyncMock(
+            return_value=UserResourceInfo(
+                max_vfolder_count=10, max_quota_scope_size=0, container_uid=None
+            )
+        )
         repository.ensure_host_permission_allowed = AsyncMock()
         repository.create_vfolder_with_permission = AsyncMock()
 
