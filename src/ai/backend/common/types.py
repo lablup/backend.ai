@@ -2052,6 +2052,7 @@ class ValkeyTarget:
     addr: str | None = None
     sentinel: list[str] | None = None
     service_name: str | None = None
+    username: str | None = None
     password: str | None = None
     sentinel_password: str | None = None
     request_timeout: int | None = None
@@ -2076,6 +2077,7 @@ class RedisTarget:
     addr: HostPortPair | None = None
     sentinel: str | list[HostPortPair] | None = None
     service_name: str | None = None
+    username: str | None = None
     password: str | None = None
     sentinel_password: str | None = None
     redis_helper_config: RedisHelperConfig | None = None
@@ -2099,6 +2101,7 @@ class RedisTarget:
             addr=self.addr,
             sentinel=self.sentinel,
             service_name=self.service_name,
+            username=self.username,
             password=self.password,
             sentinel_password=self.sentinel_password,
             redis_helper_config=self.redis_helper_config,
@@ -2123,6 +2126,7 @@ class RedisTarget:
             addr=addr,
             sentinel=sentinel_addrs,
             service_name=self.service_name,
+            username=self.username,
             password=self.password,
             sentinel_password=self.sentinel_password,
             request_timeout=None,
@@ -2142,6 +2146,7 @@ class ValkeyProfileTarget:
         addr: str | None = None,
         sentinel: list[str] | None = None,
         service_name: str | None = None,
+        username: str | None = None,
         password: str | None = None,
         sentinel_password: str | None = None,
         request_timeout: int | None = None,
@@ -2151,6 +2156,7 @@ class ValkeyProfileTarget:
             addr=addr,
             sentinel=sentinel,
             service_name=service_name,
+            username=username,
             password=password,
             sentinel_password=sentinel_password,
             request_timeout=request_timeout,
@@ -2179,6 +2185,7 @@ class RedisProfileTarget:
         addr: HostPortPair | None = None,
         sentinel: str | list[HostPortPair] | None = None,
         service_name: str | None = None,
+        username: str | None = None,
         password: str | None = None,
         sentinel_password: str | None = None,
         redis_helper_config: RedisHelperConfig | None = None,
@@ -2190,6 +2197,7 @@ class RedisProfileTarget:
             addr=addr,
             sentinel=sentinel,
             service_name=service_name,
+            username=username,
             password=password,
             sentinel_password=sentinel_password,
             redis_helper_config=redis_helper_config,
@@ -2246,6 +2254,7 @@ class RedisProfileTarget:
             addr=addr,
             sentinel=sentinel,
             service_name=data.get("service_name"),
+            username=data.get("username"),
             password=data.get("password"),
             sentinel_password=data.get("sentinel_password"),
             redis_helper_config=data.get("redis_helper_config"),
