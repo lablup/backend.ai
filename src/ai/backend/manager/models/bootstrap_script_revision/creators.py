@@ -12,21 +12,35 @@ from ai.backend.common.data.entity.bootstrap_script import BootstrapScript, Boot
 from ai.backend.common.data.entity.bootstrap_script_revision import BootstrapScriptRevisionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptRevisionData
+from ai.backend.manager.errors.bootstrap_script import BootstrapScriptNotFound
+from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
 from ai.backend.manager.models.bootstrap_script_revision.row import BootstrapScriptRevisionRow
 from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
     BootstrapScriptRevisionSearchableFields,
 )
-from ai.backend.manager.models.specs.creator import DanglingFieldCreator
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
+from ai.backend.manager.models.specs.creator import GuardedDanglingFieldCreator
+from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
 
 
 @dataclass
 class BootstrapScriptRevisionCreator(
-    DanglingFieldCreator[BootstrapScriptRevisionRow, BootstrapScriptRevisionData]
+    GuardedDanglingFieldCreator[BootstrapScriptRevisionRow, BootstrapScriptRevisionData]
 ):
     script_id: BootstrapScriptID
     script: BootstrapScript
     creator_id: UserID
+
+    @override
+    def precondition_checks(self) -> Sequence[PreconditionCheck]:
+        return (
+            PreconditionCheck(
+                finder=sa.select(BootstrapScriptRow.id).where(
+                    BootstrapScriptRow.id == self.script_id,
+                    BootstrapScriptRow.deleted_at.is_not(None),
+                ),
+                error=BootstrapScriptNotFound(f"Bootstrap script {self.script_id} is deleted"),
+            ),
+        )
 
     @override
     def build_row(self) -> BootstrapScriptRevisionRow:

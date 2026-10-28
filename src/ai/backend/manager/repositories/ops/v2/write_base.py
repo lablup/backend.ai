@@ -27,7 +27,12 @@ from ai.backend.manager.errors.repository import (
     UpsertEmptyResultError,
 )
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.specs.types import ConflictCheck, GuardCheck, IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import (
+    ConflictCheck,
+    GuardCheck,
+    IntegrityErrorCheck,
+    PreconditionCheck,
+)
 from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
 
 
@@ -51,6 +56,13 @@ class V2WriteOpsBase(V2OpsBase):
         ("check constraint", CheckConstraintViolationError),
         ("exclusion constraint", ExclusionViolationError),
     )
+
+    async def _validate_precondition_checks(self, checks: Sequence[PreconditionCheck]) -> None:
+        """Refuse the write where the spec named a row that must not be there. What the
+        database cannot state for itself is stated here, each with its own error."""
+        for check in checks:
+            if (await self._sess.execute(check.finder)).first() is not None:
+                raise check.error
 
     async def _validate_conflict_checks(self, checks: Sequence[ConflictCheck]) -> None:
         """Validate the spec-declared conflict checks in a single query, raising the

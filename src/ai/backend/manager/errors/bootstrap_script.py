@@ -17,3 +17,14 @@ class DefaultBootstrapScriptNotFound(FieldError, web.HTTPNotFound):
         return FieldErrorCode(
             BootstrapScriptFieldType(), ActionOperationType.UPDATE, ErrorDetail.NOT_FOUND
         )
+
+
+class BootstrapScriptNotFound(FieldError, web.HTTPNotFound):
+    error_type = "https://api.backend.ai/probs/bootstrap-script-not-found"
+    error_title = "The bootstrap script does not exist."
+
+    @override
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            BootstrapScriptFieldType(), ActionOperationType.CREATE, ErrorDetail.NOT_FOUND
+        )
