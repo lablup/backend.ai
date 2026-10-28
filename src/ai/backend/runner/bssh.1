@@ -1,6 +1,6 @@
 .\" Manpage for bssh
 .\" Contact the maintainers to correct errors or typos.
-.TH BSSH 1 "September 2026" "v3.0.1" "bssh Manual"
+.TH BSSH 1 "October 2026" "v3.1.0" "bssh Manual"
 
 .SH NAME
 bssh \- Broadcast SSH - SSH-compatible client with parallel execution capabilities
@@ -122,7 +122,7 @@ Example: -J jump1@proxy1,jump2@proxy2
 
 .TP
 .BR \-Q " " \fIquery_option\fR
-Query SSH configuration options (cipher, kex, mac, key, protocol-version, help)
+Query SSH configuration options (cipher, cipher-auth, mac, kex, compression, key, key-plain, key-cert, key-sig, protocol-version, help). The key lists include the FIDO types sk-ssh-ed25519@openssh.com and sk-ecdsa-sha2-nistp256@openssh.com in OpenSSH's order; webauthn-sk-ecdsa-sha2-nistp256@openssh.com is not listed because bssh does not verify it.
 
 .TP
 .BR \-4 ", " \-\-ipv4
@@ -159,12 +159,26 @@ Disable X11 forwarding
 Local port forwarding. Binds a local port to forward connections to a remote destination via SSH.
 Multiple -L options can be specified for multiple forwards.
 Example: -L 8080:example.com:80 (localhost:8080 → example.com:80)
+.br
+A Unix-domain socket path (any field containing a slash) may replace either side, as in OpenSSH:
+.I local_socket:host:hostport ,
+.I local_socket:remote_socket ,
+or
+.I [bind_address:]port:remote_socket .
+A local socket path must not already exist; bssh never unlinks an existing path before binding and never follows a symbolic link at the path. The socket is owner-only (mode 0600) from the moment it appears at the path, its mode is never changed through a path that could have been replaced by a symbolic link, and it is removed when the forwarding stops. On macOS and the BSDs the socket is first bound in a private directory created next to the path and then moved into place, so the directory part of the path plus 14 bytes must stay under the 104-byte socket path limit.
 
 .TP
 .BR \-R " " \fI[bind_address:]port:host:hostport\fR
 Remote port forwarding. Requests the SSH server to bind a port and forward connections to local destination.
 Multiple -R options can be specified for multiple forwards.
 Example: -R 8080:localhost:80 (remote:8080 → localhost:80)
+.br
+A Unix-domain socket path may replace either side:
+.I remote_socket:host:hostport ,
+.I remote_socket:local_socket ,
+or
+.I [bind_address:]port:local_socket .
+The server creates and removes a remote socket path according to its own StreamLocalBindUnlink and StreamLocalBindMask settings. Both forms are also accepted by -O forward and -O cancel on a control master.
 
 .TP
 .BR \-D " " \fI[bind_address:]port[/socks_version]\fR
@@ -440,6 +454,21 @@ List available clusters from configuration
 Test connectivity to hosts
 
 .TP
+.B network-ping, nping
+Test direct ICMP reachability without opening an SSH connection.
+.RS
+Usage: bssh [global options] network-ping [\fB--count\fR \fICOUNT\fR] [\fB--timeout\fR \fISECONDS\fR] [\fB--interval\fR \fISECONDS\fR]
+.br
+The defaults are 4 requests, a 2 second per-request reply timeout, and a 0.2 second interval. The interval cannot be less than 0.2 seconds. The global \fB--parallel\fR limit controls host concurrency.
+.br
+The count and timeout options are deliberately long-only because the OpenSSH-compatible root \fB-c\fR and \fB-W\fR options keep their cipher and stdio-forward meanings. The command uses normal output only; TUI, stream, and output-directory modes do not apply.
+.br
+ssh_config HostName aliases are expanded, then the first resolver-order address allowed by \fB-4\fR, \fB-6\fR, or AddressFamily is selected and reported. ICMP originates directly from the local machine, so ProxyJump and ProxyCommand are ignored with a warning. There is no TCP or HTTP fallback.
+.br
+Unprivileged ICMP datagram sockets are preferred. Restricted Linux systems may require a suitable ping_group_range or CAP_NET_RAW; macOS normally permits ping sockets without elevation. Permission failures are reported explicitly.
+.RE
+
+.TP
 .B upload
 Upload files to remote hosts using SFTP (supports glob patterns)
 .RS
@@ -629,8 +658,7 @@ Example:
 
 .TP
 .B CASignatureAlgorithms
-Specifies the signature algorithms that will be used for certificate validation.
-Comma-separated list of algorithms (maximum 50 entries).
+Specifies the signature algorithms a certificate authority may have used to sign a host certificate. A presented host certificate whose CA signature uses another algorithm is refused. Comma-separated list (maximum 50 entries) accepting the OpenSSH +, - and ^ modifiers. The default is OpenSSH's: ssh-ed25519, ecdsa-sha2-nistp256, ecdsa-sha2-nistp384, ecdsa-sha2-nistp521, sk-ssh-ed25519@openssh.com, sk-ecdsa-sha2-nistp256@openssh.com, webauthn-sk-ecdsa-sha2-nistp256@openssh.com, rsa-sha2-512, rsa-sha2-256.
 .br
 Example:
 .I CASignatureAlgorithms ssh-ed25519,rsa-sha2-512,rsa-sha2-256
@@ -697,6 +725,13 @@ The command is run by the user's shell, preserving OpenSSH-style quoting,
 redirection, and pipelines.
 .br
 Supported tokens are %%, %h, %k, %n, %p, and %r.
+Endpoint values for %h, %n, %r, and %k are validated before spawning,
+regardless of whether they came from CLI, inventory, environment, or library APIs.
+Only substituted values are checked; unused fields and escaped literal tokens
+(such as %%h) are unrestricted. Substituted values must be nonempty ASCII letters/digits or ., _, :, @, - and cannot start
+with -. Whitespace, shell substitutions, glob patterns, and quotes are rejected
+even in quoted tokens. Use punycode names and unbracketed IPv6 without a zone
+identifier. The command template itself remains trusted executable code.
 .br
 .I ProxyCommand none
 explicitly selects a direct connection. When ProxyCommand and ProxyJump both
@@ -770,6 +805,7 @@ Example:
 Specifies a command to execute to obtain host keys dynamically.
 Supplements UserKnownHostsFile and GlobalKnownHostsFile.
 The command output must be in known_hosts format.
+Its @cert-authority and @revoked lines apply to host certificates exactly as the same lines in a known_hosts file do (except with a pinned key); for a certificate the command receives the certificate itself as %K and its type as %t, and runs once per host-key check.
 Supports token substitution (%h, %H, etc.).
 .br
 Example:
@@ -850,6 +886,20 @@ who can recognize the pattern of trusted hosts. Default is no.
 .br
 Example:
 .I VisualHostKey yes
+
+.TP
+.B HostKeyAlgorithms
+Host key signature algorithms offered to the server, in preference order, with the OpenSSH +, - and ^ modifiers. Certificate forms (\fI*-cert-v01@openssh.com\fR) are accepted and, by default, the certificate form of every default algorithm is offered ahead of the plain forms, so a server holding a host certificate presents it. bssh always sends certificate names before plain names regardless of their relative order in the list.
+.br
+A presented host certificate is accepted only when a
+.B @cert-authority
+line in a known_hosts file, or in the KnownHostsCommand output, names the host (or its HostKeyAlias) with the signing CA key (negated !pattern entries exclude a host, and hashed host fields are matched), the certificate is a host certificate with a principal matching that name (principals may be case-sensitive wildcard patterns), its signature by the CA verifies, it is inside its validity window, it carries no critical options, its CA signature uses an algorithm permitted by CASignatureAlgorithms, and neither the CA key nor the certified key is revoked by a
+.B @revoked
+line or by RevokedHostKeys. On a non-default port a @cert-authority line naming the bare host also matches. If no @cert-authority line matches, the certified key is checked as a plain host key under the usual StrictHostKeyChecking rules, provided HostKeyAlgorithms permits its plain key type; a certificate-only HostKeyAlgorithms list refuses the connection instead. A certificate from a matching CA that fails any other check is refused outright. UpdateHostKeys is not applied to certificate-authenticated hosts.
+
+.TP
+.B RevokedHostKeys
+One or more files listing revoked host keys and host CA keys, one OpenSSH public key per line. A key or certificate listed in any of the files is refused. Each path may use the same percent tokens as UserKnownHostsFile; a path that cannot be expanded (an unset environment variable or an unsupported token) refuses every host key. The value none (or /dev/null) disables the check and must be the only value. Binary key revocation lists (KRL) are not supported: a KRL file, or a file that cannot be read, anywhere in the list refuses every host key until it is replaced.
 
 .TP
 .B HostKeyAlias
@@ -1013,7 +1063,14 @@ When enabled, passphrases are automatically retrieved from and stored in the mac
 .RS
 .IP \[bu] 2
 .B Implementation:
-Fully integrated with macOS Keychain via Security Framework. Passphrases are securely stored after successful authentication and retrieved on subsequent connections.
+Fully integrated with macOS Keychain via Security Framework. Passphrases are securely stored after successful private-key decryption and retrieved on subsequent connections.
+.IP \[bu] 2
+.B Interoperability:
+bssh uses its own
+.I bssh-ssh-key-passphrase
+Keychain service. Entries created by
+.I ssh-add --apple-use-keychain
+belong to an Apple entitlement-protected access group and cannot be read directly by third-party binaries, so bssh may prompt once before storing its own entry.
 .IP \[bu] 2
 .B Cross-platform compatibility:
 Use
@@ -1045,6 +1102,13 @@ Special values:
 .IP
 Example:
 .I IdentityAgent ~/.1password/agent.sock
+
+.TP
+.B SecurityKeyProvider
+Specifies how FIDO authenticator-hosted keys (sk-ssh-ed25519@openssh.com and sk-ecdsa-sha2-nistp256@openssh.com identity files, as enrolled by ssh-keygen -t ed25519-sk or ecdsa-sk) are accessed. The default, internal, is bssh's built-in USB HID provider, which talks CTAP2 (with CTAP1/U2F fallback) to attached authenticators on Linux and macOS without any middleware library; when several authenticators are attached, the one holding the key is used, or, when a PIN is involved, the one that is touched. Otherwise the value is a path to a shared library implementing OpenSSH's sk-api (for example libsk-libfido2.so), or a name starting with $ that selects an environment variable holding that path; an unset variable, or the value none, skips sk-* identities. A library is loaded with dlopen(3); statically linked musl builds cannot load one and say so, but their built-in provider works. When a key requires user presence and standard error is a terminal, bssh prints a confirmation notice while waiting for the touch; when the provider asks for a PIN and BatchMode is off, bssh prompts for it once. At most eight attached authenticators are considered. U2F-only keys work for ecdsa-sk keys but not ed25519-sk keys, and cannot take a PIN. Enrolling keys, loading resident keys, and authenticators that verify the user only through a built-in sensor are not supported. On Linux the provider uses /dev/hidraw devices, which normally need a udev rule granting your user access (for example the FIDO rules from the libfido2 udev package on Debian and Ubuntu); without one, signing fails with a message that FIDO devices were found but none could be opened. On macOS devices are opened non-exclusively. On other platforms the built-in provider reports that it is not available, and an sk-api library must be used. Unlike OpenSSH, the built-in provider gives up on a signature after 120 seconds (for example when the key is never touched), because provider calls are serialized across all hosts. If signing fails (no device, PIN required in BatchMode, timeout, provider error), bssh reports it and continues with the next identity. Keys held by an agent keep signing through the agent.
+.br
+Example:
+.I SecurityKeyProvider /usr/lib/libsk-libfido2.so
 
 .TP
 .B PubkeyAcceptedAlgorithms
@@ -1970,6 +2034,26 @@ Command-line usage errors are rejected by the argument parser before this
 contract applies and keep the parser's own exit code 2, as they do for every
 subcommand.
 
+.SS network-ping Subcommand
+The
+.BR network-ping
+subcommand reports direct ICMP reachability rather than SSH service or authentication health. A host counts as reachable after at least one echo reply. Packet loss is calculated as lost requests divided by sent requests (for example, 3 replies from 4 requests is 25% loss), and latency uses min/avg/max/population-standard-deviation. Its exit codes are:
+
+.TP
+.B 0
+Every targeted host answered at least once
+
+.TP
+.B 1
+At least one host answered and at least one did not
+
+.TP
+.B 255
+No host answered, or bssh failed during DNS or ICMP socket setup
+
+.PP
+Argument parser failures, including zero count/timeout/parallel, parallelism above 4096, a non-finite duration, an interval below 0.2 seconds, or a duration above 3600 seconds, retain exit status 2.
+
 .SH OUTPUT FILES
 When using the
 .B --output-dir
@@ -2011,7 +2095,7 @@ Configuration file when XDG_CONFIG_HOME is set
 SSH known hosts file for host key verification
 
 .TP
-.I ~/.ssh/id_ed25519, ~/.ssh/id_rsa, ~/.ssh/id_ecdsa, ~/.ssh/id_dsa
+.I ~/.ssh/id_ed25519, ~/.ssh/id_ed25519_sk, ~/.ssh/id_rsa, ~/.ssh/id_ecdsa, ~/.ssh/id_ecdsa_sk, ~/.ssh/id_dsa
 Default SSH private keys (checked in order of preference). If a key is
 encrypted, bssh will prompt for the passphrase.
 

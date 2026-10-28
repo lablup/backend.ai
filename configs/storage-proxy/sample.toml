@@ -472,6 +472,15 @@
   # environments. Set together with the user field for authentication.
   # Added in 22.03.0
   ## password = "ETCD_PASSWORD"
+  # Seconds without a frame from an etcd member before a keep-alive ping is sent
+  # on a connection with requests in flight. Must not be below the server's
+  # --grpc-keepalive-min-time (5 seconds by default).
+  # Added in 26.10.0
+  keep-alive-interval = 5.0
+  # Seconds to wait for a keep-alive ping reply before the connection to that
+  # etcd member is closed and its requests go to the other members.
+  # Added in 26.10.0
+  keep-alive-timeout = 3.0
 
   # Addresses of the etcd cluster members. List every member of an etcd cluster,
   # or a single address of a standalone server.
