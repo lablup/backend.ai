@@ -265,6 +265,8 @@ class TestDeploymentScopedSearch:
                             resource_group=sgroup_name,
                             lifecycle_stage=EndpointLifecycle.CREATED,
                             replicas=1,
+                            # Autoscaling scaled the second deployment in project A to zero.
+                            desired_replicas=0 if ids is endpoint_ids_in_a and i == 1 else None,
                         )
                     )
                     ids.append(eid)
@@ -469,3 +471,26 @@ class TestDeploymentScopedSearch:
         )
 
         assert result.total_count == 0
+
+    async def test_desired_replicas_falls_back_to_replicas(
+        self,
+        repository: OpsRepository[ModelDeploymentData],
+        test_data: TestData,
+    ) -> None:
+        result = await repository.scoped_search(
+            ScopedSearcher(
+                scopes=[ProjectDeploymentTarget(project_id=test_data.project_a_id)],
+                used_by=[],
+                searcher=DeploymentSearcher(
+                    pagination=OffsetPagination(limit=10, offset=0),
+                    conditions=[
+                        DeploymentSearchableFields.own.desired_replicas.filter.equals(1),
+                    ],
+                ),
+            )
+        )
+
+        (item,) = result.items
+        assert item.id == test_data.endpoint_ids_in_a[0]
+        assert item.replica_state.replica_count == 1
+        assert item.replica_state.desired_replica_count == 1
