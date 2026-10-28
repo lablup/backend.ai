@@ -67,7 +67,7 @@ class SystemSessionEnvironUpdater(
         return (
             IntegrityErrorCheck(
                 violation_type=UniqueConstraintViolationError,
-                constraint_name="uq_system_session_environ_live_key",
+                constraint_name="uq_system_session_environ_key",
                 error=SystemSessionEnvironKeyConflict(),
             ),
             IntegrityErrorCheck(

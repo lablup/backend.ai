@@ -24,13 +24,10 @@ class SystemSessionEnvironRow(SoftDeleteMixin, LifecycleTimestampsMixin, Base):
 
     __tablename__ = "system_session_environ"
     __table_args__ = (
-        sa.Index(
-            "uq_system_session_environ_live_key",
+        sa.UniqueConstraint(
             "key",
             "scope_type",
             "scope_id",
-            unique=True,
-            postgresql_where=sa.text("deleted_at IS NULL"),
         ),
         sa.CheckConstraint(
             f"key ~ '{ENVIRON_KEY_PATTERN}'",

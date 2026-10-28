@@ -242,7 +242,6 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
             upserter.build_insert_values(),
             upserter.build_update_values(),
             upserter.integrity_error_checks(),
-            upserter.index_where(),
         )
         entity = upserter.entity_id(row)
         await self._provision([entity])
@@ -267,7 +266,6 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
                 upserter.build_insert_values(),
                 upserter.build_update_values(),
                 upserter.integrity_error_checks(),
-                upserter.index_where(),
             )
             for upserter in upserters
         ]
@@ -303,17 +301,13 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
                 upserter.index_elements(),
                 insert_values,
                 upserter.integrity_error_checks(),
-                upserter.index_where(),
             )
             if inserted is not None:
                 rows.append((inserted, True))
             else:
                 rows.append((
                     await self._row_holding_key(
-                        upserter.row_class(),
-                        upserter.index_elements(),
-                        insert_values,
-                        upserter.index_where(),
+                        upserter.row_class(), upserter.index_elements(), insert_values
                     ),
                     False,
                 ))

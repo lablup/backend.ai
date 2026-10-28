@@ -10,8 +10,6 @@ from abc import ABC, abstractmethod
 from collections.abc import Collection, Sequence
 from typing import Any
 
-import sqlalchemy as sa
-
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -83,11 +81,6 @@ class EntityUpserter[TRow: Base, TData](ABC):
     def index_elements(self) -> list[str]:
         """The column names conflict detection keys on."""
         raise NotImplementedError
-
-    def index_where(self) -> sa.ColumnElement[bool] | None:
-        """The predicate of the partial unique index ``index_elements`` names; ``None``
-        when that index is not partial."""
-        return None
 
     @abstractmethod
     def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:

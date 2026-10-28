@@ -74,10 +74,10 @@ domain repository; this package holds the operations a caller reaches through th
 - They write `deleted_at` through the shared soft delete updaters. The launcher leaves out a
   soft-deleted row, so the sessions started after a delete no longer receive it.
 - The SOFT_DELETE grant on the row answers both, held by the same admins as UPDATE.
-- A key is unique only among the rows not soft-deleted, so another row at the same scope may
-  take the key of a deleted one. Restoring that deleted row is then refused by the database.
-- The seed upserts on the same key among the rows not soft-deleted: after a delete it inserts
-  a new row instead of writing to the deleted one.
+- A soft-deleted row keeps its key: no other row at the same scope takes it until the
+  deleted row is purged, so a restore is never refused for its key.
+- The seed upserts on the same key, soft-deleted rows included. After a delete it skips the
+  key; an overwrite rewrites the deleted row's value source and leaves it deleted.
 
 ## The read by ids is partial
 
