@@ -1,21 +1,17 @@
 from __future__ import annotations
 
-import base64
-import secrets
 from collections.abc import Sequence
 from datetime import datetime
 from typing import TYPE_CHECKING, Final
 
 import sqlalchemy as sa
-from cryptography.hazmat.backends import default_backend as crypto_default_backend
-from cryptography.hazmat.primitives import serialization as crypto_serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql.expression import false
 
+from ai.backend.common.auth.utils import generate_keypair, generate_ssh_keypair
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.types import AccessKey, SecretKey
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
 from ai.backend.manager.models.base import (
     GUID,
@@ -105,42 +101,6 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
 # NOTE: Deprecated legacy table reference for backward compatibility.
 # Use KeyPairRow class directly for new code.
 keypairs = KeyPairRow.__table__
-
-
-def generate_keypair() -> tuple[AccessKey, SecretKey]:
-    """
-    AWS-like access key and secret key generation.
-    """
-    ak = "AKIA" + base64.b32encode(secrets.token_bytes(10)).decode("ascii")
-    sk = secrets.token_urlsafe(30)
-    return AccessKey(ak), SecretKey(sk)
-
-
-def generate_ssh_keypair() -> tuple[str, str]:
-    """
-    Generate RSA keypair for SSH/SFTP connection.
-    """
-    key = rsa.generate_private_key(
-        backend=crypto_default_backend(),
-        public_exponent=65537,
-        key_size=2048,
-    )
-    private_key = key.private_bytes(
-        crypto_serialization.Encoding.PEM,
-        crypto_serialization.PrivateFormat.TraditionalOpenSSL,
-        crypto_serialization.NoEncryption(),
-    ).decode("utf-8")
-    public_key = (
-        key.public_key()
-        .public_bytes(
-            crypto_serialization.Encoding.OpenSSH,
-            crypto_serialization.PublicFormat.OpenSSH,
-        )
-        .decode("utf-8")
-    )
-    public_key = f"{public_key.rstrip()}\n"
-    private_key = f"{private_key.rstrip()}\n"
-    return (public_key, private_key)
 
 
 async def generate_keypair_data(key_provider_pool: KeyProviderPool) -> KeyPairSecrets:
