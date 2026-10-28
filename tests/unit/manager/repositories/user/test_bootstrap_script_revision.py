@@ -14,7 +14,11 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.errors.bootstrap_script import BootstrapScriptNotFound
+from ai.backend.manager.errors.bootstrap_script import (
+    BootstrapScriptNotFound,
+    DefaultBootstrapScriptPurgeForbidden,
+)
+from ai.backend.manager.models.bootstrap_script.purgers import NonDefaultBootstrapScriptPurger
 from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
 from ai.backend.manager.models.bootstrap_script_revision.creators import (
     BootstrapScriptRevisionCreator,
@@ -241,3 +245,14 @@ class TestBootstrapScriptRevision:
                 )
             )
             assert list(defaults).count(True) == 1
+
+    async def test_purge_is_refused_on_the_default_script(
+        self, db: ExtendedAsyncSAEngine, default_script: BootstrapScriptID
+    ) -> None:
+        with pytest.raises(DefaultBootstrapScriptPurgeForbidden):
+            async with V2DBOpsProvider(db).write_ops() as w:
+                await w.purge_field_entity(
+                    NonDefaultBootstrapScriptPurger(script_id=default_script)
+                )
+
+        assert await self._revisions(db, default_script) == [(1, "echo 1", None)]

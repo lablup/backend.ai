@@ -5,12 +5,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
-from uuid import UUID
 
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
 from ai.backend.manager.models.clauses import QueryCondition
@@ -24,11 +23,11 @@ __all__ = ("UserBootstrapScriptTarget",)
 class UserBootstrapScriptTarget(ScopeTarget):
     """The bootstrap scripts set on one user."""
 
-    user_id: UUID
+    user_id: UserID
 
     @override
     def scope_id(self) -> EntityIdentifier:
-        return UserID(self.user_id)
+        return self.user_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -36,7 +35,7 @@ class UserBootstrapScriptTarget(ScopeTarget):
 
         def inner() -> sa.sql.expression.ColumnElement[bool]:
             return sa.and_(
-                BootstrapScriptRow.entity_type == UserEntityType(),
+                BootstrapScriptRow.entity_type == user_id.entity_type(),
                 BootstrapScriptRow.entity_id == user_id,
             )
 
@@ -44,7 +43,7 @@ class UserBootstrapScriptTarget(ScopeTarget):
 
     @property
     @override
-    def existence_checks(self) -> Sequence[ExistenceCheck[UUID]]:
+    def existence_checks(self) -> Sequence[ExistenceCheck[UserID]]:
         return [
             ExistenceCheck(
                 column=UserRow.uuid,

@@ -37,5 +37,5 @@ class DefaultBootstrapScriptPurgeForbidden(FieldError, web.HTTPForbidden):
     @override
     def field_error_code(self) -> FieldErrorCode:
         return FieldErrorCode(
-            BootstrapScriptFieldType(), ActionOperationType.UPDATE, ErrorDetail.FORBIDDEN
+            BootstrapScriptFieldType(), ActionOperationType.PURGE, ErrorDetail.FORBIDDEN
         )
