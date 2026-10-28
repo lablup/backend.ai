@@ -380,6 +380,11 @@ def mock_repository() -> AsyncMock:
     repository.search_sessions_with_kernels_and_user = AsyncMock(
         return_value=SessionsForStartWithImages(sessions=[], image_configs={})
     )
+    # Every session asked for is claimed, as when no other START pass races for it.
+    repository.claim_sessions_for_start = AsyncMock(
+        side_effect=lambda session_ids, _reason: set(session_ids)
+    )
+    repository.release_sessions_for_start = AsyncMock(return_value=0)
     repository.get_terminating_sessions_by_ids = AsyncMock(return_value=[])
     repository.reset_kernels_to_pending_for_sessions = AsyncMock(return_value=0)
     repository.get_resource_group_preemption_mode = AsyncMock(return_value=PreemptionMode.TERMINATE)
