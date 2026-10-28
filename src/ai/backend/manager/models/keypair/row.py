@@ -4,7 +4,7 @@ import base64
 import secrets
 from collections.abc import Sequence
 from datetime import datetime
-from typing import TYPE_CHECKING, Final, TypedDict
+from typing import TYPE_CHECKING, Final
 
 import sqlalchemy as sa
 from cryptography.hazmat.backends import default_backend as crypto_default_backend
@@ -28,13 +28,10 @@ from ai.backend.manager.secret.types import SecretValue
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.resource_group.row import ResourceGroupForKeypairsRow
-    from ai.backend.manager.models.resource_policy.row import KeyPairResourcePolicyRow
-    from ai.backend.manager.models.user.row import UserRow
 
 __all__: Sequence[str] = (
     "KEYPAIR_SECRET_KEY_CONTEXT",
     "MAXIMUM_DOTFILE_SIZE",
-    "Dotfile",
     "KeyPairRow",
     "keypairs",
 )
@@ -100,24 +97,14 @@ class KeyPairRow(LifecycleTimestampsMixin, Base):
     )
 
     # Relationships
-    resource_policy_row: Mapped[KeyPairResourcePolicyRow] = relationship("KeyPairResourcePolicyRow")
     sgroup_for_keypairs_rows: Mapped[list[ResourceGroupForKeypairsRow]] = relationship(
         "ResourceGroupForKeypairsRow",
-    )
-    user_row: Mapped[UserRow] = relationship(
-        "UserRow", back_populates="keypairs", foreign_keys=[user]
     )
 
 
 # NOTE: Deprecated legacy table reference for backward compatibility.
 # Use KeyPairRow class directly for new code.
 keypairs = KeyPairRow.__table__
-
-
-class Dotfile(TypedDict):
-    data: str
-    path: str
-    perm: str
 
 
 def generate_keypair() -> tuple[AccessKey, SecretKey]:
