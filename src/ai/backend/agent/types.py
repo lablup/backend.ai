@@ -9,7 +9,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast, override
+from typing import TYPE_CHECKING, Any, cast, final, override
 
 import attrs
 from aiohttp.typedefs import Middleware
@@ -38,6 +38,10 @@ class AgentBackend(enum.StrEnum):
     DOCKER = "docker"
     KUBERNETES = "kubernetes"
     DUMMY = "dummy"
+
+
+# The message of the cancellation that a destroy sends to the creation of the same kernel.
+CREATION_DESTROYED_MESSAGE = "kernel destroyed during creation"
 
 
 class AbstractAgentDiscovery(ABC):
@@ -166,6 +170,13 @@ class LifecycleEvent(enum.IntEnum):
     START = 2
 
 
+@final
+class CreationAttempt:
+    """Identifies one attempt to create a kernel, by object identity."""
+
+    __slots__ = ()
+
+
 @attrs.define(auto_attribs=True, slots=True)
 class ContainerLifecycleEvent:
     kernel_id: KernelId
@@ -176,6 +187,8 @@ class ContainerLifecycleEvent:
     done_future: asyncio.Future[Any] | None = None
     exit_code: int | None = None
     suppress_events: bool = False
+    # Set by a report of a failed creation, dropped when a newer attempt for the kernel started.
+    create_attempt: CreationAttempt | None = None
 
     @override
     def __str__(self) -> str:

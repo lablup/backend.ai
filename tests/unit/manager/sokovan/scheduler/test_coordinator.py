@@ -1710,14 +1710,17 @@ class TestScheduleCoordinatorConcurrentStart:
         slow_create_entered = asyncio.Event()
         slow_create_released = asyncio.Event()
 
-        async def start_sessions(*_: Any) -> None:
+        async def start_sessions(*_: Any) -> list[SessionId]:
             if not slow_create_entered.is_set():
                 slow_create_entered.set()
                 await slow_create_released.wait()
+            return []
 
         launcher = AsyncMock()
         launcher.start_sessions_for_handler.side_effect = start_sessions
-        handler = StartSessionsLifecycleHandler(launcher=launcher, repository=repository)
+        handler = StartSessionsLifecycleHandler(
+            launcher=launcher, repository=repository, scheduling_controller=AsyncMock()
+        )
         sessions_per_pass = [
             [_create_session_with_kernels(SessionId(uuid4()), status=SessionStatus.PREPARED)],
             [_create_session_with_kernels(SessionId(uuid4()), status=SessionStatus.PREPARED)],

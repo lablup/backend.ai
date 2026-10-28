@@ -1168,7 +1168,11 @@ class KubernetesAgent(
     ) -> None:
         if not restarting:
             scratch_dir = self.local_config.container.scratch_root / str(kernel_id)
-            await run_in_executor_with_context(None, shutil.rmtree, str(scratch_dir))
+            try:
+                await run_in_executor_with_context(None, shutil.rmtree, str(scratch_dir))
+            except FileNotFoundError:
+                # A creation cancelled before its scratch was prepared leaves none.
+                pass
 
     @override
     async def create_local_network(self, network_name: str) -> None:

@@ -24,10 +24,11 @@ from ai.backend.common.types import (
     SessionId,
 )
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.kernel import SessionNotFound
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.registry import AgentRegistry, _session_terminated_error
 
 
 class DummyEtcd:
@@ -381,3 +382,235 @@ class TestWaitForSessionRunning:
                 await mock_registry_obj._wait_for_session_running(
                     session_id, mock_propagator, max_wait=0
                 )
+
+    async def test_terminated_event_raises_error_with_stored_reason(
+        self,
+        session_id: SessionId,
+        mock_propagator: MagicMock,
+        mock_registry_obj: MagicMock,
+    ) -> None:
+        """A TERMINATED event should raise SessionNotFound naming the stored error."""
+
+        async def _yield_terminated(cache_id: str) -> AsyncIterator[AbstractEvent]:
+            yield _make_scheduling_event(session_id, str(SessionStatus.TERMINATED))
+
+        mock_propagator.receive = _yield_terminated
+        mock_db_session = AsyncMock()
+        mock_db_session.scalar = AsyncMock(
+            return_value={"error": {"error": {"name": "ContainerCreationError", "repr": "boom"}}}
+        )
+        mock_db_ctx = MagicMock()
+        mock_db_ctx.__aenter__ = AsyncMock(return_value=mock_db_session)
+        mock_db_ctx.__aexit__ = AsyncMock(return_value=False)
+        mock_registry_obj.db = MagicMock()
+        mock_registry_obj.db.begin_readonly_session = MagicMock(return_value=mock_db_ctx)
+
+        with pytest.raises(SessionNotFound) as exc_info:
+            await mock_registry_obj._wait_for_session_running(
+                session_id, mock_propagator, max_wait=15
+            )
+        assert exc_info.value.extra_msg == (
+            "Session terminated during scheduling: ContainerCreationError: boom"
+        )
+
+    async def test_max_wait_zero_db_terminated_raises_error_with_stored_reason(
+        self,
+        session_id: SessionId,
+        mock_propagator: MagicMock,
+        mock_registry_obj: MagicMock,
+    ) -> None:
+        """max_wait=0 timeout + TERMINATED in DB should raise SessionNotFound naming the error."""
+
+        async def _hang(cache_id: str) -> AsyncIterator[AbstractEvent]:
+            await asyncio.Event().wait()
+            yield  # type: ignore[misc]
+
+        mock_propagator.receive = _hang
+
+        mock_db_session = AsyncMock()
+        mock_result = MagicMock()
+        mock_row = MagicMock()
+        mock_row.status = SessionStatus.TERMINATED
+        mock_row.status_data = {
+            "error": {"error": {"name": "ContainerCreationError", "repr": "boom"}}
+        }
+        mock_result.first.return_value = mock_row
+        mock_db_session.execute = AsyncMock(return_value=mock_result)
+        mock_db_ctx = MagicMock()
+        mock_db_ctx.__aenter__ = AsyncMock(return_value=mock_db_session)
+        mock_db_ctx.__aexit__ = AsyncMock(return_value=False)
+        mock_registry_obj.db = MagicMock()
+        mock_registry_obj.db.begin_readonly_session = MagicMock(return_value=mock_db_ctx)
+
+        with patch("ai.backend.manager.registry.DEFAULT_WAIT_TIMEOUT_SECONDS", 1):
+            with pytest.raises(SessionNotFound) as exc_info:
+                await mock_registry_obj._wait_for_session_running(
+                    session_id, mock_propagator, max_wait=0
+                )
+        assert exc_info.value.extra_msg == (
+            "Session terminated during scheduling: ContainerCreationError: boom"
+        )
+
+
+class TestSessionTerminatedError:
+    """Tests for the message of the error raised when a session terminates before it runs."""
+
+    @pytest.mark.parametrize(
+        ("status_data", "expected"),
+        [
+            (
+                {"error": {"src": "agent", "name": "ContainerCreationError", "repr": "boom"}},
+                "Session terminated during scheduling: ContainerCreationError: boom",
+            ),
+            (
+                {"error": {"name": "ImageNotAvailable", "repr": "ImageNotAvailable('x')"}},
+                "Session terminated during scheduling: ImageNotAvailable('x')",
+            ),
+            (
+                {"error": {"name": "ContainerCreationError"}},
+                "Session terminated during scheduling: ContainerCreationError",
+            ),
+            (
+                {
+                    "error": {
+                        "error": {"src": "agent", "name": "ContainerCreationError", "repr": "boom"}
+                    }
+                },
+                "Session terminated during scheduling: ContainerCreationError: boom",
+            ),
+            (
+                {
+                    "error": {
+                        "error": {
+                            "name": "MultiAgentError",
+                            "repr": "MultiAgentError(2)",
+                            "collection": [
+                                {"name": "ImageNotAvailable", "repr": "ImageNotAvailable('x')"},
+                                {"name": "ResourceError", "repr": "ResourceError()"},
+                            ],
+                        }
+                    }
+                },
+                "Session terminated during scheduling: ImageNotAvailable('x') (+1 more)",
+            ),
+            (
+                {"error": {"name": "ContainerCreationError", "repr": "line1\nline2\n  line3"}},
+                "Session terminated during scheduling: ContainerCreationError: line1 line2 line3",
+            ),
+            ({}, "Session terminated during scheduling"),
+            (None, "Session terminated during scheduling"),
+        ],
+        ids=[
+            "name-and-repr",
+            "repr-starts-with-name",
+            "name-only",
+            "nested",
+            "multi-agent",
+            "newlines-collapsed",
+            "no-error",
+            "no-status-data",
+        ],
+    )
+    def test_message_names_stored_error(
+        self, status_data: dict[str, Any] | None, expected: str
+    ) -> None:
+        err = _session_terminated_error(status_data)
+        assert isinstance(err, SessionNotFound)
+        assert err.extra_msg == expected
+
+    def test_long_reason_is_truncated(self) -> None:
+        err = _session_terminated_error({"error": {"name": "E", "repr": "x" * 2000}})
+        assert err.extra_msg is not None
+        reason = err.extra_msg.removeprefix("Session terminated during scheduling: ")
+        assert len(reason) == 512
+        assert reason.endswith("\u2026")
+
+    def test_traceback_is_never_included(self) -> None:
+        err = _session_terminated_error({
+            "error": {"name": "E", "repr": "boom", "traceback": "secret-tb", "agent_id": "i-a"}
+        })
+        assert err.extra_msg is not None
+        assert "secret-tb" not in err.extra_msg
+        assert "i-a" not in err.extra_msg
+
+
+class TestReadCreatedSession:
+    """Tests for the result of a blocking create once the session has reached RUNNING."""
+
+    @pytest.fixture
+    def session_id(self) -> SessionId:
+        return SessionId(uuid.uuid4())
+
+    def _make_registry(
+        self,
+        kernel_status: KernelStatus,
+        status_data: dict[str, Any] | None,
+        service_ports: list[dict[str, Any]] | None = None,
+    ) -> MagicMock:
+        registry = MagicMock(spec=AgentRegistry)
+        registry._read_created_session = AgentRegistry._read_created_session.__get__(
+            registry, AgentRegistry
+        )
+        mock_row = MagicMock()
+        mock_row.status = kernel_status
+        mock_row.status_data = status_data
+        mock_row.service_ports = service_ports or []
+        mock_result = MagicMock()
+        mock_result.first.return_value = mock_row
+        mock_db_session = AsyncMock()
+        mock_db_session.execute = AsyncMock(return_value=mock_result)
+        mock_db_ctx = MagicMock()
+        mock_db_ctx.__aenter__ = AsyncMock(return_value=mock_db_session)
+        mock_db_ctx.__aexit__ = AsyncMock(return_value=False)
+        registry.db = MagicMock()
+        registry.db.begin_readonly_session = MagicMock(return_value=mock_db_ctx)
+        return registry
+
+    async def test_kernel_failed_to_start_with_stored_error_raises_error_naming_it(
+        self, session_id: SessionId
+    ) -> None:
+        registry = self._make_registry(
+            KernelStatus.TERMINATED,
+            {"error": {"error": {"name": "SessionMismatch", "repr": "refused"}}},
+        )
+        with patch("ai.backend.manager.registry.asyncio.sleep", AsyncMock()):
+            with pytest.raises(SessionNotFound) as exc_info:
+                await registry._read_created_session(session_id, {"servicePorts": []})
+        assert exc_info.value.extra_msg == (
+            "Session terminated during startup: SessionMismatch: refused"
+        )
+
+    async def test_kernel_ended_without_stored_error_reports_status(
+        self, session_id: SessionId
+    ) -> None:
+        registry = self._make_registry(KernelStatus.TERMINATED, {})
+        resp: dict[str, Any] = {"servicePorts": []}
+        with patch("ai.backend.manager.registry.asyncio.sleep", AsyncMock()):
+            await registry._read_created_session(session_id, resp)
+        assert resp["status"] == "TERMINATED"
+
+    async def test_running_kernel_reports_service_ports(self, session_id: SessionId) -> None:
+        registry = self._make_registry(
+            KernelStatus.RUNNING,
+            {"error": {"name": "Leftover", "repr": "from a retry"}},
+            [
+                {
+                    "name": "http",
+                    "protocol": "http",
+                    "container_ports": [8000],
+                    "url_template": "http://x",
+                }
+            ],
+        )
+        resp: dict[str, Any] = {"servicePorts": []}
+        with patch("ai.backend.manager.registry.asyncio.sleep", AsyncMock()):
+            await registry._read_created_session(session_id, resp)
+        assert resp["status"] == "RUNNING"
+        assert resp["servicePorts"] == [
+            {
+                "name": "http",
+                "protocol": "http",
+                "ports": [8000],
+                "url_template": "http://x",
+            }
+        ]

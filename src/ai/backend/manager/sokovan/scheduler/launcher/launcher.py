@@ -33,7 +33,6 @@ from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import normalize_newlines
-from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
 from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
@@ -184,7 +183,7 @@ class SessionLauncher:
         self,
         sessions: list[SessionDataForStart],
         image_configs: dict[UUID, ImageConfigData],
-    ) -> None:
+    ) -> list[SessionId]:
         """
         Start sessions on agents for the given sessions.
 
@@ -196,6 +195,7 @@ class SessionLauncher:
 
         :param sessions: List of sessions with full data for starting
         :param image_configs: Image configurations indexed by image ID
+        :return: IDs of sessions whose start timed out; the handler terminates them
         """
         with RecorderContext[SessionId].shared_phase(
             "trigger_kernel_creation",
@@ -205,21 +205,22 @@ class SessionLauncher:
                 "create_kernels",
                 success_detail="Kernel creation requested",
             ):
-                await self._start_sessions_concurrently(sessions, image_configs)
+                return await self._start_sessions_concurrently(sessions, image_configs)
 
     async def _start_sessions_concurrently(
         self,
         sessions: list[SessionDataForStart],
         image_configs: dict[UUID, ImageConfigData],
-    ) -> None:
+    ) -> list[SessionId]:
         """
         Start multiple sessions concurrently with individual timeouts.
 
         :param sessions: List of sessions to start
         :param image_configs: Image configurations indexed by image ID
+        :return: IDs of sessions whose start timed out
         """
         if not sessions:
-            return
+            return []
         system_session_environ_by_session = await self._system_session_environ_repository.resolve(
             sessions,
             SystemSessionEnvironSearcher(
@@ -229,25 +230,62 @@ class SessionLauncher:
         )
 
         async def start_with_timeout(session: SessionDataForStart) -> None:
+            start_timeout = self._config_provider.config.session.start_timeout
             with with_log_context(session_id=session.session_id):
-                async with async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC):
-                    await self._start_single_session(
-                        session,
-                        image_configs,
-                        system_session_environ_by_session[session.session_id],
-                    )
+                try:
+                    async with async_timeout.timeout(delay=start_timeout):
+                        await self._start_single_session(
+                            session,
+                            image_configs,
+                            system_session_environ_by_session[session.session_id],
+                        )
+                except TimeoutError:
+                    await self._record_start_timeout(session, start_timeout)
+                    raise
 
         results = await asyncio.gather(
             *[start_with_timeout(session) for session in sessions],
             return_exceptions=True,
         )
+        timed_out: list[SessionId] = []
         for session, result in zip(sessions, results, strict=True):
-            if isinstance(result, BaseException):
+            if isinstance(result, TimeoutError):
+                log.warning(
+                    "session start timed out",
+                    session_id=session.session_id,
+                    exc_info=result,
+                )
+                timed_out.append(session.session_id)
+            elif isinstance(result, BaseException):
                 log.warning(
                     "session start failed with unhandled exception",
                     session_id=session.session_id,
                     exc_info=result,
                 )
+        return timed_out
+
+    async def _record_start_timeout(
+        self,
+        session: SessionDataForStart,
+        start_timeout: float,
+    ) -> None:
+        """Record the start timeout in the session's status_data.
+
+        The handler terminates the session; a start timeout is not retried.
+        """
+        try:
+            error_info = convert_to_status_data(
+                TimeoutError(f"session start timed out after {start_timeout} seconds"),
+                self._config_provider.config.debug.enabled,
+            )
+            await self._scheduler_repository.update_session_error_info(
+                session.session_id, error_info
+            )
+        except Exception:
+            log.exception(
+                "failed to record session start timeout",
+                start_timeout=start_timeout,
+            )
 
     async def _start_single_session(
         self,
@@ -437,10 +475,12 @@ class SessionLauncher:
             if create_tasks:
                 results = await asyncio.gather(*create_tasks, return_exceptions=True)
                 failed_agent_ids: list[AgentId] = []
+                first_failure: BaseException | None = None
                 for aid, result in zip(agent_ids_ordered, results, strict=True):
                     if isinstance(result, BaseException):
                         log.error("kernel creation failed on agent", agent_id=aid, exc_info=result)
                         failed_agent_ids.append(aid)
+                        first_failure = first_failure or result
                 if failed_agent_ids:
                     try:
                         await self._valkey_schedule.record_session_failed_agents(
@@ -448,6 +488,17 @@ class SessionLauncher:
                         )
                     except Exception:
                         log.warning("failed agents not recorded in Valkey", exc_info=True)
+                if first_failure is not None:
+                    # Keep the agent's reason on the session for the client.
+                    try:
+                        await self._scheduler_repository.update_session_error_info(
+                            session.session_id,
+                            convert_to_status_data(
+                                first_failure, self._config_provider.config.debug.enabled
+                            ),
+                        )
+                    except Exception:
+                        log.warning("agent failure not recorded on the session", exc_info=True)
 
             log.trace(
                 "session started",
