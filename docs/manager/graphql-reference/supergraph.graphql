@@ -5574,6 +5574,35 @@ enum CreateSessionType
   BATCH @join__enumValue(graph: STRAWBERRY)
 }
 
+"""
+Added in 26.10.0. Input for binding a value source to an environment variable name at one scope.
+"""
+input CreateSystemSessionEnvironInput
+  @join__type(graph: STRAWBERRY)
+{
+  """The environment variable name the value is injected under."""
+  key: String!
+
+  """
+  Which value of the starting session is injected, as a value source name systemSessionEnvironValueSources lists.
+  """
+  valueSource: String!
+
+  """Whether the row applies to every session, a domain's or a project's."""
+  scopeType: SystemSessionEnvironScopeType!
+
+  """The id of the domain or the project. Left out for public."""
+  scopeId: UUID = null
+}
+
+"""Added in 26.10.0. Payload for a system session environ row create."""
+type CreateSystemSessionEnvironPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The created row."""
+  systemSessionEnviron: SystemSessionEnviron!
+}
+
 """Added in 26.4.2. Input for creating a file upload session."""
 input CreateUploadSessionV2Input
   @join__type(graph: STRAWBERRY)
@@ -15446,6 +15475,11 @@ type Mutation
   updateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayload! @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.10.0. Bind a value source to an environment variable name at the public scope, a domain or a project.
+  """
+  createSystemSessionEnviron(input: CreateSystemSessionEnvironInput!): CreateSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.10.0. Change a system session environ row's key. Only provided fields are updated.
   """
   updateSystemSessionEnviron(id: UUID!, input: UpdateSystemSessionEnvironInput!): UpdateSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
@@ -15455,6 +15489,11 @@ type Mutation
 
   """Added in 26.10.0. Restore a soft-deleted system session environ row."""
   restoreSystemSessionEnviron(id: UUID!): RestoreSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Remove a system session environ row for good, soft-deleted or not.
+  """
+  purgeSystemSessionEnviron(id: UUID!): PurgeSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 26.10.0. Purge a runtime variant with the presets in its catalog.
@@ -19991,6 +20030,17 @@ type PurgeStorageVolumePayload
   purgedId: ID!
 
   """UUID of the purged storage volume."""
+  entityId: UUID!
+}
+
+"""Added in 26.10.0. Payload for a system session environ row purge."""
+type PurgeSystemSessionEnvironPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """Global ID of the purged row."""
+  purgedId: ID!
+
+  """The id of the purged row."""
   entityId: UUID!
 }
 

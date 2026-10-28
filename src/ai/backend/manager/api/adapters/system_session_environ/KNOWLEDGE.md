@@ -1,15 +1,15 @@
 ---
 name: system-session-environ-adapter-scenarios
 type: reference
-description: what the system session environ adapter guarantees, as scenarios; superadmin search of every row at every scope with filters, the default order and pages, the monitor role passing the search, the value source list any logged-in user reads and a call without login is refused, the update of the key by the scope's admins and its refusal on a deleted row, the soft delete and the restore by the scope's admins, the read by ids checked per row against the public, domain and project member grants
+description: what the system session environ adapter guarantees, as scenarios; superadmin search of every row at every scope with filters, the default order and pages, the monitor role passing the search, the value source list any logged-in user reads and a call without login is refused, the create at a scope by its admins and its refusals, the update of the key by the scope's admins and its refusal on a deleted row, the soft delete, the restore and the purge by the scope's admins, the read by ids checked per row against the public, domain and project member grants
 scope: src/ai/backend/manager/api/adapters/system_session_environ
-keywords: [system session environ, scenario, adapter, superadmin, monitor, global_search, public_list_value_sources, update, delete, restore, bulk_get_ids, partial bulk]
+keywords: [system session environ, scenario, adapter, superadmin, monitor, global_search, public_list_value_sources, create, update, delete, restore, purge, bulk_get_ids, partial bulk]
 generated:
   by: claude-code/opus-5.5
   at: 2026-10-23
 updated:
   by: claude-code/opus-5.5
-  at: 2026-10-27
+  at: 2026-10-28
 status: draft
 ---
 # 시스템 세션 환경변수 어댑터 — 시나리오
@@ -18,8 +18,8 @@ status: draft
 의심한다.
 
 시스템 세션 환경변수 행은 public 스코프, 도메인 스코프, 프로젝트 스코프 중 하나에 만들어진다.
-이 어댑터는 모든 행을 검색하는 호출, 값 출처 목록을 읽는 호출, 행의 키를 바꾸는 호출, 행을 삭제하고
-복원하는 호출, id로 여러 행을 읽는 호출을 제공한다.
+이 어댑터는 모든 행을 검색하는 호출, 값 출처 목록을 읽는 호출, 행을 만드는 호출, 행의 키를 바꾸는 호출,
+행을 삭제하고 복원하는 호출, 행을 영구 삭제하는 호출, id로 여러 행을 읽는 호출을 제공한다.
 
 검색은 전역 superadmin 역할 검사로 보호된다. 세션에 실제로 주입되는 행을 고르지 않고, 스코프와
 삭제 여부에 상관없이 조건에 맞는 행을 모두 반환한다.
@@ -55,6 +55,26 @@ id로 여러 행을 읽을 때는 행마다 권한을 검사한다. 모든 사�
 
 값 출처는 행이 아니라 매니저가 제공하는 목록이므로 로그인 여부만 확인하고 반환된다. 행의 값 출처는 이 목록의
 이름으로 반환되고, 검색 조건에도 이 이름을 쓴다.
+
+## 생성
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 프로젝트 관리자가 자기 프로젝트에 행을 만든다 | 한 프로젝트의 관리자 | 그 프로젝트 스코프에 키와 값 출처를 지정해 생성 | 그 프로젝트 스코프의 행이 반환되고, 그 프로젝트의 구성원이 id로 읽을 수 있다 |
+| 프로젝트 구성원이 자기 프로젝트에 행을 만든다 | 관리자가 아닌 한 프로젝트의 구성원 | 그 프로젝트 스코프에 생성 | 권한 부족으로 거부 |
+| 도메인 관리자가 자기 도메인에 행을 만든다 | 한 도메인의 관리자 | 그 도메인 스코프에 생성 | 그 도메인 스코프의 행이 반환된다 |
+| 도메인 관리자가 다른 도메인에 행을 만든다 | 두 도메인, 한 도메인의 관리자 | 다른 도메인 스코프에 생성 | 권한 부족으로 거부 |
+| 도메인 관리자가 public 스코프에 행을 만든다 | 한 도메인의 관리자 | public 스코프에 생성 | 권한 부족으로 거부 |
+| superadmin이 public 스코프에 행을 만든다 | superadmin | 스코프 id 없이 public 스코프에 생성 | public 스코프의 행이 반환되고, 어느 도메인과 프로젝트의 권한도 받지 않은 사용자가 id로 읽을 수 있다 |
+| 같은 스코프에 이미 있는 키로 만든다 | 한 프로젝트에 행 하나를 미리 만들어 둠, superadmin | 그 프로젝트 스코프에 같은 키로 생성 | 키 충돌로 거부 |
+| 같은 스코프의 삭제된 행의 키로 만든다 | 한 프로젝트에 삭제된 행 하나를 미리 만들어 둠, superadmin | 그 프로젝트 스코프에 같은 키로 생성 | 키 충돌로 거부 |
+| 다른 스코프에 있는 키로 만든다 | public 스코프에 행 하나를 미리 만들어 둠, superadmin | 한 프로젝트 스코프에 같은 키로 생성 | 그 프로젝트 스코프의 행이 반환된다 |
+| 환경변수 이름이 아닌 키로 만든다 | superadmin | 숫자로 시작하는 키로 생성 | 요청 검증에서 거부 |
+| 없는 값 출처로 만든다 | superadmin | 매니저가 제공하지 않는 값 출처 이름으로 생성 | 알 수 없는 값 출처로 거부 |
+| public 스코프에 스코프 id를 지정한다 | superadmin | public 스코프와 스코프 id를 함께 지정해 생성 | 요청 검증에서 거부 |
+| 도메인 스코프에 스코프 id를 지정하지 않는다 | superadmin | 도메인 스코프에 스코프 id 없이 생성 | 요청 검증에서 거부 |
+| 없는 도메인에 만든다 | superadmin | 어느 도메인의 것도 아닌 id로 도메인 스코프에 생성 | 도메인 없음으로 거부 |
+| 없는 프로젝트에 만든다 | superadmin | 어느 프로젝트의 것도 아닌 id로 프로젝트 스코프에 생성 | 프로젝트 없음으로 거부 |
 
 ## 수정
 
@@ -94,6 +114,16 @@ id로 여러 행을 읽을 때는 행마다 권한을 검사한다. 모든 사�
 | 프로젝트 관리자가 자기 프로젝트의 삭제된 행을 복원한다 | 한 프로젝트에 삭제된 행 하나를 미리 만들어 둠, 그 프로젝트의 관리자 | 그 행을 복원 | 삭제 시각이 비워진 행이 반환된다 |
 | 프로젝트 구성원이 자기 프로젝트의 삭제된 행을 복원한다 | 한 프로젝트에 삭제된 행 하나를 미리 만들어 둠, 관리자가 아닌 그 프로젝트의 구성원 | 그 행을 복원 | 권한 부족으로 거부 |
 
+## 영구 삭제
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 프로젝트 관리자가 자기 프로젝트의 행을 영구 삭제한다 | 한 프로젝트에 행 하나를 미리 만들어 둠, 그 프로젝트의 관리자 | 그 행을 영구 삭제 | 그 행의 id가 반환되고, 그 id로 읽으면 빈 값 |
+| 프로젝트 구성원이 자기 프로젝트의 행을 영구 삭제한다 | 한 프로젝트에 행 하나를 미리 만들어 둠, 관리자가 아닌 그 프로젝트의 구성원 | 그 행을 영구 삭제 | 권한 부족으로 거부 |
+| 도메인 관리자가 public 스코프의 행을 영구 삭제한다 | public 스코프에 행 하나를 미리 만들어 둠, 한 도메인의 관리자 | 그 행을 영구 삭제 | 권한 부족으로 거부 |
+| superadmin이 삭제된 행을 영구 삭제한다 | 한 프로젝트에 삭제된 행 하나를 미리 만들어 둠, superadmin | 그 행을 영구 삭제 | 그 행의 id가 반환된다 |
+| 영구 삭제한 행의 키로 다시 만든다 | 한 프로젝트에 삭제된 행 하나를 미리 만들어 둠, superadmin | 그 행을 영구 삭제한 뒤 같은 스코프에 같은 키로 생성 | 새 행이 반환된다 |
+
 ## id로 여러 행 읽기
 
 | 시나리오 | 상황 | 요청 | 결과 |
@@ -113,6 +143,6 @@ id로 여러 행을 읽을 때는 행마다 권한을 검사한다. 모든 사�
 
 ## 아직 적지 않은 것
 
-없다. 어댑터가 제공하는 전체 검색, 값 출처 목록, 수정, 삭제, 복원, id로 여러 행 읽기가 모두 위에 있다.
+없다. 어댑터가 제공하는 전체 검색, 값 출처 목록, 생성, 수정, 삭제, 복원, 영구 삭제, id로 여러 행 읽기가 모두 위에 있다.
 
 모든 어댑터가 물려받는 공용 도우미는 이 엔티티의 호출이 아니므로 적을 시나리오가 없다.
