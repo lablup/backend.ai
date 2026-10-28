@@ -15,6 +15,7 @@ sources:
   - src/ai/backend/manager/models/user
   - src/ai/backend/manager/models/bootstrap_script
   - src/ai/backend/manager/models/bootstrap_script_revision
+  - src/ai/backend/manager/services/user/bootstrap_script
 generated:
   by: claude-code/opus-5
   at: 2026-08-19
@@ -39,6 +40,16 @@ row is a change to that user.
 - `bootstrap_scripts` holds scripts per `(entity_type, entity_id)`; at most one live script (`deleted_at IS NULL`) per entity is `is_default`.
 - A script's content lives in `bootstrap_script_revisions`, which only ever gain rows: an update appends the next `revision_number` with the requester as `creator_id`, and the latest revision is the current content.
 - The API and session creation use the latest revision of the user's live default script. Reading one that is missing answers an empty script; updating it answers not found.
+- `processors.bootstrap_script` is a field group of the user: a script named by id reads its user through the owner lookup, and that user answers for the operation. A script set on another kind of entity resolves to no owner, so it is not found here. A deleted script is read and purged like a live one; switch-default and add-revision answer not found for it.
+
+| Operation | Rule | Why |
+|---|---|---|
+| create | Always non-default, with revision 1 in the same transaction | The default moves only through switch-default |
+| add-revision | Appends the next revision to a live script, default or not; the creator's precondition refuses a deleted one | Revisions only ever gain rows |
+| switch-default | Clears the old mark, then sets the new one, in one transaction | The partial unique index allows one default per user |
+| purge | Refused on the default; its revisions go by cascade | Same as the default keypair: switch the default first |
+| unset default | Not offered | Same as the default keypair |
+
 - `dotfiles` stores one file per row with `entity_type`, `entity_id`, `path`, `perm`, `data`, and `is_default`. Each entity has at most one default row per path; user APIs and sessions use these rows.
 - `(entity_type, entity_id)` references `virtual_entities` with `ON DELETE CASCADE`. Creating for an entity with no node fails, and a row created while its owner is purged goes with the node.
 - Project and domain dotfiles remain in their existing columns.

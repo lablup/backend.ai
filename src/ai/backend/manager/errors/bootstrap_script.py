@@ -28,3 +28,14 @@ class BootstrapScriptNotFound(FieldError, web.HTTPNotFound):
         return FieldErrorCode(
             BootstrapScriptFieldType(), ActionOperationType.CREATE, ErrorDetail.NOT_FOUND
         )
+
+
+class DefaultBootstrapScriptPurgeForbidden(FieldError, web.HTTPForbidden):
+    error_type = "https://api.backend.ai/probs/default-bootstrap-script-purge-forbidden"
+    error_title = "The default bootstrap script cannot be purged."
+
+    @override
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            BootstrapScriptFieldType(), ActionOperationType.UPDATE, ErrorDetail.FORBIDDEN
+        )
