@@ -96,6 +96,7 @@ from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountID
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType, VFSStorageID
+from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.types import AgentId
 
@@ -466,6 +467,19 @@ class DataLoaders:
 
         async def load_fn(ids: list[VFolderUUID]) -> list[list[PermissionBitDTO] | Exception]:
             return await adapter.batch_load_permissions(ids)
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def vfolder_mount_permission_loader(
+        self,
+    ) -> DataLoader[VFolderUUID, VFolderPermissionField | None]:
+        adapter = self._adapters.vfolder
+
+        async def load_fn(
+            ids: list[VFolderUUID],
+        ) -> list[VFolderPermissionField | Exception | None]:
+            return await adapter.batch_load_mount_permissions(ids)
 
         return DataLoader(load_fn=load_fn)
 
