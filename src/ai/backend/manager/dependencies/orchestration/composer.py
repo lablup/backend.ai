@@ -12,6 +12,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.dependencies import DependencyComposer, DependencyStack
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.leader import ValkeyLeaderElection
+from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.service_discovery.service_discovery import ServiceDiscovery
 from ai.backend.common.types import ValkeyProfileTarget
 from ai.backend.manager.clients.agent.pool import AgentClientPool
@@ -84,6 +85,7 @@ class OrchestrationInput:
     agent_client_pool: AgentClientPool
     appproxy_client_pool: AppProxyClientPool
     network_plugin_ctx: NetworkPluginContext
+    hook_plugin_ctx: HookPluginContext
     agent_selector: AgentSelector
     scheduling_controller: SchedulingController
     deployment_controller: DeploymentController
@@ -168,6 +170,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             agent_client_pool=setup_input.agent_client_pool,
             appproxy_client_pool=setup_input.appproxy_client_pool,
             network_plugin_ctx=setup_input.network_plugin_ctx,
+            hook_plugin_ctx=setup_input.hook_plugin_ctx,
             event_producer=setup_input.event_producer,
             valkey_schedule=setup_input.valkey_schedule,
             valkey_live=setup_input.valkey_live,

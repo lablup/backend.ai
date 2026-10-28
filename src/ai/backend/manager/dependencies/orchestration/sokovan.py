@@ -15,6 +15,7 @@ from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeySchedu
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.service_discovery.service_discovery import ServiceDiscovery
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.agent.pool import AgentClientPool
@@ -78,6 +79,7 @@ class SokovanOrchestratorInput:
     agent_client_pool: AgentClientPool
     appproxy_client_pool: AppProxyClientPool
     network_plugin_ctx: NetworkPluginContext
+    hook_plugin_ctx: HookPluginContext
     event_producer: EventProducer
     valkey_schedule: ValkeyScheduleClient
     valkey_live: ValkeyLiveClient
@@ -135,6 +137,7 @@ class SokovanOrchestratorDependency(
             setup_input.config_provider,
             setup_input.agent_client_pool,
             setup_input.network_plugin_ctx,
+            setup_input.hook_plugin_ctx,
             setup_input.valkey_schedule,
             setup_input.agent_selector,
         )

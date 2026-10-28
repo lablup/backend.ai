@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
+from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.plugin.network import NetworkPluginContext
@@ -108,6 +109,7 @@ def create_default_scheduler_components(
     config_provider: ManagerConfigProvider,
     agent_client_pool: AgentClientPool,
     network_plugin_ctx: NetworkPluginContext,
+    hook_plugin_ctx: HookPluginContext,
     valkey_schedule: ValkeyScheduleClient,
     agent_selector: AgentSelector,
 ) -> SchedulerComponents:
@@ -121,6 +123,7 @@ def create_default_scheduler_components(
         config_provider: The manager configuration provider
         agent_client_pool: Pool for managing agent clients
         network_plugin_ctx: Network plugin context for network management
+        hook_plugin_ctx: Hook plugin context for kernel creation hooks
         valkey_schedule: Valkey client for scheduling operations
         agent_selector: Agent selector shared with the scheduling controller
 
@@ -155,6 +158,7 @@ def create_default_scheduler_components(
             system_session_environ_repository=system_session_environ_repository,
             agent_client_pool=agent_client_pool,
             network_plugin_ctx=network_plugin_ctx,
+            hook_plugin_ctx=hook_plugin_ctx,
             config_provider=config_provider,
             valkey_schedule=valkey_schedule,
         )

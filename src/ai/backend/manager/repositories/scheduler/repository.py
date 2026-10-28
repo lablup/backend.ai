@@ -40,6 +40,7 @@ from ai.backend.common.types import (
     PreemptionMode,
     ResourceSlot,
     SessionId,
+    SlotName,
     VFolderMount,
     VFolderMountOptions,
     VFolderMountRequest,
@@ -730,6 +731,15 @@ class SchedulerRepository:
         :param access_keys: List of access keys whose related caches should be invalidated
         """
         await self._cache_source.invalidate_kernel_related_cache(access_keys)
+
+    @scheduler_repository_resilience.apply()
+    async def get_sealed_launch_slot_names(self) -> frozenset[SlotName]:
+        """
+        Fetch the slot types whose kernels are launched sealed, including disabled ones.
+
+        :return: Names of the slot types with ``sealed_launch`` set
+        """
+        return await self._db_source.get_sealed_launch_slot_names()
 
     @scheduler_repository_resilience.apply()
     async def get_attached_network(self, network_id: NetworkID) -> NetworkData:
