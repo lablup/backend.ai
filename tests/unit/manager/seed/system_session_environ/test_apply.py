@@ -42,26 +42,21 @@ class _ValueSourceAndDeleted:
     deleted: bool
 
 
-async def _rows_by_seed_key(
-    db: ExtendedAsyncSAEngine,
-) -> dict[str, set[_ValueSourceAndDeleted]]:
-    """The bindings under the key their seed item answers, with the public scope named."""
+async def _rows_by_seed_key(db: ExtendedAsyncSAEngine) -> dict[str, _ValueSourceAndDeleted]:
+    """Each binding by the key its seed item answers, with the public scope named."""
     public_id = global_entity_id(GlobalEntityName.PUBLIC)
-    rows_by_seed_key: dict[str, set[_ValueSourceAndDeleted]] = {}
     async with db.begin_readonly() as conn:
         rows = await conn.execute(sa.select(SystemSessionEnvironRow.__table__))
-        for row in rows:
-            seed_key = (
+        return {
+            (
                 f"{row.key}:{row.scope_type}"
                 if row.scope_id == public_id
                 else f"{row.key}:{row.scope_type}:{row.scope_id}"
+            ): _ValueSourceAndDeleted(
+                value_source=row.value_source, deleted=row.deleted_at is not None
             )
-            rows_by_seed_key.setdefault(seed_key, set()).add(
-                _ValueSourceAndDeleted(
-                    value_source=row.value_source, deleted=row.deleted_at is not None
-                )
-            )
-    return rows_by_seed_key
+            for row in rows
+        }
 
 
 async def _environ_ids_reached_from(
@@ -166,16 +161,12 @@ class TestApply:
             _DOMAIN_USER_EMAIL_SEED_KEY,
         ]
         assert await _rows_by_seed_key(db) == {
-            _PUBLIC_SESSION_ID_SEED_KEY: {
-                _ValueSourceAndDeleted(
-                    value_source=SystemSessionEnvironValueSource.SESSION_ID, deleted=False
-                )
-            },
-            _DOMAIN_USER_EMAIL_SEED_KEY: {
-                _ValueSourceAndDeleted(
-                    value_source=SystemSessionEnvironValueSource.USER_EMAIL, deleted=False
-                )
-            },
+            _PUBLIC_SESSION_ID_SEED_KEY: _ValueSourceAndDeleted(
+                value_source=SystemSessionEnvironValueSource.SESSION_ID, deleted=False
+            ),
+            _DOMAIN_USER_EMAIL_SEED_KEY: _ValueSourceAndDeleted(
+                value_source=SystemSessionEnvironValueSource.USER_EMAIL, deleted=False
+            ),
         }
 
     async def test_global_reaches_every_binding(
@@ -220,11 +211,9 @@ class TestApply:
             "exists",
             "exists",
         ]
-        assert (await _rows_by_seed_key(db))[_PUBLIC_SESSION_ID_SEED_KEY] == {
-            _ValueSourceAndDeleted(
-                value_source=SystemSessionEnvironValueSource.SESSION_ID, deleted=True
-            )
-        }
+        assert (await _rows_by_seed_key(db))[_PUBLIC_SESSION_ID_SEED_KEY] == _ValueSourceAndDeleted(
+            value_source=SystemSessionEnvironValueSource.SESSION_ID, deleted=True
+        )
 
     async def test_an_overwrite_replaces_the_source(
         self,
@@ -234,11 +223,9 @@ class TestApply:
     ) -> None:
         await SeedApplier(repository).apply(plan_rebinding_public_session_id, overwrite=True)
 
-        assert (await _rows_by_seed_key(db))[_PUBLIC_SESSION_ID_SEED_KEY] == {
-            _ValueSourceAndDeleted(
-                value_source=SystemSessionEnvironValueSource.SESSION_NAME, deleted=False
-            )
-        }
+        assert (await _rows_by_seed_key(db))[_PUBLIC_SESSION_ID_SEED_KEY] == _ValueSourceAndDeleted(
+            value_source=SystemSessionEnvironValueSource.SESSION_NAME, deleted=False
+        )
 
     async def test_an_overwrite_rewrites_a_deleted_binding_and_leaves_it_deleted(
         self,
@@ -249,11 +236,9 @@ class TestApply:
     ) -> None:
         await SeedApplier(repository).apply(plan_rebinding_public_session_id, overwrite=True)
 
-        assert (await _rows_by_seed_key(db))[_PUBLIC_SESSION_ID_SEED_KEY] == {
-            _ValueSourceAndDeleted(
-                value_source=SystemSessionEnvironValueSource.SESSION_NAME, deleted=True
-            )
-        }
+        assert (await _rows_by_seed_key(db))[_PUBLIC_SESSION_ID_SEED_KEY] == _ValueSourceAndDeleted(
+            value_source=SystemSessionEnvironValueSource.SESSION_NAME, deleted=True
+        )
 
     async def test_a_binding_the_migration_wrote_is_kept_and_placed_in_public(
         self,
