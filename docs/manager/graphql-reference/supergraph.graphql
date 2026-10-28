@@ -6677,6 +6677,16 @@ type DeleteStorageVolumePayload
 }
 
 """
+Added in 26.10.0. Payload for a system session environ row soft delete.
+"""
+type DeleteSystemSessionEnvironPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The soft-deleted row."""
+  systemSessionEnviron: SystemSessionEnviron!
+}
+
+"""
 Instead of really deleting user, just mark the account as deleted status.
 
 All related keypairs will also be inactivated.
@@ -15434,6 +15444,17 @@ type Mutation
   updateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayload! @join__field(graph: STRAWBERRY)
 
   """
+  Added in 26.10.0. Change a system session environ row's key. Only provided fields are updated.
+  """
+  updateSystemSessionEnviron(id: UUID!, input: UpdateSystemSessionEnvironInput!): UpdateSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Soft-delete a system session environ row."""
+  deleteSystemSessionEnviron(id: UUID!): DeleteSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
+
+  """Added in 26.10.0. Restore a soft-deleted system session environ row."""
+  restoreSystemSessionEnviron(id: UUID!): RestoreSystemSessionEnvironPayload @join__field(graph: STRAWBERRY)
+
+  """
   Added in 26.10.0. Purge a runtime variant with the presets in its catalog.
   """
   purgeRuntimeVariant(id: UUID!): PurgeRuntimeVariantPayload! @join__field(graph: STRAWBERRY)
@@ -23431,6 +23452,14 @@ type RestoreStorageVolumePayload
   item: StorageVolumeV2!
 }
 
+"""Added in 26.10.0. Payload for a system session environ row restore."""
+type RestoreSystemSessionEnvironPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The restored row."""
+  systemSessionEnviron: SystemSessionEnviron!
+}
+
 """Added in 26.9.0. Payload for single user restore mutation."""
 type RestoreUserV2Payload
   @join__type(graph: STRAWBERRY)
@@ -29344,6 +29373,24 @@ type UpdateStorageVolumePayload
 {
   """The updated storage volume."""
   item: StorageVolumeV2!
+}
+
+"""
+Added in 26.10.0. Input for changing a system session environ row's key.
+"""
+input UpdateSystemSessionEnvironInput
+  @join__type(graph: STRAWBERRY)
+{
+  """New environment variable name."""
+  key: String
+}
+
+"""Added in 26.10.0. Payload for a system session environ row update."""
+type UpdateSystemSessionEnvironPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """The updated row."""
+  systemSessionEnviron: SystemSessionEnviron!
 }
 
 """

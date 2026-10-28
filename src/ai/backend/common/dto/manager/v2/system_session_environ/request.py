@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
-from pydantic import Field
+from typing import Annotated
+
+from pydantic import Field, StringConstraints
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.environ.types import ENVIRON_KEY_PATTERN
 from ai.backend.common.dto.manager.query import (
     DateTimeFilter,
     EnumFilter,
@@ -17,6 +20,7 @@ from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironOrderField,
     SystemSessionEnvironScopeType,
 )
+from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchSystemSessionEnvironsInput",
@@ -24,6 +28,7 @@ __all__ = (
     "SystemSessionEnvironOrder",
     "SystemSessionEnvironScopeTypeFilter",
     "SystemSessionEnvironValueSourceFilter",
+    "UpdateSystemSessionEnvironInput",
 )
 
 
@@ -103,3 +108,13 @@ class AdminSearchSystemSessionEnvironsInput(BaseRequestModel):
     before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
     limit: int | None = Field(default=None, ge=1, description="Offset pagination: maximum items.")
     offset: int | None = Field(default=None, ge=0, description="Offset pagination: number to skip.")
+
+
+class UpdateSystemSessionEnvironInput(BaseRequestModel):
+    """Input for changing a system session environ row's key."""
+
+    key: (
+        Annotated[str, StringConstraints(max_length=256, pattern=ENVIRON_KEY_PATTERN)]
+        | None
+        | Unset
+    ) = Field(default=UNSET, description="New environment variable name. Omit to leave unchanged.")

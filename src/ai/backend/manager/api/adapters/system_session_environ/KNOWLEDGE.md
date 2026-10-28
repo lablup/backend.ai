@@ -1,9 +1,9 @@
 ---
 name: system-session-environ-adapter-scenarios
 type: reference
-description: what the system session environ adapter guarantees, as scenarios; superadmin search of every row at every scope with filters, the default order and pages, the monitor role passing the search, the value source list any logged-in user reads and a call without login is refused, the read by ids checked per row against the public, domain and project member grants
+description: what the system session environ adapter guarantees, as scenarios; superadmin search of every row at every scope with filters, the default order and pages, the monitor role passing the search, the value source list any logged-in user reads and a call without login is refused, the update of the key by the scope's admins and its refusal on a deleted row, the soft delete and the restore by the scope's admins, the read by ids checked per row against the public, domain and project member grants
 scope: src/ai/backend/manager/api/adapters/system_session_environ
-keywords: [system session environ, scenario, adapter, superadmin, monitor, global_search, public_list_value_sources, bulk_get_ids, partial bulk]
+keywords: [system session environ, scenario, adapter, superadmin, monitor, global_search, public_list_value_sources, update, delete, restore, bulk_get_ids, partial bulk]
 generated:
   by: claude-code/opus-5.5
   at: 2026-10-23
@@ -18,7 +18,8 @@ status: draft
 의심한다.
 
 시스템 세션 환경변수 행은 public 스코프, 도메인 스코프, 프로젝트 스코프 중 하나에 만들어진다.
-이 어댑터는 모든 행을 검색하는 호출, 값 출처 목록을 읽는 호출, id로 여러 행을 읽는 호출을 제공한다.
+이 어댑터는 모든 행을 검색하는 호출, 값 출처 목록을 읽는 호출, 행의 키를 바꾸는 호출, 행을 삭제하고
+복원하는 호출, id로 여러 행을 읽는 호출을 제공한다.
 
 검색은 전역 superadmin 역할 검사로 보호된다. 세션에 실제로 주입되는 행을 고르지 않고, 스코프와
 삭제 여부에 상관없이 조건에 맞는 행을 모두 반환한다.
@@ -55,6 +56,44 @@ id로 여러 행을 읽을 때는 행마다 권한을 검사한다. 모든 사�
 값 출처는 행이 아니라 매니저가 제공하는 목록이므로 로그인 여부만 확인하고 반환된다. 행의 값 출처는 이 목록의
 이름으로 반환되고, 검색 조건에도 이 이름을 쓴다.
 
+## 수정
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 프로젝트 관리자가 자기 프로젝트의 행의 키를 바꾼다 | 한 프로젝트에 행 하나를 미리 만들어 둠, 그 프로젝트의 관리자 | 새 키를 지정해 수정 | 키가 바뀐 행이 반환된다 |
+| 프로젝트 구성원이 자기 프로젝트의 행의 키를 바꾼다 | 한 프로젝트에 행 하나를 미리 만들어 둠, 관리자가 아닌 그 프로젝트의 구성원 | 새 키를 지정해 수정 | 권한 부족으로 거부 |
+| 도메인 관리자가 자기 도메인의 행의 키를 바꾼다 | 한 도메인에 행 하나를 미리 만들어 둠, 그 도메인의 관리자 | 새 키를 지정해 수정 | 키가 바뀐 행이 반환된다 |
+| 도메인 관리자가 다른 도메인의 행을 수정한다 | 두 도메인에 행을 하나씩 미리 만들어 둠, 한 도메인의 관리자 | 다른 도메인의 행에 새 키를 지정해 수정 | 권한 부족으로 거부 |
+| 도메인 관리자가 public 스코프의 행을 수정한다 | public 스코프에 행 하나를 미리 만들어 둠, 한 도메인의 관리자 | 그 행에 새 키를 지정해 수정 | 권한 부족으로 거부 |
+| superadmin이 public 스코프의 행을 수정한다 | public 스코프에 행 하나를 미리 만들어 둠, superadmin | 그 행에 새 키를 지정해 수정 | 키가 바뀐 행이 반환된다 |
+| 같은 스코프에 이미 있는 키로 바꾼다 | 한 프로젝트에 키가 서로 다른 행 둘을 미리 만들어 둠, superadmin | 한 행의 키를 다른 행의 키로 수정 | 키 충돌로 거부 |
+| 다른 스코프에 있는 키로 바꾼다 | public 스코프와 한 프로젝트에 키가 서로 다른 행을 하나씩 미리 만들어 둠, superadmin | 프로젝트 행의 키를 public 행의 키로 수정 | 키가 바뀐 행이 반환된다 |
+| 환경변수 이름이 아닌 키로 바꾼다 | 한 프로젝트에 행 하나를 미리 만들어 둠, superadmin | 숫자로 시작하는 키로 수정 | 잘못된 키로 거부 |
+| 아무 값도 지정하지 않는다 | 한 프로젝트에 행 하나를 미리 만들어 둠, superadmin | 키를 비워 수정 | 바뀌지 않은 행이 반환된다 |
+| 삭제된 행의 키를 바꾼다 | 한 프로젝트에 삭제된 행 하나를 미리 만들어 둠, superadmin | 새 키를 지정해 수정 | 삭제된 행으로 거부 |
+| 삭제된 행의 키로 바꾼다 | 한 프로젝트에 삭제된 행 하나와 키가 다른 행 하나를 미리 만들어 둠, superadmin | 삭제되지 않은 행의 키를 삭제된 행의 키로 수정 | 키 충돌로 거부 |
+
+스코프와 값 출처는 바꿀 수 없다. 같은 스코프에서는 삭제된 행을 포함해 키가 겹칠 수 없다.
+
+## 삭제
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 프로젝트 관리자가 자기 프로젝트의 행을 삭제한다 | 한 프로젝트에 행 하나를 미리 만들어 둠, 그 프로젝트의 관리자 | 그 행을 삭제 | 삭제 시각이 기록된 행이 반환된다 |
+| 프로젝트 구성원이 자기 프로젝트의 행을 삭제한다 | 한 프로젝트에 행 하나를 미리 만들어 둠, 관리자가 아닌 그 프로젝트의 구성원 | 그 행을 삭제 | 권한 부족으로 거부 |
+| 도메인 관리자가 자기 도메인의 행을 삭제한다 | 한 도메인에 행 하나를 미리 만들어 둠, 그 도메인의 관리자 | 그 행을 삭제 | 삭제 시각이 기록된 행이 반환된다 |
+| 도메인 관리자가 public 스코프의 행을 삭제한다 | public 스코프에 행 하나를 미리 만들어 둠, 한 도메인의 관리자 | 그 행을 삭제 | 권한 부족으로 거부 |
+| superadmin이 public 스코프의 행을 삭제한다 | public 스코프에 행 하나를 미리 만들어 둠, superadmin | 그 행을 삭제 | 삭제 시각이 기록된 행이 반환된다 |
+
+삭제된 행은 그 뒤에 시작하는 세션에 주입되지 않는다.
+
+## 복원
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 프로젝트 관리자가 자기 프로젝트의 삭제된 행을 복원한다 | 한 프로젝트에 삭제된 행 하나를 미리 만들어 둠, 그 프로젝트의 관리자 | 그 행을 복원 | 삭제 시각이 비워진 행이 반환된다 |
+| 프로젝트 구성원이 자기 프로젝트의 삭제된 행을 복원한다 | 한 프로젝트에 삭제된 행 하나를 미리 만들어 둠, 관리자가 아닌 그 프로젝트의 구성원 | 그 행을 복원 | 권한 부족으로 거부 |
+
 ## id로 여러 행 읽기
 
 | 시나리오 | 상황 | 요청 | 결과 |
@@ -74,6 +113,6 @@ id로 여러 행을 읽을 때는 행마다 권한을 검사한다. 모든 사�
 
 ## 아직 적지 않은 것
 
-없다. 어댑터가 제공하는 전체 검색, 값 출처 목록, id로 여러 행 읽기가 모두 위에 있다.
+없다. 어댑터가 제공하는 전체 검색, 값 출처 목록, 수정, 삭제, 복원, id로 여러 행 읽기가 모두 위에 있다.
 
 모든 어댑터가 물려받는 공용 도우미는 이 엔티티의 호출이 아니므로 적을 시나리오가 없다.

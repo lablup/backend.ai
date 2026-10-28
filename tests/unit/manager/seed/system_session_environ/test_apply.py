@@ -197,7 +197,7 @@ class TestApply:
 
         assert reached == {await _environ_id_of_key(db, "BACKENDAI_USER_EMAIL")}
 
-    async def test_an_existing_binding_is_skipped_and_kept(
+    async def test_a_deleted_binding_stays_deleted(
         self,
         db: ExtendedAsyncSAEngine,
         repository: SeedRepository,
@@ -211,7 +211,9 @@ class TestApply:
             "exists",
             "exists",
         ]
-        assert (await _rows_by_seed_key(db))[_PUBLIC_SESSION_ID_SEED_KEY].deleted is True
+        assert (await _rows_by_seed_key(db))[_PUBLIC_SESSION_ID_SEED_KEY] == _ValueSourceAndDeleted(
+            value_source=SystemSessionEnvironValueSource.SESSION_ID, deleted=True
+        )
 
     async def test_an_overwrite_replaces_the_source(
         self,
@@ -225,7 +227,7 @@ class TestApply:
             value_source=SystemSessionEnvironValueSource.SESSION_NAME, deleted=False
         )
 
-    async def test_an_overwrite_keeps_a_deleted_binding_deleted(
+    async def test_an_overwrite_rewrites_a_deleted_binding_and_leaves_it_deleted(
         self,
         db: ExtendedAsyncSAEngine,
         repository: SeedRepository,

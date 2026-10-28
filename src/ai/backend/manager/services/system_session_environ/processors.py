@@ -8,10 +8,14 @@ from ai.backend.manager.actions.v2.global_scope.processor import (
     GlobalActionProcessor,
     PublicActionProcessor,
 )
-from ai.backend.manager.actions.v2.ops.result import BatchOpsResult
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, EntityOpsResult
+from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
 from ai.backend.manager.services.system_session_environ.actions.bulk_get import (
     BulkGetSystemSessionEnvironsAction,
+)
+from ai.backend.manager.services.system_session_environ.actions.delete import (
+    DeleteSystemSessionEnvironAction,
 )
 from ai.backend.manager.services.system_session_environ.actions.global_search import (
     GlobalSearchSystemSessionEnvironsAction,
@@ -19,6 +23,12 @@ from ai.backend.manager.services.system_session_environ.actions.global_search im
 from ai.backend.manager.services.system_session_environ.actions.public_list_value_sources import (
     PublicListSystemSessionEnvironValueSourcesAction,
     PublicListSystemSessionEnvironValueSourcesActionResult,
+)
+from ai.backend.manager.services.system_session_environ.actions.restore import (
+    RestoreSystemSessionEnvironAction,
+)
+from ai.backend.manager.services.system_session_environ.actions.update import (
+    UpdateSystemSessionEnvironAction,
 )
 from ai.backend.manager.services.system_session_environ.service import SystemSessionEnvironService
 
@@ -34,6 +44,15 @@ class SystemSessionEnvironProcessors:
         PublicListSystemSessionEnvironValueSourcesAction,
         PublicListSystemSessionEnvironValueSourcesActionResult,
     ]
+    update: SingleEntityActionProcessor[
+        UpdateSystemSessionEnvironAction, EntityOpsResult[SystemSessionEnvironData]
+    ]
+    delete: SingleEntityActionProcessor[
+        DeleteSystemSessionEnvironAction, EntityOpsResult[SystemSessionEnvironData]
+    ]
+    restore: SingleEntityActionProcessor[
+        RestoreSystemSessionEnvironAction, EntityOpsResult[SystemSessionEnvironData]
+    ]
     bulk_get_ids: PartialBulkActionProcessor[
         BulkGetSystemSessionEnvironsAction, SystemSessionEnvironData
     ]
@@ -43,4 +62,7 @@ class SystemSessionEnvironProcessors:
         self.public_list_value_sources = group.public(
             PublicListSystemSessionEnvironValueSourcesAction, service.public_list_value_sources
         )
+        self.update = group.single_update_ops(UpdateSystemSessionEnvironAction)
+        self.delete = group.single_delete_ops(DeleteSystemSessionEnvironAction)
+        self.restore = group.single_restore_ops(RestoreSystemSessionEnvironAction)
         self.bulk_get_ids = group.partial_bulk_get_ops(BulkGetSystemSessionEnvironsAction)

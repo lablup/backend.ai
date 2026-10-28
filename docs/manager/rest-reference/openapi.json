@@ -37872,6 +37872,27 @@
         "title": "AdminSearchSystemSessionEnvironsInput",
         "type": "object"
       },
+      "UpdateSystemSessionEnvironInput": {
+        "description": "Input for changing a system session environ row's key.",
+        "properties": {
+          "key": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "New environment variable name. Omit to leave unchanged.",
+            "title": "Key"
+          }
+        },
+        "title": "UpdateSystemSessionEnvironInput",
+        "type": "object"
+      },
       "ArrayFilter_int_": {
         "properties": {
           "contains": {
@@ -66102,6 +66123,102 @@
         ],
         "parameters": [],
         "description": "List every value source a system session environ row can carry.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/system-session-environs/{environ_id}": {
+      "patch": {
+        "operationId": "v2/system-session-environs.update",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSystemSessionEnvironInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "environ_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Change a system session environ row's key.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/system-session-environs/{environ_id}/delete": {
+      "post": {
+        "operationId": "v2/system-session-environs.delete",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "environ_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Soft-delete a system session environ row.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/system-session-environs/{environ_id}/restore": {
+      "post": {
+        "operationId": "v2/system-session-environs.restore",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "environ_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Restore a soft-deleted system session environ row.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/users/search": {

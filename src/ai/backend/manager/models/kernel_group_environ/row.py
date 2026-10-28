@@ -7,7 +7,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.kernel_group import KernelGroupID
 from ai.backend.common.data.entity.kernel_group_environ import KernelGroupEnvironID
-from ai.backend.manager.data.environ.types import ENVIRON_KEY_PATTERN
+from ai.backend.common.data.environ.types import ENVIRON_KEY_PATTERN
 from ai.backend.manager.models.base import GUID, Base
 
 __all__ = ("KernelGroupEnvironRow",)
