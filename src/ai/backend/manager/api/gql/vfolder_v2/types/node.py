@@ -90,7 +90,10 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         description="Descriptive metadata including name, usage mode, quota scope, timestamps, and clone eligibility."
     )
     access_control: VFolderAccessControlInfoGQL = gql_field(
-        description="Access control including permission level and ownership type."
+        description=(
+            "Access control including the folder's default mount permission level "
+            "and ownership type."
+        )
     )
     ownership: VFolderOwnershipInfoGQL = gql_field(
         description=(

@@ -31026,7 +31026,9 @@ type VFolder implements Node
   """
   metadata: VFolderMetadataInfo!
 
-  """Access control including permission level and ownership type."""
+  """
+  Access control including the folder's default mount permission level and ownership type.
+  """
   accessControl: VFolderAccessControlInfo!
 
   """
@@ -31067,13 +31069,13 @@ type VFolder implements Node
 }
 
 """
-Added in 26.4.2. Access control information for a virtual folder. Includes the mount permission level (read-only, read-write, read-write-delete) and ownership type (user or project).
+Added in 26.4.2. Access control information for a virtual folder. Includes the folder's default mount permission level (read-only, read-write, read-write-delete) and ownership type (user or project).
 """
 type VFolderAccessControlInfo
   @join__type(graph: STRAWBERRY)
 {
   """
-  Mount permission level: READ_ONLY (ro), READ_WRITE (rw), or RW_DELETE (wd).
+  The folder's default mount permission level: READ_ONLY (ro), READ_WRITE (rw), or RW_DELETE (wd). The level the current user mounts at is `VFolder.effectiveMountPermission`.
   """
   permission: VFolderMountPermission!
 
