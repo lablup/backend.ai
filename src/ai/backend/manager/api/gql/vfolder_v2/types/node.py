@@ -242,7 +242,7 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
             ),
         )
     )  # type: ignore[misc]
-    async def effective_mount_permission(
+    async def mount_permission(
         self,
         info: Info[StrawberryGQLContext],
     ) -> VFolderMountPermissionGQL | None:

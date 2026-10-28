@@ -94,7 +94,7 @@ class VFolderAccessControlInfoGQL:
         description=(
             "The folder's default mount permission level: READ_ONLY (ro), READ_WRITE (rw), "
             "or RW_DELETE (wd). The level the current user mounts at is "
-            "`VFolder.effectiveMountPermission`."
+            "`VFolder.mountPermission`."
         )
     )
     ownership_type: VFolderOwnershipTypeGQL = gql_field(
