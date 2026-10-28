@@ -7,6 +7,7 @@ from typing import Annotated
 from pydantic import Field, StringConstraints
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.environ.types import ENVIRON_KEY_PATTERN
 from ai.backend.common.dto.manager.query import (
     DateTimeFilter,
     EnumFilter,
@@ -112,6 +113,8 @@ class AdminSearchSystemSessionEnvironsInput(BaseRequestModel):
 class UpdateSystemSessionEnvironInput(BaseRequestModel):
     """Input for changing a system session environ row's key."""
 
-    key: Annotated[str, StringConstraints(min_length=1, max_length=256)] | None | Unset = Field(
-        default=UNSET, description="New environment variable name. Omit to leave unchanged."
-    )
+    key: (
+        Annotated[str, StringConstraints(max_length=256, pattern=ENVIRON_KEY_PATTERN)]
+        | None
+        | Unset
+    ) = Field(default=UNSET, description="New environment variable name. Omit to leave unchanged.")
