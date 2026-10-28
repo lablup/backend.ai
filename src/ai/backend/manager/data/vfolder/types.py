@@ -139,6 +139,11 @@ class VFolderOperationStatus(enum.StrEnum):
                 return cls.DELETE_ERROR
         return None
 
+    @classmethod
+    def hard_deleted(cls) -> frozenset[VFolderOperationStatus]:
+        """Statuses of a folder whose storage is gone or failed to go; only its row remains."""
+        return frozenset({cls.DELETE_COMPLETE, cls.DELETE_ERROR})
+
     def is_deletable(self, force: bool = False) -> bool:
         if force:
             return self in {
