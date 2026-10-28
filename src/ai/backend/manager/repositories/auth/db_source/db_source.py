@@ -56,7 +56,6 @@ from ai.backend.manager.models.user.row import (
     UserRole,
     UserRow,
     UserStatus,
-    check_credential,
     users,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -600,15 +599,20 @@ class AuthDBSource:
         self,
         domain_name: str,
         email: str,
-        password: str,
+        target_password_info: PasswordInfo,
     ) -> sa.RowMapping:
         """Verify credentials without password migration (for signout, etc.)"""
-        return await check_credential(
-            db=self._db,
-            domain=domain_name,
-            email=email,
-            password=password,
-        )
+        async with self._db.begin_readonly() as conn:
+            result = await conn.execute(
+                sa.select(users)
+                .select_from(users)
+                .where((users.c.email == email) & (users.c.domain_name == domain_name)),
+            )
+            row = result.first()
+            if row is None:
+                raise AuthorizationFailed("User credential mismatch.")
+            self._check_password(row, target_password_info)
+        return row._mapping
 
     @auth_db_source_resilience.apply()
     async def fetch_default_keypair(self, user_uuid: UUID) -> KeyPairData:
