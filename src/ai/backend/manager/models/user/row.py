@@ -32,7 +32,7 @@ from ai.backend.manager.models.base import (
     EnumValueType,
     IPColumn,
 )
-from ai.backend.manager.models.hasher.factory import PasswordHasherFactory
+from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
 from ai.backend.manager.models.hasher.types import HashInfo, PasswordColumn, PasswordInfo
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -53,7 +53,6 @@ __all__: Sequence[str] = (
     "UserStatus",  # For compatibility with existing code
     "check_credential",
     "check_credential_with_migration",
-    "compare_to_hashed_password",
     "users",
 )
 
@@ -209,20 +208,6 @@ class UserRow(LifecycleTimestampsMixin, Base):
 users = UserRow.__table__
 
 
-def _verify_password(guess: str, hashed: str) -> bool:
-    """Verify a password against a hashed password."""
-    hash_info = HashInfo.from_hash_string(hashed)
-    hasher = PasswordHasherFactory.get_hasher(hash_info.algorithm)
-    return hasher.verify(guess, hash_info)
-
-
-def compare_to_hashed_password(raw_password: str, hashed_password: str) -> bool:
-    """
-    Compare a raw string password value to hashed password.
-    """
-    return _verify_password(raw_password, hashed_password)
-
-
 async def check_credential_with_migration(
     db: ExtendedAsyncSAEngine,
     domain: str,
@@ -260,7 +245,7 @@ async def check_credential_with_migration(
         raise AuthorizationFailed("User credential mismatch.")
 
     try:
-        if not _verify_password(target_password_info.password, row.password):
+        if not compare_to_hashed_password(target_password_info.password, row.password):
             raise AuthorizationFailed("User credential mismatch.")
     except ValueError as e:
         raise AuthorizationFailed("User credential mismatch.") from e
@@ -318,7 +303,7 @@ async def check_credential(
         raise AuthorizationFailed("User credential mismatch.")
 
     try:
-        if not _verify_password(password, row.password):
+        if not compare_to_hashed_password(password, row.password):
             raise AuthorizationFailed("User credential mismatch.")
     except ValueError as e:
         raise AuthorizationFailed("User credential mismatch.") from e
