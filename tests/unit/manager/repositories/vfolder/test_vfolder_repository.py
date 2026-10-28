@@ -45,6 +45,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
     VFolderAlreadyExists,
     VFolderDeletionNotAllowed,
@@ -2516,3 +2517,222 @@ class TestVFolderRepositoryTrashAndRestore:
     ) -> None:
         result = await vfolder_repository.restore_vfolders_from_trash([uuid.uuid4()])
         assert result == []
+
+
+class TestVfolderRepositoryResourcePolicyReads:
+    """The resource policy values the vfolder repository reads for a user or a project."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                RoleRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                ProjectRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+            ],
+        ):
+            yield database_connection
+
+    async def _add_domain(self, db: ExtendedAsyncSAEngine) -> DomainFixtureData:
+        domain = DomainFixtureData(
+            domain_name=DomainName(f"test-domain-{uuid.uuid4().hex[:8]}"),
+            domain_id=DomainID(uuid.uuid4()),
+        )
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    id=domain.domain_id,
+                    name=domain.domain_name,
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+        return domain
+
+    @pytest.fixture
+    async def test_domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> DomainFixtureData:
+        return await self._add_domain(db_with_cleanup)
+
+    @pytest.fixture
+    async def other_domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> DomainFixtureData:
+        return await self._add_domain(db_with_cleanup)
+
+    @pytest.fixture
+    async def test_user(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+    ) -> uuid.UUID:
+        """A user under a policy allowing 7 folders and 3 GiB, running as uid 2000."""
+        user_uuid = uuid.uuid4()
+        policy_name = f"test-user-policy-{user_uuid.hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=7,
+                    max_quota_scope_size=BinarySize.finite_from_str("3GiB"),
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                UserRow(
+                    uuid=user_uuid,
+                    username=f"testuser-{user_uuid.hex[:8]}",
+                    email=f"test-{user_uuid.hex[:8]}@example.com",
+                    need_password_change=False,
+                    status=UserStatus.ACTIVE,
+                    domain_name=test_domain.domain_name,
+                    domain_id=test_domain.domain_id,
+                    role=UserRole.USER,
+                    resource_policy=policy_name,
+                    container_uid=2000,
+                )
+            )
+        return user_uuid
+
+    @pytest.fixture
+    async def test_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+    ) -> ProjectRow:
+        """A project under a policy allowing 4 folders and 2 GiB."""
+        project_id = uuid.uuid4()
+        policy_name = f"test-project-policy-{project_id.hex[:8]}"
+        project = ProjectRow(
+            id=project_id,
+            name=f"test-project-{project_id.hex[:8]}",
+            domain_name=test_domain.domain_name,
+            is_active=True,
+            total_resource_slots=ResourceSlot(),
+            allowed_vfolder_hosts={},
+            resource_policy=policy_name,
+            type=ProjectType.MODEL_STORE,
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=4,
+                    max_quota_scope_size=BinarySize.finite_from_str("2GiB"),
+                    max_network_count=3,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(project)
+        return project
+
+    @pytest.fixture
+    def vfolder_repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> VfolderRepository:
+        return VfolderRepository(
+            db=db_with_cleanup, v2_ops_provider=ShareOpsProvider(db_with_cleanup)
+        )
+
+    async def test_a_project_reads_its_policy_max_vfolder_count(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_user: uuid.UUID,
+        test_project: ProjectRow,
+    ) -> None:
+        count = await vfolder_repository.get_max_vfolder_count(test_user, test_project.id)
+
+        assert count == 4
+
+    async def test_a_user_reads_its_policy_max_vfolder_count(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_user: uuid.UUID,
+    ) -> None:
+        count = await vfolder_repository.get_max_vfolder_count(test_user, None)
+
+        assert count == 7
+
+    async def test_an_unknown_project_is_refused(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_user: uuid.UUID,
+    ) -> None:
+        with pytest.raises(ProjectNotFound):
+            await vfolder_repository.get_max_vfolder_count(test_user, uuid.uuid4())
+
+    async def test_an_unknown_user_is_refused(
+        self,
+        vfolder_repository: VfolderRepository,
+    ) -> None:
+        with pytest.raises(UserNotFound):
+            await vfolder_repository.get_max_vfolder_count(uuid.uuid4(), None)
+
+    @pytest.mark.parametrize("by_name", [True, False], ids=["by_name", "by_id"])
+    async def test_project_resource_info_carries_its_policy_and_type(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_project: ProjectRow,
+        by_name: bool,
+    ) -> None:
+        reference: str | uuid.UUID = test_project.name if by_name else test_project.id
+
+        info = await vfolder_repository.get_group_resource_info(reference, test_domain.domain_name)
+
+        assert info is not None
+        assert info.project_id == test_project.id
+        assert info.max_vfolder_count == 4
+        assert info.max_quota_scope_size == BinarySize.finite_from_str("2GiB")
+        assert info.project_type == ProjectType.MODEL_STORE
+
+    async def test_an_unknown_project_has_no_resource_info(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+    ) -> None:
+        info = await vfolder_repository.get_group_resource_info(
+            uuid.uuid4(), test_domain.domain_name
+        )
+
+        assert info is None
+
+    async def test_a_project_under_another_domain_has_no_resource_info(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_project: ProjectRow,
+        other_domain: DomainFixtureData,
+    ) -> None:
+        info = await vfolder_repository.get_group_resource_info(
+            test_project.id, other_domain.domain_name
+        )
+
+        assert info is None
+
+    async def test_user_resource_info_carries_its_policy_and_container_uid(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_user: uuid.UUID,
+    ) -> None:
+        info = await vfolder_repository.get_user_resource_info(test_user)
+
+        assert info == (7, BinarySize.finite_from_str("3GiB"), 2000)
+
+    async def test_an_unknown_user_has_no_resource_info(
+        self,
+        vfolder_repository: VfolderRepository,
+    ) -> None:
+        info = await vfolder_repository.get_user_resource_info(uuid.uuid4())
+
+        assert info is None
