@@ -6943,6 +6943,9 @@ type DeploymentOptionsInfo
 {
   """Handler-keyed scheduler policy (timeout + retry)."""
   handlerOptions: DeploymentHandlerOptionsInfo!
+
+  """Added in 26.10.0. How the designated agents are enforced."""
+  agentSelectionPolicy: SessionAgentSelectionPolicy!
 }
 
 """Added in 26.4.4. Deployment options payload input."""
@@ -6950,6 +6953,11 @@ input DeploymentOptionsInput
   @join__type(graph: STRAWBERRY)
 {
   handlerOptions: DeploymentHandlerOptionsInput!
+
+  """
+  Added in 26.10.0. How the designated agents are enforced. null keeps the stored policy.
+  """
+  agentSelectionPolicy: SessionAgentSelectionPolicy = null
 }
 
 """Added in 25.19.0. """
@@ -14390,6 +14398,11 @@ type Mutation
 
   """Added in 25.16.0. Delete model deployment."""
   deleteModelDeployment(input: DeleteDeploymentInput!): DeleteDeploymentPayload @join__field(graph: STRAWBERRY)
+
+  """
+  Added in 26.10.0. Fully replace the ``options`` surface of a deployment. Replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
+  """
+  replaceDeploymentOptions(input: ReplaceDeploymentOptionsInput!): ReplaceDeploymentOptionsPayload @join__field(graph: STRAWBERRY)
 
   """
   Added in 25.16.0. Force syncs up-to-date replica information. In normal situations this will be automatically handled by Backend.AI schedulers.
@@ -22183,6 +22196,29 @@ input RejectRoleInvitationInput
   @join__type(graph: STRAWBERRY)
 {
   invitationId: UUID!
+}
+
+"""
+Added in 26.10.0. Input for the replaceDeploymentOptions mutation. Full-replace semantics — the supplied payload is the complete new value, except an omitted agent selection policy, which keeps the stored one.
+"""
+input ReplaceDeploymentOptionsInput
+  @join__type(graph: STRAWBERRY)
+{
+  deploymentId: UUID!
+  options: DeploymentOptionsInput!
+}
+
+"""
+Added in 26.10.0. Payload returned after replacing a deployment's options. Only the refreshed options surface is returned.
+"""
+type ReplaceDeploymentOptionsPayload
+  @join__type(graph: STRAWBERRY)
+{
+  """ID of the deployment whose ``options`` were replaced."""
+  deploymentId: ID!
+
+  """The newly persisted ``options`` surface."""
+  options: DeploymentOptionsInfo!
 }
 
 """

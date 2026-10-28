@@ -5,7 +5,8 @@ from typing import override
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.data.deployment.types import DeploymentOptions
+from ai.backend.manager.data.deployment.types import DeploymentHandlerOptions, DeploymentOptions
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 
 from .base import ResourceGroupAction
 
@@ -19,7 +20,9 @@ class ReplaceDefaultDeploymentOptionsAction(ResourceGroupAction):
     """
 
     resource_group: ResourceGroupName
-    options: DeploymentOptions
+    handler_options: DeploymentHandlerOptions
+    # ``None`` keeps the stored policy.
+    agent_selection_policy: AgentSelectionPolicy | None
 
     @override
     @classmethod

@@ -406,12 +406,11 @@ class DeploymentService:
         """Replace the ``options`` surface of a deployment in full.
 
         The repository returns the persisted :class:`DeploymentOptions`
-        via ``UPDATE ... RETURNING`` so this path does a single round-trip
-        and does not re-materialise the surrounding deployment node.
+        without re-materialising the surrounding deployment node.
         """
         log.trace("deployment options replace requested", deployment_id=action.deployment_id)
         options = await self._deployment_repository.replace_deployment_options(
-            action.deployment_id, action.options
+            action.deployment_id, action.handler_options, action.agent_selection_policy
         )
         return ReplaceDeploymentOptionsActionResult(options=options)
 

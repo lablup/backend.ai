@@ -184,7 +184,8 @@ from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.tristate.unset import Unset
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.api.adapter_options.deployment.options import (
-    deployment_options_from_input,
+    agent_selection_policy_from_input,
+    deployment_handler_options_from_input,
     deployment_options_to_info,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
@@ -884,15 +885,13 @@ class DeploymentAdapter(BaseAdapter):
     ) -> ReplaceDeploymentOptionsPayload:
         """Fully replace the ``options`` surface of a deployment.
 
-        Accepts the REST/GQL DTO input, converts to the domain
-        :class:`DeploymentOptions` (duplicate or unknown handler names
-        are rejected inside :func:`deployment_options_from_input`
-        against the coordinator's live registration), dispatches the
-        :class:`ReplaceDeploymentOptionsAction`, and returns only the
-        refreshed options surface (the repository path uses ``UPDATE ...
-        RETURNING`` and does not read the surrounding deployment node).
+        Converts the handler options to the domain
+        :class:`DeploymentHandlerOptions` (duplicate or unknown handler names
+        are rejected inside :func:`deployment_handler_options_from_input`),
+        passes the agent selection policy apart, and returns only the
+        refreshed options surface.
         """
-        options = deployment_options_from_input(
+        handler_options = deployment_handler_options_from_input(
             input.options,
             valid_handler_names=frozenset(
                 h.name() for h in self._deployment_coordinator.registered_handlers()
@@ -901,7 +900,8 @@ class DeploymentAdapter(BaseAdapter):
         action_result = await self._deployment.replace_deployment_options.run(
             ReplaceDeploymentOptionsAction(
                 deployment_id=deployment_id,
-                options=options,
+                handler_options=handler_options,
+                agent_selection_policy=agent_selection_policy_from_input(input.options),
             )
         )
         return ReplaceDeploymentOptionsPayload(

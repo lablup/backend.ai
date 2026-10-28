@@ -62,6 +62,7 @@ from ai.backend.manager.data.deployment.types import (
     AccessTokenSearchResult,
     DeploymentConfig,
     DeploymentHandlerCategory,
+    DeploymentHandlerOptions,
     DeploymentInfo,
     DeploymentInfoSearchResult,
     DeploymentInfoWithAutoScalingRules,
@@ -87,6 +88,7 @@ from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import AppProxyRouteEntry, RoutingData
 from ai.backend.manager.data.resource.types import ResourceGroupProxyTarget
 from ai.backend.manager.data.session.creation import DeploymentContext
+from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.service import EndpointNotFound
@@ -402,18 +404,22 @@ class DeploymentRepository:
     async def replace_deployment_options(
         self,
         deployment_id: DeploymentID,
-        options: DeploymentOptions,
+        handler_options: DeploymentHandlerOptions,
+        agent_selection_policy: AgentSelectionPolicy | None,
     ) -> DeploymentOptions:
         """Fully replace a deployment's ``options`` surface.
 
-        Returns the persisted :class:`DeploymentOptions` value in a
-        single ``UPDATE ... RETURNING`` round-trip. Callers that need
-        the full deployment node should re-read separately.
+        ``agent_selection_policy`` replaces the policy; ``None`` keeps the stored one.
+
+        Returns the persisted :class:`DeploymentOptions` value. Callers that
+        need the full deployment node should re-read separately.
 
         Raises:
             EndpointNotFound: If the deployment does not exist.
         """
-        return await self._db_source.replace_deployment_options(deployment_id, options)
+        return await self._db_source.replace_deployment_options(
+            deployment_id, handler_options, agent_selection_policy
+        )
 
     @deployment_repository_resilience.apply()
     async def replace_designated_agents(
