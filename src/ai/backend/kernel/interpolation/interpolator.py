@@ -31,13 +31,6 @@ class ServiceInterpolator:
         pattern = self._compile(tuple((d["start"], d["end"]) for d in self._delimiters))
         return [pattern.sub(self._evaluate, part) for part in parts]
 
-    def render(self, value: str) -> str:
-        """Interpolate one pre-start action argument."""
-        if self._delimiters == LEGACY_DELIMITERS:
-            # Image service-defs escape literal braces as ``{{ }}`` here, so the legacy syntax keeps ``str.format_map``.
-            return value.format_map(self._variables)
-        return self.apply([value])[0]
-
     @staticmethod
     @functools.cache
     def _compile(delimiters: tuple[tuple[str, str], ...]) -> re.Pattern[str]:
@@ -60,7 +53,7 @@ class ServiceInterpolator:
         except ValueError as e:
             hint = (
                 " Literal braces (e.g. JSON like vLLM '--hf-overrides') are not supported."
-                if self._delimiters == LEGACY_DELIMITERS
+                if any(d["start"] == "{" for d in self._delimiters)
                 else ""
             )
             raise InvalidServiceDefinition(

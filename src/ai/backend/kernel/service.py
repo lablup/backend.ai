@@ -108,8 +108,11 @@ class ServiceParser:
         service = self.services[service_name]
         if service.noop:
             return [], {}
-        option = opts.get("interpolation") or InterpolationOption(delimiters=LEGACY_DELIMITERS)
-        interpolator = ServiceInterpolator(self.variables, option["delimiters"])
+        interpolation_option = opts.get("interpolation")
+        delimiters = (
+            interpolation_option["delimiters"] if interpolation_option else LEGACY_DELIMITERS
+        )
+        interpolator = ServiceInterpolator(self.variables, delimiters)
 
         for action in service.prestart_actions:
             try:
@@ -118,7 +121,12 @@ class ServiceParser:
                 raise InvalidServiceDefinition(
                     f"Service-def for {service_name} used invalid action: {action['action']}"
                 ) from e
-            ret = await action_impl(interpolator, **action["args"])
+            args = {}
+            for name, value in action["args"].items():
+                args[name] = self._render_action_arg(
+                    value, interpolator, legacy=interpolation_option is None
+                )
+            ret = await action_impl(**args)
             if (ref := action.get("ref")) is not None:
                 self.variables[ref] = ret
 
@@ -165,6 +173,22 @@ class ServiceParser:
             env[env_name] = env_value
 
         return cmdargs, env
+
+    def _render_action_arg(
+        self, value: Any, interpolator: ServiceInterpolator, *, legacy: bool
+    ) -> Any:
+        match value:
+            case str() if legacy:
+                # Image service-defs escape literal braces in action args as ``{{ }}``.
+                return value.format_map(self.variables)
+            case str():
+                return interpolator.apply([value])[0]
+            case list():
+                return [
+                    self._render_action_arg(piece, interpolator, legacy=legacy) for piece in value
+                ]
+            case _:
+                return value
 
     async def get_apps(self, selected_service: str = "") -> Sequence[Mapping[str, Any]]:
         def _format(service_name: str) -> Mapping[str, Any]:
