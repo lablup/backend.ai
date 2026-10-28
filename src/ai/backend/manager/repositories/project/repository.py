@@ -15,6 +15,7 @@ from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.common.types import ResourceSlot
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -22,9 +23,9 @@ from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.resource import (
     ProjectNotFound,
 )
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater, ProjectUpdater
-from ai.backend.manager.models.resource_usage import ResourceUsageFetchResult
 from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -149,8 +150,8 @@ class ProjectRepository:
         start_date: datetime,
         end_date: datetime,
         project_ids: Sequence[UUID] | None = None,
-    ) -> ResourceUsageFetchResult:
-        """Fetch the project's kernels with their allocated slots and group shmem."""
+    ) -> tuple[list[KernelRow], dict[UUID, ResourceSlot]]:
+        """Fetch the project's kernels with the slots they were allocated."""
         return await self._db_source.fetch_project_resource_usage(start_date, end_date, project_ids)
 
     @project_repository_resilience.apply()

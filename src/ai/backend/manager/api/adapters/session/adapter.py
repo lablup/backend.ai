@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import assert_never
@@ -25,7 +25,7 @@ from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDInMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment.types import (
     EnvironmentVariableEntryInfoDTO,
@@ -192,7 +192,6 @@ from ai.backend.manager.models.session.scopes import (
 )
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import SessionSearcher
-from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.search.usage import UsedBy
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
 from ai.backend.manager.models.user.row import UserRole
@@ -719,38 +718,6 @@ class SessionAdapter(BaseAdapter):
             for group in await self._batch_kernel_groups(kernel_group_ids)
         ]
 
-    async def _batch_kernel_group_environs(
-        self, session_by_group: Mapping[KernelGroupID, SessionID]
-    ) -> dict[KernelGroupID, EnvironmentVariablesInfoDTO]:
-        """The environ of each kernel group, read under the session owning it."""
-        if not session_by_group:
-            return {}
-        action_result = await self._session.scoped_search_kernel_group_environs.run(
-            ScopedSearchKernelGroupEnvironsAction(
-                session_ids=list(dict.fromkeys(session_by_group.values())),
-                searcher=KernelGroupEnvironSearcher(
-                    pagination=NoPagination(),
-                    conditions=[
-                        KernelGroupEnvironSearchableFields.own.kernel_group_id.filter.in_(
-                            UUIDInMatchSpec(values=list(session_by_group), negated=False)
-                        )
-                    ],
-                    orders=[KernelGroupEnvironSearchableFields.own.key.order.apply(ascending=True)],
-                ),
-            )
-        )
-        entries: dict[KernelGroupID, list[EnvironmentVariableEntryInfoDTO]] = {
-            group_id: [] for group_id in session_by_group
-        }
-        for row in action_result.items:
-            entries[row.kernel_group_id].append(
-                EnvironmentVariableEntryInfoDTO(name=row.key, value=row.value)
-            )
-        return {
-            group_id: EnvironmentVariablesInfoDTO(entries=group_entries)
-            for group_id, group_entries in entries.items()
-        }
-
     async def batch_load_kernel_group_environs_by_ids(
         self, ids: Sequence[KernelGroupEnvironID]
     ) -> list[KernelGroupEnvironNode | Exception | None]:
@@ -1000,38 +967,26 @@ class SessionAdapter(BaseAdapter):
         return result
 
     async def _session_data_to_nodes(self, data: Sequence[SessionData]) -> list[SessionNode]:
-        """Convert session data to nodes, batch-loading their slot allocations and the
-        environ of their main groups."""
-        session_ids = [SessionID(item.id) for item in data]
-        allocations = await self.batch_resource_allocation_by_session(session_ids)
-        main_groups = await self._batch_main_kernel_group(session_ids)
-        environs = await self._batch_kernel_group_environs({
-            group.id: group.session_id for group in main_groups if group is not None
-        })
+        """Convert session data to nodes, batch-loading their slot allocations."""
+        allocations = await self.batch_resource_allocation_by_session([
+            SessionID(item.id) for item in data
+        ])
         nodes: list[SessionNode] = []
-        for item, allocation, main_group in zip(data, allocations, main_groups, strict=True):
+        for item, allocation in zip(data, allocations, strict=True):
             if isinstance(allocation, Exception):
                 raise allocation
-            environ = environs.get(main_group.id) if main_group is not None else None
-            nodes.append(self._session_data_to_node(item, allocation, environ))
+            nodes.append(self._session_data_to_node(item, allocation))
         return nodes
 
     async def _kernel_infos_to_nodes(self, data: Sequence[KernelInfo]) -> list[KernelNode]:
-        """Convert kernel infos to nodes, batch-loading their slot allocations and groups."""
+        """Convert kernel infos to nodes, batch-loading their slot allocations."""
         allocations = await self.batch_resource_allocation_by_kernel([
             KernelID(item.id) for item in data
         ])
-        group_ids = list(
-            dict.fromkeys(item.kernel_group_id for item in data if item.kernel_group_id is not None)
-        )
-        groups = dict(zip(group_ids, await self._batch_kernel_groups(group_ids), strict=True))
-        nodes: list[KernelNode] = []
-        for item, allocation in zip(data, allocations, strict=True):
-            group = groups.get(item.kernel_group_id) if item.kernel_group_id is not None else None
-            if isinstance(group, Exception):
-                raise group
-            nodes.append(self._kernel_info_to_node(item, allocation, group))
-        return nodes
+        return [
+            self._kernel_info_to_node(item, allocation)
+            for item, allocation in zip(data, allocations, strict=True)
+        ]
 
     # -------------------------------------------------------------------------
     # Session search
@@ -1718,10 +1673,18 @@ class SessionAdapter(BaseAdapter):
 
     @staticmethod
     def _session_data_to_node(
-        data: SessionData,
-        allocation: ResourceAllocationGQLDTO,
-        environ: EnvironmentVariablesInfoDTO | None,
+        data: SessionData, allocation: ResourceAllocationGQLDTO
     ) -> SessionNode:
+        environ = (
+            EnvironmentVariablesInfoDTO(
+                entries=[
+                    EnvironmentVariableEntryInfoDTO(name=k, value=str(v))
+                    for k, v in data.environ.items()
+                ]
+            )
+            if data.environ
+            else None
+        )
         return SessionNode(
             id=data.id,
             entity_id=data.entity_id(),
@@ -1758,7 +1721,7 @@ class SessionAdapter(BaseAdapter):
                 batch_timeout=data.batch_timeout,
             ),
             runtime=SessionRuntimeInfoGQLDTO(
-                environ=environ if environ is not None and environ.entries else None,
+                environ=environ,
                 bootstrap_script=data.bootstrap_script,
                 startup_command=data.startup_command,
                 callback_url=str(data.callback_url) if data.callback_url else None,
@@ -1772,19 +1735,21 @@ class SessionAdapter(BaseAdapter):
         )
 
     @staticmethod
-    def _kernel_info_to_node(
-        info: KernelInfo, allocation: ResourceAllocationGQLDTO, group: KernelGroupData | None
-    ) -> KernelNode:
+    def _kernel_info_to_node(info: KernelInfo, allocation: ResourceAllocationGQLDTO) -> KernelNode:
         shares = ResourceSlotInfo(
             entries=[
                 ResourceSlotEntryInfo(resource_type=k, quantity=Decimal(str(v)))
                 for k, v in (info.resource.occupied_shares or {}).items()
             ]
         )
-        shmem = group.shmem if group is not None else None
         resource_opts = (
-            ResourceOptsInfoDTO(entries=[ResourceOptsEntryInfoDTO(name="shmem", value=str(shmem))])
-            if shmem is not None
+            ResourceOptsInfoDTO(
+                entries=[
+                    ResourceOptsEntryInfoDTO(name=k, value=str(v))
+                    for k, v in info.resource.resource_opts.items()
+                ]
+            )
+            if info.resource.resource_opts
             else None
         )
         return KernelNode(
@@ -1792,7 +1757,7 @@ class SessionAdapter(BaseAdapter):
             field_id=info.id,
             image_id=info.image.image_id,
             kernel_group_id=info.kernel_group_id,
-            startup_command=group.startup_command if group is not None else None,
+            startup_command=info.runtime.startup_command,
             session_info=KernelSessionInfoGQLDTO(
                 session_id=UUID(info.session.session_id),
                 creation_id=info.session.creation_id,
@@ -1807,7 +1772,7 @@ class SessionAdapter(BaseAdapter):
             ),
             network=KernelNetworkInfoGQLDTO(
                 service_ports=None,
-                preopen_ports=group.preopen_ports if group is not None else None,
+                preopen_ports=info.network.preopen_ports,
             ),
             cluster=KernelClusterInfoGQLDTO(
                 cluster_role=info.cluster.cluster_role,

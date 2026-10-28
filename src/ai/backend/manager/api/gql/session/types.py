@@ -627,16 +627,10 @@ class SessionV2LifecycleInfoGQL:
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Reserved start time requested at creation. The scheduler honors it only for batch sessions.",
-        ),
-        deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `mainKernelGroup.requestedStartsAt`."
-        ),
+        )
     )
     batch_timeout: int | None = gql_field(
-        description="Batch execution timeout in seconds. Applicable to batch sessions.",
-        deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `mainKernelGroup.batchTimeout`."
-        ),
+        description="Batch execution timeout in seconds. Applicable to batch sessions."
     )
 
 
@@ -650,17 +644,13 @@ class SessionV2LifecycleInfoGQL:
 )
 class SessionV2RuntimeInfoGQL:
     environ: EnvironmentVariablesGQL | None = gql_field(
-        description="Environment variables for the session.",
-        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `mainKernelGroup.environ`.",
+        description="Environment variables for the session."
     )
     bootstrap_script: str | None = gql_field(
         description="Bootstrap script to run before the main process."
     )
     startup_command: str | None = gql_field(
-        description="Startup command to execute when the session starts.",
-        deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `mainKernelGroup.startupCommand`."
-        ),
+        description="Startup command to execute when the session starts."
     )
     callback_url: str | None = gql_field(
         description="URL to call back when the session completes (e.g., for batch sessions)."

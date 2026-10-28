@@ -277,8 +277,7 @@ class KernelV2ResourceInfoGQL:
         description="The fractional resource shares occupied by this kernel."
     )
     resource_opts: ResourceOptsGQL | None = gql_field(
-        description="Additional resource options and configurations for this kernel.",
-        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `kernelGroup.shmem`.",
+        description="Additional resource options and configurations for this kernel."
     )
 
 
@@ -295,8 +294,7 @@ class KernelV2NetworkInfoGQL:
         description="Collection of service ports exposed by this kernel."
     )
     preopen_ports: list[int] | None = gql_field(
-        description="List of ports that are pre-opened for this kernel.",
-        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `kernelGroup.preopenPorts`.",
+        description="List of ports that are pre-opened for this kernel."
     )
 
 
@@ -356,10 +354,7 @@ class KernelV2GQL(PydanticNodeMixin[KernelNode]):
 
     # Inlined fields (from single-element types)
     startup_command: str | None = gql_field(
-        description="Startup command executed when the kernel starts.",
-        deprecation_reason=(
-            f"Deprecated since {NEXT_RELEASE_VERSION}. Use `kernelGroup.startupCommand`."
-        ),
+        description="Startup command executed when the kernel starts."
     )
 
     # Sub-info types
