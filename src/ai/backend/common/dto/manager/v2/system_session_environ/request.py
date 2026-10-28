@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, Self
 
-from pydantic import Field, StringConstraints
+from pydantic import Field, StringConstraints, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironScopeID
 from ai.backend.common.data.environ.types import ENVIRON_KEY_PATTERN
 from ai.backend.common.dto.manager.query import (
     DateTimeFilter,
@@ -24,6 +25,7 @@ from ai.backend.common.tristate.unset import UNSET, Unset
 
 __all__ = (
     "AdminSearchSystemSessionEnvironsInput",
+    "CreateSystemSessionEnvironInput",
     "SystemSessionEnvironFilter",
     "SystemSessionEnvironOrder",
     "SystemSessionEnvironScopeTypeFilter",
@@ -108,6 +110,35 @@ class AdminSearchSystemSessionEnvironsInput(BaseRequestModel):
     before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
     limit: int | None = Field(default=None, ge=1, description="Offset pagination: maximum items.")
     offset: int | None = Field(default=None, ge=0, description="Offset pagination: number to skip.")
+
+
+class CreateSystemSessionEnvironInput(BaseRequestModel):
+    """Input for binding a value source to an environment variable name at one scope."""
+
+    key: str = Field(
+        max_length=256,
+        pattern=ENVIRON_KEY_PATTERN,
+        description="The environment variable name the value is injected under.",
+    )
+    value_source: str = Field(
+        description=(
+            "Which value of the starting session is injected, as a value source name "
+            "the value source query lists."
+        )
+    )
+    scope_type: SystemSessionEnvironScopeType = Field(
+        description="Whether the row applies to every session, a domain's or a project's."
+    )
+    scope_id: SystemSessionEnvironScopeID | None = Field(
+        default=None,
+        description="The id of the domain or the project. Left out for public.",
+    )
+
+    @model_validator(mode="after")
+    def _validate_scope_id_for_scope_type(self) -> Self:
+        if (self.scope_type is SystemSessionEnvironScopeType.PUBLIC) != (self.scope_id is None):
+            raise ValueError("scope_id is left out for public and given for domain and project")
+        return self
 
 
 class UpdateSystemSessionEnvironInput(BaseRequestModel):

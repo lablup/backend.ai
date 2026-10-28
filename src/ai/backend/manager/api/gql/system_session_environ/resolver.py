@@ -12,10 +12,13 @@ from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     AdminSearchSystemSessionEnvironsInput,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
 from ai.backend.manager.api.gql.system_session_environ.types import (
+    CreateSystemSessionEnvironInputGQL,
+    CreateSystemSessionEnvironPayloadGQL,
     DeleteSystemSessionEnvironPayloadGQL,
+    PurgeSystemSessionEnvironPayloadGQL,
     RestoreSystemSessionEnvironPayloadGQL,
     SystemSessionEnvironConnectionGQL,
     SystemSessionEnvironEdgeGQL,
@@ -101,6 +104,23 @@ async def system_session_environ_value_sources(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
         description=(
+            "Bind a value source to an environment variable name at the public scope, a "
+            "domain or a project."
+        ),
+    )
+)
+async def create_system_session_environ(
+    info: Info[StrawberryGQLContext],
+    input: CreateSystemSessionEnvironInputGQL,
+) -> CreateSystemSessionEnvironPayloadGQL | None:
+    payload = await info.context.adapters.system_session_environ.create(input.to_pydantic())
+    return CreateSystemSessionEnvironPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
             "Change a system session environ row's key. Only provided fields are updated."
         ),
     )
@@ -142,3 +162,19 @@ async def restore_system_session_environ(
 ) -> RestoreSystemSessionEnvironPayloadGQL | None:
     payload = await info.context.adapters.system_session_environ.restore(SystemSessionEnvironID(id))
     return RestoreSystemSessionEnvironPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Remove a system session environ row for good, soft-deleted or not.",
+    )
+)
+async def purge_system_session_environ(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> PurgeSystemSessionEnvironPayloadGQL | None:
+    payload = await info.context.adapters.system_session_environ.purge(SystemSessionEnvironID(id))
+    return PurgeSystemSessionEnvironPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(SystemSessionEnvironGQL, payload.entity_id)}
+    )

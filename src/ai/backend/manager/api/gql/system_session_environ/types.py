@@ -7,10 +7,13 @@ from datetime import datetime
 from typing import Any, Self, cast, override
 from uuid import UUID
 
-from strawberry import UNSET, Info
+from strawberry import ID, UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironID
+from ai.backend.common.dto.manager.v2.system_session_environ.request import (
+    CreateSystemSessionEnvironInput as CreateSystemSessionEnvironInputDTO,
+)
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     SystemSessionEnvironFilter as SystemSessionEnvironFilterDTO,
 )
@@ -27,7 +30,13 @@ from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     UpdateSystemSessionEnvironInput as UpdateSystemSessionEnvironInputDTO,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
+    CreateSystemSessionEnvironPayload as CreateSystemSessionEnvironPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.system_session_environ.response import (
     DeleteSystemSessionEnvironPayload as DeleteSystemSessionEnvironPayloadDTO,
+)
+from ai.backend.common.dto.manager.v2.system_session_environ.response import (
+    PurgeSystemSessionEnvironPayload as PurgeSystemSessionEnvironPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
     RestoreSystemSessionEnvironPayload as RestoreSystemSessionEnvironPayloadDTO,
@@ -76,10 +85,13 @@ __all__ = (
     "SystemSessionEnvironGQL",
     "SystemSessionEnvironOrderByGQL",
     "SystemSessionEnvironScopeInfoGQL",
+    "CreateSystemSessionEnvironInputGQL",
+    "CreateSystemSessionEnvironPayloadGQL",
     "UpdateSystemSessionEnvironInputGQL",
     "UpdateSystemSessionEnvironPayloadGQL",
     "DeleteSystemSessionEnvironPayloadGQL",
     "RestoreSystemSessionEnvironPayloadGQL",
+    "PurgeSystemSessionEnvironPayloadGQL",
 )
 
 
@@ -297,6 +309,45 @@ class SystemSessionEnvironOrderByGQL(PydanticInputMixin[SystemSessionEnvironOrde
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for binding a value source to an environment variable name at one scope."
+        ),
+    ),
+    name="CreateSystemSessionEnvironInput",
+)
+class CreateSystemSessionEnvironInputGQL(PydanticInputMixin[CreateSystemSessionEnvironInputDTO]):
+    key: str = gql_field(description="The environment variable name the value is injected under.")
+    value_source: str = gql_field(
+        description=(
+            "Which value of the starting session is injected, as a value source name "
+            "systemSessionEnvironValueSources lists."
+        )
+    )
+    scope_type: SystemSessionEnvironScopeTypeGQL = gql_field(
+        description="Whether the row applies to every session, a domain's or a project's."
+    )
+    scope_id: UUID | None = gql_field(
+        default=None, description="The id of the domain or the project. Left out for public."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for a system session environ row create.",
+    ),
+    model=CreateSystemSessionEnvironPayloadDTO,
+    name="CreateSystemSessionEnvironPayload",
+)
+class CreateSystemSessionEnvironPayloadGQL(
+    PydanticOutputMixin[CreateSystemSessionEnvironPayloadDTO]
+):
+    system_session_environ: SystemSessionEnvironGQL = gql_field(description="The created row.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
         description="Input for changing a system session environ row's key.",
     ),
     name="UpdateSystemSessionEnvironInput",
@@ -345,3 +396,16 @@ class RestoreSystemSessionEnvironPayloadGQL(
     PydanticOutputMixin[RestoreSystemSessionEnvironPayloadDTO]
 ):
     system_session_environ: SystemSessionEnvironGQL = gql_field(description="The restored row.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for a system session environ row purge.",
+    ),
+    model=PurgeSystemSessionEnvironPayloadDTO,
+    name="PurgeSystemSessionEnvironPayload",
+)
+class PurgeSystemSessionEnvironPayloadGQL(PydanticOutputMixin[PurgeSystemSessionEnvironPayloadDTO]):
+    purged_id: ID = gql_field(description="Global ID of the purged row.")
+    entity_id: UUID = gql_field(description="The id of the purged row.")

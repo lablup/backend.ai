@@ -564,7 +564,9 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             etcd=args.etcd,
         ),
         events=EventsService(args.db),
-        system_session_environ=SystemSessionEnvironService(),
+        system_session_environ=SystemSessionEnvironService(
+            repositories.system_session_environ.repository
+        ),
     )
 
 

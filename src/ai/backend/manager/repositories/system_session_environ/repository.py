@@ -6,6 +6,9 @@ from ai.backend.common.data.system_session_environ.types import SystemSessionEnv
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
+from ai.backend.manager.models.system_session_environ.creators import (
+    SystemSessionEnvironCreator,
+)
 from ai.backend.manager.models.system_session_environ.scopes import (
     SessionSystemSessionEnvironScope,
 )
@@ -35,6 +38,10 @@ class SystemSessionEnvironRepository:
     ) -> None:
         self._db_source = SystemSessionEnvironDBSource(v2_ops_provider)
         self._value_resolver_registry = value_resolver_registry
+
+    async def create(self, creator: SystemSessionEnvironCreator) -> SystemSessionEnvironData:
+        """Insert one binding; a domain or a project that is not there refuses the write."""
+        return await self._db_source.create(creator)
 
     async def resolve(
         self,

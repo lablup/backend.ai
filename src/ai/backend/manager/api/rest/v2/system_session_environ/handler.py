@@ -11,6 +11,7 @@ from ai.backend.common.api_handlers import APIResponse, BaseRequestModel, BodyPa
 from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironID
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     AdminSearchSystemSessionEnvironsInput,
+    CreateSystemSessionEnvironInput,
     UpdateSystemSessionEnvironInput,
 )
 
@@ -45,6 +46,11 @@ class V2SystemSessionEnvironHandler:
         payload = await self._adapter.public_list_value_sources()
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
 
+    async def create(self, body: BodyParam[CreateSystemSessionEnvironInput]) -> APIResponse:
+        """Bind a value source to an environment variable name at one scope."""
+        payload = await self._adapter.create(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=payload)
+
     async def update(
         self,
         path: PathParam[SystemSessionEnvironIdPathParam],
@@ -62,4 +68,9 @@ class V2SystemSessionEnvironHandler:
     async def restore(self, path: PathParam[SystemSessionEnvironIdPathParam]) -> APIResponse:
         """Restore a soft-deleted system session environ row."""
         payload = await self._adapter.restore(path.parsed.environ_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
+    async def purge(self, path: PathParam[SystemSessionEnvironIdPathParam]) -> APIResponse:
+        """Remove a system session environ row for good, soft-deleted or not."""
+        payload = await self._adapter.purge(path.parsed.environ_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
