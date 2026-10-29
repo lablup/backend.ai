@@ -20,7 +20,6 @@ from ai.backend.storage.watcher import WatcherClient
 from .bgtask import BackgroundTaskManagerInput, BackgroundTaskManagerProvider
 from .manager_client_pool import ManagerClientPoolProvider
 from .status_probe import StatusProbeInput, StatusProbeProvider, StatusProbeResources
-from .status_report import StatusReportInput, StatusReportProvider
 from .storage_pool import StoragePoolInput, StoragePoolProvider
 from .volume_pool import VolumePoolInput, VolumePoolProvider
 from .volume_stats import VolumeStatsInput, VolumeStatsProvider, VolumeStatsResources
@@ -110,16 +109,9 @@ class StorageComposer(DependencyComposer[StorageComposerInput, StorageResources]
         status_probe = await stack.enter_dependency(
             StatusProbeProvider(),
             StatusProbeInput(
+                local_config=local_config,
                 pidx=setup_input.pidx,
                 volume_pool=volume_pool,
-            ),
-        )
-        await stack.enter_dependency(
-            StatusReportProvider(),
-            StatusReportInput(
-                pidx=setup_input.pidx,
-                local_config=local_config,
-                registry=status_probe.registry,
                 event_producer=setup_input.event_producer,
             ),
         )

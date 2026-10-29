@@ -6,7 +6,11 @@ from typing import Any, override
 from pydantic import Field
 
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
-from ai.backend.common.data.storage.types import StorageCheckState, StorageStatusCheckType
+from ai.backend.common.data.storage.types import (
+    StorageBackendMetadata,
+    StorageCheckState,
+    StorageStatusCheckType,
+)
 from ai.backend.common.events.types import AbstractAnycastEvent, EventDomain
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import BackendAISchema
@@ -21,6 +25,9 @@ class StorageStatusObservation(BackendAISchema):
     """The latest observation of one volume, as the service holding it saw it."""
 
     volume_name: StorageVolumeName = Field(description="System-unique name of the volume.")
+    storage_backend_metadata: StorageBackendMetadata = Field(
+        description="The storage backend implementation the volume is served by."
+    )
     check_type: StorageStatusCheckType = Field(
         description="Which status check the observation comes from."
     )
@@ -37,10 +44,6 @@ class StorageStatusObservation(BackendAISchema):
     )
     extra: dict[str, Any] | None = Field(
         default=None, description="What only the check type records."
-    )
-    device_id: int | None = Field(
-        default=None,
-        description="Device id of the mount a vfs volume is served from, null otherwise.",
     )
 
 

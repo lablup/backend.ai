@@ -8,7 +8,6 @@ from typing import Any, Final, NewType
 
 from pydantic import ConfigDict, Field
 
-from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.type_adapters import VFolderIDField
 from ai.backend.common.types import BackendAISchema
 
@@ -73,6 +72,13 @@ class StorageBackendCapabilities(BackendAISchema):
     """
 
     supported: frozenset[StorageBackendCapability] = Field(default_factory=frozenset)
+
+
+class StorageBackendMetadata(BackendAISchema):
+    """A storage backend implementation, as ``storage_backend_types`` records it."""
+
+    name: StorageBackendType
+    capabilities: StorageBackendCapabilities
 
 
 class StorageVolumeUsageField(enum.StrEnum):

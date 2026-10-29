@@ -7,6 +7,7 @@ from typing import Any, override
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.data.entity.storage_backend import StorageBackendID
 from ai.backend.common.data.entity.storage_volume import StorageVolumeID, StorageVolumeName
+from ai.backend.common.data.storage.types import StorageAnomaly
 from ai.backend.manager.models.specs.created_in import CreatedInGlobal
 from ai.backend.manager.models.specs.relation import RelationUpserter
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -85,7 +86,7 @@ class StorageVolumeHoldingUpserter(
         return {
             "service_catalog_id": scope,
             "storage_volume_id": target,
-            "status": None,
+            "status": StorageAnomaly.NONE,
             "status_checked_at": None,
         }
 

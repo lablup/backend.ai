@@ -36,18 +36,18 @@ class VolumePool:
     _volumes_by_id: Mapping[VolumeID, AbstractVolume]
     _volume_status_checks: Sequence[AbstractVolumeStatusCheck]
 
-    def __init__(self, volumes: Mapping[StorageVolumeName, AbstractVolume]) -> None:
+    def __init__(
+        self,
+        volumes: Mapping[StorageVolumeName, AbstractVolume],
+        volume_status_checks: Sequence[AbstractVolumeStatusCheck],
+    ) -> None:
         self._volumes = volumes
         self._volumes_by_id = {
             volume_id: volume
             for name, volume in volumes.items()
             if (volume_id := _parse_volume_id(name)) is not None
         }
-        self._volume_status_checks = [
-            check
-            for volume in volumes.values()
-            if (check := volume.volume_status_checker()) is not None
-        ]
+        self._volume_status_checks = volume_status_checks
 
     @classmethod
     async def create(
@@ -74,7 +74,12 @@ class VolumePool:
         volumes[StorageVolumeName(NOOP_STORAGE_VOLUME_NAME)] = init_noop_volume(
             etcd, event_dispatcher, event_producer
         )
-        return cls(volumes=volumes)
+        volume_status_checks = [
+            check
+            for volume in volumes.values()
+            if (check := await volume.volume_status_checker()) is not None
+        ]
+        return cls(volumes=volumes, volume_status_checks=volume_status_checks)
 
     @classmethod
     async def _init_volume(

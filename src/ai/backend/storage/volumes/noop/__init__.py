@@ -158,7 +158,7 @@ class NoopVolume(AbstractVolume):
         return NoopFSOpModel()
 
     @override
-    def volume_status_checker(self) -> AbstractVolumeStatusCheck | None:
+    async def volume_status_checker(self) -> AbstractVolumeStatusCheck | None:
         return None
 
     # ------ volume operations -------

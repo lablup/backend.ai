@@ -17,10 +17,12 @@ from ai.backend.agent.tasks import CollectNodeStatTask, UpdateSlotsTask
 from ai.backend.agent.types import AgentBackend, get_agent_discovery
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
-from ai.backend.common.cron import LocalCron
+from ai.backend.common.cron import LocalCron, PeriodicTask
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
 from ai.backend.common.storage.probe.registry import VolumeStatusCheckRegistry
+from ai.backend.common.storage.probe.report import StorageStatusReportTask
+from ai.backend.common.storage.probe.reporter import VolumeStatusReporter, VolumeStatusReporterArgs
 from ai.backend.common.storage.probe.runner import ProbeCheckRunner, ProbeCheckRunnerArgs
 from ai.backend.common.storage.probe.volume import AbstractVolumeStatusCheck
 from ai.backend.common.types import AgentId, DeviceName, SlotName
@@ -179,10 +181,22 @@ class AgentRuntime:
         self._probe_check_runner = ProbeCheckRunner(
             ProbeCheckRunnerArgs(checks=volume_status_checks)
         )
-        self._local_cron = LocalCron([
+        periodic_tasks: list[PeriodicTask] = [
             UpdateSlotsTask(self),
             CollectNodeStatTask(self, local_config),
-        ])
+        ]
+        sd_config = local_config.service_discovery
+        # The manager tells reports apart by these ids, so without both there is nothing to report.
+        if sd_config.instance_id and sd_config.service_group:
+            reporter = VolumeStatusReporter(
+                VolumeStatusReporterArgs(
+                    registry=self._volume_status_check_registry,
+                    service_catalog_instance_id=sd_config.instance_id,
+                    service_catalog_service_group=sd_config.service_group,
+                )
+            )
+            periodic_tasks.append(StorageStatusReportTask(reporter, primary_agent.event_producer))
+        self._local_cron = LocalCron(periodic_tasks)
 
     async def __aexit__(self, *exc_info: Any) -> None:
         await self._probe_check_runner.stop()
