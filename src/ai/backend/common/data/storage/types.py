@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import enum
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Final, NewType
+from typing import Any, Final, NewType
 
 from pydantic import ConfigDict, Field
 
@@ -112,25 +113,21 @@ class StorageAnomaly(enum.StrEnum):
     DETECTED = "detected"
 
 
-@dataclass(frozen=True)
-class VfsVolumeStatusResult:
-    """What one check of a vfs volume's mount observed, when it started and how long it
-    took. ``error_msg`` is null where the observation succeeded, ``device_id`` where it
-    failed."""
+class StorageStatusCheckType(enum.StrEnum):
+    """Which status check a result comes from, deciding how the result is read."""
 
-    check_state: StorageCheckState
-    check_started_at: datetime
-    duration: timedelta | None
-    error_msg: str | None
-    device_id: int | None
+    VFS = "vfs"
 
 
 @dataclass(frozen=True)
 class StorageStatusResultData:
-    """A check's result as reported, the fields of every result type in one shape."""
+    """What one status check observed, in the shape every check reports. ``error_msg`` is
+    null where the observation succeeded; ``extra`` holds what only its check type records."""
 
-    check_started_at: datetime | None
+    check_type: StorageStatusCheckType
     check_state: StorageCheckState
+    check_started_at: datetime | None
     duration: timedelta | None
     error_msg: str | None
-    device_id: int | None
+    device_id: str | None
+    extra: Mapping[str, Any] | None

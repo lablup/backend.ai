@@ -27,12 +27,8 @@ from ai.backend.common.data.storage.types import (
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
-from ai.backend.common.storage.probe.check import AbstractProbeCheck
-from ai.backend.common.storage.probe.reporter import (
-    AbstractVolumeStatusReporter,
-    VolumeStatusReporter,
-)
-from ai.backend.common.storage.volume.vfs import VfsVolumeStatusCheck, VfsVolumeStatusDataParser
+from ai.backend.common.storage.probe.volume import AbstractVolumeStatusCheck
+from ai.backend.common.storage.volume.vfs import VfsVolumeStatusCheck
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import (
@@ -411,7 +407,6 @@ class BaseFSOpModel(AbstractFSOpModel):
 class BaseVolume(AbstractVolume):
     name: ClassVar[StorageBackendType] = StorageBackendType("vfs")
     _status_check: VfsVolumeStatusCheck | None
-    _status_data_parser: VfsVolumeStatusDataParser
 
     def __init__(
         self,
@@ -442,7 +437,6 @@ class BaseVolume(AbstractVolume):
             if status_check_config is not None
             else None
         )
-        self._status_data_parser = VfsVolumeStatusDataParser()
 
     @override
     def info(self) -> VolumeInfo:
@@ -466,14 +460,8 @@ class BaseVolume(AbstractVolume):
         )
 
     @override
-    def volume_status_check(self) -> AbstractProbeCheck[StorageVolumeName] | None:
+    def volume_status_checker(self) -> AbstractVolumeStatusCheck | None:
         return self._status_check
-
-    @override
-    def volume_status_reporter(self) -> AbstractVolumeStatusReporter | None:
-        if self._status_check is None:
-            return None
-        return VolumeStatusReporter(self._status_check, self._status_data_parser)
 
     @override
     async def get_capabilities(self) -> frozenset[StorageBackendCapability]:

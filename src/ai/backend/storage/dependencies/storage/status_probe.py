@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
-from ai.backend.common.storage.probe.registry import VolumeStatusReporterRegistry
+from ai.backend.common.storage.probe.registry import VolumeStatusCheckRegistry
 from ai.backend.common.storage.probe.runner import ProbeCheckRunner, ProbeCheckRunnerArgs
 from ai.backend.storage.volumes.pool import VolumePool
 
@@ -23,7 +23,7 @@ class StatusProbeInput:
 class StatusProbeResources:
     """Container for status probe resources."""
 
-    registry: VolumeStatusReporterRegistry
+    registry: VolumeStatusCheckRegistry
 
 
 class StatusProbeProvider(NonMonitorableDependencyProvider[StatusProbeInput, StatusProbeResources]):
@@ -41,10 +41,9 @@ class StatusProbeProvider(NonMonitorableDependencyProvider[StatusProbeInput, Sta
     @asynccontextmanager
     @override
     async def provide(self, setup_input: StatusProbeInput) -> AsyncIterator[StatusProbeResources]:
-        registry = VolumeStatusReporterRegistry(setup_input.volume_pool.volume_status_reporters())
-        runner = ProbeCheckRunner(
-            ProbeCheckRunnerArgs(checks=setup_input.volume_pool.volume_status_checks())
-        )
+        checks = setup_input.volume_pool.volume_status_checks()
+        registry = VolumeStatusCheckRegistry(checks)
+        runner = ProbeCheckRunner(ProbeCheckRunnerArgs(checks=checks))
         if setup_input.pidx == 0:
             await runner.start()
         try:
