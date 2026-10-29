@@ -93,7 +93,8 @@ class VFolderAccessControlInfoGQL:
     permission: VFolderMountPermissionGQL = gql_field(
         description=(
             "The folder's default mount permission level: READ_ONLY (ro), READ_WRITE (rw), "
-            "or RW_DELETE (wd). The level the current user mounts at is "
+            "or RW_DELETE (wd). Applies to a shared user without their own "
+            "`vfolderMountPolicies` entry. The level the current user mounts at is "
             "`VFolder.mountPermission`."
         )
     )
