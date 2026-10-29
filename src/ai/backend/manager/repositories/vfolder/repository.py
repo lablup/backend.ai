@@ -6,7 +6,6 @@ from typing import Any, cast
 import sqlalchemy as sa
 from sqlalchemy import exc as sa_exc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import current_user
@@ -87,7 +86,11 @@ from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
-from ai.backend.manager.models.resource_policy.row import keypair_resource_policies
+from ai.backend.manager.models.resource_policy.row import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+    keypair_resource_policies,
+)
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
@@ -158,6 +161,7 @@ from ai.backend.manager.repositories.vfolder.types import (
     BulkVFolderPurgeResult,
     VFolderPurgeFailure,
 )
+from ai.backend.manager.views.user import UserResourceInfo
 
 vfolder_repository_resilience = Resilience(
     policies=[
@@ -323,25 +327,30 @@ class VfolderRepository:
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             if group_uuid:
-                group_row: ProjectRow | None = await db_session.scalar(
-                    sa.select(ProjectRow)
+                project_max_vfolder_count: int | None = await db_session.scalar(
+                    sa.select(ProjectResourcePolicyRow.max_vfolder_count)
+                    .select_from(ProjectRow)
+                    .join(
+                        ProjectResourcePolicyRow,
+                        ProjectRow.resource_policy == ProjectResourcePolicyRow.name,
+                    )
                     .where(ProjectRow.id == group_uuid)
-                    .options(selectinload(ProjectRow.resource_policy_row))
                 )
-                if group_row is None:
+                if project_max_vfolder_count is None:
                     raise ProjectNotFound(f"Project with {group_uuid} not found.")
 
-                return group_row.resource_policy_row.max_vfolder_count
+                return project_max_vfolder_count
 
-            user_row: UserRow | None = await db_session.scalar(
-                sa.select(UserRow)
+            user_max_vfolder_count: int | None = await db_session.scalar(
+                sa.select(UserResourcePolicyRow.max_vfolder_count)
+                .select_from(UserRow)
+                .join(UserResourcePolicyRow, UserRow.resource_policy == UserResourcePolicyRow.name)
                 .where(UserRow.uuid == user_uuid)
-                .options(selectinload(UserRow.resource_policy_row))
             )
-            if user_row is None:
+            if user_max_vfolder_count is None:
                 raise UserNotFound(f"User with UUID {user_uuid} not found.")
 
-            return user_row.resource_policy_row.max_vfolder_count
+            return user_max_vfolder_count
 
     @vfolder_repository_resilience.apply()
     async def resolve_vfolder_ids_by_names(self, names: Sequence[str]) -> dict[str, uuid.UUID]:
@@ -428,8 +437,7 @@ class VfolderRepository:
         user_info = await self.get_user_resource_info(creator.creator_id)
         if user_info is None:
             raise UserNotFound(f"User with {creator.creator_id} not found.")
-        _, max_quota_scope_size, container_uid = user_info
-        return max_quota_scope_size, container_uid
+        return user_info.max_quota_scope_size, user_info.container_uid
 
     @vfolder_repository_resilience.apply()
     async def mark_vfolder_ready(self, vfolder_id: VFolderUUID) -> VFolderData:
@@ -1055,61 +1063,55 @@ class VfolderRepository:
 
         async with self._db.begin_readonly_session_read_committed() as session:
             if isinstance(group_id_or_name, str):
-                query = (
-                    sa.select(ProjectRow)
-                    .where(
-                        (ProjectRow.domain_name == domain_name)
-                        & (ProjectRow.name == group_id_or_name)
-                    )
-                    .options(selectinload(ProjectRow.resource_policy_row))
-                )
+                project_cond = ProjectRow.name == group_id_or_name
             else:  # UUID
-                query = (
-                    sa.select(ProjectRow)
-                    .where(
-                        (ProjectRow.domain_name == domain_name)
-                        & (ProjectRow.id == group_id_or_name)
-                    )
-                    .options(selectinload(ProjectRow.resource_policy_row))
+                project_cond = ProjectRow.id == group_id_or_name
+            query = (
+                sa.select(
+                    ProjectRow.id,
+                    ProjectRow.type,
+                    ProjectResourcePolicyRow.max_vfolder_count,
+                    ProjectResourcePolicyRow.max_quota_scope_size,
                 )
+                .select_from(ProjectRow)
+                .join(
+                    ProjectResourcePolicyRow,
+                    ProjectRow.resource_policy == ProjectResourcePolicyRow.name,
+                )
+                .where((ProjectRow.domain_name == domain_name) & project_cond)
+            )
+            row = (await session.execute(query)).first()
 
-            result = await session.execute(query)
-            group_row = result.scalar()
-
-            if not group_row:
+            if row is None:
                 return None
 
             return ProjectResourceInfo(
-                project_id=group_row.id,
-                max_vfolder_count=group_row.resource_policy_row.max_vfolder_count,
-                max_quota_scope_size=group_row.resource_policy_row.max_quota_scope_size,
-                project_type=group_row.type,
+                project_id=row.id,
+                max_vfolder_count=row.max_vfolder_count,
+                max_quota_scope_size=row.max_quota_scope_size,
+                project_type=row.type,
             )
 
     @vfolder_repository_resilience.apply()
-    async def get_user_resource_info(
-        self, user_id: uuid.UUID
-    ) -> tuple[int, int, int | None] | None:
+    async def get_user_resource_info(self, user_id: uuid.UUID) -> UserResourceInfo | None:
         """
-        Get user resource information.
-        Returns (max_vfolder_count, max_quota_scope_size, container_uid) or None.
+        Get user resource information, or None when the user is not found.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             query = (
-                sa.select(UserRow)
+                sa.select(UserResourcePolicyRow.max_quota_scope_size, UserRow.container_uid)
+                .select_from(UserRow)
+                .join(UserResourcePolicyRow, UserRow.resource_policy == UserResourcePolicyRow.name)
                 .where(UserRow.uuid == user_id)
-                .options(selectinload(UserRow.resource_policy_row))
             )
-            result = await session.execute(query)
-            user_row = result.scalar()
+            row = (await session.execute(query)).first()
 
-            if not user_row:
+            if row is None:
                 return None
 
-            return (
-                user_row.resource_policy_row.max_vfolder_count,
-                user_row.resource_policy_row.max_quota_scope_size,
-                user_row.container_uid,
+            return UserResourceInfo(
+                max_quota_scope_size=row.max_quota_scope_size,
+                container_uid=row.container_uid,
             )
 
     async def _get_vfolder_by_id(
