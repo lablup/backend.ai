@@ -602,7 +602,7 @@ class AuthDBSource:
         target_password_info: PasswordInfo,
     ) -> sa.RowMapping:
         """Verify credentials without password migration (for signout, etc.)"""
-        async with self._db.begin_readonly() as conn:
+        async with self._db.begin_readonly_read_committed() as conn:
             result = await conn.execute(
                 sa.select(users)
                 .select_from(users)
