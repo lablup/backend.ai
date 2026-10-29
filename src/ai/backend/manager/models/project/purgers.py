@@ -16,13 +16,11 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountID
 from ai.backend.common.data.vfolder_auto_mount.types import VFolderAutoMountScopeType
 from ai.backend.common.types import KernelId, SessionId
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.resource import ProjectHasActiveKernelsError
 from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.kernel.row import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    KernelRow,
-)
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.session.row import SessionRow
@@ -55,7 +53,7 @@ class ProjectKernelPurger(FieldBatchPurger[ProjectID, KernelRow, KernelId]):
             ConflictCheck(
                 condition=lambda: sa.and_(
                     KernelRow.group_id == self.project_id,
-                    KernelRow.status.in_(AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES),
+                    KernelRow.status.in_(KernelStatus.agent_resource_occupying_statuses()),
                 ),
                 error=ProjectHasActiveKernelsError(
                     f"error on deleting project {self.project_id} with active kernels"
