@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.query import (
     UUIDFilter,
 )
 from ai.backend.common.dto.manager.v2.common import NonEmptyList, OrderDirection
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
     RolePermissionPresetFilter,
 )
@@ -191,6 +192,10 @@ class RolePresetFilter(BaseRequestModel):
     permissions: RolePresetPermissionNestedFilter | None = Field(
         default=None,
         description="Filter by conditions on the permission entries the preset carries.",
+    )
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by the labels on the entity.",
     )
     AND: list[RolePresetFilter] | None = Field(default=None, description="AND conjunction.")
     OR: list[RolePresetFilter] | None = Field(default=None, description="OR conjunction.")

@@ -532,6 +532,11 @@ class RolePresetAdapter(BaseAdapter):
                 RolePresetSearchableFields.nested.permissions.correlation,
                 self._convert_permission_filter,
             ),
+            *self.apply_to_many_filter(
+                filter_.labels,
+                RolePresetSearchableFields.nested.labels.correlation,
+                self._convert_entity_label_filter,
+            ),
         ]
         if filter_.AND:
             for sub in filter_.AND:
