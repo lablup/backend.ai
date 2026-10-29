@@ -205,9 +205,7 @@ class TestCreateVFolderAction:
     ) -> None:
         repository.get_group_resource_info = AsyncMock(return_value=project_info)
         repository.get_user_resource_info = AsyncMock(
-            return_value=UserResourceInfo(
-                max_vfolder_count=10, max_quota_scope_size=0, container_uid=None
-            )
+            return_value=UserResourceInfo(max_quota_scope_size=0, container_uid=None)
         )
         repository.ensure_host_permission_allowed = AsyncMock()
         repository.create_vfolder_with_permission = AsyncMock()

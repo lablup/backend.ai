@@ -1097,11 +1097,7 @@ class VfolderRepository:
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             query = (
-                sa.select(
-                    UserResourcePolicyRow.max_vfolder_count,
-                    UserResourcePolicyRow.max_quota_scope_size,
-                    UserRow.container_uid,
-                )
+                sa.select(UserResourcePolicyRow.max_quota_scope_size, UserRow.container_uid)
                 .select_from(UserRow)
                 .join(UserResourcePolicyRow, UserRow.resource_policy == UserResourcePolicyRow.name)
                 .where(UserRow.uuid == user_id)
@@ -1112,7 +1108,6 @@ class VfolderRepository:
                 return None
 
             return UserResourceInfo(
-                max_vfolder_count=row.max_vfolder_count,
                 max_quota_scope_size=row.max_quota_scope_size,
                 container_uid=row.container_uid,
             )

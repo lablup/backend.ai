@@ -2729,7 +2729,6 @@ class TestVfolderRepositoryResourcePolicyReads:
         info = await vfolder_repository.get_user_resource_info(test_user)
 
         assert info == UserResourceInfo(
-            max_vfolder_count=7,
             max_quota_scope_size=BinarySize.finite_from_str("3GiB"),
             container_uid=2000,
         )

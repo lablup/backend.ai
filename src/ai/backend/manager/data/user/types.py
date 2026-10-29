@@ -95,7 +95,6 @@ class SessionOwnerContext:
 
 @dataclass(frozen=True)
 class UserResourceInfo:
-    max_vfolder_count: int
     max_quota_scope_size: int
     container_uid: int | None
 
