@@ -38,6 +38,7 @@ from ai.backend.manager.errors.kernel import (
     TooManyKernelsFound,
     TooManySessionsMatched,
 )
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.searchers import (
     CanonicalImageSearcher,
@@ -59,6 +60,7 @@ from ai.backend.manager.models.session.row import (
 from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.session.updaters import SessionUpdater
+from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.session_template.row import SessionTemplateRow
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRole, UserRow
@@ -654,6 +656,25 @@ class SessionDBSource:
             )
             for key in keys
         }
+
+    async def bulk_get_designated_agent_ids_by_session(
+        self,
+        session_ids: Sequence[SessionID],
+    ) -> dict[SessionID, list[AgentId]]:
+        """Read the agent ids each session designates; one with none is absent."""
+        if not session_ids:
+            return {}
+        stmt = (
+            sa.select(SessionDesignatedAgentRow.session_id, AgentRow.id)
+            .join(AgentRow, AgentRow.uuid == SessionDesignatedAgentRow.agent_uuid)
+            .where(SessionDesignatedAgentRow.session_id.in_(session_ids))
+            .order_by(AgentRow.id)
+        )
+        designated: dict[SessionID, list[AgentId]] = {}
+        async with self._db.begin_readonly_session_read_committed() as db_sess:
+            for session_id, agent_id in await db_sess.execute(stmt):
+                designated.setdefault(SessionID(session_id), []).append(AgentId(agent_id))
+        return designated
 
     async def batch_get_resource_allocation_by_session(
         self,

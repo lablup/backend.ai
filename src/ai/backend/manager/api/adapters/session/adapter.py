@@ -185,6 +185,9 @@ from ai.backend.manager.services.session.actions.bulk_get_kernels import BulkGet
 from ai.backend.manager.services.session.actions.bulk_get_main_kernel_groups import (
     BulkGetMainKernelGroupsAction,
 )
+from ai.backend.manager.services.session.actions.bulk_get_session_designated_agent_ids import (
+    BulkGetSessionDesignatedAgentIdsAction,
+)
 from ai.backend.manager.services.session.actions.compute_schedule import (
     ComputeScheduleAction,
 )
@@ -520,7 +523,7 @@ class SessionAdapter(BaseAdapter):
             return []
         result = await self._session.bulk_get.run(BulkGetSessionsAction(ids=list(session_ids)))
         nodes = iter(
-            await self._session_data_to_nodes([
+            await self._session_data_to_node_results([
                 item.value.to_session_data() for item in result.items if item.value is not None
             ])
         )
@@ -737,16 +740,43 @@ class SessionAdapter(BaseAdapter):
         return result
 
     async def _session_data_to_nodes(self, data: Sequence[SessionData]) -> list[SessionNode]:
-        """Convert session data to nodes, batch-loading their slot allocations."""
-        allocations = await self.batch_resource_allocation_by_session([
-            SessionID(item.id) for item in data
-        ])
+        """Convert session data to nodes for a payload, which carries nodes only; the first
+        session that failed to load fails the request."""
         nodes: list[SessionNode] = []
-        for item, allocation in zip(data, allocations, strict=True):
-            if isinstance(allocation, Exception):
-                raise allocation
-            nodes.append(self._session_data_to_node(item, allocation))
+        for node in await self._session_data_to_node_results(data):
+            if isinstance(node, Exception):
+                raise node
+            nodes.append(node)
         return nodes
+
+    async def _session_data_to_node_results(
+        self, data: Sequence[SessionData]
+    ) -> list[SessionNode | Exception]:
+        """Convert session data to nodes, batch-loading their slot allocations and
+        designated agents. A session whose allocation or agents fail to load answers
+        with that error instead of a node."""
+        session_ids = [SessionID(item.id) for item in data]
+        allocations = await self.batch_resource_allocation_by_session(session_ids)
+        designated = (
+            (
+                await self._session.bulk_get_session_designated_agent_ids.run(
+                    BulkGetSessionDesignatedAgentIdsAction(session_ids=session_ids)
+                )
+            ).items
+            if session_ids
+            else []
+        )
+        results: list[SessionNode | Exception] = []
+        for item, allocation, agents in zip(data, allocations, designated, strict=True):
+            if isinstance(allocation, Exception):
+                results.append(allocation)
+                continue
+            error = self.batch_load_failure(agents.error)
+            if error is not None:
+                results.append(error)
+                continue
+            results.append(self._session_data_to_node(item, allocation, agents.value or []))
+        return results
 
     async def _kernel_infos_to_nodes(self, data: Sequence[KernelInfo]) -> list[KernelNode]:
         """Convert kernel infos to nodes, batch-loading their slot allocations."""
@@ -1443,7 +1473,7 @@ class SessionAdapter(BaseAdapter):
 
     @staticmethod
     def _session_data_to_node(
-        data: SessionData, allocation: ResourceAllocationGQLDTO
+        data: SessionData, allocation: ResourceAllocationGQLDTO, designated_agent_ids: list[AgentId]
     ) -> SessionNode:
         environ = (
             EnvironmentVariablesInfoDTO(
@@ -1479,7 +1509,7 @@ class SessionAdapter(BaseAdapter):
                 allocation=allocation,
                 resource_group_name=data.resource_group_name,
                 session_group_id=data.session_group_id,
-                designated_agent_ids=data.designated_agent_ids,
+                designated_agent_ids=[str(agent_id) for agent_id in designated_agent_ids] or None,
             ),
             lifecycle=SessionLifecycleInfoGQLDTO(
                 status=_fold_session_status(data.status),

@@ -1,4 +1,5 @@
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.types import AgentId
 from ai.backend.manager.actions.registry.field import LookupFieldGroup
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
@@ -37,6 +38,9 @@ from ai.backend.manager.services.session.actions.bulk_get_kernel_groups import (
 from ai.backend.manager.services.session.actions.bulk_get_kernels import BulkGetKernelsAction
 from ai.backend.manager.services.session.actions.bulk_get_main_kernel_groups import (
     BulkGetMainKernelGroupsAction,
+)
+from ai.backend.manager.services.session.actions.bulk_get_session_designated_agent_ids import (
+    BulkGetSessionDesignatedAgentIdsAction,
 )
 from ai.backend.manager.services.session.actions.commit_session import (
     CommitSessionAction,
@@ -237,6 +241,9 @@ class SessionProcessors:
     ]
     # What the DataLoader reads: checked per owning session.
     bulk_get_kernels: PartialBulkFieldActionProcessor[BulkGetKernelsAction, KernelInfo]
+    bulk_get_session_designated_agent_ids: PartialBulkActionProcessor[
+        BulkGetSessionDesignatedAgentIdsAction, list[AgentId]
+    ]
     batch_get_session_resource_allocation: PartialBulkActionProcessor[
         BatchGetSessionResourceAllocationAction, ResourceAllocationAggregate
     ]
@@ -336,6 +343,9 @@ class SessionProcessors:
             ScopedSearchKernelsAction
         )
         self.global_search_kernels = kernels.global_searcher_ops(GlobalSearchKernelsAction)
+        self.bulk_get_session_designated_agent_ids = group.partial_bulk(
+            BulkGetSessionDesignatedAgentIdsAction, service.bulk_get_session_designated_agent_ids
+        )
         self.batch_get_session_resource_allocation = group.partial_bulk(
             BatchGetSessionResourceAllocationAction, service.batch_get_session_resource_allocation
         )
