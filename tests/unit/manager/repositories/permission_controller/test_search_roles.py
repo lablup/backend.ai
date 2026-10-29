@@ -17,7 +17,7 @@ from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleEntityType, RoleID
-from ai.backend.common.data.entity.role_preset import RolePresetID
+from ai.backend.common.data.entity.role_preset import RolePresetEntityType, RolePresetID
 from ai.backend.common.data.filter_specs import (
     StringMatchSpec,
     UUIDEqualMatchSpec,
@@ -27,12 +27,15 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.clauses import QueryCondition
 
 # ORM cluster registration: configure_mappers() (triggered when this isolated
 # test registers a domain-cluster row) resolves string relationships against the
 # registry. These rows are reachable via relationships but are not otherwise
 # imported/registered by this test; _ORM_CLUSTER keeps them live.
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelSearchableFields
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
@@ -508,6 +511,113 @@ class TestSearchRolesUsingRolePreset:
 
         assert [item.id for item in result.items] == [role_of_preset]
         assert result.total_count == 1
+
+
+def _labelled_env_prod() -> list[QueryCondition]:
+    exact = StringMatchSpec(value="env", case_insensitive=False, negated=False)
+    prod = StringMatchSpec(value="prod", case_insensitive=False, negated=False)
+    return [
+        EntityLabelSearchableFields.own.key.filter.equals(exact),
+        EntityLabelSearchableFields.own.value.filter.equals(prod),
+    ]
+
+
+@dataclass
+class LabelledRolesAndPresets:
+    labelled_role: uuid.UUID
+    labelled_preset: RolePresetID
+
+
+class TestSearchRolesAndPresetsByLabel:
+    """A label condition keeps only the roles and presets carrying that label."""
+
+    @pytest.fixture
+    async def db_with_rbac_tables(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                RolePresetRow,
+                RoleRow,
+                VirtualEntityRow,
+                EntityLabelRow,
+            ],
+        ):
+            yield database_connection
+
+    @pytest.fixture
+    async def labelled(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+    ) -> LabelledRolesAndPresets:
+        """Two roles and two presets; one of each carries ``env=prod``, the other ``env=dev``."""
+        scope_id = uuid.uuid4()
+        async with db_with_rbac_tables.begin_session() as db_sess:
+            db_sess.add(VirtualEntityRow(entity_type=ProjectEntityType(), entity_id=scope_id))
+            presets = [
+                RolePresetRow(name=name, scope_type=ProjectEntityType())
+                for name in ("preset-prod", "preset-dev")
+            ]
+            roles = [
+                RoleRow(
+                    name=name, description=name, scope_type=ProjectEntityType(), scope_id=scope_id
+                )
+                for name in ("role-prod", "role-dev")
+            ]
+            db_sess.add_all([*presets, *roles])
+            await db_sess.flush()
+            for entity_type, rows in (
+                (RolePresetEntityType(), presets),
+                (RoleEntityType(), roles),
+            ):
+                db_sess.add_all([
+                    EntityLabelRow(
+                        entity_type=entity_type, entity_id=rows[0].id, key="env", value="prod"
+                    ),
+                    EntityLabelRow(
+                        entity_type=entity_type, entity_id=rows[1].id, key="env", value="dev"
+                    ),
+                ])
+            await db_sess.flush()
+            return LabelledRolesAndPresets(labelled_role=roles[0].id, labelled_preset=presets[0].id)
+
+    async def test_a_role_search_keeps_only_the_role_carrying_the_label(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        labelled: LabelledRolesAndPresets,
+    ) -> None:
+        searcher = RoleSearcher(
+            conditions=[RoleSearchableFields.nested.labels.correlation.some(_labelled_env_prod())],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await OpsRepository[RoleData](V2DBOpsProvider(db_with_rbac_tables)).global_search(
+            GlobalSearcher(used_by=(), searcher=searcher)
+        )
+
+        assert [item.id for item in result.items] == [labelled.labelled_role]
+
+    async def test_a_preset_search_keeps_only_the_preset_carrying_the_label(
+        self,
+        db_with_rbac_tables: ExtendedAsyncSAEngine,
+        labelled: LabelledRolesAndPresets,
+    ) -> None:
+        searcher = RolePresetSearcher(
+            conditions=[
+                RolePresetSearchableFields.nested.labels.correlation.some(_labelled_env_prod())
+            ],
+            orders=[],
+            pagination=OffsetPagination(limit=10, offset=0),
+        )
+
+        result = await OpsRepository[RolePresetData](
+            V2DBOpsProvider(db_with_rbac_tables)
+        ).global_search(GlobalSearcher(used_by=(), searcher=searcher))
+
+        assert [item.id for item in result.items] == [labelled.labelled_preset]
 
 
 class TestSearchRolesTotalCountNotInflated:
