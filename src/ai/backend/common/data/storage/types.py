@@ -74,6 +74,13 @@ class StorageBackendCapabilities(BackendAISchema):
     supported: frozenset[StorageBackendCapability] = Field(default_factory=frozenset)
 
 
+class StorageBackendMetadata(BackendAISchema):
+    """A storage backend implementation, as ``storage_backend_types`` records it."""
+
+    name: StorageBackendType
+    capabilities: StorageBackendCapabilities
+
+
 class StorageVolumeUsageField(enum.StrEnum):
     """A usage figure a volume may show a user, named as the ``exposed_volume_info``
     setting names it."""

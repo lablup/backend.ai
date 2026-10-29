@@ -21,6 +21,7 @@ from ai.backend.manager.repositories.ops.v2.replica_group.provider import Replic
 from ai.backend.manager.repositories.ops.v2.retention.provider import RetentionOpsProvider
 from ai.backend.manager.repositories.ops.v2.role_preset.provider import RolePresetOpsProvider
 from ai.backend.manager.repositories.ops.v2.secret.provider import SecretOpsProvider
+from ai.backend.manager.repositories.ops.v2.storage_status.provider import StorageStatusOpsProvider
 from ai.backend.manager.secret.pool import KeyProviderPool
 
 
@@ -36,6 +37,7 @@ class RepositoryArgs:
     retention_ops_provider: RetentionOpsProvider
     role_preset_ops_provider: RolePresetOpsProvider
     secret_ops_provider: SecretOpsProvider
+    storage_status_ops_provider: StorageStatusOpsProvider
     storage_manager: StorageSessionManager
     config_provider: ManagerConfigProvider
     key_provider_pool: KeyProviderPool
