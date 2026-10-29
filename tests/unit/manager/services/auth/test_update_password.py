@@ -8,7 +8,6 @@ from ai.backend.common.plugin.hook import HookResult, HookResults
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.common import RejectedByHook
-from ai.backend.manager.models.user.row import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.repository import AuthRepository
 from ai.backend.manager.repositories.user_resource_policy.repository import (
     UserResourcePolicyRepository,
@@ -18,6 +17,7 @@ from ai.backend.manager.services.auth.actions.update_password import (
     UpdatePasswordAction,
 )
 from ai.backend.manager.services.auth.service import AuthService
+from ai.backend.manager.views.auth import UserCredential
 
 
 @pytest.fixture
@@ -72,12 +72,10 @@ async def test_update_password_successful(
     )
 
     # Valid old password
-    mock_auth_repository.check_credential_without_migration.return_value = {
-        "uuid": "12345678-1234-5678-1234-567812345678",
-        "email": action.email,
-        "role": UserRole.USER,
-        "status": UserStatus.ACTIVE,
-    }
+    mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
+        hashed_password="hashed_password",
+    )
 
     # Password update succeeds
     mock_auth_repository.update_user_password.return_value = None
@@ -114,12 +112,10 @@ async def test_update_password_fails_when_new_passwords_dont_match(
     )
 
     # Valid old password
-    mock_auth_repository.check_credential_without_migration.return_value = {
-        "uuid": "12345678-1234-5678-1234-567812345678",
-        "email": action.email,
-        "role": UserRole.USER,
-        "status": UserStatus.ACTIVE,
-    }
+    mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
+        hashed_password="hashed_password",
+    )
 
     result = await auth_service.update_password(action)
 
@@ -184,12 +180,10 @@ async def test_update_password_with_hook_rejection(
     )
 
     # Valid old password
-    mock_auth_repository.check_credential_without_migration.return_value = {
-        "uuid": "test-uuid",
-        "email": action.email,
-        "role": UserRole.USER,
-        "status": UserStatus.ACTIVE,
-    }
+    mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
+        hashed_password="hashed_password",
+    )
 
     # Hook rejects the new password format
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
@@ -221,12 +215,10 @@ async def test_update_password_repository_call(
     )
 
     # Setup successful scenario
-    mock_auth_repository.check_credential_without_migration.return_value = {
-        "uuid": "test-uuid",
-        "email": action.email,
-        "role": UserRole.USER,
-        "status": UserStatus.ACTIVE,
-    }
+    mock_auth_repository.check_credential_without_migration.return_value = UserCredential(
+        user_id=UserID(UUID("12345678-1234-5678-1234-567812345678")),
+        hashed_password="hashed_password",
+    )
     mock_hook_plugin_ctx.dispatch.return_value = HookResult(
         status=HookResults.PASSED,
         result=None,

@@ -65,6 +65,7 @@ from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.views.auth import UserCredential
 
 auth_db_source_resilience = Resilience(
     policies=[
@@ -600,19 +601,19 @@ class AuthDBSource:
         domain_name: str,
         email: str,
         target_password_info: PasswordInfo,
-    ) -> sa.RowMapping:
+    ) -> UserCredential:
         """Verify credentials without password migration (for signout, etc.)"""
         async with self._db.begin_readonly_read_committed() as conn:
             result = await conn.execute(
-                sa.select(users)
-                .select_from(users)
-                .where((users.c.email == email) & (users.c.domain_name == domain_name)),
+                sa.select(users.c.uuid, users.c.password).where(
+                    (users.c.email == email) & (users.c.domain_name == domain_name)
+                ),
             )
             row = result.first()
             if row is None:
                 raise AuthorizationFailed("User credential mismatch.")
             self._check_password(row, target_password_info)
-        return row._mapping
+        return UserCredential(user_id=UserID(row.uuid), hashed_password=row.password)
 
     @auth_db_source_resilience.apply()
     async def fetch_default_keypair(self, user_uuid: UUID) -> KeyPairData:

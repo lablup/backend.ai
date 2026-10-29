@@ -18,6 +18,7 @@ from ai.backend.manager.models.association_container_registries_groups.row impor
 )
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.hasher.factory import compare_to_hashed_password
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
@@ -193,17 +194,17 @@ class TestCheckCredentialWithoutMigration:
     ) -> _Credential:
         return await self._add_user(db_with_cleanup, domain, user_resource_policy_name, None)
 
-    async def test_returns_the_user_row_for_a_matching_credential(
+    async def test_returns_the_user_and_the_stored_hash_for_a_matching_credential(
         self,
         auth_repository: AuthRepository,
         user_with_password: _Credential,
     ) -> None:
-        row = await auth_repository.check_credential_without_migration(
+        credential = await auth_repository.check_credential_without_migration(
             user_with_password.domain_name, user_with_password.email, _password_info(_PASSWORD)
         )
 
-        assert row["uuid"] == user_with_password.user_uuid
-        assert row["email"] == user_with_password.email
+        assert credential.user_id == user_with_password.user_uuid
+        assert compare_to_hashed_password(_PASSWORD, credential.hashed_password)
 
     async def test_rejects_a_wrong_password(
         self,

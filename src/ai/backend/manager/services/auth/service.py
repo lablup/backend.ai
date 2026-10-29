@@ -740,7 +740,7 @@ class AuthService:
             ),
         )
         new_password = action.new_password
-        if compare_to_hashed_password(new_password, checked_user["password"]):
+        if compare_to_hashed_password(new_password, checked_user.hashed_password):
             raise AuthorizationFailed("Cannot update to the same password as an existing password.")
 
         # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
@@ -763,11 +763,11 @@ class AuthService:
             salt_size=auth_config.password_hash_salt_size,
         )
         changed_at = await self._auth_repository.update_user_password_by_uuid(
-            checked_user["uuid"], password_info
+            checked_user.user_id, password_info
         )
 
         return UpdatePasswordNoAuthActionResult(
-            user_id=checked_user["uuid"],
+            user_id=checked_user.user_id,
             password_changed_at=changed_at,
         )
 
