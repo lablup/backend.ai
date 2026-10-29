@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import enum
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Final, NewType
+from typing import Any, Final, NewType
 
 from pydantic import ConfigDict, Field
 
@@ -94,36 +95,39 @@ class StorageVolumeUsageExposure(BackendAISchema):
     )
 
 
-class ServiceStorageStatus(enum.StrEnum):
-    """How a service currently sees a storage backend or volume it relates to.
+class StorageCheckState(enum.StrEnum):
+    """Whether a service has checked a storage backend or volume it relates to.
 
     not_checked: declared, but no check has run yet.
-    healthy: the last check found no problem.
-    unhealthy: the check found a problem.
-    lost: the service no longer declares it.
+    checked: a check has run.
     """
 
     NOT_CHECKED = "not_checked"
-    HEALTHY = "healthy"
-    UNHEALTHY = "unhealthy"
-    LOST = "lost"
+    CHECKED = "checked"
+
+
+class StorageAnomaly(enum.StrEnum):
+    """Whether an anomaly was detected in a storage backend's or volume's reports."""
+
+    NONE = "none"
+    DETECTED = "detected"
+
+
+class StorageStatusCheckType(enum.StrEnum):
+    """Which status check a result comes from, deciding how the result is read."""
+
+    VFS = "vfs"
 
 
 @dataclass(frozen=True)
-class StorageStatusResult:
-    """What one status check observed, when it started and how long it took.
+class StorageStatusResultData:
+    """What one status check observed, in the shape every check reports. ``error_msg`` is
+    null where the observation succeeded; ``extra`` holds what only its check type records."""
 
-    ``error_msg`` is null where the observation itself succeeded, which says nothing
-    about whether the subject is in order; reading the observation decides that.
-    """
-
-    check_started_at: datetime
+    check_type: StorageStatusCheckType
+    check_state: StorageCheckState
+    check_started_at: datetime | None
     duration: timedelta | None
     error_msg: str | None
-
-
-@dataclass(frozen=True)
-class VfsVolumeStatusResult(StorageStatusResult):
-    """What a vfs volume's mount looked like, null where the observation failed."""
-
-    device_id: int | None
+    device_id: str | None
+    extra: Mapping[str, Any] | None

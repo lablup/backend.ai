@@ -10,7 +10,7 @@ from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.defs import NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
-from ai.backend.common.storage.probe.registry import VolumeStatusCheck
+from ai.backend.common.storage.probe.volume import AbstractVolumeStatusCheck
 from ai.backend.common.types import VolumeID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.config.unified import StorageProxyUnifiedConfig, VolumeInfoConfig
@@ -34,7 +34,7 @@ def _parse_volume_id(volume_name: StorageVolumeName) -> VolumeID | None:
 class VolumePool:
     _volumes: Mapping[StorageVolumeName, AbstractVolume]
     _volumes_by_id: Mapping[VolumeID, AbstractVolume]
-    _volume_status_checks: Sequence[VolumeStatusCheck]
+    _volume_status_checks: Sequence[AbstractVolumeStatusCheck]
 
     def __init__(self, volumes: Mapping[StorageVolumeName, AbstractVolume]) -> None:
         self._volumes = volumes
@@ -106,7 +106,7 @@ class VolumePool:
         for volume in self._volumes.values():
             await volume.shutdown()
 
-    def volume_status_checks(self) -> Sequence[VolumeStatusCheck]:
+    def volume_status_checks(self) -> Sequence[AbstractVolumeStatusCheck]:
         return self._volume_status_checks
 
     def list_volumes(self) -> Mapping[StorageVolumeName, VolumeInfo]:

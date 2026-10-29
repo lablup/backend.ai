@@ -20,7 +20,7 @@ from ai.backend.common.data.storage.types import (
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
-from ai.backend.common.storage.probe.registry import VolumeStatusCheck
+from ai.backend.common.storage.probe.volume import AbstractVolumeStatusCheck
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import InvalidSubpathError, VFolderNotFoundError
@@ -236,7 +236,7 @@ class AbstractVolume(metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    def volume_status_checker(self) -> VolumeStatusCheck | None:
+    def volume_status_checker(self) -> AbstractVolumeStatusCheck | None:
         raise NotImplementedError
 
     @final

@@ -9,7 +9,7 @@ import secrets
 import shutil
 import time
 from collections import deque
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Mapping, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any, ClassVar, final, override
 
@@ -18,12 +18,16 @@ import janus
 import trafaret as t
 
 from ai.backend.common.asyncio import run_in_executor_with_context
+from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.data.storage.types import (
     StorageBackendCapability,
     StorageBackendType,
 )
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
-from ai.backend.common.storage.probe.registry import VolumeStatusCheck
+from ai.backend.common.etcd import AsyncEtcd
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.storage.probe.volume import AbstractVolumeStatusCheck
 from ai.backend.common.storage.volume.vfs import VfsVolumeStatusCheck
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.logging.structured import StructuredLogger
@@ -402,6 +406,37 @@ class BaseFSOpModel(AbstractFSOpModel):
 
 class BaseVolume(AbstractVolume):
     name: ClassVar[StorageBackendType] = StorageBackendType("vfs")
+    _status_check: VfsVolumeStatusCheck | None
+
+    def __init__(
+        self,
+        local_config: Mapping[str, Any],
+        mount_path: Path,
+        *,
+        etcd: AsyncEtcd,
+        event_dispatcher: EventDispatcher,
+        event_producer: EventProducer,
+        watcher: WatcherClient | None = None,
+        options: Mapping[str, Any] | None = None,
+        volume_name: StorageVolumeName,
+        status_check_config: VolumeStatusCheckConfig | None,
+    ) -> None:
+        super().__init__(
+            local_config,
+            mount_path,
+            etcd=etcd,
+            options=options,
+            volume_name=volume_name,
+            status_check_config=status_check_config,
+            event_dispatcher=event_dispatcher,
+            event_producer=event_producer,
+            watcher=watcher,
+        )
+        self._status_check = (
+            VfsVolumeStatusCheck.create(volume_name, mount_path, status_check_config)
+            if status_check_config is not None
+            else None
+        )
 
     @override
     def info(self) -> VolumeInfo:
@@ -425,12 +460,8 @@ class BaseVolume(AbstractVolume):
         )
 
     @override
-    def volume_status_checker(self) -> VolumeStatusCheck | None:
-        if self._status_check_config is None:
-            return None
-        return VfsVolumeStatusCheck.create(
-            self._volume_name, self.mount_path, self._status_check_config
-        )
+    def volume_status_checker(self) -> AbstractVolumeStatusCheck | None:
+        return self._status_check
 
     @override
     async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
