@@ -31161,7 +31161,7 @@ type VFolder implements Node
   entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 
   """
-  Added in 26.9.0. The permission bits the current user holds on this vfolder.
+  Added in 26.9.0. The permission bits the current user holds on this vfolder. On a folder shared to them, capped by the share's `EntityShare.permissions`. Separate from the mount level (`mountPermission`).
   """
   permissions: [PermissionBit!]!
 
@@ -31178,7 +31178,7 @@ type VFolderAccessControlInfo
   @join__type(graph: STRAWBERRY)
 {
   """
-  The folder's default mount permission level: READ_ONLY (ro), READ_WRITE (rw), or RW_DELETE (wd). The level the current user mounts at is `VFolder.mountPermission`.
+  The folder's default mount permission level: READ_ONLY (ro), READ_WRITE (rw), or RW_DELETE (wd). Applies to a shared user without their own `vfolderMountPolicies` entry. The level the current user mounts at is `VFolder.mountPermission`.
   """
   permission: VFolderMountPermission!
 
