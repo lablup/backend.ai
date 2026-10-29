@@ -9002,6 +9002,18 @@
             ],
             "default": null
           },
+          "labels": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityLabelNestedFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by the labels on the entity."
+          },
           "AND": {
             "anyOf": [
               {
@@ -20830,6 +20842,18 @@
             ],
             "default": null,
             "description": "Filter by conditions on the permission entries the preset carries."
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityLabelNestedFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by the labels on the entity."
           },
           "AND": {
             "anyOf": [
