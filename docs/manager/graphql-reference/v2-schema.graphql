@@ -7624,6 +7624,110 @@ The `JSON` scalar type represents JSON values as specified by [ECMA-404](https:/
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
 """
+Added in 26.10.0. One role of a session and the execution spec its kernels share.
+"""
+type KernelGroup implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """ID of the kernel group."""
+  fieldId: UUID!
+
+  """ID of the session the group belongs to."""
+  sessionId: UUID!
+
+  """Role of the group, unique within its session."""
+  role: String!
+
+  """ID of the image the group's kernels run."""
+  imageId: UUID
+
+  """Shared memory requested for the group. Null means the runtime default."""
+  shmem: BinarySizeInfo
+
+  """Command the group's kernels run at startup."""
+  startupCommand: String
+
+  """Ports pre-opened on the group's kernels."""
+  preopenPorts: [Int!]!
+
+  """
+  Reserved start time requested at creation. Honored only for batch sessions.
+  """
+  requestedStartsAt: DateTime
+
+  """Batch execution timeout in seconds."""
+  batchTimeout: Int
+
+  """The session the group belongs to."""
+  session: SessionV2
+
+  """The image the group's kernels run."""
+  image: ImageV2
+}
+
+"""Added in 26.10.0. Paginated connection for kernel groups."""
+type KernelGroupConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [KernelGroupEdge!]!
+
+  """Total number of kernel groups matching the query."""
+  count: Int!
+}
+
+"""Added in 26.10.0. One kernel group within a connection."""
+type KernelGroupEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KernelGroup!
+}
+
+"""Added in 26.10.0. Filter for kernel groups."""
+input KernelGroupFilter {
+  """Filter by kernel group ID."""
+  fieldId: UUIDFilter = null
+
+  """Filter by role."""
+  role: StringFilter = null
+
+  """Filter by image ID."""
+  imageId: UUIDFilter = null
+
+  """Filter by creation time."""
+  createdAt: DateTimeFilter = null
+
+  """Match all nested filters."""
+  AND: [KernelGroupFilter!] = null
+
+  """Match any nested filter."""
+  OR: [KernelGroupFilter!] = null
+
+  """Negate nested filters."""
+  NOT: [KernelGroupFilter!] = null
+}
+
+"""Added in 26.10.0. One ordering rule for a kernel group search."""
+input KernelGroupOrderBy {
+  """Field to order by."""
+  field: KernelGroupOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.10.0. Fields available for ordering kernel groups."""
+enum KernelGroupOrderField {
+  ROLE
+  REQUESTED_STARTS_AT
+  CREATED_AT
+}
+
+"""
 Added in 26.3.0. Per-slot resource allocation entry for a kernel.
 Represents one row from the resource_allocations table.
 """
@@ -7793,6 +7897,9 @@ type KernelV2 implements Node {
   """
   imageId: ID
 
+  """Added in 26.10.0. ID of the kernel group this kernel belongs to."""
+  kernelGroupId: UUID
+
   """Startup command executed when the kernel starts."""
   startupCommand: String
 
@@ -7819,6 +7926,9 @@ type KernelV2 implements Node {
 
   """Added in 26.4.3. The image used by this kernel."""
   image: ImageV2
+
+  """Added in 26.10.0. The kernel group this kernel belongs to."""
+  kernelGroup: KernelGroup
 
   """Added in 26.2.0. The user who owns this kernel."""
   user: UserV2
@@ -20133,6 +20243,12 @@ type SessionV2 implements Node {
 
   """Added in 26.3.0. The kernels belonging to this session."""
   kernels: KernelV2Connection
+
+  """Added in 26.10.0. The main kernel group of this session."""
+  mainKernelGroup: KernelGroup
+
+  """Added in 26.10.0. The kernel groups of this session, one per role."""
+  kernelGroups(filter: KernelGroupFilter = null, orderBy: [KernelGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelGroupConnection
 
   """
   Added in 26.4.4. The model deployment replica served by this session: a single replica instance of a model deployment that runs in this compute session and serves inference requests. Null for non-inference sessions.

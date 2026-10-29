@@ -293,6 +293,7 @@ def _create_kernel_info(kernel_id: KernelId) -> KernelInfo:
         ),
         metrics=Metrics(num_queries=0, last_stat=None, container_log=None),
         metadata=Metadata(callback_url=None, internal_data=None),
+        kernel_group_id=None,
     )
 
 
