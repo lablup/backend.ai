@@ -1968,15 +1968,16 @@ class ScheduleDBSource:
                 matched_dependency_ids.append(SessionID(dependency_id))
 
             # An agent id missing from ``agents`` designates nothing.
-            designated_agent_ids = list(
-                spec.resource_spec.options.scheduling_target.designated_agents
-            )
             designated_agent_uuids: list[AgentUUID] = []
-            if designated_agent_ids:
+            if spec.resource_spec.options.scheduling_target.designated_agents:
                 designated_agent_uuids = list(
                     (
                         await read_sess.scalars(
-                            sa.select(AgentRow.uuid).where(AgentRow.id.in_(designated_agent_ids))
+                            sa.select(AgentRow.uuid).where(
+                                AgentRow.id.in_(
+                                    spec.resource_spec.options.scheduling_target.designated_agents
+                                )
+                            )
                         )
                     ).all()
                 )
