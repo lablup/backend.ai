@@ -13,7 +13,11 @@ from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 
 __all__ = (
+    "KernelGroupEnvironOrderField",
+    "KernelGroupEnvironScope",
     "KernelGroupOrderField",
+    "KernelGroupResourceSlotOrderField",
+    "KernelGroupResourceSlotScope",
     "KernelGroupScope",
 )
 
@@ -31,4 +35,34 @@ class KernelGroupScope(BaseRequestModel):
 
     session: NonEmptyList[UUIDScope] = Field(
         description="Sessions whose kernel groups are being read."
+    )
+
+
+class KernelGroupEnvironOrderField(StrEnum):
+    """Fields available for ordering kernel group environ rows."""
+
+    KEY = "key"
+
+
+class KernelGroupEnvironScope(BaseRequestModel):
+    """Scope for the scoped kernel group environ query. At least one session must be given."""
+
+    session: NonEmptyList[UUIDScope] = Field(
+        description="Sessions whose kernel groups' environ rows are being read."
+    )
+
+
+class KernelGroupResourceSlotOrderField(StrEnum):
+    """Fields available for ordering kernel group resource slot rows."""
+
+    SLOT_NAME = "slot_name"
+    QUANTITY = "quantity"
+
+
+class KernelGroupResourceSlotScope(BaseRequestModel):
+    """Scope for the scoped kernel group resource slot query. At least one session must be
+    given."""
+
+    session: NonEmptyList[UUIDScope] = Field(
+        description="Sessions whose kernel groups' resource slot rows are being read."
     )

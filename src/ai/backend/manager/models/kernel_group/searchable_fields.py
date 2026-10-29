@@ -6,12 +6,21 @@ from typing import override
 
 from ai.backend.manager.data.kernel_group.types import KernelGroupData
 from ai.backend.manager.models.kernel_group.row import KernelGroupRow
+from ai.backend.manager.models.kernel_group_environ.row import KernelGroupEnvironRow
+from ai.backend.manager.models.kernel_group_environ.searchable_fields import (
+    KernelGroupEnvironSearchableFields,
+)
+from ai.backend.manager.models.kernel_group_resource_slot.row import KernelGroupResourceSlotRow
+from ai.backend.manager.models.kernel_group_resource_slot.searchable_fields import (
+    KernelGroupResourceSlotSearchableFields,
+)
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.string import StringConditions
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
 from ai.backend.manager.models.specs.orders.column import ColumnOrder
 from ai.backend.manager.models.specs.search.converter import RowDataConverter
-from ai.backend.manager.models.specs.search.field import SearchableField
+from ai.backend.manager.models.specs.search.correlation import ToManyCorrelation
+from ai.backend.manager.models.specs.search.field import NestedSearchableField, SearchableField
 
 
 class _KernelGroupOwnFields(RowDataConverter[KernelGroupRow, KernelGroupData]):
@@ -51,5 +60,27 @@ class _KernelGroupOwnFields(RowDataConverter[KernelGroupRow, KernelGroupData]):
         return row.to_data()
 
 
+class _KernelGroupNestedFields:
+    """The rows the kernel group owns. Read under the kernel group's own permission."""
+
+    environ = NestedSearchableField(
+        KernelGroupEnvironSearchableFields.own,
+        ToManyCorrelation(
+            KernelGroupEnvironRow,
+            KernelGroupRow,
+            KernelGroupEnvironRow.kernel_group_id == KernelGroupRow.id,
+        ),
+    )
+    resource_slots = NestedSearchableField(
+        KernelGroupResourceSlotSearchableFields.own,
+        ToManyCorrelation(
+            KernelGroupResourceSlotRow,
+            KernelGroupRow,
+            KernelGroupResourceSlotRow.kernel_group_id == KernelGroupRow.id,
+        ),
+    )
+
+
 class KernelGroupSearchableFields:
     own = _KernelGroupOwnFields()
+    nested = _KernelGroupNestedFields
