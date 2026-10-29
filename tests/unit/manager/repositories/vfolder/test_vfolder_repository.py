@@ -40,7 +40,6 @@ from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.data.user.types import UserResourceInfo
 from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -121,6 +120,7 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.types import SecretValue
+from ai.backend.manager.views.user import UserResourceInfo
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 

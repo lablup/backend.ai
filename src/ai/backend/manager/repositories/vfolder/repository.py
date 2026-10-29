@@ -34,7 +34,6 @@ from ai.backend.manager.data.entity_share.types import EntityShareData, EntitySh
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.project.types import ProjectResourceInfo
-from ai.backend.manager.data.user.types import UserResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
     VFolderCloneInfo,
@@ -162,6 +161,7 @@ from ai.backend.manager.repositories.vfolder.types import (
     BulkVFolderPurgeResult,
     VFolderPurgeFailure,
 )
+from ai.backend.manager.views.user import UserResourceInfo
 
 vfolder_repository_resilience = Resilience(
     policies=[
