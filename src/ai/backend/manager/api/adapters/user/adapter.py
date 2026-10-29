@@ -1259,6 +1259,11 @@ class UserAdapter(BaseAdapter):
                 UserSearchableFields.nested.keypairs.correlation,
                 self._convert_keypair_filter,
             ),
+            *self.apply_to_many_filter(
+                f.labels,
+                UserSearchableFields.nested.labels.correlation,
+                self._convert_entity_label_filter,
+            ),
             *self.apply_nullable_datetime_filter(
                 f.totp_activated_at, fields.totp_activated_at.filter
             ),

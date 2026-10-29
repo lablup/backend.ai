@@ -7,7 +7,10 @@ import asyncio
 import click
 
 from ai.backend.client.cli.v2.helpers import (
+    EntityLabelTerm,
     create_v2_registry,
+    entity_label_filter_options,
+    entity_label_relations,
     load_v2_config,
     parse_order_options,
     print_result,
@@ -133,6 +136,7 @@ def delete(user_id: str) -> None:
     help="Filter by user role.",
 )
 @click.option("--domain-name", default=None, type=str, help="Filter by exact domain name.")
+@entity_label_filter_options
 @click.option(
     "--order-by",
     multiple=True,
@@ -147,6 +151,7 @@ def search(
     role: str | None,
     domain_name: str | None,
     order_by: tuple[str, ...],
+    label: tuple[EntityLabelTerm, ...],
 ) -> None:
     """Search users (superadmin only)."""
     from ai.backend.common.dto.manager.v2.user.request import (
@@ -157,8 +162,9 @@ def search(
     from ai.backend.common.dto.manager.v2.user.types import UserOrderField
 
     # Build filter only if any filter option is provided
+    relations = entity_label_relations(label)
     filter_dto: UserFilter | None = None
-    if any(
+    if relations or any(
         opt is not None for opt in (username_contains, email_contains, status, role, domain_name)
     ):
         from ai.backend.common.dto.manager.query import StringFilter
@@ -179,6 +185,7 @@ def search(
             status=UserStatusFilter(equals=UserStatus(status)) if status is not None else None,
             role=UserRoleFilter(equals=UserRoleEnum(role)) if role is not None else None,
             domain_name=(StringFilter(equals=domain_name) if domain_name is not None else None),
+            AND=[UserFilter(labels=rel) for rel in relations] or None,
         )
 
     # Build order only if --order-by is provided

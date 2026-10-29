@@ -33,6 +33,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_pydantic_input,
 )
+from ai.backend.manager.api.gql.entity_label.types.filters import EntityLabelNestedFilterGQL
 from ai.backend.manager.api.gql.keypair.types.filters import KeypairFilterGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin
 
@@ -282,6 +283,13 @@ class UserFilterGQL(PydanticInputMixin[UserFilter]):
         description=_NESTED_FILTER_DEPRECATION.format(
             subject="projects",
             instead="`projectUsersV2`, which reads the users of one project",
+        ),
+        default=None,
+    )
+    labels: EntityLabelNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Select entities by the labels on them.",
         ),
         default=None,
     )

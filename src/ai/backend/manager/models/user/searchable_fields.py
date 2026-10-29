@@ -6,8 +6,13 @@ from typing import override
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.manager.data.user.types import UserData, UserStatus
+from ai.backend.manager.models.entity_label.searchable_fields import (
+    EntityLabelCorrelation,
+    EntityLabelSearchableFields,
+)
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.specs.conditions.array import ArrayConditions
@@ -148,7 +153,7 @@ class _UserOwnFields(RowDataConverter[UserRow, UserData]):
 
 
 class _UserNestedFields:
-    """The keypairs the user owns, read under the user's own permission.
+    """The keypairs and labels the user owns, read under the user's own permission.
 
     A keypair is the user's field row (``KeypairCreator`` is a
     ``FieldCreator[UserID, ...]``), so one permission answers for the pair. Narrowing a
@@ -159,6 +164,10 @@ class _UserNestedFields:
     keypairs = NestedSearchableField(
         KeyPairSearchableFields.own,
         ToManyCorrelation(KeyPairRow, UserRow, KeyPairRow.user == UserRow.uuid),
+    )
+    labels = NestedSearchableField(
+        EntityLabelSearchableFields.own,
+        EntityLabelCorrelation(UserRow, UserEntityType(), UserRow.uuid),
     )
 
 
