@@ -24,16 +24,16 @@ class SessionDesignatedAgentRow(Base):
     id: Mapped[SessionDesignatedAgentID] = mapped_column(
         "id",
         GUID(SessionDesignatedAgentID),
-        unique=True,
-        nullable=False,
+        primary_key=True,
         server_default=sa.text("uuid_generate_v7()"),
     )
-    session_id: Mapped[SessionID] = mapped_column("session_id", GUID(SessionID), primary_key=True)
+    session_id: Mapped[SessionID] = mapped_column("session_id", GUID(SessionID), nullable=False)
     agent_uuid: Mapped[AgentUUID] = mapped_column(
-        "agent_uuid", GUID(AgentUUID), primary_key=True, index=True
+        "agent_uuid", GUID(AgentUUID), nullable=False, index=True
     )
 
     __table_args__ = (
+        sa.UniqueConstraint("session_id", "agent_uuid"),
         sa.ForeignKeyConstraint(["session_id"], ["sessions.id"], ondelete="CASCADE"),
         sa.ForeignKeyConstraint(["agent_uuid"], ["agents.uuid"], ondelete="CASCADE"),
     )

@@ -107,8 +107,9 @@ def upgrade() -> None:
         ),
         sa.Column("session_id", GUID(), nullable=False),
         sa.Column("agent_uuid", GUID(), nullable=False),
-        sa.PrimaryKeyConstraint(
-            "session_id", "agent_uuid", name=op.f("pk_session_designated_agents")
+        sa.PrimaryKeyConstraint("id", name=op.f("pk_session_designated_agents")),
+        sa.UniqueConstraint(
+            "session_id", "agent_uuid", name=op.f("uq_session_designated_agents_session_id")
         ),
         sa.ForeignKeyConstraint(
             ["session_id"],
@@ -122,7 +123,6 @@ def upgrade() -> None:
             name=op.f("fk_session_designated_agents_agent_uuid_agents"),
             ondelete="CASCADE",
         ),
-        sa.UniqueConstraint("id", name=op.f("uq_session_designated_agents_id")),
     )
     op.create_index(
         op.f("ix_session_designated_agents_agent_uuid"),
