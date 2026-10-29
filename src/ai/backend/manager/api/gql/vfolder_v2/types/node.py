@@ -221,7 +221,11 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
     @gql_added_field(
         BackendAIGQLMeta(
             added_version="26.9.0",
-            description="The permission bits the current user holds on this vfolder.",
+            description=(
+                "The permission bits the current user holds on this vfolder. On a folder shared "
+                "to them, capped by the share's `EntityShare.permissions`. Separate from the "
+                "mount level (`mountPermission`)."
+            ),
         )
     )  # type: ignore[misc]
     async def permissions(
