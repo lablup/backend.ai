@@ -3,8 +3,6 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-import sqlalchemy as sa
-
 from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
@@ -33,6 +31,7 @@ from ai.backend.manager.repositories.auth.db_source.db_source import (
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.secret.pool import KeyProviderPool
+from ai.backend.manager.views.auth import UserCredential
 
 auth_repository_resilience = Resilience(
     policies=[
@@ -189,11 +188,11 @@ class AuthRepository:
         self,
         domain_name: str,
         email: str,
-        password: str,
-    ) -> sa.RowMapping:
+        target_password_info: PasswordInfo,
+    ) -> UserCredential:
         """Check credentials without password migration (for signout, etc.)"""
         return await self._db_source.verify_credential_without_migration(
-            domain_name, email, password
+            domain_name, email, target_password_info
         )
 
     @auth_repository_resilience.apply()

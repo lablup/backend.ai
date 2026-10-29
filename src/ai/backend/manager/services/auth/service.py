@@ -638,10 +638,16 @@ class AuthService:
         if action.email != action.requester_email:
             raise GenericForbidden("Not the account owner")
         email = action.email
+        auth_config = self._config_provider.config.auth
         await self._auth_repository.check_credential_without_migration(
             action.domain_name,
             email,
-            action.password,
+            PasswordInfo(
+                password=action.password,
+                algorithm=auth_config.password_hash_algorithm,
+                rounds=auth_config.password_hash_rounds,
+                salt_size=auth_config.password_hash_salt_size,
+            ),
         )
         deleted_tokens = await self._auth_repository.delete_user_login_sessions(
             action.user_id,
@@ -674,11 +680,17 @@ class AuthService:
                 success=False,
                 message="new password mismatch",
             )
+        auth_config = self._config_provider.config.auth
         try:
             await self._auth_repository.check_credential_without_migration(
                 domain_name,
                 email,
-                action.old_password,
+                PasswordInfo(
+                    password=action.old_password,
+                    algorithm=auth_config.password_hash_algorithm,
+                    rounds=auth_config.password_hash_rounds,
+                    salt_size=auth_config.password_hash_salt_size,
+                ),
             )
         except AuthorizationFailed as e:
             raise AuthorizationFailed("Old password mismatch") from e
@@ -720,10 +732,15 @@ class AuthService:
         checked_user = await self._auth_repository.check_credential_without_migration(
             action.domain_name,
             action.email,
-            password=action.current_password,
+            PasswordInfo(
+                password=action.current_password,
+                algorithm=auth_config.password_hash_algorithm,
+                rounds=auth_config.password_hash_rounds,
+                salt_size=auth_config.password_hash_salt_size,
+            ),
         )
         new_password = action.new_password
-        if compare_to_hashed_password(new_password, checked_user["password"]):
+        if compare_to_hashed_password(new_password, checked_user.hashed_password):
             raise AuthorizationFailed("Cannot update to the same password as an existing password.")
 
         # [Hooking point for VERIFY_PASSWORD_FORMAT with the ALL_COMPLETED requirement]
@@ -746,11 +763,11 @@ class AuthService:
             salt_size=auth_config.password_hash_salt_size,
         )
         changed_at = await self._auth_repository.update_user_password_by_uuid(
-            checked_user["uuid"], password_info
+            checked_user.user_id, password_info
         )
 
         return UpdatePasswordNoAuthActionResult(
-            user_id=checked_user["uuid"],
+            user_id=checked_user.user_id,
             password_changed_at=changed_at,
         )
 
