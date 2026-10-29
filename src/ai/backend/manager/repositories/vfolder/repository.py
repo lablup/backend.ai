@@ -263,6 +263,8 @@ class VfolderRepository:
     ) -> VFolderHostPermissionMap:
         """
         Get the allowed VFolder hosts for a user.
+
+        A personal project carries no hosts of its own; the user's keypair policy answers.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             if group_uuid:
@@ -271,8 +273,8 @@ class VfolderRepository:
                 )
                 if group_row is None:
                     raise ProjectNotFound(f"Project with {group_uuid} not found.")
-
-                return group_row.allowed_vfolder_hosts
+                if group_row.type != ProjectType.PERSONAL:
+                    return group_row.allowed_vfolder_hosts
 
             allowed_hosts = await self._fetch_default_keypair_vfolder_hosts(db_session, user_uuid)
             if allowed_hosts is None:

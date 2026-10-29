@@ -490,7 +490,7 @@ class TestVfolderRepository:
                 )
             )
 
-    async def test_naming_a_personal_project_is_refused(
+    async def test_naming_a_personal_project_makes_a_project_folder_there(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         vfolder_repository: VfolderRepository,
@@ -498,32 +498,22 @@ class TestVfolderRepository:
         test_user: uuid.UUID,
         test_project_resource_policy_name: str,
     ) -> None:
-        """Nothing is created under another person's name; sharing puts it there."""
-        personal_project = uuid.uuid4()
-        async with db_with_cleanup.begin_session() as session:
-            session.add(
-                ProjectRow(
-                    id=personal_project,
-                    name=f"personal-{personal_project.hex[:8]}",
-                    domain_name=test_domain.domain_name,
-                    is_active=True,
-                    total_resource_slots=ResourceSlot(),
-                    allowed_vfolder_hosts={"local": ["create-vfolder"]},
-                    resource_policy=test_project_resource_policy_name,
-                    type=ProjectType.PERSONAL,
-                    creator_id=test_user,
-                )
-            )
-            await session.flush()
+        """A personal project carries no hosts; the user's keypair policy answers."""
+        personal_project = await _add_project(
+            db_with_cleanup, test_domain, test_project_resource_policy_name, ProjectType.PERSONAL
+        )
+        await _add_default_keypair_allowing_create(db_with_cleanup, test_user)
 
-        with pytest.raises(VFolderInvalidParameter):
-            await vfolder_repository.create_vfolder_with_permission(
-                self._make_project_vfolder_creator(
-                    domain_name=test_domain.domain_name,
-                    group_id=personal_project,
-                    user_id=test_user,
-                )
+        creation = await vfolder_repository.create_vfolder_with_permission(
+            self._make_project_vfolder_creator(
+                domain_name=test_domain.domain_name,
+                group_id=personal_project,
+                user_id=test_user,
             )
+        )
+
+        assert creation.vfolder.ownership_type == VFolderOwnershipType.GROUP
+        assert creation.vfolder.group == personal_project
 
     async def test_the_owners_allowance_refuses_the_folder_over_it(
         self,
@@ -687,6 +677,42 @@ async def _add_project(
             )
         )
     return project_id
+
+
+async def _add_default_keypair_allowing_create(
+    db: ExtendedAsyncSAEngine, user_id: uuid.UUID
+) -> None:
+    """A default keypair whose policy allows creating folders on ``local``."""
+    policy_name = f"test-kp-policy-{uuid.uuid4().hex[:8]}"
+    async with db.begin_session() as session:
+        session.add(
+            KeyPairResourcePolicyRow(
+                name=policy_name,
+                default_for_unspecified=DefaultForUnspecified.LIMITED,
+                total_resource_slots=ResourceSlot(),
+                max_session_lifetime=0,
+                max_concurrent_sessions=10,
+                max_concurrent_sftp_sessions=1,
+                max_containers_per_session=1,
+                idle_timeout=0,
+                allowed_vfolder_hosts=VFolderHostPermissionMap({
+                    "local": {VFolderHostPermission.CREATE},
+                }),
+            )
+        )
+        await session.flush()
+        session.add(
+            KeyPairRow(
+                user=user_id,
+                access_key=f"DK{user_id.hex[:14]}",
+                secret_key=SecretValue("test-secret"),
+                is_active=True,
+                is_admin=False,
+                is_default=True,
+                resource_policy=policy_name,
+                rate_limit=1000,
+            )
+        )
 
 
 async def _set_project_folder_allowance(
@@ -880,6 +906,71 @@ class TestVfolderRepositoryAllowedVfolderHosts:
         )
 
         assert isinstance(result, VFolderHostPermissionMap)
+
+    async def test_get_allowed_vfolder_hosts_answers_a_general_project_with_its_own_hosts(
+        self,
+        vfolder_repository: VfolderRepository,
+        user_with_default_keypair: uuid.UUID,
+        test_group: uuid.UUID,
+    ) -> None:
+        """The user's keypair policy does not answer for a general project."""
+        result = await vfolder_repository.get_allowed_vfolder_hosts(
+            user_uuid=user_with_default_keypair,
+            group_uuid=test_group,
+        )
+
+        assert result == VFolderHostPermissionMap({
+            "local": {
+                VFolderHostPermission.CREATE,
+                VFolderHostPermission.MOUNT_IN_SESSION,
+            },
+        })
+
+    @pytest.fixture
+    async def test_personal_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_project_resource_policy_name: str,
+        test_user: uuid.UUID,
+    ) -> uuid.UUID:
+        """``test_user``'s personal project, which carries no hosts of its own."""
+        project_uuid = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ProjectRow(
+                    id=project_uuid,
+                    name=f"personal-{project_uuid.hex[:8]}",
+                    domain_name=test_domain.domain_name,
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    resource_policy=test_project_resource_policy_name,
+                    type=ProjectType.PERSONAL,
+                    creator_id=test_user,
+                )
+            )
+            await db_sess.flush()
+        return project_uuid
+
+    async def test_get_allowed_vfolder_hosts_answers_a_personal_project_with_the_keypair_policy(
+        self,
+        vfolder_repository: VfolderRepository,
+        user_with_default_keypair: uuid.UUID,
+        test_personal_project: uuid.UUID,
+    ) -> None:
+        """A personal project carries no hosts; the user's default keypair policy answers."""
+        result = await vfolder_repository.get_allowed_vfolder_hosts(
+            user_uuid=user_with_default_keypair,
+            group_uuid=test_personal_project,
+        )
+
+        assert result == VFolderHostPermissionMap({
+            "local:volume1": {
+                VFolderHostPermission.CREATE,
+                VFolderHostPermission.MODIFY,
+            },
+        })
 
     @pytest.fixture
     async def keypair_policy_with_hosts(
