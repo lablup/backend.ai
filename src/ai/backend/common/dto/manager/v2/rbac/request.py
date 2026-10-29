@@ -21,6 +21,7 @@ from ai.backend.common.dto.manager.query import (
     UUIDFilter,
 )
 from ai.backend.common.dto.manager.v2.common import NonEmptyList
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
@@ -402,6 +403,10 @@ class RoleFilter(BaseRequestModel):
     entity_id: UUIDFilter | None = Field(
         default=None,
         description=f"Added in {NEXT_RELEASE_VERSION}. Filter by role ID.",
+    )
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by the labels on the entity.",
     )
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None

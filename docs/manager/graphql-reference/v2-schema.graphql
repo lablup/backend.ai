@@ -5209,6 +5209,9 @@ input DeploymentRevisionPresetFilter {
   """Variant ID filter."""
   runtimeVariantId: UUIDFilter = null
 
+  """Added in 26.10.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
+
   """Added in 26.7.0. Match all of the given sub-filters."""
   AND: [DeploymentRevisionPresetFilter!] = null
 
@@ -18104,6 +18107,9 @@ input RoleFilter {
 
   """Added in 26.10.0. Filter by role ID."""
   entityId: UUIDFilter = null
+
+  """Added in 26.10.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
   NOT: [RoleFilter!] = null
@@ -18496,6 +18502,9 @@ input RolePresetFilter {
   Added in 26.9.0. Filter by conditions on the permission entries the preset carries.
   """
   permissions: RolePresetPermissionNestedFilter = null
+
+  """Added in 26.10.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [RolePresetFilter!] = null
@@ -23700,6 +23709,9 @@ input UserV2Filter {
   Filter by the user's projects. Deprecated since 26.9.0. The condition is evaluated on rows the caller may not be able to read. Use `projectUsersV2`, which reads the users of one project.
   """
   project: UserProjectNestedFilter = null
+
+  """Added in 26.10.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [UserV2Filter!] = null
   OR: [UserV2Filter!] = null
   NOT: [UserV2Filter!] = null

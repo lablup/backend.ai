@@ -29,6 +29,7 @@ from ai.backend.common.dto.manager.v2.deployment_revision_preset.types import (
     DeploymentRevisionPresetOrderField,
     DeploymentRevisionPresetUsage,
 )
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsEntryDTO
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
@@ -308,6 +309,10 @@ class DeploymentRevisionPresetFilter(BaseRequestModel):
     )
     name: StringFilter | None = Field(default=None)
     runtime_variant_id: UUIDFilter | None = Field(default=None)
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by the labels on the entity.",
+    )
     AND: list[DeploymentRevisionPresetFilter] | None = Field(default=None)
     OR: list[DeploymentRevisionPresetFilter] | None = Field(default=None)
     NOT: list[DeploymentRevisionPresetFilter] | None = Field(default=None)

@@ -12,6 +12,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.manager.data.project.types import ProjectType
@@ -28,6 +29,8 @@ from ai.backend.manager.models.deployment_revision_preset.row import DeploymentR
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelSearchableFields
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -103,6 +106,7 @@ _WITH_TABLES: list[TableOrORM] = [
     EntityMembershipRow,
     EntityMembershipCapRow,
     ScopeBindingRow,
+    EntityLabelRow,
 ]
 
 
@@ -630,6 +634,48 @@ class TestUserNestedSearchIntegration:
                 ])
             ],
             orders=[DeprecatedUserOrders.by_project_name(ascending=True)],
+        )
+        result = await user_db_source.search_users(searcher)
+
+        assert result.total_count == 1
+        assert result.items[0].uuid == search_fixture.user_in_active_domain
+
+    async def test_search_users_with_label_filter_keeps_only_the_labelled_user(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        user_db_source: UserDBSource,
+        search_fixture: UserSearchFixture,
+    ) -> None:
+        """A label condition keeps only the user carrying ``env=prod``."""
+        async with db_with_cleanup.begin_session() as session:
+            session.add_all([
+                EntityLabelRow(
+                    entity_type=UserEntityType(),
+                    entity_id=search_fixture.user_in_active_domain,
+                    key="env",
+                    value="prod",
+                ),
+                EntityLabelRow(
+                    entity_type=UserEntityType(),
+                    entity_id=search_fixture.user_in_inactive_domain,
+                    key="env",
+                    value="dev",
+                ),
+            ])
+        labels = EntityLabelSearchableFields.own
+        searcher = UserSearcher(
+            pagination=OffsetPagination(limit=50, offset=0),
+            conditions=[
+                UserSearchableFields.nested.labels.correlation.some([
+                    labels.key.filter.equals(
+                        StringMatchSpec(value="env", case_insensitive=False, negated=False)
+                    ),
+                    labels.value.filter.equals(
+                        StringMatchSpec(value="prod", case_insensitive=False, negated=False)
+                    ),
+                ])
+            ],
+            orders=[],
         )
         result = await user_db_source.search_users(searcher)
 
