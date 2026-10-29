@@ -4,15 +4,16 @@
 
 - **Hard FK columns** — discoverable from the schema and (partly) enforced by
   the DB: ``model_cards.vfolder`` (RESTRICT), ``deployment_revisions.model``
-  (SET NULL), and the ``vfolder_*`` CASCADE child tables.
+  (SET NULL), ``kernel_group_vfolder_mounts.vfolder_id`` (CASCADE), and the
+  ``vfolder_*`` CASCADE child tables.
 - **Soft JSONB references** that embed a vfolder id but are *not* foreign keys,
   so schema metadata and the DB cannot see them:
-  ``sessions.vfolder_mounts`` / ``kernels.vfolder_mounts`` (``VFolderMount``)
-  and ``deployment_revisions.extra_mounts`` (``MountInfoEntry``).
+  ``sessions.vfolder_mounts`` (``VFolderMount``) and
+  ``deployment_revisions.extra_mounts`` (``MountInfoEntry``).
 
 The purge in-use guard must reject a purge while any *active* reference exists,
-but the DB cannot enforce that for the soft references (and ``SET NULL`` FKs are
-silently nulled rather than blocked). Both categories are therefore checked
+but the DB cannot enforce that for the soft references (and ``SET NULL`` / ``CASCADE``
+FKs are silently nulled or deleted rather than blocked). Both categories are therefore checked
 explicitly through the registry below.
 
 Each check carries one condition, read two ways: as a ``ConflictCheck`` the
@@ -45,6 +46,7 @@ from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.kernel.row import DEAD_KERNEL_STATUSES, KernelRow
+from ai.backend.manager.models.kernel_group_vfolder_mount.row import KernelGroupVFolderMountRow
 from ai.backend.manager.models.session.row import DEAD_SESSION_STATUSES, SessionRow
 from ai.backend.manager.models.specs.types import ConflictCheck
 from ai.backend.manager.models.vfolder.row import VFolderRow
@@ -98,9 +100,10 @@ def _sessions_mounting(vfolder_id: VFolderID) -> sa.ColumnElement[bool]:
 
 
 def _kernels_mounting(vfolder_id: VFolderID) -> sa.ColumnElement[bool]:
-    return KernelRow.status.not_in(DEAD_KERNEL_STATUSES) & KernelRow.vfolder_mounts.contains([
-        {"vfid": str(vfolder_id)}
-    ])
+    return KernelRow.status.not_in(DEAD_KERNEL_STATUSES) & sa.exists().where(
+        KernelGroupVFolderMountRow.kernel_group_id == KernelRow.kernel_group_id,
+        KernelGroupVFolderMountRow.vfolder_id == vfolder_id.folder_id,
+    )
 
 
 def _active_endpoint_condition(
@@ -134,7 +137,7 @@ VFOLDER_REFERENCE_CHECKS: list[VFolderReferenceCheck] = [
         build_condition=_sessions_mounting,
     ),
     VFolderReferenceCheck(
-        source="kernels.vfolder_mounts",
+        source="kernel_group_vfolder_mounts.vfolder_id",
         describe="mounted on live kernel(s)",
         referrer_id_column=KernelRow.id,
         build_condition=_kernels_mounting,

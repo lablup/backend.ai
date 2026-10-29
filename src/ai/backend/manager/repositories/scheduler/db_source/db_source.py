@@ -73,6 +73,7 @@ from ai.backend.manager.data.kernel.types import KernelListResult, KernelStatus
 from ai.backend.manager.data.kernel_group.types import (
     KernelGroupEnvironData,
     KernelGroupResourceSlotData,
+    KernelGroupVFolderMountData,
 )
 from ai.backend.manager.data.network.types import NetworkData
 from ai.backend.manager.data.resource.types import SlotTypeInfo, UserEnqueuePolicy
@@ -119,6 +120,10 @@ from ai.backend.manager.models.kernel_group_resource_slot.creators import (
     KernelGroupResourceSlotCreator,
 )
 from ai.backend.manager.models.kernel_group_resource_slot.row import KernelGroupResourceSlotRow
+from ai.backend.manager.models.kernel_group_vfolder_mount.creators import (
+    KernelGroupVFolderMountCreator,
+)
+from ai.backend.manager.models.kernel_group_vfolder_mount.row import KernelGroupVFolderMountRow
 from ai.backend.manager.models.keypair.row import KeyPairRow, keypairs
 from ai.backend.manager.models.network.row import NetworkRow
 from ai.backend.manager.models.project.row import ProjectRow
@@ -2015,6 +2020,15 @@ class ScheduleDBSource:
             environ_creations: list[
                 NestedFieldToCreate[KernelGroupID, KernelGroupEnvironRow, KernelGroupEnvironData]
             ] = []
+            mount_creations: list[
+                NestedFieldToCreate[
+                    KernelGroupID, KernelGroupVFolderMountRow, KernelGroupVFolderMountData
+                ]
+            ] = []
+            mounts_by_role = {
+                kernel.cluster_role: kernel.vfolder_mounts
+                for kernel in spec.resource_spec.kernel_specs
+            }
             for group, group_data in zip(kernel_groups, groups, strict=True):
                 requested = resource_slot_to_quantities(
                     ResourceSlotEntry.inputs_to_resource_slot(
@@ -2038,8 +2052,16 @@ class ScheduleDBSource:
                     )
                     for key, value in group.execution_spec.environ.items()
                 )
+                mount_creations.extend(
+                    NestedFieldToCreate(
+                        owner_id=group_data.id,
+                        creator=KernelGroupVFolderMountCreator(mount=mount),
+                    )
+                    for mount in mounts_by_role.get(group.role, ())
+                )
             await w.atomic_create_nested_fields(slot_creations)
             await w.atomic_create_nested_fields(environ_creations)
+            await w.atomic_create_nested_fields(mount_creations)
             group_ids = {group_data.role: group_data.id for group_data in groups}
             kernel_creators = [
                 KernelCreator(

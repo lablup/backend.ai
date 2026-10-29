@@ -35,6 +35,13 @@ _FK_HANDLED_ELSEWHERE = {
     "model_cards.vfolder",
 }
 
+# Soft-reference columns whose mounts a registered source also holds, so the guard
+# reads that source instead.
+_SOFT_COLUMNS_COVERED_ELSEWHERE = {
+    # Written with the same mounts as kernel_group_vfolder_mounts.vfolder_id.
+    "kernels.vfolder_mounts",
+}
+
 
 def _load_all_models() -> None:
     for module_info in pkgutil.iter_modules(ai.backend.manager.models.__path__):
@@ -67,7 +74,7 @@ def test_all_soft_vfolder_reference_columns_are_registered() -> None:
             ) or (isinstance(col_type, PydanticListColumn) and col_type._schema is MountInfoEntry):
                 soft_columns.add(f"{table.name}.{column.name}")
 
-    missing = soft_columns - registered
+    missing = soft_columns - registered - _SOFT_COLUMNS_COVERED_ELSEWHERE
     assert not missing, (
         f"Unregistered vfolder soft-reference column(s): {sorted(missing)}. "
         "Add a VFolderReferenceCheck for each in repositories/vfolder/purge_guards.py "
