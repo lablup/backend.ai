@@ -1,4 +1,4 @@
-"""Add auto-generated file revisions and applications
+"""Add auto-generated file revisions and organization relations
 
 Revision ID: 46d84960bae3
 Revises: 133c191ae872
@@ -53,34 +53,44 @@ def upgrade() -> None:
         ),
     )
     op.create_table(
-        "auto_generated_file_applications",
-        sa.Column("entity_type", sa.String(32), nullable=False),
-        sa.Column("entity_id", GUID(), nullable=False),
+        "organization_auto_generated_file_relations",
+        sa.Column("organization_type", sa.String(32), nullable=False),
+        sa.Column("organization_id", GUID(), nullable=False),
+        sa.Column("file_id", GUID(), nullable=False),
         sa.Column("path", sa.Text(), nullable=False),
         sa.Column("perm", sa.Text(), nullable=False),
-        sa.Column("file_id", GUID(), nullable=False),
         sa.PrimaryKeyConstraint(
-            "entity_type", "entity_id", "path", name=op.f("pk_auto_generated_file_applications")
+            "organization_type",
+            "organization_id",
+            "file_id",
+            name=op.f("pk_organization_auto_generated_file_relations"),
         ),
         sa.ForeignKeyConstraint(
-            ["entity_type", "entity_id"],
+            ["organization_type", "organization_id"],
             ["virtual_entities.entity_type", "virtual_entities.entity_id"],
-            name=op.f("fk_auto_generated_file_applications_entity_virtual_entities"),
+            name="fk_organization_auto_generated_file_relations_virtual_entities",
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
             ["file_id"],
             ["dotfiles.id"],
-            name=op.f("fk_auto_generated_file_applications_file_id_dotfiles"),
+            name=op.f("fk_organization_auto_generated_file_relations_file_id_dotfiles"),
             ondelete="CASCADE",
         ),
+        sa.UniqueConstraint(
+            "organization_type",
+            "organization_id",
+            "path",
+            name="uq_organization_auto_generated_file_relations_path",
+        ),
         sa.CheckConstraint(
-            "char_length(perm) <= 4", name=op.f("ck_auto_generated_file_applications_perm_length")
+            "char_length(perm) <= 4",
+            name=op.f("ck_organization_auto_generated_file_relations_perm_length"),
         ),
     )
     op.create_index(
-        op.f("ix_auto_generated_file_applications_file_id"),
-        "auto_generated_file_applications",
+        op.f("ix_organization_auto_generated_file_relations_file_id"),
+        "organization_auto_generated_file_relations",
         ["file_id"],
         unique=False,
     )
@@ -88,8 +98,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index(
-        op.f("ix_auto_generated_file_applications_file_id"),
-        table_name="auto_generated_file_applications",
+        op.f("ix_organization_auto_generated_file_relations_file_id"),
+        table_name="organization_auto_generated_file_relations",
     )
-    op.drop_table("auto_generated_file_applications")
+    op.drop_table("organization_auto_generated_file_relations")
     op.drop_table("auto_generated_file_revisions")
