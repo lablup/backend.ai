@@ -11,9 +11,17 @@ from strawberry.relay import Connection, Edge, NodeID, PageInfo
 
 from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.model_card.request import SearchModelCardsInput
 from ai.backend.common.dto.manager.v2.model_card.types import ModelCardUsage, ModelCardUses
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.response import VFolderNode
+from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
+    ScopedSearchVFolderAutoMountsInput,
+    VFolderAutoMountFilter,
+)
+from ai.backend.common.dto.manager.v2.vfolder_auto_mount.types import VFolderAutoMountScope
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.common_types import BinarySizeInfoGQL
@@ -40,6 +48,14 @@ from ai.backend.manager.api.gql.model_card.types import (
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
 from ai.backend.manager.api.gql.rbac.types.scope import PermissionBitGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
+from ai.backend.manager.api.gql.vfolder_auto_mount.resolver import (
+    build_vfolder_auto_mount_connection,
+)
+from ai.backend.manager.api.gql.vfolder_auto_mount.types import (
+    VFolderAutoMountConnectionGQL,
+    VFolderAutoMountFilterGQL,
+    VFolderAutoMountOrderByGQL,
+)
 from ai.backend.manager.api.gql.vfolder_v2.types.enum import (
     VFolderMountPermissionGQL,
     VFolderOperationStatusGQL,
@@ -256,6 +272,61 @@ class VFolderGQL(PydanticNodeMixin[VFolderNode]):
         if mount_permission is None:
             return None
         return VFolderMountPermissionGQL(mount_permission.value)
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The auto-mounts set on this vfolder, read within the project or the user "
+                "owning it."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def vfolder_auto_mounts(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: VFolderAutoMountFilterGQL | None = None,
+        order_by: list[VFolderAutoMountOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> VFolderAutoMountConnectionGQL | None:
+        payload = await info.context.adapters.vfolder_auto_mount.scoped_search(
+            ScopedSearchVFolderAutoMountsInput(
+                scope=self._auto_mount_scope(),
+                filter=self._auto_mount_filter(filter),
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        return build_vfolder_auto_mount_connection(payload)
+
+    def _auto_mount_scope(self) -> VFolderAutoMountScope:
+        """The project or the user owning this vfolder, where its auto-mounts are set."""
+        if self.ownership.project_id is not None:
+            return VFolderAutoMountScope(project=[UUIDScope(value=self.ownership.project_id)])
+        if self.ownership.user_id is not None:
+            return VFolderAutoMountScope(user=[UUIDScope(value=self.ownership.user_id)])
+        raise UnreachableError(f"VFolder {self.id} has neither a project nor a user owner")
+
+    def _auto_mount_filter(
+        self, filter: VFolderAutoMountFilterGQL | None
+    ) -> VFolderAutoMountFilter:
+        """The caller's filter narrowed to this vfolder; kept top-level so its ``deleted_at``
+        still lifts the default."""
+        this_vfolder = VFolderAutoMountFilter(vfolder_id=UUIDFilter(equals=UUID(self.id)))
+        if filter is None:
+            return this_vfolder
+        given = filter.to_pydantic()
+        return given.model_copy(update={"AND": [*(given.AND or []), this_vfolder]})
 
     @classmethod
     @override
