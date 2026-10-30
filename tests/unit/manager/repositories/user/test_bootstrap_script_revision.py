@@ -11,10 +11,12 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScript, BootstrapScriptID
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.bootstrap_script import (
+    BootstrapScriptEntityMismatch,
     BootstrapScriptNotFound,
     DefaultBootstrapScriptPurgeForbidden,
 )
@@ -150,6 +152,15 @@ class TestBootstrapScriptRevision:
         """A second, non-default script of the user."""
         return await self._add_script(db, user_id, BootstrapScript("echo other"), is_default=False)
 
+    @pytest.fixture
+    async def project_script(self, db: ExtendedAsyncSAEngine) -> BootstrapScriptID:
+        """A live script set on a project."""
+        async with db.begin_session() as session:
+            row = BootstrapScriptRow(entity_type=ProjectEntityType(), entity_id=uuid.uuid4())
+            session.add(row)
+            await session.flush()
+            return row.id
+
     async def _add_script(
         self,
         db: ExtendedAsyncSAEngine,
@@ -247,6 +258,14 @@ class TestBootstrapScriptRevision:
             await repository.switch_default_bootstrap_script(other_user_id, default_script)
 
         assert await repository.default_bootstrap_script(other_user_id) is None
+
+    async def test_switch_refuses_a_project_script(
+        self, repository: UserRepository, user_id: UserID, project_script: BootstrapScriptID
+    ) -> None:
+        with pytest.raises(BootstrapScriptEntityMismatch):
+            await repository.switch_default_bootstrap_script(user_id, project_script)
+
+        assert await repository.default_bootstrap_script(user_id) is None
 
     async def test_switch_refuses_a_soft_deleted_script(
         self, repository: UserRepository, user_id: UserID, deleted_default_script: BootstrapScriptID
