@@ -64,6 +64,9 @@ from ai.backend.manager.services.container_registry.actions.read_registry_quota 
     ReadRegistryQuotaAction,
 )
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
+from ai.backend.manager.services.project.actions.clear_default_registry import (
+    ClearProjectDefaultRegistryAction,
+)
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.actions.delete_project import (
     DeleteProjectAction,
@@ -72,6 +75,9 @@ from ai.backend.manager.services.project.actions.purge_project import (
     PurgeProjectAction,
 )
 from ai.backend.manager.services.project.actions.restore_project import RestoreProjectAction
+from ai.backend.manager.services.project.actions.switch_default_registry import (
+    SwitchProjectDefaultRegistryAction,
+)
 from ai.backend.manager.services.project.actions.update_project import UpdateProjectAction
 from ai.backend.manager.services.rbac.actions.roster.join_project import JoinProjectAction
 from ai.backend.manager.services.rbac.actions.roster.leave_project import LeaveProjectAction
@@ -632,21 +638,9 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
     allowed_vfolder_hosts = graphene.JSONString(required=False)
     integration_id = graphene.String(required=False)
     resource_policy = graphene.String(required=False)
-    container_registry = graphene.JSONString(
-        required=False, default_value={}, description="Added in 24.03.0"
-    )
+    container_registry = graphene.JSONString(required=False, description="Added in 24.03.0")
 
     def to_action(self, group_id: uuid.UUID) -> UpdateProjectAction:
-        registry = self.container_registry
-        if registry is Undefined:
-            container_registry = TriState[ImageCommitRegistry].nop()
-        elif not registry:
-            container_registry = TriState[ImageCommitRegistry].nullify()
-        else:
-            parsed = ImageCommitRegistryReq.model_validate(registry)
-            container_registry = TriState.update(
-                ImageCommitRegistry(registry_name=parsed.registry, project_name=parsed.project)
-            )
         updater = ProjectUpdater(
             project_id=ProjectID(group_id),
             name=OptionalState[str].from_graphql(
@@ -672,9 +666,24 @@ class ModifyGroupInput(graphene.InputObjectType):  # type: ignore[misc]
             resource_policy=OptionalState[str].from_graphql(
                 self.resource_policy,
             ),
-            container_registry=container_registry,
         )
         return UpdateProjectAction(updater=updater)
+
+    def to_registry_change(self) -> TriState[ImageCommitRegistry]:
+        """The change asked of the project's default registry: omitted keeps it,
+        ``null`` and ``{}`` clear it."""
+        registry = self.container_registry
+        if registry is Undefined:
+            return TriState[ImageCommitRegistry].nop()
+        if not registry:
+            return TriState[ImageCommitRegistry].nullify()
+        parsed = ImageCommitRegistryReq.model_validate(registry)
+        return TriState.update(
+            ImageCommitRegistry(
+                registry_name=parsed.registry,
+                project_name=parsed.project,
+            )
+        )
 
     def roster_change(self, group_id: uuid.UUID) -> tuple[str, list[UserID]] | None:
         """The roster change asked for beside the edit, if any: the mode and who it
@@ -774,11 +783,27 @@ class ModifyGroup(graphene.Mutation):  # type: ignore[misc]
         props: ModifyGroupInput,
     ) -> ModifyGroup:
         graph_ctx: GraphQueryContext = info.context
+        project_id = ProjectID(gid)
+
+        # Resolved before anything is written, so a registry that is not there changes
+        # nothing. The default is set after the edit, as a run of its own.
+        registry_change = props.to_registry_change()
+        registry_id: ContainerRegistryID | None = None
+        registry = registry_change.optional_value()
+        if registry is not None:
+            registry_adapter = ContainerRegistryAdapter(
+                graph_ctx.processors.container_registry, graph_ctx.processors.rbac
+            )
+            registry_project_name: ContainerRegistryProjectName | None = None
+            if registry.project_name is not None:
+                registry_project_name = ContainerRegistryProjectName(registry.project_name)
+            registry_id = await registry_adapter.lookup_by_name_and_registry_project(
+                ContainerRegistryName(registry.registry_name), registry_project_name
+            )
 
         roster_change = props.roster_change(gid)
         if roster_change is not None:
             mode, user_ids = roster_change
-            project_id = ProjectID(gid)
             if mode == "add":
                 await graph_ctx.processors.rbac.join_project.run(
                     JoinProjectAction(project_id=project_id, user_ids=user_ids)
@@ -791,8 +816,17 @@ class ModifyGroup(graphene.Mutation):  # type: ignore[misc]
         data = (
             await cls._apply_is_active(graph_ctx, res.data, props.is_active) if res.data else None
         )
+        if registry_id is not None:
+            await graph_ctx.processors.project.switch_default_registry.run(
+                SwitchProjectDefaultRegistryAction(project_id=project_id, registry_id=registry_id)
+            )
+        # If no registry is specified but there was a change, clear the default registry.
+        elif not registry_change.is_nop():
+            await graph_ctx.processors.project.clear_default_registry.run(
+                ClearProjectDefaultRegistryAction(project_id=project_id)
+            )
         graph_ctx.dataloader_manager.get_loader(graph_ctx, "Group.image_commit_registry").clear(
-            ProjectID(gid)
+            project_id
         )
         return cls(
             ok=True,
