@@ -1141,7 +1141,7 @@ class DeploymentRepository:
                 )
                 if new_replica_count is None:
                     log.debug(
-                        "autoscaling replica count at or beyond limit, rule skipped",
+                        "autoscaling replica count cannot move, rule skipped",
                         deployment_id=deployment.id,
                         rule_id=rule.id,
                         current_replica_count=current_replica_count,
