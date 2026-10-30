@@ -17,6 +17,8 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.kernel_group import KernelGroupID
+from ai.backend.common.data.entity.kernel_group_environ import KernelGroupEnvironID
+from ai.backend.common.data.entity.kernel_group_resource_slot import KernelGroupResourceSlotID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
@@ -51,15 +53,29 @@ from ai.backend.common.dto.manager.v2.kernel.response import (
 )
 from ai.backend.common.dto.manager.v2.kernel.types import KernelOrderField, KernelStatusFilter
 from ai.backend.common.dto.manager.v2.kernel_group.request import (
+    KernelGroupEnvironFilter,
+    KernelGroupEnvironOrder,
     KernelGroupFilter,
     KernelGroupOrder,
+    KernelGroupResourceSlotFilter,
+    KernelGroupResourceSlotOrder,
+    ScopedSearchKernelGroupEnvironsInput,
+    ScopedSearchKernelGroupResourceSlotsInput,
     ScopedSearchKernelGroupsInput,
 )
 from ai.backend.common.dto.manager.v2.kernel_group.response import (
+    KernelGroupEnvironNode,
     KernelGroupNode,
+    KernelGroupResourceSlotNode,
+    ScopedSearchKernelGroupEnvironsPayload,
+    ScopedSearchKernelGroupResourceSlotsPayload,
     ScopedSearchKernelGroupsPayload,
 )
-from ai.backend.common.dto.manager.v2.kernel_group.types import KernelGroupOrderField
+from ai.backend.common.dto.manager.v2.kernel_group.types import (
+    KernelGroupEnvironOrderField,
+    KernelGroupOrderField,
+    KernelGroupResourceSlotOrderField,
+)
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceOptsEntryInfoDTO,
     ResourceOptsInfoDTO,
@@ -128,7 +144,11 @@ from ai.backend.common.types import ResourceSlotEntry as DataResourceSlotEntry
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
-from ai.backend.manager.data.kernel_group.types import KernelGroupData
+from ai.backend.manager.data.kernel_group.types import (
+    KernelGroupData,
+    KernelGroupEnvironData,
+    KernelGroupResourceSlotData,
+)
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.compute_schedule import ComputeScheduleKernelResult
 from ai.backend.manager.data.session.draft import KernelResourceInput
@@ -151,6 +171,18 @@ from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.kernel_group.row import KernelGroupRow
 from ai.backend.manager.models.kernel_group.searchable_fields import KernelGroupSearchableFields
 from ai.backend.manager.models.kernel_group.searchers import KernelGroupSearcher
+from ai.backend.manager.models.kernel_group_environ.row import KernelGroupEnvironRow
+from ai.backend.manager.models.kernel_group_environ.searchable_fields import (
+    KernelGroupEnvironSearchableFields,
+)
+from ai.backend.manager.models.kernel_group_environ.searchers import KernelGroupEnvironSearcher
+from ai.backend.manager.models.kernel_group_resource_slot.row import KernelGroupResourceSlotRow
+from ai.backend.manager.models.kernel_group_resource_slot.searchable_fields import (
+    KernelGroupResourceSlotSearchableFields,
+)
+from ai.backend.manager.models.kernel_group_resource_slot.searchers import (
+    KernelGroupResourceSlotSearcher,
+)
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session.scopes import (
     DomainSessionTarget,
@@ -178,6 +210,12 @@ from ai.backend.manager.services.session.actions.batch_get_session_resource_allo
     BatchGetSessionResourceAllocationAction,
 )
 from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
+from ai.backend.manager.services.session.actions.bulk_get_kernel_group_environs import (
+    BulkGetKernelGroupEnvironsAction,
+)
+from ai.backend.manager.services.session.actions.bulk_get_kernel_group_resource_slots import (
+    BulkGetKernelGroupResourceSlotsAction,
+)
 from ai.backend.manager.services.session.actions.bulk_get_kernel_groups import (
     BulkGetKernelGroupsAction,
 )
@@ -210,6 +248,12 @@ from ai.backend.manager.services.session.actions.global_search_kernels import (
 from ai.backend.manager.services.session.actions.rename_session import RenameSessionAction
 from ai.backend.manager.services.session.actions.scoped_search import (
     ScopedSearchSessionsAction,
+)
+from ai.backend.manager.services.session.actions.scoped_search_kernel_group_environs import (
+    ScopedSearchKernelGroupEnvironsAction,
+)
+from ai.backend.manager.services.session.actions.scoped_search_kernel_group_resource_slots import (
+    ScopedSearchKernelGroupResourceSlotsAction,
 )
 from ai.backend.manager.services.session.actions.scoped_search_kernel_groups import (
     ScopedSearchKernelGroupsAction,
@@ -267,6 +311,16 @@ _KERNEL_PAGINATION_SPEC = PaginationSpec(
 _KERNEL_GROUP_PAGINATION_SPEC = PaginationSpec(
     forward_order=KernelGroupSearchableFields.own.created_at.order.apply(ascending=True),
     cursor_column=KernelGroupRow.id,
+)
+
+_KERNEL_GROUP_ENVIRON_PAGINATION_SPEC = PaginationSpec(
+    forward_order=KernelGroupEnvironSearchableFields.own.key.order.apply(ascending=True),
+    cursor_column=KernelGroupEnvironRow.id,
+)
+
+_KERNEL_GROUP_RESOURCE_SLOT_PAGINATION_SPEC = PaginationSpec(
+    forward_order=KernelGroupResourceSlotSearchableFields.own.slot_name.order.apply(ascending=True),
+    cursor_column=KernelGroupResourceSlotRow.id,
 )
 
 
@@ -667,6 +721,34 @@ class SessionAdapter(BaseAdapter):
             for group in await self._batch_kernel_groups(kernel_group_ids)
         ]
 
+    async def batch_load_kernel_group_environs_by_ids(
+        self, ids: Sequence[KernelGroupEnvironID]
+    ) -> list[KernelGroupEnvironNode | Exception | None]:
+        """The kernel group environ rows the ids name for a DataLoader, in the order of the
+        ids."""
+        if not ids:
+            return []
+        return await self.batch_load_fields(
+            self._session.bulk_get_kernel_group_environs,
+            BulkGetKernelGroupEnvironsAction(ids=list(ids)),
+            ids,
+            self._kernel_group_environ_data_to_node,
+        )
+
+    async def batch_load_kernel_group_resource_slots_by_ids(
+        self, ids: Sequence[KernelGroupResourceSlotID]
+    ) -> list[KernelGroupResourceSlotNode | Exception | None]:
+        """The kernel group resource slot rows the ids name for a DataLoader, in the order of
+        the ids."""
+        if not ids:
+            return []
+        return await self.batch_load_fields(
+            self._session.bulk_get_kernel_group_resource_slots,
+            BulkGetKernelGroupResourceSlotsAction(ids=list(ids)),
+            ids,
+            self._kernel_group_resource_slot_data_to_node,
+        )
+
     async def scoped_search_kernel_groups(
         self, input: ScopedSearchKernelGroupsInput
     ) -> ScopedSearchKernelGroupsPayload:
@@ -735,6 +817,157 @@ class SessionAdapter(BaseAdapter):
                     result.append(fields.requested_starts_at.order.apply(ascending))
                 case KernelGroupOrderField.CREATED_AT:
                     result.append(fields.created_at.order.apply(ascending))
+                case _:
+                    assert_never(order.field)
+        return result
+
+    async def scoped_search_kernel_group_environs(
+        self, input: ScopedSearchKernelGroupEnvironsInput
+    ) -> ScopedSearchKernelGroupEnvironsPayload:
+        """Search the environ rows of the kernel groups of the sessions in the scope,
+        authorized on each session."""
+        conditions = self._convert_kernel_group_environ_filter(input.filter) if input.filter else []
+        orders = self._convert_kernel_group_environ_orders(input.order) if input.order else []
+        action_result = await self._session.scoped_search_kernel_group_environs.run(
+            ScopedSearchKernelGroupEnvironsAction(
+                session_ids=[SessionID(item.value) for item in input.scope.session],
+                searcher=self._build_searcher(
+                    KernelGroupEnvironSearcher,
+                    conditions=conditions,
+                    orders=orders,
+                    pagination_spec=_KERNEL_GROUP_ENVIRON_PAGINATION_SPEC,
+                    first=input.first,
+                    after=input.after,
+                    last=input.last,
+                    before=input.before,
+                    limit=input.limit,
+                    offset=input.offset,
+                ),
+            )
+        )
+        return ScopedSearchKernelGroupEnvironsPayload(
+            items=[self._kernel_group_environ_data_to_node(row) for row in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _convert_kernel_group_environ_filter(
+        self, f: KernelGroupEnvironFilter
+    ) -> list[QueryCondition]:
+        fields = KernelGroupEnvironSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
+            *self.apply_uuid_filter(f.kernel_group_id, fields.kernel_group_id.filter),
+            *self.apply_string_filter(f.key, fields.key.filter),
+        ]
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_kernel_group_environ_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                sub_conditions = self._convert_kernel_group_environ_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            for sub in f.NOT:
+                sub_conditions = self._convert_kernel_group_environ_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+        return conditions
+
+    def _convert_kernel_group_environ_orders(
+        self, orders: list[KernelGroupEnvironOrder]
+    ) -> list[QueryOrder]:
+        fields = KernelGroupEnvironSearchableFields.own
+        result: list[QueryOrder] = []
+        for order in orders:
+            ascending = order.direction == OrderDirection.ASC
+            match order.field:
+                case KernelGroupEnvironOrderField.KEY:
+                    result.append(fields.key.order.apply(ascending))
+                case _:
+                    assert_never(order.field)
+        return result
+
+    async def scoped_search_kernel_group_resource_slots(
+        self, input: ScopedSearchKernelGroupResourceSlotsInput
+    ) -> ScopedSearchKernelGroupResourceSlotsPayload:
+        """Search the resource slot rows of the kernel groups of the sessions in the scope,
+        authorized on each session."""
+        conditions = (
+            self._convert_kernel_group_resource_slot_filter(input.filter) if input.filter else []
+        )
+        orders = self._convert_kernel_group_resource_slot_orders(input.order) if input.order else []
+        action_result = await self._session.scoped_search_kernel_group_resource_slots.run(
+            ScopedSearchKernelGroupResourceSlotsAction(
+                session_ids=[SessionID(item.value) for item in input.scope.session],
+                searcher=self._build_searcher(
+                    KernelGroupResourceSlotSearcher,
+                    conditions=conditions,
+                    orders=orders,
+                    pagination_spec=_KERNEL_GROUP_RESOURCE_SLOT_PAGINATION_SPEC,
+                    first=input.first,
+                    after=input.after,
+                    last=input.last,
+                    before=input.before,
+                    limit=input.limit,
+                    offset=input.offset,
+                ),
+            )
+        )
+        return ScopedSearchKernelGroupResourceSlotsPayload(
+            items=[
+                self._kernel_group_resource_slot_data_to_node(row) for row in action_result.items
+            ],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _convert_kernel_group_resource_slot_filter(
+        self, f: KernelGroupResourceSlotFilter
+    ) -> list[QueryCondition]:
+        fields = KernelGroupResourceSlotSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
+            *self.apply_uuid_filter(f.kernel_group_id, fields.kernel_group_id.filter),
+            *self.apply_string_filter(f.slot_name, fields.slot_name.filter),
+            *self.apply_decimal_filter(f.quantity, fields.quantity.filter),
+        ]
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_kernel_group_resource_slot_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                sub_conditions = self._convert_kernel_group_resource_slot_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            for sub in f.NOT:
+                sub_conditions = self._convert_kernel_group_resource_slot_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+        return conditions
+
+    def _convert_kernel_group_resource_slot_orders(
+        self, orders: list[KernelGroupResourceSlotOrder]
+    ) -> list[QueryOrder]:
+        fields = KernelGroupResourceSlotSearchableFields.own
+        result: list[QueryOrder] = []
+        for order in orders:
+            ascending = order.direction == OrderDirection.ASC
+            match order.field:
+                case KernelGroupResourceSlotOrderField.SLOT_NAME:
+                    result.append(fields.slot_name.order.apply(ascending))
+                case KernelGroupResourceSlotOrderField.QUANTITY:
+                    result.append(fields.quantity.order.apply(ascending))
                 case _:
                     assert_never(order.field)
         return result
@@ -998,6 +1231,16 @@ class SessionAdapter(BaseAdapter):
                 f.labels,
                 SessionSearchableFields.nested.labels.correlation,
                 self._convert_entity_label_filter,
+            ),
+            *self.apply_to_many_filter(
+                f.kernel_group_environ,
+                SessionSearchableFields.nested.kernel_group_environ.correlation,
+                self._convert_kernel_group_environ_filter,
+            ),
+            *self.apply_to_many_filter(
+                f.kernel_group_resource_slots,
+                SessionSearchableFields.nested.kernel_group_resource_slots.correlation,
+                self._convert_kernel_group_resource_slot_filter,
             ),
             *self.apply_string_filter(f.creation_id, fields.creation_id.filter),
             *self.apply_enum_filter(f.session_type, fields.session_type.filter),
@@ -1595,6 +1838,28 @@ class SessionAdapter(BaseAdapter):
                 terminated_at=info.lifecycle.terminated_at,
                 starts_at=info.lifecycle.starts_at,
             ),
+        )
+
+    @staticmethod
+    def _kernel_group_environ_data_to_node(data: KernelGroupEnvironData) -> KernelGroupEnvironNode:
+        return KernelGroupEnvironNode(
+            id=data.id,
+            field_id=data.id,
+            kernel_group_id=data.kernel_group_id,
+            key=data.key,
+            value=data.value,
+        )
+
+    @staticmethod
+    def _kernel_group_resource_slot_data_to_node(
+        data: KernelGroupResourceSlotData,
+    ) -> KernelGroupResourceSlotNode:
+        return KernelGroupResourceSlotNode(
+            id=data.id,
+            field_id=data.id,
+            kernel_group_id=data.kernel_group_id,
+            slot_name=data.slot_name,
+            quantity=data.quantity,
         )
 
     @staticmethod

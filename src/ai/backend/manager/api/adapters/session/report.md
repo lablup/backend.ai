@@ -2,11 +2,15 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/session/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/session/adapter.py)
 
-시나리오: 미완 24 / 26
+시나리오: 미완 28 / 30
 
-- ops 로 구성 (3)
+- ops 로 구성 (7)
+  - batch_load_kernel_group_environs_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - batch_load_kernel_group_resource_slots_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - batch_load_kernel_groups_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - batch_load_main_kernel_groups — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - scoped_search_kernel_group_environs — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - scoped_search_kernel_group_resource_slots — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - scoped_search_kernel_groups — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
 - ops + 직접 구현 (10)
   - admin_search — 성공 있음 3 · 실패 있음 1 (global_searcher_ops, partial_bulk)

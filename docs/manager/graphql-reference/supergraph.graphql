@@ -10755,6 +10755,12 @@ type KernelGroup implements Node
 
   """The image the group's kernels run."""
   image: ImageV2
+
+  """Environment variables requested on the group."""
+  environ(filter: KernelGroupEnvironFilter = null, orderBy: [KernelGroupEnvironOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelGroupEnvironConnection
+
+  """Resource slots requested on each kernel of the group."""
+  resourceSlots(filter: KernelGroupResourceSlotFilter = null, orderBy: [KernelGroupResourceSlotOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelGroupResourceSlotConnection
 }
 
 """Added in 26.10.0. Paginated connection for kernel groups."""
@@ -10780,6 +10786,122 @@ type KernelGroupEdge
 
   """The item at the end of the edge"""
   node: KernelGroup!
+}
+
+"""
+Added in 26.10.0. One environment variable requested on a kernel group.
+"""
+type KernelGroupEnviron implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """ID of the environ row."""
+  fieldId: UUID!
+
+  """ID of the kernel group the row belongs to."""
+  kernelGroupId: UUID!
+
+  """Variable name."""
+  key: String!
+
+  """Variable value."""
+  value: String!
+}
+
+"""Added in 26.10.0. Paginated connection for kernel group environ rows."""
+type KernelGroupEnvironConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [KernelGroupEnvironEdge!]!
+
+  """Total number of environ rows matching the query."""
+  count: Int!
+}
+
+"""Added in 26.10.0. One kernel group environ row within a connection."""
+type KernelGroupEnvironEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KernelGroupEnviron!
+}
+
+"""Added in 26.10.0. Filter for kernel group environ rows."""
+input KernelGroupEnvironFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by environ row ID."""
+  fieldId: UUIDFilter = null
+
+  """Filter by the kernel group the row belongs to."""
+  kernelGroupId: UUIDFilter = null
+
+  """Filter by variable name."""
+  key: StringFilter = null
+
+  """Match all nested filters."""
+  AND: [KernelGroupEnvironFilter!] = null
+
+  """Match any nested filter."""
+  OR: [KernelGroupEnvironFilter!] = null
+
+  """Negate nested filters."""
+  NOT: [KernelGroupEnvironFilter!] = null
+}
+
+"""
+Added in 26.10.0. Filter sessions by conditions on the environ rows of their kernel groups.
+"""
+input KernelGroupEnvironNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Matches sessions with at least one environ row when true, and sessions with none when false. Says nothing about what the rows hold.
+  """
+  exists: Boolean = null
+
+  """
+  Matches sessions with at least one environ row satisfying all conditions.
+  """
+  some: KernelGroupEnvironFilter = null
+
+  """
+  Matches sessions where every environ row satisfies all conditions (also true when the session has none).
+  """
+  every: KernelGroupEnvironFilter = null
+
+  """Matches sessions with no environ row satisfying all conditions."""
+  none: KernelGroupEnvironFilter = null
+}
+
+"""Added in 26.10.0. One ordering rule for a kernel group environ search."""
+input KernelGroupEnvironOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: KernelGroupEnvironOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.10.0. Fields available for ordering kernel group environ rows.
+"""
+enum KernelGroupEnvironOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  KEY @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 26.10.0. Filter for kernel groups."""
@@ -10826,6 +10948,132 @@ enum KernelGroupOrderField
   ROLE @join__enumValue(graph: STRAWBERRY)
   REQUESTED_STARTS_AT @join__enumValue(graph: STRAWBERRY)
   CREATED_AT @join__enumValue(graph: STRAWBERRY)
+}
+
+"""
+Added in 26.10.0. One slot's amount requested on each kernel of a kernel group.
+"""
+type KernelGroupResourceSlot implements Node
+  @join__implements(graph: STRAWBERRY, interface: "Node")
+  @join__type(graph: STRAWBERRY)
+{
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """ID of the resource slot row."""
+  fieldId: UUID!
+
+  """ID of the kernel group the row belongs to."""
+  kernelGroupId: UUID!
+
+  """Resource slot name (e.g. cpu, mem)."""
+  slotName: String!
+
+  """Amount requested on each kernel of the group."""
+  quantity: Decimal!
+}
+
+"""
+Added in 26.10.0. Paginated connection for kernel group resource slot rows.
+"""
+type KernelGroupResourceSlotConnection
+  @join__type(graph: STRAWBERRY)
+{
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [KernelGroupResourceSlotEdge!]!
+
+  """Total number of resource slot rows matching the query."""
+  count: Int!
+}
+
+"""
+Added in 26.10.0. One kernel group resource slot row within a connection.
+"""
+type KernelGroupResourceSlotEdge
+  @join__type(graph: STRAWBERRY)
+{
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KernelGroupResourceSlot!
+}
+
+"""Added in 26.10.0. Filter for kernel group resource slot rows."""
+input KernelGroupResourceSlotFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """Filter by resource slot row ID."""
+  fieldId: UUIDFilter = null
+
+  """Filter by the kernel group the row belongs to."""
+  kernelGroupId: UUIDFilter = null
+
+  """Filter by slot name."""
+  slotName: StringFilter = null
+
+  """Filter by the amount requested on each kernel."""
+  quantity: DecimalFilter = null
+
+  """Match all nested filters."""
+  AND: [KernelGroupResourceSlotFilter!] = null
+
+  """Match any nested filter."""
+  OR: [KernelGroupResourceSlotFilter!] = null
+
+  """Negate nested filters."""
+  NOT: [KernelGroupResourceSlotFilter!] = null
+}
+
+"""
+Added in 26.10.0. Filter sessions by conditions on the resource slot rows of their kernel groups.
+"""
+input KernelGroupResourceSlotNestedFilter
+  @join__type(graph: STRAWBERRY)
+{
+  """
+  Matches sessions with at least one resource slot row when true, and sessions with none when false. Says nothing about what the rows hold.
+  """
+  exists: Boolean = null
+
+  """
+  Matches sessions with at least one resource slot row satisfying all conditions.
+  """
+  some: KernelGroupResourceSlotFilter = null
+
+  """
+  Matches sessions where every resource slot row satisfies all conditions (also true when the session has none).
+  """
+  every: KernelGroupResourceSlotFilter = null
+
+  """Matches sessions with no resource slot row satisfying all conditions."""
+  none: KernelGroupResourceSlotFilter = null
+}
+
+"""
+Added in 26.10.0. One ordering rule for a kernel group resource slot search.
+"""
+input KernelGroupResourceSlotOrderBy
+  @join__type(graph: STRAWBERRY)
+{
+  """Field to order by."""
+  field: KernelGroupResourceSlotOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""
+Added in 26.10.0. Fields available for ordering kernel group resource slot rows.
+"""
+enum KernelGroupResourceSlotOrderField
+  @join__type(graph: STRAWBERRY)
+{
+  SLOT_NAME @join__enumValue(graph: STRAWBERRY)
+  QUANTITY @join__enumValue(graph: STRAWBERRY)
 }
 
 """Added in 24.09.0."""
@@ -26889,6 +27137,16 @@ input SessionV2Filter
   Added in 26.10.0. Filter by the reserved start time requested at creation.
   """
   requestedStartsAt: DateTimeFilter = null
+
+  """
+  Added in 26.10.0. Filter by the environ rows of the session's kernel groups.
+  """
+  kernelGroupEnviron: KernelGroupEnvironNestedFilter = null
+
+  """
+  Added in 26.10.0. Filter by the resource slot rows of the session's kernel groups.
+  """
+  kernelGroupResourceSlots: KernelGroupResourceSlotNestedFilter = null
   AND: [SessionV2Filter!] = null
   OR: [SessionV2Filter!] = null
   NOT: [SessionV2Filter!] = null
