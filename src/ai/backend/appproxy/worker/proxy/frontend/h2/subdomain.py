@@ -8,7 +8,7 @@ from yarl import URL
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError, SubprocessPipeError
-from ai.backend.appproxy.worker.proxy.backend.h2 import BackendConfig, H2Backend
+from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend
 from ai.backend.appproxy.worker.types import Circuit, SubdomainFrontendInfo
 from ai.backend.logging.structured import StructuredLogger
 
@@ -22,7 +22,7 @@ class SubdomainFrontend(H2Frontend[str]):
     log_monitor_tasks: list[asyncio.Task[Any]]
     proc_monitor_task: asyncio.Task[Any] | None
 
-    api_port: int | None
+    api_port: int
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
@@ -30,10 +30,10 @@ class SubdomainFrontend(H2Frontend[str]):
         self.process = None
         self.log_monitor_tasks = []
         self.proc_monitor_task = None
+        self.api_port = self.api_port_pool.pop()
 
     @override
     async def start(self) -> None:
-        self.api_port = self.api_port_pool.pop()
         worker_config = self.root_context.local_config.proxy_worker
         wildcard_domain_config = worker_config.wildcard_domain
         if not wildcard_domain_config:
@@ -66,10 +66,13 @@ class SubdomainFrontend(H2Frontend[str]):
             asyncio.create_task(self._log_monitor_task(proc.stderr, "stderr"))
         )
         self.proc_monitor_task = asyncio.create_task(self._proc_monitor_task(proc))
+        self._nghttpx_running = True
+        await self._send_registered_backend_routes()
         log.info("accepting proxy requests", service_addr=str(service_addr))
 
     @override
     async def stop(self) -> None:
+        self._nghttpx_running = False
         if not self.proc_monitor_task:
             return
         self.proc_monitor_task.cancel()
@@ -78,28 +81,14 @@ class SubdomainFrontend(H2Frontend[str]):
             return
         self.process.terminate()
         await self.process.wait()
-        try:
-            for task in self.log_monitor_tasks:
-                task.cancel()
-                await task
-        finally:
-            if self.api_port:
-                self.api_port_pool.add(self.api_port)
+        for task in self.log_monitor_tasks:
+            task.cancel()
+            await task
 
     @override
     async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> H2Backend:
         backend = H2Backend(URL(f"http://localhost:{self.api_port}"), self.root_context, circuit)
         return await self.update_backend(backend, routes)
-
-    @override
-    async def update_backend(self, backend: H2Backend, routes: list[RouteInfo]) -> H2Backend:
-        backend_configs = [BackendConfig(r.current_kernel_host, r.kernel_port) for r in routes]
-        await backend.update_config(backend_configs)
-        return backend
-
-    @override
-    async def terminate_backend(self, backend: H2Backend) -> None:
-        await backend.update_config([])
 
     @override
     def get_circuit_key(self, circuit: Circuit) -> str:

@@ -12,6 +12,12 @@ from ai.backend.appproxy.common.errors import GenericBadRequest, ServerMisconfig
 from ai.backend.appproxy.worker.config import WildcardDomainConfig
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
 from ai.backend.appproxy.worker.types import Circuit, SubdomainFrontendInfo
+from ai.backend.common.dto.appproxy.v2.ingress.types import (
+    IngressFrontend,
+    IngressFrontendKind,
+    IngressProtocol,
+    WildcardFrontend,
+)
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .base import BaseHTTPFrontend
@@ -88,23 +94,32 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
 
     def parse_slot(self, request: web.Request) -> str:
         # exclude port number when evaluating the subdomain
-        subdomain = request.host.partition(":")[0].replace(self.wildcard_config.domain, "").lower()
-        if subdomain not in self.circuits:
-            raise GenericBadRequest(f"E20009: Subdomain {subdomain} not registered")
-        return subdomain
+        return request.host.partition(":")[0].replace(self.wildcard_config.domain, "").lower()
 
     @web.middleware
     async def ensure_slot_middleware(
         self, request: web.Request, handler: Handler
     ) -> web.StreamResponse:
         async def _exception_safe_handler(request: web.Request) -> web.StreamResponse:
-            slot = self.parse_slot(request)
-            circuit = self.circuits[slot]
-            with with_log_context(circuit_id=circuit.id):
-                self.ensure_allowed_ip(request, circuit)
-                self.ensure_credential(request, circuit)
-                backend = self.backends[slot]
-                request["circuit"] = circuit
+            subdomain = self.parse_slot(request)
+            backend = self.backends.get(subdomain)
+            if backend is None:
+                raise GenericBadRequest(f"E20009: Subdomain {subdomain} not registered")
+            ingress = await self._read_ingress(
+                IngressFrontend(
+                    kind=IngressFrontendKind.WILDCARD,
+                    protocol=IngressProtocol.HTTP,
+                    wildcard=WildcardFrontend(subdomain=subdomain),
+                )
+            )
+            if ingress is None:
+                raise GenericBadRequest(f"E20009: Subdomain {subdomain} not registered")
+            with with_log_context(circuit_id=backend.circuit.id):
+                self.ensure_allowed_ip(request, ingress.access)
+                # TODO: Check the credential against ingress.access once an ingress carries the id
+                # its tokens name.
+                self.ensure_credential(request, backend.circuit)
+                request["circuit"] = backend.circuit
                 request["backend"] = backend
                 return await handler(request)
 
