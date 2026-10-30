@@ -222,6 +222,19 @@ class TestDeploymentDesignatedAgents:
                 DeploymentID(uuid.uuid4()), set(agent_uuids[:agent_count])
             )
 
+    async def test_fetching_returns_the_agents_in_uuid_order(
+        self,
+        repository: DeploymentRepository,
+        deployment_ids: list[DeploymentID],
+        agent_uuids: list[AgentUUID],
+    ) -> None:
+        deployment_id = deployment_ids[0]
+        await repository.replace_designated_agents(deployment_id, set(agent_uuids))
+
+        designated = await repository.fetch_designated_agents_by_deployment_ids({deployment_id})
+
+        assert designated[deployment_id] == sorted(agent_uuids)
+
     async def test_fetching_many_groups_by_deployment_with_an_empty_list_for_none(
         self,
         repository: DeploymentRepository,

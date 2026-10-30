@@ -12,6 +12,7 @@ import pytest
 
 from ai.backend.common.config import ModelConfig, ModelDefinition, ModelServiceConfig
 from ai.backend.common.contexts.user import with_user_context
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentEntityType, DeploymentID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
@@ -475,3 +476,41 @@ class TestFieldBatchLoads:
         assert none is None
         action = processors.deployment.bulk_get_deployment_policies.run.await_args.args[0]
         assert list(action.owner_ids()) == [deployment_id, DeploymentID(without_policy)]
+
+
+class TestDesignatedAgentsBatchLoad:
+    """The designated agents of each deployment are read through one bulk action."""
+
+    async def test_each_deployment_answers_its_agents_or_its_denial(self) -> None:
+        designating = DeploymentID(uuid4())
+        plain = DeploymentID(uuid4())
+        denied = DeploymentID(uuid4())
+        agent = AgentUUID(uuid4())
+        denial = GenericForbidden("no read on this deployment")
+        processors = MagicMock()
+        processors.deployment.bulk_get_deployment_designated_agents.run = AsyncMock(
+            return_value=PartialBulkResult(
+                items=[
+                    PartialBulkEntityResult[list[AgentUUID]].succeeded(designating, [agent]),
+                    PartialBulkEntityResult[list[AgentUUID]].succeeded(plain, []),
+                    PartialBulkEntityResult[list[AgentUUID]].denied(denied, denial),
+                ]
+            )
+        )
+        deployment_adapter = DeploymentAdapter(processors.deployment, MagicMock())
+
+        answers = await deployment_adapter.batch_load_designated_agents([
+            designating,
+            plain,
+            denied,
+        ])
+
+        assert answers == [[agent], [], denial]
+
+    async def test_no_deployment_ids_read_nothing(self) -> None:
+        processors = MagicMock()
+        processors.deployment.bulk_get_deployment_designated_agents.run = AsyncMock()
+        deployment_adapter = DeploymentAdapter(processors.deployment, MagicMock())
+
+        assert await deployment_adapter.batch_load_designated_agents([]) == []
+        processors.deployment.bulk_get_deployment_designated_agents.run.assert_not_awaited()

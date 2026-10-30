@@ -6,6 +6,7 @@ from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.project import ProjectID
@@ -94,6 +95,9 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.partial_bu
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
     UpdateAutoScalingRuleActionResult,
+)
+from ai.backend.manager.services.deployment.actions.bulk_get_deployment_designated_agents import (
+    BulkGetDeploymentDesignatedAgentsAction,
 )
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
@@ -401,6 +405,22 @@ class DeploymentService:
             action.updater.deployment_id, action.updater
         )
         return UpdateDeploymentActionResult(data=_convert_deployment_info_to_data(deployment_info))
+
+    async def bulk_get_deployment_designated_agents(
+        self, action: BulkGetDeploymentDesignatedAgentsAction
+    ) -> PartialBulkResult[list[AgentUUID]]:
+        """Read the agents each deployment designates; one designating none answers ``[]``."""
+        designated = await self._deployment_repository.fetch_designated_agents_by_deployment_ids(
+            set(action.deployment_ids)
+        )
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[list[AgentUUID]].succeeded(
+                    deployment_id, list(designated.get(deployment_id, [])), description="read"
+                )
+                for deployment_id in action.deployment_ids
+            ]
+        )
 
     async def replace_deployment_options(
         self, action: ReplaceDeploymentOptionsAction

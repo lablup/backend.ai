@@ -12771,6 +12771,11 @@ type ModelDeployment implements Node
   """The access tokens of this entity."""
   accessTokens(filter: AccessTokenFilter = null, orderBy: [AccessTokenOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): AccessTokenConnection
 
+  """
+  Added in 26.10.0. The agents this deployment designates for its route sessions.
+  """
+  designatedAgents: AgentV2Connection
+
   """Added in 26.9.0. The labels on this deployment."""
   entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 }
