@@ -1146,12 +1146,14 @@ class DeploymentRepository:
                 if rule.action.max_replicas is not None:
                     new_replica_count = min(new_replica_count, rule.action.max_replicas)
 
-                if new_replica_count == current_replica_count:
+                # A count already beyond a limit is clamped against scale_direction.
+                if (new_replica_count - current_replica_count) * scale_direction <= 0:
                     log.debug(
-                        "autoscaling replica count already at limit, rule skipped",
+                        "autoscaling replica count at or beyond limit, rule skipped",
                         deployment_id=deployment.id,
                         rule_id=rule.id,
                         current_replica_count=current_replica_count,
+                        new_replica_count=new_replica_count,
                         min_replica_count=rule.action.min_replicas,
                         max_replica_count=rule.action.max_replicas,
                     )

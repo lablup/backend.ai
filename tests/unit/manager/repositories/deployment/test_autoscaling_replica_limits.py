@@ -303,10 +303,16 @@ class TestCalculateDesiredReplicasForDeployment:
         "case",
         [
             _DesiredReplicasCase(
-                current_replicas=1,
+                current_replicas=2,
                 load=_Load.LOW,
-                rules=[_RuleLimits(step_size=2, min_replicas=2, max_replicas=3)],
-                expected_replicas=2,
+                rules=[_RuleLimits(step_size=1, min_replicas=3, max_replicas=None)],
+                expected_replicas=None,
+            ),
+            _DesiredReplicasCase(
+                current_replicas=5,
+                load=_Load.HIGH,
+                rules=[_RuleLimits(step_size=1, min_replicas=None, max_replicas=3)],
+                expected_replicas=None,
             ),
             _DesiredReplicasCase(
                 current_replicas=2,
@@ -347,6 +353,24 @@ class TestCalculateDesiredReplicasForDeployment:
                 ],
                 expected_replicas=4,
             ),
+            _DesiredReplicasCase(
+                current_replicas=4,
+                load=_Load.HIGH,
+                rules=[
+                    _RuleLimits(step_size=1, min_replicas=None, max_replicas=3),
+                    _RuleLimits(step_size=1, min_replicas=None, max_replicas=5),
+                ],
+                expected_replicas=5,
+            ),
+            _DesiredReplicasCase(
+                current_replicas=2,
+                load=_Load.LOW,
+                rules=[
+                    _RuleLimits(step_size=1, min_replicas=3, max_replicas=None),
+                    _RuleLimits(step_size=1, min_replicas=1, max_replicas=None),
+                ],
+                expected_replicas=1,
+            ),
         ],
         ids=lambda case: (
             f"{case.load.name.lower()}-{len(case.rules)}rule"
@@ -382,10 +406,22 @@ class TestCalculateDesiredReplicasForDeployment:
                 rules=[_RuleLimits(step_size=1, min_replicas=1, max_replicas=None)],
                 expected_replicas=None,
             ),
+            _DesiredReplicasCase(
+                current_replicas=5,
+                load=_Load.HIGH,
+                rules=[_RuleLimits(step_size=1, min_replicas=None, max_replicas=3)],
+                expected_replicas=None,
+            ),
+            _DesiredReplicasCase(
+                current_replicas=2,
+                load=_Load.LOW,
+                rules=[_RuleLimits(step_size=1, min_replicas=3, max_replicas=None)],
+                expected_replicas=None,
+            ),
         ],
         ids=lambda case: f"{case.load.name.lower()}-at-{case.current_replicas}",
     )
-    async def test_rule_at_limit_is_not_triggered(
+    async def test_rule_at_or_beyond_its_limit_is_not_triggered(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         deployment_repository: DeploymentRepository,
