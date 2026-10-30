@@ -89,7 +89,7 @@ async def status(request: web.Request) -> web.Response:
         "authority": worker_config.authority,
         "app_mode": worker_config.frontend_mode,
         "protocol": worker_config.protocol,
-        "occupied_slots": len(root_ctx.proxy_frontend.circuits),
+        "occupied_slots": len(root_ctx.proxy_frontend.backends),
         "available_slots": available_slots,
     })
 

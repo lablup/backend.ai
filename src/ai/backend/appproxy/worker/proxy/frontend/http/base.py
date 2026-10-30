@@ -26,6 +26,7 @@ from ai.backend.appproxy.worker.types import (
     InteractiveAppInfo,
     RootContext,
 )
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAccess
 from ai.backend.common.exception import BackendAIError
 from ai.backend.logging.structured import StructuredLogger
 
@@ -45,12 +46,9 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
         trusted_proxies = root_context.local_config.proxy_worker.trusted_proxies
         self._xff_strict = XForwardedStrict([list(trusted_proxies)]) if trusted_proxies else None
 
-    def ensure_allowed_ip(self, request: web.Request, circuit: Circuit) -> None:
-        validator = circuit.ip_validator
-        if not validator.is_restricted:
-            return
+    def ensure_allowed_ip(self, request: web.Request, access: IngressAccess) -> None:
         client_ip = request.remote
-        if not client_ip or not validator.is_allowed(client_ip):
+        if not self._is_client_ip_allowed(client_ip, access):
             log.trace("rejecting client {} (not in allowed_client_ips)", client_ip)
             raise ClientIPNotAllowed("E20011: Client address not allowed")
 
@@ -110,8 +108,8 @@ class BaseHTTPFrontend[TCircuitKeyType: (int, str)](BaseFrontend[HTTPBackend, TC
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
         now = time.time()
         return [
-            self.circuits[key]
-            for key, backend in self.backends.items()
+            backend.circuit
+            for backend in self.backends.values()
             if (backend.last_used - now) >= threshold
         ]
 

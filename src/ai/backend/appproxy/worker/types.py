@@ -352,6 +352,7 @@ class RootContext:
     cors_options: dict[str, aiohttp_cors.ResourceOptions]
     metrics: WorkerMetricRegistry
     health_probe: HealthProbe
+    proxy_frontend_serving: asyncio.Event
     ingress_state: IngressState
 
 
@@ -524,7 +525,8 @@ class Circuit(SerializableCircuit):
                 return IngressFrontend(
                     kind=IngressFrontendKind.WILDCARD,
                     protocol=protocol,
-                    wildcard=WildcardFrontend(subdomain=subdomain),
+                    # The subdomain frontends match the lowercased request host.
+                    wildcard=WildcardFrontend(subdomain=subdomain.lower()),
                 )
             case _:
                 raise UnreachableError("a circuit holds only a port or subdomain frontend")

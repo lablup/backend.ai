@@ -160,6 +160,7 @@ from .proxy.frontend import (
     TraefikSubdomainFrontend,
     TraefikTCPFrontend,
 )
+from .proxy.frontend.health_checker import ProxyFrontendServingHealthChecker
 from .tasks import WorkerHeartbeatTask
 from .types import Circuit, CleanupContext, RootContext, WorkerMetricRegistry
 
@@ -495,12 +496,24 @@ async def proxy_frontend_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 "unsupported proxy protocol",
                 proxy_protocol=root_ctx.local_config.proxy_worker.protocol,
             )
-    await root_ctx.proxy_frontend.start()
-    log.info("started the proxy frontend", frontend_name=type(root_ctx.proxy_frontend).__name__)
     try:
         yield
     finally:
         await root_ctx.proxy_frontend.terminate_all_circuits()
+
+
+@asynccontextmanager
+async def proxy_frontend_serving_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    # Runs after worker_registration_ctx, so no request reaches the frontend before the
+    # initial circuit load.
+    await root_ctx.proxy_frontend.start()
+    log.info("started the proxy frontend", frontend_name=type(root_ctx.proxy_frontend).__name__)
+    root_ctx.proxy_frontend_serving.set()
+    await root_ctx.health_probe.check_all()
+    try:
+        yield
+    finally:
+        root_ctx.proxy_frontend_serving.clear()
         try:
             await root_ctx.proxy_frontend.stop()
         except CleanupError as ee:
@@ -561,6 +574,11 @@ async def health_probe_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
                 ComponentId("stat"): root_ctx.valkey_stat,
             }
         )
+    )
+
+    root_ctx.proxy_frontend_serving = asyncio.Event()
+    await probe.register_readiness(
+        ProxyFrontendServingHealthChecker(root_ctx.proxy_frontend_serving)
     )
 
     # Start periodic health checking
@@ -764,12 +782,13 @@ async def handle_proxy_route_event(
             log.debug("circuit routes updated: {}", event.circuit.id)
             updated_circuit = Circuit.from_serialized_circuit(event.circuit)
             await context.proxy_frontend.update_circuit_route_info(updated_circuit, event.routes)
-            # The frontend stores the new routes on the circuit it holds and skips one it does not.
-            held_circuit = context.proxy_frontend.circuits.get(
+            # The frontend stores the new routes on the circuit of the backend it holds and skips a
+            # circuit it holds no backend of.
+            held_backend = context.proxy_frontend.backends.get(
                 context.proxy_frontend.get_circuit_key(updated_circuit)
             )
-            if ingress_writer is not None and held_circuit is not None:
-                await ingress_writer.apply([held_circuit.to_ingress(ingress_authority)])
+            if ingress_writer is not None and held_backend is not None:
+                await ingress_writer.apply([held_backend.circuit.to_ingress(ingress_authority)])
         case AppProxyCircuitRemovedEvent():
             log.debug("circuits removed: {}", [str(c.id) for c in event.circuits])
             removed_circuits = [Circuit.from_serialized_circuit(c) for c in event.circuits]
@@ -877,6 +896,7 @@ def build_root_app(
                 health_probe_ctx,
                 service_discovery_ctx,
                 worker_registration_ctx,
+                proxy_frontend_serving_ctx,
             ]
         else:
             cleanup_contexts = [
@@ -890,6 +910,7 @@ def build_root_app(
                 health_probe_ctx,
                 service_discovery_ctx,
                 worker_registration_ctx,
+                proxy_frontend_serving_ctx,
             ]
     shutdown_context_instances = []
 
