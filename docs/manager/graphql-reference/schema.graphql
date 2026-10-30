@@ -2745,7 +2745,7 @@ input ModifyGroupInput {
   resource_policy: String
 
   """Added in 24.03.0"""
-  container_registry: JSONString = "{}"
+  container_registry: JSONString
 }
 
 """Instead of deleting the group, just mark it as inactive."""

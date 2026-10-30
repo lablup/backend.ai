@@ -291,19 +291,27 @@ class TestGroupNodeQuery:
 
 
 class TestRegistryTargetInput:
-    @pytest.mark.parametrize(
-        "configuration", [{}, {"containerRegistry": None}, {"containerRegistry": "{}"}]
-    )
-    def test_omitted_null_and_empty_clear_the_target(
+    def _props(
         self, configuration: dict[str, Any], monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    ) -> ModifyGroupInput:
         monkeypatch.setattr(inputobjecttype, "_INPUT_OBJECT_TYPE_DEFAULT_VALUE", Undefined)
-
         schema = graphene.Schema(types=[ModifyGroupInput])
         input_type = schema.graphql_schema.get_type("ModifyGroupInput")
         assert isinstance(input_type, GraphQLInputObjectType)
         props = coerce_input_value(configuration, input_type)
-        target = props.to_action(uuid4()).updater.container_registry
+        assert isinstance(props, ModifyGroupInput)
+        return props
+
+    def test_omitted_keeps_the_target(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        assert self._props({}, monkeypatch).to_registry_change().is_nop()
+
+    @pytest.mark.parametrize(
+        "configuration", [{"containerRegistry": None}, {"containerRegistry": "{}"}]
+    )
+    def test_null_and_empty_clear_the_target(
+        self, configuration: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        target = self._props(configuration, monkeypatch).to_registry_change()
         assert not target.is_nop()
         assert target.optional_value() is None
 
