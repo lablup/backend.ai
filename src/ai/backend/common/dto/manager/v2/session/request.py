@@ -434,7 +434,10 @@ class EnqueueSessionInput(BaseRequestModel):
     )
     bootstrap_script: str | None = Field(
         default=None,
-        description="Shell script executed on container startup. Falls back to keypair setting.",
+        description=(
+            "Shell script executed on container startup. Falls back to the user's default"
+            " bootstrap script, then the resource group's default."
+        ),
     )
 
     # Scheduling

@@ -224,6 +224,7 @@ class SchedulerRepository:
                     policy=None,
                     container_user=ContainerUserInfo(),
                     dotfiles=DotfileBundle(),
+                    default_bootstrap_script=None,
                     pending_session_count=0,
                     pending_session_resource_slots={},
                     vfolder_mounts_by_role={},

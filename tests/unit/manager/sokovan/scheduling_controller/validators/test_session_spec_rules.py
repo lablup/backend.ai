@@ -218,6 +218,7 @@ def _ctx(
             policy=policy,
             container_user=ContainerUserInfo(),
             dotfiles=dotfiles or DotfileBundle(),
+            default_bootstrap_script=None,
             pending_session_count=pending_session_count,
             pending_session_resource_slots=pending_session_resource_slots or {},
             vfolder_mounts_by_role={},

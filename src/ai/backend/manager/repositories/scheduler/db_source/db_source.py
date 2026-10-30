@@ -24,6 +24,7 @@ from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack
 from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel import KernelID
@@ -96,6 +97,11 @@ from ai.backend.manager.errors.resource import DomainNotFound, ResourceGroupNotF
 from ai.backend.manager.errors.resource_slot import AgentResourceCapacityExceeded
 from ai.backend.manager.exceptions import ErrorStatusInfo
 from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.bootstrap_script.row import (
+    BootstrapScriptRow,
+    UserDefaultBootstrapScriptRow,
+)
+from ai.backend.manager.models.bootstrap_script_revision.row import BootstrapScriptRevisionRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow, domains
 from ai.backend.manager.models.dotfile.row import DotfileRow
@@ -2310,6 +2316,26 @@ class ScheduleDBSource:
                 db_sess, user_scope_for_dotfiles, access_key
             )
 
+        default_bootstrap_script: BootstrapScript | None = None
+        if user_uuid is not None:
+            default_bootstrap_script = await db_sess.scalar(
+                sa.select(BootstrapScriptRevisionRow.script)
+                .join(
+                    BootstrapScriptRow,
+                    BootstrapScriptRow.id == BootstrapScriptRevisionRow.script_id,
+                )
+                .join(
+                    UserDefaultBootstrapScriptRow,
+                    UserDefaultBootstrapScriptRow.script_id == BootstrapScriptRow.id,
+                )
+                .where(
+                    UserDefaultBootstrapScriptRow.user_id == user_uuid,
+                    BootstrapScriptRow.deleted_at.is_(None),
+                )
+                .order_by(BootstrapScriptRevisionRow.revision_number.desc())
+                .limit(1)
+            )
+
         # Global per-user pending-session count and requested-slot total for
         # the enqueue queue-depth / queue-resource gates. Concurrent-session
         # limits are enforced by the scheduler. The slot total is aggregated
@@ -2348,6 +2374,7 @@ class ScheduleDBSource:
             policy=user_enqueue_policy,
             container_user=user_container,
             dotfiles=dotfile_bundle,
+            default_bootstrap_script=default_bootstrap_script,
             pending_session_count=pending_session_count,
             pending_session_resource_slots=pending_session_resource_slots,
         )
