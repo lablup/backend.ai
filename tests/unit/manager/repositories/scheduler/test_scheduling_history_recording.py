@@ -6,9 +6,10 @@ for enqueue (initial creation to PENDING) and RUNNING to TERMINATING transitions
 """
 
 import uuid
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Mapping
 from datetime import datetime, timedelta
 from decimal import Decimal
+from pathlib import PurePosixPath
 from typing import Any
 from unittest.mock import MagicMock
 
@@ -26,6 +27,8 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID, Resour
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
@@ -33,12 +36,17 @@ from ai.backend.common.types import (
     AgentId,
     ClusterMode,
     DefaultForUnspecified,
+    MountPermission,
+    QuotaScopeID,
     ResourceSlot,
     ResourceSlotEntry,
     SecretKey,
     SessionId,
     SessionResult,
     SessionTypes,
+    VFolderID,
+    VFolderMount,
+    VFolderUsageMode,
 )
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
@@ -63,6 +71,7 @@ from ai.backend.manager.data.session.spec import (
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import InvalidKernelConfig
@@ -74,6 +83,7 @@ from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel_group.row import KernelGroupRow
 from ai.backend.manager.models.kernel_group_environ.row import KernelGroupEnvironRow
 from ai.backend.manager.models.kernel_group_resource_slot.row import KernelGroupResourceSlotRow
+from ai.backend.manager.models.kernel_group_vfolder_mount.row import KernelGroupVFolderMountRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
@@ -89,9 +99,13 @@ from ai.backend.manager.models.resource_policy.row import (
 from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow, ResourceSlotTypeRow
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
+from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -147,6 +161,8 @@ class TestEnqueueSessionSchedulingHistory:
                 ResourceSlotTypeRow,
                 KernelGroupResourceSlotRow,
                 KernelGroupEnvironRow,
+                VFolderRow,
+                KernelGroupVFolderMountRow,
                 ResourceAllocationRow,
                 SessionDependencyRow,
                 SessionDesignatedAgentRow,
@@ -488,6 +504,7 @@ class TestEnqueueSessionSchedulingHistory:
         dependencies: tuple[SessionID, ...] = (),
         groups: list[KernelGroup] | None = None,
         designated_agents: tuple[AgentId, ...] = (),
+        mounts_by_role: Mapping[str, tuple[VFolderMount, ...]] | None = None,
     ) -> SessionSpec:
         kernel_groups = groups or [self._group(role="main", replica_count=1, image_id=image_id)]
         kernel_specs = tuple(
@@ -497,6 +514,7 @@ class TestEnqueueSessionSchedulingHistory:
                 cluster_hostname=f"{group.role}{replica_idx + 1}",
                 local_rank=0,
                 execution_spec=group.execution_spec,
+                vfolder_mounts=(mounts_by_role or {}).get(group.role, ()),
             )
             for group in kernel_groups
             for replica_idx in range(group.replica_count)
@@ -1000,6 +1018,176 @@ class TestEnqueueSessionSchedulingHistory:
                     environ={"1-NOT-A-NAME": "x"},
                 ),
             ],
+            **enqueue_spec_args,
+        )
+
+        with pytest.raises(InvalidKernelConfig):
+            await db_source.enqueue_session_from_spec(spec)
+
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            assert (
+                await db_sess.scalar(sa.select(SessionRow).where(SessionRow.id == session_id))
+            ) is None
+
+    async def _mount(
+        self,
+        db: ExtendedAsyncSAEngine,
+        domain: DomainFixtureData,
+        user_uuid: uuid.UUID,
+        alias: str,
+        usage_mode: VFolderUsageMode,
+    ) -> VFolderMount:
+        """Register a vfolder and return its resolved mount."""
+        quota_scope_id = QuotaScopeID.parse(f"user:{user_uuid}")
+        vfolder_id = VFolderUUID(uuid.uuid4())
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                VFolderRow(
+                    id=vfolder_id,
+                    name=alias,
+                    host="local:volume1",
+                    domain_name=domain.domain_name,
+                    quota_scope_id=quota_scope_id,
+                    usage_mode=usage_mode,
+                    ownership_type=VFolderOwnershipType.USER,
+                    user=user_uuid,
+                )
+            )
+            await db_sess.flush()
+        return VFolderMount(
+            name=alias,
+            vfid=VFolderID(quota_scope_id, vfolder_id),
+            vfsubpath=PurePosixPath("."),
+            host_path=PurePosixPath(f"/vfroot/local/{alias}"),
+            kernel_path=PurePosixPath(f"/home/work/{alias}"),
+            mount_perm=MountPermission.READ_WRITE,
+            usage_mode=usage_mode,
+        )
+
+    @pytest.fixture
+    async def main_mount(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_user_uuid: uuid.UUID,
+    ) -> VFolderMount:
+        return await self._mount(
+            db_with_cleanup, test_domain, test_user_uuid, "main-data", VFolderUsageMode.GENERAL
+        )
+
+    @pytest.fixture
+    async def worker_mount(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_user_uuid: uuid.UUID,
+    ) -> VFolderMount:
+        return await self._mount(
+            db_with_cleanup, test_domain, test_user_uuid, "worker-data", VFolderUsageMode.MODEL
+        )
+
+    @pytest.fixture
+    async def session_mounting_per_role(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_image_id: ImageID,
+        enqueue_spec_args: dict[str, Any],
+        main_mount: VFolderMount,
+        worker_mount: VFolderMount,
+    ) -> SessionID:
+        """A session whose main and two workers mount different vfolders."""
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        session_id = SessionID(uuid.uuid4())
+        await db_source.enqueue_session_from_spec(
+            self._spec(
+                session_id=session_id,
+                image_id=test_image_id,
+                groups=[
+                    self._group(role="main", replica_count=1, image_id=test_image_id),
+                    self._group(role="worker", replica_count=2, image_id=test_image_id),
+                ],
+                mounts_by_role={"main": (main_mount,), "worker": (worker_mount,)},
+                **enqueue_spec_args,
+            )
+        )
+        return session_id
+
+    async def test_enqueue_writes_vfolder_mounts_under_their_group_only(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        session_mounting_per_role: SessionID,
+        main_mount: VFolderMount,
+        worker_mount: VFolderMount,
+    ) -> None:
+        """Each group row holds only its own role's mount."""
+        groups = await self._groups_by_role(db_with_cleanup, session_mounting_per_role)
+        async with db_with_cleanup.begin_readonly_session() as db_sess:
+            mounts = (
+                await db_sess.execute(
+                    sa.select(
+                        KernelGroupVFolderMountRow.kernel_group_id,
+                        KernelGroupVFolderMountRow.vfolder_id,
+                        KernelGroupVFolderMountRow.mount_destination,
+                    )
+                    .join(
+                        KernelGroupRow,
+                        KernelGroupRow.id == KernelGroupVFolderMountRow.kernel_group_id,
+                    )
+                    .where(KernelGroupRow.session_id == session_mounting_per_role)
+                )
+            ).all()
+        assert sorted(
+            (row.kernel_group_id, row.vfolder_id, row.mount_destination) for row in mounts
+        ) == sorted([
+            (groups["main"].id, main_mount.vfid.folder_id, "/home/work/main-data"),
+            (groups["worker"].id, worker_mount.vfid.folder_id, "/home/work/worker-data"),
+        ])
+
+    async def test_search_sessions_with_kernels_gives_each_kernel_its_role_mounts(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        session_mounting_per_role: SessionID,
+        main_mount: VFolderMount,
+        worker_mount: VFolderMount,
+    ) -> None:
+        """The main kernel starts with the main mount and every worker with the worker mount."""
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+
+        result = await db_source.search_sessions_with_kernels(
+            SessionSearcher(
+                pagination=NoPagination(),
+                conditions=[
+                    SessionSearchableFields.own.id.filter.in_(
+                        UUIDInMatchSpec(values=[session_mounting_per_role], negated=False)
+                    )
+                ],
+            )
+        )
+
+        (session,) = result.sessions
+        assert sorted(
+            (kernel.cluster_hostname, [mount.to_json() for mount in kernel.vfolder_mounts])
+            for kernel in session.kernels
+        ) == [
+            ("main1", [main_mount.to_json()]),
+            ("worker1", [worker_mount.to_json()]),
+            ("worker2", [worker_mount.to_json()]),
+        ]
+
+    async def test_enqueue_refuses_two_vfolder_mounts_at_one_destination(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_image_id: ImageID,
+        enqueue_spec_args: dict[str, Any],
+        main_mount: VFolderMount,
+    ) -> None:
+        """Two mounts of one group at the same destination leave nothing behind."""
+        db_source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        session_id = SessionID(uuid.uuid4())
+        spec = self._spec(
+            session_id=session_id,
+            image_id=test_image_id,
+            mounts_by_role={"main": (main_mount, main_mount)},
             **enqueue_spec_args,
         )
 

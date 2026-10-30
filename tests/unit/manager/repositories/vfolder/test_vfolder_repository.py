@@ -19,6 +19,7 @@ from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.kernel_group import KernelGroupRole
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
@@ -69,6 +70,8 @@ from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.kernel_group.row import KernelGroupRow
+from ai.backend.manager.models.kernel_group_vfolder_mount.row import KernelGroupVFolderMountRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project.row import ProjectRow
@@ -182,7 +185,9 @@ class TestVfolderRepository:
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
+                KernelGroupRow,
                 KernelRow,
+                KernelGroupVFolderMountRow,
                 ReplicaGroupRow,
                 RoutingRow,
                 ResourcePresetRow,
@@ -1208,7 +1213,9 @@ class TestVfolderRepositoryPurge:
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
+                KernelGroupRow,
                 KernelRow,
+                KernelGroupVFolderMountRow,
                 ReplicaGroupRow,
                 RoutingRow,
                 ModelCardRow,
@@ -1578,7 +1585,9 @@ class TestVfolderRepositoryDeleteForever:
                 DeploymentRevisionRow,
                 SessionRow,
                 AgentRow,
+                KernelGroupRow,
                 KernelRow,
+                KernelGroupVFolderMountRow,
                 ReplicaGroupRow,
                 RoutingRow,
                 ModelCardRow,
@@ -2108,15 +2117,6 @@ class TestVfolderRepositoryDeleteForever:
         # isolating the kernel-level mount guard from the session-level one.
         session_id = uuid.uuid4()
         kernel_id = uuid.uuid4()
-        mount = VFolderMount(
-            name="mnt",
-            vfid=VFolderID(quota_scope_id, vfolder_id),
-            vfsubpath=PurePosixPath("."),
-            host_path=PurePosixPath("/vfroot/local/mnt"),
-            kernel_path=PurePosixPath("/home/work/mnt"),
-            mount_perm=MountPermission.READ_WRITE,
-            usage_mode=VFolderUsageMode.GENERAL,
-        )
         async with db.begin_session() as db_sess:
             db_sess.add(
                 SessionRow(
@@ -2132,10 +2132,24 @@ class TestVfolderRepositoryDeleteForever:
                     vfolder_mounts=[],
                 )
             )
+            await db_sess.flush()
+            group = KernelGroupRow(session_id=session_id, role=KernelGroupRole(DEFAULT_ROLE))
+            db_sess.add(group)
+            await db_sess.flush()
+            db_sess.add(
+                KernelGroupVFolderMountRow(
+                    kernel_group_id=group.id,
+                    vfolder_id=vfolder_id,
+                    vfsubpath=".",
+                    mount_destination="/home/work/mnt",
+                    mount_perm=MountPermission.READ_WRITE,
+                )
+            )
             db_sess.add(
                 KernelRow(
                     id=kernel_id,
                     session_id=session_id,
+                    kernel_group_id=group.id,
                     domain_name=domain_name,
                     group_id=group_id,
                     user_uuid=user_id,
@@ -2146,7 +2160,6 @@ class TestVfolderRepositoryDeleteForever:
                     repl_out_port=0,
                     stdin_port=0,
                     stdout_port=0,
-                    vfolder_mounts=[mount],
                 )
             )
             await db_sess.flush()
