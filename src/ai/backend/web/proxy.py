@@ -39,6 +39,7 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 HTTP_HEADERS_TO_FORWARD = [
     "Accept-Language",
     "Authorization",
+    "Cookie",
 ]
 
 CHUNK_SIZE: Final[int] = 64 * 1024
@@ -258,8 +259,6 @@ async def _run_proxy_request(
                         # Passthrough the streamed content
                         content = frontend_rqst.content
                 fill_forwarding_hdrs_to_api_session(frontend_rqst, api_session)
-                # Deliver cookie for token-based authentication.
-                api_session.aiohttp_session.cookie_jar.update_cookies(frontend_rqst.cookies)
                 backend_rqst = Request(
                     frontend_rqst.method,
                     path,
@@ -463,9 +462,6 @@ async def web_handler_with_jwt(
 
                 fill_forwarding_hdrs_to_api_session(frontend_rqst, api_session)
 
-                # Deliver cookie for token-based authentication (if needed)
-                api_session.aiohttp_session.cookie_jar.update_cookies(frontend_rqst.cookies)
-
                 # Create backend request
                 backend_rqst = Request(
                     frontend_rqst.method,
@@ -592,8 +588,6 @@ async def web_plugin_handler(
                         content = json.dumps(body).encode("utf8")
                 request_api_version = frontend_rqst.headers.get("X-BackendAI-Version", None)
                 fill_forwarding_hdrs_to_api_session(frontend_rqst, api_session)
-                # Deliver cookie for token-based authentication.
-                api_session.aiohttp_session.cookie_jar.update_cookies(frontend_rqst.cookies)
                 backend_rqst = Request(
                     frontend_rqst.method,
                     path,
