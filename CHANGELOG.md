@@ -16,6 +16,14 @@ Changes
 
 <!-- towncrier release notes start -->
 
+## 26.4.18 (2026-10-30)
+
+### Fixes
+* Clamp the autoscaling replica count to the rule's `min_replicas` and `max_replicas` instead of skipping the scaling action when `step_size` crosses a limit ([#15081](https://github.com/lablup/backend.ai/issues/15081))
+* Stop sending storage-proxy usage requests for vfolders in `DELETE_COMPLETE` or `DELETE_ERROR` status, which now fail with not-found in the manager ([#16129](https://github.com/lablup/backend.ai/issues/16129))
+* Fix the webserver accumulating browser cookies of proxied requests in shared Manager client sessions, which sent them along with other users' requests and failed anonymous requests with 400 once the Cookie header exceeded 8KB. ([#16168](https://github.com/lablup/backend.ai/issues/16168))
+
+
 ## 26.4.17 (2026-10-27)
 
 ### Features
