@@ -4,11 +4,14 @@ import enum
 import re
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 from ai.backend.common import msgpack
 from ai.backend.common.data.entity.dotfile import DotfileID
+from ai.backend.common.data.entity.dotfile_revision import DotfileRevisionID
 from ai.backend.common.data.entity.types import FieldData, RuntimeEntityID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE, RESERVED_DOTFILES
 from ai.backend.manager.errors.storage import (
     DotfileAlreadyExists,
@@ -54,6 +57,28 @@ class DotfileData(FieldData):
     perm: str
     data: str
     is_default: bool
+
+
+@dataclass(frozen=True)
+class DotfileRevisionData(FieldData):
+    """One write of a dotfile's permission and content; the latest one is the current content."""
+
+    id: DotfileRevisionID
+    dotfile_id: DotfileID
+    revision_number: int
+    perm: str
+    data: str
+    creator_id: UserID | None
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class DotfileApplicationData(FieldData):
+    """The dotfile an entity's sessions get for one path."""
+
+    entity: RuntimeEntityID
+    path: str
+    dotfile_id: DotfileID
 
 
 @dataclass(frozen=True)
