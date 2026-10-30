@@ -1,11 +1,9 @@
 import pytest
 
 from ai.backend.common.container_registry import ContainerRegistryType
-from ai.backend.manager.errors.container_registry import (
-    InvalidContainerRegistryProject,
-    InvalidContainerRegistryURL,
-)
-from ai.backend.manager.models.container_registry.row import (
+from ai.backend.common.exception import InvalidContainerRegistryURL
+from ai.backend.manager.errors.container_registry import InvalidContainerRegistryProject
+from ai.backend.manager.services.container_registry.validator import (
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )

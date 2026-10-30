@@ -14,7 +14,10 @@ from ai.backend.common.dto.manager.v2.container_registry.request import (
     UpdateContainerRegistryInput,
 )
 from ai.backend.common.dto.manager.v2.container_registry.types import ContainerRegistryType
-from ai.backend.common.exception import BackendAISchemaValidationFailed
+from ai.backend.common.exception import (
+    BackendAISchemaValidationFailed,
+    InvalidContainerRegistryURL,
+)
 
 
 class TestAllowedGroupsInput:
@@ -132,18 +135,46 @@ class TestCreateContainerRegistryInput:
 class TestCreateContainerRegistryInputValidationFailures:
     """Tests for CreateContainerRegistryInput validation failures."""
 
-    def test_blank_url_raises_validation_error(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+    def test_blank_url_raises_invalid_url(self) -> None:
+        with pytest.raises(InvalidContainerRegistryURL):
             CreateContainerRegistryInput(
                 url="",
                 registry_name="my-registry",
                 type=ContainerRegistryType.DOCKER,
             )
 
-    def test_whitespace_only_url_raises_validation_error(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+    def test_whitespace_only_url_raises_invalid_url(self) -> None:
+        with pytest.raises(InvalidContainerRegistryURL):
             CreateContainerRegistryInput(
                 url="   ",
+                registry_name="my-registry",
+                type=ContainerRegistryType.DOCKER,
+            )
+
+    @pytest.mark.parametrize(
+        "url",
+        [
+            "https://registry.example.com",
+            "http://registry.example.com:5000",
+            "registry.example.com",
+            "registry.example.com/library",
+        ],
+    )
+    def test_accepts_a_url_a_host_can_be_read_from(self, url: str) -> None:
+        """A scheme is optional; the registry clients prepend one."""
+        parsed = CreateContainerRegistryInput(
+            url=url,
+            registry_name="my-registry",
+            type=ContainerRegistryType.DOCKER,
+        )
+
+        assert parsed.url == url
+
+    @pytest.mark.parametrize("url", ["https://", "http://", "/library"])
+    def test_url_without_a_host_raises_invalid_url(self, url: str) -> None:
+        with pytest.raises(InvalidContainerRegistryURL):
+            CreateContainerRegistryInput(
+                url=url,
                 registry_name="my-registry",
                 type=ContainerRegistryType.DOCKER,
             )
@@ -244,15 +275,29 @@ class TestUpdateContainerRegistryInput:
 class TestUpdateContainerRegistryInputValidationFailures:
     """Tests for UpdateContainerRegistryInput validation failures."""
 
-    def test_blank_url_raises_validation_error(self) -> None:
+    def test_blank_url_raises_invalid_url(self) -> None:
         reg_id = uuid.uuid4()
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+        with pytest.raises(InvalidContainerRegistryURL):
             UpdateContainerRegistryInput(id=reg_id, url="")
 
-    def test_whitespace_only_url_raises_validation_error(self) -> None:
+    def test_whitespace_only_url_raises_invalid_url(self) -> None:
         reg_id = uuid.uuid4()
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+        with pytest.raises(InvalidContainerRegistryURL):
             UpdateContainerRegistryInput(id=reg_id, url="   ")
+
+    @pytest.mark.parametrize("url", ["https://", "http://", "/library"])
+    def test_url_without_a_host_raises_invalid_url(self, url: str) -> None:
+        reg_id = uuid.uuid4()
+        with pytest.raises(InvalidContainerRegistryURL):
+            UpdateContainerRegistryInput(id=reg_id, url=url)
+
+    def test_url_left_out_is_not_checked(self) -> None:
+        """An update that names no url keeps the stored one."""
+        reg_id = uuid.uuid4()
+
+        parsed = UpdateContainerRegistryInput(id=reg_id, registry_name="my-registry")
+
+        assert parsed.url is None
 
     def test_blank_registry_name_raises_validation_error(self) -> None:
         reg_id = uuid.uuid4()

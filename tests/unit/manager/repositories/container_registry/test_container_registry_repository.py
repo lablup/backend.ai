@@ -24,6 +24,7 @@ from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.permission.global_entity import global_entity_id
+from ai.backend.manager.errors.container_registry import InvalidContainerRegistryProject
 from ai.backend.manager.errors.image import (
     ContainerRegistryNotFound,
 )
@@ -461,6 +462,37 @@ class TestContainerRegistryRepository:
         assert result.type == creator.type
         assert result.project == creator.project
         assert result.id is not None
+
+    async def test_create_registry_refuses_a_harbor_project_harbor_would_reject(
+        self,
+        repository: ContainerRegistryRepository,
+    ) -> None:
+        """The column refuses the row and the creator names the error the caller sees."""
+        creator = ContainerRegistryCreator(
+            url="https://harbor.example.com",
+            type=ContainerRegistryType.HARBOR2,
+            registry_name="bad-project-registry",
+            project="Upper Case",
+        )
+
+        with pytest.raises(InvalidContainerRegistryProject):
+            await repository.create_registry(creator)
+
+    async def test_modify_registry_refuses_clearing_a_harbor_project(
+        self,
+        repository: ContainerRegistryRepository,
+        creator: ContainerRegistryCreator,
+    ) -> None:
+        """An update naming only the project still answers to the row's constraint."""
+        created = await repository.create_registry(creator)
+
+        with pytest.raises(InvalidContainerRegistryProject):
+            await repository.modify_registry(
+                ContainerRegistryUpdater(
+                    registry_id=ContainerRegistryID(created.id),
+                    project=TriState[str].nullify(),
+                )
+            )
 
     @pytest.fixture
     async def registry_creator_and_projects(
