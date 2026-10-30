@@ -36157,6 +36157,23 @@
             "default": null,
             "description": "Resource groups the session runs in",
             "title": "Resource Group"
+          },
+          "vfolder": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Vfolders the session's kernel groups mount",
+            "title": "Vfolder"
           }
         },
         "title": "SessionUses",
@@ -39892,6 +39909,23 @@
             "default": null,
             "description": "Model cards built on the vfolder",
             "title": "Model Card"
+          },
+          "session": {
+            "anyOf": [
+              {
+                "items": {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Sessions whose kernel groups mount the vfolder",
+            "title": "Session"
           }
         },
         "title": "VFolderUsedBy",

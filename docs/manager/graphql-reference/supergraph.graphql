@@ -26960,6 +26960,9 @@ input SessionUses
 
   """Resource groups the session runs in."""
   resourceGroup: [UUID!] = null
+
+  """Added in 26.10.0. Vfolders the session's kernel groups mount."""
+  vfolder: [UUID!] = null
 }
 
 """Added in 26.3.0. Represents a compute session in Backend.AI."""
@@ -32220,6 +32223,9 @@ input VFolderUsedBy
 
   """Model cards built on the vfolder."""
   modelCard: [UUID!] = null
+
+  """Added in 26.10.0. Sessions whose kernel groups mount the vfolder."""
+  session: [UUID!] = null
 }
 
 """Added in 25.16.0. VFS Storage configuration."""
