@@ -27,6 +27,10 @@ from ai.backend.manager.models.resource_usage import (
 )
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
 from ai.backend.manager.repositories.project.repository import ProjectRepository
+from ai.backend.manager.services.project.actions.clear_default_registry import (
+    ClearProjectDefaultRegistryAction,
+    ClearProjectDefaultRegistryActionResult,
+)
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.actions.create_project_dotfile import (
     CreateProjectDotfileAction,
@@ -42,6 +46,10 @@ from ai.backend.manager.services.project.actions.partial_bulk_update_projects im
 from ai.backend.manager.services.project.actions.purge_project import (
     PurgeProjectAction,
     PurgeProjectActionResult,
+)
+from ai.backend.manager.services.project.actions.switch_default_registry import (
+    SwitchProjectDefaultRegistryAction,
+    SwitchProjectDefaultRegistryActionResult,
 )
 from ai.backend.manager.services.project.actions.update_project import (
     UpdateProjectAction,
@@ -114,6 +122,18 @@ class ProjectService:
     async def purge_group(self, action: PurgeProjectAction) -> PurgeProjectActionResult:
         await self._group_repository.purge_group(action.project_id)
         return PurgeProjectActionResult(project_id=action.project_id)
+
+    async def switch_default_registry(
+        self, action: SwitchProjectDefaultRegistryAction
+    ) -> SwitchProjectDefaultRegistryActionResult:
+        await self._group_repository.switch_default_registry(action.project_id, action.registry_id)
+        return SwitchProjectDefaultRegistryActionResult(registry_id=action.registry_id)
+
+    async def clear_default_registry(
+        self, action: ClearProjectDefaultRegistryAction
+    ) -> ClearProjectDefaultRegistryActionResult:
+        await self._group_repository.clear_default_registry(action.project_id)
+        return ClearProjectDefaultRegistryActionResult(project_id=action.project_id)
 
     async def _get_project_stats_for_period(
         self,

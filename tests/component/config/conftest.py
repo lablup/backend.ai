@@ -28,6 +28,8 @@ from ai.backend.common.dto.manager.config import (
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
+    Concern,
+    ConcernMeta,
     FieldGroupMeta,
     GroupMeta,
     ProcessorDependencies,
@@ -161,6 +163,7 @@ def server_module_registries(
     )
     project = ProjectProcessors(
         config_registry.group(GroupMeta(ProjectEntityType())),
+        config_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
         ProjectService(
             MagicMock(),
             MagicMock(),
