@@ -68,3 +68,13 @@ class AllowProject(TestSeedLink[ProjectData, ContainerRegistryData]):
     @override
     def seed(self) -> ContainerRegistryProjectCreator:
         return ContainerRegistryProjectCreator()
+
+
+class AllowProjectAsDefault(AllowProject):
+    @override
+    def kind(self) -> str:
+        return "을 default 레지스트리로 허용한"
+
+    @override
+    def seed(self) -> ContainerRegistryProjectCreator:
+        return ContainerRegistryProjectCreator(is_default=True)

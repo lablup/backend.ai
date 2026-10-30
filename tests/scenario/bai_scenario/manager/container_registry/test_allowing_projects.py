@@ -35,6 +35,7 @@ from bai_scenario.components.container_registry import (
     ARegistryToAllowAndACaller,
     RemoveProject,
     allowed_project_count,
+    default_link_count,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
@@ -407,6 +408,62 @@ class DisabledEnforcementAllowsProject(
         return TheCallReturnsNothing()
 
 
+@dataclass(frozen=True)
+class AddingDefaultProjectKeepsTheDefault(
+    Scenario[TestSeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+):
+    @override
+    def summary(self) -> str:
+        return "allowing-a-project-already-linked-as-its-default-keeps-the-default"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "이 레지스트리를 default로 허용받은 프로젝트를 허용 목록에 다시 넣어도 "
+            "거부되지 않고 default 레지스트리도 그대로 유지된다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow(allowed_as_default=True)
+
+    @override
+    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+        return ChangingAllowedProjects()
+
+    @override
+    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+        return TheCallReturnsNothing()
+
+
+@dataclass(frozen=True)
+class RemovingDefaultProjectDropsTheDefault(
+    Scenario[TestSeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+):
+    @override
+    def summary(self) -> str:
+        return "removing-a-project-linked-as-its-default-drops-the-default"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "이 레지스트리를 default로 허용받은 프로젝트를 허용 목록에서 빼면 "
+            "association과 함께 default 레지스트리 지정도 사라진다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow(allowed_as_default=True)
+
+    @override
+    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+        return ChangingAllowedProjects(change=RemoveProject())
+
+    @override
+    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+        return TheCallReturnsNothing()
+
+
 SCENARIOS: list[AllowedProjectScenario] = [
     AddingProjectWithBothScopesGranted(),
     AddingExistingProjectIsIdempotent(),
@@ -420,6 +477,8 @@ SCENARIOS: list[AllowedProjectScenario] = [
     MissingProjectPermissionIsRefused(),
     MissingRegistryPermissionIsRefused(),
     DisabledEnforcementAllowsProject(),
+    AddingDefaultProjectKeepsTheDefault(),
+    RemovingDefaultProjectDropsTheDefault(),
 ]
 
 
@@ -430,9 +489,18 @@ def expected_allowed_project_count(scenario: AllowedProjectScenario) -> int:
             | AddingExistingProjectIsIdempotent()
             | CreatePermissionIsEnoughToAddAProject()
             | DisabledEnforcementAllowsProject()
+            | AddingDefaultProjectKeepsTheDefault()
         ):
             return 1
         case CreatePermissionCannotRemoveAProject():
+            return 1
+        case _:
+            return 0
+
+
+def expected_default_link_count(scenario: AllowedProjectScenario) -> int:
+    match scenario:
+        case AddingDefaultProjectKeepsTheDefault():
             return 1
         case _:
             return 0
@@ -446,3 +514,4 @@ async def test_allowing_projects(
 ) -> None:
     await run_scenario(scenario, adapter, engine)
     assert await allowed_project_count(engine) == expected_allowed_project_count(scenario)
+    assert await default_link_count(engine) == expected_default_link_count(scenario)
