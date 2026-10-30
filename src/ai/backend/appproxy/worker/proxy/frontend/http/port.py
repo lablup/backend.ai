@@ -11,6 +11,12 @@ from aiohttp.typedefs import Handler
 from ai.backend.appproxy.common.errors import GenericBadRequest, ServerMisconfiguredError
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
 from ai.backend.appproxy.worker.types import Circuit, PortFrontendInfo
+from ai.backend.common.dto.appproxy.v2.ingress.types import (
+    IngressFrontend,
+    IngressFrontendKind,
+    IngressProtocol,
+)
+from ai.backend.common.dto.appproxy.v2.ingress.types import PortFrontend as IngressPortFrontend
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .base import BaseHTTPFrontend
@@ -102,14 +108,24 @@ class PortFrontend(BaseHTTPFrontend[int]):
         self, request: web.Request, handler: Handler
     ) -> web.StreamResponse:
         port: int = request.app["port"]
-        circuit = self.circuits.get(port, None)
-        if circuit is None:
+        backend = self.backends.get(port)
+        if backend is None:
             raise GenericBadRequest(f"Unregistered slot {port}")
-        with with_log_context(circuit_id=circuit.id):
-            self.ensure_allowed_ip(request, circuit)
-            self.ensure_credential(request, circuit)
-            backend = self.backends[port]
-            request["circuit"] = circuit
+        ingress = await self._read_ingress(
+            IngressFrontend(
+                kind=IngressFrontendKind.PORT,
+                protocol=IngressProtocol.HTTP,
+                port=IngressPortFrontend(number=port),
+            )
+        )
+        if ingress is None:
+            raise GenericBadRequest(f"Unregistered slot {port}")
+        with with_log_context(circuit_id=backend.circuit.id):
+            self.ensure_allowed_ip(request, ingress.access)
+            # TODO: Check the credential against ingress.access once an ingress carries the id
+            # its tokens name.
+            self.ensure_credential(request, backend.circuit)
+            request["circuit"] = backend.circuit
             request["backend"] = backend
             return await handler(request)
 

@@ -12,7 +12,7 @@ from ai.backend.appproxy.common.errors import (
     ServerMisconfiguredError,
     WorkerNotAvailable,
 )
-from ai.backend.appproxy.common.types import RouteInfo, SerializableCircuit
+from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError
 from ai.backend.appproxy.worker.proxy.backend import TCPBackend
 from ai.backend.appproxy.worker.types import (
@@ -20,6 +20,13 @@ from ai.backend.appproxy.worker.types import (
     PortFrontendInfo,
     RootContext,
 )
+from ai.backend.common.dto.appproxy.v2.ingress.types import (
+    IngressAccess,
+    IngressFrontend,
+    IngressFrontendKind,
+    IngressProtocol,
+)
+from ai.backend.common.dto.appproxy.v2.ingress.types import PortFrontend as IngressPortFrontend
 from ai.backend.logging.structured import StructuredLogger, with_log_context
 
 from .base import BaseFrontend
@@ -93,18 +100,12 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
         # TCP does not support authentication
         return
 
-    def _is_peer_allowed(self, writer: asyncio.StreamWriter, circuit: SerializableCircuit) -> bool:
+    def _is_peer_allowed(self, writer: asyncio.StreamWriter, access: IngressAccess) -> bool:
         # TCP carries no forwarded-for header, so the allowlist is matched
         # against the direct connection peer only.
-        validator = circuit.ip_validator
-        if not validator.is_restricted:
-            return True
         peername = writer.get_extra_info("peername")
-        if not peername:
-            log.trace("rejecting a TCP connection with an unknown peer")
-            return False
-        peer_ip = peername[0]
-        if not validator.is_allowed(peer_ip):
+        peer_ip = peername[0] if peername else None
+        if not self._is_client_ip_allowed(peer_ip, access):
             log.trace("rejecting TCP client {} (not in allowed_client_ips)", peer_ip)
             return False
         return True
@@ -126,8 +127,8 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
         now = time.time()
         return [
-            self.circuits[key]
-            for key, backend in self.backends.items()
+            backend.circuit
+            for backend in self.backends.values()
             if (backend.last_used - now) >= threshold
         ]
 
@@ -146,7 +147,14 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
             return
 
         with with_log_context(circuit_id=backend.circuit.id):
-            if not self._is_peer_allowed(writer, backend.circuit):
+            ingress = await self._read_ingress(
+                IngressFrontend(
+                    kind=IngressFrontendKind.PORT,
+                    protocol=IngressProtocol.TCP,
+                    port=IngressPortFrontend(number=circuit_key),
+                )
+            )
+            if ingress is None or not self._is_peer_allowed(writer, ingress.access):
                 await self._close_writer(writer)
                 return
 

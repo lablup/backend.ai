@@ -8,7 +8,7 @@ from yarl import URL
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError, SubprocessPipeError
-from ai.backend.appproxy.worker.proxy.backend.h2 import BackendConfig, H2Backend
+from ai.backend.appproxy.worker.proxy.backend.h2 import H2Backend
 from ai.backend.appproxy.worker.types import Circuit, PortFrontendInfo
 from ai.backend.logging.structured import StructuredLogger
 
@@ -30,7 +30,13 @@ class PortFrontend(H2Frontend[int]):
 
         self.api_endpoint = None
         self.processes = []
-        self.api_ports = {}
+        port_proxy_config = self.root_context.local_config.proxy_worker.port_proxy
+        if not port_proxy_config:
+            raise ServerMisconfiguredError("worker:proxy-worker.port-proxy")
+        port_start, port_end = port_proxy_config.bind_port_range
+        self.api_ports = {
+            listen_port: self.api_port_pool.pop() for listen_port in range(port_start, port_end + 1)
+        }
 
     @override
     async def start(self) -> None:
@@ -42,9 +48,7 @@ class PortFrontend(H2Frontend[int]):
         if not h2_config:
             raise ServerMisconfiguredError("worker:proxy-worker.http2")
 
-        port_start, port_end = port_proxy_config.bind_port_range
-        for listen_port in range(port_start, port_end + 1):
-            api_port = self.api_port_pool.pop()
+        for listen_port, api_port in self.api_ports.items():
             nghttpx_args = ["-s", f"--frontend=127.0.0.1,{api_port};api"]
             if worker_config.tls_listen:
                 nghttpx_args += [
@@ -71,43 +75,32 @@ class PortFrontend(H2Frontend[int]):
                 asyncio.create_task(self._log_monitor_task(proc.stderr, f"stderr #{listen_port}"))
             )
             self.proc_monitor_tasks.append(asyncio.create_task(self._proc_monitor_task(proc)))
-            self.api_ports[listen_port] = api_port
             log.info(
                 "started the nghttpx server",
                 bind_host=port_proxy_config.bind_host,
                 port=listen_port,
             )
+        self._nghttpx_running = True
+        await self._send_registered_backend_routes()
 
     @override
     async def stop(self) -> None:
+        self._nghttpx_running = False
         for task in self.proc_monitor_tasks:
             task.cancel()
             await task
         for process in self.processes:
             process.terminate()
             await process.wait()
-        try:
-            for task in self.log_monitor_tasks:
-                task.cancel()
-                await task
-        finally:
-            self.api_ports = {}
+        for task in self.log_monitor_tasks:
+            task.cancel()
+            await task
 
     @override
     async def initialize_backend(self, circuit: Circuit, routes: list[RouteInfo]) -> H2Backend:
         api_port = self.api_ports[self.get_circuit_key(circuit)]
         backend = H2Backend(URL(f"http://localhost:{api_port}"), self.root_context, circuit)
         return await self.update_backend(backend, routes)
-
-    @override
-    async def update_backend(self, backend: H2Backend, routes: list[RouteInfo]) -> H2Backend:
-        backend_configs = [BackendConfig(r.current_kernel_host, r.kernel_port) for r in routes]
-        await backend.update_config(backend_configs)
-        return backend
-
-    @override
-    async def terminate_backend(self, backend: H2Backend) -> None:
-        await backend.update_config([])
 
     @override
     def get_circuit_key(self, circuit: Circuit) -> int:

@@ -26,11 +26,13 @@ from ai.backend.appproxy.worker.proxy.backend.tcp import TCPBackend
 from ai.backend.appproxy.worker.proxy.frontend.http.port import PortFrontend
 from ai.backend.appproxy.worker.proxy.frontend.tcp import TCPFrontend
 from ai.backend.appproxy.worker.types import Circuit, InteractiveAppInfo, PortFrontendInfo
+from ai.backend.common.dto.appproxy.v2.ingress.types import IngressAuthority
 
 WORKER_LOGGER_NAME = "ai.backend.appproxy.worker"
 TRACE_LEVEL = 5
 PORT = 10200
 CIRCUIT_ID = UUID("d0e6f60c-f375-4454-b4d3-e8ee202fa372")
+AUTHORITY = IngressAuthority("worker-1")
 
 
 def _closed_port() -> int:
@@ -108,7 +110,9 @@ class TestHTTPProxyLogging:
         frontend = PortFrontend(root_context)
         circuit = _create_circuit(ProxyProtocol.HTTP, kernel_port=_closed_port())
         backend = HTTPBackend(circuit.route_info, root_context, circuit)
-        frontend.circuits[PORT] = circuit
+        root_context.ingress_state.reader.get = AsyncMock(
+            return_value=circuit.to_ingress(AUTHORITY)
+        )
         frontend.backends[PORT] = backend
         try:
             yield frontend
@@ -175,7 +179,9 @@ class TestTCPProxyLogging:
         frontend = TCPFrontend(root_context)
         circuit = _create_circuit(ProxyProtocol.TCP, kernel_port=_closed_port())
         backend = TCPBackend(circuit.route_info, root_context, circuit)
-        frontend.circuits[PORT] = circuit
+        root_context.ingress_state.reader.get = AsyncMock(
+            return_value=circuit.to_ingress(AUTHORITY)
+        )
         frontend.backends[PORT] = backend
         try:
             yield frontend

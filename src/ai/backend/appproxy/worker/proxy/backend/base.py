@@ -10,8 +10,7 @@ from multidict import CIMultiDict
 from yarl import URL
 
 from ai.backend.appproxy.common.types import RouteInfo
-from ai.backend.appproxy.common.types import SerializableCircuit as Circuit
-from ai.backend.appproxy.worker.types import RootContext
+from ai.backend.appproxy.worker.types import Circuit, RootContext
 from ai.backend.logging.structured import StructuredLogger
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
