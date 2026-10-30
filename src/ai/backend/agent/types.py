@@ -30,6 +30,8 @@ from ai.backend.common.types import (
 
 if TYPE_CHECKING:
     from .agent import AbstractAgent
+    from .config.unified import AgentUnifiedConfig
+    from .network.locator import ContainerLocator
     from .resources import AbstractComputePlugin
 
 
@@ -79,6 +81,12 @@ class AbstractAgentDiscovery(ABC):
         tar archives.
         """
         raise NotImplementedError
+
+    def create_container_locator(self, local_config: AgentUnifiedConfig) -> ContainerLocator:
+        """The locator a network plugin's privileged helper uses for this backend's containers."""
+        raise NotImplementedError(
+            f"{type(self).__name__} does not expose a container locator",
+        )
 
 
 def get_agent_discovery(backend: AgentBackend) -> AbstractAgentDiscovery:
