@@ -34961,6 +34961,312 @@
         "title": "ComputeScheduleInput",
         "type": "object"
       },
+      "KernelGroupEnvironFilter": {
+        "description": "Filter for kernel group environ rows.",
+        "properties": {
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by environ row ID."
+          },
+          "kernel_group_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the kernel group the row belongs to."
+          },
+          "key": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by variable name."
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/KernelGroupEnvironFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "AND logical combinator.",
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/KernelGroupEnvironFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "OR logical combinator.",
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/KernelGroupEnvironFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "NOT logical combinator.",
+            "title": "Not"
+          }
+        },
+        "title": "KernelGroupEnvironFilter",
+        "type": "object"
+      },
+      "KernelGroupEnvironNestedFilter": {
+        "description": "The `kernel_group_environ` field of a session filter.\n\nEach quantifier matches one environ row of any of the session's kernel groups at a time.\nTo require two different variables, combine two of these with the session filter's `AND`.",
+        "properties": {
+          "exists": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "True for a row that has at least one related row, false for one that has none. Asks nothing about what the related rows hold.",
+            "title": "Exists"
+          },
+          "some": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KernelGroupEnvironFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "At least one related row matches."
+          },
+          "every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KernelGroupEnvironFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Every related row matches; true when there is none."
+          },
+          "none": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KernelGroupEnvironFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "No related row matches."
+          }
+        },
+        "title": "KernelGroupEnvironNestedFilter",
+        "type": "object"
+      },
+      "KernelGroupResourceSlotFilter": {
+        "description": "Filter for kernel group resource slot rows.",
+        "properties": {
+          "field_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by resource slot row ID."
+          },
+          "kernel_group_id": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UUIDFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the kernel group the row belongs to."
+          },
+          "slot_name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StringFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by slot name."
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DecimalFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the amount requested on each kernel."
+          },
+          "AND": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/KernelGroupResourceSlotFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "AND logical combinator.",
+            "title": "And"
+          },
+          "OR": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/KernelGroupResourceSlotFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "OR logical combinator.",
+            "title": "Or"
+          },
+          "NOT": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/KernelGroupResourceSlotFilter"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "NOT logical combinator.",
+            "title": "Not"
+          }
+        },
+        "title": "KernelGroupResourceSlotFilter",
+        "type": "object"
+      },
+      "KernelGroupResourceSlotNestedFilter": {
+        "description": "The `kernel_group_resource_slots` field of a session filter.\n\nEach quantifier matches one slot row of any of the session's kernel groups at a time.\nTo require two different slots, combine two of these with the session filter's `AND`.",
+        "properties": {
+          "exists": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "True for a row that has at least one related row, false for one that has none. Asks nothing about what the related rows hold.",
+            "title": "Exists"
+          },
+          "some": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KernelGroupResourceSlotFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "At least one related row matches."
+          },
+          "every": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KernelGroupResourceSlotFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Every related row matches; true when there is none."
+          },
+          "none": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KernelGroupResourceSlotFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "No related row matches."
+          }
+        },
+        "title": "KernelGroupResourceSlotNestedFilter",
+        "type": "object"
+      },
       "NetworkTypeEnum": {
         "description": "Inter-container network types a session may use.",
         "enum": [
@@ -35383,6 +35689,30 @@
             ],
             "default": null,
             "description": "Filter by the reserved start time requested at creation"
+          },
+          "kernel_group_environ": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KernelGroupEnvironNestedFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the environ rows of the session's kernel groups"
+          },
+          "kernel_group_resource_slots": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KernelGroupResourceSlotNestedFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the resource slot rows of the session's kernel groups"
           },
           "AND": {
             "anyOf": [
