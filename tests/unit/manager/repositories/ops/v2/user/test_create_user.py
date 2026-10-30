@@ -394,6 +394,24 @@ async def user_role_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:
     return preset_id
 
 
+@pytest.fixture
+async def owner_role_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:
+    """A project-scope preset whose role goes to a personal project's owner alone."""
+    preset_id = uuid.uuid4()
+    async with db.begin_session() as session:
+        session.add(
+            RolePresetRow(
+                id=preset_id,
+                name="preset-project-owner",
+                scope_type=ProjectEntityType(),
+                auto_assign=False,
+                auto_assign_to_owner=True,
+            )
+        )
+        await session.commit()
+    return preset_id
+
+
 class TestUserGraphProvisioning:
     """Creating a user puts it in the graph under its domain, with its own role."""
 
@@ -454,6 +472,30 @@ class TestUserGraphProvisioning:
             )
         assert role.name == f"preset-user-{str(user_id)[:8]}"
         assert {str(VFolderEntityType())} == {str(entity_type) for entity_type in entity_types}
+
+    async def test_the_owner_holds_the_owner_role_of_their_personal_project(
+        self,
+        db: ExtendedAsyncSAEngine,
+        provider: UserOpsProvider,
+        domain: DomainFixtureData,
+        owner_role_preset: uuid.UUID,
+    ) -> None:
+        user_id = await _create_user(provider, domain.domain_id, "alice")
+        personal_id = (await _personal_projects(db, domain.domain_name))[0].id
+
+        async with db.begin_readonly_session() as session:
+            held = (
+                await session.scalars(
+                    sa.select(RoleRow.role_preset_id)
+                    .join(UserRoleRow, UserRoleRow.role_id == RoleRow.id)
+                    .where(
+                        UserRoleRow.user_id == user_id,
+                        RoleRow.scope_type == ProjectEntityType(),
+                        RoleRow.scope_id == ProjectID(personal_id),
+                    )
+                )
+            ).all()
+        assert held == [owner_role_preset]
 
     async def test_the_user_holds_the_declared_user_owner_role(
         self,
