@@ -67,11 +67,11 @@ class IngressFrontend(BaseFieldModel):
         return self
 
     def key(self) -> IngressFrontendKey:
-        """The port number or the subdomain; unique within an authority."""
+        """``{kind}-{port number or subdomain}``; unique within an authority."""
         if self.port is not None:
-            return IngressFrontendKey(str(self.port.number))
+            return IngressFrontendKey(f"{self.kind.value}-{self.port.number}")
         if self.wildcard is not None:
-            return IngressFrontendKey(self.wildcard.subdomain)
+            return IngressFrontendKey(f"{self.kind.value}-{self.wildcard.subdomain}")
         raise UnreachableError("A validated frontend sets either port or wildcard")
 
 

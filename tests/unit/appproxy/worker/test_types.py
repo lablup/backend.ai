@@ -187,14 +187,14 @@ class TestCircuit:
                 frontend_mode=FrontendMode.PORT,
                 port=10205,
                 subdomain=None,
-                frontend_key=IngressFrontendKey("10205"),
+                frontend_key=IngressFrontendKey("port-10205"),
                 kind=IngressFrontendKind.PORT,
             ),
             _FrontendCase(
                 frontend_mode=FrontendMode.WILDCARD_DOMAIN,
                 port=None,
                 subdomain="notebook",
-                frontend_key=IngressFrontendKey("notebook"),
+                frontend_key=IngressFrontendKey("wildcard-notebook"),
                 kind=IngressFrontendKind.WILDCARD,
             ),
         ],
@@ -252,5 +252,5 @@ class TestCircuit:
         self, circuit: Circuit
     ) -> None:
         assert circuit.to_ingress_key(AUTHORITY) == IngressKey(
-            authority=AUTHORITY, frontend_key=IngressFrontendKey("10205")
+            authority=AUTHORITY, frontend_key=IngressFrontendKey("port-10205")
         )

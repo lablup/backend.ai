@@ -6,12 +6,14 @@ from dataclasses import dataclass, field
 import pytest
 
 from ai.backend.appproxy.common.config import PermitHashConfig, SecretConfig
-from ai.backend.appproxy.common.types import DigestModType
+from ai.backend.appproxy.common.types import DigestModType, WorkerFrontend
 from ai.backend.appproxy.coordinator.clients.worker.traefik.routing_config import (
     TraefikRoutingConfigFactory,
     TraefikRoutingConfigFactoryArgs,
 )
 from ai.backend.appproxy.coordinator.clients.worker.traefik.types import (
+    HttpRouterConfig,
+    IngressRoutingConfigs,
     IpAllowListMiddlewareConfig,
     TcpRouterConfig,
 )
@@ -33,6 +35,7 @@ from ai.backend.common.dto.appproxy.v2.ingress.types import (
     IngressTargetGroup,
     IngressTargetGroupID,
     PortFrontend,
+    WildcardFrontend,
 )
 
 
@@ -41,6 +44,13 @@ class _ClientIPStrategyCase:
     name: str
     strategy: ClientIPStrategyConfig | None
     expected_ip_allowlist_middleware_config: IpAllowListMiddlewareConfig
+
+
+@dataclass(frozen=True)
+class _HttpRouterFrontendCase:
+    name: str
+    frontend: IngressFrontend
+    expected_http_router: HttpRouterConfig
 
 
 @dataclass(frozen=True)
@@ -130,9 +140,26 @@ def tcp_ingress(case: _ClientIPRuleCase) -> Ingress:
 
 
 @pytest.fixture
-def port_10205_ingress_key() -> IngressKey:
+def http_ingress_on_the_case_frontend(case: _HttpRouterFrontendCase) -> Ingress:
+    return Ingress(
+        id=IngressID("ingress-1"),
+        authority=IngressAuthority("worker-1"),
+        revision=1,
+        frontend=case.frontend,
+        access=IngressAccess(mode=IngressAccessMode.PUBLIC, allowed_client_ips=[]),
+        backend=IngressBackend(
+            id=IngressBackendID("backend-1"),
+            target_groups=[
+                IngressTargetGroup(id=IngressTargetGroupID("group-1"), weight=1, targets=[])
+            ],
+        ),
+    )
+
+
+@pytest.fixture
+def port_frontend_ingress_key() -> IngressKey:
     return IngressKey(
-        authority=IngressAuthority("worker-1"), frontend_key=IngressFrontendKey("10205")
+        authority=IngressAuthority("worker-1"), frontend_key=IngressFrontendKey("port-10205")
     )
 
 
@@ -178,15 +205,12 @@ class TestTraefikRoutingConfigFactory:
         routing_config_factory: TraefikRoutingConfigFactory,
         http_ingress_allowing_one_network: Ingress,
     ) -> None:
-        routing_configs = routing_config_factory.routing_configs_by_etcd_key(
+        routing_configs = routing_config_factory.build_routing_configs(
             http_ingress_allowing_one_network,
-            hostname="worker-1.example.com",
-            wildcard_domain=None,
-            tls_listen=False,
+            WorkerFrontend(hostname="worker-1.example.com", wildcard_domain=None, tls_listen=False),
         )
         assert (
-            routing_configs["worker_worker-1/http/middlewares/bai_ingress_10205_ipallowlist"]
-            == case.expected_ip_allowlist_middleware_config
+            routing_configs.ip_allowlist_middleware == case.expected_ip_allowlist_middleware_config
         )
 
     @pytest.mark.parametrize(
@@ -207,27 +231,80 @@ class TestTraefikRoutingConfigFactory:
         routing_config_factory_without_client_ip_strategy: TraefikRoutingConfigFactory,
         tcp_ingress: Ingress,
     ) -> None:
-        routing_configs = (
-            routing_config_factory_without_client_ip_strategy.routing_configs_by_etcd_key(
-                tcp_ingress, hostname="worker-1.example.com", wildcard_domain=None, tls_listen=False
-            )
+        routing_configs = routing_config_factory_without_client_ip_strategy.build_routing_configs(
+            tcp_ingress,
+            WorkerFrontend(hostname="worker-1.example.com", wildcard_domain=None, tls_listen=False),
         )
-        assert routing_configs[
-            "worker_worker-1/tcp/routers/bai_ingress_10205_router"
-        ] == TcpRouterConfig(
+        assert routing_configs.tcp_router == TcpRouterConfig(
             rule=case.expected_rule,
-            service="bai_ingress_10205_service",
+            service="bai_ingress_port-10205_service",
             entrypoints=["portproxy_10205"],
         )
 
-    def test_all_routing_config_etcd_keys_lists_every_key_of_both_protocols(
-        self, port_10205_ingress_key: IngressKey
+    def test_etcd_subtrees_of_no_config_clear_every_key_of_both_protocols(
+        self, port_frontend_ingress_key: IngressKey
     ) -> None:
-        assert TraefikRoutingConfigFactory.all_routing_config_etcd_keys(port_10205_ingress_key) == [
-            "worker_worker-1/http/routers/bai_ingress_10205_router",
-            "worker_worker-1/http/services/bai_ingress_10205_service",
-            "worker_worker-1/http/middlewares/bai_ingress_10205_ipallowlist",
-            "worker_worker-1/http/middlewares/bai_ingress_10205_auth",
-            "worker_worker-1/tcp/routers/bai_ingress_10205_router",
-            "worker_worker-1/tcp/services/bai_ingress_10205_service",
-        ]
+        assert TraefikRoutingConfigFactory.build_etcd_subtrees(
+            port_frontend_ingress_key, IngressRoutingConfigs()
+        ) == {
+            "worker_worker-1/http/routers/bai_ingress_port-10205_router": {},
+            "worker_worker-1/http/services/bai_ingress_port-10205_service": {},
+            "worker_worker-1/http/middlewares/bai_ingress_port-10205_cors": {},
+            "worker_worker-1/http/middlewares/bai_ingress_port-10205_ipallowlist": {},
+            "worker_worker-1/http/middlewares/bai_ingress_port-10205_auth": {},
+            "worker_worker-1/tcp/routers/bai_ingress_port-10205_router": {},
+            "worker_worker-1/tcp/services/bai_ingress_port-10205_service": {},
+        }
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _HttpRouterFrontendCase(
+                name="port",
+                frontend=IngressFrontend(
+                    kind=IngressFrontendKind.PORT,
+                    protocol=IngressProtocol.HTTP,
+                    port=PortFrontend(number=10205),
+                ),
+                expected_http_router=HttpRouterConfig(
+                    rule="Host(`worker-1.example.com`)",
+                    service="bai_ingress_port-10205_service",
+                    entrypoints=["portproxy_10205"],
+                    middlewares=["bai_ingress_port-10205_cors", "bai_ingress_port-10205_auth"],
+                ),
+            ),
+            _HttpRouterFrontendCase(
+                name="wildcard",
+                frontend=IngressFrontend(
+                    kind=IngressFrontendKind.WILDCARD,
+                    protocol=IngressProtocol.HTTP,
+                    wildcard=WildcardFrontend(subdomain="notebook"),
+                ),
+                expected_http_router=HttpRouterConfig(
+                    rule="Host(`notebook.apps.example.com`)",
+                    service="bai_ingress_wildcard-notebook_service",
+                    entrypoints=["domainproxy"],
+                    middlewares=[
+                        "bai_ingress_wildcard-notebook_cors",
+                        "bai_ingress_wildcard-notebook_auth",
+                    ],
+                ),
+            ),
+        ],
+        ids=lambda case: case.name,
+    )
+    def test_http_router_matches_the_frontend_port_or_subdomain(
+        self,
+        case: _HttpRouterFrontendCase,
+        routing_config_factory_without_client_ip_strategy: TraefikRoutingConfigFactory,
+        http_ingress_on_the_case_frontend: Ingress,
+    ) -> None:
+        routing_configs = routing_config_factory_without_client_ip_strategy.build_routing_configs(
+            http_ingress_on_the_case_frontend,
+            WorkerFrontend(
+                hostname="worker-1.example.com",
+                wildcard_domain=".apps.example.com",
+                tls_listen=False,
+            ),
+        )
+        assert routing_configs.http_router == case.expected_http_router

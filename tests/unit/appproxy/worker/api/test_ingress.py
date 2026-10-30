@@ -131,13 +131,13 @@ class TestIngressHandler:
         )
         assert isinstance(response, web.Response)
         assert response.status == HTTPStatus.OK
-        assert json.loads(response.text or "") == {"revisions": {"10205": 3}}
+        assert json.loads(response.text or "") == {"revisions": {"port-10205": 3}}
         writer.apply.assert_awaited_once()
 
     async def test_remove_removes_through_the_writer(
         self, api_delivery_root_ctx: Mock, writer: AsyncMock
     ) -> None:
-        body = {"keys": [{"authority": "worker-1", "frontend_key": "10205"}]}
+        body = {"keys": [{"authority": "worker-1", "frontend_key": "port-10205"}]}
         response = await IngressHandler().remove(_request(api_delivery_root_ctx, body))
         assert response.status == HTTPStatus.NO_CONTENT
         writer.remove.assert_awaited_once()
@@ -150,7 +150,7 @@ class TestIngressHandler:
         )
         assert isinstance(response, web.Response)
         assert response.status == HTTPStatus.OK
-        assert json.loads(response.text or "") == {"revisions": {"10205": 3}}
+        assert json.loads(response.text or "") == {"revisions": {"port-10205": 3}}
         writer.replace_all.assert_awaited_once()
 
     async def test_write_outside_the_api_delivery_is_not_supported(
@@ -166,4 +166,4 @@ class TestIngressHandler:
         response = await IngressHandler().revisions(_request(api_delivery_root_ctx))
         assert isinstance(response, web.Response)
         assert response.status == HTTPStatus.OK
-        assert json.loads(response.text or "") == {"revisions": {"10205": 3}}
+        assert json.loads(response.text or "") == {"revisions": {"port-10205": 3}}
