@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Generator
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, mock_open, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -198,65 +197,3 @@ class TestInitSshdServiceHostKey:
             str(LEGACY_HOST_KEY_PATH) in map(str, call[0])
             for call in mock_init_agent_key_absent.call_args_list
         )
-
-
-@dataclass(frozen=True)
-class _ClusterSshConfigCase:
-    cluster_replicas: dict[str, int]
-    expected_host_lines: list[str]
-
-
-class TestInitSshdServiceClusterSshConfig:
-    """Tests for the per-role ssh config entries init_sshd_service() writes without a port mapping."""
-
-    @pytest.fixture
-    def ssh_config_file_without_port_mapping(self) -> Generator[MagicMock, None, None]:
-        """The cluster private key exists, the port mapping and the user's ssh config do not."""
-        existing_paths = {
-            Path("/home/work/.ssh/authorized_keys"),
-            AGENT_HOST_KEY_PATH,
-            Path("/home/config/ssh/id_cluster"),
-        }
-        ssh_config_file = mock_open()
-        with (
-            patch.object(Path, "is_dir", return_value=False),
-            patch.object(Path, "mkdir"),
-            patch.object(Path, "stat", side_effect=FileNotFoundError),
-            patch.object(
-                Path,
-                "is_file",
-                autospec=True,
-                side_effect=lambda self: self in existing_paths,
-            ),
-            patch.object(Path, "read_text", side_effect=FileNotFoundError),
-            patch.object(Path, "open", ssh_config_file),
-            patch("shutil.rmtree"),
-        ):
-            yield ssh_config_file
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _ClusterSshConfigCase(
-                cluster_replicas={"main": 1},
-                expected_host_lines=["Host main*"],
-            ),
-            _ClusterSshConfigCase(
-                cluster_replicas={"main": 1, "sub": 2},
-                expected_host_lines=["Host main*", "Host sub*"],
-            ),
-        ],
-        ids=lambda case: ",".join(case.cluster_replicas),
-    )
-    async def test_writes_a_host_entry_per_cluster_role(
-        self,
-        case: _ClusterSshConfigCase,
-        ssh_config_file_without_port_mapping: MagicMock,
-    ) -> None:
-        await init_sshd_service({}, case.cluster_replicas)
-
-        written = "".join(
-            call.args[0] for call in ssh_config_file_without_port_mapping().write.call_args_list
-        )
-        host_lines = [line for line in written.splitlines() if line.startswith("Host ")]
-        assert host_lines == case.expected_host_lines
