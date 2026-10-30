@@ -19798,7 +19798,7 @@ type VFolder implements Node {
   entityId: UUID!
 
   """
-  Current operation status. READY, CLONING, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.
+  Current operation status. READY, CREATING, CLONING, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.
   """
   status: VFolderOperationStatus!
 
@@ -20025,6 +20025,7 @@ type VFolderMountPolicy {
 """Added in 26.4.2. Operation status of a virtual folder."""
 enum VFolderOperationStatus {
   READY
+  CREATING
   CLONING
   DELETE_PENDING
   DELETE_ONGOING
