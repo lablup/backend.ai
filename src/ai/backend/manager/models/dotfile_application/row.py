@@ -9,7 +9,7 @@ from ai.backend.manager.models.base import GUID, Base
 
 
 class DotfileApplicationRow(Base):
-    """The dotfile an entity's sessions get for one path.
+    """The dotfile an entity's sessions get for one path, and the permission it is written with.
 
     At most one per entity and path. Removing the entity's graph node or the dotfile
     deletes the row.
@@ -22,11 +22,13 @@ class DotfileApplicationRow(Base):
             ["virtual_entities.entity_type", "virtual_entities.entity_id"],
             ondelete="CASCADE",
         ),
+        sa.CheckConstraint("char_length(perm) <= 4", name="perm_length"),
     )
 
     entity_type: Mapped[EntityType] = mapped_column("entity_type", sa.String(32), primary_key=True)
     entity_id: Mapped[UUID] = mapped_column("entity_id", GUID(), primary_key=True)
     path: Mapped[str] = mapped_column("path", sa.Text, primary_key=True)
+    perm: Mapped[str] = mapped_column("perm", sa.Text, nullable=False)
     dotfile_id: Mapped[DotfileID] = mapped_column(
         "dotfile_id",
         GUID(DotfileID),

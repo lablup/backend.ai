@@ -30,6 +30,7 @@ class _DotfileApplicationOwnFields(RowDataConverter[DotfileApplicationRow, Dotfi
         StringConditions(DotfileApplicationRow.path),
         ColumnOrder(DotfileApplicationRow.path),
     )
+    perm = SearchableField(DotfileApplicationRow.perm, None, None)
     dotfile_id = SearchableField(
         DotfileApplicationRow.dotfile_id,
         UUIDConditions(DotfileApplicationRow.dotfile_id),
@@ -41,6 +42,7 @@ class _DotfileApplicationOwnFields(RowDataConverter[DotfileApplicationRow, Dotfi
         return DotfileApplicationData(
             entity=RuntimeEntityID(self.entity_type.read(row), self.entity_id.read(row)),
             path=self.path.read(row),
+            perm=self.perm.read(row),
             dotfile_id=self.dotfile_id.read(row),
         )
 
