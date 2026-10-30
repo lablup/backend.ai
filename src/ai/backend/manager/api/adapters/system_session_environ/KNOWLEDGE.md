@@ -1,7 +1,7 @@
 ---
 name: system-session-environ-adapter-scenarios
 type: reference
-description: what the system session environ adapter guarantees, as scenarios; superadmin search of every row at every scope with filters, the default order and pages, the monitor role passing the search, the search within named public, domain and project scopes, the value source list any logged-in user reads and a call without login is refused, the create at a scope by its admins and its refusals, the update of the key by the scope's admins and its refusal on a deleted row, the soft delete, the restore and the purge by the scope's admins, the read by ids checked per row against the domain and project member grants
+description: what the system session environ adapter guarantees, as scenarios; superadmin search of every row at every scope with filters, the default order and pages, the monitor role passing the search, the search within named public, domain and project scopes, the value source list any logged-in user reads and a call without login is refused, the create at a scope by its admins and its refusals, the update of the key by the scope's admins and its refusal on a deleted row, the soft delete, the restore and the purge by the scope's admins, the read by ids checked per row against the domain and project admin grants, the domain and project members refused
 scope: src/ai/backend/manager/api/adapters/system_session_environ
 keywords: [system session environ, scenario, adapter, superadmin, monitor, global_search, scoped_search, public_list_value_sources, create, update, delete, restore, purge, bulk_get_ids, partial bulk]
 generated:
@@ -9,7 +9,7 @@ generated:
   at: 2026-10-23
 updated:
   by: claude-code/opus-5.5
-  at: 2026-10-28
+  at: 2026-10-30
 status: draft
 ---
 # 시스템 세션 환경변수 어댑터 — 시나리오
@@ -26,7 +26,8 @@ id로 여러 행을 읽는 호출을 제공한다.
 삭제 여부에 상관없이 조건에 맞는 행을 모두 반환한다.
 
 id로 여러 행을 읽을 때는 행마다 권한을 검사한다. 모든 사용자는 public 스코프의 행을 읽을 수 있고,
-도메인과 프로젝트의 구성원은 그 도메인과 프로젝트의 행을 읽을 수 있다.
+도메인과 프로젝트의 관리자는 그 도메인과 프로젝트의 행을 읽을 수 있다. 관리자가 아닌 구성원은 도메인과
+프로젝트의 행을 읽을 수 없다.
 
 ## 전체 검색
 
@@ -51,13 +52,16 @@ id로 여러 행을 읽을 때는 행마다 권한을 검사한다. 모든 사�
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 프로젝트 구성원이 자기 프로젝트의 행을 검색한다 | public 스코프, 한 도메인, 그 도메인의 한 프로젝트에 행을 하나씩 미리 만들어 둠. 프로젝트의 행은 삭제되어 있음. 그 프로젝트의 구성원 | 그 프로젝트를 스코프로 지정해 검색 | 프로젝트의 행만 반환된다. 삭제된 행도 반환된다 |
-| 프로젝트 구성원이 다른 프로젝트의 행을 검색한다 | 두 프로젝트에 행을 하나씩 미리 만들어 둠, 한 프로젝트의 구성원 | 다른 프로젝트를 스코프로 지정해 검색 | 권한 부족으로 거부 |
-| 도메인 구성원이 자기 도메인의 행을 검색한다 | "프로젝트 구성원이 자기 프로젝트의 행을 검색한다"와 같은 행, 그 도메인의 구성원 | 그 도메인을 스코프로 지정해 검색 | 도메인의 행만 반환된다. 그 도메인에 속한 프로젝트의 행은 반환되지 않는다 |
-| 도메인 구성원이 다른 도메인의 행을 검색한다 | 두 도메인에 행을 하나씩 미리 만들어 둠, 한 도메인의 구성원 | 다른 도메인을 스코프로 지정해 검색 | 권한 부족으로 거부 |
-| 도메인과 프로젝트의 권한이 없는 사용자가 public 스코프의 행을 검색한다 | "프로젝트 구성원이 자기 프로젝트의 행을 검색한다"와 같은 행, 어느 도메인과 프로젝트의 읽기 권한도 받지 않은 사용자 | public 스코프를 지정해 검색 | public 스코프의 행만 반환된다 |
-| 여러 스코프를 함께 지정한다 | "프로젝트 구성원이 자기 프로젝트의 행을 검색한다"와 같은 행, 그 프로젝트의 구성원 | public 스코프와 그 프로젝트를 함께 지정해 검색 | public 스코프의 행과 프로젝트의 행이 반환된다 |
-| 읽을 수 없는 스코프를 하나 섞어 지정한다 | 두 프로젝트에 행을 하나씩 미리 만들어 둠, 한 프로젝트의 구성원 | 자기 프로젝트와 다른 프로젝트를 함께 지정해 검색 | 호출 전체가 권한 부족으로 거부 |
+| 프로젝트 관리자가 자기 프로젝트의 행을 검색한다 | public 스코프, 한 도메인, 그 도메인의 한 프로젝트에 행을 하나씩 미리 만들어 둠. 프로젝트의 행은 삭제되어 있음. 그 프로젝트의 관리자 | 그 프로젝트를 스코프로 지정해 검색 | 프로젝트의 행만 반환된다. 삭제된 행도 반환된다 |
+| 프로젝트 구성원이 자기 프로젝트의 행을 검색한다 | "프로젝트 관리자가 자기 프로젝트의 행을 검색한다"와 같은 행, 관리자가 아닌 그 프로젝트의 구성원 | 그 프로젝트를 스코프로 지정해 검색 | 권한 부족으로 거부 |
+| 프로젝트 관리자가 다른 프로젝트의 행을 검색한다 | 두 프로젝트에 행을 하나씩 미리 만들어 둠, 한 프로젝트의 관리자 | 다른 프로젝트를 스코프로 지정해 검색 | 권한 부족으로 거부 |
+| 도메인 관리자가 자기 도메인의 행을 검색한다 | "프로젝트 관리자가 자기 프로젝트의 행을 검색한다"와 같은 행, 그 도메인의 관리자 | 그 도메인을 스코프로 지정해 검색 | 도메인의 행만 반환된다. 그 도메인에 속한 프로젝트의 행은 반환되지 않는다 |
+| 도메인 구성원이 자기 도메인의 행을 검색한다 | "프로젝트 관리자가 자기 프로젝트의 행을 검색한다"와 같은 행, 관리자가 아닌 그 도메인의 구성원 | 그 도메인을 스코프로 지정해 검색 | 권한 부족으로 거부 |
+| 도메인 구성원이 구성원이 아닌 프로젝트의 행을 검색한다 | "프로젝트 관리자가 자기 프로젝트의 행을 검색한다"와 같은 행, 관리자가 아니고 그 프로젝트의 구성원도 아닌 그 도메인의 구성원 | 그 프로젝트를 스코프로 지정해 검색 | 권한 부족으로 거부 |
+| 도메인 관리자가 다른 도메인의 행을 검색한다 | 두 도메인에 행을 하나씩 미리 만들어 둠, 한 도메인의 관리자 | 다른 도메인을 스코프로 지정해 검색 | 권한 부족으로 거부 |
+| 도메인과 프로젝트의 권한이 없는 사용자가 public 스코프의 행을 검색한다 | "프로젝트 관리자가 자기 프로젝트의 행을 검색한다"와 같은 행, 어느 도메인과 프로젝트의 읽기 권한도 받지 않은 사용자 | public 스코프를 지정해 검색 | public 스코프의 행만 반환된다 |
+| 여러 스코프를 함께 지정한다 | "프로젝트 관리자가 자기 프로젝트의 행을 검색한다"와 같은 행, 그 프로젝트의 관리자 | public 스코프와 그 프로젝트를 함께 지정해 검색 | public 스코프의 행과 프로젝트의 행이 반환된다 |
+| 읽을 수 없는 스코프를 하나 섞어 지정한다 | 두 프로젝트에 행을 하나씩 미리 만들어 둠, 한 프로젝트의 관리자 | 자기 프로젝트와 다른 프로젝트를 함께 지정해 검색 | 호출 전체가 권한 부족으로 거부 |
 | 스코프를 하나도 지정하지 않는다 | superadmin | 스코프 없이 검색 | 입력 검증에서 거부 |
 
 ## 값 출처 목록
@@ -74,7 +78,7 @@ id로 여러 행을 읽을 때는 행마다 권한을 검사한다. 모든 사�
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 프로젝트 관리자가 자기 프로젝트에 행을 만든다 | 한 프로젝트의 관리자 | 그 프로젝트 스코프에 키와 값 출처를 지정해 생성 | 그 프로젝트 스코프의 행이 반환되고, 그 프로젝트의 구성원이 id로 읽을 수 있다 |
+| 프로젝트 관리자가 자기 프로젝트에 행을 만든다 | 한 프로젝트의 관리자 | 그 프로젝트 스코프에 키와 값 출처를 지정해 생성 | 그 프로젝트 스코프의 행이 반환되고, 그 프로젝트의 관리자가 id로 읽을 수 있다 |
 | 프로젝트 구성원이 자기 프로젝트에 행을 만든다 | 관리자가 아닌 한 프로젝트의 구성원 | 그 프로젝트 스코프에 생성 | 권한 부족으로 거부 |
 | 도메인 관리자가 자기 도메인에 행을 만든다 | 한 도메인의 관리자 | 그 도메인 스코프에 생성 | 그 도메인 스코프의 행이 반환된다 |
 | 도메인 관리자가 다른 도메인에 행을 만든다 | 두 도메인, 한 도메인의 관리자 | 다른 도메인 스코프에 생성 | 권한 부족으로 거부 |
@@ -137,8 +141,10 @@ id로 여러 행을 읽을 때는 행마다 권한을 검사한다. 모든 사�
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
 | superadmin이 여러 스코프의 행을 함께 읽는다 | public 스코프, 한 도메인, 한 프로젝트의 행을 하나씩 미리 만들어 둠, superadmin | public 스코프, 도메인, 프로젝트 행의 id 목록으로 조회 | 요청한 순서대로 public 스코프, 도메인, 프로젝트의 행 |
-| 프로젝트 구성원이 자기 프로젝트의 행과 다른 프로젝트의 행을 함께 읽는다 | 구성원인 프로젝트와 다른 프로젝트에 행을 하나씩 미리 만들어 둠, 한 프로젝트의 구성원 | 자기 프로젝트의 행과 다른 프로젝트의 행의 id 목록으로 조회 | 자기 프로젝트의 행은 반환되고, 다른 프로젝트 행의 항목은 권한 부족으로 거부 |
-| 도메인 구성원이 다른 도메인의 행을 읽는다 | 다른 도메인의 행 하나, 한 도메인의 구성원 | 그 행의 id 목록으로 조회 | 그 항목이 권한 부족으로 거부 |
+| 프로젝트 관리자가 자기 프로젝트의 행과 다른 프로젝트의 행을 함께 읽는다 | 관리자인 프로젝트와 다른 프로젝트에 행을 하나씩 미리 만들어 둠, 한 프로젝트의 관리자 | 자기 프로젝트의 행과 다른 프로젝트의 행의 id 목록으로 조회 | 자기 프로젝트의 행은 반환되고, 다른 프로젝트 행의 항목은 권한 부족으로 거부 |
+| 프로젝트 구성원이 자기 프로젝트의 행을 읽는다 | 한 프로젝트에 행 하나를 미리 만들어 둠, 관리자가 아닌 그 프로젝트의 구성원 | 그 행의 id 목록으로 조회 | 그 항목이 권한 부족으로 거부 |
+| 도메인 구성원이 자기 도메인의 행과 구성원이 아닌 프로젝트의 행을 읽는다 | 한 도메인과 그 도메인의 한 프로젝트에 행을 하나씩 미리 만들어 둠, 관리자가 아니고 그 프로젝트의 구성원도 아닌 그 도메인의 구성원 | 도메인의 행과 프로젝트의 행의 id 목록으로 조회 | 도메인 행과 프로젝트 행의 항목이 모두 권한 부족으로 거부 |
+| 도메인 관리자가 다른 도메인의 행을 읽는다 | 다른 도메인의 행 하나, 한 도메인의 관리자 | 그 행의 id 목록으로 조회 | 그 항목이 권한 부족으로 거부 |
 | superadmin이 어느 행의 것도 아닌 id를 읽는다 | superadmin | 그 id 목록으로 조회 | 그 항목이 빈 값 |
 | 프로젝트 구성원이 어느 행의 것도 아닌 id를 읽는다 | 한 프로젝트의 구성원 | 그 id 목록으로 조회 | 그 항목이 권한 부족으로 거부 |
 
