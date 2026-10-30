@@ -45,7 +45,6 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderStorageTarget,
     vfolder_status_map,
 )
-from ai.backend.manager.errors.bootstrap_script import DefaultBootstrapScriptNotFound
 from ai.backend.manager.errors.keypair import NoDefaultKeypairResourcePolicy
 from ai.backend.manager.errors.resource import PersonalProjectNotFound
 from ai.backend.manager.errors.user import (
@@ -57,7 +56,11 @@ from ai.backend.manager.errors.user import (
     UserNotFound,
     UserPurgeInProgress,
 )
+from ai.backend.manager.models.bootstrap_script.creators import BootstrapScriptCreator
 from ai.backend.manager.models.bootstrap_script.purgers import BootstrapScriptPurger
+from ai.backend.manager.models.bootstrap_script.upserters import (
+    UserDefaultBootstrapScriptUpserter,
+)
 from ai.backend.manager.models.bootstrap_script_revision.creators import (
     BootstrapScriptRevisionCreator,
 )
@@ -173,17 +176,27 @@ class UserDBSource:
     async def add_default_bootstrap_script_revision(
         self, user_id: UserID, script: BootstrapScript, creator_id: UserID
     ) -> None:
-        """Append the next revision to the user's live default script."""
+        """Append the next revision to the user's live default script. A user with no
+        default gets a new script, set as the default."""
         async with self._v2_ops.write_ops() as w:
             current = await self._current_default_revision(w, user_id)
-            if current is None:
-                raise DefaultBootstrapScriptNotFound(f"{user_id} has no default bootstrap script")
+            if current is not None:
+                await w.create_dangling_field(
+                    BootstrapScriptRevisionCreator(
+                        script_id=current.script_id,
+                        script=script,
+                        creator_id=creator_id,
+                    )
+                )
+                return
+            created = await w.create_field(user_id, BootstrapScriptCreator())
             await w.create_dangling_field(
                 BootstrapScriptRevisionCreator(
-                    script_id=current.script_id,
-                    script=script,
-                    creator_id=creator_id,
+                    script_id=created.id, script=script, creator_id=creator_id
                 )
+            )
+            await w.upsert_field_entity(
+                user_id, UserDefaultBootstrapScriptUpserter(script_id=created.id)
             )
 
     async def _current_default_revision(

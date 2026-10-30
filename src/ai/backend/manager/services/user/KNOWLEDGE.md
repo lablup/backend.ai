@@ -39,7 +39,7 @@ row is a change to that user.
 
 - `bootstrap_scripts` holds scripts per `(entity_type, entity_id)`. `user_default_bootstrap_scripts` points at a user's default script, zero or one per user.
 - A script's content lives in `bootstrap_script_revisions`, which only ever gain rows: an update appends the next `revision_number` with the requester as `creator_id`, and the latest revision is the current content.
-- The API and session creation use the latest revision of the user's live default script. Reading one that is missing answers an empty script; updating it answers not found.
+- The legacy API and session creation use the latest revision of the user's live default script. Without a default, a read answers an empty script and a legacy update creates a script and sets it as the default.
 - In `processors.bootstrap_script`, the operations naming a script by id (get, bulk get, add revision, purge) are in a dangling lookup field group: the owner lookup finds the owner from the row's `entity_type`, and that owner answers for the operation. The operations taking the owner by name are user single-entity actions (create, switch default, unset default) and a user scope search. A deleted script is read and purged like a live one; switch-default and add-revision answer not found for it.
 
 | Operation | Rule | Why |
