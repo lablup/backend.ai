@@ -1477,3 +1477,85 @@ class TestScheduleCoordinatorFaultLogging:
             await coordinator._process_lifecycle_handler_schedule(ScheduleType.SCHEDULE, handler)
 
         assert self._error_records(caplog) == []
+
+
+class TestTheManagerSweepMark:
+    """Agents read the mark as "the manager has seen all its kernels", so it is published
+    only by a kernel sweep in which every resource group came back."""
+
+    @pytest.fixture
+    def valkey_schedule(self) -> AsyncMock:
+        return AsyncMock()
+
+    @pytest.fixture
+    def handler(self) -> MagicMock:
+        handler = MagicMock()
+        handler.name.return_value = "sweep-stale-kernels"
+        handler.lock_id = None
+        return handler
+
+    def _coordinator(
+        self, resource_group_ids: list[ResourceGroupID], valkey_schedule: AsyncMock
+    ) -> ScheduleCoordinator:
+        coordinator = ScheduleCoordinator.__new__(ScheduleCoordinator)
+        coordinator._repository = AsyncMock()
+        coordinator._repository.get_all_resource_groups.return_value = resource_group_ids
+        coordinator._operation_metrics = MagicMock()
+        coordinator._operation_metrics.measure_operation.return_value = nullcontext()
+        coordinator._valkey_schedule = valkey_schedule
+        return coordinator
+
+    async def test_marked_when_every_resource_group_came_back(
+        self, handler: MagicMock, valkey_schedule: AsyncMock
+    ) -> None:
+        coordinator = self._coordinator(
+            [ResourceGroupID(uuid4()), ResourceGroupID(uuid4())], valkey_schedule
+        )
+        with patch.object(coordinator, "_process_kernel_resource_group", AsyncMock()):
+            await coordinator._process_kernel_schedule(ScheduleType.SWEEP_STALE_KERNELS, handler)
+
+        valkey_schedule.mark_manager_sweep.assert_awaited_once()
+
+    async def test_marked_when_there_is_no_resource_group(
+        self, handler: MagicMock, valkey_schedule: AsyncMock
+    ) -> None:
+        # Nothing to sweep is not a failure; the mark must keep advancing for the orphan reap.
+        coordinator = self._coordinator([], valkey_schedule)
+
+        await coordinator._process_kernel_schedule(ScheduleType.SWEEP_STALE_KERNELS, handler)
+
+        valkey_schedule.mark_manager_sweep.assert_awaited_once()
+
+    async def test_not_marked_when_a_resource_group_failed(
+        self, handler: MagicMock, valkey_schedule: AsyncMock
+    ) -> None:
+        failing = ResourceGroupID(uuid4())
+        coordinator = self._coordinator([ResourceGroupID(uuid4()), failing], valkey_schedule)
+
+        async def process(_: Any, __: Any, resource_group_id: ResourceGroupID) -> None:
+            if resource_group_id == failing:
+                raise RuntimeError("the database was unreachable")
+
+        with patch.object(coordinator, "_process_kernel_resource_group", process):
+            await coordinator._process_kernel_schedule(ScheduleType.SWEEP_STALE_KERNELS, handler)
+
+        valkey_schedule.mark_manager_sweep.assert_not_awaited()
+
+    async def test_a_failed_mark_does_not_fail_the_pass(
+        self, handler: MagicMock, valkey_schedule: AsyncMock
+    ) -> None:
+        valkey_schedule.mark_manager_sweep.side_effect = RuntimeError("valkey unreachable")
+        coordinator = self._coordinator([], valkey_schedule)
+
+        assert await coordinator._process_kernel_schedule(ScheduleType.SWEEP_STALE_KERNELS, handler)
+
+    async def test_not_marked_by_another_kernel_pass(
+        self, handler: MagicMock, valkey_schedule: AsyncMock
+    ) -> None:
+        coordinator = self._coordinator([ResourceGroupID(uuid4())], valkey_schedule)
+        with patch.object(coordinator, "_process_kernel_resource_group", AsyncMock()):
+            await coordinator._process_kernel_schedule(
+                ScheduleType.DETECT_KERNEL_TERMINATION, handler
+            )
+
+        valkey_schedule.mark_manager_sweep.assert_not_awaited()
