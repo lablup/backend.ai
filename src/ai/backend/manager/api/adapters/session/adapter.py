@@ -786,16 +786,6 @@ class SessionAdapter(BaseAdapter):
             *self.apply_string_filter(f.role, fields.role.filter),
             *self.apply_uuid_filter(f.image_id, fields.image_id.filter),
             *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
-            *self.apply_to_many_filter(
-                f.environ,
-                KernelGroupSearchableFields.nested.environ.correlation,
-                self._convert_kernel_group_environ_filter,
-            ),
-            *self.apply_to_many_filter(
-                f.resource_slots,
-                KernelGroupSearchableFields.nested.resource_slots.correlation,
-                self._convert_kernel_group_resource_slot_filter,
-            ),
         ]
         if f.AND:
             for sub in f.AND:
@@ -1241,6 +1231,16 @@ class SessionAdapter(BaseAdapter):
                 f.labels,
                 SessionSearchableFields.nested.labels.correlation,
                 self._convert_entity_label_filter,
+            ),
+            *self.apply_to_many_filter(
+                f.kernel_group_environ,
+                SessionSearchableFields.nested.kernel_group_environ.correlation,
+                self._convert_kernel_group_environ_filter,
+            ),
+            *self.apply_to_many_filter(
+                f.kernel_group_resource_slots,
+                SessionSearchableFields.nested.kernel_group_resource_slots.correlation,
+                self._convert_kernel_group_resource_slot_filter,
             ),
             *self.apply_string_filter(f.creation_id, fields.creation_id.filter),
             *self.apply_enum_filter(f.session_type, fields.session_type.filter),

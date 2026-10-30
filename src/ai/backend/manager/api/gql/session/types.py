@@ -145,9 +145,11 @@ from ai.backend.manager.api.gql.kernel.types import (
 from ai.backend.manager.api.gql.kernel_group.types import (
     KernelGroupConnectionGQL,
     KernelGroupEdgeGQL,
+    KernelGroupEnvironNestedFilterGQL,
     KernelGroupFilterGQL,
     KernelGroupGQL,
     KernelGroupOrderByGQL,
+    KernelGroupResourceSlotNestedFilterGQL,
 )
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
@@ -483,6 +485,20 @@ class SessionV2FilterGQL(PydanticInputMixin[SessionFilter]):
         BackendAIGQLMeta(
             added_version=NEXT_RELEASE_VERSION,
             description="Filter by the reserved start time requested at creation.",
+        ),
+        default=None,
+    )
+    kernel_group_environ: KernelGroupEnvironNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the environ rows of the session's kernel groups.",
+        ),
+        default=None,
+    )
+    kernel_group_resource_slots: KernelGroupResourceSlotNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the resource slot rows of the session's kernel groups.",
         ),
         default=None,
     )

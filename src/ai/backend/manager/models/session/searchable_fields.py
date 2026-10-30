@@ -20,6 +20,15 @@ from ai.backend.manager.models.entity_label.searchable_fields import (
 )
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
+from ai.backend.manager.models.kernel_group.row import KernelGroupRow
+from ai.backend.manager.models.kernel_group_environ.row import KernelGroupEnvironRow
+from ai.backend.manager.models.kernel_group_environ.searchable_fields import (
+    KernelGroupEnvironSearchableFields,
+)
+from ai.backend.manager.models.kernel_group_resource_slot.row import KernelGroupResourceSlotRow
+from ai.backend.manager.models.kernel_group_resource_slot.searchable_fields import (
+    KernelGroupResourceSlotSearchableFields,
+)
 from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.routing.row import RoutingRow
@@ -256,7 +265,7 @@ class _SessionOwnFields(RowDataConverter[SessionRow, SessionEntityData]):
 
 
 class _SessionNestedFields:
-    """Rows of other tables the session owns: its labels and its kernels."""
+    """Rows of other tables the session owns: labels, kernels and kernel group rows."""
 
     labels = NestedSearchableField(
         EntityLabelSearchableFields.own,
@@ -265,6 +274,30 @@ class _SessionNestedFields:
     kernels = NestedSearchableField(
         KernelSearchableFields.own,
         ToManyCorrelation(KernelRow, SessionRow, KernelRow.session_id == SessionRow.id),
+    )
+    kernel_group_environ = NestedSearchableField(
+        KernelGroupEnvironSearchableFields.own,
+        ToManyCorrelation(
+            sa.join(
+                KernelGroupEnvironRow,
+                KernelGroupRow,
+                KernelGroupRow.id == KernelGroupEnvironRow.kernel_group_id,
+            ),
+            SessionRow,
+            KernelGroupRow.session_id == SessionRow.id,
+        ),
+    )
+    kernel_group_resource_slots = NestedSearchableField(
+        KernelGroupResourceSlotSearchableFields.own,
+        ToManyCorrelation(
+            sa.join(
+                KernelGroupResourceSlotRow,
+                KernelGroupRow,
+                KernelGroupRow.id == KernelGroupResourceSlotRow.kernel_group_id,
+            ),
+            SessionRow,
+            KernelGroupRow.session_id == SessionRow.id,
+        ),
     )
 
 

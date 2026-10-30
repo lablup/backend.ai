@@ -64,10 +64,10 @@ KernelGroupEnvironFilter.model_rebuild()
 
 
 class KernelGroupEnvironNestedFilter(ToManyFilter[KernelGroupEnvironFilter]):
-    """The `environ` field of a kernel group filter.
+    """The `kernel_group_environ` field of a session filter.
 
-    Each quantifier matches one environ row at a time. To require two different variables,
-    combine two of these with the kernel group filter's own `AND`.
+    Each quantifier matches one environ row of any of the session's kernel groups at a time.
+    To require two different variables, combine two of these with the session filter's `AND`.
     """
 
 
@@ -121,10 +121,10 @@ KernelGroupResourceSlotFilter.model_rebuild()
 
 
 class KernelGroupResourceSlotNestedFilter(ToManyFilter[KernelGroupResourceSlotFilter]):
-    """The `resource_slots` field of a kernel group filter.
+    """The `kernel_group_resource_slots` field of a session filter.
 
-    Each quantifier matches one slot row at a time. To require two different slots,
-    combine two of these with the kernel group filter's own `AND`.
+    Each quantifier matches one slot row of any of the session's kernel groups at a time.
+    To require two different slots, combine two of these with the session filter's `AND`.
     """
 
 
@@ -160,12 +160,6 @@ class KernelGroupFilter(BaseRequestModel):
     role: StringFilter | None = Field(default=None, description="Filter by role.")
     image_id: UUIDFilter | None = Field(default=None, description="Filter by image ID.")
     created_at: DateTimeFilter | None = Field(default=None, description="Filter by creation time.")
-    environ: KernelGroupEnvironNestedFilter | None = Field(
-        default=None, description="Filter by conditions on the group's environ rows."
-    )
-    resource_slots: KernelGroupResourceSlotNestedFilter | None = Field(
-        default=None, description="Filter by conditions on the group's resource slot rows."
-    )
 
     AND: list[KernelGroupFilter] | None = Field(default=None, description="AND logical combinator.")
     OR: list[KernelGroupFilter] | None = Field(default=None, description="OR logical combinator.")

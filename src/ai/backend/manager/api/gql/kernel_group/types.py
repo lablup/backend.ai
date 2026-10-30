@@ -510,31 +510,31 @@ class KernelGroupConnectionGQL(Connection[KernelGroupGQL]):
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Filter kernel groups by conditions on their environ rows.",
+        description="Filter sessions by conditions on the environ rows of their kernel groups.",
     ),
     name="KernelGroupEnvironNestedFilter",
 )
 class KernelGroupEnvironNestedFilterGQL(PydanticInputMixin[KernelGroupEnvironNestedFilterDTO]):
     exists: bool | None = gql_field(
         description=(
-            "Matches groups with at least one environ row when true, and groups with none when "
-            "false. Says nothing about what the rows hold."
+            "Matches sessions with at least one environ row when true, and sessions with none "
+            "when false. Says nothing about what the rows hold."
         ),
         default=None,
     )
     some: KernelGroupEnvironFilterGQL | None = gql_field(
-        description="Matches groups with at least one environ row satisfying all conditions.",
+        description="Matches sessions with at least one environ row satisfying all conditions.",
         default=None,
     )
     every: KernelGroupEnvironFilterGQL | None = gql_field(
         description=(
-            "Matches groups where every environ row satisfies all conditions "
-            "(also true when the group has none)."
+            "Matches sessions where every environ row satisfies all conditions "
+            "(also true when the session has none)."
         ),
         default=None,
     )
     none: KernelGroupEnvironFilterGQL | None = gql_field(
-        description="Matches groups with no environ row satisfying all conditions.",
+        description="Matches sessions with no environ row satisfying all conditions.",
         default=None,
     )
 
@@ -542,7 +542,7 @@ class KernelGroupEnvironNestedFilterGQL(PydanticInputMixin[KernelGroupEnvironNes
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Filter kernel groups by conditions on their resource slot rows.",
+        description="Filter sessions by conditions on the resource slot rows of their kernel groups.",
     ),
     name="KernelGroupResourceSlotNestedFilter",
 )
@@ -551,24 +551,26 @@ class KernelGroupResourceSlotNestedFilterGQL(
 ):
     exists: bool | None = gql_field(
         description=(
-            "Matches groups with at least one resource slot row when true, and groups with none when "
-            "false. Says nothing about what the rows hold."
+            "Matches sessions with at least one resource slot row when true, and sessions with "
+            "none when false. Says nothing about what the rows hold."
         ),
         default=None,
     )
     some: KernelGroupResourceSlotFilterGQL | None = gql_field(
-        description="Matches groups with at least one resource slot row satisfying all conditions.",
+        description=(
+            "Matches sessions with at least one resource slot row satisfying all conditions."
+        ),
         default=None,
     )
     every: KernelGroupResourceSlotFilterGQL | None = gql_field(
         description=(
-            "Matches groups where every resource slot row satisfies all conditions "
-            "(also true when the group has none)."
+            "Matches sessions where every resource slot row satisfies all conditions "
+            "(also true when the session has none)."
         ),
         default=None,
     )
     none: KernelGroupResourceSlotFilterGQL | None = gql_field(
-        description="Matches groups with no resource slot row satisfying all conditions.",
+        description="Matches sessions with no resource slot row satisfying all conditions.",
         default=None,
     )
 
@@ -586,12 +588,6 @@ class KernelGroupFilterGQL(PydanticInputMixin[KernelGroupFilterDTO]):
     image_id: UUIDFilter | None = gql_field(description="Filter by image ID.", default=None)
     created_at: DateTimeFilter | None = gql_field(
         description="Filter by creation time.", default=None
-    )
-    environ: KernelGroupEnvironNestedFilterGQL | None = gql_field(
-        description="Filter by conditions on the group's environ rows.", default=None
-    )
-    resource_slots: KernelGroupResourceSlotNestedFilterGQL | None = gql_field(
-        description="Filter by conditions on the group's resource slot rows.", default=None
     )
     AND: list[Self] | None = gql_field(description="Match all nested filters.", default=None)
     OR: list[Self] | None = gql_field(description="Match any nested filter.", default=None)
