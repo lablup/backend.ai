@@ -19,7 +19,10 @@ from ai.backend.manager.errors.bootstrap_script import (
     DefaultBootstrapScriptPurgeForbidden,
 )
 from ai.backend.manager.models.bootstrap_script.purgers import NonDefaultBootstrapScriptPurger
-from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
+from ai.backend.manager.models.bootstrap_script.row import (
+    BootstrapScriptRow,
+    UserDefaultBootstrapScriptRow,
+)
 from ai.backend.manager.models.bootstrap_script_revision.creators import (
     BootstrapScriptRevisionCreator,
 )
@@ -50,6 +53,7 @@ class TestBootstrapScriptRevision:
                 UserResourcePolicyRow,
                 UserRow,
                 BootstrapScriptRow,
+                UserDefaultBootstrapScriptRow,
                 BootstrapScriptRevisionRow,
             ],
         ):
@@ -69,9 +73,17 @@ class TestBootstrapScriptRevision:
 
     @pytest.fixture
     async def user_id(self, db: ExtendedAsyncSAEngine) -> UserID:
+        return await self._add_user(db)
+
+    @pytest.fixture
+    async def other_user_id(self, db: ExtendedAsyncSAEngine, user_id: UserID) -> UserID:
+        return await self._add_user(db)
+
+    async def _add_user(self, db: ExtendedAsyncSAEngine) -> UserID:
         user_id = UserID(uuid.uuid4())
         domain_id = DomainID(uuid.uuid4())
         domain_name = f"domain-{domain_id.hex[:8]}"
+        policy_name = f"policy-{user_id.hex[:8]}"
         async with db.begin_session() as session:
             session.add(
                 DomainRow(
@@ -87,7 +99,7 @@ class TestBootstrapScriptRevision:
             )
             session.add(
                 UserResourcePolicyRow(
-                    name="user-policy",
+                    name=policy_name,
                     max_vfolder_count=10,
                     max_quota_scope_size=-1,
                     max_session_count_per_model_session=10,
@@ -108,7 +120,7 @@ class TestBootstrapScriptRevision:
                     status_info="",
                     domain_name=domain_name,
                     role=UserRole.USER,
-                    resource_policy="user-policy",
+                    resource_policy=policy_name,
                     allowed_client_ip=None,
                     totp_key=None,
                     domain_id=domain_id,
@@ -119,7 +131,7 @@ class TestBootstrapScriptRevision:
     @pytest.fixture
     async def default_script(self, db: ExtendedAsyncSAEngine, user_id: UserID) -> BootstrapScriptID:
         """The user's default script, holding one revision."""
-        return await self._add_script(db, user_id, BootstrapScript("echo 1"))
+        return await self._add_script(db, user_id, BootstrapScript("echo 1"), is_default=True)
 
     @pytest.fixture
     async def deleted_default_script(
@@ -134,24 +146,27 @@ class TestBootstrapScriptRevision:
         return default_script
 
     @pytest.fixture
-    async def replacement_default_script(
-        self, db: ExtendedAsyncSAEngine, user_id: UserID, deleted_default_script: BootstrapScriptID
-    ) -> BootstrapScriptID:
-        """A new default set while the old one is soft-deleted."""
-        return await self._add_script(db, user_id, BootstrapScript("echo replacement"))
+    async def other_script(self, db: ExtendedAsyncSAEngine, user_id: UserID) -> BootstrapScriptID:
+        """A second, non-default script of the user."""
+        return await self._add_script(db, user_id, BootstrapScript("echo other"), is_default=False)
 
     async def _add_script(
-        self, db: ExtendedAsyncSAEngine, user_id: UserID, script: BootstrapScript
+        self,
+        db: ExtendedAsyncSAEngine,
+        user_id: UserID,
+        script: BootstrapScript,
+        *,
+        is_default: bool,
     ) -> BootstrapScriptID:
         async with db.begin_session() as session:
-            row = BootstrapScriptRow(
-                entity_type=UserEntityType(), entity_id=user_id, is_default=True
-            )
+            row = BootstrapScriptRow(entity_type=UserEntityType(), entity_id=user_id)
             session.add(row)
             await session.flush()
             session.add(
                 BootstrapScriptRevisionRow(script_id=row.id, revision_number=1, script=script)
             )
+            if is_default:
+                session.add(UserDefaultBootstrapScriptRow(user_id=user_id, script_id=row.id))
             return row.id
 
     async def _revisions(
@@ -193,14 +208,64 @@ class TestBootstrapScriptRevision:
             (3, "echo 3", user_id),
         ]
 
-    @pytest.mark.usefixtures("replacement_default_script")
-    async def test_new_default_can_replace_a_soft_deleted_one(
+    @pytest.mark.usefixtures("deleted_default_script")
+    async def test_soft_deleted_default_reads_as_none(
         self, repository: UserRepository, user_id: UserID
     ) -> None:
+        assert await repository.default_bootstrap_script(user_id) is None
+
+    async def test_add_without_a_default_creates_the_default(
+        self, repository: UserRepository, user_id: UserID
+    ) -> None:
+        await repository.add_default_bootstrap_script_revision(
+            user_id, BootstrapScript("echo first"), user_id
+        )
+
         current = await repository.default_bootstrap_script(user_id)
 
         assert current is not None
-        assert current.script == "echo replacement"
+        assert (current.revision_number, current.script) == (1, "echo first")
+
+    @pytest.mark.usefixtures("default_script")
+    async def test_switch_moves_the_default(
+        self, repository: UserRepository, user_id: UserID, other_script: BootstrapScriptID
+    ) -> None:
+        await repository.switch_default_bootstrap_script(user_id, other_script)
+
+        current = await repository.default_bootstrap_script(user_id)
+
+        assert current is not None
+        assert current.script == "echo other"
+
+    async def test_switch_refuses_a_script_of_another_user(
+        self,
+        repository: UserRepository,
+        other_user_id: UserID,
+        default_script: BootstrapScriptID,
+    ) -> None:
+        with pytest.raises(BootstrapScriptNotFound):
+            await repository.switch_default_bootstrap_script(other_user_id, default_script)
+
+        assert await repository.default_bootstrap_script(other_user_id) is None
+
+    async def test_switch_refuses_a_soft_deleted_script(
+        self, repository: UserRepository, user_id: UserID, deleted_default_script: BootstrapScriptID
+    ) -> None:
+        with pytest.raises(BootstrapScriptNotFound):
+            await repository.switch_default_bootstrap_script(user_id, deleted_default_script)
+
+    @pytest.mark.usefixtures("default_script")
+    async def test_unset_leaves_no_default_and_keeps_the_script(
+        self, db: ExtendedAsyncSAEngine, repository: UserRepository, user_id: UserID
+    ) -> None:
+        await repository.unset_default_bootstrap_script(user_id)
+
+        assert await repository.default_bootstrap_script(user_id) is None
+        async with db.begin_readonly_session() as session:
+            count = await session.scalar(
+                sa.select(sa.func.count()).where(BootstrapScriptRow.entity_id == user_id)
+            )
+        assert count == 1
 
     async def test_revision_is_refused_on_a_soft_deleted_script(
         self,
@@ -236,15 +301,28 @@ class TestBootstrapScriptRevision:
             await session.flush()
             targets = [row.id for row in rows]
 
-        await asyncio.gather(*(repository.switch_default_bootstrap_script(t) for t in targets))
+        await asyncio.gather(
+            *(repository.switch_default_bootstrap_script(user_id, t) for t in targets)
+        )
 
         async with db.begin_readonly_session() as session:
-            defaults = await session.scalars(
-                sa.select(BootstrapScriptRow.is_default).where(
-                    BootstrapScriptRow.entity_id == user_id
+            defaults = (
+                await session.scalars(
+                    sa.select(UserDefaultBootstrapScriptRow.script_id).where(
+                        UserDefaultBootstrapScriptRow.user_id == user_id
+                    )
                 )
-            )
-            assert list(defaults).count(True) == 1
+            ).all()
+        assert len(defaults) == 1
+        assert defaults[0] in targets
+
+    async def test_purge_removes_a_non_default_script(
+        self, db: ExtendedAsyncSAEngine, other_script: BootstrapScriptID
+    ) -> None:
+        async with V2DBOpsProvider(db).write_ops() as w:
+            await w.purge_field_entity(NonDefaultBootstrapScriptPurger(script_id=other_script))
+
+        assert await self._revisions(db, other_script) == []
 
     async def test_purge_is_refused_on_the_default_script(
         self, db: ExtendedAsyncSAEngine, default_script: BootstrapScriptID

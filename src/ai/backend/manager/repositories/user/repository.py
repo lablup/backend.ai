@@ -14,7 +14,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScript, BootstrapScriptID
 from ai.backend.common.data.entity.dotfile import DotfileID
 from ai.backend.common.data.entity.keypair import KeyPairID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
@@ -41,11 +41,10 @@ from ai.backend.manager.errors.bootstrap_script import BootstrapScriptNotFound
 from ai.backend.manager.errors.storage import DotfileCreationFailed, DotfileNotFound
 from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.bootstrap_script.creators import BootstrapScriptCreator
+from ai.backend.manager.models.bootstrap_script.purgers import UserDefaultBootstrapScriptPurger
 from ai.backend.manager.models.bootstrap_script.queriers import BootstrapScriptQuerier
-from ai.backend.manager.models.bootstrap_script.scopes import UserBootstrapScriptTarget
-from ai.backend.manager.models.bootstrap_script.updaters import (
-    ClearDefaultBootstrapScriptUpdater,
-    MarkDefaultBootstrapScriptUpdater,
+from ai.backend.manager.models.bootstrap_script.upserters import (
+    UserDefaultBootstrapScriptUpserter,
 )
 from ai.backend.manager.models.bootstrap_script_revision.creators import (
     BootstrapScriptRevisionCreator,
@@ -152,24 +151,27 @@ class UserRepository:
 
     @user_repository_resilience.apply()
     async def switch_default_bootstrap_script(
-        self, script_id: BootstrapScriptID
+        self, user_id: UserID, script_id: BootstrapScriptID
     ) -> BootstrapScriptData:
-        """Move the default mark among the user's scripts onto ``script_id``. Clearing
-        the previous mark needs its own statement: the partial unique index allows one."""
+        """Point the user's default at ``script_id``, a live script set on that user."""
         async with self._v2_ops.write_ops() as w:
             target = await w.query_field_data(BootstrapScriptQuerier(script_id=script_id))
-            if target is None:
+            if (
+                target is None
+                or target.deleted_at is not None
+                or target.entity.entity_type() != UserEntityType()
+                or target.entity != user_id
+            ):
                 raise BootstrapScriptNotFound(f"Bootstrap script {script_id} not found")
-            user_id = UserID(target.entity)
-            # The clear locks the user's scripts, so a concurrent switch waits for this one.
-            await w.batch_update_in_scopes(
-                [UserBootstrapScriptTarget(user_id=user_id)],
-                ClearDefaultBootstrapScriptUpdater(user_id=user_id),
+            await w.upsert_field_entity(
+                user_id, UserDefaultBootstrapScriptUpserter(script_id=script_id)
             )
-            marked = await w.update_data(MarkDefaultBootstrapScriptUpdater(script_id=script_id))
-            if marked is None:
-                raise BootstrapScriptNotFound(f"Bootstrap script {script_id} not found")
-            return marked
+            return target
+
+    @user_repository_resilience.apply()
+    async def unset_default_bootstrap_script(self, user_id: UserID) -> None:
+        async with self._v2_ops.write_ops() as w:
+            await w.batch_purge_field_entities(user_id, UserDefaultBootstrapScriptPurger())
 
     @user_repository_resilience.apply()
     async def default_access_key(self, user_id: UserID) -> AccessKey | None:

@@ -102,6 +102,10 @@ from ai.backend.manager.services.user.bootstrap_script.actions.switch_default im
     SwitchDefaultBootstrapScriptAction,
     SwitchDefaultBootstrapScriptActionResult,
 )
+from ai.backend.manager.services.user.bootstrap_script.actions.unset_default import (
+    UnsetDefaultBootstrapScriptAction,
+    UnsetDefaultBootstrapScriptActionResult,
+)
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
 )
@@ -411,5 +415,13 @@ class UserService:
     async def switch_default_bootstrap_script(
         self, action: SwitchDefaultBootstrapScriptAction
     ) -> SwitchDefaultBootstrapScriptActionResult:
-        script = await self._user_repository.switch_default_bootstrap_script(action.script_id)
+        script = await self._user_repository.switch_default_bootstrap_script(
+            action.user_id, action.script_id
+        )
         return SwitchDefaultBootstrapScriptActionResult(script=script)
+
+    async def unset_default_bootstrap_script(
+        self, action: UnsetDefaultBootstrapScriptAction
+    ) -> UnsetDefaultBootstrapScriptActionResult:
+        await self._user_repository.unset_default_bootstrap_script(action.user_id)
+        return UnsetDefaultBootstrapScriptActionResult()

@@ -5,9 +5,14 @@ from __future__ import annotations
 from typing import override
 
 from ai.backend.common.data.entity.types import RuntimeEntityID
-from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
-from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
-from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
+from ai.backend.manager.data.bootstrap_script.types import (
+    BootstrapScriptData,
+    UserDefaultBootstrapScriptData,
+)
+from ai.backend.manager.models.bootstrap_script.row import (
+    BootstrapScriptRow,
+    UserDefaultBootstrapScriptRow,
+)
 from ai.backend.manager.models.specs.conditions.datetime import DateTimeConditions
 from ai.backend.manager.models.specs.conditions.string import StringConditions
 from ai.backend.manager.models.specs.conditions.uuid import UUIDConditions
@@ -34,11 +39,6 @@ class _BootstrapScriptOwnFields(RowDataConverter[BootstrapScriptRow, BootstrapSc
         UUIDConditions(BootstrapScriptRow.entity_id),
         ColumnOrder(BootstrapScriptRow.entity_id),
     )
-    is_default = SearchableField(
-        BootstrapScriptRow.is_default,
-        BoolConditions(BootstrapScriptRow.is_default),
-        ColumnOrder(BootstrapScriptRow.is_default),
-    )
     created_at = SearchableField(
         BootstrapScriptRow.created_at,
         DateTimeConditions(BootstrapScriptRow.created_at),
@@ -55,11 +55,33 @@ class _BootstrapScriptOwnFields(RowDataConverter[BootstrapScriptRow, BootstrapSc
         return BootstrapScriptData(
             id=self.field_id.read(row),
             entity=RuntimeEntityID(self.entity_type.read(row), self.entity_id.read(row)),
-            is_default=self.is_default.read(row),
             created_at=self.created_at.read(row),
             deleted_at=self.deleted_at.read(row),
         )
 
 
+class _UserDefaultBootstrapScriptOwnFields(
+    RowDataConverter[UserDefaultBootstrapScriptRow, UserDefaultBootstrapScriptData]
+):
+    user_id = SearchableField(
+        UserDefaultBootstrapScriptRow.user_id,
+        UUIDConditions(UserDefaultBootstrapScriptRow.user_id),
+        ColumnOrder(UserDefaultBootstrapScriptRow.user_id),
+    )
+    script_id = SearchableField(
+        UserDefaultBootstrapScriptRow.script_id,
+        UUIDConditions(UserDefaultBootstrapScriptRow.script_id),
+        ColumnOrder(UserDefaultBootstrapScriptRow.script_id),
+    )
+
+    @override
+    def to_data(self, row: UserDefaultBootstrapScriptRow) -> UserDefaultBootstrapScriptData:
+        return UserDefaultBootstrapScriptData(
+            user_id=self.user_id.read(row),
+            script_id=self.script_id.read(row),
+        )
+
+
 class BootstrapScriptSearchableFields:
     own = _BootstrapScriptOwnFields()
+    user_default = _UserDefaultBootstrapScriptOwnFields()

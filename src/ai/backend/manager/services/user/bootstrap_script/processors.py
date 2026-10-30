@@ -31,6 +31,10 @@ from ai.backend.manager.services.user.bootstrap_script.actions.switch_default im
     SwitchDefaultBootstrapScriptAction,
     SwitchDefaultBootstrapScriptActionResult,
 )
+from ai.backend.manager.services.user.bootstrap_script.actions.unset_default import (
+    UnsetDefaultBootstrapScriptAction,
+    UnsetDefaultBootstrapScriptActionResult,
+)
 from ai.backend.manager.services.user.service import UserService
 
 
@@ -51,6 +55,9 @@ class BootstrapScriptProcessors:
     ]
     switch_default: SingleEntityActionProcessor[
         SwitchDefaultBootstrapScriptAction, SwitchDefaultBootstrapScriptActionResult
+    ]
+    unset_default: SingleEntityActionProcessor[
+        UnsetDefaultBootstrapScriptAction, UnsetDefaultBootstrapScriptActionResult
     ]
     purge: SingleFieldActionProcessor[
         PurgeBootstrapScriptAction, EntityOpsResult[BootstrapScriptData]
@@ -73,5 +80,8 @@ class BootstrapScriptProcessors:
         self.search = scripts.search_ops(SearchBootstrapScriptsAction)
         self.switch_default = group.single_entity(
             SwitchDefaultBootstrapScriptAction, user_service.switch_default_bootstrap_script
+        )
+        self.unset_default = group.single_entity(
+            UnsetDefaultBootstrapScriptAction, user_service.unset_default_bootstrap_script
         )
         self.purge = scripts.runtime_purge_ops(PurgeBootstrapScriptAction)

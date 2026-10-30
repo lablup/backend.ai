@@ -46,7 +46,10 @@ from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import DotfileData
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.secret.types import KeyProviderType
-from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
+from ai.backend.manager.models.bootstrap_script.row import (
+    BootstrapScriptRow,
+    UserDefaultBootstrapScriptRow,
+)
 from ai.backend.manager.models.bootstrap_script_revision.row import BootstrapScriptRevisionRow
 from ai.backend.manager.models.dotfile.row import DotfileRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -333,23 +336,35 @@ async def default_bootstrap_scripts(
 ) -> AsyncIterator[None]:
     """Give every user an empty default bootstrap script."""
     async with db_engine.begin() as conn:
-        script_ids = list(
-            (
-                await conn.execute(
-                    sa.insert(BootstrapScriptRow)
-                    .from_select(
-                        ["entity_type", "entity_id", "is_default"],
-                        sa.select(sa.literal(UserEntityType()), UserRow.uuid, sa.true()),
-                    )
-                    .returning(BootstrapScriptRow.id)
+        scripts = (
+            await conn.execute(
+                sa.insert(BootstrapScriptRow)
+                .from_select(
+                    ["entity_type", "entity_id"],
+                    sa.select(sa.literal(UserEntityType()), UserRow.uuid),
                 )
-            ).scalars()
-        )
-        if script_ids:
+                .returning(BootstrapScriptRow.id, BootstrapScriptRow.entity_id)
+            )
+        ).all()
+        if scripts:
             await conn.execute(
                 sa.insert(BootstrapScriptRevisionRow),
-                [{"script_id": sid, "revision_number": 1, "script": ""} for sid in script_ids],
+                [{"script_id": sid, "revision_number": 1, "script": ""} for sid, _ in scripts],
             )
+            await conn.execute(
+                sa.insert(UserDefaultBootstrapScriptRow),
+                [{"user_id": uid, "script_id": sid} for sid, uid in scripts],
+            )
+    try:
+        yield
+    finally:
+        async with db_engine.begin() as conn:
+            await conn.execute(sa.delete(BootstrapScriptRow))
+
+
+@pytest.fixture()
+async def no_default_bootstrap_scripts(db_engine: SAEngine) -> AsyncIterator[None]:
+    """Leave every user without a bootstrap script, and remove what the test wrote."""
     try:
         yield
     finally:

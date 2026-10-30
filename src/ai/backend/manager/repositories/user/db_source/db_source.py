@@ -22,7 +22,6 @@ from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
-from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.types import AccessKey, VFolderID
 from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
@@ -59,9 +58,6 @@ from ai.backend.manager.errors.user import (
     UserPurgeInProgress,
 )
 from ai.backend.manager.models.bootstrap_script.purgers import BootstrapScriptPurger
-from ai.backend.manager.models.bootstrap_script.searchable_fields import (
-    BootstrapScriptSearchableFields,
-)
 from ai.backend.manager.models.bootstrap_script_revision.creators import (
     BootstrapScriptRevisionCreator,
 )
@@ -69,7 +65,7 @@ from ai.backend.manager.models.bootstrap_script_revision.searchable_fields impor
     BootstrapScriptRevisionSearchableFields,
 )
 from ai.backend.manager.models.bootstrap_script_revision.searchers import (
-    BootstrapScriptRevisionSearcher,
+    DefaultBootstrapScriptRevisionSearcher,
 )
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.purgers import UserEndpointPurger
@@ -193,19 +189,11 @@ class UserDBSource:
     async def _current_default_revision(
         self, ops: V2ReadOps, user_id: UserID
     ) -> BootstrapScriptRevisionData | None:
-        script = BootstrapScriptSearchableFields.own
         revision = BootstrapScriptRevisionSearchableFields.own
         result = await ops.search_in_global(
-            BootstrapScriptRevisionSearcher(
+            DefaultBootstrapScriptRevisionSearcher(
+                user_id=user_id,
                 pagination=OffsetPagination(limit=1),
-                conditions=[
-                    script.entity_type.filter.equals(
-                        StringMatchSpec(UserEntityType(), case_insensitive=False, negated=False)
-                    ),
-                    script.entity_id.filter.equals(UUIDEqualMatchSpec(user_id, negated=False)),
-                    script.is_default.filter.equals(True),
-                    script.deleted_at.filter.is_null(),
-                ],
                 orders=[revision.revision_number.order.apply(ascending=False)],
             )
         )
