@@ -18,6 +18,7 @@ from .system.composer import SystemComposer, SystemInput, SystemResources
 _WORKER_CLIENT_TIMEOUT: Final[aiohttp.ClientTimeout] = aiohttp.ClientTimeout(
     total=30.0, connect=10.0
 )
+_MAX_CONCURRENT_TRAEFIK_ETCD_CALLS: Final[int] = 16
 
 
 @dataclass
@@ -74,10 +75,16 @@ class CoordinatorDependencyComposer(DependencyComposer[DependencyInput, Dependen
             ),
         )
 
-        # Stage 4: Components (worker client pool)
+        # Stage 4: Components (worker client pool, Traefik worker client)
         components = await stack.enter_composer(
             ComponentsComposer(),
-            ComponentsInput(worker_client_timeout=_WORKER_CLIENT_TIMEOUT),
+            ComponentsInput(
+                config=bootstrap.config,
+                worker_client_timeout=_WORKER_CLIENT_TIMEOUT,
+                traefik_etcd=infrastructure.traefik_etcd,
+                worker_service_discovery=system.worker_service_discovery,
+                max_concurrent_traefik_etcd_calls=_MAX_CONCURRENT_TRAEFIK_ETCD_CALLS,
+            ),
         )
 
         yield DependencyResources(

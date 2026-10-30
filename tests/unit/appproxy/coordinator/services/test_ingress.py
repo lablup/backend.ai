@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from http import HTTPStatus
-from unittest.mock import AsyncMock, MagicMock, Mock
+from unittest.mock import AsyncMock, MagicMock, Mock, call
 
 import aiohttp
 import pytest
@@ -16,10 +16,12 @@ from ai.backend.appproxy.common.defs import (
     WORKER_SERVICE_GROUP,
 )
 from ai.backend.appproxy.common.types import IngressDeliveryMode
+from ai.backend.appproxy.coordinator.clients.worker.traefik.client import TraefikWorkerClient
 from ai.backend.appproxy.coordinator.errors.ingress import (
-    ApiDeliveryWorkerPushFailedError,
     ApiDeliveryWorkerServerError,
     ApiDeliveryWorkerUnreachableError,
+    IngressPushFailedError,
+    TraefikIngressWriteFailedError,
 )
 from ai.backend.appproxy.coordinator.services.ingress import IngressService
 from ai.backend.common.clients.http_client.client_pool import ClientPool
@@ -58,13 +60,34 @@ WORKER_2_NODE = "10.0.1.1:10201"
 @dataclass(frozen=True)
 class _PushOperationCase:
     name: str
-    push: Callable[[IngressService, Ingress], Awaitable[None]]
+    call_ingress_service: Callable[[IngressService, Ingress], Awaitable[None]]
+
+
+@dataclass(frozen=True)
+class _MultiIngressPushOperationCase:
+    name: str
+    call_ingress_service: Callable[[IngressService, list[Ingress]], Awaitable[None]]
 
 
 @dataclass(frozen=True)
 class _PushFailure:
     worker_addr: str
     error_type: str
+
+
+@dataclass(frozen=True)
+class _TraefikIngressServiceSituation:
+    ingress_service: IngressService
+    traefik_worker_client: AsyncMock
+    worker_sessions: dict[str, MagicMock]
+    ingresses: list[Ingress]
+
+
+@dataclass(frozen=True)
+class _FailedTraefikWriteSituation:
+    ingress_service: IngressService
+    ingresses: list[Ingress]
+    other_authority_write_finished: asyncio.Event
 
 
 def _node(authority: str, delivery_mode: IngressDeliveryMode, addr: str) -> ServiceMetadata:
@@ -147,22 +170,22 @@ def unannounced_ingress(public_access: IngressAccess, backend: IngressBackend) -
 
 
 @pytest.fixture
-def service_discovery() -> AsyncMock:
-    service_discovery = AsyncMock(spec=ServiceDiscovery)
-    service_discovery.get_service_group.return_value = [
+def worker_service_discovery() -> AsyncMock:
+    worker_service_discovery = AsyncMock(spec=ServiceDiscovery)
+    worker_service_discovery.get_service_group.return_value = [
         _node("worker-1", IngressDeliveryMode.API, WORKER_1_NODE_A),
         _node("worker-1", IngressDeliveryMode.API, WORKER_1_NODE_B),
         _node("worker-1", IngressDeliveryMode.REDIS, WORKER_1_REDIS_NODE),
         _node("worker-2", IngressDeliveryMode.API, WORKER_2_NODE),
     ]
-    return service_discovery
+    return worker_service_discovery
 
 
 @pytest.fixture
-def empty_service_discovery() -> AsyncMock:
-    service_discovery = AsyncMock(spec=ServiceDiscovery)
-    service_discovery.get_service_group.side_effect = ValueError("No services found")
-    return service_discovery
+def empty_worker_service_discovery() -> AsyncMock:
+    worker_service_discovery = AsyncMock(spec=ServiceDiscovery)
+    worker_service_discovery.get_service_group.side_effect = ValueError("No services found")
+    return worker_service_discovery
 
 
 @pytest.fixture
@@ -221,21 +244,79 @@ def client_pool(worker_sessions: dict[str, MagicMock]) -> Mock:
 
 
 @pytest.fixture
-def service(
-    service_discovery: AsyncMock, client_pool: Mock, secrets: SecretConfig
+def traefik_accepting_ingresses_of_two_authorities(
+    worker_service_discovery: AsyncMock,
+    client_pool: Mock,
+    secrets: SecretConfig,
+    worker_sessions: dict[str, MagicMock],
+    worker_1_ingress: Ingress,
+    worker_2_ingress: Ingress,
+) -> _TraefikIngressServiceSituation:
+    traefik_worker_client = AsyncMock(spec=TraefikWorkerClient)
+    return _TraefikIngressServiceSituation(
+        ingress_service=IngressService(
+            worker_service_discovery,
+            client_pool,
+            secrets,
+            traefik_worker_client=traefik_worker_client,
+        ),
+        traefik_worker_client=traefik_worker_client,
+        worker_sessions=worker_sessions,
+        ingresses=[worker_1_ingress, worker_2_ingress],
+    )
+
+
+@pytest.fixture
+def traefik_failing_the_write_of_one_authority(
+    worker_service_discovery: AsyncMock,
+    client_pool: Mock,
+    secrets: SecretConfig,
+    worker_1_ingress: Ingress,
+    worker_2_ingress: Ingress,
+) -> _FailedTraefikWriteSituation:
+    other_authority_write_finished = asyncio.Event()
+
+    async def fail_the_first_authority_and_finish_the_other_late(
+        ingresses_or_keys: list[Ingress] | list[IngressKey],
+    ) -> None:
+        if ingresses_or_keys[0].authority == worker_1_ingress.authority:
+            raise TraefikIngressWriteFailedError()
+        await asyncio.sleep(0.05)
+        other_authority_write_finished.set()
+
+    traefik_worker_client = AsyncMock(spec=TraefikWorkerClient)
+    traefik_worker_client.upsert.side_effect = fail_the_first_authority_and_finish_the_other_late
+    traefik_worker_client.remove.side_effect = fail_the_first_authority_and_finish_the_other_late
+    return _FailedTraefikWriteSituation(
+        ingress_service=IngressService(
+            worker_service_discovery,
+            client_pool,
+            secrets,
+            traefik_worker_client=traefik_worker_client,
+        ),
+        ingresses=[worker_1_ingress, worker_2_ingress],
+        other_authority_write_finished=other_authority_write_finished,
+    )
+
+
+@pytest.fixture
+def api_delivery_ingress_service(
+    worker_service_discovery: AsyncMock, client_pool: Mock, secrets: SecretConfig
 ) -> IngressService:
-    return IngressService(service_discovery, client_pool, secrets)
+    return IngressService(
+        worker_service_discovery, client_pool, secrets, traefik_worker_client=None
+    )
 
 
 class TestIngressService:
     async def test_upsert_pushes_each_authority_to_its_api_nodes(
         self,
-        service: IngressService,
+        api_delivery_ingress_service: IngressService,
         worker_sessions: dict[str, MagicMock],
         worker_1_ingress: Ingress,
         worker_2_ingress: Ingress,
     ) -> None:
-        await service.upsert([worker_1_ingress, worker_2_ingress])
+        await api_delivery_ingress_service.upsert([worker_1_ingress, worker_2_ingress])
         pushed = {
             addr: tuple(
                 ingress.key()
@@ -254,12 +335,12 @@ class TestIngressService:
 
     async def test_remove_pushes_each_authority_to_its_api_nodes(
         self,
-        service: IngressService,
+        api_delivery_ingress_service: IngressService,
         worker_sessions: dict[str, MagicMock],
         worker_1_ingress: Ingress,
         worker_2_ingress: Ingress,
     ) -> None:
-        await service.remove([worker_1_ingress.key(), worker_2_ingress.key()])
+        await api_delivery_ingress_service.remove([worker_1_ingress.key(), worker_2_ingress.key()])
         pushed: dict[str, tuple[IngressKey, ...]] = {
             addr: tuple(
                 IngressRemoveRequest.model_validate(session.post.call_args.kwargs["json"]).keys
@@ -275,12 +356,12 @@ class TestIngressService:
 
     async def test_authority_without_an_api_node_is_skipped(
         self,
-        service: IngressService,
+        api_delivery_ingress_service: IngressService,
         worker_sessions: dict[str, MagicMock],
         worker_1_ingress: Ingress,
         unannounced_ingress: Ingress,
     ) -> None:
-        await service.upsert([worker_1_ingress, unannounced_ingress])
+        await api_delivery_ingress_service.upsert([worker_1_ingress, unannounced_ingress])
         pushed = {
             addr: tuple(
                 ingress.key()
@@ -298,14 +379,16 @@ class TestIngressService:
 
     async def test_no_registered_worker_pushes_nothing(
         self,
-        empty_service_discovery: AsyncMock,
+        empty_worker_service_discovery: AsyncMock,
         client_pool: Mock,
         secrets: SecretConfig,
         worker_sessions: dict[str, MagicMock],
         worker_1_ingress: Ingress,
     ) -> None:
-        service = IngressService(empty_service_discovery, client_pool, secrets)
-        await service.upsert([worker_1_ingress])
+        ingress_service = IngressService(
+            empty_worker_service_discovery, client_pool, secrets, traefik_worker_client=None
+        )
+        await ingress_service.upsert([worker_1_ingress])
         for session in worker_sessions.values():
             session.post.assert_not_called()
 
@@ -313,10 +396,16 @@ class TestIngressService:
         "case",
         [
             _PushOperationCase(
-                name="upsert", push=lambda service, ingress: service.upsert([ingress])
+                name="upsert",
+                call_ingress_service=lambda ingress_service, ingress: ingress_service.upsert([
+                    ingress
+                ]),
             ),
             _PushOperationCase(
-                name="remove", push=lambda service, ingress: service.remove([ingress.key()])
+                name="remove",
+                call_ingress_service=lambda ingress_service, ingress: ingress_service.remove([
+                    ingress.key()
+                ]),
             ),
         ],
         ids=lambda case: case.name,
@@ -324,23 +413,29 @@ class TestIngressService:
     async def test_failed_node_fails_the_push_after_every_node_finishes(
         self,
         case: _PushOperationCase,
-        service: IngressService,
+        api_delivery_ingress_service: IngressService,
         failing_node: dict[str, MagicMock],
         slow_node_finished: asyncio.Event,
         worker_1_ingress: Ingress,
     ) -> None:
-        with pytest.raises(ApiDeliveryWorkerPushFailedError):
-            await case.push(service, worker_1_ingress)
+        with pytest.raises(IngressPushFailedError):
+            await case.call_ingress_service(api_delivery_ingress_service, worker_1_ingress)
         assert slow_node_finished.is_set()
 
     @pytest.mark.parametrize(
         "case",
         [
             _PushOperationCase(
-                name="upsert", push=lambda service, ingress: service.upsert([ingress])
+                name="upsert",
+                call_ingress_service=lambda ingress_service, ingress: ingress_service.upsert([
+                    ingress
+                ]),
             ),
             _PushOperationCase(
-                name="remove", push=lambda service, ingress: service.remove([ingress.key()])
+                name="remove",
+                call_ingress_service=lambda ingress_service, ingress: ingress_service.remove([
+                    ingress.key()
+                ]),
             ),
         ],
         ids=lambda case: case.name,
@@ -348,12 +443,12 @@ class TestIngressService:
     async def test_every_failed_node_is_reported(
         self,
         case: _PushOperationCase,
-        service: IngressService,
+        api_delivery_ingress_service: IngressService,
         server_error_node: dict[str, MagicMock],
         worker_1_ingress: Ingress,
     ) -> None:
-        with pytest.raises(ApiDeliveryWorkerPushFailedError) as exc_info:
-            await case.push(service, worker_1_ingress)
+        with pytest.raises(IngressPushFailedError) as exc_info:
+            await case.call_ingress_service(api_delivery_ingress_service, worker_1_ingress)
         extra_data = exc_info.value.extra_data
         assert extra_data is not None
         reported = [
@@ -370,3 +465,58 @@ class TestIngressService:
                 error_type=ApiDeliveryWorkerServerError.error_type,
             ),
         ]
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _MultiIngressPushOperationCase(
+                name="upsert",
+                call_ingress_service=lambda ingress_service, ingresses: ingress_service.upsert(
+                    ingresses
+                ),
+            ),
+            _MultiIngressPushOperationCase(
+                name="remove",
+                call_ingress_service=lambda ingress_service, ingresses: ingress_service.remove([
+                    ingress.key() for ingress in ingresses
+                ]),
+            ),
+        ],
+        ids=lambda case: case.name,
+    )
+    async def test_failed_traefik_write_is_reported_after_every_write_finishes(
+        self,
+        case: _MultiIngressPushOperationCase,
+        traefik_failing_the_write_of_one_authority: _FailedTraefikWriteSituation,
+    ) -> None:
+        situation = traefik_failing_the_write_of_one_authority
+        with pytest.raises(IngressPushFailedError) as exc_info:
+            await case.call_ingress_service(situation.ingress_service, situation.ingresses)
+        assert situation.other_authority_write_finished.is_set()
+        extra_data = exc_info.value.extra_data
+        assert extra_data is not None
+        assert [failure["type"] for failure in extra_data["failures"]] == [
+            TraefikIngressWriteFailedError.error_type
+        ]
+
+    async def test_upsert_with_traefik_writes_each_authority_through_the_traefik_client(
+        self, traefik_accepting_ingresses_of_two_authorities: _TraefikIngressServiceSituation
+    ) -> None:
+        situation = traefik_accepting_ingresses_of_two_authorities
+        await situation.ingress_service.upsert(situation.ingresses)
+        assert situation.traefik_worker_client.upsert.await_args_list == [
+            call([ingress]) for ingress in situation.ingresses
+        ]
+        for session in situation.worker_sessions.values():
+            session.post.assert_not_called()
+
+    async def test_remove_with_traefik_clears_each_authority_through_the_traefik_client(
+        self, traefik_accepting_ingresses_of_two_authorities: _TraefikIngressServiceSituation
+    ) -> None:
+        situation = traefik_accepting_ingresses_of_two_authorities
+        await situation.ingress_service.remove([ingress.key() for ingress in situation.ingresses])
+        assert situation.traefik_worker_client.remove.await_args_list == [
+            call([ingress.key()]) for ingress in situation.ingresses
+        ]
+        for session in situation.worker_sessions.values():
+            session.post.assert_not_called()
