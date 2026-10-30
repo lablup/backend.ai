@@ -71,6 +71,7 @@ class _DesiredReplicasCase:
     load: _Load
     rules: list[_RuleLimits]
     expected_replicas: int | None
+    expected_triggered_per_rule: list[bool]
 
 
 class TestCalculateDesiredReplicasForDeployment:
@@ -307,54 +308,63 @@ class TestCalculateDesiredReplicasForDeployment:
                 load=_Load.LOW,
                 rules=[_RuleLimits(step_size=1, min_replicas=3, max_replicas=None)],
                 expected_replicas=None,
+                expected_triggered_per_rule=[False],
             ),
             _DesiredReplicasCase(
                 current_replicas=5,
                 load=_Load.HIGH,
                 rules=[_RuleLimits(step_size=1, min_replicas=None, max_replicas=3)],
                 expected_replicas=None,
+                expected_triggered_per_rule=[False],
             ),
             _DesiredReplicasCase(
                 current_replicas=2,
                 load=_Load.HIGH,
                 rules=[_RuleLimits(step_size=2, min_replicas=None, max_replicas=3)],
                 expected_replicas=3,
+                expected_triggered_per_rule=[True],
             ),
             _DesiredReplicasCase(
                 current_replicas=3,
                 load=_Load.LOW,
                 rules=[_RuleLimits(step_size=5, min_replicas=1, max_replicas=None)],
                 expected_replicas=1,
+                expected_triggered_per_rule=[True],
             ),
             _DesiredReplicasCase(
                 current_replicas=3,
                 load=_Load.HIGH,
                 rules=[_RuleLimits(step_size=1, min_replicas=None, max_replicas=3)],
                 expected_replicas=None,
+                expected_triggered_per_rule=[False],
             ),
             _DesiredReplicasCase(
                 current_replicas=1,
                 load=_Load.LOW,
                 rules=[_RuleLimits(step_size=1, min_replicas=1, max_replicas=None)],
                 expected_replicas=None,
+                expected_triggered_per_rule=[False],
             ),
             _DesiredReplicasCase(
                 current_replicas=1,
                 load=_Load.HIGH,
                 rules=[_RuleLimits(step_size=1, min_replicas=1, max_replicas=3)],
                 expected_replicas=2,
+                expected_triggered_per_rule=[True],
             ),
             _DesiredReplicasCase(
                 current_replicas=1,
                 load=_Load.HIGH,
                 rules=[_RuleLimits(step_size=2, min_replicas=5, max_replicas=None)],
                 expected_replicas=3,
+                expected_triggered_per_rule=[True],
             ),
             _DesiredReplicasCase(
                 current_replicas=6,
                 load=_Load.LOW,
                 rules=[_RuleLimits(step_size=1, min_replicas=None, max_replicas=3)],
                 expected_replicas=5,
+                expected_triggered_per_rule=[True],
             ),
             _DesiredReplicasCase(
                 current_replicas=3,
@@ -364,6 +374,7 @@ class TestCalculateDesiredReplicasForDeployment:
                     _RuleLimits(step_size=1, min_replicas=None, max_replicas=5),
                 ],
                 expected_replicas=4,
+                expected_triggered_per_rule=[False, True],
             ),
             _DesiredReplicasCase(
                 current_replicas=4,
@@ -373,6 +384,7 @@ class TestCalculateDesiredReplicasForDeployment:
                     _RuleLimits(step_size=1, min_replicas=None, max_replicas=5),
                 ],
                 expected_replicas=5,
+                expected_triggered_per_rule=[False, True],
             ),
             _DesiredReplicasCase(
                 current_replicas=2,
@@ -382,6 +394,7 @@ class TestCalculateDesiredReplicasForDeployment:
                     _RuleLimits(step_size=1, min_replicas=1, max_replicas=None),
                 ],
                 expected_replicas=1,
+                expected_triggered_per_rule=[False, True],
             ),
         ],
         ids=lambda case: (
@@ -389,8 +402,9 @@ class TestCalculateDesiredReplicasForDeployment:
             f"-{case.current_replicas}-to-{case.expected_replicas}"
         ),
     )
-    async def test_desired_replicas_after_step_within_limit(
+    async def test_desired_replicas_and_triggered_rules(
         self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
         deployment_repository: DeploymentRepository,
         deployment: DeploymentInfo,
         rules: list[AutoScalingRule],
@@ -401,57 +415,18 @@ class TestCalculateDesiredReplicasForDeployment:
             deployment, rules, metrics_data
         )
 
-        assert result == case.expected_replicas
-
-    @pytest.mark.parametrize(
-        "case",
-        [
-            _DesiredReplicasCase(
-                current_replicas=3,
-                load=_Load.HIGH,
-                rules=[_RuleLimits(step_size=1, min_replicas=None, max_replicas=3)],
-                expected_replicas=None,
-            ),
-            _DesiredReplicasCase(
-                current_replicas=1,
-                load=_Load.LOW,
-                rules=[_RuleLimits(step_size=1, min_replicas=1, max_replicas=None)],
-                expected_replicas=None,
-            ),
-            _DesiredReplicasCase(
-                current_replicas=5,
-                load=_Load.HIGH,
-                rules=[_RuleLimits(step_size=1, min_replicas=None, max_replicas=3)],
-                expected_replicas=None,
-            ),
-            _DesiredReplicasCase(
-                current_replicas=2,
-                load=_Load.LOW,
-                rules=[_RuleLimits(step_size=1, min_replicas=3, max_replicas=None)],
-                expected_replicas=None,
-            ),
-        ],
-        ids=lambda case: f"{case.load.name.lower()}-at-{case.current_replicas}",
-    )
-    async def test_rule_at_or_beyond_its_limit_is_not_triggered(
-        self,
-        db_with_cleanup: ExtendedAsyncSAEngine,
-        deployment_repository: DeploymentRepository,
-        deployment: DeploymentInfo,
-        rules: list[AutoScalingRule],
-        metrics_data: AutoScalingMetricsData,
-        case: _DesiredReplicasCase,
-    ) -> None:
-        await deployment_repository.calculate_desired_replicas_for_deployment(
-            deployment, rules, metrics_data
-        )
-
         async with db_with_cleanup.begin_readonly_session() as db_sess:
-            last_triggered = (
-                await db_sess.scalars(
-                    sa.select(EndpointAutoScalingRuleRow.last_triggered_at).where(
-                        EndpointAutoScalingRuleRow.endpoint == deployment.id
+            last_triggered_at_by_rule_id = dict(
+                (
+                    await db_sess.execute(
+                        sa.select(
+                            EndpointAutoScalingRuleRow.id,
+                            EndpointAutoScalingRuleRow.last_triggered_at,
+                        ).where(EndpointAutoScalingRuleRow.endpoint == deployment.id)
                     )
-                )
-            ).all()
-        assert list(last_triggered) == [None]
+                ).tuples()
+            )
+        assert result == case.expected_replicas
+        assert [
+            last_triggered_at_by_rule_id[AutoScalingRuleID(rule.id)] is not None for rule in rules
+        ] == case.expected_triggered_per_rule
