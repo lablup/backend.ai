@@ -1,0 +1,2 @@
+import{r as o,n as r}from"./index-CwWAznqi.js";import{B as s}from"./BAIVFolderIdenticon-PgyEX4dv.js";const n={argumentDefinitions:[],kind:"Fragment",metadata:null,name:"VFolderNodeIdenticonV2Fragment",selections:[{alias:null,args:null,kind:"ScalarField",name:"id",storageKey:null}],type:"VFolder",abstractKey:null};n.hash="eed0916f633b4f27f9770a3c1fa7fe86";const i=({vfolderNodeIdenticonFrgmt:a,style:t})=>{const e=o.useFragment(n,a);return r.jsx(s,{seed:e==null?void 0:e.id,style:t})};export{i as V};
+//# sourceMappingURL=VFolderNodeIdenticonV2-CDYH4mMW.js.map

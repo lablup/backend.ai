@@ -1,0 +1,8 @@
+/*
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ Co-located styles for the PowerSearch chrome both property filters share:
+ `.bai-power-search` on the control's root and `.bai-power-search-editor`
+ around the editor popover content handed over through `components.Editor`.
+*/@layer components{.bai-power-search-editor .astryx-stack[data-direction=horizontal]{flex-wrap:wrap}.bai-power-search .astryx-tokenizer>:has(>.astryx-token){max-width:100%;min-width:0}.bai-power-search .astryx-token>button>span:not(.astryx-icon){display:block}.bai-power-search .astryx-token[data-color=default]{--color-neutral: inherit;box-shadow:none}}

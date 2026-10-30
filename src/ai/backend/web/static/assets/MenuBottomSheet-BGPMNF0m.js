@@ -1,0 +1,2 @@
+import{BottomSheet as r}from"./BottomSheet-C7Cy7dyi.js";import{n as e,bk as m}from"./index-CwWAznqi.js";import"./icons-BgdBQS0N.js";import"./useScrollableArea-Bsuw_xFk.js";import"./lodash-RhKGq0BF.js";function a({finalFocusRef:o,isOpen:t,onOpenChange:n,label:i,children:p}){return e.jsx(r,{finalFocusRef:o,isOpen:t,onOpenChange:n,label:i,height:"hug",purpose:"info",children:e.jsx(m,{paddingBlockStart:4,paddingBlockEnd:0,paddingInline:1,children:p})})}a.displayName="MenuBottomSheet";export{a as MenuBottomSheet};
+//# sourceMappingURL=MenuBottomSheet-BGPMNF0m.js.map

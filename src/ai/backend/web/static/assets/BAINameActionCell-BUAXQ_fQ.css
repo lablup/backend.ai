@@ -1,0 +1,48 @@
+/**
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ Co-located styles for <BAINameActionCell> (to-astryx ticket 33). Replaces the
+ `antd-style` `createStyles` block; imported by the component itself (P17).
+ Nothing here targets `.ant-*` — the rules are plain flex plumbing plus the
+ hover reveal, so none of it dies when antd leaves (P6).
+
+ ## Class naming (READ BEFORE RENAMING)
+
+ The two `bai-name-action-cell-*` names below are LOAD-BEARING MARKERS, not
+ styling hooks: `calculateVisibleActions` measures the title icon through
+ `querySelector('.bai-name-action-cell-title-icon')`, and ~20 e2e specs locate
+ the action group through `.bai-name-action-cell-actions`. They stay.
+ `bai-nac-menu-icon` is one too: `BAINameActionCell.test.tsx` reads the
+ more-menu icon's tint through it.
+
+ The styling hooks that used to be emotion hashes are namespaced `bai-nac-*`
+ instead of reusing the `bai-name-action-cell-*` family, whose only survivor
+ (`-danger`) lives in `../styles/dangerAction.css`. Two sheets
+ defining one class name is decided by load order, which is exactly the kind
+ of silent, environment-dependent drift this migration keeps tripping over.
+
+ Token mapping (P19-checked against the declared Astryx set):
+   token.marginXS  (8px)          -> var(--spacing-2)
+   token.marginXXS (4px)          -> var(--spacing-1)
+   token.colorInfo / colorInfoBg  -> var(--bai-nac-info) /
+                                     var(--bai-nac-info-bg)
+   token.colorError / colorErrorBg-> var(--bai-nac-error) /
+                                     var(--bai-nac-error-bg)
+     These four custom properties are published by `BAINameActionCell.tsx` on
+     the actions container, straight from the theme shim's MEASURED antd values.
+     They replace an earlier hand-picked substitution to Astryx's hue-family
+     TEXT tiers (`--color-text-blue` #00458C/#C7D3FF, `--color-text-red`
+     #89001A/#FFC6C1), which are ~4 ramp steps darker than antd's and match no
+     antd token. The visible consequence was that ONE semantic action had TWO
+     colours: a table's bulk-selection buttons kept their inline
+     `token.colorInfo` (#028DF2) while the per-row buttons came out #00458C.
+     QA-FINDINGS Q-15.
+     ACCESSIBILITY NOTE, recorded rather than silently traded: on white,
+     #00458C is 8.9:1 and antd's #028DF2 is 3.3:1. Parity with antd is what the
+     report asks for and what the project directive says to follow, so parity
+     wins here — but these are icon-only controls, and if the team would rather
+     keep the darker tier, this block is the one place to change.
+   token.colorTextDisabled        -> var(--color-text-disabled)
+   token.colorBgContainerDisabled -> var(--color-background-muted)
+*/.bai-nac-wrapper{display:flex;align-items:center;gap:var(--spacing-2);width:100%;min-width:0;position:relative}.bai-nac-title-area{flex:1;min-width:0;display:flex;align-items:center;gap:var(--spacing-1)}.bai-nac-title-icon{flex-shrink:0;display:flex;align-items:center}.bai-nac-actions{flex-shrink:0;display:flex;align-items:center;gap:2px}.bai-nac-actions-hover{flex-shrink:0;display:flex;align-items:center;gap:2px;opacity:0;pointer-events:none;transition:opacity .15s ease}.bai-nac-hover-wrapper:hover .bai-name-action-cell-actions,.bai-nac-hover-wrapper:has(:focus-visible) .bai-name-action-cell-actions{opacity:1;pointer-events:auto}.bai-nac-menu-icon{display:inline-flex;align-items:center;flex-shrink:0}.bai-nac-action-button-default{color:var(--bai-nac-info);background-color:transparent;transition:background-color .2s ease,color .2s ease}.bai-nac-action-button-default:not(:disabled):hover{color:var(--bai-nac-info)!important;background-color:var(--bai-nac-info-bg)!important}.bai-nac-action-button-danger{color:var(--bai-nac-error);background-color:transparent;transition:background-color .2s ease,color .2s ease}.bai-nac-action-button-danger:not(:disabled):hover{color:var(--bai-nac-error)!important;background-color:var(--bai-nac-error-bg)!important}.bai-nac-action-button-disabled{color:var(--color-text-disabled);background-color:var(--color-background-muted)}

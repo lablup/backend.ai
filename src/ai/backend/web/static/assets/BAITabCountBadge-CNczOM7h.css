@@ -1,0 +1,29 @@
+/*
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ `.bai-tab-count-badge` — the count pill next to a tab label (FR-3706).
+
+ Astryx `Badge.variant` is a closed enum with no member that follows the ambient
+ menu accent — `info` looks like one but the theme pins it to a fixed tinted
+ blue (`BADGE_TINTED` in `react/src/astryx-theme/backendAiTheme.ts`), so "paint
+ this in the ACTIVE menu group's primary" is inexpressible as a variant. `--color-accent` is:
+ `AutoAdminPrimaryColorProvider`
+ (`react/src/components/MainLayout/MainLayout.tsx`) wraps every non-project
+ scope in `AstryxAdminTheme`, so the token already resolves per menu group —
+ measured on the badge element itself, light mode:
+
+   /session, /data     --color-accent: light-dark(#FF7A00, #be5e06)  (user)
+   /admin/session      --color-accent: light-dark(#028DF2, #0387bf)  (admin)
+
+ UNLAYERED on purpose, matching `actionAccent.css` / `BAITabList.css`: Astryx
+ ships inside `@layer astryx-base` with a `:not(#\#):not(#\#):not(#\#)`
+ specificity boost that no selector can beat within that layer, but any
+ unlayered rule beats every named layer, so a single class is enough and no
+ `!important` is needed.
+
+ No outline: `BADGE_TINTED` rings every Badge variant with an inset
+ `box-shadow` (neutral → `--color-border-gray`). A tab count is a plain pill,
+ and on the accent fill of the selected state the grey ring reads as a stray
+ border, so it is dropped for both states.
+*/.bai-tab-count-badge{box-shadow:none}.bai-tab-count-badge--selected{background-color:var(--color-accent);color:var(--color-on-accent)}

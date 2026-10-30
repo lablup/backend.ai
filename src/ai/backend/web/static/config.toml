@@ -54,7 +54,7 @@ enableReservoir = false                 # Enable reservoir page
 proxyURL = "[Proxy URL]"
 proxyBaseURL = "[Base URL of websocket proxy,]"
 proxyListenIP = "[Websocket proxy configuration IP.]"
-#disableCertCheck = false                # If true, It will disable certification check
+#disableCertCheck = false                # If true, skip TLS certificate checks. Desktop: also accepts invalid certificates in the main window without asking; may be set in <userData>/config.toml
 
 [menu]
 #blocklist = "" # Hide menus on the list which are separated by comma. please note that 'start' menu cannot be added to blocklist

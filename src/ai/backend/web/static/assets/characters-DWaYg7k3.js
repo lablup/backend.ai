@@ -1,0 +1,2 @@
+const r=typeof Intl.Segmenter=="function"?new Intl.Segmenter(void 0,{granularity:"grapheme"}):null;function o(e){return r?[...r.segment(e)].map(t=>t.segment):[...e]}function u(e){return e===""?0:o(e).length}function i(e){if(r){const n=r.segment(e)[Symbol.iterator]().next();return n.done?"":n.value.segment}const t=e.codePointAt(0);return t==null?"":String.fromCodePoint(t)}function f(e,t,n="…"){const c=o(e);if(c.length<=t)return e;const a=Math.max(t-u(n),0);return c.slice(0,a).join("")+n}export{u as c,i as f,f as t};
+//# sourceMappingURL=characters-DWaYg7k3.js.map
