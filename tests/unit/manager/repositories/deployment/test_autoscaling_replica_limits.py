@@ -424,7 +424,9 @@ class TestCalculateDesiredReplicasForDeployment:
                             EndpointAutoScalingRuleRow.last_triggered_at,
                         ).where(EndpointAutoScalingRuleRow.endpoint == deployment.id)
                     )
-                ).tuples()
+                )
+                .tuples()
+                .all()
             )
         assert result == case.expected_replicas
         assert [
