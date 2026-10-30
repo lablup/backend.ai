@@ -2,7 +2,7 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/vfolder/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/vfolder/adapter.py)
 
-시나리오: 미완 25 / 30
+시나리오: 미완 23 / 30
 
 - ops 로 구성 (4)
   - admin_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
@@ -10,8 +10,8 @@
   - project_search — 대표 성공 ✓ · 대표 실패 ✓
   - scoped_search — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
 - 직접 구현 (26)
-  - batch_load_mount_permissions — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - batch_load_permissions — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
+  - batch_load_mount_permissions — 성공 있음 1 · 실패 있음 2 (partial_bulk)
+  - batch_load_permissions — 성공 있음 1 · 실패 있음 2 (partial_bulk)
   - bulk_delete — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
   - bulk_purge — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
   - clone — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
@@ -61,6 +61,22 @@
 | 시나리오 | 판정 |
 |---|---|
 | [폴더를 하나도 만들지 않은 사용자가 자기 폴더를 조회하면, 답은 비어 있다](#vfolder-a-user-who-has-made-no-folder-lists-none) | 성공 |
+
+**batch_load_mount_permissions**
+
+| 시나리오 | 판정 |
+|---|---|
+| [자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더의 마운트 수준을 일괄 읽기로 읽으면, 읽기 쓰기가 온다](#permission_loading-a-user-granted-folder-read-mounts-their-folder-read-write) | 성공 |
+| [자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더와 공유받지 않은 남의 폴더의 마운트 수준을 한 번에 읽으면, 입력 순서대로 자기 폴더는 읽기 쓰기, 남의 폴더는 권한 부족 거부가 온다](#permission_loading-a-user-granted-folder-read-mounts-their-folder-read-write-and-is-refused-anothers) | 거부 |
+| [아무 권한도 받지 않은 사용자가 자기 폴더의 마운트 수준을 일괄 읽기로 읽으면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다](#permission_loading-a-user-granted-nothing-gets-a-refusal-in-place-of-their-folders-mount-permission) | 거부 |
+
+**batch_load_permissions**
+
+| 시나리오 | 판정 |
+|---|---|
+| [자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더의 권한을 일괄 읽기로 읽으면, 읽기 권한이 온다](#permission_loading-a-user-granted-folder-read-loads-their-folders-permissions) | 성공 |
+| [자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더와 공유받지 않은 남의 폴더의 권한을 한 번에 읽으면, 입력 순서대로 자기 폴더는 읽기 권한, 남의 폴더는 권한 부족 거부가 온다](#permission_loading-a-user-granted-folder-read-loads-their-folders-permissions-and-is-refused-anothers) | 거부 |
+| [아무 권한도 받지 않은 사용자가 자기 폴더의 권한을 일괄 읽기로 읽으면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다](#permission_loading-a-user-granted-nothing-gets-a-refusal-in-place-of-their-folders-permissions) | 거부 |
 
 **create**
 
@@ -508,6 +524,196 @@ Then
   - total_count = 0
   - has_next_page = False
   - has_previous_page = False
+
+### batch_load_mount_permissions
+
+<a id="permission_loading-a-user-granted-folder-read-mounts-their-folder-read-write"></a>
+
+#### [a-user-granted-folder-read-mounts-their-folder-read-write](/tests/scenario/bai_scenario/manager/vfolder/test_permission_loading.py) — pass
+
+자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더의 마운트 수준을 일괄 읽기로 읽으면, 읽기 쓰기가 온다
+
+Given
+
+- 자기 개인 폴더 하나를 가진, 자기 개인 프로젝트에서 폴더를 읽을 수 있는 사용자 한 명
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+  - 폴더 읽기 권한 부여
+    - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 folder-reader-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-reader-1 보유
+
+When
+
+- VFolderAdapter.batch_load_mount_permissions — user-1이 folder-1 폴더의 마운트 수준을 일괄 읽음
+
+Then
+
+- 그 폴더 하나가 읽기 쓰기로 온다
+  - loaded = [<VFolderPermissionField.READ_WRITE: 'rw'>]
+
+<a id="permission_loading-a-user-granted-folder-read-mounts-their-folder-read-write-and-is-refused-anothers"></a>
+
+#### [a-user-granted-folder-read-mounts-their-folder-read-write-and-is-refused-anothers](/tests/scenario/bai_scenario/manager/vfolder/test_permission_loading.py) — pass
+
+자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더와 공유받지 않은 남의 폴더의 마운트 수준을 한 번에 읽으면, 입력 순서대로 자기 폴더는 읽기 쓰기, 남의 폴더는 권한 부족 거부가 온다
+
+Given
+
+- 자기 개인 폴더 하나를 가진, 자기 개인 프로젝트에서 폴더를 읽을 수 있는 사용자 한 명과, 그 사람에게 공유되지 않은 남의 개인 폴더 하나
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+  - 개인 폴더 folder-2: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+  - 폴더 읽기 권한 부여
+    - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 folder-reader-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-reader-1 보유
+
+When
+
+- VFolderAdapter.batch_load_mount_permissions — user-1이 folder-1, folder-2 순으로 마운트 수준을 일괄 읽음
+
+Then
+
+- 입력 순서대로 자기 폴더는 읽기 쓰기, 남의 폴더는 권한 부족 거부가 온다
+  - length = 2
+  - [0] = <VFolderPermissionField.READ_WRITE: 'rw'>
+  - 거부: NotEnoughPermission
+
+<a id="permission_loading-a-user-granted-nothing-gets-a-refusal-in-place-of-their-folders-mount-permission"></a>
+
+#### [a-user-granted-nothing-gets-a-refusal-in-place-of-their-folders-mount-permission](/tests/scenario/bai_scenario/manager/vfolder/test_permission_loading.py) — pass
+
+아무 권한도 받지 않은 사용자가 자기 폴더의 마운트 수준을 일괄 읽기로 읽으면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다
+
+Given
+
+- 자기 개인 폴더 하나를 가진, 아무 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+
+When
+
+- VFolderAdapter.batch_load_mount_permissions — user-1이 folder-1 폴더의 마운트 수준을 일괄 읽음
+
+Then
+
+- 그 자리는 권한 부족으로 거부된다
+  - length = 1
+  - 거부: NotEnoughPermission
+
+### batch_load_permissions
+
+<a id="permission_loading-a-user-granted-folder-read-loads-their-folders-permissions"></a>
+
+#### [a-user-granted-folder-read-loads-their-folders-permissions](/tests/scenario/bai_scenario/manager/vfolder/test_permission_loading.py) — pass
+
+자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더의 권한을 일괄 읽기로 읽으면, 읽기 권한이 온다
+
+Given
+
+- 자기 개인 폴더 하나를 가진, 자기 개인 프로젝트에서 폴더를 읽을 수 있는 사용자 한 명
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+  - 폴더 읽기 권한 부여
+    - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 folder-reader-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-reader-1 보유
+
+When
+
+- VFolderAdapter.batch_load_permissions — user-1이 folder-1 폴더의 권한을 일괄 읽음
+
+Then
+
+- 그 폴더 하나가 읽기 권한으로 온다
+  - loaded = [[<PermissionBitDTO.READ: 'read'>]]
+
+<a id="permission_loading-a-user-granted-folder-read-loads-their-folders-permissions-and-is-refused-anothers"></a>
+
+#### [a-user-granted-folder-read-loads-their-folders-permissions-and-is-refused-anothers](/tests/scenario/bai_scenario/manager/vfolder/test_permission_loading.py) — pass
+
+자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더와 공유받지 않은 남의 폴더의 권한을 한 번에 읽으면, 입력 순서대로 자기 폴더는 읽기 권한, 남의 폴더는 권한 부족 거부가 온다
+
+Given
+
+- 자기 개인 폴더 하나를 가진, 자기 개인 프로젝트에서 폴더를 읽을 수 있는 사용자 한 명과, 그 사람에게 공유되지 않은 남의 개인 폴더 하나
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-2: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+  - 개인 폴더 folder-2: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+  - 폴더 읽기 권한 부여
+    - 역할 folder-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 folder-reader-1: vfolder 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 folder-reader-1 보유
+
+When
+
+- VFolderAdapter.batch_load_permissions — user-1이 folder-1, folder-2 순으로 권한을 일괄 읽음
+
+Then
+
+- 입력 순서대로 자기 폴더는 읽기 권한, 남의 폴더는 권한 부족 거부가 온다
+  - length = 2
+  - [0] = [<PermissionBitDTO.READ: 'read'>]
+  - 거부: NotEnoughPermission
+
+<a id="permission_loading-a-user-granted-nothing-gets-a-refusal-in-place-of-their-folders-permissions"></a>
+
+#### [a-user-granted-nothing-gets-a-refusal-in-place-of-their-folders-permissions](/tests/scenario/bai_scenario/manager/vfolder/test_permission_loading.py) — pass
+
+아무 권한도 받지 않은 사용자가 자기 폴더의 권한을 일괄 읽기로 읽으면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다
+
+Given
+
+- 자기 개인 폴더 하나를 가진, 아무 권한도 받지 않은 사용자 한 명
+  - 도메인 home-1: 이 도메인의 폴더는 local:volume1에 놓을 수 있다
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 개인 폴더 folder-1: 그 사람의 개인 프로젝트에 놓이고, 쓸 수 있는 상태다
+
+When
+
+- VFolderAdapter.batch_load_permissions — user-1이 folder-1 폴더의 권한을 일괄 읽음
+
+Then
+
+- 그 자리는 권한 부족으로 거부된다
+  - length = 1
+  - 거부: NotEnoughPermission
 
 ### create
 

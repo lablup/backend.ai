@@ -17,7 +17,7 @@ from ai.backend.manager.data.session.types import SessionEntityData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.testutils.scenario_steps import Given
 from bai_scenario.components.domain import GrantedUser, SomeoneOf
-from bai_scenario.components.resource_allocation import lay_a_place
+from bai_scenario.components.resource_allocation import SomeoneReadingSessionsIn, lay_a_place
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
 from bai_scenario.seeds.session.session import TestSeedSession
@@ -131,3 +131,85 @@ class APendingSessionAndSomeone(Given[Any, APendingSessionAndACaller]):
             case Terminator.NOBODY_GRANTED:
                 caller = await seeding.within(SomeoneOf(place.domain))
         return APendingSessionAndACaller(session=seeding.made(session), caller=seeding.made(caller))
+
+
+class FirstProjectGrant(enum.Enum):
+    """두 프로젝트 중 첫 프로젝트 범위에서 호출자가 받은 세션 권한."""
+
+    SESSION_READ = "session-read"
+    SESSION_SOFT_DELETE = "session-soft-delete"
+    NOTHING = "nothing"
+
+
+@dataclass(frozen=True)
+class PendingSessionsInTwoProjectsAndACaller:
+    """서로 다른 두 프로젝트의 대기 세션 하나씩과, 그것들을 한 번에 다루려는 사용자."""
+
+    first_project_session: SessionEntityData
+    second_project_session: SessionEntityData
+    caller: UserData
+
+
+@dataclass(frozen=True)
+class PendingSessionsInTwoProjectsAndSomeone(Given[Any, PendingSessionsInTwoProjectsAndACaller]):
+    """두 프로젝트에 대기 세션을 하나씩 두고, 첫 프로젝트 범위에서만 권한을 받은 사용자를 둔다."""
+
+    granted: FirstProjectGrant
+
+    @override
+    def describe(self) -> str:
+        match self.granted:
+            case FirstProjectGrant.SESSION_READ:
+                return (
+                    "서로 다른 두 프로젝트에 대기 세션 하나씩과, "
+                    "첫 프로젝트 범위에서만 세션 조회 권한을 받은 일반 사용자 한 명"
+                )
+            case FirstProjectGrant.SESSION_SOFT_DELETE:
+                return (
+                    "서로 다른 두 프로젝트에 대기 세션 하나씩과, "
+                    "첫 프로젝트 범위에서만 세션 soft delete 권한을 받은 일반 사용자 한 명"
+                )
+            case FirstProjectGrant.NOTHING:
+                return (
+                    "서로 다른 두 프로젝트에 대기 세션 하나씩과, "
+                    "아무 권한도 받지 않은 일반 사용자 한 명"
+                )
+
+    @override
+    async def lay(self, seeding: Any) -> PendingSessionsInTwoProjectsAndACaller:
+        first_place = await lay_a_place(seeding, slots=0)
+        second_place = await lay_a_place(seeding, slots=0)
+        first_project_session = await seeding.creating_from_three(
+            TestSeedSession(access_key=first_place.access_key),
+            first_place.project,
+            first_place.owner,
+            first_place.group,
+        )
+        second_project_session = await seeding.creating_from_three(
+            TestSeedSession(access_key=second_place.access_key),
+            second_place.project,
+            second_place.owner,
+            second_place.group,
+        )
+        caller: Laid[UserData]
+        match self.granted:
+            case FirstProjectGrant.SESSION_READ:
+                caller = await seeding.within(
+                    SomeoneReadingSessionsIn(
+                        first_place.domain,
+                        first_place.project,
+                        lambda p: ProjectID(p.id),
+                        "프로젝트",
+                    )
+                )
+            case FirstProjectGrant.SESSION_SOFT_DELETE:
+                caller = await seeding.within(
+                    SomeoneTerminatingSessionsIn(first_place.domain, first_place.project)
+                )
+            case FirstProjectGrant.NOTHING:
+                caller = await seeding.within(SomeoneOf(first_place.domain))
+        return PendingSessionsInTwoProjectsAndACaller(
+            first_project_session=seeding.made(first_project_session),
+            second_project_session=seeding.made(second_project_session),
+            caller=seeding.made(caller),
+        )
