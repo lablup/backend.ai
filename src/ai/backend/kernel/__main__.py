@@ -31,8 +31,8 @@ def setproctitle(title: str) -> None:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", action="store_true", default=False)
-    parser.add_argument("--session-id", type=str, default=None)
-    parser.add_argument("--cluster-replicas", type=json.loads, default='{"main": 1}')
+    parser.add_argument("--session-id", type=str, required=True)
+    parser.add_argument("--cluster-replicas", type=json.loads, required=True)
     parser.add_argument("lang", type=str, choices=lang_map.keys())
     parser.add_argument("runtime_path", type=Path, nargs="?", default=None)
     if os.environ.get("BACKEND_REEXECED") == "1":

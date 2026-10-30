@@ -1016,10 +1016,11 @@ class BaseRunner(metaclass=ABCMeta):
         # so every session left one behind. Applied here to cover images' service-defs too.
         if service_name not in ("jupyter", "jupyterlab"):
             return cmdargs
-        overrides = ['--IdentityProvider.cookie_options={"expires_days": None}']
-        if session_id := self.cmdargs.session_id:
-            overrides.append(f"--IdentityProvider.cookie_name=bai-jupyter-{session_id}")
-        return [*cmdargs, *overrides]
+        return [
+            *cmdargs,
+            '--IdentityProvider.cookie_options={"expires_days": None}',
+            f"--IdentityProvider.cookie_name=bai-jupyter-{self.cmdargs.session_id}",
+        ]
 
     async def _wait_service_proc(
         self,
