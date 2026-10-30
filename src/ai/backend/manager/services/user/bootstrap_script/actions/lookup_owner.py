@@ -5,17 +5,16 @@ from dataclasses import dataclass
 from typing import Any, override
 
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptID
-from ai.backend.common.data.entity.types import EntityType
-from ai.backend.common.data.entity.user import UserEntityType, UserID
-from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
-from ai.backend.manager.actions.v2.field.lookup import LookupFieldOwnerOpsAction
+from ai.backend.common.data.entity.types import EntityType, GlobalEntityType
+from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkRuntimeFieldOwnerOpsAction
+from ai.backend.manager.actions.v2.field.lookup import LookupRuntimeFieldOwnerOpsAction
 from ai.backend.manager.actions.v2.lookup.base import LookupKey
 from ai.backend.manager.models.bootstrap_script.lookups import BootstrapScriptOwnerLookup
 
 
 @dataclass(frozen=True)
 class BootstrapScriptIDLookupKey(LookupKey):
-    """A bootstrap script's id, resolved into the user it is set on."""
+    """A bootstrap script's id, resolved into the entity it is set on."""
 
     script_id: BootstrapScriptID
 
@@ -29,15 +28,15 @@ class BootstrapScriptIDLookupKey(LookupKey):
 
 
 @dataclass
-class LookupBootstrapScriptOwnerAction(LookupFieldOwnerOpsAction[BootstrapScriptID, UserID]):
-    """The user a bootstrap script is set on."""
+class LookupBootstrapScriptOwnerAction(LookupRuntimeFieldOwnerOpsAction[BootstrapScriptID]):
+    """The entity a bootstrap script is set on; its kind is a value on the row."""
 
     script_id: BootstrapScriptID
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return UserEntityType()
+        return GlobalEntityType()
 
     @override
     @classmethod
@@ -58,17 +57,15 @@ class LookupBootstrapScriptOwnerAction(LookupFieldOwnerOpsAction[BootstrapScript
 
 
 @dataclass
-class LookupBulkBootstrapScriptOwnerAction(
-    LookupBulkFieldOwnerOpsAction[BootstrapScriptID, UserID]
-):
-    """The users several bootstrap scripts are set on."""
+class LookupBulkBootstrapScriptOwnerAction(LookupBulkRuntimeFieldOwnerOpsAction[BootstrapScriptID]):
+    """The entities several bootstrap scripts are set on."""
 
     script_ids: Sequence[BootstrapScriptID]
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
-        return UserEntityType()
+        return GlobalEntityType()
 
     @override
     @classmethod

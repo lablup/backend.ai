@@ -17,8 +17,7 @@ from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 class BootstrapScriptCreator(
     FieldCreator[EntityIdentifier, BootstrapScriptRow, BootstrapScriptData]
 ):
-    """A script row with no content; its first revision is written beside it.
-    ``is_default`` is left to the server default, ``false``."""
+    """A script row with no content; its first revision is written beside it."""
 
     @override
     def field_id(self, row: BootstrapScriptRow) -> BootstrapScriptID:

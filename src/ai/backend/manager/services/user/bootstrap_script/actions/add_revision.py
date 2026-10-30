@@ -4,9 +4,8 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptID
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
+from ai.backend.manager.actions.v2.field.base import BaseRuntimeSingleFieldAction
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptRevisionData
 from ai.backend.manager.models.bootstrap_script_revision.creators import (
     BootstrapScriptRevisionCreator,
@@ -17,7 +16,7 @@ from ai.backend.manager.services.user.bootstrap_script.actions.lookup_owner impo
 
 
 @dataclass(frozen=True)
-class AddBootstrapScriptRevisionAction(BaseSingleFieldAction[BootstrapScriptID, UserID]):
+class AddBootstrapScriptRevisionAction(BaseRuntimeSingleFieldAction[BootstrapScriptID]):
     """Append the next revision to the live bootstrap script the creator names, default
     or not. The creator's ``creator_id`` is the impersonated owner under act-as."""
 

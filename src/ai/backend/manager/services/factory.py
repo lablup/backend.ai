@@ -9,6 +9,7 @@ from ai.backend.common.data.entity.artifact import ArtifactEntityType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
 from ai.backend.common.data.entity.audit_log import AuditLogFieldType, AuditLogScopeFieldType
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptFieldType
 from ai.backend.common.data.entity.client_ip_masking import ClientIPMaskingPolicyEntityType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
@@ -84,6 +85,7 @@ from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
 from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
+from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
 from ai.backend.manager.data.dotfile.types import DotfileData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.data.fair_share.types import (
@@ -288,6 +290,11 @@ from ai.backend.manager.services.system_session_environ.processors import (
 from ai.backend.manager.services.system_session_environ.service import SystemSessionEnvironService
 from ai.backend.manager.services.template.processors import TemplateProcessors
 from ai.backend.manager.services.template.service import TemplateService
+from ai.backend.manager.services.user.bootstrap_script.actions.lookup_owner import (
+    LookupBootstrapScriptOwnerAction,
+    LookupBulkBootstrapScriptOwnerAction,
+)
+from ai.backend.manager.services.user.bootstrap_script.processors import BootstrapScriptProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.services.user_resource_policy.processors import UserResourcePolicyProcessors
@@ -909,6 +916,16 @@ def create_processors(
                 LookupDotfileOwnerAction,
                 LookupBulkDotfileOwnerAction,
             )
+        ),
+        bootstrap_script=BootstrapScriptProcessors(
+            organization_groups.group(GroupMeta(UserEntityType())),
+            registry.dangling_lookup_field_group(
+                FieldGroupMeta(BootstrapScriptFieldType()),
+                BootstrapScriptData,
+                LookupBootstrapScriptOwnerAction,
+                LookupBulkBootstrapScriptOwnerAction,
+            ),
+            services.user,
         ),
         idle_checker_assignment=IdleCheckerAssignmentProcessors(
             session_groups.group(GroupMeta(IdleCheckerEntityType())),

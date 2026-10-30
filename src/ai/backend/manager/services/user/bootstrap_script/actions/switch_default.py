@@ -4,24 +4,23 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.actions.v2.field.base import BaseSingleFieldAction
+from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
-from ai.backend.manager.services.user.bootstrap_script.actions.lookup_owner import (
-    LookupBootstrapScriptOwnerAction,
-)
 
 
 @dataclass(frozen=True)
-class SwitchDefaultBootstrapScriptAction(BaseSingleFieldAction[BootstrapScriptID, UserID]):
-    """Move the default mark among a user's bootstrap scripts onto one script."""
+class SwitchDefaultBootstrapScriptAction(BaseSingleEntityAction):
+    """Point the user's default at one of the user's live bootstrap scripts."""
 
+    user_id: UserID
     script_id: BootstrapScriptID
 
     @override
-    def to_owner_lookup_action(self) -> LookupBootstrapScriptOwnerAction:
-        return LookupBootstrapScriptOwnerAction(script_id=self.script_id)
+    def entity_id(self) -> EntityIdentifier:
+        return self.user_id
 
     @override
     @classmethod

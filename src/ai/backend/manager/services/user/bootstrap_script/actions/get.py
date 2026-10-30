@@ -4,8 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptID
-from ai.backend.common.data.entity.user import UserID
-from ai.backend.manager.actions.v2.field.ops import GetFieldOpsAction
+from ai.backend.manager.actions.v2.field.ops import RuntimeGetFieldOpsAction
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
 from ai.backend.manager.models.bootstrap_script.queriers import BootstrapScriptQuerier
 from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
@@ -16,9 +15,9 @@ from ai.backend.manager.services.user.bootstrap_script.actions.lookup_owner impo
 
 @dataclass
 class GetBootstrapScriptAction(
-    GetFieldOpsAction[BootstrapScriptID, UserID, BootstrapScriptRow, BootstrapScriptData]
+    RuntimeGetFieldOpsAction[BootstrapScriptID, BootstrapScriptRow, BootstrapScriptData]
 ):
-    """Read one bootstrap script, authorized against the user it is set on."""
+    """Read one bootstrap script, authorized against the entity it is set on."""
 
     script_id: BootstrapScriptID
 

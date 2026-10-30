@@ -9,22 +9,21 @@ from uuid import UUID
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptID
-from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
-from ai.backend.manager.models.specs.lookup import FieldOwnerLookup
+from ai.backend.manager.models.specs.lookup import RuntimeFieldOwnerLookup
 
 
-class BootstrapScriptOwnerLookup(FieldOwnerLookup[BootstrapScriptID, UserID]):
-    """The user a bootstrap script is set on. A script set on another kind of entity
-    resolves to no owner."""
+class BootstrapScriptOwnerLookup(RuntimeFieldOwnerLookup[BootstrapScriptID]):
+    """The entity each named bootstrap script is set on, read from the type and id on
+    the row."""
 
     @override
     def build_query(self, field_ids: Sequence[BootstrapScriptID]) -> sa.sql.Select[Any]:
-        return sa.select(BootstrapScriptRow.id, BootstrapScriptRow.entity_id).where(
-            BootstrapScriptRow.id.in_(field_ids),
-            BootstrapScriptRow.entity_type == UserEntityType(),
-        )
+        return sa.select(
+            BootstrapScriptRow.id, BootstrapScriptRow.entity_id, BootstrapScriptRow.entity_type
+        ).where(BootstrapScriptRow.id.in_(field_ids))
 
     @override
-    def to_entity_id(self, value: UUID) -> UserID:
-        return UserID(value)
+    def owner_of(self, entity_type: EntityType, entity_id: UUID) -> RuntimeEntityID:
+        return RuntimeEntityID(entity_type, entity_id)

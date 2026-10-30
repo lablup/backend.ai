@@ -295,12 +295,18 @@ class TestBootstrapScript:
             )
 
 
+@pytest.mark.usefixtures("no_default_bootstrap_scripts")
 class TestBootstrapScriptWithoutDefault:
-    async def test_update_answers_not_found(self, admin_registry: BackendAIClientRegistry) -> None:
-        with pytest.raises(NotFoundError):
-            await admin_registry.config.update_bootstrap_script(
-                UpdateBootstrapScriptRequest(script="echo admin")
-            )
+    async def test_update_creates_the_default(
+        self, admin_registry: BackendAIClientRegistry
+    ) -> None:
+        await admin_registry.config.update_bootstrap_script(
+            UpdateBootstrapScriptRequest(script="echo admin")
+        )
+
+        result = await admin_registry.config.get_bootstrap_script()
+
+        assert result.root == "echo admin"
 
 
 # ---------------------------------------------------------------------------

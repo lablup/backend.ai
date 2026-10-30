@@ -49,9 +49,8 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.dto.agent.response import (
@@ -127,14 +126,11 @@ from ai.backend.manager.data.session.options import (
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import verify_vfolder_name
 from ai.backend.manager.models.agent.row import AgentRow, agents
-from ai.backend.manager.models.bootstrap_script.searchable_fields import (
-    BootstrapScriptSearchableFields,
-)
 from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
     BootstrapScriptRevisionSearchableFields,
 )
 from ai.backend.manager.models.bootstrap_script_revision.searchers import (
-    BootstrapScriptRevisionSearcher,
+    DefaultBootstrapScriptRevisionSearcher,
 )
 from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.endpoint.row import EndpointRow
@@ -634,24 +630,12 @@ class AgentRegistry:
             if not user_row:
                 raise UserNotFound(f"User with UUID {user_scope.user_uuid} not found.")
         if not bootstrap_script:
-            script = BootstrapScriptSearchableFields.own
             revision = BootstrapScriptRevisionSearchableFields.own
             async with self._ops_provider.read_ops() as r:
                 revisions = await r.search_in_global(
-                    BootstrapScriptRevisionSearcher(
+                    DefaultBootstrapScriptRevisionSearcher(
+                        user_id=UserID(user_scope.user_uuid),
                         pagination=OffsetPagination(limit=1),
-                        conditions=[
-                            script.entity_type.filter.equals(
-                                StringMatchSpec(
-                                    UserEntityType(), case_insensitive=False, negated=False
-                                )
-                            ),
-                            script.entity_id.filter.equals(
-                                UUIDEqualMatchSpec(user_scope.user_uuid, negated=False)
-                            ),
-                            script.is_default.filter.equals(True),
-                            script.deleted_at.filter.is_null(),
-                        ],
                         orders=[revision.revision_number.order.apply(ascending=False)],
                     )
                 )

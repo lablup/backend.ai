@@ -48,6 +48,11 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.bootstrap_script.row import (
+    BootstrapScriptRow,
+    UserDefaultBootstrapScriptRow,
+)
+from ai.backend.manager.models.bootstrap_script_revision.row import BootstrapScriptRevisionRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.dotfile.row import DotfileRow
@@ -97,6 +102,9 @@ _SCHEDULER_ROWS: list[type] = [
     UserRow,
     VirtualEntityRow,
     DotfileRow,
+    BootstrapScriptRow,
+    UserDefaultBootstrapScriptRow,
+    BootstrapScriptRevisionRow,
     KeyPairRow,
     ProjectRow,
     EntityFieldRow,
