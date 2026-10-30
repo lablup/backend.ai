@@ -19,6 +19,7 @@ from ai.backend.common.dto.manager.query import (
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironOrderField,
+    SystemSessionEnvironScope,
     SystemSessionEnvironScopeType,
 )
 from ai.backend.common.tristate.unset import UNSET, Unset
@@ -26,6 +27,7 @@ from ai.backend.common.tristate.unset import UNSET, Unset
 __all__ = (
     "AdminSearchSystemSessionEnvironsInput",
     "CreateSystemSessionEnvironInput",
+    "ScopedSearchSystemSessionEnvironsInput",
     "SystemSessionEnvironFilter",
     "SystemSessionEnvironOrder",
     "SystemSessionEnvironScopeTypeFilter",
@@ -98,6 +100,24 @@ class SystemSessionEnvironOrder(BaseRequestModel):
 class AdminSearchSystemSessionEnvironsInput(BaseRequestModel):
     """Input for searching every system session environ row (superadmin)."""
 
+    filter: SystemSessionEnvironFilter | None = Field(
+        default=None, description="Filter conditions."
+    )
+    order: list[SystemSessionEnvironOrder] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, ge=1, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, ge=1, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, ge=1, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, ge=0, description="Offset pagination: number to skip.")
+
+
+class ScopedSearchSystemSessionEnvironsInput(BaseRequestModel):
+    """Input for searching the system session environ rows the named scopes reach."""
+
+    scope: SystemSessionEnvironScope = Field(description="Scope (OR across all items).")
     filter: SystemSessionEnvironFilter | None = Field(
         default=None, description="Filter conditions."
     )

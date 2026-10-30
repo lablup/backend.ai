@@ -398,6 +398,9 @@ from ai.backend.manager.services.system_session_environ.actions.purge import (
 from ai.backend.manager.services.system_session_environ.actions.restore import (
     RestoreSystemSessionEnvironAction,
 )
+from ai.backend.manager.services.system_session_environ.actions.scoped_search import (
+    ScopedSearchSystemSessionEnvironsAction,
+)
 from ai.backend.manager.services.system_session_environ.actions.update import (
     UpdateSystemSessionEnvironAction,
 )
@@ -1098,9 +1101,9 @@ def test_vfs_storage_loader_read_is_a_partial_permission_read() -> None:
 
 
 def test_system_session_environ_operations_keep_their_judged_gates() -> None:
-    """The search reads every row under the global gate, the create against the scope it
-    writes in; the DataLoader, the update, the soft delete, the restore and the purge are
-    checked per named row."""
+    """The search reads every row under the global gate, the scoped search and the create
+    against the named scopes; the DataLoader, the update, the soft delete, the restore and the
+    purge are checked per named row."""
     registry = _ops_registry()
     SystemSessionEnvironProcessors(
         registry.group(GroupMeta(SystemSessionEnvironEntityType())),
@@ -1111,6 +1114,11 @@ def test_system_session_environ_operations_keep_their_judged_gates() -> None:
         GlobalSearchSystemSessionEnvironsAction: (
             SystemSessionEnvironEntityType(),
             ActionKind.GLOBAL,
+            ActionGate.PERMISSION,
+        ),
+        ScopedSearchSystemSessionEnvironsAction: (
+            SystemSessionEnvironEntityType(),
+            ActionKind.SCOPE,
             ActionGate.PERMISSION,
         ),
         BulkGetSystemSessionEnvironsAction: (

@@ -12,6 +12,7 @@ from ai.backend.common.data.entity.system_session_environ import SystemSessionEn
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     AdminSearchSystemSessionEnvironsInput,
     CreateSystemSessionEnvironInput,
+    ScopedSearchSystemSessionEnvironsInput,
     UpdateSystemSessionEnvironInput,
 )
 
@@ -44,6 +45,14 @@ class V2SystemSessionEnvironHandler:
     async def list_value_sources(self) -> APIResponse:
         """List every value source a system session environ row can carry."""
         payload = await self._adapter.public_list_value_sources()
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
+    async def scoped_search(
+        self,
+        body: BodyParam[ScopedSearchSystemSessionEnvironsInput],
+    ) -> APIResponse:
+        """Search the system session environ rows the named scopes reach."""
+        payload = await self._adapter.scoped_search(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
 
     async def create(self, body: BodyParam[CreateSystemSessionEnvironInput]) -> APIResponse:

@@ -7,6 +7,7 @@ from ai.backend.common.data.entity.system_session_environ import SystemSessionEn
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     AdminSearchSystemSessionEnvironsInput,
     CreateSystemSessionEnvironInput,
+    ScopedSearchSystemSessionEnvironsInput,
     UpdateSystemSessionEnvironInput,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
@@ -16,6 +17,7 @@ from ai.backend.common.dto.manager.v2.system_session_environ.response import (
     ListSystemSessionEnvironValueSourcesPayload,
     PurgeSystemSessionEnvironPayload,
     RestoreSystemSessionEnvironPayload,
+    ScopedSearchSystemSessionEnvironsPayload,
     UpdateSystemSessionEnvironPayload,
 )
 
@@ -42,6 +44,17 @@ class V2SystemSessionEnvironClient(BaseDomainClient):
             "GET",
             f"{_PATH}/value-sources",
             response_model=ListSystemSessionEnvironValueSourcesPayload,
+        )
+
+    async def scoped_search(
+        self, request: ScopedSearchSystemSessionEnvironsInput
+    ) -> ScopedSearchSystemSessionEnvironsPayload:
+        """Search the system session environ rows the named scopes reach."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/scoped/search",
+            request=request,
+            response_model=ScopedSearchSystemSessionEnvironsPayload,
         )
 
     async def create(

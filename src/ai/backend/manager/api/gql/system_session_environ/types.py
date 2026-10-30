@@ -52,6 +52,9 @@ from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironScopeType,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
+    SystemSessionEnvironScope as SystemSessionEnvironScopeDTO,
+)
+from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironScopeInfo as SystemSessionEnvironScopeInfoDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -61,6 +64,7 @@ from ai.backend.manager.api.gql.base import (
     OrderDirection,
     StringFilter,
     UUIDFilter,
+    UUIDScopeGQL,
 )
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -84,6 +88,7 @@ __all__ = (
     "SystemSessionEnvironFilterGQL",
     "SystemSessionEnvironGQL",
     "SystemSessionEnvironOrderByGQL",
+    "SystemSessionEnvironScopeGQL",
     "SystemSessionEnvironScopeInfoGQL",
     "CreateSystemSessionEnvironInputGQL",
     "CreateSystemSessionEnvironPayloadGQL",
@@ -304,6 +309,26 @@ class SystemSessionEnvironOrderByGQL(PydanticInputMixin[SystemSessionEnvironOrde
     direction: OrderDirection = gql_field(
         description="Order direction.", default=OrderDirection.ASC
     )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Scope for the scoped system session environ query. Each list is OR'd internally "
+            "and across lists, and every scope named is authorized before the read runs."
+        ),
+    ),
+    name="SystemSessionEnvironScope",
+)
+class SystemSessionEnvironScopeGQL(PydanticInputMixin[SystemSessionEnvironScopeDTO]):
+    domain: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Domains whose rows are being read."
+    )
+    project: list[UUIDScopeGQL] | None = gql_field(
+        default=None, description="Projects whose rows are being read."
+    )
+    public: bool = gql_field(default=False, description="Include the rows registered in public.")
 
 
 @gql_pydantic_input(
