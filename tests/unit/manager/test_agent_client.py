@@ -118,6 +118,15 @@ class TestAgentClientPassesAgentId:
         assert result == 30000
         mock_peer.call.assign_port.assert_called_once_with(agent_id=AgentId("port-agent"))
 
+    async def test_release_port_passes_port_and_agent_id(self, mock_peer: MagicMock) -> None:
+        client = AgentClient(mock_peer, AgentId("port-agent"))
+
+        mock_peer.call.release_port = AsyncMock(return_value=None)
+
+        await client.release_port(30000)
+
+        mock_peer.call.release_port.assert_called_once_with(30000, agent_id=AgentId("port-agent"))
+
     async def test_upload_file_passes_agent_id(self, mock_peer: MagicMock) -> None:
         client = AgentClient(mock_peer, AgentId("file-agent"))
 

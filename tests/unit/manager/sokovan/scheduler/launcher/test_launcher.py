@@ -10,20 +10,35 @@ Test Scenarios:
 
 from __future__ import annotations
 
+import asyncio
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
+from callosum.rpc import RPCUserError
 
-from ai.backend.common.types import AutoPullBehavior
+from ai.backend.common.types import AgentId, AutoPullBehavior
+from ai.backend.manager.errors.agent import AgentConnectionUnavailable
+from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
+from ai.backend.manager.sokovan.scheduler.launcher import launcher as launcher_module
 from ai.backend.manager.sokovan.scheduler.launcher.launcher import SessionLauncher
+from ai.backend.manager.sokovan.scheduler.results import FailureDisposition
+from ai.backend.manager.views.sokovan.config import NetworkSetup
 from ai.backend.manager.views.sokovan.image import ImageConfigData
 from ai.backend.manager.views.sokovan.lifecycle import (
     SessionDataForPull,
     SessionDataForStart,
 )
+
+
+async def _never_returns(*args: Any, **kwargs: Any) -> Any:
+    await asyncio.Event().wait()
+
 
 # =============================================================================
 # TestSessionLauncherImagePulling (SC-LA-001 ~ SC-LA-004)
@@ -347,6 +362,585 @@ class TestSessionLauncherKernelCreation:
         environ = kernel_configs[0]["environ"]
         assert environ["A"] == "test-session"
         assert environ["U"] == "mine"
+
+
+class TestSessionLauncherStartFailures:
+    """Sessions the launcher could not start are returned with a disposition, never dropped."""
+
+    async def test_network_setup_failure_is_replace_and_blames_no_agent(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_repository: AsyncMock,
+        mock_valkey_schedule: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        async def _refuses(
+            session: SessionDataForStart, assigned_ports: list[tuple[AgentId, int]]
+        ) -> NetworkSetup:
+            raise ServerMisconfiguredError("the network could not be set up")
+
+        monkeypatch.setattr(launcher, "_setup_network_configuration", _refuses)
+        session_id = session_for_start_single_kernel.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel], image_config_default
+            )
+
+        failure = failed[session_id]
+        assert "ServerMisconfiguredError" in failure.message
+        assert failure.disposition is FailureDisposition.REPLACE
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+        mock_repository.update_session_error_info.assert_awaited()
+        mock_valkey_schedule.record_session_failed_agents.assert_not_awaited()
+
+    async def test_missing_network_plugin_blames_no_agent(
+        self,
+        launcher: SessionLauncher,
+        mock_network_plugin_ctx: MagicMock,
+        mock_valkey_schedule: AsyncMock,
+        session_for_start_multi_node: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """The manager lacks the configured driver: no agent is at fault, none is avoided."""
+        mock_network_plugin_ctx.plugins = {}
+        session_id = session_for_start_multi_node.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_multi_node], image_config_default
+            )
+
+        assert "ServerMisconfiguredError" in failed[session_id].message
+        assert failed[session_id].disposition is FailureDisposition.REPLACE
+        mock_valkey_schedule.record_session_failed_agents.assert_not_awaited()
+
+    async def test_agent_failing_local_network_setup_is_recorded_alone(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_valkey_schedule: AsyncMock,
+        session_for_start_multi_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """The agent asked to make the local network failed: only that agent is avoided."""
+        mock_client = mock_agent_client_pool._mock_client
+        mock_client.create_local_network.side_effect = RuntimeError("bridge creation failed")
+        session_id = session_for_start_multi_kernel.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_multi_kernel], image_config_default
+            )
+
+        assert "AgentNetworkSetupFailed" in failed[session_id].message
+        assert failed[session_id].disposition is FailureDisposition.REPLACE
+        mock_client.create_kernels.assert_not_awaited()
+        mock_valkey_schedule.record_session_failed_agents.assert_awaited_once_with(
+            session_id, [session_for_start_multi_kernel.kernels[0].agent_id]
+        )
+
+    async def test_failure_before_kernel_creation_is_replace(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        async def _boom() -> tuple[str, str]:
+            raise RuntimeError("could not make the cluster ssh keypair")
+
+        monkeypatch.setattr(launcher, "_create_cluster_ssh_keypair", _boom)
+        session_id = session_for_start_single_kernel.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel], image_config_default
+            )
+
+        assert failed[session_id].disposition is FailureDisposition.REPLACE
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+
+    async def test_session_without_assigned_agent_is_replace(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        for kernel in session_for_start_single_kernel.kernels:
+            kernel.agent_id = None
+        session_id = session_for_start_single_kernel.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel], image_config_default
+            )
+
+        assert failed[session_id].disposition is FailureDisposition.REPLACE
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+
+    async def test_a_session_with_one_unassigned_kernel_is_replace(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_multi_node: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """Starting only the placed kernels would leave the session waiting for the rest."""
+        session_for_start_multi_node.kernels[1].agent_id = None
+        session_id = session_for_start_multi_node.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_multi_node], image_config_default
+            )
+
+        assert failed[session_id].disposition is FailureDisposition.REPLACE
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+
+    async def test_an_image_missing_from_the_db_is_abandon_and_asks_no_agent(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_repository: AsyncMock,
+        session_for_start_multi_node: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """Built from the session's own rows: another attempt would fail the same way."""
+        session_for_start_multi_node.kernels[1].image_id = uuid4()  # not among the configs
+        session_id = session_for_start_multi_node.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_multi_node], image_config_default
+            )
+
+        assert failed[session_id].disposition is FailureDisposition.ABANDON
+        assert "not found in database" in failed[session_id].message
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+        mock_repository.update_session_error_info.assert_awaited_once()
+
+    @staticmethod
+    def _unreachable(pool: MagicMock, *agent_ids: AgentId) -> None:
+        """The pool refuses these agents before any request is sent."""
+
+        @asynccontextmanager
+        async def acquire(agent_id: AgentId) -> AsyncIterator[AsyncMock]:
+            if agent_id in agent_ids:
+                raise AgentConnectionUnavailable(agent_id, "connection unhealthy")
+            yield pool._mock_client
+
+        pool.acquire = MagicMock(side_effect=acquire)
+
+    async def test_no_agent_reached_is_replace(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_valkey_schedule: AsyncMock,
+        session_for_start_multi_node: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        self._unreachable(mock_agent_client_pool, AgentId("agent-1"), AgentId("agent-2"))
+        session_id = session_for_start_multi_node.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_multi_node], image_config_default
+            )
+
+        assert failed[session_id].disposition is FailureDisposition.REPLACE
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+        mock_valkey_schedule.record_session_failed_agents.assert_awaited_once_with(
+            session_id, [AgentId("agent-1"), AgentId("agent-2")]
+        )
+
+    async def test_a_start_timeout_while_connecting_is_replace(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_multi_node: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """No request went out while the pool was still connecting: placed again."""
+        monkeypatch.setattr(launcher_module, "START_SESSION_TIMEOUT_SEC", 0.05)
+
+        @asynccontextmanager
+        async def acquire(agent_id: AgentId) -> AsyncIterator[AsyncMock]:
+            await asyncio.Event().wait()  # the connect handshake never finishes
+            yield mock_agent_client_pool._mock_client
+
+        mock_agent_client_pool.acquire = MagicMock(side_effect=acquire)
+        session_id = session_for_start_multi_node.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_multi_node], image_config_default
+            )
+
+        assert failed[session_id].disposition is FailureDisposition.REPLACE
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+
+    async def test_an_unreached_agent_beside_a_started_one_is_abandon(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_multi_node: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """The session cannot complete, and give-up tears down the kernel that was created."""
+        self._unreachable(mock_agent_client_pool, AgentId("agent-2"))
+        session_id = session_for_start_multi_node.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_multi_node], image_config_default
+            )
+
+        assert failed[session_id].disposition is FailureDisposition.ABANDON
+        mock_agent_client_pool._mock_client.create_kernels.assert_awaited_once()
+
+    async def test_an_unreached_agent_beside_an_unanswered_one_is_not_a_failure(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_multi_node: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """The answered-nothing agent may still be creating; the creation timeout owns it."""
+        self._unreachable(mock_agent_client_pool, AgentId("agent-2"))
+        mock_agent_client_pool._mock_client.create_kernels.side_effect = TimeoutError()
+        session_id = session_for_start_multi_node.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_multi_node], image_config_default
+            )
+
+        assert failed == {}
+
+    async def test_an_unresolved_system_environ_is_raised_not_reported(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_system_session_environ_repository: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        session_for_start_multi_node: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """A batch-level error must not spend every session's retry budget at once."""
+        mock_system_session_environ_repository.resolve.side_effect = ConnectionError("db is down")
+        sessions = [session_for_start_single_kernel, session_for_start_multi_node]
+
+        with (
+            RecorderContext.scope("test", entity_ids=[s.session_id for s in sessions]),
+            pytest.raises(ConnectionError),
+        ):
+            await launcher.start_sessions_for_handler(sessions, image_config_default)
+
+        mock_agent_client_pool._mock_client.create_kernels.assert_not_awaited()
+
+    async def test_started_session_is_not_reported(
+        self,
+        launcher: SessionLauncher,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        session_ids = [session_for_start_single_kernel.session_id]
+        with RecorderContext.scope("test", entity_ids=session_ids):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel], image_config_default
+            )
+
+        assert failed == {}
+
+    async def test_refused_kernel_creation_is_abandon(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        mock_agent_client_pool._mock_client.create_kernels.side_effect = RPCUserError(
+            "ImagePullFailedError", "ImagePullFailedError('no such image')", ""
+        )
+        session_id = session_for_start_single_kernel.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel], image_config_default
+            )
+
+        assert failed[session_id].disposition is FailureDisposition.ABANDON
+
+    @pytest.mark.parametrize(
+        "error",
+        [
+            TimeoutError(),
+            AgentConnectionUnavailable(AgentId("agent-1"), "connection unhealthy"),
+            RuntimeError("the transport went away mid-create"),
+        ],
+    )
+    async def test_kernel_creation_not_answered_by_the_agent_is_not_a_failure(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        mock_valkey_schedule: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        error: Exception,
+    ) -> None:
+        """The agent may still be creating: the session goes on and the creation timeout owns it."""
+        mock_agent_client_pool._mock_client.create_kernels.side_effect = error
+        session_id = session_for_start_single_kernel.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel], image_config_default
+            )
+
+        assert failed == {}
+        mock_valkey_schedule.record_session_failed_agents.assert_awaited_once()
+
+    async def test_refusal_beside_an_unanswered_agent_is_not_a_failure(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_multi_node: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """One agent may still be creating, so the session is not given up under it."""
+        mock_agent_client_pool._mock_client.create_kernels.side_effect = [
+            RPCUserError("ImagePullFailedError", "ImagePullFailedError('no such image')", ""),
+            TimeoutError(),
+        ]
+        session_id = session_for_start_multi_node.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_multi_node], image_config_default
+            )
+
+        assert mock_agent_client_pool._mock_client.create_kernels.await_count == 2
+        assert failed == {}
+
+    async def test_failure_before_dispatch_is_replace_when_its_error_is_not_stored(
+        self,
+        launcher: SessionLauncher,
+        mock_repository: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        async def _boom() -> tuple[str, str]:
+            raise RuntimeError("could not make the cluster ssh keypair")
+
+        monkeypatch.setattr(launcher, "_create_cluster_ssh_keypair", _boom)
+        mock_repository.update_session_error_info.side_effect = ConnectionError("db is down")
+        session_id = session_for_start_single_kernel.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel], image_config_default
+            )
+
+        assert "could not make the cluster ssh keypair" in failed[session_id].message
+        assert failed[session_id].disposition is FailureDisposition.REPLACE
+
+    async def test_network_setup_failure_is_replace_when_its_error_is_not_stored(
+        self,
+        launcher: SessionLauncher,
+        mock_repository: AsyncMock,
+        session_for_start_single_kernel: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        async def _refuses(
+            session: SessionDataForStart, assigned_ports: list[tuple[AgentId, int]]
+        ) -> NetworkSetup:
+            raise ServerMisconfiguredError("the network could not be set up")
+
+        monkeypatch.setattr(launcher, "_setup_network_configuration", _refuses)
+        mock_repository.update_session_error_info.side_effect = ConnectionError("db is down")
+        session_id = session_for_start_single_kernel.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_single_kernel], image_config_default
+            )
+
+        assert "ServerMisconfiguredError" in failed[session_id].message
+        assert failed[session_id].disposition is FailureDisposition.REPLACE
+
+    async def test_start_timeout_after_dispatch_is_not_a_failure(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_host_network: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """START_SESSION_TIMEOUT may fire while agents are creating: never torn down for it."""
+        monkeypatch.setattr(launcher_module, "START_SESSION_TIMEOUT_SEC", 0.05)
+        mock_client = mock_agent_client_pool._mock_client
+        mock_client.assign_port.side_effect = [22001, 22002]
+        mock_client.create_kernels.side_effect = _never_returns
+        session_id = session_for_start_host_network.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_host_network], image_config_default
+            )
+
+        assert failed == {}
+        mock_client.release_port.assert_not_awaited()
+
+    async def test_start_timeout_before_dispatch_is_replace_and_releases_ports(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_host_network: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """No agent was asked to create yet: re-placed, and the host ports given back."""
+        monkeypatch.setattr(launcher_module, "START_SESSION_TIMEOUT_SEC", 0.05)
+        monkeypatch.setattr(launcher, "_create_cluster_ssh_keypair", _never_returns)
+        mock_client = mock_agent_client_pool._mock_client
+        mock_client.assign_port.side_effect = [22001, 22002]
+        session_id = session_for_start_host_network.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_host_network], image_config_default
+            )
+
+        assert failed[session_id].disposition is FailureDisposition.REPLACE
+        mock_client.create_kernels.assert_not_awaited()
+        assert sorted(c.args[0] for c in mock_client.release_port.await_args_list) == [
+            22001,
+            22002,
+        ]
+
+
+class TestSessionLauncherHostPortRelease:
+    """Host ports a failed attempt took are given back before the session is placed again."""
+
+    async def test_ports_released_when_start_fails_before_dispatch(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_host_network: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        async def _boom() -> tuple[str, str]:
+            raise RuntimeError("could not make the cluster ssh keypair")
+
+        monkeypatch.setattr(launcher, "_create_cluster_ssh_keypair", _boom)
+        mock_client = mock_agent_client_pool._mock_client
+        mock_client.assign_port.side_effect = [22001, 22002]
+        session_id = session_for_start_host_network.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_host_network], image_config_default
+            )
+
+        assert failed[session_id].disposition is FailureDisposition.REPLACE
+        assert sorted(c.args[0] for c in mock_client.release_port.await_args_list) == [
+            22001,
+            22002,
+        ]
+
+    async def test_ports_released_when_a_later_assignment_fails(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_host_network: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        mock_client = mock_agent_client_pool._mock_client
+        mock_client.assign_port.side_effect = [22001, RuntimeError("port pool exhausted")]
+        session_id = session_for_start_host_network.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_host_network], image_config_default
+            )
+
+        assert failed[session_id].disposition is FailureDisposition.REPLACE
+        mock_client.release_port.assert_awaited_once_with(22001)
+
+    async def test_ports_released_when_the_request_cannot_be_built(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_host_network: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """ABANDON before any creation was requested: no agent will give the ports back."""
+        mock_client = mock_agent_client_pool._mock_client
+        mock_client.assign_port.side_effect = [22001, 22002]
+        session_for_start_host_network.kernels[0].image_id = uuid4()
+        session_id = session_for_start_host_network.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_host_network], image_config_default
+            )
+
+        assert failed[session_id].disposition is FailureDisposition.ABANDON
+        assert sorted(c.args[0] for c in mock_client.release_port.await_args_list) == [
+            22001,
+            22002,
+        ]
+
+    async def test_ports_kept_when_an_agent_refused_the_creation(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_host_network: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        """After dispatch the agent gives back a port it used; releasing it too could free a
+        port another kernel has taken since."""
+        mock_client = mock_agent_client_pool._mock_client
+        mock_client.assign_port.side_effect = [22001, 22002]
+        mock_client.create_kernels.side_effect = RPCUserError(
+            "ImagePullFailedError", "ImagePullFailedError('no such image')", ""
+        )
+        session_id = session_for_start_host_network.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_host_network], image_config_default
+            )
+
+        assert failed[session_id].disposition is FailureDisposition.ABANDON
+        mock_client.release_port.assert_not_awaited()
+
+    async def test_ports_kept_when_the_session_started(
+        self,
+        launcher: SessionLauncher,
+        mock_agent_client_pool: MagicMock,
+        session_for_start_host_network: SessionDataForStart,
+        image_config_default: dict[UUID, ImageConfigData],
+    ) -> None:
+        session_id = session_for_start_host_network.session_id
+
+        with RecorderContext.scope("test", entity_ids=[session_id]):
+            failed = await launcher.start_sessions_for_handler(
+                [session_for_start_host_network], image_config_default
+            )
+
+        assert failed == {}
+        mock_agent_client_pool._mock_client.release_port.assert_not_awaited()
 
 
 # =============================================================================
