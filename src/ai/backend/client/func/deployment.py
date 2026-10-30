@@ -37,6 +37,8 @@ class Deployment(BaseFunction):
     """
     Provides functions to interact with the deployment system.
     Supports deployments, revisions, and routes.
+
+    Deprecated: calls the deprecated REST v1 deployment API. Use `V2DeploymentClient`.
     """
 
     # Deployment CRUD operations

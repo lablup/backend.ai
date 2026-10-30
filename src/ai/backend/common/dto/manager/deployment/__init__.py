@@ -1,5 +1,8 @@
 """
 Common DTOs for deployment system used by both Client SDK and Manager.
+
+Deprecated: they back the deprecated REST v1 deployment API.
+Use ``ai.backend.common.dto.manager.v2.deployment``.
 """
 
 from __future__ import annotations
