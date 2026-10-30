@@ -15,6 +15,9 @@ from ai.backend.manager.data.deployment.types import (
 )
 from ai.backend.manager.data.session.types import SchedulingResult, SubStepResult
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
+from ai.backend.manager.models.replica_group_history.searchable_fields import (
+    ReplicaGroupHistorySearchableFields,
+)
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -65,4 +68,4 @@ class ReplicaGroupHistoryCreator(
 
     @override
     def to_data(self, row: ReplicaGroupHistoryRow) -> ReplicaGroupHistoryData:
-        return row.to_data()
+        return ReplicaGroupHistorySearchableFields.own.to_data(row)

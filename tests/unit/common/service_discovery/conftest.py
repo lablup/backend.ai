@@ -4,7 +4,6 @@ from collections.abc import AsyncIterator
 
 import pytest
 
-from ai.backend.common import redis_helper
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.service_discovery.etcd_discovery.service_discovery import (
     ETCDServiceDiscovery,
@@ -21,10 +20,6 @@ from ai.backend.common.service_discovery.service_discovery import (
 )
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import (
-    HostPortPair,
-    RedisConnectionInfo,
-    RedisHelperConfig,
-    RedisTarget,
     ValkeyTarget,
 )
 
@@ -40,33 +35,6 @@ async def etcd_discovery(etcd: AsyncEtcd) -> AsyncIterator[ETCDServiceDiscovery]
     )
     # Cleanup
     await etcd.delete_prefix(prefix)
-
-
-@pytest.fixture
-async def redis_conn(
-    redis_container: tuple[str, HostPortPairModel],
-) -> AsyncIterator[RedisConnectionInfo]:
-    # Configure test Redis connection
-    # Convert HostPortPairModel to HostPortPair namedtuple
-    hostport_model = redis_container[1]
-    hostport = HostPortPair(hostport_model.host, hostport_model.port)
-    conn = redis_helper.get_redis_object(
-        RedisTarget(
-            addr=hostport,
-            redis_helper_config=RedisHelperConfig(
-                socket_timeout=1.0,
-                socket_connect_timeout=1.0,
-                reconnect_poll_timeout=1.0,
-                max_connections=10,
-                connection_ready_timeout=1.0,
-            ),
-        ),
-        name="test-redis",
-    )
-    yield conn
-    # Cleanup after tests
-    await conn.client.flushdb()
-    await conn.close()
 
 
 @pytest.fixture

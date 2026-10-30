@@ -19,8 +19,8 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AccessKey, KernelId, SessionId
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.resource_slot import ResourceAllocationRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource

@@ -12,6 +12,8 @@ from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.rbac import RBACClient
 from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.rbac.request import (
     AssignRoleRequest,
@@ -21,7 +23,6 @@ from ai.backend.common.dto.manager.rbac.request import (
     RevokeRoleRequest,
     RoleFilter,
     SearchRolesRequest,
-    SearchScopesRequest,
     SearchUsersAssignedToRoleRequest,
     UpdateRoleRequest,
 )
@@ -34,7 +35,6 @@ from ai.backend.common.dto.manager.rbac.response import (
     GetScopeTypesResponse,
     RevokeRoleResponse,
     SearchRolesResponse,
-    SearchScopesResponse,
     SearchUsersAssignedToRoleResponse,
     UpdateRoleResponse,
 )
@@ -246,7 +246,9 @@ class TestRoleAssign:
         mock_session = _make_request_session(resp)
         rc = _make_rbac_client(mock_session)
 
-        result = await rc.assign_role(AssignRoleRequest(user_id=user_id, role_id=role_id))
+        result = await rc.assign_role(
+            AssignRoleRequest(user_id=UserID(user_id), role_id=RoleID(role_id))
+        )
 
         assert isinstance(result, AssignRoleResponse)
         assert result.user_id == user_id
@@ -270,7 +272,9 @@ class TestRoleRevoke:
         mock_session = _make_request_session(resp)
         rc = _make_rbac_client(mock_session)
 
-        result = await rc.revoke_role(RevokeRoleRequest(user_id=user_id, role_id=role_id))
+        result = await rc.revoke_role(
+            RevokeRoleRequest(user_id=UserID(user_id), role_id=RoleID(role_id))
+        )
 
         assert isinstance(result, RevokeRoleResponse)
         assert result.user_id == user_id
@@ -322,30 +326,6 @@ class TestScopeTypes:
         assert method == "GET"
         assert url.endswith("/admin/rbac/scope-types")
         assert body is None
-
-
-class TestSearchScopes:
-    async def test_search_scopes(self) -> None:
-        resp = _json_response({
-            "items": [
-                {
-                    "scope_type": "domain",
-                    "scope_id": "default",
-                    "name": "default",
-                }
-            ],
-            "pagination": {"total": 1, "offset": 0, "limit": 100},
-        })
-        mock_session = _make_request_session(resp)
-        rc = _make_rbac_client(mock_session)
-
-        result = await rc.search_scopes("domain", SearchScopesRequest())
-
-        assert isinstance(result, SearchScopesResponse)
-        assert len(result.items) == 1
-        method, url, body = _last_request_call(mock_session)
-        assert method == "POST"
-        assert url.endswith("/admin/rbac/scopes/domain/search")
 
 
 class TestEntityTypes:

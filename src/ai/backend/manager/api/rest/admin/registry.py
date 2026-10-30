@@ -15,7 +15,7 @@ from ai.backend.manager.api.rest.routing import RouteRegistry
 from .handler import AdminHandler
 
 if TYPE_CHECKING:
-    from ai.backend.manager.api.gql.graphql_ws import GraphQLTransportWSHandler
+    from ai.backend.manager.api.gql.graphql_ws.handler import GraphQLTransportWSHandler
     from ai.backend.manager.api.rest.types import RouteDeps
 
 

@@ -5,8 +5,9 @@ from collections.abc import Sequence
 from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
+    RouteData,
     RouteHandlerCategory,
     RouteHealthStatus,
     RouteStatus,
@@ -16,13 +17,12 @@ from ai.backend.manager.data.deployment.types import (
     RouteTransitionTarget,
 )
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResult
 
 from .base import RouteHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class RunningRouteHandler(RouteHandler):
@@ -77,8 +77,6 @@ class RunningRouteHandler(RouteHandler):
     @override
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute health check for running routes."""
-        log.debug("Checking health for {} running routes", len(routes))
-
         # Execute route health check logic via executor
         return await self._route_executor.check_running_routes(routes)
 
@@ -86,4 +84,4 @@ class RunningRouteHandler(RouteHandler):
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after checking running routes."""
         if result.errors:
-            log.warning("Cleaning up {} routes", len(result.errors))
+            log.debug("unhealthy routes cleaning up", route_count=len(result.errors))

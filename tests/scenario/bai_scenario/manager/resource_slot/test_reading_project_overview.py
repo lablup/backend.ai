@@ -24,13 +24,13 @@ from bai_scenario.components.resource_allocation import (
 )
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 UNKNOWN = uuid.UUID(int=0)
 
 type Overview = ActiveResourceOverviewInfoDTO
-type OverviewStep = Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+type OverviewStep = Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 
 
 @dataclass(frozen=True)
@@ -60,7 +60,7 @@ class ReadingTheProjectOverview(When[AKernelAndACaller, ResourceSlotAdapter, Ove
 
 @dataclass(frozen=True)
 class TheSuperadminReadsAProjectOverview(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 ):
     @override
     def summary(self) -> str:
@@ -74,7 +74,7 @@ class TheSuperadminReadsAProjectOverview(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -88,7 +88,7 @@ class TheSuperadminReadsAProjectOverview(
 
 @dataclass(frozen=True)
 class AUserReadingSessionsInTheProjectReadsItsOverview(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 ):
     @override
     def summary(self) -> str:
@@ -99,7 +99,7 @@ class AUserReadingSessionsInTheProjectReadsItsOverview(
         return "프로젝트 범위에서 세션을 읽을 수 있는 사용자가 그 프로젝트의 개요를 조회하면 개요가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(granted=Granted.THE_PROJECT)
 
     @override
@@ -113,7 +113,7 @@ class AUserReadingSessionsInTheProjectReadsItsOverview(
 
 @dataclass(frozen=True)
 class AUserReadingSessionsInTheDomainReadsAProjectOverview(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 ):
     @override
     def summary(self) -> str:
@@ -127,7 +127,7 @@ class AUserReadingSessionsInTheDomainReadsAProjectOverview(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(granted=Granted.THE_DOMAIN)
 
     @override
@@ -141,7 +141,7 @@ class AUserReadingSessionsInTheDomainReadsAProjectOverview(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadAProjectOverview(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 ):
     @override
     def summary(self) -> str:
@@ -152,7 +152,7 @@ class AUserGrantedNothingMayNotReadAProjectOverview(
         return "아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone()
 
     @override
@@ -166,7 +166,7 @@ class AUserGrantedNothingMayNotReadAProjectOverview(
 
 @dataclass(frozen=True)
 class AProjectIdNothingAnswersToIsEmpty(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview]
 ):
     @override
     def summary(self) -> str:
@@ -180,7 +180,7 @@ class AProjectIdNothingAnswersToIsEmpty(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -194,7 +194,7 @@ class AProjectIdNothingAnswersToIsEmpty(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneReadAProjectOverview(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview], Configured
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, Overview], Configured
 ):
     @override
     def summary(self) -> str:
@@ -209,7 +209,7 @@ class EnforcementOffLetsAnyoneReadAProjectOverview(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone()
 
     @override

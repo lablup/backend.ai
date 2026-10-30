@@ -25,10 +25,10 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_pydantic_input,
 )
-from ai.backend.manager.api.gql.fair_share.types import ProjectFairShareGQL
+from ai.backend.manager.api.gql.fair_share.types.project import ProjectFairShareGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.resource_slot.overview_types import ActiveResourceOverviewGQL
-from ai.backend.manager.api.gql.resource_usage.types import (
+from ai.backend.manager.api.gql.resource_usage.types.project_usage import (
     ProjectUsageBucketConnection,
     ProjectUsageBucketFilter,
     ProjectUsageBucketOrderBy,
@@ -56,6 +56,11 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.api.gql.user.types.filters import UserFilterGQL, UserOrderByGQL
     from ai.backend.manager.api.gql.user.types.node import UserV2Connection
+    from ai.backend.manager.api.gql.vfolder_auto_mount.types import (
+        VFolderAutoMountConnectionGQL,
+        VFolderAutoMountFilterGQL,
+        VFolderAutoMountOrderByGQL,
+    )
 
 
 @gql_pydantic_input(
@@ -103,7 +108,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
     id: NodeID[str] = gql_field(description="Unique identifier for the project (UUID).")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the project.",
         ),
     )
@@ -173,7 +178,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
         from strawberry.relay import PageInfo
 
         from ai.backend.manager.api.gql.base import encode_cursor
-        from ai.backend.manager.api.gql.resource_usage.types import (
+        from ai.backend.manager.api.gql.resource_usage.types.project_usage import (
             ProjectUsageBucketEdge,
             ProjectUsageBucketGQL,
         )
@@ -219,8 +224,13 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
     ):
         from ai.backend.manager.errors.resource import DomainNotFound
 
-        domain: DomainV2GQL | None = await info.context.data_loaders.domain_loader.load(
+        domain_id = await info.context.data_loaders.domain_id_by_name_loader.load(
             self.organization.domain_name
+        )
+        if domain_id is None:
+            raise DomainNotFound(self.organization.domain_name)
+        domain: DomainV2GQL | None = await info.context.data_loaders.domain_by_id_loader.load(
+            domain_id
         )
         if domain is None:
             raise DomainNotFound(self.organization.domain_name)
@@ -292,7 +302,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Resource groups this project may schedule on.",
         )
     )  # type: ignore[misc]
@@ -366,7 +376,7 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Model cards belonging to this project.",
         )
     )  # type: ignore[misc]
@@ -435,6 +445,66 @@ class ProjectV2GQL(PydanticNodeMixin[ProjectNode]):
             ),
             count=payload.total_count,
         )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="VFolders auto-mounted into every session created in this project.",
+        )
+    )  # type: ignore[misc]
+    async def vfolder_auto_mounts(
+        self,
+        info: Info,
+        filter: Annotated[
+            VFolderAutoMountFilterGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.vfolder_auto_mount.types"),
+        ]
+        | None = None,
+        order_by: list[
+            Annotated[
+                VFolderAutoMountOrderByGQL,
+                strawberry.lazy("ai.backend.manager.api.gql.vfolder_auto_mount.types"),
+            ]
+        ]
+        | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> (
+        Annotated[
+            VFolderAutoMountConnectionGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.vfolder_auto_mount.types"),
+        ]
+        | None
+    ):
+        from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
+        from ai.backend.common.dto.manager.v2.vfolder_auto_mount.request import (
+            ScopedSearchVFolderAutoMountsInput,
+        )
+        from ai.backend.common.dto.manager.v2.vfolder_auto_mount.types import (
+            VFolderAutoMountScope,
+        )
+        from ai.backend.manager.api.gql.vfolder_auto_mount.resolver import (
+            build_vfolder_auto_mount_connection,
+        )
+
+        payload = await info.context.adapters.vfolder_auto_mount.scoped_search(
+            ScopedSearchVFolderAutoMountsInput(
+                scope=VFolderAutoMountScope(project=[UUIDScope(value=UUID(str(self.id)))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        return build_vfolder_auto_mount_connection(payload)
 
     @classmethod
     @override

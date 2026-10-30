@@ -20,10 +20,17 @@ from ai.backend.common.configs import (
     PyroscopeConfig,
     ServiceDiscoveryConfig,
 )
+from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
 from ai.backend.common.data.artifact.types import ArtifactRegistryType
-from ai.backend.common.data.storage.types import ArtifactStorageType
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
+from ai.backend.common.data.storage.types import ArtifactStorageType, StorageBackendType
 from ai.backend.common.exception import GenericNotImplementedError, InvalidConfigError
-from ai.backend.common.meta import BackendAIConfigMeta, CompositeType, ConfigExample
+from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
+    BackendAIConfigMeta,
+    CompositeType,
+    ConfigExample,
+)
 from ai.backend.common.typed_validators import (
     AutoDirectoryPath,
     GroupID,
@@ -103,6 +110,27 @@ class VolumeInfoConfig(BaseConfigSchema):
             added_version="22.06.0",
         ),
     ]
+    volume_status_check: Annotated[
+        VolumeStatusCheckConfig | None,
+        Field(
+            default=None,
+            validation_alias=AliasChoices("volume-status-check", "volume_status_check"),
+            serialization_alias="volume-status-check",
+        ),
+        BackendAIConfigMeta(
+            description="Configuration for the periodic status checks of this volume.",
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
+        ),
+    ]
+
+    @model_validator(mode="after")
+    def _validate_volume_status_check(self) -> Self:
+        if self.volume_status_check is not None and self.backend != StorageBackendType("vfs"):
+            raise InvalidConfigError(
+                f"Volume status check is not supported for backend {self.backend!r}"
+            )
+        return self
 
     def to_dataclass(self) -> VolumeInfo:
         return VolumeInfo(
@@ -1651,7 +1679,7 @@ class StorageProxyUnifiedConfig(BaseConfigSchema):
         ),
     ]
     volume: Annotated[
-        dict[str, VolumeInfoConfig],
+        dict[StorageVolumeName, VolumeInfoConfig],
         Field(),
         BackendAIConfigMeta(
             description=(

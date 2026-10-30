@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
@@ -45,7 +46,7 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.configs.pyroscope import PyroscopeConfig
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
@@ -87,7 +88,8 @@ from ai.backend.manager.actions.registry.types import GroupMeta, ProcessorDepend
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.agent_cache import AgentRPCCache
 from ai.backend.manager.api.rest.app import build_root_app, mount_registries
-from ai.backend.manager.api.rest.middleware import build_auth_middleware, build_exception_middleware
+from ai.backend.manager.api.rest.middleware.auth import build_auth_middleware
+from ai.backend.manager.api.rest.middleware.exception import build_exception_middleware
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.server_status import (
     ALL_ALLOWED,
@@ -109,38 +111,53 @@ from ai.backend.manager.config.unified import (
     ManagerConfig,
     ManagerUnifiedConfig,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.base import pgsql_connect_opts
-from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageAliasRow, ImageRow
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.keypair import keypairs
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.dotfile.row import DotfileRow
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
+from ai.backend.manager.models.kernel.row import kernels
+
+# ``kernels.kernel_group_id`` references ``kernel_groups``; nothing under src imports the
+# kernel group rows yet, so name them for the sandbox to resolve the foreign key.
+from ai.backend.manager.models.kernel_group.row import KernelGroupRow  # noqa: F401
+from ai.backend.manager.models.kernel_group_environ.row import KernelGroupEnvironRow  # noqa: F401
+from ai.backend.manager.models.kernel_group_resource_slot.row import (  # noqa: F401
+    KernelGroupResourceSlotRow,
+)
+from ai.backend.manager.models.keypair.row import keypairs
 from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
-from ai.backend.manager.models.project import (
+from ai.backend.manager.models.project.row import (
     ProjectRow,
     ProjectType,
     association_groups_users,
 )
-from ai.backend.manager.models.resource_group import resource_groups, sgroups_for_domains
-from ai.backend.manager.models.resource_group.row import ResourceGroupOpts
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_group.row import (
+    resource_groups,
+    sgroups_for_domains,
+)
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
     keypair_resource_policies,
 )
 from ai.backend.manager.models.resource_slot.row import ResourceSlotTypeRow
 from ai.backend.manager.models.resource_slot.types import NumberFormat
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.session_template import SessionTemplateRow
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_template.row import SessionTemplateRow
+
+# Nothing under src imports the storage rows yet; name them so the sandbox holds their
+# tables when `schema oneshot` builds the full schema.
+from ai.backend.manager.models.storage_backend.row import StorageBackendRow  # noqa: F401
+from ai.backend.manager.models.storage_volume.row import StorageVolumeRow  # noqa: F401
+from ai.backend.manager.models.user.row import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.vfolder.row import vfolders
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -158,6 +175,9 @@ from ai.backend.manager.repositories.db.engine import (
 from ai.backend.manager.repositories.global_entity.loader import GlobalEntityIDLoader
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -168,6 +188,7 @@ from ai.backend.manager.secret.pool import KeyProviderPool
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
+from ai.backend.testutils.action_validators import build_global_gate
 from ai.backend.testutils.bootstrap import (  # noqa: F401
     POSTGRES_MAINTENANCE_DB,
     POSTGRES_PASSWORD,
@@ -437,8 +458,10 @@ def database(
     and install the table schema using alembic.
     """
     db_url = (
-        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/{POSTGRES_MAINTENANCE_DB}")
-        .with_port(bootstrap_config.db.addr.port)
+        yarl.URL(
+            f"postgresql+asyncpg://{bootstrap_config.db.addrs[0].host}/{POSTGRES_MAINTENANCE_DB}"
+        )
+        .with_port(bootstrap_config.db.addrs[0].port)
         .with_user(bootstrap_config.db.user)
     )
     if bootstrap_config.db.password is not None:
@@ -565,8 +588,8 @@ async def db_engine(
 ) -> AsyncIterator[SAEngine]:
     """Provide a function-scoped SQLAlchemy async engine connected to the test database."""
     db_url = (
-        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addr.host}/{test_db}")
-        .with_port(bootstrap_config.db.addr.port)
+        yarl.URL(f"postgresql+asyncpg://{bootstrap_config.db.addrs[0].host}/{test_db}")
+        .with_port(bootstrap_config.db.addrs[0].port)
         .with_user(bootstrap_config.db.user)
     )
     if bootstrap_config.db.password is not None:
@@ -1073,6 +1096,12 @@ async def admin_user_fixture(
     yield data
     async with db_engine.begin() as conn:
         # Clean side-effect tables that tests may populate via the running server
+        await conn.execute(
+            sa.delete(DotfileRow).where(
+                DotfileRow.entity_type == "user",
+                DotfileRow.entity_id == data.user_uuid,
+            )
+        )
         await conn.execute(vfolders.delete())
         await conn.execute(kernels.delete())
         await conn.execute(SessionRow.__table__.delete())
@@ -1167,6 +1196,12 @@ async def regular_user_fixture(
     yield data
     async with db_engine.begin() as conn:
         # Clean side-effect tables that tests may populate via the running server
+        await conn.execute(
+            sa.delete(DotfileRow).where(
+                DotfileRow.entity_type == "user",
+                DotfileRow.entity_id == data.user_uuid,
+            )
+        )
         await conn.execute(
             sa.delete(SessionTemplateRow).where(SessionTemplateRow.user_uuid == str(data.user_uuid))
         )
@@ -1398,14 +1433,8 @@ async def background_task_manager(
 def _make_async_etcd(bootstrap_config: BootstrapConfig) -> AsyncEtcd:
     """Create an AsyncEtcd instance from bootstrap config."""
     etcd_config = bootstrap_config.etcd
-    etcd_addr = etcd_config.addr
-    addrs: HostPortPair | list[HostPortPair]
-    if isinstance(etcd_addr, list):
-        addrs = [HostPortPair(host=a.host, port=a.port) for a in etcd_addr]
-    else:
-        addrs = HostPortPair(host=etcd_addr.host, port=etcd_addr.port)
     return AsyncEtcd(
-        addrs=addrs,
+        addrs=[HostPortPair(host=a.host, port=a.port) for a in etcd_config.addrs],
         namespace=etcd_config.namespace,
         scope_prefix_map={
             ConfigScopes.GLOBAL: "global",
@@ -1522,11 +1551,13 @@ def auth_processors(
         database_engine,
         V2DBOpsProvider(database_engine),
         ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     group_repository = ProjectRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         config_provider,
         valkey_clients.stat,
         storage_manager,
@@ -1551,12 +1582,21 @@ def auth_processors(
 
 
 @pytest.fixture()
-def processor_registry(database_engine: ExtendedAsyncSAEngine) -> ProcessorRegistry[Any]:
-    """The registry every v2-wired processor group is built from."""
+def processor_registry(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> ProcessorRegistry[Any]:
+    """The registry every v2-wired processor group is built from.
+
+    Only the global gate is real here: these tests run global actions as the caller they
+    set, and the other shapes are gated by the domain conftest that needs them.
+    """
     return ProcessorRegistry(
         ProcessorDependencies(
             monitors=ActionMonitors(),
-            validators=V2ActionValidators(),
+            validators=V2ActionValidators(
+                global_scope=[build_global_gate(database_engine, config_provider)]
+            ),
             repository=OpsRepository(V2DBOpsProvider(database_engine)),
         )
     )
@@ -1681,7 +1721,7 @@ def acting_superadmin() -> Iterator[None]:
     one; this supplies the equivalent so the test exercises the gate rather than
     tripping over its absence.
     """
-    with with_user(
+    with with_user_context(
         UserData(
             user_id=uuid.uuid4(),
             is_authorized=True,

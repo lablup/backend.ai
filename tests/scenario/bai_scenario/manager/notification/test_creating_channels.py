@@ -31,7 +31,7 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.notification import TheNewChannelNode
 from bai_scenario.components.system import ACaller, SomeoneAlone
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 from bai_scenario.seeds.notification.channel import (
     FROM_EMAIL,
@@ -43,7 +43,9 @@ from bai_scenario.seeds.notification.channel import (
     WEBHOOK_URL,
 )
 
-type CreatingStep = Scenario[SeedingSession, ACaller, NotificationAdapter, NotificationChannelNode]
+type CreatingStep = Scenario[
+    TestSeedingSession, ACaller, NotificationAdapter, NotificationChannelNode
+]
 
 
 def spec_input(kind: NotificationChannelType | None) -> NotificationChannelSpecInputDTO:
@@ -100,7 +102,7 @@ class Creating(When[ACaller, NotificationAdapter, NotificationChannelNode]):
 
 @dataclass(frozen=True)
 class TheSuperadminMakesAWebhookChannel(
-    Scenario[SeedingSession, ACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, ACaller, NotificationAdapter, NotificationChannelNode]
 ):
     started: datetime
 
@@ -116,7 +118,7 @@ class TheSuperadminMakesAWebhookChannel(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -130,7 +132,7 @@ class TheSuperadminMakesAWebhookChannel(
 
 @dataclass(frozen=True)
 class TheSuperadminMakesAnEmailChannel(
-    Scenario[SeedingSession, ACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, ACaller, NotificationAdapter, NotificationChannelNode]
 ):
     started: datetime
 
@@ -146,7 +148,7 @@ class TheSuperadminMakesAnEmailChannel(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -166,7 +168,7 @@ class TheSuperadminMakesAnEmailChannel(
 
 @dataclass(frozen=True)
 class ADisabledChannelIsMade(
-    Scenario[SeedingSession, ACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, ACaller, NotificationAdapter, NotificationChannelNode]
 ):
     started: datetime
 
@@ -179,7 +181,7 @@ class ADisabledChannelIsMade(
         return "슈퍼관리자가 비활성으로 지정해 채널을 만들면 비활성인 채널이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -193,7 +195,7 @@ class ADisabledChannelIsMade(
 
 @dataclass(frozen=True)
 class ASpecNamingNeitherIsRefused(
-    Scenario[SeedingSession, ACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, ACaller, NotificationAdapter, NotificationChannelNode]
 ):
     @override
     def summary(self) -> str:
@@ -204,7 +206,7 @@ class ASpecNamingNeitherIsRefused(
         return "webhook도 email도 주지 않은 명세로 만들려 하면 잘못된 입력으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -218,7 +220,7 @@ class ASpecNamingNeitherIsRefused(
 
 @dataclass(frozen=True)
 class ATypeAndSpecThatDisagreeAreRefused(
-    Scenario[SeedingSession, ACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, ACaller, NotificationAdapter, NotificationChannelNode]
 ):
     @override
     def summary(self) -> str:
@@ -232,7 +234,7 @@ class ATypeAndSpecThatDisagreeAreRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.SUPERADMIN)
 
     @override
@@ -246,7 +248,7 @@ class ATypeAndSpecThatDisagreeAreRefused(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotCreate(
-    Scenario[SeedingSession, ACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, ACaller, NotificationAdapter, NotificationChannelNode]
 ):
     @override
     def summary(self) -> str:
@@ -257,7 +259,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
         return "슈퍼관리자가 아닌 사용자가 채널을 만들려 하면 역할 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone()
 
     @override
@@ -271,7 +273,7 @@ class AUserWhoIsNotTheSuperadminMayNotCreate(
 
 @dataclass(frozen=True)
 class TheMonitorMayNotCreate(
-    Scenario[SeedingSession, ACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, ACaller, NotificationAdapter, NotificationChannelNode]
 ):
     @override
     def summary(self) -> str:
@@ -282,7 +284,7 @@ class TheMonitorMayNotCreate(
         return "모니터가 채널을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACaller]:
+    def given(self) -> Given[TestSeedingSession, ACaller]:
         return SomeoneAlone(role=UserRole.MONITOR)
 
     @override

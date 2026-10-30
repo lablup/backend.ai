@@ -105,8 +105,30 @@ id로 규칙을 만들 수 있고 규칙이 가리키는 채널을 지워도 규
 | 존재하지 않는 id를 삭제한다 | 다른 채널만 있음, 슈퍼관리자 | 삭제 | 대상을 찾을 수 없어 거부 |
 | 아무 권한도 없는 사용자가 삭제한다 | 같은 채널, 아무 권한도 없음 | 삭제 | 권한 부족으로 거부 |
 
-삭제는 행을 지운다. soft delete는 없다. 규칙이 가리키는 채널을 지워도 막히지 않는 것은 두
+삭제는 행을 지우는 purge다. soft delete는 없다. 규칙이 가리키는 채널을 지워도 막히지 않는 것은 두
 테이블 사이에 외래 키가 없기 때문이다.
+
+수정과 purge는 접두어 없는 이름(`updateNotificationChannel`, `purgeNotificationChannel`)이
+기본이고 권한 검사만 거친다. 옛 이름(`adminUpdateNotificationChannel`,
+`adminDeleteNotificationChannel`, `deleteNotificationChannel`)과 본문에 id를 받는 옛 REST 삭제 경로는
+같은 호출로 잇는 deprecated 별칭이고, 슈퍼관리자 검사를 그대로 거친다. 규칙도 같다.
+
+## 여럿 채널 수정
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 여럿의 설명을 한 번에 바꾼다 | 채널 둘, 슈퍼관리자 | 둘의 `description` 값 수정 | 둘 다 새 설명으로 오고 실패한 것은 없음 |
+| 아무 권한도 없는 사용자가 여럿을 수정한다 | 같은 채널 둘, 아무 권한도 없음 | 둘의 `description` 값 수정 | 수정된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
+## 여럿 채널 purge
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 둘과 없는 id 하나를 한 번에 purge 한다 | 채널 둘, 슈퍼관리자 | 셋 purge | 둘은 지우기 전 모습으로 오고, 없는 id 는 대상 없음 이유로 실패 목록에 옴 |
+| 아무 권한도 없는 사용자가 여럿을 purge 한다 | 같은 채널 둘, 아무 권한도 없음 | 둘 purge | 지워진 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
+여럿 연산은 호출 전체를 거부하지 않는다. 처리한 채널은 처리된 목록에, 처리하지 못한 것은 id 와
+이유를 실패 목록에 싣는다. 규칙의 여럿 연산도 같다.
 
 ## 채널 검증
 
@@ -175,6 +197,20 @@ id로 규칙을 만들 수 있고 규칙이 가리키는 채널을 지워도 규
 | 존재하지 않는 id를 삭제한다 | 다른 규칙만 있음, 슈퍼관리자 | 삭제 | 대상을 찾을 수 없어 거부 |
 | 아무 권한도 없는 사용자가 삭제한다 | 같은 규칙, 아무 권한도 없음 | 삭제 | 권한 부족으로 거부 |
 
+## 여럿 규칙 수정
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 여럿의 설명을 한 번에 바꾼다 | 규칙 둘, 슈퍼관리자 | 둘의 `description` 값 수정 | 둘 다 새 설명으로 오고 실패한 것은 없음 |
+| 아무 권한도 없는 사용자가 여럿을 수정한다 | 같은 규칙 둘, 아무 권한도 없음 | 둘의 `description` 값 수정 | 수정된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
+## 여럿 규칙 purge
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 둘과 없는 id 하나를 한 번에 purge 한다 | 규칙 둘, 슈퍼관리자 | 셋 purge | 둘은 지우기 전 모습으로 오고, 없는 id 는 대상 없음 이유로 실패 목록에 옴 |
+| 아무 권한도 없는 사용자가 여럿을 purge 한다 | 같은 규칙 둘, 아무 권한도 없음 | 둘 purge | 지워진 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
 ## 규칙 검증
 
 | 시나리오 | 상황 | 요청 | 결과 |
@@ -191,10 +227,11 @@ id로 규칙을 만들 수 있고 규칙이 가리키는 채널을 지워도 규
 
 ## 아직 적지 않은 것
 
-없다. 어댑터가 제공하는 `create_channel`, `get_channel`, `update_channel`, `delete_channel`,
-`search_channels`, `validate_channel`, `batch_load_channels_by_ids`, `create_rule`, `get_rule`,
-`update_rule`, `delete_rule`, `search_rules`, `validate_rule`, `batch_load_rules_by_ids`가 모두
-위에 있다.
+없다. 어댑터가 제공하는 `create_channel`, `get_channel`, `update_channel`, `purge_channel`,
+`partial_bulk_update_channels`, `partial_bulk_purge_channels`, `search_channels`,
+`validate_channel`, `batch_load_channels_by_ids`, `create_rule`, `get_rule`, `update_rule`,
+`purge_rule`, `partial_bulk_update_rules`, `partial_bulk_purge_rules`, `search_rules`,
+`validate_rule`, `batch_load_rules_by_ids`가 모두 위에 있다.
 
 `batch_load_fields`는 모든 어댑터가 물려받는 공용 도우미이지 이 엔티티의 호출이 아니다. 레포트가
 이 호출도 함께 세지만 적을 시나리오는 없다.

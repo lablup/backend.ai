@@ -8,6 +8,7 @@ from ai.backend.common.data.entity.entity_share import EntityShareID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier, RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.entity_share.request import (
@@ -37,11 +38,19 @@ from ai.backend.manager.data.entity_share.types import (
     EntityShareStatus,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.entity_share.conditions import EntityShareConditions
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
-from ai.backend.manager.models.entity_share.orders import EntityShareOrders
 from ai.backend.manager.models.entity_share.row import EntityShareRow
+from ai.backend.manager.models.entity_share.scopes import (
+    EntityShareTarget,
+    OwningEntityShareTarget,
+    RecipientProjectEntityShareTarget,
+    RecipientUserEntityShareTarget,
+)
+from ai.backend.manager.models.entity_share.searchable_fields import (
+    EntityShareSearchableFields,
+)
 from ai.backend.manager.models.entity_share.searchers import EntityShareSearcher
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.services.entity_share.actions.answer import (
     AcceptEntityShareAction,
     CancelEntityShareAction,
@@ -49,15 +58,12 @@ from ai.backend.manager.services.entity_share.actions.answer import (
     RejectEntityShareAction,
     RevokeEntityShareAction,
 )
+from ai.backend.manager.services.entity_share.actions.bulk_get import BulkGetEntitySharesAction
 from ai.backend.manager.services.entity_share.actions.create import (
     CreateEntityShareAction,
 )
 from ai.backend.manager.services.entity_share.actions.get import GetEntityShareAction
 from ai.backend.manager.services.entity_share.actions.search import (
-    EntityShareOwningScopeItem,
-    EntityShareRecipientProjectScopeItem,
-    EntityShareRecipientScopeItem,
-    EntityShareScopeItem,
     SearchEntitySharesAction,
 )
 from ai.backend.manager.services.entity_share.processors import EntityShareProcessors
@@ -67,7 +73,7 @@ __all__ = ("EntityShareAdapter",)
 
 def _entity_share_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=EntityShareOrders.created_at(ascending=True),
+        forward_order=EntityShareSearchableFields.own.created_at.order.apply(ascending=True),
         cursor_column=EntityShareRow.id,
     )
 
@@ -111,6 +117,20 @@ class EntityShareAdapter(BaseAdapter):
     async def get(self, share_id: EntityShareID) -> EntitySharePayload:
         result = await self._entity_share.get.run(GetEntityShareAction(share_id=share_id))
         return EntitySharePayload(share=self._to_node(result.data))
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[EntityShareID]
+    ) -> list[EntityShareNode | Exception | None]:
+        """Batch load entity shares by id for DataLoader use, one answer per id."""
+        if not ids:
+            return []
+        result = await self._entity_share.bulk_get.run(BulkGetEntitySharesAction(ids=ids))
+        return [
+            self._to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def accept(self, share_id: EntityShareID) -> EntitySharePayload:
         me = current_user()
@@ -156,18 +176,28 @@ class EntityShareAdapter(BaseAdapter):
         me = current_user()
         if me is None:
             raise UnreachableError("User context is not available")
-        items: list[EntityShareScopeItem] = []
+        targets: list[EntityShareTarget] = []
         sharers: list[uuid.UUID] = []
         for side in input.sides:
             match side:
                 case EntityShareSideDTO.RECIPIENT:
-                    items.append(EntityShareRecipientScopeItem(user_id=UserID(me.user_id)))
+                    targets.append(
+                        RecipientUserEntityShareTarget(recipient_user_id=UserID(me.user_id))
+                    )
                 case EntityShareSideDTO.SHARER:
-                    items.append(EntityShareOwningScopeItem(target=UserID(me.user_id)))
+                    targets.append(OwningEntityShareTarget(scope=UserID(me.user_id)))
                     sharers.append(me.user_id)
         return await self._search(
-            items,
-            extra_conditions=([EntityShareConditions.by_sharers(sharers)] if sharers else []),
+            targets,
+            extra_conditions=(
+                [
+                    EntityShareSearchableFields.own.sharer_user_id.filter.in_(
+                        UUIDInMatchSpec(values=sharers, negated=False)
+                    )
+                ]
+                if sharers
+                else []
+            ),
             filter=input.filter,
             order=input.order,
             first=input.first,
@@ -187,7 +217,7 @@ class EntityShareAdapter(BaseAdapter):
         shares is refused unless the caller may reach that person's scope.
         """
         return await self._search(
-            self._to_scope_items(input.scope),
+            self._to_scope_targets(input.scope),
             filter=input.filter,
             order=input.order,
             first=input.first,
@@ -200,7 +230,7 @@ class EntityShareAdapter(BaseAdapter):
 
     async def _search(
         self,
-        items: list[EntityShareScopeItem],
+        targets: list[EntityShareTarget],
         *,
         extra_conditions: Sequence[QueryCondition] = (),
         filter: EntityShareFilter | None,
@@ -228,7 +258,9 @@ class EntityShareAdapter(BaseAdapter):
             offset=offset,
         )
         result = await self._entity_share.search.run(
-            SearchEntitySharesAction(items=items, searcher=searcher)
+            SearchEntitySharesAction(
+                searcher=ScopedSearcher(scopes=targets, used_by=(), searcher=searcher)
+            )
         )
         return SearchEntitySharesPayload(
             items=[self._to_node(d) for d in result.items],
@@ -237,21 +269,21 @@ class EntityShareAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
-    def _to_scope_items(self, scope: EntityShareScope) -> list[EntityShareScopeItem]:
-        items: list[EntityShareScopeItem] = []
+    def _to_scope_targets(self, scope: EntityShareScope) -> list[EntityShareTarget]:
+        targets: list[EntityShareTarget] = []
         for recipient in scope.recipient or ():
-            items.append(EntityShareRecipientScopeItem(user_id=UserID(recipient.value)))
-        for project in scope.recipient_project or ():
-            items.append(EntityShareRecipientProjectScopeItem(project_id=ProjectID(project.value)))
-        for sharer in scope.sharer or ():
-            items.append(EntityShareOwningScopeItem(target=UserID(sharer.value)))
-        for target in scope.target or ():
-            items.append(
-                EntityShareOwningScopeItem(
-                    target=RuntimeEntityID(target.entity_type, target.entity_id)
-                )
+            targets.append(
+                RecipientUserEntityShareTarget(recipient_user_id=UserID(recipient.value))
             )
-        return items
+        for project in scope.recipient_project or ():
+            targets.append(RecipientProjectEntityShareTarget(project_id=ProjectID(project.value)))
+        for sharer in scope.sharer or ():
+            targets.append(OwningEntityShareTarget(scope=UserID(sharer.value)))
+        for target in scope.target or ():
+            targets.append(
+                OwningEntityShareTarget(scope=RuntimeEntityID(target.entity_type, target.entity_id))
+            )
+        return targets
 
     def _to_permission_cap(self, permissions: Sequence[PermissionBitDTO]) -> Permission | None:
         """An empty list means no ceiling, which is what ``None`` says to the graph."""
@@ -268,35 +300,38 @@ class EntityShareAdapter(BaseAdapter):
         return [dto for dto in PermissionBitDTO if cap & Permission[dto.name]]
 
     def _convert_filter(self, filter: EntityShareFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
+        fields = EntityShareSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
+            *self.apply_uuid_filter(filter.target_entity_id, fields.target_entity_id.filter),
+            *self.apply_uuid_filter(filter.recipient_entity_id, fields.recipient_entity_id.filter),
+            *self.apply_string_filter(filter.recipient_email, fields.recipient_email.filter),
+        ]
         if filter.status is not None:
             if filter.status.equals is not None:
                 conditions.append(
-                    EntityShareConditions.by_status(EntityShareStatus(filter.status.equals))
+                    fields.status.filter.equals(EntityShareStatus(filter.status.equals))
                 )
             if filter.status.in_ is not None:
                 conditions.append(
-                    EntityShareConditions.by_status_in([
+                    fields.status.filter.in_([
                         EntityShareStatus(status) for status in filter.status.in_
                     ])
                 )
-        if filter.recipient_email is not None and filter.recipient_email.equals is not None:
-            conditions.append(
-                EntityShareConditions.by_recipient_email(filter.recipient_email.equals)
-            )
         return conditions
 
     def _convert_orders(self, orders: Sequence[EntityShareOrderBy]) -> list[QueryOrder]:
+        fields = EntityShareSearchableFields.own
         converted: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction is OrderDirection.ASC
             match order.field:
                 case EntityShareOrderField.CREATED_AT:
-                    converted.append(EntityShareOrders.created_at(ascending))
+                    converted.append(fields.created_at.order.apply(ascending))
                 case EntityShareOrderField.UPDATED_AT:
-                    converted.append(EntityShareOrders.updated_at(ascending))
+                    converted.append(fields.updated_at.order.apply(ascending))
                 case EntityShareOrderField.STATUS:
-                    converted.append(EntityShareOrders.status(ascending))
+                    converted.append(fields.status.order.apply(ascending))
         return converted
 
     def _to_node(self, data: EntityShareData) -> EntityShareNode:
@@ -304,11 +339,14 @@ class EntityShareAdapter(BaseAdapter):
             id=data.id,
             entity_id=data.entity_id(),
             sharer_user_id=data.sharer_user_id,
+            recipient_entity_type=data.recipient.entity_type() if data.recipient else None,
+            recipient_entity_id=data.recipient,
             recipient_email=data.recipient_email,
             target_entity_type=data.target.entity_type(),
             target_entity_id=data.target,
             permissions=self._to_permission_dtos(data.permission_cap),
             status=EntityShareStatusDTO(data.status),
+            expires_at=data.expires_at,
             created_at=data.created_at,
             updated_at=data.updated_at,
         )

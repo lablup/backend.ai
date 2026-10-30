@@ -77,45 +77,6 @@ def make_string_in_factory(
     return factory
 
 
-def make_nested_string_in_factory(
-    column: sa.orm.InstrumentedAttribute[Any],
-    exists_wrapper: Callable[
-        [sa.sql.expression.ColumnElement[bool]], sa.sql.expression.ColumnElement[bool]
-    ],
-) -> Callable[[StringInMatchSpec], QueryCondition]:
-    """Create a factory for string ``IN`` conditions wrapped in an EXISTS subquery.
-
-    Same semantics as ``make_string_in_factory`` but wraps the produced
-    ``IN`` predicate inside the supplied ``exists_wrapper`` so that the
-    resulting condition matches rows whose related entity satisfies the
-    column predicate.
-
-    Usage::
-
-        class DomainConditions:
-            by_user_username_in = staticmethod(
-                make_nested_string_in_factory(
-                    UserRow.username,
-                    lambda c: DomainConditions._exists_user(c),
-                )
-            )
-    """
-
-    def factory(spec: StringInMatchSpec) -> QueryCondition:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            if spec.case_insensitive:
-                condition = sa.func.lower(column).in_([v.lower() for v in spec.values])
-            else:
-                condition = column.in_(spec.values)
-            if spec.negated:
-                condition = sa.not_(condition)
-            return exists_wrapper(condition)
-
-        return inner
-
-    return factory
-
-
 class StringConditions:
     """String match condition factories for one column.
 

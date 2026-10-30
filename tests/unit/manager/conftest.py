@@ -12,6 +12,7 @@ from typing import Any
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import (
     DomainEntityType,
     DomainID,
@@ -22,14 +23,13 @@ from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
 from ai.backend.logging import LocalLogger, LogLevel
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
 from ai.backend.logging.types import LogFormat
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.fixtures import DomainFactory, DomainFixtureData
 
 pytest_plugins = [
     "ai.backend.testutils.bootstrap",
     "ai.backend.testutils.db_fixtures",
+    "ai.backend.testutils.otel",
 ]
 
 
@@ -151,7 +151,7 @@ def domain_factory() -> DomainFactory:
     exposes both ``domain_name`` and ``domain_id`` so call sites are ready for
     the upcoming domain PK migration to UUID.
     """
-    from ai.backend.manager.models.domain import (
+    from ai.backend.manager.models.domain.row import (
         domains,
     )  # lazy: avoid registering DomainRow globally
     from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow

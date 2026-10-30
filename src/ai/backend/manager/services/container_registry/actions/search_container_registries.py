@@ -3,32 +3,25 @@
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
+from ai.backend.common.data.entity.types import EntityType
+from ai.backend.manager.actions.v2.ops.base import GlobalSearcherOpsAction
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.container_registry.actions.base import (
-    ContainerRegistryAction,
-)
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 
 
-@dataclass
-class SearchContainerRegistriesAction(ContainerRegistryAction):
-    querier: BatchQuerier
+@dataclass(frozen=True)
+class SearchContainerRegistriesAction(
+    GlobalSearcherOpsAction[ContainerRegistryRow, ContainerRegistryData]
+):
+    """Page through every container registry."""
+
+    @override
+    @classmethod
+    def entity_type(cls) -> EntityType:
+        return ContainerRegistryEntityType()
 
     @override
     @classmethod
     def action_name(cls) -> str:
         return "search_container_registries"
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchContainerRegistriesActionResult:
-    data: list[ContainerRegistryData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool

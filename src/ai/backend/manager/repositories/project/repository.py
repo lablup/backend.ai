@@ -9,26 +9,32 @@ from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
 from ai.backend.common.types import ResourceSlot
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.resource import (
     ProjectNotFound,
 )
-from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.project.creators import ProjectCreator
 from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater, ProjectUpdater
+from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.project.db_source import ProjectDBSource
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
+from ai.backend.manager.repositories.project.db_source.db_source import ProjectDBSource
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 project_repository_resilience = Resilience(
@@ -48,6 +54,8 @@ project_repository_resilience = Resilience(
 
 class ProjectRepository:
     _db_source: ProjectDBSource
+    _v2_ops: V2DBOpsProvider
+    _policy_ops: ResourcePolicyOpsProvider
     _config_provider: ManagerConfigProvider
     _valkey_stat_client: ValkeyStatClient
     _storage_manager: StorageSessionManager
@@ -56,15 +64,26 @@ class ProjectRepository:
         self,
         db: ExtendedAsyncSAEngine,
         v2_ops_provider: V2DBOpsProvider,
+        policy_ops_provider: ResourcePolicyOpsProvider,
         config_provider: ManagerConfigProvider,
         valkey_stat_client: ValkeyStatClient,
         storage_manager: StorageSessionManager,
     ) -> None:
         self._db_source = ProjectDBSource(db, v2_ops_provider)
         self._v2_ops = v2_ops_provider
+        self._policy_ops = policy_ops_provider
         self._config_provider = config_provider
         self._valkey_stat_client = valkey_stat_client
         self._storage_manager = storage_manager
+
+    @project_repository_resilience.apply()
+    async def create_project(self, creator: ProjectCreator) -> ProjectData:
+        """Register a project under its domain and lend it the resource policy it is
+        subject to."""
+        async with self._policy_ops.write_ops() as w:
+            data = await w.create_role_managed_entity(creator)
+            await w.restate_project_resource_policy_share(ProjectID(data.id))
+            return data
 
     @project_repository_resilience.apply()
     async def modify_validated(
@@ -72,8 +91,33 @@ class ProjectRepository:
         updater: ProjectUpdater,
     ) -> ProjectData | None:
         """Modify a project. Who belongs to it is the roster's own operation."""
-        async with self._v2_ops.write_ops() as w:
-            return await w.update_data(updater)
+        async with self._policy_ops.write_ops() as w:
+            data = await w.update_data(updater)
+            if data is None:
+                return None
+            await w.restate_project_resource_policy_share(ProjectID(data.id))
+            return data
+
+    @project_repository_resilience.apply()
+    async def partial_bulk_modify_validated(
+        self, updaters: Sequence[ProjectUpdater]
+    ) -> BulkResultWithFailures[ProjectData]:
+        """Modify each named project the way :meth:`modify_validated` does, in its own
+        savepoint."""
+        successes: dict[EntityIdentifier, ProjectData] = {}
+        errors: dict[EntityIdentifier, Exception] = {}
+        async with self._policy_ops.write_ops() as w:
+            for updater in updaters:
+                try:
+                    async with w.savepoint() as sp:
+                        data = await sp.update_data(updater)
+                        if data is None:
+                            raise ProjectNotFound(f"Project not found: {updater.project_id}")
+                        await sp.restate_project_resource_policy_share(updater.project_id)
+                        successes[updater.project_id] = data
+                except Exception as e:
+                    errors[updater.project_id] = e
+        return BulkResultWithFailures(successes=successes, errors=errors)
 
     @project_repository_resilience.apply()
     async def update_dotfiles(self, updater: ProjectDotfilesUpdater) -> ProjectData:

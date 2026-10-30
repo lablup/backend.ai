@@ -1,18 +1,20 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import TYPE_CHECKING, Annotated, Self
+from typing import TYPE_CHECKING, Annotated, Self, override
 from uuid import UUID
 
 import strawberry
 from strawberry import UNSET, Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import OrderDirection, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
     DeploymentRevisionPresetFilter,
     DeploymentRevisionPresetOrder,
@@ -38,6 +40,18 @@ from ai.backend.common.dto.manager.v2.model_card.request import (
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
     ModelCardOrder as OrderDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.request import (
+    ModelCardResourceRequirementFilter as RequirementFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.request import (
+    ModelCardResourceRequirementNestedFilter as RequirementNestedFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.request import (
+    PartialBulkPurgeModelCardsInput as PartialBulkPurgeInputDTO,
+)
+from ai.backend.common.dto.manager.v2.model_card.request import (
+    PartialBulkUpdateModelCardsInput as PartialBulkUpdateInputDTO,
 )
 from ai.backend.common.dto.manager.v2.model_card.request import (
     UpdateModelCardInput as UpdateInputDTO,
@@ -77,14 +91,22 @@ from ai.backend.common.dto.manager.v2.model_card.types import (
 )
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ModelCardScope,
+    ModelCardUsage,
+    ModelCardUses,
 )
 from ai.backend.common.dto.manager.v2.model_card.types import (
     ProjectModelCardScope as ProjectModelCardScopeDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.manager.api.gql.base import DateTimeFilter as DateTimeFilterGQL
+from ai.backend.manager.api.gql.base import DecimalFilter as DecimalFilterGQL
+from ai.backend.manager.api.gql.base import (
+    NullableDateTimeFilter as NullableDateTimeFilterGQL,
+)
 from ai.backend.manager.api.gql.base import StringFilter as StringFilterGQL
 from ai.backend.manager.api.gql.base import UUIDFilter as UUIDFilterGQL
 from ai.backend.manager.api.gql.base import UUIDScopeGQL
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -121,8 +143,22 @@ if TYPE_CHECKING:
     name="ModelCardV2OrderField",
 )
 class ModelCardOrderFieldGQL(StrEnum):
+    ENTITY_ID = "entity_id"
     NAME = "name"
+    VFOLDER_ID = "vfolder_id"
+    DOMAIN_NAME = "domain_name"
+    PROJECT_ID = "project_id"
+    CREATOR_ID = "creator_id"
+    AUTHOR = "author"
+    TITLE = "title"
+    MODEL_VERSION = "model_version"
+    TASK = "task"
+    CATEGORY = "category"
+    ARCHITECTURE = "architecture"
+    LICENSE = "license"
+    ACCESS_LEVEL = "access_level"
     CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
 
 
 @gql_enum(
@@ -204,7 +240,7 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
     id: NodeID[str] = gql_field(description="Relay-style global node identifier.")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the model card.",
         ),
     )
@@ -269,7 +305,10 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
         ]
         | None
     ):
-        return await info.context.data_loaders.domain_loader.load(self.domain_name)
+        domain_id = await info.context.data_loaders.domain_id_by_name_loader.load(self.domain_name)
+        if domain_id is None:
+            return None
+        return await info.context.data_loaders.domain_by_id_loader.load(domain_id)
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -347,6 +386,19 @@ class ModelCardGQL(PydanticNodeMixin[NodeDTO]):
         )
         return build_preset_connection(result)
 
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[ModelCardGQL | None]:
+        return await info.context.data_loaders.model_card_loader.load_many([
+            ModelCardID(UUID(nid)) for nid in node_ids
+        ])
+
 
 ModelCardV2Edge = Edge[ModelCardGQL]
 
@@ -390,19 +442,142 @@ class ModelCardAvailablePresetsScopeGQL(PydanticInputMixin[AvailablePresetsScope
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Filter for one minimum resource requirement of a model card.",
+    ),
+    name="ModelCardV2ResourceRequirementFilter",
+)
+class ModelCardResourceRequirementFilterGQL(PydanticInputMixin[RequirementFilterDTO]):
+    slot_name: StringFilterGQL | None = gql_field(
+        default=None, description="Resource slot name filter."
+    )
+    min_quantity: DecimalFilterGQL | None = gql_field(
+        default=None, description="Minimum quantity filter."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Filter model cards by conditions on their minimum resource requirements.",
+    ),
+    name="ModelCardV2ResourceRequirementNestedFilter",
+)
+class ModelCardResourceRequirementNestedFilterGQL(PydanticInputMixin[RequirementNestedFilterDTO]):
+    exists: bool | None = gql_field(
+        description=(
+            "Matches cards that carry at least one requirement when true, and cards "
+            "carrying none when false. Says nothing about what the requirements hold."
+        ),
+        default=None,
+    )
+    some: ModelCardResourceRequirementFilterGQL | None = gql_field(
+        description="Matches cards with at least one requirement satisfying all conditions.",
+        default=None,
+    )
+    every: ModelCardResourceRequirementFilterGQL | None = gql_field(
+        description=(
+            "Matches cards where every requirement satisfies all conditions "
+            "(also true when the card has none)."
+        ),
+        default=None,
+    )
+    none: ModelCardResourceRequirementFilterGQL | None = gql_field(
+        description="Matches cards with no requirement satisfying all conditions.",
+        default=None,
+    )
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(added_version="26.4.2", description="Filter for model cards."),
     name="ModelCardV2Filter",
 )
 class ModelCardFilterGQL(PydanticInputMixin[FilterDTO]):
+    entity_id: UUIDFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by model card ID."),
+        default=None,
+    )
     name: StringFilterGQL | None = gql_field(default=None, description="Name filter.")
+    vfolder_id: UUIDFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by the VFolder holding the model.",
+        ),
+        default=None,
+    )
     domain_name: StringFilterGQL | None = gql_field(default=None, description="Domain filter.")
     project_id: UUIDFilterGQL | None = gql_field(default=None, description="Project filter.")
+    creator_id: UUIDFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by the user who created the model card.",
+        ),
+        default=None,
+    )
+    author: StringFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Author filter."),
+        default=None,
+    )
+    title: StringFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Title filter."),
+        default=None,
+    )
+    model_version: StringFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Model version filter."),
+        default=None,
+    )
+    task: StringFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Task filter."),
+        default=None,
+    )
+    category: StringFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Category filter."),
+        default=None,
+    )
+    architecture: StringFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Architecture filter."),
+        default=None,
+    )
+    license: StringFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="License filter."),
+        default=None,
+    )
+    access_level: StringFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description=(
+                "Access level filter. The column stores the level as text, so this is a "
+                "string match rather than an enum comparison."
+            ),
+        ),
+        default=None,
+    )
     storage_host: StringFilterGQL | None = gql_field(
         default=None,
         description=(
             "Filter by the storage host backing the model card's VFolder. "
             "Matches via an EXISTS subquery against the VFolder host column."
         ),
+        deprecation_reason=(
+            "Deprecated since 26.9.0. Search vfolders by host first, then "
+            "pass their ids as `usedBy.vfolder`."
+        ),
+    )
+    created_at: DateTimeFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Creation datetime filter."),
+        default=None,
+    )
+    updated_at: NullableDateTimeFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Update datetime filter."),
+        default=None,
+    )
+    min_resource: ModelCardResourceRequirementNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by conditions on the minimum resource requirements.",
+        ),
+        default=None,
     )
     AND: list[Self] | None = gql_field(
         default=None, description="Combine nested filters with logical AND."
@@ -500,6 +675,19 @@ class UpdateModelCardPayloadGQL(PydanticOutputMixin[UpdatePayloadDTO]):
 )
 class DeleteModelCardPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
     id: UUID = gql_field(description="ID of the deleted model card.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Payload for model card purge.",
+    ),
+    model=DeletePayloadDTO,
+    name="PurgeModelCardPayload",
+)
+class PurgeModelCardPayloadGQL(PydanticOutputMixin[DeletePayloadDTO]):
+    purged_id: strawberry.ID = gql_field(description="Global ID of the purged model card.")
+    entity_id: UUID = gql_field(description="UUID of the purged model card.")
 
 
 @gql_pydantic_type(
@@ -626,6 +814,56 @@ class BulkDeleteModelCardsV2PayloadGQL:
 @gql_pydantic_input(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several model cards, each answered for separately.",
+    ),
+    name="PartialBulkUpdateModelCardsInput",
+)
+class PartialBulkUpdateModelCardsInputGQL(PydanticInputMixin[PartialBulkUpdateInputDTO]):
+    items: list[UpdateModelCardInputGQL] = gql_field(
+        description="The model cards to update, each with its ID and fields."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for purging several model cards, each answered for separately.",
+    ),
+    name="PartialBulkPurgeModelCardsInput",
+)
+class PartialBulkPurgeModelCardsInputGQL(PydanticInputMixin[PartialBulkPurgeInputDTO]):
+    ids: list[UUID] = gql_field(description="IDs of the model cards to purge.")
+    options: DeleteModelCardOptionsGQL | None = gql_field(
+        description="Options for the purge.",
+        default=None,
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk model card operation: the model cards processed and "
+            "the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[NodeDTO],
+    name="PartialBulkModelCardsPayload",
+)
+class PartialBulkModelCardsPayloadGQL(PydanticOutputMixin[PartialBulkPayload[NodeDTO]]):
+    """Payload for partial bulk model card mutations."""
+
+    successes: list[ModelCardGQL] = gql_field(
+        description="The model cards processed, as they now stand."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The model cards not processed, each with the reason."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
         description=(
             "Scope for the scoped model card query. Each list is OR'd internally, and "
             "every scope named is authorized before the read runs."
@@ -638,7 +876,7 @@ class ModelCardScopeGQL(PydanticInputMixin[ModelCardScope]):
 
     domain: list[UUIDScopeGQL] | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Domains whose model cards are being read.",
         ),
         default=None,
@@ -648,8 +886,42 @@ class ModelCardScopeGQL(PydanticInputMixin[ModelCardScope]):
     )
     user: list[UUIDScopeGQL] | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Users whose model cards are being read.",
         ),
         default=None,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Entities a model card uses, whose ids narrow the read.",
+    ),
+    name="ModelCardUses",
+)
+class ModelCardUsesGQL(PydanticInputMixin[ModelCardUses]):
+    """The entities a model card uses, whose ids narrow the read."""
+
+    vfolder: list[UUID] | None = gql_field(
+        default=None, description="VFolders the model card is built on."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description=(
+            "Uses narrowing a model card query; every id is AND-ed. The caller must be able "
+            "to read each listed entity, or the request is refused. Only model cards the caller "
+            "can read are returned, even when a listed entity is tied to others."
+        ),
+    ),
+    name="ModelCardUsage",
+)
+class ModelCardUsageGQL(PydanticInputMixin[ModelCardUsage]):
+    """The uses that narrow a model card read."""
+
+    uses: ModelCardUsesGQL | None = gql_field(
+        default=None, description="Entities the model card uses, whose ids narrow the read."
     )

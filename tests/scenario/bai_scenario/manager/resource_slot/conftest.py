@@ -28,6 +28,7 @@ from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.agent.repository import AgentRepository
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -37,7 +38,9 @@ from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
 from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 from ai.backend.manager.services.resource_slot.service import ResourceSlotService
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from bai_scenario.runner.unwired import unwired
 
 
@@ -78,6 +81,6 @@ async def adapter(
         ),
         DomainProcessors(
             registry.group(GroupMeta(DomainEntityType())),
-            DomainService(DomainRepository(engine, provider)),
+            DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
         ),
     )

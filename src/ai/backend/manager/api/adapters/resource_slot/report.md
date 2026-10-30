@@ -2,33 +2,178 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/resource_slot/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_slot/adapter.py)
 
-Not exercised by any scenario: batch_load_fields.
+시나리오: 미완 2 / 14
 
-### creating
+- ops 로 구성 (10)
+  - admin_create_slot_type — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_update_slot_type — 대표 성공 ✓ · 대표 실패 ✓
+  - get_slot_type — 대표 성공 ✓ · 대표 실패 ✓
+  - lookup_slot_type — 대표 성공 ✓ · 대표 실패 ✓
+  - partial_bulk_purge_slot_types — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+  - purge_slot_type — 대표 성공 ✓ · 대표 실패 ✓
+  - scoped_search_agent_resources — 대표 성공 ✓ · 대표 실패 ✓
+  - search_agent_resources — 대표 성공 ✓ · 대표 실패 ✓
+  - search_allocations — 대표 성공 ✓ · 대표 실패 ✓
+  - search_slot_types — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
+- 직접 구현 (4)
+  - get_agent_resource — 성공 있음 2 · 실패 있음 6 (single_entity)
+  - get_domain_resource_overview — 성공 있음 3 · 실패 있음 3 (scope)
+  - get_kernel_allocation — 성공 있음 3 · 실패 있음 4 (single_entity)
+  - get_project_resource_overview — 성공 있음 5 · 실패 있음 1 (scope)
 
-#### [a-slot-name-already-taken-is-refused](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
+**admin_create_slot_type**
 
-같은 이름의 슬롯 종류가 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다. 이 행은 에이전트 자원·커널 할당·모델 카드 자원 요구·배포 preset 자원 슬롯·배포 리비전 자원 슬롯 테이블이 참조하므로 덮어쓰지 않는다
+| 시나리오 | 판정 |
+|---|---|
+| [슈퍼관리자가 표시 이름·설명·단위·아이콘·서식·순위까지 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다](#creating-a-slot-type-made-with-every-display-value-carries-them-back) | 성공 |
+| [슈퍼관리자가 bytes 종류로 생성하면 그 종류가 담긴 노드가 반환된다](#creating-a-slot-type-of-the-bytes-kind-is-made) | 성공 |
+| [슈퍼관리자가 count 종류로 생성하면 그 종류가 담긴 노드가 반환된다](#creating-a-slot-type-of-the-count-kind-is-made) | 성공 |
+| [슈퍼관리자가 unified 종류로 생성하면 그 종류가 담긴 노드가 반환된다](#creating-a-slot-type-of-the-unified-kind-is-made) | 성공 |
+| [슈퍼관리자가 unique 종류로 생성하면 그 종류가 담긴 노드가 반환된다](#creating-a-slot-type-of-the-unique-kind-is-made) | 성공 |
+| [슈퍼관리자가 슬롯 이름과 종류만 지정해 생성하면, 표시용 문자열은 모두 비고 필수 여부는 거짓, 사용 여부는 참, 순위는 0, 숫자 서식은 십진에 반올림 없음인 노드가 반환된다](#creating-the-superadmin-makes-a-slot-type-with-a-name-and-a-kind-alone) | 성공 |
+| [같은 이름의 슬롯 종류가 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다. 이 행은 에이전트 자원·커널 할당·모델 카드 자원 요구·배포 preset 자원 슬롯·배포 리비전 자원 슬롯 테이블이 참조하므로 덮어쓰지 않는다](#creating-a-slot-name-already-taken-is-refused) | 거부 |
+| [슈퍼관리자가 아닌 사용자가 슬롯 종류를 생성하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-slot-type) | 거부 |
+| [권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 생성하지 못한다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-slot-type) | 거부 |
 
-Given
+**admin_update_slot_type**
 
-- 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+| 시나리오 | 판정 |
+|---|---|
+| [슬롯 이름만 지정하고 나머지를 모두 생략해 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-a-slot-type-edit-giving-no-value-changes-nothing) | 성공 |
+| [사용 중인 슬롯 종류의 사용 여부를 끄면, 사용하지 않는 상태가 담긴 노드가 반환된다](#editing-disabling-a-slot-type-answers-it-disabled) | 성공 |
+| [슈퍼관리자가 이름으로 지정해 표시 이름만 수정하면, 표시 이름은 새 값이 되고 나머지는 그대로 유지된다](#editing-editing-a-slot-type-display-name-leaves-the-rest-alone) | 성공 |
+| [슈퍼관리자가 아닌 사용자가 슬롯 종류를 수정하면 역할 부족으로 거부된다](#editing-a-user-who-is-not-the-superadmin-may-not-edit-a-slot-type) | 거부 |
+| [슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-slot-name-nothing-answers-to-is-not-found) | 거부 |
+| [권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 수정하지 못한다](#editing-turning-enforcement-off-does-not-let-a-user-edit-a-slot-type) | 거부 |
 
-When
+**get_slot_type**
 
-- ResourceSlotAdapter.admin_create_slot_type — user-1이 이미 있는 이름 slot-1(으)로 다시 생성
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 없는 사용자가 이름으로 조회하면 그 슬롯 종류 전체가 반환된다. 이름을 풀어내는 단계도 그 뒤의 조회도 인증만 확인한다](#reading-a-user-granted-nothing-reads-a-slot-type-by-name) | 성공 |
+| [존재하지 않는 이름으로 조회하면 거부된다. 변환한 대상에 권한 검사가 뒤따르므로 존재하지 않는 이름과 닿지 못하는 이름이 같은 이름으로 거부된다](#reading-reading-a-slot-name-nothing-answers-to-is-refused) | 거부 |
 
-Then
+**lookup_slot_type**
 
-- 거부된다
-  - 거부: ResourceSlotTypeAlreadyExists
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 없는 사용자가 이름으로 id를 찾으면 그 슬롯 종류의 id가 반환된다](#looking_up-a-user-granted-nothing-looks-up-a-slot-type-by-name) | 성공 |
+| [존재하지 않는 이름으로 id를 찾으면 잘못된 요청으로 거부된다](#looking_up-looking-up-a-slot-name-nothing-answers-to-is-refused) | 거부 |
+
+**partial_bulk_purge_slot_types**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무 권한도 없는 사용자가 슬롯 종류 여럿을 한 번에 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-slot-types) | 성공 |
+| [아무것도 참조하지 않는 슬롯 종류 둘과 없는 id 하나를 슈퍼관리자가 한 번에 삭제하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-slot-types-answers-for-the-missing-one) | 성공 |
+
+**purge_slot_type**
+
+| 시나리오 | 판정 |
+|---|---|
+| [아무것도 참조하지 않는 슬롯 종류를 슈퍼관리자가 id로 삭제하면 삭제한 이름을 담은 응답이 반환된다](#retiring-the-superadmin-purges-a-slot-type-nothing-refers-to) | 성공 |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 슬롯 종류를 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-purge-a-slot-type) | 성공 |
+| [배포 리비전이 아직 사용하는 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다](#retiring-a-slot-type-a-deployment-revision-still-uses-may-not-be-purged) | 거부 |
+| [커널이 아직 할당받은 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다](#retiring-a-slot-type-a-kernel-still-asks-for-may-not-be-purged) | 거부 |
+| [아무 권한도 없는 사용자가 슬롯 종류를 삭제하면 권한 부족으로 거부된다. 수정이 역할 부족으로 거부되는 것과는 다른 검사다](#retiring-a-user-granted-nothing-may-not-purge-a-slot-type) | 거부 |
+| [아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. 호출한 사용자가 쓸 수 있는지를 대상을 찾기 전에 검사하기 때문이다](#retiring-a-user-granted-nothing-purging-an-unknown-slot-type-id-is-refused-by-permission) | 거부 |
+| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-purging-a-slot-type-id-nothing-answers-to-is-not-found) | 거부 |
+
+**scoped_search_agent_resources**
+
+| 시나리오 | 판정 |
+|---|---|
+| [리소스 그룹의 에이전트를 읽을 수 있는 사용자가 슬롯 둘을 보고한 에이전트를 지정해 조회하면 그 에이전트가 보고한 슬롯이 모두 반환된다](#scoped_searching_agent_resources-a-user-reading-agents-in-the-group-finds-every-slot-the-agent-reports) | 성공 |
+| [리소스 그룹의 에이전트를 읽을 수 있는 사용자가 아직 슬롯을 보고하지 않은 그 에이전트를 지정해 조회하면 응답이 비어 있다](#scoped_searching_agent_resources-a-user-reading-agents-in-the-group-searches-the-agent-and-finds-no-slot) | 성공 |
+| [슈퍼관리자가 아직 슬롯을 보고하지 않은 에이전트를 지정해 조회하면 응답이 비어 있다](#scoped_searching_agent_resources-the-superadmin-searches-the-agent-and-finds-no-slot) | 성공 |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 에이전트를 지정해 조회할 수 있다](#scoped_searching_agent_resources-turning-enforcement-off-lets-a-user-search-an-agent-s-resources) | 성공 |
+| [아무 권한도 없는 사용자가 에이전트를 지정해 조회하면 권한 부족으로 거부된다](#scoped_searching_agent_resources-a-user-granted-nothing-may-not-search-an-agent-s-resources) | 거부 |
+| [둘 중 한 에이전트만 읽을 수 있는 사용자가 둘을 함께 지정해 조회하면 전체가 권한 부족으로 거부된다. 읽을 수 있는 쪽만 골라 답하지 않는다](#scoped_searching_agent_resources-one-agent-the-caller-may-not-read-refuses-the-whole-search) | 거부 |
+
+**search_agent_resources**
+
+| 시나리오 | 판정 |
+|---|---|
+| [모니터가 필터 없이 조회하면 응답이 반환된다. 슈퍼관리자인지 검사하는 조회는 모니터도 통과한다](#searching_agent_resources-a-monitor-may-search-agent-resources) | 성공 |
+| [슬롯 둘을 보고한 에이전트 하나가 있을 때 한 슬롯의 이름을 필터로 조회하면, 응답에는 그 슬롯의 행만 남는다](#searching_agent_resources-a-slot-name-filter-narrows-the-answer-to-that-slot) | 성공 |
+| [슬롯을 보고한 에이전트 둘이 있을 때 한 에이전트를 필터로 조회하면, 응답에는 그 에이전트의 행만 남는다](#searching_agent_resources-an-agent-filter-narrows-the-answer-to-that-agent-s-slots) | 성공 |
+| [아직 슬롯을 보고하지 않은 에이전트만 있을 때 슈퍼관리자가 필터 없이 조회하면 응답이 비어 있다](#searching_agent_resources-an-agent-reporting-no-slot-means-none-is-found) | 성공 |
+| [보고된 슬롯 둘이 있을 때 앞에서 1건만 요청해 조회하면 슬롯 이름 순서로 앞선 한 건이 반환되고 다음 페이지가 있다고 응답한다](#searching_agent_resources-asking-for-the-first-slot-answers-one-and-a-next-page) | 성공 |
+| [보고된 슬롯 11개가 있을 때 크기 없이 조회하면 슬롯 이름 순서로 앞선 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching_agent_resources-omitting-the-page-size-answers-ten-slots-and-a-next-page) | 성공 |
+| [슬롯을 보고한 에이전트 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 보고된 슬롯이 모두 반환된다](#searching_agent_resources-the-superadmin-finds-every-slot-the-agents-report) | 성공 |
+| [아무 권한도 없는 사용자가 조회하면 역할 부족으로 거부된다](#searching_agent_resources-a-user-granted-nothing-may-not-search-agent-resources) | 거부 |
+| [권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 조회할 수 없다. 슈퍼관리자 검사는 그 설정을 읽지 않는다](#searching_agent_resources-turning-enforcement-off-still-refuses-a-user-searching-agent-resources) | 거부 |
+
+**search_allocations**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슬롯 하나씩 요구하는 커널 둘이 있을 때 한 커널의 id를 필터로 조회하면, 응답에는 그 커널의 할당만 남는다](#searching_allocations-a-kernel-id-filter-narrows-the-answer-to-that-kernel-s-allocations) | 성공 |
+| [모니터가 필터 없이 조회하면 할당이 다 집계된다. 슈퍼관리자인지 검사하는 조회는 모니터도 통과한다](#searching_allocations-a-monitor-counts-every-allocation-laid) | 성공 |
+| [슬롯 둘을 요구하는 커널 하나가 있을 때 한 슬롯의 이름을 필터로 조회하면, 응답에는 그 슬롯의 할당만 남는다](#searching_allocations-a-slot-name-filter-narrows-the-answer-to-that-slot-s-allocation) | 성공 |
+| [할당 11건이 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching_allocations-omitting-the-page-size-answers-ten-allocations-and-a-next-page) | 성공 |
+| [슬롯 둘을 요구하는 커널 하나가 있을 때 슈퍼관리자가 필터 없이 조회하면 할당 둘이 다 집계된다](#searching_allocations-the-superadmin-counts-every-allocation-laid) | 성공 |
+| [아무 권한도 없는 사용자가 조회하면 역할 부족으로 거부된다](#searching_allocations-a-user-granted-nothing-may-not-search-allocations) | 거부 |
+| [권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 조회할 수 없다. 슈퍼관리자 검사는 그 설정을 읽지 않는다](#searching_allocations-turning-enforcement-off-still-refuses-a-user-searching-allocations) | 거부 |
+
+**search_slot_types**
+
+| 시나리오 | 판정 |
+|---|---|
+| [슬롯 종류 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 슬롯 종류만 남는다](#searching-a-name-filter-narrows-the-answer-to-the-slot-type-it-names) | 성공 |
+| [슬롯 종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다](#searching-a-user-granted-nothing-counts-every-slot-type-laid) | 성공 |
+| [슬롯 종류 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching-omitting-the-page-size-answers-ten-slot-types-and-a-next-page) | 성공 |
+
+**get_agent_resource**
+
+| 시나리오 | 판정 |
+|---|---|
+| [리소스 그룹의 에이전트를 읽을 수 있는 사용자가 에이전트가 보고한 슬롯을 조회하면 그 슬롯에 보고된 용량과 사용량이 반환된다](#reading_agent_resources-a-user-reading-agents-in-the-group-reads-a-slot-the-agent-reports) | 성공 |
+| [슈퍼관리자가 에이전트가 보고한 슬롯을 조회하면 그 슬롯에 보고된 용량과 사용량이 반환된다](#reading_agent_resources-the-superadmin-reads-a-slot-the-agent-reports) | 성공 |
+| [아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다. 에이전트에 대한 권한을 슬롯을 찾기 전에 검사한다](#reading_agent_resources-a-user-granted-nothing-may-not-read-an-agent-slot) | 거부 |
+| [아무 권한도 없는 사용자가 존재하지 않는 에이전트 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다. 이름을 풀어내는 단계는 인증만 확인하고, 권한은 풀어낸 에이전트에 대해 검사한다](#reading_agent_resources-a-user-granted-nothing-reading-an-unknown-agent-name-is-not-found) | 거부 |
+| [리소스 그룹의 에이전트를 읽을 수 있는 사용자가 에이전트가 보고하지 않는 슬롯을 조회하면 권한 검사를 통과한 뒤 대상을 찾을 수 없다는 이유로 거부된다](#reading_agent_resources-a-user-reading-agents-in-the-group-reaches-the-slot-the-agent-does-not-report) | 거부 |
+| [슈퍼관리자가 에이전트가 보고하지 않는 슬롯을 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading_agent_resources-reading-a-slot-the-agent-does-not-report-is-not-found) | 거부 |
+| [슈퍼관리자가 존재하지 않는 에이전트 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading_agent_resources-reading-an-agent-name-nothing-answers-to-is-not-found) | 거부 |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 권한 검사를 통과하고, 에이전트가 보고하지 않는 슬롯이므로 대상을 찾을 수 없다는 이유로 거부된다](#reading_agent_resources-turning-enforcement-off-lets-a-user-pass-the-gate-to-the-slot-the-agent-does-not-report) | 거부 |
+
+**get_domain_resource_overview**
+
+| 시나리오 | 판정 |
+|---|---|
+| [도메인 범위에서 세션을 읽을 수 있는 사용자가 그 도메인의 개요를 조회하면 개요가 반환된다](#reading_domain_overview-a-user-reading-sessions-in-the-domain-reads-its-overview) | 성공 |
+| [대기 중인 커널만 있는 도메인의 개요를 슈퍼관리자가 조회하면 점유된 슬롯이 없고 세션 수가 0이다. 개요는 자원을 점유했거나 배정받은 커널만 세고, 요구만 한 커널은 세지 않는다](#reading_domain_overview-the-superadmin-reads-a-domain-overview-that-counts-no-pending-kernel) | 성공 |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 도메인의 개요를 조회할 수 있다](#reading_domain_overview-turning-enforcement-off-lets-a-user-read-a-domain-overview) | 성공 |
+| [아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다](#reading_domain_overview-a-user-granted-nothing-may-not-read-a-domain-overview) | 거부 |
+| [프로젝트 범위에서만 세션을 읽을 수 있는 사용자가 그 프로젝트가 속한 도메인의 개요를 조회하면 권한 부족으로 거부된다. 도메인 개요는 도메인 범위의 권한을 검사한다](#reading_domain_overview-a-user-reading-sessions-in-the-project-may-not-read-the-domain-overview) | 거부 |
+| [존재하지 않는 도메인 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading_domain_overview-reading-the-overview-of-a-domain-name-nothing-answers-to-is-not-found) | 거부 |
+
+**get_kernel_allocation**
+
+| 시나리오 | 판정 |
+|---|---|
+| [프로젝트 범위에서 세션을 읽을 수 있는 사용자가 조회하면 그 할당 전체가 반환된다. 할당은 커널이 속한 세션의 것이므로, 세션에 대한 권한이 할당을 읽게 한다](#reading_allocations-a-user-reading-sessions-in-the-project-reads-a-kernel-slot-allocation) | 성공 |
+| [슈퍼관리자가 커널 id와 슬롯 이름으로 조회하면 그 할당 전체가 반환된다. 커널은 아직 스케줄링되지 않았으므로 요구한 양만 있고 실제 사용량은 없다](#reading_allocations-the-superadmin-reads-a-kernel-slot-allocation) | 성공 |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 할당을 조회할 수 있다](#reading_allocations-turning-enforcement-off-lets-a-user-read-a-kernel-slot-allocation) | 성공 |
+| [아무 권한도 없는 사용자가 조회하면 커널 id를 풀어낼 수 없다는 이유로 거부된다. 커널 id를 세션으로 풀어내는 단계가 그 세션에 대한 권한을 검사하고, 권한이 없을 때와 커널이 없을 때 같은 답을 한다](#reading_allocations-a-user-granted-nothing-may-not-read-a-kernel-slot-allocation) | 거부 |
+| [아무 권한도 없는 사용자가 존재하지 않는 커널 id로 조회해도 커널 id를 풀어낼 수 없다는 같은 이유로 거부된다. 답으로는 그 커널이 있는지 알 수 없다](#reading_allocations-a-user-granted-nothing-reading-an-unknown-kernel-id-is-refused-the-same-way) | 거부 |
+| [슈퍼관리자가 존재하지 않는 커널 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다. 모든 검사를 통과하는 슈퍼관리자에게는 없다는 사실을 그대로 답한다](#reading_allocations-reading-a-kernel-id-nothing-answers-to-is-not-found) | 거부 |
+| [슈퍼관리자가 그 커널이 요구하지 않은 슬롯 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading_allocations-reading-a-slot-the-kernel-did-not-ask-for-is-not-found) | 거부 |
+
+**get_project_resource_overview**
+
+| 시나리오 | 판정 |
+|---|---|
+| [도메인 범위에서 세션을 읽을 수 있는 사용자가 그 도메인에 속한 프로젝트의 개요를 조회하면 개요가 반환된다. 도메인 범위의 권한은 그 안의 프로젝트에도 미친다](#reading_project_overview-a-user-reading-sessions-in-the-domain-reads-a-project-overview-in-it) | 성공 |
+| [프로젝트 범위에서 세션을 읽을 수 있는 사용자가 그 프로젝트의 개요를 조회하면 개요가 반환된다](#reading_project_overview-a-user-reading-sessions-in-the-project-reads-its-overview) | 성공 |
+| [슈퍼관리자가 존재하지 않는 프로젝트 id로 조회하면 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다. 도메인 개요와 달리 프로젝트는 id로 지정하므로 풀어내는 단계가 없고, 프로젝트가 있는지 확인하지 않는다](#reading_project_overview-reading-the-overview-of-a-project-id-nothing-answers-to-answers-an-empty-overview) | 성공 |
+| [대기 중인 커널만 있는 프로젝트의 개요를 슈퍼관리자가 조회하면 점유된 슬롯이 없고 세션 수가 0이다. 개요는 자원을 점유했거나 배정받은 커널만 세고, 요구만 한 커널은 세지 않는다](#reading_project_overview-the-superadmin-reads-a-project-overview-that-counts-no-pending-kernel) | 성공 |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 프로젝트의 개요를 조회할 수 있다](#reading_project_overview-turning-enforcement-off-lets-a-user-read-a-project-overview) | 성공 |
+| [아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다](#reading_project_overview-a-user-granted-nothing-may-not-read-a-project-overview) | 거부 |
+
+### admin_create_slot_type
+
+<a id="creating-a-slot-type-made-with-every-display-value-carries-them-back"></a>
 
 #### [a-slot-type-made-with-every-display-value-carries-them-back](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
 
@@ -64,6 +209,8 @@ Then
   - number_format = NumberFormatInfo(binary=True, round_length=2)
   - rank = 3
 
+<a id="creating-a-slot-type-of-the-bytes-kind-is-made"></a>
+
 #### [a-slot-type-of-the-bytes-kind-is-made](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
 
 슈퍼관리자가 bytes 종류로 생성하면 그 종류가 담긴 노드가 반환된다
@@ -97,6 +244,8 @@ Then
   - display_icon = ''
   - number_format = NumberFormatInfo(binary=False, round_length=0)
   - rank = 0
+
+<a id="creating-a-slot-type-of-the-count-kind-is-made"></a>
 
 #### [a-slot-type-of-the-count-kind-is-made](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
 
@@ -132,6 +281,8 @@ Then
   - number_format = NumberFormatInfo(binary=False, round_length=0)
   - rank = 0
 
+<a id="creating-a-slot-type-of-the-unified-kind-is-made"></a>
+
 #### [a-slot-type-of-the-unified-kind-is-made](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
 
 슈퍼관리자가 unified 종류로 생성하면 그 종류가 담긴 노드가 반환된다
@@ -165,6 +316,8 @@ Then
   - display_icon = ''
   - number_format = NumberFormatInfo(binary=False, round_length=0)
   - rank = 0
+
+<a id="creating-a-slot-type-of-the-unique-kind-is-made"></a>
 
 #### [a-slot-type-of-the-unique-kind-is-made](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
 
@@ -200,28 +353,7 @@ Then
   - number_format = NumberFormatInfo(binary=False, round_length=0)
   - rank = 0
 
-#### [a-user-who-is-not-the-superadmin-may-not-create-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
-
-슈퍼관리자가 아닌 사용자가 슬롯 종류를 생성하면 역할 부족으로 거부된다
-
-Given
-
-- 일반 사용자 한 명
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.admin_create_slot_type — user-1이 count 종류 슬롯 cuda.shares(을)를 이름과 종류만 지정해 생성
-
-Then
-
-- 거부된다
-  - 거부: InsufficientPrivilege
+<a id="creating-the-superadmin-makes-a-slot-type-with-a-name-and-a-kind-alone"></a>
 
 #### [the-superadmin-makes-a-slot-type-with-a-name-and-a-kind-alone](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
 
@@ -257,6 +389,63 @@ Then
   - number_format = NumberFormatInfo(binary=False, round_length=0)
   - rank = 0
 
+<a id="creating-a-slot-name-already-taken-is-refused"></a>
+
+#### [a-slot-name-already-taken-is-refused](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
+
+같은 이름의 슬롯 종류가 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다. 이 행은 에이전트 자원·커널 할당·모델 카드 자원 요구·배포 preset 자원 슬롯·배포 리비전 자원 슬롯 테이블이 참조하므로 덮어쓰지 않는다
+
+Given
+
+- 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.admin_create_slot_type — user-1이 이미 있는 이름 slot-1(으)로 다시 생성
+
+Then
+
+- 거부된다
+  - 거부: ResourceSlotTypeAlreadyExists
+
+<a id="creating-a-user-who-is-not-the-superadmin-may-not-create-a-slot-type"></a>
+
+#### [a-user-who-is-not-the-superadmin-may-not-create-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
+
+슈퍼관리자가 아닌 사용자가 슬롯 종류를 생성하면 역할 부족으로 거부된다
+
+Given
+
+- 일반 사용자 한 명
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.admin_create_slot_type — user-1이 count 종류 슬롯 cuda.shares(을)를 이름과 종류만 지정해 생성
+
+Then
+
+- 거부된다
+  - 거부: InsufficientPrivilege
+
+<a id="creating-turning-enforcement-off-does-not-let-a-user-create-a-slot-type"></a>
+
 #### [turning-enforcement-off-does-not-let-a-user-create-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_creating.py) — pass
 
 권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 생성하지 못한다
@@ -280,7 +469,9 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-### editing
+### admin_update_slot_type
+
+<a id="editing-a-slot-type-edit-giving-no-value-changes-nothing"></a>
 
 #### [a-slot-type-edit-giving-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
 
@@ -291,11 +482,15 @@ Given
 - 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
   - 자원 슬롯 종류 slot-1: count 종류
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -317,29 +512,7 @@ Then
   - number_format = NumberFormatInfo(binary=False, round_length=0)
   - rank = 0
 
-#### [a-user-who-is-not-the-superadmin-may-not-edit-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
-
-슈퍼관리자가 아닌 사용자가 슬롯 종류를 수정하면 역할 부족으로 거부된다
-
-Given
-
-- 자원 슬롯 종류 하나와, 일반 사용자 한 명
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.admin_update_slot_type — user-1이 slot-1의 표시 이름 수정
-
-Then
-
-- 거부된다
-  - 거부: InsufficientPrivilege
+<a id="editing-disabling-a-slot-type-answers-it-disabled"></a>
 
 #### [disabling-a-slot-type-answers-it-disabled](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
 
@@ -350,11 +523,15 @@ Given
 - 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
   - 자원 슬롯 종류 slot-1: count 종류
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -376,6 +553,8 @@ Then
   - number_format = NumberFormatInfo(binary=False, round_length=0)
   - rank = 0
 
+<a id="editing-editing-a-slot-type-display-name-leaves-the-rest-alone"></a>
+
 #### [editing-a-slot-type-display-name-leaves-the-rest-alone](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
 
 슈퍼관리자가 이름으로 지정해 표시 이름만 수정하면, 표시 이름은 새 값이 되고 나머지는 그대로 유지된다
@@ -385,11 +564,15 @@ Given
 - 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
   - 자원 슬롯 종류 slot-1: count 종류
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -411,44 +594,26 @@ Then
   - number_format = NumberFormatInfo(binary=False, round_length=0)
   - rank = 0
 
-#### [the-superadmin-editing-a-slot-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
+<a id="editing-a-user-who-is-not-the-superadmin-may-not-edit-a-slot-type"></a>
 
-슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다
+#### [a-user-who-is-not-the-superadmin-may-not-edit-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
 
-Given
-
-- 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.admin_update_slot_type — user-1이 no-such-slot의 표시 이름 수정
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-#### [turning-enforcement-off-does-not-let-a-user-edit-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
-
-권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 수정하지 못한다
+슈퍼관리자가 아닌 사용자가 슬롯 종류를 수정하면 역할 부족으로 거부된다
 
 Given
 
 - 자원 슬롯 종류 하나와, 일반 사용자 한 명
   - 자원 슬롯 종류 slot-1: count 종류
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -459,7 +624,69 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-### reading
+<a id="editing-the-superadmin-editing-a-slot-name-nothing-answers-to-is-not-found"></a>
+
+#### [the-superadmin-editing-a-slot-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
+
+슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.admin_update_slot_type — user-1이 no-such-slot의 표시 이름 수정
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+<a id="editing-turning-enforcement-off-does-not-let-a-user-edit-a-slot-type"></a>
+
+#### [turning-enforcement-off-does-not-let-a-user-edit-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_editing.py) — pass
+
+권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 수정하지 못한다
+
+Given
+
+- 자원 슬롯 종류 하나와, 일반 사용자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.admin_update_slot_type — user-1이 slot-1의 표시 이름 수정
+
+Then
+
+- 거부된다
+  - 거부: InsufficientPrivilege
+
+### get_slot_type
+
+<a id="reading-a-user-granted-nothing-reads-a-slot-type-by-name"></a>
 
 #### [a-user-granted-nothing-reads-a-slot-type-by-name](/tests/scenario/bai_scenario/manager/resource_slot/test_reading.py) — pass
 
@@ -470,11 +697,15 @@ Given
 - 자원 슬롯 종류 하나와, 일반 사용자 한 명
   - 자원 슬롯 종류 slot-1: count 종류
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -496,20 +727,26 @@ Then
   - number_format = NumberFormatInfo(binary=False, round_length=0)
   - rank = 0
 
-#### [reading-a-slot-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_reading.py) — pass
+<a id="reading-reading-a-slot-name-nothing-answers-to-is-refused"></a>
 
-존재하지 않는 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
+#### [reading-a-slot-name-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/resource_slot/test_reading.py) — pass
+
+존재하지 않는 이름으로 조회하면 거부된다. 변환한 대상에 권한 검사가 뒤따르므로 존재하지 않는 이름과 닿지 못하는 이름이 같은 이름으로 거부된다
 
 Given
 
 - 자원 슬롯 종류 하나와, 일반 사용자 한 명
   - 자원 슬롯 종류 slot-1: count 종류
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
@@ -518,900 +755,229 @@ When
 Then
 
 - 거부된다
-  - 거부: EntityNotFoundError
+  - 거부: GenericBadRequest
 
-### reading_agent_resources
+### lookup_slot_type
 
-#### [a-user-granted-nothing-may-not-read-an-agent-slot](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_agent_resources.py) — pass
+<a id="looking_up-a-user-granted-nothing-looks-up-a-slot-type-by-name"></a>
 
-아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다. 에이전트에 대한 권한을 슬롯을 찾기 전에 검사한다
+#### [a-user-granted-nothing-looks-up-a-slot-type-by-name](/tests/scenario/bai_scenario/manager/resource_slot/test_looking_up.py) — pass
 
-Given
-
-- 에이전트 하나와, 일반 사용자 한 명
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.get_agent_resource — user-1이 agent-1 에이전트의 cpu 슬롯 조회
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [a-user-granted-nothing-reading-an-unknown-agent-name-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_agent_resources.py) — pass
-
-아무 권한도 없는 사용자가 존재하지 않는 에이전트 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다. 이름을 풀어내는 단계는 인증만 확인하고, 권한은 풀어낸 에이전트에 대해 검사한다
+아무 권한도 없는 사용자가 이름으로 id를 찾으면 그 슬롯 종류의 id가 반환된다
 
 Given
 
-- 에이전트 하나와, 일반 사용자 한 명
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+- 자원 슬롯 종류 하나와, 일반 사용자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.get_agent_resource — user-1이 no-such-agent 에이전트의 cpu 슬롯 조회
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-#### [a-user-reading-agents-in-the-group-reaches-the-slot-the-agent-does-not-report](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_agent_resources.py) — pass
-
-리소스 그룹의 에이전트를 읽을 수 있는 사용자가 에이전트가 보고하지 않는 슬롯을 조회하면 권한 검사를 통과한 뒤 대상을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 에이전트 하나와, 그것을 읽을 수 있는 일반 사용자 한 명
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
-  - 도메인 home-1
-  - 리소스 그룹의 에이전트 조회 권한을 받은 사용자 준비
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
       - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
       - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
       - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
       - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 agent-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 agent-reader-1: agent 전체에 READ 허용
-    - 일반 사용자 user-1: 역할 agent-reader-1 보유
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- ResourceSlotAdapter.get_agent_resource — user-1이 agent-1 에이전트의 cpu 슬롯 조회
+- ResourceSlotAdapter.lookup_slot_type — user-1이 slot-1 이름으로 id 찾기
 
 Then
 
-- 거부된다
-  - 거부: AgentResourceNotFound
+- 미리 만들어 둔 슬롯 종류의 id가 반환된다
+  - id: 미리 만들어 둔 슬롯 종류의 id와 같다
 
-#### [reading-a-slot-the-agent-does-not-report-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_agent_resources.py) — pass
+<a id="looking_up-looking-up-a-slot-name-nothing-answers-to-is-refused"></a>
 
-슈퍼관리자가 에이전트가 보고하지 않는 슬롯을 조회하면 대상을 찾을 수 없다는 이유로 거부된다
+#### [looking-up-a-slot-name-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/resource_slot/test_looking_up.py) — pass
 
-Given
-
-- 에이전트 하나와, 슈퍼관리자 한 명
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.get_agent_resource — user-1이 agent-1 에이전트의 cpu 슬롯 조회
-
-Then
-
-- 거부된다
-  - 거부: AgentResourceNotFound
-
-#### [reading-an-agent-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_agent_resources.py) — pass
-
-슈퍼관리자가 존재하지 않는 에이전트 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
+존재하지 않는 이름으로 id를 찾으면 잘못된 요청으로 거부된다
 
 Given
 
-- 에이전트 하나와, 슈퍼관리자 한 명
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.get_agent_resource — user-1이 no-such-agent 에이전트의 cpu 슬롯 조회
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-#### [turning-enforcement-off-lets-a-user-pass-the-gate-to-the-slot-the-agent-does-not-report](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_agent_resources.py) — pass
-
-권한 검사를 끄면 아무 권한도 없는 사용자도 권한 검사를 통과하고, 에이전트가 보고하지 않는 슬롯이므로 대상을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 에이전트 하나와, 일반 사용자 한 명
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.get_agent_resource — user-1이 agent-1 에이전트의 cpu 슬롯 조회
-
-Then
-
-- 거부된다
-  - 거부: AgentResourceNotFound
-
-### reading_allocations
-
-#### [a-user-granted-nothing-may-not-read-a-kernel-slot-allocation](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_allocations.py) — pass
-
-아무 권한도 없는 사용자가 조회하면 커널 id를 풀어낼 수 없다는 이유로 거부된다. 커널 id를 세션으로 풀어내는 단계가 그 세션에 대한 권한을 검사하고, 권한이 없을 때와 커널이 없을 때 같은 답을 한다
-
-Given
-
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
+- 자원 슬롯 종류 하나와, 일반 사용자 한 명
   - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- ResourceSlotAdapter.get_kernel_allocation — user-2이 미리 만들어 둔 커널의 id와 slot-1 슬롯 이름으로 조회
+- ResourceSlotAdapter.lookup_slot_type — user-1이 no-such-slot 이름으로 id 찾기
 
 Then
 
 - 거부된다
   - 거부: GenericBadRequest
 
-#### [a-user-granted-nothing-reading-an-unknown-kernel-id-is-refused-the-same-way](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_allocations.py) — pass
+### partial_bulk_purge_slot_types
 
-아무 권한도 없는 사용자가 존재하지 않는 커널 id로 조회해도 커널 id를 풀어낼 수 없다는 같은 이유로 거부된다. 답으로는 그 커널이 있는지 알 수 없다
+<a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-slot-types"></a>
 
-Given
+#### [a-user-granted-nothing-purges-none-of-several-slot-types](/tests/scenario/bai_scenario/manager/resource_slot/test_partial_bulk_purging.py) — pass
 
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-
-When
-
-- ResourceSlotAdapter.get_kernel_allocation — user-2이 존재하지 않는 커널 id와 slot-1 슬롯 이름으로 조회
-
-Then
-
-- 거부된다
-  - 거부: GenericBadRequest
-
-#### [a-user-reading-sessions-in-the-project-reads-a-kernel-slot-allocation](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_allocations.py) — pass
-
-프로젝트 범위에서 세션을 읽을 수 있는 사용자가 조회하면 그 할당 전체가 반환된다. 할당은 커널이 속한 세션의 것이므로, 세션에 대한 권한이 할당을 읽게 한다
+아무 권한도 없는 사용자가 슬롯 종류 여럿을 한 번에 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
 Given
 
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 프로젝트 범위에서 세션을 읽을 수 있는 일반 사용자 한 명
+- 자원 슬롯 종류 2개와, 일반 사용자 한 명
+  - 자원 슬롯 종류 wanted-1: count 종류
+  - 자원 슬롯 종류 other-1: count 종류
   - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-  - 프로젝트 범위의 세션 조회 권한을 받은 사용자 준비
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
     - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-      - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-reader-1: session 전체에 READ 허용
-    - 일반 사용자 user-2: 역할 session-reader-1 보유
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- ResourceSlotAdapter.get_kernel_allocation — user-2이 미리 만들어 둔 커널의 id와 slot-1 슬롯 이름으로 조회
+- ResourceSlotAdapter.partial_bulk_purge_slot_types — user-1이 슬롯 종류 2개를 한 번에 삭제함
 
 Then
 
-- 그 커널의 할당 전체가 반환된다
-  - id: 미리 만들어 둔 커널의 id와 슬롯 이름와 같다
-  - kernel_id: 미리 만들어 둔 커널의 id와 같다
+- 처리된 슬롯 종류 없이 대상이 모두 실패 목록에 온다
+  - successes = []
+  - failed count = 2
+  - failed[0].id: 미리 만들어 둔 슬롯 종류의 id와 같다
+  - failed[0].message: 'Insufficient permission'를 담은 이유
+  - failed[1].id: 미리 만들어 둔 슬롯 종류의 id와 같다
+  - failed[1].message: 'Insufficient permission'를 담은 이유
+
+<a id="partial_bulk_purging-purging-several-slot-types-answers-for-the-missing-one"></a>
+
+#### [purging-several-slot-types-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_slot/test_partial_bulk_purging.py) — pass
+
+아무것도 참조하지 않는 슬롯 종류 둘과 없는 id 하나를 슈퍼관리자가 한 번에 삭제하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+
+Given
+
+- 자원 슬롯 종류 2개와, 슈퍼관리자 한 명
+  - 자원 슬롯 종류 wanted-1: count 종류
+  - 자원 슬롯 종류 other-1: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.partial_bulk_purge_slot_types — user-1이 슬롯 종류 2개 와 없는 id 하나를 한 번에 삭제함
+
+Then
+
+- 미리 만들어 둔 슬롯 종류가 모두 지워지기 전 모습으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
+  - successes count = 2
+  - successes[0].id = 'wanted-1'
+  - successes[0].uuid: 무시함 — 데이터베이스가 만든다
+  - successes[0].slot_name = 'wanted-1'
+  - successes[0].slot_type = 'count'
+  - successes[0].required = False
+  - successes[0].enabled = True
+  - successes[0].display_name = '미리 만들어 둔 슬롯'
+  - successes[0].description = '미리 만들어 둔 슬롯 종류'
+  - successes[0].display_unit = ''
+  - successes[0].display_icon = ''
+  - successes[0].number_format = NumberFormatInfo(binary=False, round_length=0)
+  - successes[0].rank = 0
+  - successes[1].id = 'other-1'
+  - successes[1].uuid: 무시함 — 데이터베이스가 만든다
+  - successes[1].slot_name = 'other-1'
+  - successes[1].slot_type = 'count'
+  - successes[1].required = False
+  - successes[1].enabled = True
+  - successes[1].display_name = '미리 만들어 둔 슬롯'
+  - successes[1].description = '미리 만들어 둔 슬롯 종류'
+  - successes[1].display_unit = ''
+  - successes[1].display_icon = ''
+  - successes[1].number_format = NumberFormatInfo(binary=False, round_length=0)
+  - successes[1].rank = 0
+  - failed count = 1
+  - failed[0].id: 요청에 넣은 없는 id와 같다
+  - failed[0].message: 'not found'를 담은 이유
+
+### purge_slot_type
+
+<a id="retiring-the-superadmin-purges-a-slot-type-nothing-refers-to"></a>
+
+#### [the-superadmin-purges-a-slot-type-nothing-refers-to](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
+
+아무것도 참조하지 않는 슬롯 종류를 슈퍼관리자가 id로 삭제하면 삭제한 이름을 담은 응답이 반환된다
+
+Given
+
+- 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.purge_slot_type — user-1이 slot-1 삭제
+
+Then
+
+- 삭제한 슬롯 종류의 이름이 반환된다
   - slot_name = 'slot-1'
-  - requested: 수로 보아 1
-  - used = None
 
-#### [reading-a-kernel-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_allocations.py) — pass
+<a id="retiring-turning-enforcement-off-lets-a-user-purge-a-slot-type"></a>
 
-슈퍼관리자가 존재하지 않는 커널 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다. 모든 검사를 통과하는 슈퍼관리자에게는 없다는 사실을 그대로 답한다
+#### [turning-enforcement-off-lets-a-user-purge-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
 
-Given
-
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-
-When
-
-- ResourceSlotAdapter.get_kernel_allocation — user-2이 존재하지 않는 커널 id와 slot-1 슬롯 이름으로 조회
-
-Then
-
-- 거부된다
-  - 거부: FieldNotFoundError
-
-#### [reading-a-slot-the-kernel-did-not-ask-for-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_allocations.py) — pass
-
-슈퍼관리자가 그 커널이 요구하지 않은 슬롯 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
+권한 검사를 끄면 아무 권한도 없는 사용자도 슬롯 종류를 삭제할 수 있다
 
 Given
 
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
+- 자원 슬롯 종류 하나와, 일반 사용자 한 명
   - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- ResourceSlotAdapter.get_kernel_allocation — user-2이 미리 만들어 둔 커널의 id와 no-such-slot 슬롯 이름으로 조회
+- ResourceSlotAdapter.purge_slot_type — user-1이 slot-1 삭제
 
 Then
 
-- 거부된다
-  - 거부: ResourceAllocationNotFound
-
-#### [the-superadmin-reads-a-kernel-slot-allocation](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_allocations.py) — pass
-
-슈퍼관리자가 커널 id와 슬롯 이름으로 조회하면 그 할당 전체가 반환된다. 커널은 아직 스케줄링되지 않았으므로 요구한 양만 있고 실제 사용량은 없다
-
-Given
-
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-
-When
-
-- ResourceSlotAdapter.get_kernel_allocation — user-2이 미리 만들어 둔 커널의 id와 slot-1 슬롯 이름으로 조회
-
-Then
-
-- 그 커널의 할당 전체가 반환된다
-  - id: 미리 만들어 둔 커널의 id와 슬롯 이름와 같다
-  - kernel_id: 미리 만들어 둔 커널의 id와 같다
+- 삭제한 슬롯 종류의 이름이 반환된다
   - slot_name = 'slot-1'
-  - requested: 수로 보아 1
-  - used = None
 
-#### [turning-enforcement-off-lets-a-user-read-a-kernel-slot-allocation](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_allocations.py) — pass
-
-권한 검사를 끄면 아무 권한도 없는 사용자도 할당을 조회할 수 있다
-
-Given
-
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-
-When
-
-- ResourceSlotAdapter.get_kernel_allocation — user-2이 미리 만들어 둔 커널의 id와 slot-1 슬롯 이름으로 조회
-
-Then
-
-- 그 커널의 할당 전체가 반환된다
-  - id: 미리 만들어 둔 커널의 id와 슬롯 이름와 같다
-  - kernel_id: 미리 만들어 둔 커널의 id와 같다
-  - slot_name = 'slot-1'
-  - requested: 수로 보아 1
-  - used = None
-
-### reading_domain_overview
-
-#### [a-user-granted-nothing-may-not-read-a-domain-overview](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_domain_overview.py) — pass
-
-아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다
-
-Given
-
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-
-When
-
-- ResourceSlotAdapter.get_domain_resource_overview — user-2이 home-1 도메인의 개요 조회
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [a-user-reading-sessions-in-the-domain-reads-its-overview](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_domain_overview.py) — pass
-
-도메인 범위에서 세션을 읽을 수 있는 사용자가 그 도메인의 개요를 조회하면 개요가 반환된다
-
-Given
-
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 도메인 범위에서 세션을 읽을 수 있는 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-  - 도메인 범위의 세션 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-      - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-reader-1: session 전체에 READ 허용
-    - 일반 사용자 user-2: 역할 session-reader-1 보유
-
-When
-
-- ResourceSlotAdapter.get_domain_resource_overview — user-2이 home-1 도메인의 개요 조회
-
-Then
-
-- 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다
-  - slots.entries = []
-  - session_count = 0
-
-#### [a-user-reading-sessions-in-the-project-may-not-read-the-domain-overview](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_domain_overview.py) — pass
-
-프로젝트 범위에서만 세션을 읽을 수 있는 사용자가 그 프로젝트가 속한 도메인의 개요를 조회하면 권한 부족으로 거부된다. 도메인 개요는 도메인 범위의 권한을 검사한다
-
-Given
-
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 프로젝트 범위에서 세션을 읽을 수 있는 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-  - 프로젝트 범위의 세션 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-      - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-reader-1: session 전체에 READ 허용
-    - 일반 사용자 user-2: 역할 session-reader-1 보유
-
-When
-
-- ResourceSlotAdapter.get_domain_resource_overview — user-2이 home-1 도메인의 개요 조회
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [reading-the-overview-of-a-domain-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_domain_overview.py) — pass
-
-존재하지 않는 도메인 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
-
-Given
-
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-
-When
-
-- ResourceSlotAdapter.get_domain_resource_overview — user-2이 no-such-domain 도메인의 개요 조회
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-#### [the-superadmin-reads-a-domain-overview-that-counts-no-pending-kernel](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_domain_overview.py) — pass
-
-대기 중인 커널만 있는 도메인의 개요를 슈퍼관리자가 조회하면 점유된 슬롯이 없고 세션 수가 0이다. 개요는 자원을 점유했거나 배정받은 커널만 세고, 요구만 한 커널은 세지 않는다
-
-Given
-
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-
-When
-
-- ResourceSlotAdapter.get_domain_resource_overview — user-2이 home-1 도메인의 개요 조회
-
-Then
-
-- 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다
-  - slots.entries = []
-  - session_count = 0
-
-#### [turning-enforcement-off-lets-a-user-read-a-domain-overview](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_domain_overview.py) — pass
-
-권한 검사를 끄면 아무 권한도 없는 사용자도 도메인의 개요를 조회할 수 있다
-
-Given
-
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-
-When
-
-- ResourceSlotAdapter.get_domain_resource_overview — user-2이 home-1 도메인의 개요 조회
-
-Then
-
-- 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다
-  - slots.entries = []
-  - session_count = 0
-
-### reading_project_overview
-
-#### [a-user-granted-nothing-may-not-read-a-project-overview](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_project_overview.py) — pass
-
-아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다
-
-Given
-
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-
-When
-
-- ResourceSlotAdapter.get_project_resource_overview — user-2이 team-1 프로젝트의 id로 개요 조회
-
-Then
-
-- 거부된다
-  - 거부: NotEnoughPermission
-
-#### [a-user-reading-sessions-in-the-domain-reads-a-project-overview-in-it](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_project_overview.py) — pass
-
-도메인 범위에서 세션을 읽을 수 있는 사용자가 그 도메인에 속한 프로젝트의 개요를 조회하면 개요가 반환된다. 도메인 범위의 권한은 그 안의 프로젝트에도 미친다
-
-Given
-
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 도메인 범위에서 세션을 읽을 수 있는 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-  - 도메인 범위의 세션 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-      - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-reader-1: session 전체에 READ 허용
-    - 일반 사용자 user-2: 역할 session-reader-1 보유
-
-When
-
-- ResourceSlotAdapter.get_project_resource_overview — user-2이 team-1 프로젝트의 id로 개요 조회
-
-Then
-
-- 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다
-  - slots.entries = []
-  - session_count = 0
-
-#### [a-user-reading-sessions-in-the-project-reads-its-overview](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_project_overview.py) — pass
-
-프로젝트 범위에서 세션을 읽을 수 있는 사용자가 그 프로젝트의 개요를 조회하면 개요가 반환된다
-
-Given
-
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 프로젝트 범위에서 세션을 읽을 수 있는 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-  - 프로젝트 범위의 세션 조회 권한을 받은 사용자 준비
-    - 도메인에 속한 사용자 한 명 준비
-      - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-      - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-    - 역할 session-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
-    - 역할 session-reader-1: session 전체에 READ 허용
-    - 일반 사용자 user-2: 역할 session-reader-1 보유
-
-When
-
-- ResourceSlotAdapter.get_project_resource_overview — user-2이 team-1 프로젝트의 id로 개요 조회
-
-Then
-
-- 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다
-  - slots.entries = []
-  - session_count = 0
-
-#### [reading-the-overview-of-a-project-id-nothing-answers-to-answers-an-empty-overview](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_project_overview.py) — pass
-
-슈퍼관리자가 존재하지 않는 프로젝트 id로 조회하면 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다. 도메인 개요와 달리 프로젝트는 id로 지정하므로 풀어내는 단계가 없고, 프로젝트가 있는지 확인하지 않는다
-
-Given
-
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-
-When
-
-- ResourceSlotAdapter.get_project_resource_overview — user-2이 존재하지 않는 프로젝트 id로 개요 조회
-
-Then
-
-- 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다
-  - slots.entries = []
-  - session_count = 0
-
-#### [the-superadmin-reads-a-project-overview-that-counts-no-pending-kernel](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_project_overview.py) — pass
-
-대기 중인 커널만 있는 프로젝트의 개요를 슈퍼관리자가 조회하면 점유된 슬롯이 없고 세션 수가 0이다. 개요는 자원을 점유했거나 배정받은 커널만 세고, 요구만 한 커널은 세지 않는다
-
-Given
-
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 슈퍼관리자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-
-When
-
-- ResourceSlotAdapter.get_project_resource_overview — user-2이 team-1 프로젝트의 id로 개요 조회
-
-Then
-
-- 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다
-  - slots.entries = []
-  - session_count = 0
-
-#### [turning-enforcement-off-lets-a-user-read-a-project-overview](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_project_overview.py) — pass
-
-권한 검사를 끄면 아무 권한도 없는 사용자도 프로젝트의 개요를 조회할 수 있다
-
-Given
-
-- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-
-When
-
-- ResourceSlotAdapter.get_project_resource_overview — user-2이 team-1 프로젝트의 id로 개요 조회
-
-Then
-
-- 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다
-  - slots.entries = []
-  - session_count = 0
-
-### retiring
+<a id="retiring-a-slot-type-a-deployment-revision-still-uses-may-not-be-purged"></a>
 
 #### [a-slot-type-a-deployment-revision-still-uses-may-not-be-purged](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
 
@@ -1445,12 +1011,14 @@ Given
 
 When
 
-- ResourceSlotAdapter.admin_purge_slot_type — user-1이 cpu 삭제
+- ResourceSlotAdapter.purge_slot_type — user-1이 cpu 삭제
 
 Then
 
 - 거부된다
   - 거부: ResourceSlotTypeInUse
+
+<a id="retiring-a-slot-type-a-kernel-still-asks-for-may-not-be-purged"></a>
 
 #### [a-slot-type-a-kernel-still-asks-for-may-not-be-purged](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
 
@@ -1476,16 +1044,19 @@ Given
   - 이미지 image-1: x86_64 이미지
   - 자원 슬롯 종류 slot-1: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1인 커널 하나를 갖는다
 
 When
 
-- ResourceSlotAdapter.admin_purge_slot_type — user-2이 slot-1 삭제
+- ResourceSlotAdapter.purge_slot_type — user-2이 slot-1 삭제
 
 Then
 
 - 거부된다
   - 거부: ResourceSlotTypeInUse
+
+<a id="retiring-a-user-granted-nothing-may-not-purge-a-slot-type"></a>
 
 #### [a-user-granted-nothing-may-not-purge-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
 
@@ -1496,110 +1067,112 @@ Given
 - 자원 슬롯 종류 하나와, 일반 사용자 한 명
   - 자원 슬롯 종류 slot-1: count 종류
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- ResourceSlotAdapter.admin_purge_slot_type — user-1이 slot-1 삭제
+- ResourceSlotAdapter.purge_slot_type — user-1이 slot-1 삭제
 
 Then
 
 - 거부된다
   - 거부: NotEnoughPermission
 
-#### [purging-a-slot-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
+<a id="retiring-a-user-granted-nothing-purging-an-unknown-slot-type-id-is-refused-by-permission"></a>
 
-슈퍼관리자가 존재하지 않는 이름을 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
+#### [a-user-granted-nothing-purging-an-unknown-slot-type-id-is-refused-by-permission](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
 
-Given
-
-- 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.admin_purge_slot_type — user-1이 no-such-slot 삭제
-
-Then
-
-- 거부된다
-  - 거부: EntityNotFoundError
-
-#### [the-superadmin-purges-a-slot-type-nothing-refers-to](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
-
-아무것도 참조하지 않는 슬롯 종류를 슈퍼관리자가 이름으로 삭제하면 삭제한 이름을 담은 응답이 반환된다
-
-Given
-
-- 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.admin_purge_slot_type — user-1이 slot-1 삭제
-
-Then
-
-- 삭제한 슬롯 종류의 이름이 반환된다
-  - slot_name = 'slot-1'
-
-#### [turning-enforcement-off-lets-a-user-purge-a-slot-type](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
-
-권한 검사를 끄면 아무 권한도 없는 사용자도 슬롯 종류를 삭제할 수 있다
+아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. 호출한 사용자가 쓸 수 있는지를 대상을 찾기 전에 검사하기 때문이다
 
 Given
 
 - 자원 슬롯 종류 하나와, 일반 사용자 한 명
   - 자원 슬롯 종류 slot-1: count 종류
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
 
 When
 
-- ResourceSlotAdapter.admin_purge_slot_type — user-1이 slot-1 삭제
+- ResourceSlotAdapter.purge_slot_type — user-1이 존재하지 않는 id 삭제
 
 Then
 
-- 삭제한 슬롯 종류의 이름이 반환된다
-  - slot_name = 'slot-1'
+- 거부된다
+  - 거부: NotEnoughPermission
 
-### scoped_searching_agent_resources
+<a id="retiring-purging-a-slot-type-id-nothing-answers-to-is-not-found"></a>
 
-#### [a-user-granted-nothing-may-not-search-an-agent-s-resources](/tests/scenario/bai_scenario/manager/resource_slot/test_scoped_searching_agent_resources.py) — pass
+#### [purging-a-slot-type-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_retiring.py) — pass
 
-아무 권한도 없는 사용자가 에이전트를 지정해 조회하면 권한 부족으로 거부된다
+슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
 
 Given
 
-- 에이전트 하나와, 일반 사용자 한 명
+- 자원 슬롯 종류 하나와, 슈퍼관리자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 슈퍼관리자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.purge_slot_type — user-1이 존재하지 않는 id 삭제
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+### scoped_search_agent_resources
+
+<a id="scoped_searching_agent_resources-a-user-reading-agents-in-the-group-finds-every-slot-the-agent-reports"></a>
+
+#### [a-user-reading-agents-in-the-group-finds-every-slot-the-agent-reports](/tests/scenario/bai_scenario/manager/resource_slot/test_scoped_searching_agent_resources.py) — pass
+
+리소스 그룹의 에이전트를 읽을 수 있는 사용자가 슬롯 둘을 보고한 에이전트를 지정해 조회하면 그 에이전트가 보고한 슬롯이 모두 반환된다
+
+Given
+
+- 슬롯 2개를 보고한 에이전트 1개와, 에이전트를 읽을 수 있는 일반 사용자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
   - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
   - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 에이전트 agent-1: slot-1 슬롯 용량 10 보고, 1 사용 중
+  - 에이전트 agent-1: slot-2 슬롯 용량 20 보고, 1 사용 중
   - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 리소스 그룹의 에이전트 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 agent-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 agent-reader-1: agent 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 agent-reader-1 보유
 
 When
 
@@ -1607,8 +1180,25 @@ When
 
 Then
 
-- 거부된다
-  - 거부: NotEnoughPermission
+- 보고된 슬롯 행 전체가 반환된다
+  - len(items) = 2
+  - items[0].id = 'agent-1:slot-1'
+  - items[0].field_id: 무시함 — 데이터베이스가 만든다
+  - items[0].agent_id = 'agent-1'
+  - items[0].slot_name = 'slot-1'
+  - items[0].capacity: 수로 보아 10
+  - items[0].used: 수로 보아 1
+  - items[1].id = 'agent-1:slot-2'
+  - items[1].field_id: 무시함 — 데이터베이스가 만든다
+  - items[1].agent_id = 'agent-1'
+  - items[1].slot_name = 'slot-2'
+  - items[1].capacity: 수로 보아 20
+  - items[1].used: 수로 보아 1
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="scoped_searching_agent_resources-a-user-reading-agents-in-the-group-searches-the-agent-and-finds-no-slot"></a>
 
 #### [a-user-reading-agents-in-the-group-searches-the-agent-and-finds-no-slot](/tests/scenario/bai_scenario/manager/resource_slot/test_scoped_searching_agent_resources.py) — pass
 
@@ -1642,6 +1232,95 @@ Then
   - has_next_page = False
   - has_previous_page = False
 
+<a id="scoped_searching_agent_resources-the-superadmin-searches-the-agent-and-finds-no-slot"></a>
+
+#### [the-superadmin-searches-the-agent-and-finds-no-slot](/tests/scenario/bai_scenario/manager/resource_slot/test_scoped_searching_agent_resources.py) — pass
+
+슈퍼관리자가 아직 슬롯을 보고하지 않은 에이전트를 지정해 조회하면 응답이 비어 있다
+
+Given
+
+- 에이전트 하나와, 슈퍼관리자 한 명
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.scoped_search_agent_resources — user-1이 agent-1 에이전트를 지정해 조회
+
+Then
+
+- 답이 비어 있다
+  - items = []
+  - total_count = 0
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="scoped_searching_agent_resources-turning-enforcement-off-lets-a-user-search-an-agent-s-resources"></a>
+
+#### [turning-enforcement-off-lets-a-user-search-an-agent-s-resources](/tests/scenario/bai_scenario/manager/resource_slot/test_scoped_searching_agent_resources.py) — pass
+
+권한 검사를 끄면 아무 권한도 없는 사용자도 에이전트를 지정해 조회할 수 있다
+
+Given
+
+- 에이전트 하나와, 일반 사용자 한 명
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.scoped_search_agent_resources — user-1이 agent-1 에이전트를 지정해 조회
+
+Then
+
+- 답이 비어 있다
+  - items = []
+  - total_count = 0
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="scoped_searching_agent_resources-a-user-granted-nothing-may-not-search-an-agent-s-resources"></a>
+
+#### [a-user-granted-nothing-may-not-search-an-agent-s-resources](/tests/scenario/bai_scenario/manager/resource_slot/test_scoped_searching_agent_resources.py) — pass
+
+아무 권한도 없는 사용자가 에이전트를 지정해 조회하면 권한 부족으로 거부된다
+
+Given
+
+- 에이전트 하나와, 일반 사용자 한 명
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.scoped_search_agent_resources — user-1이 agent-1 에이전트를 지정해 조회
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="scoped_searching_agent_resources-one-agent-the-caller-may-not-read-refuses-the-whole-search"></a>
+
 #### [one-agent-the-caller-may-not-read-refuses-the-whole-search](/tests/scenario/bai_scenario/manager/resource_slot/test_scoped_searching_agent_resources.py) — pass
 
 둘 중 한 에이전트만 읽을 수 있는 사용자가 둘을 함께 지정해 조회하면 전체가 권한 부족으로 거부된다. 읽을 수 있는 쪽만 골라 답하지 않는다
@@ -1673,159 +1352,9 @@ Then
 - 거부된다
   - 거부: NotEnoughPermission
 
-#### [the-superadmin-searches-the-agent-and-finds-no-slot](/tests/scenario/bai_scenario/manager/resource_slot/test_scoped_searching_agent_resources.py) — pass
+### search_agent_resources
 
-슈퍼관리자가 아직 슬롯을 보고하지 않은 에이전트를 지정해 조회하면 응답이 비어 있다
-
-Given
-
-- 에이전트 하나와, 슈퍼관리자 한 명
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.scoped_search_agent_resources — user-1이 agent-1 에이전트를 지정해 조회
-
-Then
-
-- 답이 비어 있다
-  - items = []
-  - total_count = 0
-  - has_next_page = False
-  - has_previous_page = False
-
-#### [turning-enforcement-off-lets-a-user-search-an-agent-s-resources](/tests/scenario/bai_scenario/manager/resource_slot/test_scoped_searching_agent_resources.py) — pass
-
-권한 검사를 끄면 아무 권한도 없는 사용자도 에이전트를 지정해 조회할 수 있다
-
-Given
-
-- 에이전트 하나와, 일반 사용자 한 명
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.scoped_search_agent_resources — user-1이 agent-1 에이전트를 지정해 조회
-
-Then
-
-- 답이 비어 있다
-  - items = []
-  - total_count = 0
-  - has_next_page = False
-  - has_previous_page = False
-
-### searching
-
-#### [a-name-filter-narrows-the-answer-to-the-slot-type-it-names](/tests/scenario/bai_scenario/manager/resource_slot/test_searching.py) — pass
-
-슬롯 종류 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 슬롯 종류만 남는다
-
-Given
-
-- 자원 슬롯 종류 3개와, 일반 사용자 한 명
-  - 자원 슬롯 종류 wanted-1: count 종류
-  - 자원 슬롯 종류 other-1: count 종류
-  - 자원 슬롯 종류 other-2: count 종류
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.search_slot_types — user-1이 wanted-1 이름 필터로 조회
-
-Then
-
-- 필터에 맞는 슬롯 종류 하나만 반환된다
-  - items = ['wanted-1']
-  - total_count = 1
-  - has_next_page = False
-  - has_previous_page = False
-
-#### [a-user-granted-nothing-counts-every-slot-type-laid](/tests/scenario/bai_scenario/manager/resource_slot/test_searching.py) — pass
-
-슬롯 종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다
-
-Given
-
-- 자원 슬롯 종류 2개와, 일반 사용자 한 명
-  - 자원 슬롯 종류 wanted-1: count 종류
-  - 자원 슬롯 종류 other-1: count 종류
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.search_slot_types — user-1이 필터 없이 전체 조회
-
-Then
-
-- 미리 만들어 둔 슬롯 종류가 모두 집계된다
-  - items = ['other-1', 'wanted-1']
-  - total_count = 2
-  - has_next_page = False
-  - has_previous_page = False
-
-#### [omitting-the-page-size-answers-ten-slot-types-and-a-next-page](/tests/scenario/bai_scenario/manager/resource_slot/test_searching.py) — pass
-
-슬롯 종류 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다
-
-Given
-
-- 자원 슬롯 종류 11개와, 일반 사용자 한 명
-  - 자원 슬롯 종류 wanted-1: count 종류
-  - 자원 슬롯 종류 other-1: count 종류
-  - 자원 슬롯 종류 other-2: count 종류
-  - 자원 슬롯 종류 other-3: count 종류
-  - 자원 슬롯 종류 other-4: count 종류
-  - 자원 슬롯 종류 other-5: count 종류
-  - 자원 슬롯 종류 other-6: count 종류
-  - 자원 슬롯 종류 other-7: count 종류
-  - 자원 슬롯 종류 other-8: count 종류
-  - 자원 슬롯 종류 other-9: count 종류
-  - 자원 슬롯 종류 other-10: count 종류
-  - 도메인 home-1
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-
-When
-
-- ResourceSlotAdapter.search_slot_types — user-1이 필터 없이 전체 조회
-
-Then
-
-- 기본 크기의 첫 페이지가 반환된다
-  - len(items) = 10
-  - total_count = 11
-  - has_next_page = True
-  - has_previous_page = False
-
-### searching_agent_resources
+<a id="searching_agent_resources-a-monitor-may-search-agent-resources"></a>
 
 #### [a-monitor-may-search-agent-resources](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
 
@@ -1855,30 +1384,87 @@ Then
   - has_next_page = False
   - has_previous_page = False
 
-#### [a-user-granted-nothing-may-not-search-agent-resources](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
+<a id="searching_agent_resources-a-slot-name-filter-narrows-the-answer-to-that-slot"></a>
 
-아무 권한도 없는 사용자가 조회하면 역할 부족으로 거부된다
+#### [a-slot-name-filter-narrows-the-answer-to-that-slot](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
+
+슬롯 둘을 보고한 에이전트 하나가 있을 때 한 슬롯의 이름을 필터로 조회하면, 응답에는 그 슬롯의 행만 남는다
 
 Given
 
-- 에이전트 하나와, 일반 사용자 한 명
+- 슬롯 2개를 보고한 에이전트 1개와, 슈퍼관리자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
   - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
   - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 에이전트 agent-1: slot-1 슬롯 용량 10 보고, 1 사용 중
+  - 에이전트 agent-1: slot-2 슬롯 용량 20 보고, 1 사용 중
   - 도메인 home-1
   - 도메인에 속한 사용자 한 명 준비
     - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
     - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
     - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
 
 When
 
-- ResourceSlotAdapter.search_agent_resources — user-1이 필터 없이 전체 조회
+- ResourceSlotAdapter.search_agent_resources — user-1이 slot-2 슬롯 이름 필터로 조회
 
 Then
 
-- 거부된다
-  - 거부: InsufficientPrivilege
+- 보고된 슬롯 행 전체가 이 순서대로 반환된다
+  - len(items) = 1
+  - items[0].id = 'agent-1:slot-2'
+  - items[0].field_id: 무시함 — 데이터베이스가 만든다
+  - items[0].agent_id = 'agent-1'
+  - items[0].slot_name = 'slot-2'
+  - items[0].capacity: 수로 보아 20
+  - items[0].used: 수로 보아 1
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching_agent_resources-an-agent-filter-narrows-the-answer-to-that-agent-s-slots"></a>
+
+#### [an-agent-filter-narrows-the-answer-to-that-agent-s-slots](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
+
+슬롯을 보고한 에이전트 둘이 있을 때 한 에이전트를 필터로 조회하면, 응답에는 그 에이전트의 행만 남는다
+
+Given
+
+- 슬롯 1개씩 보고한 에이전트 2개와, 슈퍼관리자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 에이전트 agent-1: slot-1 슬롯 용량 10 보고, 1 사용 중
+  - 에이전트 agent-2: 살아 있고, 아직 보고한 슬롯이 없다
+  - 에이전트 agent-2: slot-1 슬롯 용량 10 보고, 1 사용 중
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.search_agent_resources — user-1이 agent-2 에이전트 필터로 조회
+
+Then
+
+- 보고된 슬롯 행 전체가 이 순서대로 반환된다
+  - len(items) = 1
+  - items[0].id = 'agent-2:slot-1'
+  - items[0].field_id: 무시함 — 데이터베이스가 만든다
+  - items[0].agent_id = 'agent-2'
+  - items[0].slot_name = 'slot-1'
+  - items[0].capacity: 수로 보아 10
+  - items[0].used: 수로 보아 1
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching_agent_resources-an-agent-reporting-no-slot-means-none-is-found"></a>
 
 #### [an-agent-reporting-no-slot-means-none-is-found](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
 
@@ -1908,6 +1494,233 @@ Then
   - has_next_page = False
   - has_previous_page = False
 
+<a id="searching_agent_resources-asking-for-the-first-slot-answers-one-and-a-next-page"></a>
+
+#### [asking-for-the-first-slot-answers-one-and-a-next-page](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
+
+보고된 슬롯 둘이 있을 때 앞에서 1건만 요청해 조회하면 슬롯 이름 순서로 앞선 한 건이 반환되고 다음 페이지가 있다고 응답한다
+
+Given
+
+- 슬롯 2개를 보고한 에이전트 1개와, 슈퍼관리자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 에이전트 agent-1: slot-1 슬롯 용량 10 보고, 1 사용 중
+  - 에이전트 agent-1: slot-2 슬롯 용량 20 보고, 1 사용 중
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.search_agent_resources — user-1이 앞에서 1건만 요청해 조회
+
+Then
+
+- 슬롯 이름 순서로 앞선 행 전체가 반환되고 다음 페이지가 있다고 응답한다
+  - len(items) = 1
+  - items[0].id = 'agent-1:slot-1'
+  - items[0].field_id: 무시함 — 데이터베이스가 만든다
+  - items[0].agent_id = 'agent-1'
+  - items[0].slot_name = 'slot-1'
+  - items[0].capacity: 수로 보아 10
+  - items[0].used: 수로 보아 1
+  - total_count = 2
+  - has_next_page = True
+  - has_previous_page = False
+
+<a id="searching_agent_resources-omitting-the-page-size-answers-ten-slots-and-a-next-page"></a>
+
+#### [omitting-the-page-size-answers-ten-slots-and-a-next-page](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
+
+보고된 슬롯 11개가 있을 때 크기 없이 조회하면 슬롯 이름 순서로 앞선 10건까지 반환되고 다음 페이지가 있다고 응답한다
+
+Given
+
+- 슬롯 11개를 보고한 에이전트 1개와, 슈퍼관리자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 자원 슬롯 종류 slot-3: count 종류
+  - 자원 슬롯 종류 slot-4: count 종류
+  - 자원 슬롯 종류 slot-5: count 종류
+  - 자원 슬롯 종류 slot-6: count 종류
+  - 자원 슬롯 종류 slot-7: count 종류
+  - 자원 슬롯 종류 slot-8: count 종류
+  - 자원 슬롯 종류 slot-9: count 종류
+  - 자원 슬롯 종류 slot-10: count 종류
+  - 자원 슬롯 종류 slot-11: count 종류
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 에이전트 agent-1: slot-1 슬롯 용량 10 보고, 1 사용 중
+  - 에이전트 agent-1: slot-2 슬롯 용량 20 보고, 1 사용 중
+  - 에이전트 agent-1: slot-3 슬롯 용량 30 보고, 1 사용 중
+  - 에이전트 agent-1: slot-4 슬롯 용량 40 보고, 1 사용 중
+  - 에이전트 agent-1: slot-5 슬롯 용량 50 보고, 1 사용 중
+  - 에이전트 agent-1: slot-6 슬롯 용량 60 보고, 1 사용 중
+  - 에이전트 agent-1: slot-7 슬롯 용량 70 보고, 1 사용 중
+  - 에이전트 agent-1: slot-8 슬롯 용량 80 보고, 1 사용 중
+  - 에이전트 agent-1: slot-9 슬롯 용량 90 보고, 1 사용 중
+  - 에이전트 agent-1: slot-10 슬롯 용량 100 보고, 1 사용 중
+  - 에이전트 agent-1: slot-11 슬롯 용량 110 보고, 1 사용 중
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.search_agent_resources — user-1이 필터 없이 전체 조회
+
+Then
+
+- 슬롯 이름 순서로 앞선 행 전체가 반환되고 다음 페이지가 있다고 응답한다
+  - len(items) = 10
+  - items[0].id = 'agent-1:slot-1'
+  - items[0].field_id: 무시함 — 데이터베이스가 만든다
+  - items[0].agent_id = 'agent-1'
+  - items[0].slot_name = 'slot-1'
+  - items[0].capacity: 수로 보아 10
+  - items[0].used: 수로 보아 1
+  - items[1].id = 'agent-1:slot-10'
+  - items[1].field_id: 무시함 — 데이터베이스가 만든다
+  - items[1].agent_id = 'agent-1'
+  - items[1].slot_name = 'slot-10'
+  - items[1].capacity: 수로 보아 100
+  - items[1].used: 수로 보아 1
+  - items[2].id = 'agent-1:slot-11'
+  - items[2].field_id: 무시함 — 데이터베이스가 만든다
+  - items[2].agent_id = 'agent-1'
+  - items[2].slot_name = 'slot-11'
+  - items[2].capacity: 수로 보아 110
+  - items[2].used: 수로 보아 1
+  - items[3].id = 'agent-1:slot-2'
+  - items[3].field_id: 무시함 — 데이터베이스가 만든다
+  - items[3].agent_id = 'agent-1'
+  - items[3].slot_name = 'slot-2'
+  - items[3].capacity: 수로 보아 20
+  - items[3].used: 수로 보아 1
+  - items[4].id = 'agent-1:slot-3'
+  - items[4].field_id: 무시함 — 데이터베이스가 만든다
+  - items[4].agent_id = 'agent-1'
+  - items[4].slot_name = 'slot-3'
+  - items[4].capacity: 수로 보아 30
+  - items[4].used: 수로 보아 1
+  - items[5].id = 'agent-1:slot-4'
+  - items[5].field_id: 무시함 — 데이터베이스가 만든다
+  - items[5].agent_id = 'agent-1'
+  - items[5].slot_name = 'slot-4'
+  - items[5].capacity: 수로 보아 40
+  - items[5].used: 수로 보아 1
+  - items[6].id = 'agent-1:slot-5'
+  - items[6].field_id: 무시함 — 데이터베이스가 만든다
+  - items[6].agent_id = 'agent-1'
+  - items[6].slot_name = 'slot-5'
+  - items[6].capacity: 수로 보아 50
+  - items[6].used: 수로 보아 1
+  - items[7].id = 'agent-1:slot-6'
+  - items[7].field_id: 무시함 — 데이터베이스가 만든다
+  - items[7].agent_id = 'agent-1'
+  - items[7].slot_name = 'slot-6'
+  - items[7].capacity: 수로 보아 60
+  - items[7].used: 수로 보아 1
+  - items[8].id = 'agent-1:slot-7'
+  - items[8].field_id: 무시함 — 데이터베이스가 만든다
+  - items[8].agent_id = 'agent-1'
+  - items[8].slot_name = 'slot-7'
+  - items[8].capacity: 수로 보아 70
+  - items[8].used: 수로 보아 1
+  - items[9].id = 'agent-1:slot-8'
+  - items[9].field_id: 무시함 — 데이터베이스가 만든다
+  - items[9].agent_id = 'agent-1'
+  - items[9].slot_name = 'slot-8'
+  - items[9].capacity: 수로 보아 80
+  - items[9].used: 수로 보아 1
+  - total_count = 11
+  - has_next_page = True
+  - has_previous_page = False
+
+<a id="searching_agent_resources-the-superadmin-finds-every-slot-the-agents-report"></a>
+
+#### [the-superadmin-finds-every-slot-the-agents-report](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
+
+슬롯을 보고한 에이전트 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 보고된 슬롯이 모두 반환된다
+
+Given
+
+- 슬롯 1개씩 보고한 에이전트 2개와, 슈퍼관리자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 에이전트 agent-1: slot-1 슬롯 용량 10 보고, 1 사용 중
+  - 에이전트 agent-2: 살아 있고, 아직 보고한 슬롯이 없다
+  - 에이전트 agent-2: slot-1 슬롯 용량 10 보고, 1 사용 중
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.search_agent_resources — user-1이 필터 없이 전체 조회
+
+Then
+
+- 보고된 슬롯 행 전체가 반환된다
+  - len(items) = 2
+  - items[0].id = 'agent-1:slot-1'
+  - items[0].field_id: 무시함 — 데이터베이스가 만든다
+  - items[0].agent_id = 'agent-1'
+  - items[0].slot_name = 'slot-1'
+  - items[0].capacity: 수로 보아 10
+  - items[0].used: 수로 보아 1
+  - items[1].id = 'agent-2:slot-1'
+  - items[1].field_id: 무시함 — 데이터베이스가 만든다
+  - items[1].agent_id = 'agent-2'
+  - items[1].slot_name = 'slot-1'
+  - items[1].capacity: 수로 보아 10
+  - items[1].used: 수로 보아 1
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching_agent_resources-a-user-granted-nothing-may-not-search-agent-resources"></a>
+
+#### [a-user-granted-nothing-may-not-search-agent-resources](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
+
+아무 권한도 없는 사용자가 조회하면 역할 부족으로 거부된다
+
+Given
+
+- 에이전트 하나와, 일반 사용자 한 명
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.search_agent_resources — user-1이 필터 없이 전체 조회
+
+Then
+
+- 거부된다
+  - 거부: InsufficientPrivilege
+
+<a id="searching_agent_resources-turning-enforcement-off-still-refuses-a-user-searching-agent-resources"></a>
+
 #### [turning-enforcement-off-still-refuses-a-user-searching-agent-resources](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_agent_resources.py) — pass
 
 권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 조회할 수 없다. 슈퍼관리자 검사는 그 설정을 읽지 않는다
@@ -1933,7 +1746,9 @@ Then
 - 거부된다
   - 거부: InsufficientPrivilege
 
-### searching_allocations
+### search_allocations
+
+<a id="searching_allocations-a-kernel-id-filter-narrows-the-answer-to-that-kernel-s-allocations"></a>
 
 #### [a-kernel-id-filter-narrows-the-answer-to-that-kernel-s-allocations](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_allocations.py) — pass
 
@@ -1959,8 +1774,10 @@ Given
   - 이미지 image-1: x86_64 이미지
   - 자원 슬롯 종류 slot-1: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1인 커널 하나를 갖는다
   - 세션 session-2: 스케줄링을 기다리고 있다
+  - 세션 session-2: main 커널 그룹 하나를 갖는다
   - 세션 session-2: 요구량이 slot-1 1인 커널 하나를 갖는다
 
 When
@@ -1974,6 +1791,8 @@ Then
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
+
+<a id="searching_allocations-a-monitor-counts-every-allocation-laid"></a>
 
 #### [a-monitor-counts-every-allocation-laid](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_allocations.py) — pass
 
@@ -2000,6 +1819,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -2013,6 +1833,8 @@ Then
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
+
+<a id="searching_allocations-a-slot-name-filter-narrows-the-answer-to-that-slot-s-allocation"></a>
 
 #### [a-slot-name-filter-narrows-the-answer-to-that-slot-s-allocation](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_allocations.py) — pass
 
@@ -2039,6 +1861,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -2054,41 +1877,7 @@ Then
   - has_next_page = False
   - has_previous_page = False
 
-#### [a-user-granted-nothing-may-not-search-allocations](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_allocations.py) — pass
-
-아무 권한도 없는 사용자가 조회하면 역할 부족으로 거부된다
-
-Given
-
-- 슬롯 2개씩 요구하는 커널 1개와, 일반 사용자 한 명
-  - 도메인 home-1
-  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-  - 프로젝트 team-1
-  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
-  - 도메인에 속한 사용자 한 명 준비
-    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
-    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
-    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
-    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
-  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
-  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
-  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
-  - 이미지 image-1: x86_64 이미지
-  - 자원 슬롯 종류 slot-1: count 종류
-  - 자원 슬롯 종류 slot-2: count 종류
-  - 세션 session-1: 스케줄링을 기다리고 있다
-  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
-
-When
-
-- ResourceSlotAdapter.search_allocations — user-2이 필터 없이 전체 조회
-
-Then
-
-- 거부된다
-  - 거부: InsufficientPrivilege
+<a id="searching_allocations-omitting-the-page-size-answers-ten-allocations-and-a-next-page"></a>
 
 #### [omitting-the-page-size-answers-ten-allocations-and-a-next-page](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_allocations.py) — pass
 
@@ -2124,6 +1913,7 @@ Given
   - 자원 슬롯 종류 slot-10: count 종류
   - 자원 슬롯 종류 slot-11: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2, slot-3 3, slot-4 4, slot-5 5, slot-6 6, slot-7 7, slot-8 8, slot-9 9, slot-10 10, slot-11 11인 커널 하나를 갖는다
 
 When
@@ -2137,6 +1927,8 @@ Then
   - total_count = 11
   - has_next_page = True
   - has_previous_page = False
+
+<a id="searching_allocations-the-superadmin-counts-every-allocation-laid"></a>
 
 #### [the-superadmin-counts-every-allocation-laid](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_allocations.py) — pass
 
@@ -2163,6 +1955,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -2176,6 +1969,47 @@ Then
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
+
+<a id="searching_allocations-a-user-granted-nothing-may-not-search-allocations"></a>
+
+#### [a-user-granted-nothing-may-not-search-allocations](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_allocations.py) — pass
+
+아무 권한도 없는 사용자가 조회하면 역할 부족으로 거부된다
+
+Given
+
+- 슬롯 2개씩 요구하는 커널 1개와, 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+
+When
+
+- ResourceSlotAdapter.search_allocations — user-2이 필터 없이 전체 조회
+
+Then
+
+- 거부된다
+  - 거부: InsufficientPrivilege
+
+<a id="searching_allocations-turning-enforcement-off-still-refuses-a-user-searching-allocations"></a>
 
 #### [turning-enforcement-off-still-refuses-a-user-searching-allocations](/tests/scenario/bai_scenario/manager/resource_slot/test_searching_allocations.py) — pass
 
@@ -2202,6 +2036,7 @@ Given
   - 자원 슬롯 종류 slot-1: count 종류
   - 자원 슬롯 종류 slot-2: count 종류
   - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
   - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
 
 When
@@ -2212,4 +2047,1150 @@ Then
 
 - 거부된다
   - 거부: InsufficientPrivilege
+
+### search_slot_types
+
+<a id="searching-a-name-filter-narrows-the-answer-to-the-slot-type-it-names"></a>
+
+#### [a-name-filter-narrows-the-answer-to-the-slot-type-it-names](/tests/scenario/bai_scenario/manager/resource_slot/test_searching.py) — pass
+
+슬롯 종류 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 슬롯 종류만 남는다
+
+Given
+
+- 자원 슬롯 종류 3개와, 일반 사용자 한 명
+  - 자원 슬롯 종류 wanted-1: count 종류
+  - 자원 슬롯 종류 other-1: count 종류
+  - 자원 슬롯 종류 other-2: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.search_slot_types — user-1이 wanted-1 이름 필터로 조회
+
+Then
+
+- 필터에 맞는 슬롯 종류 하나만 반환된다
+  - items = ['wanted-1']
+  - total_count = 1
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-a-user-granted-nothing-counts-every-slot-type-laid"></a>
+
+#### [a-user-granted-nothing-counts-every-slot-type-laid](/tests/scenario/bai_scenario/manager/resource_slot/test_searching.py) — pass
+
+슬롯 종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다
+
+Given
+
+- 자원 슬롯 종류 2개와, 일반 사용자 한 명
+  - 자원 슬롯 종류 wanted-1: count 종류
+  - 자원 슬롯 종류 other-1: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.search_slot_types — user-1이 필터 없이 전체 조회
+
+Then
+
+- 미리 만들어 둔 슬롯 종류가 모두 집계된다
+  - items = ['other-1', 'wanted-1']
+  - total_count = 2
+  - has_next_page = False
+  - has_previous_page = False
+
+<a id="searching-omitting-the-page-size-answers-ten-slot-types-and-a-next-page"></a>
+
+#### [omitting-the-page-size-answers-ten-slot-types-and-a-next-page](/tests/scenario/bai_scenario/manager/resource_slot/test_searching.py) — pass
+
+슬롯 종류 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다
+
+Given
+
+- 자원 슬롯 종류 11개와, 일반 사용자 한 명
+  - 자원 슬롯 종류 wanted-1: count 종류
+  - 자원 슬롯 종류 other-1: count 종류
+  - 자원 슬롯 종류 other-2: count 종류
+  - 자원 슬롯 종류 other-3: count 종류
+  - 자원 슬롯 종류 other-4: count 종류
+  - 자원 슬롯 종류 other-5: count 종류
+  - 자원 슬롯 종류 other-6: count 종류
+  - 자원 슬롯 종류 other-7: count 종류
+  - 자원 슬롯 종류 other-8: count 종류
+  - 자원 슬롯 종류 other-9: count 종류
+  - 자원 슬롯 종류 other-10: count 종류
+  - 도메인 home-1
+  - public 에서 resource_slot_type 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 public-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 public-reader-1: resource_slot_type 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 public-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.search_slot_types — user-1이 필터 없이 전체 조회
+
+Then
+
+- 기본 크기의 첫 페이지가 반환된다
+  - len(items) = 10
+  - total_count = 11
+  - has_next_page = True
+  - has_previous_page = False
+
+### get_agent_resource
+
+<a id="reading_agent_resources-a-user-reading-agents-in-the-group-reads-a-slot-the-agent-reports"></a>
+
+#### [a-user-reading-agents-in-the-group-reads-a-slot-the-agent-reports](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_agent_resources.py) — pass
+
+리소스 그룹의 에이전트를 읽을 수 있는 사용자가 에이전트가 보고한 슬롯을 조회하면 그 슬롯에 보고된 용량과 사용량이 반환된다
+
+Given
+
+- 슬롯 1개를 보고한 에이전트 1개와, 에이전트를 읽을 수 있는 일반 사용자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 에이전트 agent-1: slot-1 슬롯 용량 10 보고, 1 사용 중
+  - 도메인 home-1
+  - 리소스 그룹의 에이전트 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 agent-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 agent-reader-1: agent 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 agent-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.get_agent_resource — user-1이 agent-1 에이전트의 slot-1 슬롯 조회
+
+Then
+
+- 보고된 슬롯 행 전체가 반환된다
+  - id = 'agent-1:slot-1'
+  - field_id: 무시함 — 데이터베이스가 만든다
+  - agent_id = 'agent-1'
+  - slot_name = 'slot-1'
+  - capacity: 수로 보아 10
+  - used: 수로 보아 1
+
+<a id="reading_agent_resources-the-superadmin-reads-a-slot-the-agent-reports"></a>
+
+#### [the-superadmin-reads-a-slot-the-agent-reports](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_agent_resources.py) — pass
+
+슈퍼관리자가 에이전트가 보고한 슬롯을 조회하면 그 슬롯에 보고된 용량과 사용량이 반환된다
+
+Given
+
+- 슬롯 1개를 보고한 에이전트 1개와, 슈퍼관리자 한 명
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 에이전트 agent-1: slot-1 슬롯 용량 10 보고, 1 사용 중
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_agent_resource — user-1이 agent-1 에이전트의 slot-1 슬롯 조회
+
+Then
+
+- 보고된 슬롯 행 전체가 반환된다
+  - id = 'agent-1:slot-1'
+  - field_id: 무시함 — 데이터베이스가 만든다
+  - agent_id = 'agent-1'
+  - slot_name = 'slot-1'
+  - capacity: 수로 보아 10
+  - used: 수로 보아 1
+
+<a id="reading_agent_resources-a-user-granted-nothing-may-not-read-an-agent-slot"></a>
+
+#### [a-user-granted-nothing-may-not-read-an-agent-slot](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_agent_resources.py) — pass
+
+아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다. 에이전트에 대한 권한을 슬롯을 찾기 전에 검사한다
+
+Given
+
+- 에이전트 하나와, 일반 사용자 한 명
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_agent_resource — user-1이 agent-1 에이전트의 cpu 슬롯 조회
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="reading_agent_resources-a-user-granted-nothing-reading-an-unknown-agent-name-is-not-found"></a>
+
+#### [a-user-granted-nothing-reading-an-unknown-agent-name-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_agent_resources.py) — pass
+
+아무 권한도 없는 사용자가 존재하지 않는 에이전트 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다. 이름을 풀어내는 단계는 인증만 확인하고, 권한은 풀어낸 에이전트에 대해 검사한다
+
+Given
+
+- 에이전트 하나와, 일반 사용자 한 명
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_agent_resource — user-1이 no-such-agent 에이전트의 cpu 슬롯 조회
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+<a id="reading_agent_resources-a-user-reading-agents-in-the-group-reaches-the-slot-the-agent-does-not-report"></a>
+
+#### [a-user-reading-agents-in-the-group-reaches-the-slot-the-agent-does-not-report](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_agent_resources.py) — pass
+
+리소스 그룹의 에이전트를 읽을 수 있는 사용자가 에이전트가 보고하지 않는 슬롯을 조회하면 권한 검사를 통과한 뒤 대상을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 에이전트 하나와, 그것을 읽을 수 있는 일반 사용자 한 명
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 도메인 home-1
+  - 리소스 그룹의 에이전트 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+      - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+      - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 agent-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 agent-reader-1: agent 전체에 READ 허용
+    - 일반 사용자 user-1: 역할 agent-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.get_agent_resource — user-1이 agent-1 에이전트의 cpu 슬롯 조회
+
+Then
+
+- 거부된다
+  - 거부: AgentResourceNotFound
+
+<a id="reading_agent_resources-reading-a-slot-the-agent-does-not-report-is-not-found"></a>
+
+#### [reading-a-slot-the-agent-does-not-report-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_agent_resources.py) — pass
+
+슈퍼관리자가 에이전트가 보고하지 않는 슬롯을 조회하면 대상을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 에이전트 하나와, 슈퍼관리자 한 명
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_agent_resource — user-1이 agent-1 에이전트의 cpu 슬롯 조회
+
+Then
+
+- 거부된다
+  - 거부: AgentResourceNotFound
+
+<a id="reading_agent_resources-reading-an-agent-name-nothing-answers-to-is-not-found"></a>
+
+#### [reading-an-agent-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_agent_resources.py) — pass
+
+슈퍼관리자가 존재하지 않는 에이전트 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 에이전트 하나와, 슈퍼관리자 한 명
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 슈퍼관리자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_agent_resource — user-1이 no-such-agent 에이전트의 cpu 슬롯 조회
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+<a id="reading_agent_resources-turning-enforcement-off-lets-a-user-pass-the-gate-to-the-slot-the-agent-does-not-report"></a>
+
+#### [turning-enforcement-off-lets-a-user-pass-the-gate-to-the-slot-the-agent-does-not-report](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_agent_resources.py) — pass
+
+권한 검사를 끄면 아무 권한도 없는 사용자도 권한 검사를 통과하고, 에이전트가 보고하지 않는 슬롯이므로 대상을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 에이전트 하나와, 일반 사용자 한 명
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 에이전트 agent-1: 살아 있고, 아직 보고한 슬롯이 없다
+  - 도메인 home-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_agent_resource — user-1이 agent-1 에이전트의 cpu 슬롯 조회
+
+Then
+
+- 거부된다
+  - 거부: AgentResourceNotFound
+
+### get_domain_resource_overview
+
+<a id="reading_domain_overview-a-user-reading-sessions-in-the-domain-reads-its-overview"></a>
+
+#### [a-user-reading-sessions-in-the-domain-reads-its-overview](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_domain_overview.py) — pass
+
+도메인 범위에서 세션을 읽을 수 있는 사용자가 그 도메인의 개요를 조회하면 개요가 반환된다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 도메인 범위에서 세션을 읽을 수 있는 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+  - 도메인 범위의 세션 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+      - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 session-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 session-reader-1: session 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 session-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.get_domain_resource_overview — user-2이 home-1 도메인의 개요 조회
+
+Then
+
+- 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다
+  - slots.entries = []
+  - session_count = 0
+
+<a id="reading_domain_overview-the-superadmin-reads-a-domain-overview-that-counts-no-pending-kernel"></a>
+
+#### [the-superadmin-reads-a-domain-overview-that-counts-no-pending-kernel](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_domain_overview.py) — pass
+
+대기 중인 커널만 있는 도메인의 개요를 슈퍼관리자가 조회하면 점유된 슬롯이 없고 세션 수가 0이다. 개요는 자원을 점유했거나 배정받은 커널만 세고, 요구만 한 커널은 세지 않는다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_domain_resource_overview — user-2이 home-1 도메인의 개요 조회
+
+Then
+
+- 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다
+  - slots.entries = []
+  - session_count = 0
+
+<a id="reading_domain_overview-turning-enforcement-off-lets-a-user-read-a-domain-overview"></a>
+
+#### [turning-enforcement-off-lets-a-user-read-a-domain-overview](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_domain_overview.py) — pass
+
+권한 검사를 끄면 아무 권한도 없는 사용자도 도메인의 개요를 조회할 수 있다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_domain_resource_overview — user-2이 home-1 도메인의 개요 조회
+
+Then
+
+- 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다
+  - slots.entries = []
+  - session_count = 0
+
+<a id="reading_domain_overview-a-user-granted-nothing-may-not-read-a-domain-overview"></a>
+
+#### [a-user-granted-nothing-may-not-read-a-domain-overview](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_domain_overview.py) — pass
+
+아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_domain_resource_overview — user-2이 home-1 도메인의 개요 조회
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="reading_domain_overview-a-user-reading-sessions-in-the-project-may-not-read-the-domain-overview"></a>
+
+#### [a-user-reading-sessions-in-the-project-may-not-read-the-domain-overview](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_domain_overview.py) — pass
+
+프로젝트 범위에서만 세션을 읽을 수 있는 사용자가 그 프로젝트가 속한 도메인의 개요를 조회하면 권한 부족으로 거부된다. 도메인 개요는 도메인 범위의 권한을 검사한다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 프로젝트 범위에서 세션을 읽을 수 있는 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+  - 프로젝트 범위의 세션 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+      - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 session-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 session-reader-1: session 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 session-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.get_domain_resource_overview — user-2이 home-1 도메인의 개요 조회
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+<a id="reading_domain_overview-reading-the-overview-of-a-domain-name-nothing-answers-to-is-not-found"></a>
+
+#### [reading-the-overview-of-a-domain-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_domain_overview.py) — pass
+
+존재하지 않는 도메인 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_domain_resource_overview — user-2이 no-such-domain 도메인의 개요 조회
+
+Then
+
+- 거부된다
+  - 거부: EntityNotFoundError
+
+### get_kernel_allocation
+
+<a id="reading_allocations-a-user-reading-sessions-in-the-project-reads-a-kernel-slot-allocation"></a>
+
+#### [a-user-reading-sessions-in-the-project-reads-a-kernel-slot-allocation](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_allocations.py) — pass
+
+프로젝트 범위에서 세션을 읽을 수 있는 사용자가 조회하면 그 할당 전체가 반환된다. 할당은 커널이 속한 세션의 것이므로, 세션에 대한 권한이 할당을 읽게 한다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 프로젝트 범위에서 세션을 읽을 수 있는 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+  - 프로젝트 범위의 세션 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+      - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 session-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 session-reader-1: session 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 session-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.get_kernel_allocation — user-2이 미리 만들어 둔 커널의 id와 slot-1 슬롯 이름으로 조회
+
+Then
+
+- 그 커널의 할당 전체가 반환된다
+  - id: 미리 만들어 둔 커널의 id와 슬롯 이름와 같다
+  - kernel_id: 미리 만들어 둔 커널의 id와 같다
+  - slot_name = 'slot-1'
+  - requested: 수로 보아 1
+  - used = None
+
+<a id="reading_allocations-the-superadmin-reads-a-kernel-slot-allocation"></a>
+
+#### [the-superadmin-reads-a-kernel-slot-allocation](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_allocations.py) — pass
+
+슈퍼관리자가 커널 id와 슬롯 이름으로 조회하면 그 할당 전체가 반환된다. 커널은 아직 스케줄링되지 않았으므로 요구한 양만 있고 실제 사용량은 없다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_kernel_allocation — user-2이 미리 만들어 둔 커널의 id와 slot-1 슬롯 이름으로 조회
+
+Then
+
+- 그 커널의 할당 전체가 반환된다
+  - id: 미리 만들어 둔 커널의 id와 슬롯 이름와 같다
+  - kernel_id: 미리 만들어 둔 커널의 id와 같다
+  - slot_name = 'slot-1'
+  - requested: 수로 보아 1
+  - used = None
+
+<a id="reading_allocations-turning-enforcement-off-lets-a-user-read-a-kernel-slot-allocation"></a>
+
+#### [turning-enforcement-off-lets-a-user-read-a-kernel-slot-allocation](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_allocations.py) — pass
+
+권한 검사를 끄면 아무 권한도 없는 사용자도 할당을 조회할 수 있다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_kernel_allocation — user-2이 미리 만들어 둔 커널의 id와 slot-1 슬롯 이름으로 조회
+
+Then
+
+- 그 커널의 할당 전체가 반환된다
+  - id: 미리 만들어 둔 커널의 id와 슬롯 이름와 같다
+  - kernel_id: 미리 만들어 둔 커널의 id와 같다
+  - slot_name = 'slot-1'
+  - requested: 수로 보아 1
+  - used = None
+
+<a id="reading_allocations-a-user-granted-nothing-may-not-read-a-kernel-slot-allocation"></a>
+
+#### [a-user-granted-nothing-may-not-read-a-kernel-slot-allocation](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_allocations.py) — pass
+
+아무 권한도 없는 사용자가 조회하면 커널 id를 풀어낼 수 없다는 이유로 거부된다. 커널 id를 세션으로 풀어내는 단계가 그 세션에 대한 권한을 검사하고, 권한이 없을 때와 커널이 없을 때 같은 답을 한다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_kernel_allocation — user-2이 미리 만들어 둔 커널의 id와 slot-1 슬롯 이름으로 조회
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+<a id="reading_allocations-a-user-granted-nothing-reading-an-unknown-kernel-id-is-refused-the-same-way"></a>
+
+#### [a-user-granted-nothing-reading-an-unknown-kernel-id-is-refused-the-same-way](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_allocations.py) — pass
+
+아무 권한도 없는 사용자가 존재하지 않는 커널 id로 조회해도 커널 id를 풀어낼 수 없다는 같은 이유로 거부된다. 답으로는 그 커널이 있는지 알 수 없다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_kernel_allocation — user-2이 존재하지 않는 커널 id와 slot-1 슬롯 이름으로 조회
+
+Then
+
+- 거부된다
+  - 거부: GenericBadRequest
+
+<a id="reading_allocations-reading-a-kernel-id-nothing-answers-to-is-not-found"></a>
+
+#### [reading-a-kernel-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_allocations.py) — pass
+
+슈퍼관리자가 존재하지 않는 커널 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다. 모든 검사를 통과하는 슈퍼관리자에게는 없다는 사실을 그대로 답한다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_kernel_allocation — user-2이 존재하지 않는 커널 id와 slot-1 슬롯 이름으로 조회
+
+Then
+
+- 거부된다
+  - 거부: FieldNotFoundError
+
+<a id="reading_allocations-reading-a-slot-the-kernel-did-not-ask-for-is-not-found"></a>
+
+#### [reading-a-slot-the-kernel-did-not-ask-for-is-not-found](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_allocations.py) — pass
+
+슈퍼관리자가 그 커널이 요구하지 않은 슬롯 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_kernel_allocation — user-2이 미리 만들어 둔 커널의 id와 no-such-slot 슬롯 이름으로 조회
+
+Then
+
+- 거부된다
+  - 거부: ResourceAllocationNotFound
+
+### get_project_resource_overview
+
+<a id="reading_project_overview-a-user-reading-sessions-in-the-domain-reads-a-project-overview-in-it"></a>
+
+#### [a-user-reading-sessions-in-the-domain-reads-a-project-overview-in-it](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_project_overview.py) — pass
+
+도메인 범위에서 세션을 읽을 수 있는 사용자가 그 도메인에 속한 프로젝트의 개요를 조회하면 개요가 반환된다. 도메인 범위의 권한은 그 안의 프로젝트에도 미친다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 도메인 범위에서 세션을 읽을 수 있는 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+  - 도메인 범위의 세션 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+      - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 session-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 session-reader-1: session 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 session-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.get_project_resource_overview — user-2이 team-1 프로젝트의 id로 개요 조회
+
+Then
+
+- 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다
+  - slots.entries = []
+  - session_count = 0
+
+<a id="reading_project_overview-a-user-reading-sessions-in-the-project-reads-its-overview"></a>
+
+#### [a-user-reading-sessions-in-the-project-reads-its-overview](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_project_overview.py) — pass
+
+프로젝트 범위에서 세션을 읽을 수 있는 사용자가 그 프로젝트의 개요를 조회하면 개요가 반환된다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 프로젝트 범위에서 세션을 읽을 수 있는 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+  - 프로젝트 범위의 세션 조회 권한을 받은 사용자 준비
+    - 도메인에 속한 사용자 한 명 준비
+      - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+      - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+      - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+    - 역할 session-reader-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 session-reader-1: session 전체에 READ 허용
+    - 일반 사용자 user-2: 역할 session-reader-1 보유
+
+When
+
+- ResourceSlotAdapter.get_project_resource_overview — user-2이 team-1 프로젝트의 id로 개요 조회
+
+Then
+
+- 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다
+  - slots.entries = []
+  - session_count = 0
+
+<a id="reading_project_overview-reading-the-overview-of-a-project-id-nothing-answers-to-answers-an-empty-overview"></a>
+
+#### [reading-the-overview-of-a-project-id-nothing-answers-to-answers-an-empty-overview](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_project_overview.py) — pass
+
+슈퍼관리자가 존재하지 않는 프로젝트 id로 조회하면 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다. 도메인 개요와 달리 프로젝트는 id로 지정하므로 풀어내는 단계가 없고, 프로젝트가 있는지 확인하지 않는다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_project_resource_overview — user-2이 존재하지 않는 프로젝트 id로 개요 조회
+
+Then
+
+- 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다
+  - slots.entries = []
+  - session_count = 0
+
+<a id="reading_project_overview-the-superadmin-reads-a-project-overview-that-counts-no-pending-kernel"></a>
+
+#### [the-superadmin-reads-a-project-overview-that-counts-no-pending-kernel](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_project_overview.py) — pass
+
+대기 중인 커널만 있는 프로젝트의 개요를 슈퍼관리자가 조회하면 점유된 슬롯이 없고 세션 수가 0이다. 개요는 자원을 점유했거나 배정받은 커널만 세고, 요구만 한 커널은 세지 않는다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 슈퍼관리자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 슈퍼관리자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_project_resource_overview — user-2이 team-1 프로젝트의 id로 개요 조회
+
+Then
+
+- 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다
+  - slots.entries = []
+  - session_count = 0
+
+<a id="reading_project_overview-turning-enforcement-off-lets-a-user-read-a-project-overview"></a>
+
+#### [turning-enforcement-off-lets-a-user-read-a-project-overview](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_project_overview.py) — pass
+
+권한 검사를 끄면 아무 권한도 없는 사용자도 프로젝트의 개요를 조회할 수 있다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_project_resource_overview — user-2이 team-1 프로젝트의 id로 개요 조회
+
+Then
+
+- 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다
+  - slots.entries = []
+  - session_count = 0
+
+<a id="reading_project_overview-a-user-granted-nothing-may-not-read-a-project-overview"></a>
+
+#### [a-user-granted-nothing-may-not-read-a-project-overview](/tests/scenario/bai_scenario/manager/resource_slot/test_reading_project_overview.py) — pass
+
+아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다
+
+Given
+
+- 슬롯 둘을 요구하며 대기 중인 커널 하나와, 일반 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 team-1
+  - 리소스 그룹 resource-group-1: fifo 스케줄러를 쓴다
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+    - 사용자 정책 user-policy-2: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-3: 동시 세션 5개까지
+    - 일반 사용자 user-2: 자기 키와 개인 프로젝트를 갖는다
+  - 키페어 정책 keypair-policy-2: 동시 세션 5개까지
+  - 일반 사용자 user-1: 기본이 아닌 활성 키 하나를 더 갖는다
+  - 컨테이너 레지스트리 registry-1: 이미지를 가져오는 곳
+  - 이미지 image-1: x86_64 이미지
+  - 자원 슬롯 종류 slot-1: count 종류
+  - 자원 슬롯 종류 slot-2: count 종류
+  - 세션 session-1: 스케줄링을 기다리고 있다
+  - 세션 session-1: main 커널 그룹 하나를 갖는다
+  - 세션 session-1: 요구량이 slot-1 1, slot-2 2인 커널 하나를 갖는다
+
+When
+
+- ResourceSlotAdapter.get_project_resource_overview — user-2이 team-1 프로젝트의 id로 개요 조회
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
 

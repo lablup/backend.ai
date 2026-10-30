@@ -8,18 +8,17 @@ from uuid import uuid4
 import pytest
 
 from ai.backend.common.types import SessionId
-from ai.backend.manager.sokovan.recorder import (
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
+from ai.backend.manager.sokovan.recorder.exceptions import NestedPhaseError, StepWithoutPhaseError
+from ai.backend.manager.sokovan.recorder.pool import RecordPool
+from ai.backend.manager.sokovan.recorder.recorder import TransitionRecorder
+from ai.backend.manager.sokovan.recorder.types import (
     ExecutionRecord,
-    NestedPhaseError,
     PhaseRecord,
-    RecorderContext,
-    RecordPool,
+    RecordBuildData,
     StepRecord,
     StepStatus,
-    StepWithoutPhaseError,
-    TransitionRecorder,
 )
-from ai.backend.manager.sokovan.recorder.types import RecordBuildData
 
 
 class TestRecorderContext:

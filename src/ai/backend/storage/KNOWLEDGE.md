@@ -65,7 +65,8 @@ interface.
   `VolumePool.create()`, which also registers the noop volume, and is addressed
   by its `[volume.<name>]` configuration key; nothing builds a volume on a
   request path.
-- A UUID configuration key is canonicalised, so `get_volume(VolumeID)` and
-  `get_volume_by_name(key)` reach the same object.
+- The configuration key is the volume name (`StorageVolumeName`), unique across
+  the system, and `get_volume_by_name()` looks a volume up by it. `get_volume(VolumeID)`
+  remains only for the deprecated `VolumeService`.
 - Because initialisation is eager, a volume whose mount is broken fails the
   whole startup instead of failing on its first request.

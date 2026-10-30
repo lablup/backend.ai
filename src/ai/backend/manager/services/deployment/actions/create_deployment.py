@@ -42,3 +42,7 @@ class CreateDeploymentAction(DeploymentScopeAction):
 @dataclass
 class CreateDeploymentActionResult(DeploymentScopeActionResult):
     data: ModelDeploymentData
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return (self.data.id,)

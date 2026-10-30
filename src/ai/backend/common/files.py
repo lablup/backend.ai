@@ -6,7 +6,7 @@ from typing import Any
 
 import janus
 
-from .asyncio import current_loop
+from .asyncio import run_in_executor_with_context
 from .types import Sentinel
 
 __all__ = ("AsyncFileWriter",)
@@ -37,8 +37,7 @@ class AsyncFileWriter:
             self._encode = lambda v: v.encode()  # default encoder
 
     async def __aenter__(self) -> AsyncFileWriter:
-        loop = current_loop()
-        self._fut = loop.run_in_executor(None, self._write)
+        self._fut = run_in_executor_with_context(None, self._write)
         return self
 
     def _write(self) -> None:

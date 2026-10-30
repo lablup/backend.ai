@@ -16,11 +16,11 @@ from ai.backend.common.configs.generator import (
     TOMLGenerator,
 )
 from ai.backend.common.meta import ConfigEnvironment
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @click.group()
@@ -105,7 +105,7 @@ Generated using BackendAIConfigMeta annotations.
         )
         generator = TOMLGenerator(env=config_env, config=generator_config)
         generator.generate_to_file(AgentUnifiedConfig, output, header=header_comment.strip())
-        log.info("Sample configuration file generated successfully: {}", output)
+        log.info("sample configuration file generated", output_path=str(output))
     except Exception as e:
         raise click.ClickException(f"Failed to generate sample configuration: {e}") from e
 

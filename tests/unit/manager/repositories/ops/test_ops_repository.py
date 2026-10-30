@@ -43,19 +43,21 @@ from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.repository import AmbiguousEntityKeyError, EmptyOperationScopeError
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.purgers import RolePresetPurger
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
+    RolePresetSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.role_preset.updaters import (
-    RolePresetSoftDeleteUpdater,
     RolePresetUpdater,
 )
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
+from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope, ScopeTarget
 from ai.backend.manager.models.specs.creator import GlobalEntityCreator
 from ai.backend.manager.models.specs.lookup import BulkDataLookup, DataLookup
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
@@ -65,11 +67,13 @@ from ai.backend.manager.models.specs.querier import (
     BulkFieldQuerier,
     DataQuerier,
 )
-from ai.backend.manager.models.specs.searcher import Searcher
+from ai.backend.manager.models.specs.search.usage import UsedBy
+from ai.backend.manager.models.specs.searcher import ScopedSearcher, Searcher
+from ai.backend.manager.models.specs.soft_delete import RestoreUpdater, SoftDeleteUpdater
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater
 from ai.backend.manager.models.specs.upserter import GlobalEntityUpserter
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -112,7 +116,7 @@ class _PresetCreator(GlobalEntityCreator[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -143,7 +147,7 @@ class _PresetUpserter(GlobalEntityUpserter[RolePresetRow, RolePresetData]):
             "name": self.name,
             "scope_type": DomainEntityType(),
             "auto_assign": False,
-            "deleted": False,
+            "deleted_at": None,
         }
 
     @override
@@ -152,7 +156,7 @@ class _PresetUpserter(GlobalEntityUpserter[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -173,7 +177,7 @@ class _PresetQuerier(DataQuerier[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 class _PresetBulkQuerier(BulkEntityQuerier[RolePresetRow, RolePresetData]):
@@ -189,7 +193,7 @@ class _PresetBulkQuerier(BulkEntityQuerier[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 class _PresetFieldType(FieldType):
@@ -269,7 +273,7 @@ class _PresetBatchUpdater(DataBatchUpdater[RolePresetRow, RolePresetData]):
 
     @override
     def build_values(self) -> dict[str, Any]:
-        return {"deleted": self.deleted}
+        return {"deleted_at": sa.func.now() if self.deleted else None}
 
     @override
     def conditions(self) -> list[QueryCondition]:
@@ -277,7 +281,7 @@ class _PresetBatchUpdater(DataBatchUpdater[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -300,7 +304,7 @@ class _PresetBatchPurger(EntityBatchPurger[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -413,7 +417,7 @@ class TestCreate:
 
         assert isinstance(created, RolePresetData)
         assert created.name == "analysts"
-        assert created.deleted is False
+        assert created.deleted_at is None
 
     async def test_created_row_is_readable_back(
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
@@ -557,11 +561,41 @@ class TestUpdate:
     async def test_soft_delete_is_an_update(
         self, repository: OpsRepository[RolePresetData], preset: RolePresetData
     ) -> None:
-        # What ``DeleteService`` runs: the domain's own deleted-flag updater, because
-        # which column marks a row deleted is not something ops can know.
-        deleted = await repository.update(RolePresetSoftDeleteUpdater(preset_id=preset.id))
+        # What ``DeleteService`` runs: the shared soft delete updater.
+        deleted = await repository.update(
+            SoftDeleteUpdater(
+                target_row=RolePresetRow,
+                target_column=RolePresetRow.id,
+                target_id=preset.id,
+                converter=RolePresetSearchableFields.own,
+            )
+        )
 
-        assert deleted.deleted is True
+        assert deleted.deleted_at is not None
+
+    async def test_restore_clears_the_soft_delete(
+        self, repository: OpsRepository[RolePresetData], preset: RolePresetData
+    ) -> None:
+        await repository.update(
+            SoftDeleteUpdater(
+                target_row=RolePresetRow,
+                target_column=RolePresetRow.id,
+                target_id=preset.id,
+                converter=RolePresetSearchableFields.own,
+            )
+        )
+
+        restored = await repository.update(
+            RestoreUpdater(
+                target_row=RolePresetRow,
+                target_column=RolePresetRow.id,
+                target_id=preset.id,
+                converter=RolePresetSearchableFields.own,
+            )
+        )
+
+        assert restored.deleted_at is None
+        assert (await repository.get(_PresetQuerier(target=preset.id))).deleted_at is None
 
     async def test_missing_row_raises(self, repository: OpsRepository[RolePresetData]) -> None:
         with pytest.raises(EntityNotFoundError):
@@ -624,7 +658,7 @@ class TestBatchUpdate:
 
         # The two domain-scoped rows, not the project-scoped one.
         assert sorted(u.name for u in updated) == ["default", "other"]
-        assert all(u.deleted for u in updated)
+        assert all(u.deleted_at is not None for u in updated)
 
     async def test_no_match_returns_nothing(
         self, repository: OpsRepository[RolePresetData]
@@ -722,6 +756,25 @@ class _NamedScope(OperationScope):
         return ()
 
 
+@dataclass(frozen=True)
+class _NamedScopeTarget(ScopeTarget):
+    name: str
+    domain_id: DomainID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.domain_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        return lambda: RolePresetRow.name == self.name
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return ()
+
+
 @dataclass
 class _SearchPresetsAction(BaseScopeAction, SearchOpsAction[RolePresetRow, _PresetView]):
     """The only file a pass-through domain still writes: the action."""
@@ -794,6 +847,47 @@ class TestSearch:
         )
 
         assert [item.id for item in result.items] == [preset.id]
+
+    async def test_scoped_searcher_ands_used_by_onto_the_scopes(
+        self,
+        repository: OpsRepository[RolePresetData],
+        view_repository: OpsRepository[_PresetView],
+        preset: RolePresetData,
+    ) -> None:
+        other = await repository.create_global_entity(
+            _PresetCreator(name="other", scope_type=DomainEntityType())
+        )
+
+        result = await view_repository.scoped_search(
+            ScopedSearcher(
+                scopes=[
+                    _NamedScopeTarget(name="default", domain_id=DomainID(uuid.uuid4())),
+                    _NamedScopeTarget(name="other", domain_id=DomainID(uuid.uuid4())),
+                ],
+                used_by=[
+                    UsedBy(
+                        target=DomainID(uuid.uuid4()),
+                        condition=lambda: RolePresetRow.name == "other",
+                    )
+                ],
+                searcher=_PresetSearcher(pagination=OffsetPagination(offset=0, limit=20)),
+            )
+        )
+
+        assert [item.id for item in result.items] == [other.id]
+        assert result.total_count == 1
+
+    async def test_scoped_searcher_with_no_scope_is_rejected(
+        self, view_repository: OpsRepository[_PresetView], preset: RolePresetData
+    ) -> None:
+        with pytest.raises(EmptyOperationScopeError):
+            await view_repository.scoped_search(
+                ScopedSearcher(
+                    scopes=[],
+                    used_by=[],
+                    searcher=_PresetSearcher(pagination=OffsetPagination(offset=0, limit=20)),
+                )
+            )
 
     async def test_offset_priority_orders_lead(
         self,

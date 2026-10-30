@@ -4,8 +4,11 @@ from typing import Any
 
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
-from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.repositories.resource_preset import ResourcePresetRepository
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.models.resource_preset.updaters import (
+    ResourcePresetResourceGroupUpdater,
+)
+from ai.backend.manager.repositories.resource_preset.repository import ResourcePresetRepository
 from ai.backend.manager.services.resource_preset.actions.check_presets import (
     CheckResourcePresetsAction,
     CheckResourcePresetsActionResult,
@@ -22,16 +25,16 @@ from ai.backend.manager.services.resource_preset.actions.list_presets import (
     ListResourcePresetsAction,
     ListResourcePresetsResult,
 )
-from ai.backend.manager.services.resource_preset.actions.search_presets import (
-    SearchResourcePresetsV2Action,
-    SearchResourcePresetsV2ActionResult,
+from ai.backend.manager.services.resource_preset.actions.set_preset_resource_group import (
+    SetResourcePresetResourceGroupAction,
+    SetResourcePresetResourceGroupActionResult,
 )
 from ai.backend.manager.services.resource_preset.actions.update_preset import (
     UpdateResourcePresetAction,
     UpdateResourcePresetActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourcePresetService:
@@ -63,6 +66,16 @@ class ResourcePresetService:
         preset_data = await self._resource_preset_repository.modify_preset_validated(action.updater)
         return UpdateResourcePresetActionResult(resource_preset=preset_data)
 
+    async def set_preset_resource_group(
+        self, action: SetResourcePresetResourceGroupAction
+    ) -> SetResourcePresetResourceGroupActionResult:
+        preset_data = await self._resource_preset_repository.set_preset_resource_group(
+            ResourcePresetResourceGroupUpdater(
+                preset_id=action.preset_id, resource_group_name=action.resource_group_name
+            )
+        )
+        return SetResourcePresetResourceGroupActionResult(resource_preset=preset_data)
+
     async def delete_preset(
         self, action: DeleteResourcePresetAction
     ) -> DeleteResourcePresetActionResult:
@@ -93,28 +106,13 @@ class ResourcePresetService:
 
         return ListResourcePresetsResult(presets=presets)
 
-    async def search_presets_v2(
-        self,
-        action: SearchResourcePresetsV2Action,
-    ) -> SearchResourcePresetsV2ActionResult:
-        """Search resource presets with filter/order/pagination."""
-        result = await self._resource_preset_repository.search_presets(action.querier)
-        return SearchResourcePresetsV2ActionResult(
-            presets=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
     async def check_presets(
         self, action: CheckResourcePresetsAction
     ) -> CheckResourcePresetsActionResult:
         result = await self._resource_preset_repository.check_presets(
-            access_key=action.access_key,
             user_id=action.user_id,
             group_name=action.group,
             domain_name=action.domain_name,
-            resource_policy=action.resource_policy,
             resource_group=action.resource_group,
         )
 

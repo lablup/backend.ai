@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import shlex
 import shutil
 from collections.abc import Iterable, Mapping, MutableMapping
 from pathlib import Path
@@ -179,7 +180,7 @@ async def prepare_sshd_service(service_info: Mapping[str, Any]) -> tuple[list[st
     return cmdargs, env
 
 
-async def prepare_ttyd_service(service_info: Mapping[str, Any]) -> tuple[list[str], dict[str, str]]:
+def _terminal_shell_command() -> list[str]:
     shell = "sh"
     if Path("/bin/zsh").exists():
         shell = "zsh"
@@ -188,7 +189,34 @@ async def prepare_ttyd_service(service_info: Mapping[str, Any]) -> tuple[list[st
     elif Path("/bin/ash").exists():
         shell = "ash"
 
-    cmdargs = ["/opt/kernel/ttyd", "-W", "-p", service_info["port"], f"/bin/{shell}"]
+    command = [f"/bin/{shell}"]
     if shell != "ash":  # Currently prebuilt tmux in Alpine-based containers is not supported.
-        cmdargs += ["-c", f"export SHELL=/bin/{shell}; /opt/kernel/tmux -2 attach"]
+        command += ["-c", f"export SHELL=/bin/{shell}; /opt/kernel/tmux -2 attach"]
+    return command
+
+
+async def prepare_ttyd_service(service_info: Mapping[str, Any]) -> tuple[list[str], dict[str, str]]:
+    cmdargs = [
+        "/opt/kernel/ttyd",
+        "-W",
+        "-p",
+        str(service_info["port"]),
+        *_terminal_shell_command(),
+    ]
+    return cmdargs, {}
+
+
+async def prepare_etty_service(service_info: Mapping[str, Any]) -> tuple[list[str], dict[str, str]]:
+    # etty joins positional arguments with spaces and re-splits them, so the command
+    # goes in as one shell-quoted string to keep the `-c` script intact.
+    cmdargs = [
+        "/opt/kernel/etty",
+        "-W",
+        "--bind",
+        "0.0.0.0",
+        "-p",
+        str(service_info["port"]),
+        "--command",
+        shlex.join(_terminal_shell_command()),
+    ]
     return cmdargs, {}

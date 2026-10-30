@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
@@ -13,7 +14,7 @@ from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.leader import ValkeyLeaderElection
 from ai.backend.common.service_discovery.service_discovery import ServiceDiscovery
 from ai.backend.common.types import ValkeyProfileTarget
-from ai.backend.manager.clients.agent import AgentClientPool
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -21,23 +22,28 @@ from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
-from ai.backend.manager.repositories.fair_share import FairShareRepository
+from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
 from ai.backend.manager.repositories.idle_checker.repository import IdleCheckerRepository
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
 from ai.backend.manager.repositories.replica_group.repository import ReplicaGroupRepository
-from ai.backend.manager.repositories.resource_usage_history import (
+from ai.backend.manager.repositories.resource_usage_history.repository import (
     ResourceUsageHistoryRepository,
 )
 from ai.backend.manager.repositories.retention.repository import RetentionRepository
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
-from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
+from ai.backend.manager.repositories.system_session_environ.repository import (
+    SystemSessionEnvironRepository,
+)
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import AgentSelector
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
 from ai.backend.manager.types import DistributedLockFactory
 
@@ -60,6 +66,7 @@ class OrchestrationInput:
     event_producer: EventProducer
     distributed_lock_factory: DistributedLockFactory
     valkey_profile_target: ValkeyProfileTarget
+    sentinel_monitors: SentinelMonitorSet
     valkey_schedule: ValkeyScheduleClient
     valkey_live: ValkeyLiveClient
     valkey_stat: ValkeyStatClient
@@ -73,6 +80,7 @@ class OrchestrationInput:
     fair_share_repository: FairShareRepository
     resource_usage_repository: ResourceUsageHistoryRepository
     retention_repository: RetentionRepository
+    system_session_environ_repository: SystemSessionEnvironRepository
     agent_client_pool: AgentClientPool
     appproxy_client_pool: AppProxyClientPool
     network_plugin_ctx: NetworkPluginContext
@@ -138,6 +146,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             config_provider=setup_input.config_provider,
             event_producer=setup_input.event_producer,
             lock_factory=setup_input.distributed_lock_factory,
+            sentinel_monitors=setup_input.sentinel_monitors,
         )
         idle_checker_host = await stack.enter_dependency(
             idle_checker_dep,
@@ -154,6 +163,7 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
             metric_repository=setup_input.metric_repository,
             fair_share_repository=setup_input.fair_share_repository,
             resource_usage_repository=setup_input.resource_usage_repository,
+            system_session_environ_repository=setup_input.system_session_environ_repository,
             config_provider=setup_input.config_provider,
             agent_client_pool=setup_input.agent_client_pool,
             appproxy_client_pool=setup_input.appproxy_client_pool,
@@ -181,11 +191,13 @@ class OrchestrationComposer(DependencyComposer[OrchestrationInput, Orchestration
         leader_dep = LeaderElectionDependency()
         leader_input = LeaderElectionInput(
             valkey_profile_target=setup_input.valkey_profile_target,
+            sentinel_monitors=setup_input.sentinel_monitors,
             pidx=setup_input.pidx,
             config_provider=setup_input.config_provider,
             event_producer=setup_input.event_producer,
             sokovan_orchestrator=sokovan_orchestrator,
             retention_repository=setup_input.retention_repository,
+            valkey_live=setup_input.valkey_live,
         )
         leader_election = await stack.enter_dependency(
             leader_dep,

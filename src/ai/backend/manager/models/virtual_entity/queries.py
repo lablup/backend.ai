@@ -11,7 +11,7 @@ import uuid
 from typing import Any
 
 import sqlalchemy as sa
-from sqlalchemy.orm import InstrumentedAttribute, aliased
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserEntityType
@@ -41,22 +41,22 @@ def user_scope_membership_query(
     ``scope_type``, narrowed to one user when ``user_id`` is given. The scope side is
     ``VirtualEntityRow``, so callers may filter on its columns; both selected columns
     are UUIDs, so no string casts are needed."""
-    member = aliased(VirtualEntityRow, name="member_virtual_entity")
+    member = VirtualEntityRow.__table__.alias("member_virtual_entity")
     query = (
         sa.select(
-            member.entity_id.label("user_id"),
+            member.c.entity_id.label("user_id"),
             VirtualEntityRow.entity_id.label("scope_id"),
         )
         .select_from(EntityMembershipRow)
         .join(VirtualEntityRow, EntityMembershipRow.virtual_entity_id == VirtualEntityRow.id)
-        .join(member, EntityMembershipRow.member_entity_id == member.id)
+        .join(member, EntityMembershipRow.member_entity_id == member.c.id)
         .where(
             VirtualEntityRow.entity_type == scope_type,
-            member.entity_type == UserEntityType(),
+            member.c.entity_type == UserEntityType(),
         )
     )
     if user_id is not None:
-        query = query.where(member.entity_id == user_id)
+        query = query.where(member.c.entity_id == user_id)
     return query
 
 
@@ -65,7 +65,7 @@ def scope_membership_exists(
     scope_id: UuidExpr,
     member_type: EntityType,
     member_id: UuidExpr,
-) -> sa.ColumnElement[bool]:
+) -> sa.Exists:
     """EXISTS predicate: the scope reaches the named member.
 
     The same span a permission check walks -- the member is held by a virtual entity,
@@ -87,7 +87,7 @@ def scope_share_exists(
     scope_id: UuidExpr,
     member_type: EntityType,
     member_id: UuidExpr,
-) -> sa.ColumnElement[bool]:
+) -> sa.Exists:
     """EXISTS predicate: the scope reaches the named member through a share."""
     return sa.exists(
         _scope_membership_select(scope_type, scope_id, member_type, member_id).where(
@@ -102,22 +102,22 @@ def _scope_membership_select(
     member_type: EntityType,
     member_id: UuidExpr,
 ) -> sa.Select[tuple[int]]:
-    member = aliased(VirtualEntityRow, name="member_virtual_entity")
-    governor = aliased(VirtualEntityRow, name="governor_virtual_entity")
+    member = VirtualEntityRow.__table__.alias("member_virtual_entity")
+    governor = VirtualEntityRow.__table__.alias("governor_virtual_entity")
     return (
         sa.select(sa.literal(1))
         .select_from(EntityMembershipRow)
-        .join(member, EntityMembershipRow.member_entity_id == member.id)
+        .join(member, EntityMembershipRow.member_entity_id == member.c.id)
         .join(
             ScopeBindingRow,
             ScopeBindingRow.virtual_entity_id == EntityMembershipRow.virtual_entity_id,
         )
-        .join(governor, ScopeBindingRow.scope_entity_id == governor.id)
+        .join(governor, ScopeBindingRow.scope_entity_id == governor.c.id)
         .where(
-            governor.entity_type == scope_type,
-            governor.entity_id == scope_id,
-            member.entity_type == member_type,
-            member.entity_id == member_id,
+            governor.c.entity_type == scope_type,
+            governor.c.entity_id == scope_id,
+            member.c.entity_type == member_type,
+            member.c.entity_id == member_id,
         )
     )
 
@@ -126,6 +126,6 @@ def user_scope_membership_exists(
     scope_type: EntityType,
     scope_id: UuidExpr,
     user_id: UuidExpr,
-) -> sa.ColumnElement[bool]:
+) -> sa.Exists:
     """EXISTS predicate: the user is enrolled in the scope's virtual entity."""
     return scope_membership_exists(scope_type, scope_id, UserEntityType(), user_id)

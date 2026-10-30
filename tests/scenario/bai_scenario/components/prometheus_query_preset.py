@@ -14,7 +14,11 @@ from datetime import datetime
 from typing import Any, override
 from uuid import UUID
 
+from ai.backend.common.data.entity.prometheus_query_preset import (
+    PrometheusQueryPresetEntityType,
+)
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.prometheus_query_preset.response import (
     DeleteQueryDefinitionPayload,
     QueryDefinitionNode,
@@ -31,6 +35,7 @@ from ai.backend.manager.data.prometheus_query_preset_category.types import (
 )
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -43,15 +48,15 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.domain import WAS_HERE, SomeoneOf, WrittenByThisRun
+from bai_scenario.components.domain import Mentions, WrittenByThisRun
+from bai_scenario.components.system import lay_a_caller, lay_a_public_reader
 from bai_scenario.fakes.prometheus import ANSWERED_AT, INSTANT
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.prometheus_query_preset.category import SeedCategory
+from bai_scenario.seeds.prometheus_query_preset.category import TestSeedCategory
 from bai_scenario.seeds.prometheus_query_preset.preset import (
     METRIC,
     TEMPLATE,
-    SeedPreset,
-    SeedPresetIn,
+    TestSeedPreset,
+    TestSeedPresetIn,
 )
 from bai_scenario.seeds.seeder import Laid
 
@@ -97,10 +102,8 @@ class ManyPresetsAndACaller:
 
 
 async def lay_someone(seeding: Any, role: UserRole) -> Laid[UserData]:
-    """호출자 한 명. 사용자는 도메인에 속해야 하므로 도메인 하나를 함께 만든다."""
-    domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-    laid: Laid[UserData] = await seeding.within(SomeoneOf(domain, role=role))
-    return laid
+    """호출자 한 명. public 에서 읽을 권한을 함께 받는다."""
+    return await lay_a_public_reader(seeding, PrometheusQueryPresetEntityType(), role)
 
 
 @dataclass(frozen=True)
@@ -131,7 +134,7 @@ class ACategoryAndSomeone(Given[Any, ACatalogAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ACatalogAndACaller:
-        category = await seeding.creating(SeedCategory())
+        category = await seeding.creating(TestSeedCategory())
         caller = await lay_someone(seeding, self.role)
         return ACatalogAndACaller(caller=seeding.made(caller), category=seeding.made(category))
 
@@ -145,22 +148,29 @@ class APresetAndSomeone(Given[Any, APresetAndACaller]):
     time_window: str | None = None
     filter_labels: Sequence[str] = ()
     group_labels: Sequence[str] = ()
+    reading_in_public: bool = True
+    """호출자가 public 에서 프리셋을 읽을 수 있는지. 읽기가 없는 쪽을 세우는 행이 끈다."""
 
     @override
     def describe(self) -> str:
-        return f"이미 있는 프리셋 하나와, {self.role.value} 한 명"
+        reach = "프리셋을 읽을 수 있는" if self.reading_in_public else "아무 권한도 없는"
+        return f"이미 있는 프리셋 하나와, {reach} {self.role.value} 한 명"
 
     @override
     async def lay(self, seeding: Any) -> APresetAndACaller:
         preset = await seeding.creating(
-            SeedPreset(
+            TestSeedPreset(
                 query_template=self.query_template,
                 time_window=self.time_window,
                 filter_labels=self.filter_labels,
                 group_labels=self.group_labels,
             )
         )
-        caller = await lay_someone(seeding, self.role)
+        caller = (
+            await lay_someone(seeding, self.role)
+            if self.reading_in_public
+            else await lay_a_caller(seeding, self.role)
+        )
         return APresetAndACaller(preset=seeding.made(preset), caller=seeding.made(caller))
 
 
@@ -176,9 +186,9 @@ class APresetInOneOfTwoCategories(Given[Any, APresetAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> APresetAndACaller:
-        home = await seeding.creating(SeedCategory(name_hint="home"))
-        elsewhere = await seeding.creating(SeedCategory(name_hint="elsewhere"))
-        preset = await seeding.creating_from(SeedPresetIn(), home)
+        home = await seeding.creating(TestSeedCategory(name_hint="home"))
+        elsewhere = await seeding.creating(TestSeedCategory(name_hint="elsewhere"))
+        preset = await seeding.creating_from(TestSeedPresetIn(), home)
         caller = await lay_someone(seeding, self.role)
         return APresetAndACaller(
             preset=seeding.made(preset),
@@ -197,7 +207,7 @@ class APresetAndNobody(Given[Any, APresetAlone]):
 
     @override
     async def lay(self, seeding: Any) -> APresetAlone:
-        preset = await seeding.creating(SeedPreset())
+        preset = await seeding.creating(TestSeedPreset())
         return APresetAlone(preset=seeding.made(preset))
 
 
@@ -214,9 +224,9 @@ class ManyPresetsAndSomeone(Given[Any, ManyPresetsAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
-        wanted = await seeding.creating(SeedPreset(name_hint="wanted"))
+        wanted = await seeding.creating(TestSeedPreset(name_hint="wanted"))
         others = [
-            await seeding.creating(SeedPreset(name_hint="other")) for _ in range(self.besides)
+            await seeding.creating(TestSeedPreset(name_hint="other")) for _ in range(self.besides)
         ]
         caller = await lay_someone(seeding, self.role)
         return ManyPresetsAndACaller(
@@ -242,11 +252,15 @@ class PresetsInTwoCategories(Given[Any, ManyPresetsAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ManyPresetsAndACaller:
-        wanted = await seeding.creating(SeedCategory(name_hint="wanted"))
-        other = await seeding.creating(SeedCategory(name_hint="other"))
-        first = await seeding.creating_from(SeedPresetIn(SeedPreset(name_hint="wanted")), wanted)
-        second = await seeding.creating_from(SeedPresetIn(SeedPreset(name_hint="beside")), wanted)
-        await seeding.creating_from(SeedPresetIn(SeedPreset(name_hint="elsewhere")), other)
+        wanted = await seeding.creating(TestSeedCategory(name_hint="wanted"))
+        other = await seeding.creating(TestSeedCategory(name_hint="other"))
+        first = await seeding.creating_from(
+            TestSeedPresetIn(TestSeedPreset(name_hint="wanted")), wanted
+        )
+        second = await seeding.creating_from(
+            TestSeedPresetIn(TestSeedPreset(name_hint="beside")), wanted
+        )
+        await seeding.creating_from(TestSeedPresetIn(TestSeedPreset(name_hint="elsewhere")), other)
         caller = await lay_someone(seeding, self.role)
         return ManyPresetsAndACaller(
             laid=(seeding.made(first), seeding.made(second)),
@@ -543,3 +557,34 @@ class TheRemovedOneIsNamed(Then[APresetAndACaller, DeleteQueryDefinitionPayload]
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
         return [Held("id", payload.id, SameAs[UUID](laid.preset.id, "미리 만들어 둔 프리셋"))]
+
+
+@dataclass(frozen=True)
+class NothingIsProcessed(Then[ManyPresetsAndACaller, PartialBulkPayload[QueryDefinitionNode]]):
+    """처리된 프리셋 없이, 미리 만들어 둔 프리셋가 모두 같은 이유로 실패 목록에 온다."""
+
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return "처리된 프리셋 없이 대상이 모두 실패 목록에 온다"
+
+    @override
+    def look(
+        self,
+        laid: ManyPresetsAndACaller,
+        answered: Answered[PartialBulkPayload[QueryDefinitionNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        verdicts: list[Verdict] = [
+            Same("successes", payload.successes, []),
+            Same("failed count", len(payload.failed), len(laid.laid)),
+        ]
+        for i, (failure, one) in enumerate(zip(payload.failed, laid.laid, strict=False)):
+            verdicts += [
+                Held[UUID](f"failed[{i}].id", failure.id, SameAs(one.id, "대상 프리셋의 id")),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+            ]
+        return verdicts

@@ -11,11 +11,12 @@ from typing import TYPE_CHECKING, Protocol
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
 from ai.backend.common.types import (
@@ -27,26 +28,26 @@ from ai.backend.common.types import (
     VFolderMount,
     VFolderUsageMode,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.model_card.creators import ModelCardCreator
 from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
@@ -55,9 +56,9 @@ from ai.backend.manager.models.resource_slot.row import (
     ModelCardResourceRequirementRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.model_card.db_source.db_source import ModelCardDBSource
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -266,6 +267,7 @@ class TestModelCardDelete:
                 resource_policy=test_user_resource_policy.name,
             )
             db_sess.add(user)
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user.uuid))
             await db_sess.flush()
         return user
 
@@ -476,7 +478,7 @@ class TestModelCardDelete:
             DeleteModelCardOptions(delete_associated_vfolder=False),
         )
 
-        assert set(result.successes) == {valid_a.id, valid_b.id}
+        assert {card.id for card in result.successes} == {valid_a.id, valid_b.id}
         assert [failure.card_id for failure in result.failures] == [missing_id]
 
         async with db_with_cleanup.begin_readonly_session() as session:
@@ -513,7 +515,7 @@ class TestModelCardDelete:
             DeleteModelCardOptions(delete_associated_vfolder=True),
         )
 
-        assert set(result.successes) == {free_card.id}
+        assert {card.id for card in result.successes} == {free_card.id}
         assert [failure.card_id for failure in result.failures] == [mounted_card.id]
 
         async with db_with_cleanup.begin_readonly_session() as session:

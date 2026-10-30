@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 from typing import Self
 
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -16,6 +19,7 @@ class UserRepositories:
             args.db,
             args.v2_ops_provider,
             ShareOpsProvider(args.db),
+            ResourcePolicyOpsProvider(args.db),
             args.key_provider_pool,
         )
 

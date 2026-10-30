@@ -11,9 +11,13 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.models.keypair.row import KeyPairRow
-from ai.backend.manager.models.specs.querier import OwnedFieldQuerier
+from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
+from ai.backend.manager.models.specs.querier import BulkFieldQuerier, OwnedFieldQuerier
 
-__all__ = ("DefaultKeypairQuerier",)
+__all__ = (
+    "BulkKeypairQuerier",
+    "DefaultKeypairQuerier",
+)
 
 
 @dataclass
@@ -34,4 +38,20 @@ class DefaultKeypairQuerier(OwnedFieldQuerier[UserID, KeyPairRow, KeyPairData]):
 
     @override
     def to_data(self, row: KeyPairRow) -> KeyPairData:
-        return row.to_data()
+        return KeyPairSearchableFields.own.to_data(row)
+
+
+class BulkKeypairQuerier(BulkFieldQuerier[KeyPairRow, KeyPairData]):
+    """The keypairs the caller named."""
+
+    @override
+    def row_class(self) -> type[KeyPairRow]:
+        return KeyPairRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return KeyPairRow.id
+
+    @override
+    def to_data(self, row: KeyPairRow) -> KeyPairData:
+        return KeyPairSearchableFields.own.to_data(row)

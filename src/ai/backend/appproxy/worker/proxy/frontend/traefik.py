@@ -9,7 +9,7 @@ from typing import Any, Final, override
 
 from aiohttp import web
 
-from ai.backend.appproxy.common.config import get_default_redis_key_ttl
+from ai.backend.appproxy.common.config import ContentEncodingConfig, get_default_redis_key_ttl
 from ai.backend.appproxy.common.errors import ServerMisconfiguredError
 from ai.backend.appproxy.common.types import RouteInfo
 from ai.backend.appproxy.worker.errors import InvalidFrontendTypeError, MissingTraefikConfigError
@@ -22,11 +22,11 @@ from ai.backend.appproxy.worker.types import (
     SubdomainFrontendInfo,
 )
 from ai.backend.common.cron import LocalCron, PeriodicTask
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .base import BaseFrontend
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 type MSetType = Mapping[str | bytes, bytes | float | int | str]
 
 
@@ -113,7 +113,16 @@ class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
         app.router.add_head("/{key}/mark-last-used-time", self.mark_last_used_time)
         app.router.add_head("/{key}/mark-active", self.mark_active)
         app.router.add_head("/{key}/mark-inactive", self.mark_inactive)
-        self.runner = web.AppRunner(app, access_log=None)
+        self.runner = web.AppRunner(
+            app,
+            access_log=None,
+            max_field_size=root_context.local_config.proxy_worker.max_header_field_size,
+        )
+
+    @override
+    def apply_content_encoding_config(self, config: ContentEncodingConfig) -> None:
+        # The Go plugin applies the config the coordinator writes to Traefik etcd.
+        pass
 
     @override
     async def start(self) -> None:
@@ -155,7 +164,7 @@ class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
         ttl = get_default_redis_key_ttl()
         await self.root_context.valkey_live.store_multiple_live_data(data, ex=ttl)
 
-        log.debug("Wrote {} keys", len(keys))
+        log.debug("wrote {} last-used-time keys", len(keys))
 
     async def mark_last_used_time(self, request: web.Request) -> web.StreamResponse:
         key = request.match_info["key"]
@@ -174,7 +183,7 @@ class AbstractTraefikFrontend[TCircuitKeyType: (int, str)](
         try:
             self.active_circuits.remove(uuid.UUID(key))
         except KeyError:
-            log.warning("mark_inactive(): key {!r} not found in active circuits", key)
+            log.debug("circuit {} to mark inactive is not active", key)
 
         return web.StreamResponse(status=204)
 

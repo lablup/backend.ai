@@ -23,13 +23,14 @@ from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.defs import DEFAULT_FILE_IO_TIMEOUT
 from ai.backend.common.lock import EtcdLock, FileLock, RedisLock
-from ai.backend.logging import BraceStyleAdapter, LogLevel
+from ai.backend.logging import LogLevel
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.session.types import SessionStatus
 
 from .defs import DEFAULT_METRIC_RANGE_VECTOR_TIMEWINDOW
 from .pglock import PgAdvisoryLock
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 _max_cpu_count = os.cpu_count()
 _file_perm = Path(__file__).stat()

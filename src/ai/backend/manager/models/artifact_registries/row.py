@@ -7,32 +7,30 @@ from typing import TYPE_CHECKING, override
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.base import (
     GUID,
     Base,
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
-    from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
+    from ai.backend.manager.models.huggingface_registry.row import HuggingFaceRegistryRow
+    from ai.backend.manager.models.reservoir_registry.row import ReservoirRegistryRow
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("ArtifactRegistryRow",)
 
 
 def _get_huggingface_registry_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
+    from ai.backend.manager.models.huggingface_registry.row import HuggingFaceRegistryRow
 
     return HuggingFaceRegistryRow.id == foreign(ArtifactRegistryRow.registry_id)
 
 
 def _get_reservoir_registry_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
+    from ai.backend.manager.models.reservoir_registry.row import ReservoirRegistryRow
 
     return ReservoirRegistryRow.id == foreign(ArtifactRegistryRow.registry_id)
 
@@ -72,11 +70,3 @@ class ArtifactRegistryRow(Base):
     @override
     def __str__(self) -> str:
         return f"ArtifactRegistryRow(id={self.id}, registry_id={self.registry_id}, type={self.type}, name={self.name})"
-
-    def to_dataclass(self) -> ArtifactRegistryData:
-        return ArtifactRegistryData(
-            id=ArtifactRegistryID(self.id),
-            registry_id=self.registry_id,
-            name=self.name,
-            type=ArtifactRegistryType(self.type),
-        )

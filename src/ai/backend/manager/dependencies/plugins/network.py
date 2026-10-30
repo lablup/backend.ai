@@ -5,12 +5,12 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import override
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.plugin.network import NetworkPluginContext
 
 from .base import PluginDependency, PluginsInput
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class NetworkPluginDependency(PluginDependency[NetworkPluginContext]):
@@ -38,7 +38,7 @@ class NetworkPluginDependency(PluginDependency[NetworkPluginContext]):
             allowlist=setup_input.allowed_plugins,
             blocklist=setup_input.disabled_plugins,
         )
-        log.info("NetworkPluginContext initialized with plugins: {}", list(ctx.plugins.keys()))
+        log.info("network plugins initialized", plugin_names=", ".join(ctx.plugins.keys()))
         try:
             yield ctx
         finally:

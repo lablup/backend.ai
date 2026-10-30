@@ -10,7 +10,6 @@ from ai.backend.common.dto.manager.rbac.request import (
     PurgeRoleRequest,
     RevokeRoleRequest,
     SearchRolesRequest,
-    SearchScopesRequest,
     SearchUsersAssignedToRoleRequest,
     UpdateRoleRequest,
 )
@@ -23,7 +22,6 @@ from ai.backend.common.dto.manager.rbac.response import (
     GetScopeTypesResponse,
     RevokeRoleResponse,
     SearchRolesResponse,
-    SearchScopesResponse,
     SearchUsersAssignedToRoleResponse,
     UpdateRoleResponse,
 )
@@ -114,16 +112,6 @@ class RBACClient(BaseDomainClient):
             "GET",
             "/admin/rbac/scope-types",
             response_model=GetScopeTypesResponse,
-        )
-
-    async def search_scopes(
-        self, scope_type: str, request: SearchScopesRequest
-    ) -> SearchScopesResponse:
-        return await self._client.typed_request(
-            "POST",
-            f"/admin/rbac/scopes/{scope_type}/search",
-            request=request,
-            response_model=SearchScopesResponse,
         )
 
     # ---- Entity Management ----

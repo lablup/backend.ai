@@ -9,7 +9,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 
 from .base import (
     VFolderAction,
@@ -20,8 +20,12 @@ from .base import (
 
 
 @dataclass
-class GlobalListAllowedTypesAction(VFolderGlobalAction):
-    """Query allowed vfolder types from etcd config."""
+class PublicListAllowedTypesAction(VFolderGlobalAction):
+    """Read the vfolder types the etcd config allows.
+
+    Open to any authenticated caller: the list is what a user needs before creating
+    a folder, and it names no entity.
+    """
 
     @override
     @classmethod
@@ -31,11 +35,11 @@ class GlobalListAllowedTypesAction(VFolderGlobalAction):
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "global_list_allowed_types"
+        return "public_list_allowed_types"
 
 
 @dataclass
-class GlobalListAllowedTypesActionResult:
+class PublicListAllowedTypesActionResult:
     allowed_types: list[str]
 
 

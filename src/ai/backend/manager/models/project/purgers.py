@@ -13,6 +13,8 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountID
+from ai.backend.common.data.vfolder_auto_mount.types import VFolderAutoMountScopeType
 from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.errors.resource import ProjectHasActiveKernelsError
@@ -22,6 +24,7 @@ from ai.backend.manager.models.kernel.row import (
     KernelRow,
 )
 from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.purger import (
     EntityBatchPurger,
@@ -29,6 +32,7 @@ from ai.backend.manager.models.specs.purger import (
     FieldBatchPurger,
 )
 from ai.backend.manager.models.specs.types import ConflictCheck
+from ai.backend.manager.models.vfolder_auto_mount.row import VFolderAutoMountRow
 
 
 @dataclass
@@ -135,6 +139,32 @@ class ProjectEndpointPurger(EntityBatchPurger[EndpointRow, DeploymentID]):
 
 
 @dataclass
+class ProjectVFolderAutoMountPurger(EntityBatchPurger[VFolderAutoMountRow, VFolderAutoMountID]):
+    """Clears the vfolder auto-mounts set on a project, each with the RBAC graph it left."""
+
+    project_id: ProjectID
+
+    @override
+    def entity_id(self, row: VFolderAutoMountRow) -> EntityIdentifier:
+        return row.id
+
+    @override
+    def build_subquery(self) -> sa.sql.Select[tuple[VFolderAutoMountRow]]:
+        return sa.select(VFolderAutoMountRow).where(
+            VFolderAutoMountRow.scope_type == VFolderAutoMountScopeType.PROJECT,
+            VFolderAutoMountRow.scope_id == self.project_id,
+        )
+
+    @override
+    def conflict_checks(self) -> Sequence[ConflictCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: VFolderAutoMountRow) -> VFolderAutoMountID:
+        return row.id
+
+
+@dataclass
 class ProjectPurger(EntityPurger[ProjectRow, ProjectData]):
     """Removes a project along with the scope it was."""
 
@@ -158,4 +188,4 @@ class ProjectPurger(EntityPurger[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
-        return row.to_data()
+        return ProjectSearchableFields.own.to_data(row)

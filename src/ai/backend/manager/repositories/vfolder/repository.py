@@ -6,7 +6,6 @@ from typing import Any, cast
 import sqlalchemy as sa
 from sqlalchemy import exc as sa_exc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
-from sqlalchemy.orm import selectinload
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.contexts.user import current_user
@@ -15,6 +14,7 @@ from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
@@ -36,13 +36,18 @@ from ai.backend.manager.data.permission.id import ScopeId
 from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
-    UserWithVFolderHostPermissions,
-    ValidatedVFolderInfo,
+    VFolderCloneInfo,
     VFolderCreation,
     VFolderData,
     VFolderInvitationData,
     VFolderMountPolicyData,
+    VFolderOperationStatus,
+    VFolderOwnershipType,
+    VFolderStatusSet,
+    VFolderStorageTarget,
+    vfolder_status_map,
 )
+from ai.backend.manager.defs import is_unmanaged
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.auth import AuthorizationFailed
 from ai.backend.manager.errors.entity_share import EntityShareNotFound
@@ -62,7 +67,7 @@ from ai.backend.manager.errors.storage import (
     VFolderOperationFailed,
 )
 from ai.backend.manager.errors.user import KeyPairNotFound, UserNotFound
-from ai.backend.manager.models.agent import agents
+from ai.backend.manager.models.agent.row import agents
 from ai.backend.manager.models.entity_share.creators import EntityShareCreator
 from ai.backend.manager.models.entity_share.lookups import HeldShareLookup
 from ai.backend.manager.models.entity_share.purgers import EntitySharePendingOfferBatchPurger
@@ -75,45 +80,30 @@ from ai.backend.manager.models.entity_share.updaters import (
     EntityShareRejectUpdater,
     EntityShareRevokeUpdater,
 )
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.keypair import KeyPairRow, keypairs
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.keypair.row import KeyPairRow, keypairs
 from ai.backend.manager.models.model_card.purgers import ModelCardPurger
 from ai.backend.manager.models.model_card.row import ModelCardRow
-from ai.backend.manager.models.project import ProjectRow, ProjectType
 from ai.backend.manager.models.project.lookups import PersonalProjectOfUserLookup
-from ai.backend.manager.models.resource_policy import keypair_resource_policies
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.resource_policy.row import (
+    ProjectResourcePolicyRow,
+    UserResourcePolicyRow,
+    keypair_resource_policies,
+)
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.specs.types import ConflictCheck, IntegrityErrorCheck
-from ai.backend.manager.models.user import (
+from ai.backend.manager.models.user.lookups import UserEmailLookup
+from ai.backend.manager.models.user.queries import joined_project_ids_query
+from ai.backend.manager.models.user.row import (
     ACTIVE_USER_STATUSES,
     UserRole,
     UserRow,
     UserStatus,
     users,
 )
-from ai.backend.manager.models.user.lookups import UserEmailLookup
-from ai.backend.manager.models.user.queries import joined_project_ids_query
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine, execute_with_retry
-from ai.backend.manager.models.vfolder import (
-    HARD_DELETED_VFOLDER_STATUSES,
-    VFolderCloneInfo,
-    VFolderDeletionInfo,
-    VFolderOperationStatus,
-    VFolderOwnershipType,
-    VFolderRow,
-    VFolderStatusSet,
-    VFolderUserMountPolicyRow,
-    ensure_host_permission_allowed,
-    ensure_quota_scope_accessible_by_user,
-    get_allowed_vfolder_hosts_by_group,
-    get_allowed_vfolder_hosts_by_user,
-    get_sessions_by_mounted_folder,
-    is_unmanaged,
-    vfolder_status_map,
-    vfolders,
-)
-from ai.backend.manager.models.vfolder.conditions import VFolderConditions
 from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
@@ -130,7 +120,13 @@ from ai.backend.manager.models.vfolder.queriers import (
     VFolderQuerier,
     VFolderUserMountPolicyQuerier,
 )
-from ai.backend.manager.models.vfolder.scopes import UserVFolderOperationScope
+from ai.backend.manager.models.vfolder.row import (
+    VFolderRow,
+    VFolderUserMountPolicyRow,
+    vfolders,
+)
+from ai.backend.manager.models.vfolder.scopes import UserVFolderTarget
+from ai.backend.manager.models.vfolder.searchable_fields import VFolderSearchableFields
 from ai.backend.manager.models.vfolder.searchers import VFolderUserMountPolicySearcher
 from ai.backend.manager.models.vfolder.updaters import (
     VFolderAttributeUpdater,
@@ -139,20 +135,33 @@ from ai.backend.manager.models.vfolder.updaters import (
     VFolderTrashUpdater,
 )
 from ai.backend.manager.models.vfolder.upserters import VFolderUserMountPolicyUpserter
+from ai.backend.manager.models.vfolder_auto_mount.purgers import (
+    VFolderAutoMountVFolderBatchPurger,
+)
 from ai.backend.manager.models.virtual_entity.queries import (
     user_scope_membership_exists,
 )
 from ai.backend.manager.repositories.base.integrity import match_integrity_error
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.write import V2ShareWriteOps
+from ai.backend.manager.repositories.vfolder.host_permission import (
+    ensure_host_permission_allowed,
+    get_allowed_vfolder_hosts_by_group,
+    get_allowed_vfolder_hosts_by_user,
+)
 from ai.backend.manager.repositories.vfolder.purge_guards import (
     find_active_vfolder_references,
+    get_sessions_by_mounted_folder,
     vfolder_reference_conflict_checks,
+)
+from ai.backend.manager.repositories.vfolder.quota_scope import (
+    ensure_quota_scope_accessible_by_user,
 )
 from ai.backend.manager.repositories.vfolder.types import (
     BulkVFolderPurgeResult,
     VFolderPurgeFailure,
 )
+from ai.backend.manager.views.user import UserResourceInfo
 
 vfolder_repository_resilience = Resilience(
     policies=[
@@ -236,18 +245,18 @@ class VfolderRepository:
 
     @vfolder_repository_resilience.apply()
     async def batch_load_by_ids(self, ids: Sequence[uuid.UUID]) -> list[VFolderData | None]:
-        """
-        Batch fetch vfolders by IDs without permission validation.
+        """The named vfolders in the given order, ``None`` where an id matches no row.
 
-        Returns a list with the same length and order as the input ids;
-        entries that are not found are ``None``. Intended for GraphQL
-        DataLoader use where the caller has already authorized access to a
-        parent entity that references these vfolder IDs.
+        No permission check: the partial bulk action calling this has already
+        narrowed ``ids`` to what the caller may read.
         """
         if not ids:
             return []
         async with self._db.begin_readonly_session() as session:
-            query = sa.select(VFolderRow).where(VFolderConditions.by_ids(ids)())
+            id_in = VFolderSearchableFields.own.id.filter.in_(
+                UUIDInMatchSpec(values=list(ids), negated=False)
+            )
+            query = sa.select(VFolderRow).where(id_in())
             result = await session.execute(query)
             rows_by_id = {row.id: self._vfolder_row_to_data(row) for row in result.scalars().all()}
             return [rows_by_id.get(VFolderUUID(vfolder_id)) for vfolder_id in ids]
@@ -258,6 +267,8 @@ class VfolderRepository:
     ) -> VFolderHostPermissionMap:
         """
         Get the allowed VFolder hosts for a user.
+
+        A personal project carries no hosts of its own; the user's keypair policy answers.
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             if group_uuid:
@@ -266,8 +277,8 @@ class VfolderRepository:
                 )
                 if group_row is None:
                     raise ProjectNotFound(f"Project with {group_uuid} not found.")
-
-                return group_row.allowed_vfolder_hosts
+                if group_row.type != ProjectType.PERSONAL:
+                    return group_row.allowed_vfolder_hosts
 
             allowed_hosts = await self._fetch_default_keypair_vfolder_hosts(db_session, user_uuid)
             if allowed_hosts is None:
@@ -308,66 +319,6 @@ class VfolderRepository:
         return allowed_hosts
 
     @vfolder_repository_resilience.apply()
-    async def get_user_with_keypair_policy_vfolder_hosts(
-        self, user_uuid: uuid.UUID
-    ) -> UserWithVFolderHostPermissions:
-        """
-        Load user data together with the merged ``allowed_vfolder_hosts`` from
-        all of the user's active keypair resource policies.
-
-        A user can hold multiple keypairs, each pointing to its own keypair
-        resource policy. This method unions ``allowed_vfolder_hosts`` across
-        every active keypair so that the host-permission check reflects the
-        full set of hosts available to the user (rather than only the default
-        keypair).
-
-        Implementation note: a single LEFT OUTER JOIN is used (instead of an
-        ORM ``selectinload`` on ``UserRow.keypairs``) so that only the columns
-        needed for the host-permission check are loaded. This avoids loading
-        sensitive keypair columns such as ``secret_key`` and
-        ``ssh_private_key``.
-        """
-        async with self._db.begin_readonly_session_read_committed() as db_session:
-            stmt = (
-                sa.select(
-                    UserRow.email,
-                    UserRow.role,
-                    UserRow.domain_name,
-                    keypair_resource_policies.c.allowed_vfolder_hosts,
-                )
-                .select_from(UserRow)
-                .outerjoin(
-                    KeyPairRow,
-                    sa.and_(
-                        KeyPairRow.user == UserRow.uuid,
-                        KeyPairRow.is_active.is_(True),
-                    ),
-                )
-                .outerjoin(
-                    keypair_resource_policies,
-                    keypair_resource_policies.c.name == KeyPairRow.resource_policy,
-                )
-                .where(UserRow.uuid == user_uuid)
-            )
-            rows = (await db_session.execute(stmt)).all()
-            if not rows:
-                raise UserNotFound(f"User with UUID {user_uuid} not found.")
-            email, role, domain_name, _ = rows[0]
-            if role is None or domain_name is None:
-                raise UserNotFound(f"User with UUID {user_uuid} has invalid role or domain data.")
-            merged_hosts = VFolderHostPermissionMap()
-            for row in rows:
-                policy_hosts = row.allowed_vfolder_hosts
-                if policy_hosts is None:
-                    continue
-                merged_hosts = VFolderHostPermissionMap(merged_hosts | policy_hosts)
-            return UserWithVFolderHostPermissions(
-                email=email,
-                role=role,
-                allowed_vfolder_hosts=merged_hosts,
-            )
-
-    @vfolder_repository_resilience.apply()
     async def get_max_vfolder_count(
         self, user_uuid: uuid.UUID, group_uuid: uuid.UUID | None
     ) -> int:
@@ -376,25 +327,30 @@ class VfolderRepository:
         """
         async with self._db.begin_readonly_session_read_committed() as db_session:
             if group_uuid:
-                group_row: ProjectRow | None = await db_session.scalar(
-                    sa.select(ProjectRow)
+                project_max_vfolder_count: int | None = await db_session.scalar(
+                    sa.select(ProjectResourcePolicyRow.max_vfolder_count)
+                    .select_from(ProjectRow)
+                    .join(
+                        ProjectResourcePolicyRow,
+                        ProjectRow.resource_policy == ProjectResourcePolicyRow.name,
+                    )
                     .where(ProjectRow.id == group_uuid)
-                    .options(selectinload(ProjectRow.resource_policy_row))
                 )
-                if group_row is None:
+                if project_max_vfolder_count is None:
                     raise ProjectNotFound(f"Project with {group_uuid} not found.")
 
-                return group_row.resource_policy_row.max_vfolder_count
+                return project_max_vfolder_count
 
-            user_row: UserRow | None = await db_session.scalar(
-                sa.select(UserRow)
+            user_max_vfolder_count: int | None = await db_session.scalar(
+                sa.select(UserResourcePolicyRow.max_vfolder_count)
+                .select_from(UserRow)
+                .join(UserResourcePolicyRow, UserRow.resource_policy == UserResourcePolicyRow.name)
                 .where(UserRow.uuid == user_uuid)
-                .options(selectinload(UserRow.resource_policy_row))
             )
-            if user_row is None:
+            if user_max_vfolder_count is None:
                 raise UserNotFound(f"User with UUID {user_uuid} not found.")
 
-            return user_row.resource_policy_row.max_vfolder_count
+            return user_max_vfolder_count
 
     @vfolder_repository_resilience.apply()
     async def resolve_vfolder_ids_by_names(self, names: Sequence[str]) -> dict[str, uuid.UUID]:
@@ -481,8 +437,7 @@ class VfolderRepository:
         user_info = await self.get_user_resource_info(creator.creator_id)
         if user_info is None:
             raise UserNotFound(f"User with {creator.creator_id} not found.")
-        _, max_quota_scope_size, container_uid = user_info
-        return max_quota_scope_size, container_uid
+        return user_info.max_quota_scope_size, user_info.container_uid
 
     @vfolder_repository_resilience.apply()
     async def mark_vfolder_ready(self, vfolder_id: VFolderUUID) -> VFolderData:
@@ -548,7 +503,7 @@ class VfolderRepository:
                     quota_scope_id=vfolder_row.quota_scope_id,
                     folder_id=vfolder_row.id,
                 )
-                deletion_info = VFolderDeletionInfo(
+                deletion_info = VFolderStorageTarget(
                     vfolder_id=vfolder_id_obj,
                     host=vfolder_row.host,
                     unmanaged_path=vfolder_row.unmanaged_path,
@@ -785,6 +740,10 @@ class VfolderRepository:
                 reference_checks = vfolder_reference_conflict_checks(
                     VFolderID(vfolder.quota_scope_id, vfolder.id)
                 )
+            # The FK cascade would take the auto-mount rows first and leave their nodes.
+            await w.batch_purge_entities_in_global(
+                VFolderAutoMountVFolderBatchPurger(vfolder_id=vfolder_id)
+            )
             try:
                 purged = await w.purge_entity(
                     VFolderPurger(vfolder_id=vfolder_id, reference_checks=reference_checks)
@@ -917,9 +876,9 @@ class VfolderRepository:
             await w.unshare(await self._landing_project(w, user_id), [target])
 
     def _invitation_query(self) -> sa.Select[Any]:
-        """Open vfolder offers with the folder offered, the sharer's email and name, and
-        the mount level the invitee is set to get: their policy row, or the folder's
-        default when none stands."""
+        """Open vfolder offers with the folder offered, the sharer's email and name, the
+        invitee's email, and the mount level the invitee is set to get: their policy row,
+        or the folder's default when none stands."""
         invitee = UserRow.__table__.alias("invitee")
         return (
             sa.select(
@@ -927,6 +886,7 @@ class VfolderRepository:
                 VFolderRow,
                 UserRow.email,
                 UserRow.username,
+                invitee.c.email,
                 sa.func.coalesce(
                     VFolderUserMountPolicyRow.permission, VFolderRow.default_mount_permission
                 ),
@@ -959,6 +919,7 @@ class VfolderRepository:
         share_row: EntityShareRow,
         inviter_email: str | None,
         inviter_username: str | None,
+        invitee_email: str | None,
         permission: VFolderMountPolicy,
     ) -> VFolderInvitationData:
         return VFolderInvitationData(
@@ -966,7 +927,7 @@ class VfolderRepository:
             vfolder=share_row.target_entity_id,
             inviter=inviter_email or "",
             inviter_username=inviter_username,
-            invitee=share_row.recipient_email or "",
+            invitee=share_row.recipient_email or invitee_email or "",
             permission=permission,
             created_at=share_row.created_at,
             modified_at=share_row.updated_at,
@@ -983,7 +944,7 @@ class VfolderRepository:
                 .select_from(VFolderRow)
                 .where(
                     (VFolderRow.user == user_id)
-                    & (VFolderRow.status.not_in(HARD_DELETED_VFOLDER_STATUSES))
+                    & (VFolderRow.status.not_in(VFolderOperationStatus.hard_deleted()))
                 )
             )
             result = await session.scalar(query)
@@ -1002,7 +963,7 @@ class VfolderRepository:
                 .where(
                     (VFolderRow.group == group_id)
                     & (VFolderRow.ownership_type == VFolderOwnershipType.GROUP)
-                    & (VFolderRow.status.not_in(HARD_DELETED_VFOLDER_STATUSES))
+                    & (VFolderRow.status.not_in(VFolderOperationStatus.hard_deleted()))
                 )
             )
             result = await session.scalar(query)
@@ -1016,7 +977,7 @@ class VfolderRepository:
                 sa.select(VFolderRow.id)
                 .where(
                     VFolderRow.name == name,
-                    VFolderRow.status.not_in(HARD_DELETED_VFOLDER_STATUSES),
+                    VFolderRow.status.not_in(VFolderOperationStatus.hard_deleted()),
                     scope.to_condition()(),
                 )
                 .exists()
@@ -1102,61 +1063,55 @@ class VfolderRepository:
 
         async with self._db.begin_readonly_session_read_committed() as session:
             if isinstance(group_id_or_name, str):
-                query = (
-                    sa.select(ProjectRow)
-                    .where(
-                        (ProjectRow.domain_name == domain_name)
-                        & (ProjectRow.name == group_id_or_name)
-                    )
-                    .options(selectinload(ProjectRow.resource_policy_row))
-                )
+                project_cond = ProjectRow.name == group_id_or_name
             else:  # UUID
-                query = (
-                    sa.select(ProjectRow)
-                    .where(
-                        (ProjectRow.domain_name == domain_name)
-                        & (ProjectRow.id == group_id_or_name)
-                    )
-                    .options(selectinload(ProjectRow.resource_policy_row))
+                project_cond = ProjectRow.id == group_id_or_name
+            query = (
+                sa.select(
+                    ProjectRow.id,
+                    ProjectRow.type,
+                    ProjectResourcePolicyRow.max_vfolder_count,
+                    ProjectResourcePolicyRow.max_quota_scope_size,
                 )
+                .select_from(ProjectRow)
+                .join(
+                    ProjectResourcePolicyRow,
+                    ProjectRow.resource_policy == ProjectResourcePolicyRow.name,
+                )
+                .where((ProjectRow.domain_name == domain_name) & project_cond)
+            )
+            row = (await session.execute(query)).first()
 
-            result = await session.execute(query)
-            group_row = result.scalar()
-
-            if not group_row:
+            if row is None:
                 return None
 
             return ProjectResourceInfo(
-                project_id=group_row.id,
-                max_vfolder_count=group_row.resource_policy_row.max_vfolder_count,
-                max_quota_scope_size=group_row.resource_policy_row.max_quota_scope_size,
-                project_type=group_row.type,
+                project_id=row.id,
+                max_vfolder_count=row.max_vfolder_count,
+                max_quota_scope_size=row.max_quota_scope_size,
+                project_type=row.type,
             )
 
     @vfolder_repository_resilience.apply()
-    async def get_user_resource_info(
-        self, user_id: uuid.UUID
-    ) -> tuple[int, int, int | None] | None:
+    async def get_user_resource_info(self, user_id: uuid.UUID) -> UserResourceInfo | None:
         """
-        Get user resource information.
-        Returns (max_vfolder_count, max_quota_scope_size, container_uid) or None.
+        Get user resource information, or None when the user is not found.
         """
         async with self._db.begin_readonly_session_read_committed() as session:
             query = (
-                sa.select(UserRow)
+                sa.select(UserResourcePolicyRow.max_quota_scope_size, UserRow.container_uid)
+                .select_from(UserRow)
+                .join(UserResourcePolicyRow, UserRow.resource_policy == UserResourcePolicyRow.name)
                 .where(UserRow.uuid == user_id)
-                .options(selectinload(UserRow.resource_policy_row))
             )
-            result = await session.execute(query)
-            user_row = result.scalar()
+            row = (await session.execute(query)).first()
 
-            if not user_row:
+            if row is None:
                 return None
 
-            return (
-                user_row.resource_policy_row.max_vfolder_count,
-                user_row.resource_policy_row.max_quota_scope_size,
-                user_row.container_uid,
+            return UserResourceInfo(
+                max_quota_scope_size=row.max_quota_scope_size,
+                container_uid=row.container_uid,
             )
 
     async def _get_vfolder_by_id(
@@ -1212,10 +1167,6 @@ class VfolderRepository:
             quota_scope_id=row.quota_scope_id,
             usage_mode=row.usage_mode,
             default_mount_permission=row.default_mount_permission,
-            max_files=row.max_files or 0,
-            max_size=row.max_size,
-            num_files=row.num_files or 0,
-            cur_size=row.cur_size or 0,
             created_at=row.created_at,
             last_used=row.last_used,
             updated_at=row.updated_at,
@@ -1348,9 +1299,13 @@ class VfolderRepository:
             row = (await session.execute(query)).one_or_none()
             if row is None:
                 return None
-            share_row, _, inviter_email, inviter_username, permission = row
+            share_row, _, inviter_email, inviter_username, invitee_email, permission = row
             return self._invitation_data(
-                share_row, inviter_email, inviter_username, VFolderMountPolicy(permission)
+                share_row,
+                inviter_email,
+                inviter_username,
+                invitee_email,
+                VFolderMountPolicy(permission),
             )
 
     @vfolder_repository_resilience.apply()
@@ -1477,11 +1432,22 @@ class VfolderRepository:
             return [
                 (
                     self._invitation_data(
-                        share_row, inviter_email, inviter_username, VFolderMountPolicy(permission)
+                        share_row,
+                        inviter_email,
+                        inviter_username,
+                        invitee_email,
+                        VFolderMountPolicy(permission),
                     ),
                     self._vfolder_row_to_data(vfolder_row),
                 )
-                for share_row, vfolder_row, inviter_email, inviter_username, permission in result
+                for (
+                    share_row,
+                    vfolder_row,
+                    inviter_email,
+                    inviter_username,
+                    invitee_email,
+                    permission,
+                ) in result
             ]
 
     @vfolder_repository_resilience.apply()
@@ -1498,11 +1464,22 @@ class VfolderRepository:
             return [
                 (
                     self._invitation_data(
-                        share_row, inviter_email, inviter_username, VFolderMountPolicy(permission)
+                        share_row,
+                        inviter_email,
+                        inviter_username,
+                        invitee_email,
+                        VFolderMountPolicy(permission),
                     ),
                     self._vfolder_row_to_data(vfolder_row),
                 )
-                for share_row, vfolder_row, inviter_email, inviter_username, permission in result
+                for (
+                    share_row,
+                    vfolder_row,
+                    inviter_email,
+                    inviter_username,
+                    invitee_email,
+                    permission,
+                ) in result
             ]
 
     @vfolder_repository_resilience.apply()
@@ -1558,7 +1535,7 @@ class VfolderRepository:
         permission: VFolderHostPermission,
         allowed_vfolder_types: Sequence[str],
         resource_policy: Mapping[str, Any],
-    ) -> ValidatedVFolderInfo:
+    ) -> VFolderStorageTarget:
         """
         Resolve user from context, validate vfolder access, check host permission,
         and return validated VFolderID with storage info.
@@ -1575,7 +1552,7 @@ class VfolderRepository:
             resource_policy=resource_policy,
             domain_name=vfolder_data.domain_name,
         )
-        return ValidatedVFolderInfo(
+        return VFolderStorageTarget(
             vfolder_id=VFolderID(
                 quota_scope_id=vfolder_data.quota_scope_id,
                 folder_id=vfolder_data.id,
@@ -1661,7 +1638,7 @@ class VfolderRepository:
         """The ``.logs`` vfolder the user reaches, or ``None`` when there is none."""
         async with self._v2_ops.read_ops() as r:
             vfolder_id = await r.lookup_entity_id(
-                VFolderNameLookup(scopes=[UserVFolderOperationScope(user_id=user_id)], name=".logs")
+                VFolderNameLookup(scopes=[UserVFolderTarget(user_id=user_id)], name=".logs")
             )
         if vfolder_id is None:
             return None

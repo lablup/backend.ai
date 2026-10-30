@@ -1,15 +1,18 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.manager.data.service_catalog.types import ServiceCatalogData
 from ai.backend.manager.models.service_catalog.creators import ServiceCatalogEndpointCreator
 from ai.backend.manager.models.service_catalog.purgers import ServiceCatalogEndpointBatchPurger
+from ai.backend.manager.models.service_catalog.queriers import BulkServiceCatalogQuerier
 from ai.backend.manager.models.service_catalog.upserters import ServiceCatalogUpserter
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 
@@ -50,3 +53,11 @@ class ServiceCatalogRepository:
             await w.batch_purge_field_entities(service_id, ServiceCatalogEndpointBatchPurger())
             await w.atomic_create_field_entities(service_id, endpoints)
         return service_id
+
+    @service_catalog_repository_resilience.apply()
+    async def bulk_get(
+        self, service_ids: Sequence[ServiceCatalogID]
+    ) -> Mapping[EntityIdentifier, ServiceCatalogData]:
+        """Read the named services; one that is gone is absent."""
+        async with self._ops.read_ops() as r:
+            return await r.query_bulk_data(BulkServiceCatalogQuerier(), service_ids)

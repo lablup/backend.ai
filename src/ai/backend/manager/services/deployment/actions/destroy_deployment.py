@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import override
 
 from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.services.deployment.actions.base import (
     DeploymentSingleEntityAction,
 )
@@ -27,3 +28,4 @@ class DestroyDeploymentAction(DeploymentSingleEntityAction):
 @dataclass
 class DestroyDeploymentActionResult:
     success: bool
+    data: ModelDeploymentData

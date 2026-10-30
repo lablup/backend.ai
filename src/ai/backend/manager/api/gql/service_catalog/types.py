@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
 from enum import StrEnum
-from typing import Self
+from typing import Self, override
 from uuid import UUID
 
+from strawberry import Info
 from strawberry.relay import NodeID
 from strawberry.scalars import JSON
 
+from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.dto.manager.v2.service_catalog.request import (
     ServiceCatalogFilter as ServiceCatalogFilterDTO,
 )
@@ -18,13 +21,10 @@ from ai.backend.common.dto.manager.v2.service_catalog.request import (
 )
 from ai.backend.common.dto.manager.v2.service_catalog.response import ServiceCatalogNode
 from ai.backend.common.dto.manager.v2.service_catalog.types import (
-    EndpointInfo,
-)
-from ai.backend.common.dto.manager.v2.service_catalog.types import (
     ServiceCatalogStatusFilter as ServiceCatalogStatusFilterDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import OrderDirection, StringFilter
+from ai.backend.manager.api.gql.base import OrderDirection, StringFilter, UUIDFilter
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -32,16 +32,19 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_node_type,
     gql_pydantic_input,
-    gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticInputMixin,
     PydanticNodeMixin,
-    PydanticOutputMixin,
 )
+from ai.backend.manager.api.gql.storage_volume_service_attachment.types import (
+    StorageVolumeServiceAttachmentConnectionGQL,
+    StorageVolumeServiceAttachmentFilterGQL,
+    StorageVolumeServiceAttachmentOrderByGQL,
+)
+from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
-    "ServiceCatalogEndpointGQL",
     "ServiceCatalogFilterGQL",
     "ServiceCatalogGQL",
     "ServiceCatalogOrderByGQL",
@@ -63,23 +66,6 @@ class ServiceCatalogStatusGQL(StrEnum):
     DEREGISTERED = "deregistered"
 
 
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version="26.3.0",
-        description="An endpoint exposed by a service instance.",
-    ),
-    model=EndpointInfo,
-    name="ServiceCatalogEndpoint",
-)
-class ServiceCatalogEndpointGQL(PydanticOutputMixin[EndpointInfo]):
-    role: str = gql_field(description="Role of this endpoint (e.g., 'main', 'health').")
-    scope: str = gql_field(description="Network scope (e.g., 'public', 'private', 'internal').")
-    address: str = gql_field(description="Hostname or IP address.")
-    port: int = gql_field(description="Port number.")
-    protocol: str = gql_field(description="Protocol (e.g., 'grpc', 'http', 'https').")
-    metadata: JSON | None = gql_field(description="Additional metadata.", default=None)
-
-
 @gql_node_type(
     BackendAIGQLMeta(
         added_version="26.3.0",
@@ -91,7 +77,7 @@ class ServiceCatalogGQL(PydanticNodeMixin[ServiceCatalogNode]):
     id: NodeID[str] = gql_field(description="Relay-style global node ID.")
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the service catalog.",
         ),
     )
@@ -107,9 +93,39 @@ class ServiceCatalogGQL(PydanticNodeMixin[ServiceCatalogNode]):
     registered_at: datetime = gql_field(description="When the service was first registered.")
     last_heartbeat: datetime = gql_field(description="Last heartbeat timestamp.")
     config_hash: str = gql_field(description="Hash of the service configuration.")
-    endpoints: list[ServiceCatalogEndpointGQL] = gql_field(
-        description="Endpoints exposed by this service instance."
-    )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The storage volumes attached to this service, one attachment per volume.",
+        )
+    )  # type: ignore[misc]
+    async def storage_volume_attachments(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: StorageVolumeServiceAttachmentFilterGQL | None = None,
+        order_by: list[StorageVolumeServiceAttachmentOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> StorageVolumeServiceAttachmentConnectionGQL | None:
+        raise NotImplementedError
+
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[ServiceCatalogGQL | None]:
+        return await info.context.data_loaders.service_catalog_loader.load_many([
+            ServiceCatalogID(UUID(nid)) for nid in node_ids
+        ])
 
 
 @gql_enum(
@@ -171,6 +187,10 @@ class ServiceCatalogFilterGQL(PydanticInputMixin[ServiceCatalogFilterDTO]):
     )
     status: ServiceCatalogStatusFilterGQL | None = gql_field(
         description="Filter by health status. Supports equals, in, not_equals, and not_in operations.",
+        default=None,
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by service ID."),
         default=None,
     )
     AND: list[Self] | None = None

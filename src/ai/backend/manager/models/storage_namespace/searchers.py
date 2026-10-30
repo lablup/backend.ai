@@ -10,6 +10,9 @@ import sqlalchemy as sa
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.specs.searcher import Searcher
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
+from ai.backend.manager.models.storage_namespace.searchable_fields import (
+    StorageNamespaceSearchableFields,
+)
 
 
 @dataclass
@@ -20,4 +23,4 @@ class StorageNamespaceSearcher(Searcher[StorageNamespaceRow, StorageNamespaceDat
 
     @override
     def to_data(self, row: StorageNamespaceRow) -> StorageNamespaceData:
-        return row.to_dataclass()
+        return StorageNamespaceSearchableFields.own.to_data(row)

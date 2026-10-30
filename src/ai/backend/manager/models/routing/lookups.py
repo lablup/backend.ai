@@ -11,8 +11,9 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.replica import ReplicaID
+from ai.backend.common.data.entity.types import FieldType
 from ai.backend.manager.models.routing.row import RoutingRow
-from ai.backend.manager.models.specs.lookup import FieldOwnerLookup
+from ai.backend.manager.models.specs.lookup import FieldOwnerKeyLookup, FieldOwnerLookup
 
 
 @dataclass
@@ -24,6 +25,29 @@ class ReplicaOwnerLookup(FieldOwnerLookup[ReplicaID, DeploymentID]):
         self, field_ids: Sequence[ReplicaID]
     ) -> sa.sql.Select[tuple[ReplicaID, DeploymentID]]:
         return sa.select(RoutingRow.id, RoutingRow.endpoint).where(RoutingRow.id.in_(field_ids))
+
+    @override
+    def to_entity_id(self, value: UUID) -> DeploymentID:
+        return DeploymentID(value)
+
+
+@dataclass
+class ReplicaDeploymentLookup(FieldOwnerKeyLookup[DeploymentID]):
+    """Reads the deployment one replica serves.
+
+    Keyed by the replica id a request carries: a replica is no scope of its own, so the
+    deployment is what answers for a read naming it.
+    """
+
+    replica_id: ReplicaID
+
+    @override
+    def field_type(self) -> FieldType:
+        return ReplicaID.field_type()
+
+    @override
+    def build_query(self) -> sa.sql.Select[tuple[DeploymentID]]:
+        return sa.select(RoutingRow.endpoint).where(RoutingRow.id == self.replica_id)
 
     @override
     def to_entity_id(self, value: UUID) -> DeploymentID:

@@ -25,17 +25,17 @@ from ai.backend.manager.models.alembic.versions.b8c828d3636e_link_roles_to_their
     backfill,
 )
 from ai.backend.manager.models.base import GUID
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -81,6 +81,13 @@ async def db(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(database_connection, _TABLES):
+        async with database_connection.begin() as conn:
+            await conn.execute(
+                sa.text(
+                    "ALTER TABLE role_presets "
+                    "ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT false"
+                )
+            )
         yield database_connection
 
 
@@ -126,10 +133,13 @@ async def _add_preset(
             name=name,
             role_name_template=template,
             scope_type=scope_type or ProjectEntityType(),
-            deleted=deleted,
         )
         session.add(preset)
         await session.flush()
+        await session.execute(
+            sa.text("UPDATE role_presets SET deleted = :deleted WHERE id = :id"),
+            {"deleted": deleted, "id": preset.id},
+        )
         return preset.id
 
 

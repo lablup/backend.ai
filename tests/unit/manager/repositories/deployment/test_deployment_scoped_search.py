@@ -1,14 +1,14 @@
-"""The project and user deployment scopes on the modern endpoint search."""
+"""The project and user deployment scopes on the generic deployment search."""
 
 from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from unittest.mock import AsyncMock
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
@@ -16,55 +16,59 @@ from ai.backend.common.data.entity.deployment import DeploymentEntityType, Deplo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.deployment.types import DeploymentInfo
+from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
     DeploymentAutoScalingPolicyRow,
 )
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.endpoint.scopes import (
-    ProjectDeploymentOperationScope,
-    UserDeploymentOperationScope,
+    ProjectDeploymentTarget,
+    UserDeploymentTarget,
 )
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
+from ai.backend.manager.models.endpoint.searchers import DeploymentSearcher
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
+from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
@@ -75,6 +79,7 @@ class TestData:
     other_user_id: uuid.UUID
     project_a_id: uuid.UUID
     project_b_id: uuid.UUID
+    resource_group_id: ResourceGroupID
     endpoint_ids_in_a: list[uuid.UUID]
     endpoint_ids_in_b: list[uuid.UUID]
 
@@ -167,15 +172,15 @@ class TestDeploymentScopedSearch:
             )
             await db_sess.flush()
 
-            db_sess.add(
-                ResourceGroupRow(
-                    name=sgroup_name,
-                    driver="static",
-                    scheduler="fifo",
-                    scheduler_opts=ResourceGroupOpts(),
-                )
+            resource_group = ResourceGroupRow(
+                name=sgroup_name,
+                driver="static",
+                scheduler="fifo",
+                scheduler_opts=ResourceGroupOpts(),
             )
+            db_sess.add(resource_group)
             await db_sess.flush()
+            resource_group_id = resource_group.id
 
             db_sess.add(
                 UserResourcePolicyRow(
@@ -259,6 +264,8 @@ class TestDeploymentScopedSearch:
                             resource_group=sgroup_name,
                             lifecycle_stage=EndpointLifecycle.CREATED,
                             replicas=1,
+                            # Autoscaling scaled the second deployment in project A to zero.
+                            desired_replicas=0 if ids is endpoint_ids_in_a and i == 1 else None,
                         )
                     )
                     ids.append(eid)
@@ -302,34 +309,33 @@ class TestDeploymentScopedSearch:
             other_user_id=other_user_id,
             project_a_id=project_a_id,
             project_b_id=project_b_id,
+            resource_group_id=resource_group_id,
             endpoint_ids_in_a=endpoint_ids_in_a,
             endpoint_ids_in_b=endpoint_ids_in_b,
         )
 
     @pytest.fixture
-    def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> DeploymentRepository:
-        return DeploymentRepository(
-            db=db_with_cleanup,
-            reconcile_ops_provider=ReconcileOpsProvider(db_with_cleanup),
-            storage_manager=AsyncMock(),
-            valkey_stat=AsyncMock(),
-            valkey_live=AsyncMock(),
-            valkey_schedule=AsyncMock(),
-            permission_check=AsyncMock(),
-        )
+    def repository(
+        self, db_with_cleanup: ExtendedAsyncSAEngine
+    ) -> OpsRepository[ModelDeploymentData]:
+        return OpsRepository(V2DBOpsProvider(db_with_cleanup))
 
     @pytest.fixture
-    def querier(self) -> BatchQuerier:
-        return BatchQuerier(pagination=OffsetPagination(limit=10, offset=0))
+    def searcher(self) -> DeploymentSearcher:
+        return DeploymentSearcher(pagination=OffsetPagination(limit=10, offset=0))
 
     async def test_project_scope_returns_only_that_project(
         self,
-        repository: DeploymentRepository,
-        querier: BatchQuerier,
+        repository: OpsRepository[ModelDeploymentData],
+        searcher: DeploymentSearcher,
         test_data: TestData,
     ) -> None:
-        result = await repository.search_endpoints_in_scopes(
-            querier, [ProjectDeploymentOperationScope(project_id=test_data.project_a_id)]
+        result = await repository.scoped_search(
+            ScopedSearcher(
+                scopes=[ProjectDeploymentTarget(project_id=test_data.project_a_id)],
+                used_by=[],
+                searcher=searcher,
+            )
         )
 
         assert result.total_count == 2
@@ -339,30 +345,40 @@ class TestDeploymentScopedSearch:
 
     async def test_project_scope_reads_the_modern_info(
         self,
-        repository: DeploymentRepository,
-        querier: BatchQuerier,
+        repository: OpsRepository[ModelDeploymentData],
+        searcher: DeploymentSearcher,
         test_data: TestData,
     ) -> None:
-        result = await repository.search_endpoints_in_scopes(
-            querier, [ProjectDeploymentOperationScope(project_id=test_data.project_b_id)]
+        result = await repository.scoped_search(
+            ScopedSearcher(
+                scopes=[ProjectDeploymentTarget(project_id=test_data.project_b_id)],
+                used_by=[],
+                searcher=searcher,
+            )
         )
 
         (item,) = result.items
-        assert isinstance(item, DeploymentInfo)
-        assert item.metadata.project == test_data.project_b_id
-        assert item.metadata.created_user == test_data.owner_id
-        assert item.state.lifecycle == EndpointLifecycle.CREATED
+        assert isinstance(item, ModelDeploymentData)
+        assert item.metadata.project_id == test_data.project_b_id
+        assert item.created_user_id == test_data.owner_id
+        assert item.metadata.status == ModelDeploymentStatus.from_lifecycle(
+            EndpointLifecycle.CREATED
+        )
         assert item.current_revision_id is None
         assert item.policy is None
 
     async def test_user_scope_returns_the_deployments_the_user_created(
         self,
-        repository: DeploymentRepository,
-        querier: BatchQuerier,
+        repository: OpsRepository[ModelDeploymentData],
+        searcher: DeploymentSearcher,
         test_data: TestData,
     ) -> None:
-        result = await repository.search_endpoints_in_scopes(
-            querier, [UserDeploymentOperationScope(user_id=UserID(test_data.owner_id))]
+        result = await repository.scoped_search(
+            ScopedSearcher(
+                scopes=[UserDeploymentTarget(user_id=UserID(test_data.owner_id))],
+                used_by=[],
+                searcher=searcher,
+            )
         )
 
         assert result.total_count == 3
@@ -372,12 +388,16 @@ class TestDeploymentScopedSearch:
 
     async def test_user_scope_is_empty_for_a_user_who_created_none(
         self,
-        repository: DeploymentRepository,
-        querier: BatchQuerier,
+        repository: OpsRepository[ModelDeploymentData],
+        searcher: DeploymentSearcher,
         test_data: TestData,
     ) -> None:
-        result = await repository.search_endpoints_in_scopes(
-            querier, [UserDeploymentOperationScope(user_id=UserID(test_data.other_user_id))]
+        result = await repository.scoped_search(
+            ScopedSearcher(
+                scopes=[UserDeploymentTarget(user_id=UserID(test_data.other_user_id))],
+                used_by=[],
+                searcher=searcher,
+            )
         )
 
         assert result.total_count == 0
@@ -385,22 +405,91 @@ class TestDeploymentScopedSearch:
 
     async def test_unknown_project_is_refused(
         self,
-        repository: DeploymentRepository,
-        querier: BatchQuerier,
+        repository: OpsRepository[ModelDeploymentData],
+        searcher: DeploymentSearcher,
         test_data: TestData,
     ) -> None:
         with pytest.raises(ProjectNotFound):
-            await repository.search_endpoints_in_scopes(
-                querier, [ProjectDeploymentOperationScope(project_id=uuid.uuid4())]
+            await repository.scoped_search(
+                ScopedSearcher(
+                    scopes=[ProjectDeploymentTarget(project_id=uuid.uuid4())],
+                    used_by=[],
+                    searcher=searcher,
+                )
             )
 
     async def test_unknown_user_is_refused(
         self,
-        repository: DeploymentRepository,
-        querier: BatchQuerier,
+        repository: OpsRepository[ModelDeploymentData],
+        searcher: DeploymentSearcher,
         test_data: TestData,
     ) -> None:
         with pytest.raises(UserNotFound):
-            await repository.search_endpoints_in_scopes(
-                querier, [UserDeploymentOperationScope(user_id=UserID(uuid.uuid4()))]
+            await repository.scoped_search(
+                ScopedSearcher(
+                    scopes=[UserDeploymentTarget(user_id=UserID(uuid.uuid4()))],
+                    used_by=[],
+                    searcher=searcher,
+                )
             )
+
+    async def test_uses_narrows_to_the_resource_group_the_deployments_run_in(
+        self,
+        repository: OpsRepository[ModelDeploymentData],
+        searcher: DeploymentSearcher,
+        test_data: TestData,
+    ) -> None:
+        used_by = DeploymentSearchableFields.linked.usage.resource_groups.uses(
+            test_data.resource_group_id
+        )
+        result = await repository.scoped_search(
+            ScopedSearcher(
+                scopes=[ProjectDeploymentTarget(project_id=test_data.project_a_id)],
+                used_by=[used_by],
+                searcher=searcher,
+            )
+        )
+
+        assert {item.id for item in result.items} == set(test_data.endpoint_ids_in_a)
+
+    async def test_uses_another_resource_group_returns_none(
+        self,
+        repository: OpsRepository[ModelDeploymentData],
+        searcher: DeploymentSearcher,
+        test_data: TestData,
+    ) -> None:
+        used_by = DeploymentSearchableFields.linked.usage.resource_groups.uses(
+            ResourceGroupID(uuid.uuid4())
+        )
+        result = await repository.scoped_search(
+            ScopedSearcher(
+                scopes=[ProjectDeploymentTarget(project_id=test_data.project_a_id)],
+                used_by=[used_by],
+                searcher=searcher,
+            )
+        )
+
+        assert result.total_count == 0
+
+    async def test_desired_replicas_falls_back_to_replicas(
+        self,
+        repository: OpsRepository[ModelDeploymentData],
+        test_data: TestData,
+    ) -> None:
+        result = await repository.scoped_search(
+            ScopedSearcher(
+                scopes=[ProjectDeploymentTarget(project_id=test_data.project_a_id)],
+                used_by=[],
+                searcher=DeploymentSearcher(
+                    pagination=OffsetPagination(limit=10, offset=0),
+                    conditions=[
+                        DeploymentSearchableFields.own.desired_replicas.filter.equals(1),
+                    ],
+                ),
+            )
+        )
+
+        (item,) = result.items
+        assert item.id == test_data.endpoint_ids_in_a[0]
+        assert item.replica_state.replica_count == 1
+        assert item.replica_state.desired_replica_count == 1

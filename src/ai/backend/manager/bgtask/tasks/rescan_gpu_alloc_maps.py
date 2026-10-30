@@ -10,14 +10,14 @@ from ai.backend.common.bgtask.task.base import (
     BaseBackgroundTaskManifest,
 )
 from ai.backend.common.types import AgentId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.bgtask.types import ManagerBgtaskName
 
 if TYPE_CHECKING:
     from ai.backend.manager.clients.agent.pool import AgentClientPool
     from ai.backend.manager.repositories.agent.repository import AgentRepository
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RescanGPUAllocMapsManifest(BaseBackgroundTaskManifest):
@@ -56,17 +56,13 @@ class RescanGPUAllocMapsHandler(BaseBackgroundTaskHandler[RescanGPUAllocMapsMani
 
     @override
     async def execute(self, manifest: RescanGPUAllocMapsManifest) -> None:
-        try:
-            # Get agent data from repository (DB)
-            agent_data = await self._agent_repository.get_by_id(manifest.agent_id)
+        # Get agent data from repository (DB)
+        agent_data = await self._agent_repository.get_by_id(manifest.agent_id)
 
-            # Get agent client from pool and scan GPU allocation map
-            async with self._agent_client_pool.acquire(AgentId(agent_data.id)) as client:
-                alloc_map = await client.scan_gpu_alloc_map()
+        # Get agent client from pool and scan GPU allocation map
+        async with self._agent_client_pool.acquire(AgentId(agent_data.id)) as client:
+            alloc_map = await client.scan_gpu_alloc_map()
 
-            # Store result in cache via repository
-            await self._agent_repository.update_gpu_alloc_map(manifest.agent_id, alloc_map)
-            log.info("Agent {} GPU alloc map scanned successfully", manifest.agent_id)
-        except Exception as e:
-            log.error("Failed to scan GPU alloc map for agent {}: {}", manifest.agent_id, e)
-            raise
+        # Store result in cache via repository
+        await self._agent_repository.update_gpu_alloc_map(manifest.agent_id, alloc_map)
+        log.debug("gpu alloc map scanned", agent_id=manifest.agent_id)

@@ -30,8 +30,12 @@ from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
@@ -81,6 +85,7 @@ async def adapter(
     project_repository = ProjectRepository(
         engine,
         provider,
+        ResourcePolicyOpsProvider(engine),
         config,
         valkey.stat,
         unwired(StorageSessionManager, "only folder work reaches it"),
@@ -105,7 +110,7 @@ async def adapter(
     )
     domain = DomainProcessors(
         registry.group(GroupMeta(DomainEntityType())),
-        DomainService(DomainRepository(engine, provider)),
+        DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
     )
     user = UserProcessors(
         registry.group(GroupMeta(UserEntityType())),
@@ -117,6 +122,7 @@ async def adapter(
                 engine,
                 provider,
                 ShareOpsProvider(engine),
+                ResourcePolicyOpsProvider(engine),
                 KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
             ),
             unwired(SchedulingController, "only enqueue schedules"),

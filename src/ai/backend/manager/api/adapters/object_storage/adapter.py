@@ -4,38 +4,47 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
+from typing import assert_never
 from uuid import UUID
 
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionID
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.object_storage.request import (
     AdminSearchObjectStoragesInput,
     CreateObjectStorageInput,
-    DeleteObjectStorageInput,
     ObjectStorageFilter,
     ObjectStorageOrder,
+    PartialBulkPurgeObjectStoragesInput,
+    PartialBulkUpdateObjectStoragesInput,
     UpdateObjectStorageInput,
 )
 from ai.backend.common.dto.manager.v2.object_storage.response import (
     AdminSearchObjectStoragesPayload,
     CreateObjectStoragePayload,
-    DeleteObjectStoragePayload,
     ObjectStorageNode,
     PresignedDownloadURLPayload,
     PresignedUploadURLPayload,
+    PurgeObjectStoragePayload,
     UpdateObjectStoragePayload,
 )
-from ai.backend.common.dto.manager.v2.object_storage.types import OrderDirection
+from ai.backend.common.dto.manager.v2.object_storage.types import (
+    ObjectStorageOrderField,
+    OrderDirection,
+)
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.object_storage.conditions import ObjectStorageConditions
 from ai.backend.manager.models.object_storage.creators import ObjectStorageCreator
-from ai.backend.manager.models.object_storage.orders import ObjectStorageOrders
+from ai.backend.manager.models.object_storage.searchable_fields import (
+    ObjectStorageSearchableFields,
+)
 from ai.backend.manager.models.object_storage.searchers import ObjectStorageSearcher
 from ai.backend.manager.models.object_storage.updaters import ObjectStorageUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.object_storage.actions.bulk_get import (
     BulkGetObjectStoragesAction,
 )
@@ -46,6 +55,12 @@ from ai.backend.manager.services.object_storage.actions.get_download_presigned_u
 )
 from ai.backend.manager.services.object_storage.actions.get_upload_presigned_url import (
     GetUploadPresignedURLAction,
+)
+from ai.backend.manager.services.object_storage.actions.partial_bulk_purge_object_storages import (
+    PartialBulkPurgeObjectStoragesAction,
+)
+from ai.backend.manager.services.object_storage.actions.partial_bulk_update_object_storages import (
+    PartialBulkUpdateObjectStoragesAction,
 )
 from ai.backend.manager.services.object_storage.actions.purge import PurgeObjectStorageAction
 from ai.backend.manager.services.object_storage.actions.search import SearchObjectStoragesAction
@@ -76,7 +91,7 @@ class ObjectStorageAdapter(BaseAdapter):
         searcher = self.build_searcher(input)
 
         action_result = await self._object_storage.global_search_object_storages.run(
-            SearchObjectStoragesAction(searcher=searcher)
+            SearchObjectStoragesAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
         return AdminSearchObjectStoragesPayload(
@@ -95,46 +110,30 @@ class ObjectStorageAdapter(BaseAdapter):
         return ObjectStorageSearcher(pagination=pagination, conditions=conditions, orders=orders)
 
     def _convert_filter(self, filter: ObjectStorageFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if filter.name is not None:
-            condition = self.convert_string_filter(
-                filter.name,
-                contains_factory=ObjectStorageConditions.by_name_contains,
-                equals_factory=ObjectStorageConditions.by_name_equals,
-                starts_with_factory=ObjectStorageConditions.by_name_starts_with,
-                ends_with_factory=ObjectStorageConditions.by_name_ends_with,
-                in_factory=ObjectStorageConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.host is not None:
-            condition = self.convert_string_filter(
-                filter.host,
-                contains_factory=ObjectStorageConditions.by_host_contains,
-                equals_factory=ObjectStorageConditions.by_host_equals,
-                starts_with_factory=ObjectStorageConditions.by_host_starts_with,
-                ends_with_factory=ObjectStorageConditions.by_host_ends_with,
-                in_factory=ObjectStorageConditions.by_host_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        return conditions
+        fields = ObjectStorageSearchableFields.own
+        return [
+            *self.apply_string_filter(filter.name, fields.name.filter),
+            *self.apply_string_filter(filter.host, fields.host.filter),
+        ]
 
     @staticmethod
     def _convert_orders(orders: list[ObjectStorageOrder]) -> list[QueryOrder]:
+        """``created_at`` has no column on the table, so it orders by nothing."""
+        fields = ObjectStorageSearchableFields.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
-            match order.field.value:
-                case "name":
-                    result.append(ObjectStorageOrders.name(ascending))
-                case "host":
-                    result.append(ObjectStorageOrders.host(ascending))
-                case "region":
-                    result.append(ObjectStorageOrders.region(ascending))
+            match order.field:
+                case ObjectStorageOrderField.NAME:
+                    result.append(fields.name.order.apply(ascending))
+                case ObjectStorageOrderField.HOST:
+                    result.append(fields.host.order.apply(ascending))
+                case ObjectStorageOrderField.REGION:
+                    result.append(fields.region.order.apply(ascending))
+                case ObjectStorageOrderField.CREATED_AT:
+                    continue
+                case _:
+                    assert_never(order.field)
         return result
 
     @staticmethod
@@ -188,10 +187,49 @@ class ObjectStorageAdapter(BaseAdapter):
         )
         return CreateObjectStoragePayload(object_storage=self._data_to_dto(action_result.data))
 
-    async def update(self, input: UpdateObjectStorageInput) -> UpdateObjectStoragePayload:
-        """Update an existing object storage."""
-        updater = ObjectStorageUpdater(
-            storage_id=ObjectStorageID(input.id),
+    async def update(
+        self, storage_id: ObjectStorageID, input: UpdateObjectStorageInput
+    ) -> UpdateObjectStoragePayload:
+        """Update an existing object storage. The ID the input carries is not read."""
+        action_result = await self._object_storage.update.run(
+            UpdateObjectStorageAction(updater=self._to_updater(storage_id, input))
+        )
+        return UpdateObjectStoragePayload(object_storage=self._data_to_dto(action_result.data))
+
+    async def purge(self, storage_id: ObjectStorageID) -> PurgeObjectStoragePayload:
+        """Permanently remove an object storage."""
+        action_result = await self._object_storage.purge.run(
+            PurgeObjectStorageAction(storage_id=storage_id)
+        )
+        return PurgeObjectStoragePayload(id=action_result.data.id, entity_id=action_result.data.id)
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateObjectStoragesInput
+    ) -> PartialBulkPayload[ObjectStorageNode]:
+        """Update several object storages, answering for each one."""
+        result = await self._object_storage.partial_bulk_update.run(
+            PartialBulkUpdateObjectStoragesAction(
+                updaters=[self._to_updater(ObjectStorageID(item.id), item) for item in input.items]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeObjectStoragesInput
+    ) -> PartialBulkPayload[ObjectStorageNode]:
+        """Permanently remove several object storages, answering for each one."""
+        result = await self._object_storage.partial_bulk_purge.run(
+            PartialBulkPurgeObjectStoragesAction(
+                ids=[ObjectStorageID(storage_id) for storage_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_updater(
+        self, storage_id: ObjectStorageID, input: UpdateObjectStorageInput
+    ) -> ObjectStorageUpdater:
+        return ObjectStorageUpdater(
+            storage_id=storage_id,
             name=OptionalState.from_unset(input.name),
             host=OptionalState.from_unset(input.host),
             access_key=OptionalState.from_unset(input.access_key),
@@ -199,17 +237,20 @@ class ObjectStorageAdapter(BaseAdapter):
             endpoint=OptionalState.from_unset(input.endpoint),
             region=TriState.from_unset(input.region),
         )
-        action_result = await self._object_storage.update.run(
-            UpdateObjectStorageAction(updater=updater)
-        )
-        return UpdateObjectStoragePayload(object_storage=self._data_to_dto(action_result.data))
 
-    async def delete(self, input: DeleteObjectStorageInput) -> DeleteObjectStoragePayload:
-        """Delete an object storage."""
-        action_result = await self._object_storage.purge.run(
-            PurgeObjectStorageAction(storage_id=input.id)
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[ObjectStorageData]
+    ) -> PartialBulkPayload[ObjectStorageNode]:
+        return PartialBulkPayload[ObjectStorageNode](
+            successes=[
+                self._data_to_dto(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
         )
-        return DeleteObjectStoragePayload(id=action_result.data.id)
 
     async def get_presigned_download_url(
         self,

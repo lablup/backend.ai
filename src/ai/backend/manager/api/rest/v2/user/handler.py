@@ -15,7 +15,7 @@ from ai.backend.common.dto.manager.v2.user.request import (
     SearchUsersRequest,
     UpdateUserInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import (
     DomainNamePathParam,
     ProjectIdPathParam,
@@ -26,7 +26,7 @@ from ai.backend.manager.api.rest.v2.path_params import (
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2UserHandler:

@@ -596,8 +596,10 @@ class TestAgentUnifiedConfigValidation:
         with caplog.at_level("WARNING", logger=CONFIG_LOGGER):
             config = AgentUnifiedConfig.model_validate(raw_config)
 
-        warnings = [r.getMessage() for r in caplog.records if r.name == CONFIG_LOGGER]
-        assert any("use-experimental-redis-event-dispatcher" in m for m in warnings)
+        unknown_fields = [
+            r.__dict__["log_tag_unknown_fields"] for r in caplog.records if r.name == CONFIG_LOGGER
+        ]
+        assert any("use-experimental-redis-event-dispatcher" in f for f in unknown_fields)
         assert config.agent.model_dump()["use-experimental-redis-event-dispatcher"] is True
         assert "use-experimental-redis-event-dispatcher" in config.agent.model_fields_set
 

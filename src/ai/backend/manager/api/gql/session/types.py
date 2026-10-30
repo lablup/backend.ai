@@ -16,12 +16,17 @@ from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.common import (
     ResourceSlotEntryInput as ResourceSlotEntryInputDTO,
 )
 from ai.backend.common.dto.manager.v2.kernel.request import AdminSearchKernelsInput
+from ai.backend.common.dto.manager.v2.kernel_group.request import ScopedSearchKernelGroupsInput
+from ai.backend.common.dto.manager.v2.kernel_group.types import KernelGroupScope
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.session.request import (
     BatchConfigInput as BatchConfigInputDTO,
 )
@@ -36,6 +41,9 @@ from ai.backend.common.dto.manager.v2.session.request import (
 )
 from ai.backend.common.dto.manager.v2.session.request import (
     MountItemInput as MountItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.session.request import (
+    PartialBulkTerminateSessionsInput as PartialBulkTerminateSessionsInputDTO,
 )
 from ai.backend.common.dto.manager.v2.session.request import (
     ResourceOptsInput as ResourceOptsInputDTO,
@@ -74,16 +82,27 @@ from ai.backend.common.dto.manager.v2.session.response import (
     SessionRuntimeInfoGQLDTO,
 )
 from ai.backend.common.dto.manager.v2.session.response import (
+    SessionTerminationInfo as SessionTerminationInfoDTO,
+)
+from ai.backend.common.dto.manager.v2.session.response import (
     TerminateSessionsPayload as TerminateSessionsPayloadDTO,
 )
 from ai.backend.common.dto.manager.v2.session.types import (
+    NetworkTypeFilter,
     ProjectSessionScope,
+    SessionResultFilter,
     SessionScope,
     SessionStatusFilter,
+    SessionTypeFilter,
+    SessionUsage,
+    SessionUsedBy,
+    SessionUses,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ImageID, SessionId
 from ai.backend.manager.api.gql.base import (
+    DateTimeFilter,
+    IntFilter,
     OrderDirection,
     StringFilter,
     UUIDFilter,
@@ -95,7 +114,7 @@ from ai.backend.manager.api.gql.common.types import (
     SessionV2ResultGQL,
     SessionV2TypeGQL,
 )
-from ai.backend.manager.api.gql.common_types import BinarySizeInputGQL
+from ai.backend.manager.api.gql.common_types import BinarySizeInputGQL, PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -109,13 +128,13 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.deployment.types.revision import EnvironmentVariablesGQL
 from ai.backend.manager.api.gql.domain_v2.types.node import DomainV2GQL
-from ai.backend.manager.api.gql.entity_label.types import (
-    EntityLabelConnection,
+from ai.backend.manager.api.gql.entity_label.types.field import resolve_entity_labels
+from ai.backend.manager.api.gql.entity_label.types.filters import (
     EntityLabelFilterGQL,
     EntityLabelNestedFilterGQL,
     EntityLabelOrderByGQL,
-    resolve_entity_labels,
 )
+from ai.backend.manager.api.gql.entity_label.types.node import EntityLabelConnection
 from ai.backend.manager.api.gql.image.types import ImageV2ConnectionGQL
 from ai.backend.manager.api.gql.kernel.types import (
     KernelV2ConnectionGQL,
@@ -123,8 +142,15 @@ from ai.backend.manager.api.gql.kernel.types import (
     KernelV2GQL,
     ResourceAllocationGQL,
 )
+from ai.backend.manager.api.gql.kernel_group.types import (
+    KernelGroupConnectionGQL,
+    KernelGroupEdgeGQL,
+    KernelGroupFilterGQL,
+    KernelGroupGQL,
+    KernelGroupOrderByGQL,
+)
 from ai.backend.manager.api.gql.project_v2.types.node import ProjectV2GQL
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.resource_group.types import ResourceGroupGQL
 from ai.backend.manager.api.gql.session_options.types import AgentSelectionPolicyGQL
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -133,6 +159,7 @@ from ai.backend.manager.errors.user import UserNotFound
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.gql.deployment.types.replica import ModelReplica
+    from ai.backend.manager.api.gql.session_group.types import SessionGroupGQL
 
 
 @gql_enum(
@@ -160,9 +187,18 @@ class SessionV2StatusGQL(StrEnum):
 # ========== Order and Filter Types ==========
 
 
+_PRIORITY_RENAMED = (
+    "Deprecated since 26.9.0. Renamed to `tier`; the value and its meaning are unchanged."
+)
+
+
 @gql_enum(
     BackendAIGQLMeta(added_version="26.3.0", description="Fields available for ordering sessions."),
     name="SessionV2OrderField",
+    deprecated_values={
+        "PRIORITY": _PRIORITY_RENAMED,
+        "ACCESS_KEY": f"Deprecated since {NEXT_RELEASE_VERSION}. Order by `USER_ID`.",
+    },
 )
 class SessionV2OrderFieldGQL(StrEnum):
     CREATED_AT = "created_at"
@@ -170,6 +206,28 @@ class SessionV2OrderFieldGQL(StrEnum):
     STATUS = "status"
     ID = "id"
     NAME = "name"
+    CREATION_ID = "creation_id"
+    SESSION_TYPE = "session_type"
+    PRIORITY = "priority"
+    TIER = "tier"
+    JOB_PRIORITY = "job_priority"
+    IS_PREEMPTIBLE = "is_preemptible"
+    CLUSTER_SIZE = "cluster_size"
+    RESOURCE_GROUP_NAME = "resource_group_name"
+    DOMAIN_NAME = "domain_name"
+    PROJECT_ID = "project_id"
+    USER_ID = "user_id"
+    ACCESS_KEY = "access_key"
+    TAG = "tag"
+    USE_HOST_NETWORK = "use_host_network"
+    BATCH_TIMEOUT = "batch_timeout"
+    STARTS_AT = "starts_at"
+    RESULT = "result"
+    NETWORK_TYPE = "network_type"
+    NETWORK_ID = "network_id"
+    REPLICA_ID = "replica_id"
+    SESSION_GROUP_ID = "session_group_id"
+    REQUESTED_STARTS_AT = "requested_starts_at"
 
 
 @gql_pydantic_input(
@@ -188,6 +246,74 @@ class SessionV2StatusFilterGQL(PydanticInputMixin[SessionStatusFilter]):
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for the session type.", added_version="26.9.0"),
+    name="SessionV2TypeFilter",
+)
+class SessionV2TypeFilterGQL(PydanticInputMixin[SessionTypeFilter]):
+    equals: SessionV2TypeGQL | None = gql_field(
+        description="Exact session type match.", default=None
+    )
+    in_: list[SessionV2TypeGQL] | None = gql_field(
+        description="Session types to match.", name="in", default=None
+    )
+    not_equals: SessionV2TypeGQL | None = gql_field(
+        description="Excludes exact session type match.", name="notEquals", default=None
+    )
+    not_in: list[SessionV2TypeGQL] | None = gql_field(
+        description="Excludes session types in the list.", name="notIn", default=None
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for the session result.", added_version="26.9.0"),
+    name="SessionV2ResultFilter",
+)
+class SessionV2ResultFilterGQL(PydanticInputMixin[SessionResultFilter]):
+    equals: SessionV2ResultGQL | None = gql_field(description="Exact result match.", default=None)
+    in_: list[SessionV2ResultGQL] | None = gql_field(
+        description="Results to match.", name="in", default=None
+    )
+    not_equals: SessionV2ResultGQL | None = gql_field(
+        description="Excludes exact result match.", name="notEquals", default=None
+    )
+    not_in: list[SessionV2ResultGQL] | None = gql_field(
+        description="Excludes results in the list.", name="notIn", default=None
+    )
+
+
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Inter-container network type a session uses.",
+    ),
+    name="SessionV2NetworkType",
+)
+class SessionV2NetworkTypeGQL(StrEnum):
+    VOLATILE = "volatile"
+    PERSISTENT = "persistent"
+    HOST = "host"
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(description="Filter for the session network type.", added_version="26.9.0"),
+    name="SessionV2NetworkTypeFilter",
+)
+class SessionV2NetworkTypeFilterGQL(PydanticInputMixin[NetworkTypeFilter]):
+    equals: SessionV2NetworkTypeGQL | None = gql_field(
+        description="Exact network type match.", default=None
+    )
+    in_: list[SessionV2NetworkTypeGQL] | None = gql_field(
+        description="Network types to match.", name="in", default=None
+    )
+    not_equals: SessionV2NetworkTypeGQL | None = gql_field(
+        description="Excludes exact network type match.", name="notEquals", default=None
+    )
+    not_in: list[SessionV2NetworkTypeGQL] | None = gql_field(
+        description="Excludes network types in the list.", name="notIn", default=None
+    )
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(
         description="Filter criteria for querying sessions.",
         added_version="26.3.0",
@@ -195,7 +321,15 @@ class SessionV2StatusFilterGQL(PydanticInputMixin[SessionStatusFilter]):
     name="SessionV2Filter",
 )
 class SessionV2FilterGQL(PydanticInputMixin[SessionFilter]):
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = gql_field(
+        description="Filter by session ID.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entityId`.",
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by session ID."),
+        default=None,
+    )
     status: SessionV2StatusFilterGQL | None = None
     name: StringFilter | None = None
     domain_name: StringFilter | None = None
@@ -204,8 +338,151 @@ class SessionV2FilterGQL(PydanticInputMixin[SessionFilter]):
 
     labels: EntityLabelNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Select entities by the labels on them.",
+        ),
+        default=None,
+    )
+
+    creation_id: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by the id the creating request carried.",
+        ),
+        default=None,
+    )
+    session_type: SessionV2TypeFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by session type.",
+        ),
+        default=None,
+    )
+    tier: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by the scheduling tier of the pending queue.",
+        ),
+        default=None,
+    )
+    priority: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by the scheduling tier of the pending queue.",
+        ),
+        default=None,
+        deprecation_reason=_PRIORITY_RENAMED,
+    )
+    job_priority: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by the preemption priority among the owner's sessions.",
+        ),
+        default=None,
+    )
+    is_preemptible: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by whether the session may be preempted.",
+        ),
+        default=None,
+    )
+    cluster_size: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by the number of kernels in the session.",
+        ),
+        default=None,
+    )
+    resource_group_name: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by the resource group the session runs in.",
+        ),
+        default=None,
+    )
+    access_key: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by the access key the session was created with.",
+        ),
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `userUuid`.",
+    )
+    tag: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by the user-supplied tag.",
+        ),
+        default=None,
+    )
+    use_host_network: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by whether the session uses the host network.",
+        ),
+        default=None,
+    )
+    batch_timeout: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by the batch execution timeout in seconds.",
+        ),
+        default=None,
+    )
+    starts_at: DateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by when the session started running.",
+        ),
+        default=None,
+    )
+    terminated_at: DateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by when the session terminated.",
+        ),
+        default=None,
+    )
+    result: SessionV2ResultFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by the session result.",
+        ),
+        default=None,
+    )
+    network_type: SessionV2NetworkTypeFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by the inter-container network type.",
+        ),
+        default=None,
+    )
+    network_id: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by the network reference the session uses.",
+        ),
+        default=None,
+    )
+    replica_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Filter by the deployment replica the session serves.",
+        ),
+        default=None,
+    )
+    session_group_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the session group the session belongs to.",
+        ),
+        default=None,
+    )
+    requested_starts_at: DateTimeFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Filter by the reserved start time requested at creation.",
         ),
         default=None,
     )
@@ -259,12 +536,24 @@ class SessionV2MetadataInfoGQL:
     session_type: SessionV2TypeGQL = gql_field(
         description="Type of the session (interactive, batch, inference)."
     )
-    access_key: str = gql_field(description="Access key used to create this session.")
+    access_key: str = gql_field(
+        description="Access key used to create this session.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `user` on the session.",
+    )
     cluster_mode: ClusterModeGQL = gql_field(
         description="Cluster mode for distributed sessions (single-node, multi-node)."
     )
     cluster_size: int = gql_field(description="Number of nodes in the cluster.")
-    priority: int = gql_field(description="Scheduling priority of the session.")
+    tier: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Scheduling tier of the session.",
+        )
+    )
+    priority: int = gql_field(
+        description="Scheduling tier of the session.",
+        deprecation_reason=_PRIORITY_RENAMED,
+    )
     job_priority: int = gql_added_field(
         BackendAIGQLMeta(
             added_version="26.8.0",
@@ -300,6 +589,18 @@ class SessionV2ResourceInfoGQL:
     resource_group_name: str | None = gql_field(
         description="The resource group (scaling group) this session is assigned to."
     )
+    session_group_id: UUID | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Placement group ID. Null if the session does not belong to a session group.",
+        )
+    )
+    designated_agent_ids: list[str] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Agent IDs designated at session creation.",
+        )
+    )
 
 
 @gql_pydantic_type(
@@ -320,7 +621,13 @@ class SessionV2LifecycleInfoGQL:
         description="Timestamp when the session was terminated. Null if still active."
     )
     starts_at: datetime | None = gql_field(
-        description="Scheduled start time for the session, if applicable."
+        description="When the session started running. Null until it reaches RUNNING."
+    )
+    requested_starts_at: datetime | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Reserved start time requested at creation. The scheduler honors it only for batch sessions.",
+        )
     )
     batch_timeout: int | None = gql_field(
         description="Batch execution timeout in seconds. Applicable to batch sessions."
@@ -380,7 +687,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
     id: NodeID[str]
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the session.",
         ),
     )
@@ -395,7 +702,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
     # Fields used as keys for dynamic resolvers
     domain_name: str
-    user_id: ID
+    user_id: ID | None
     project_id: ID
     replica_id: ID | None = gql_added_field(
         BackendAIGQLMeta(
@@ -418,12 +725,17 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
         BackendAIGQLMeta(added_version="26.3.0", description="The domain this session belongs to.")
     )  # type: ignore[misc]
     async def domain(self, info: Info[StrawberryGQLContext]) -> DomainV2GQL | None:
-        return await info.context.data_loaders.domain_loader.load(self.domain_name)
+        domain_id = await info.context.data_loaders.domain_id_by_name_loader.load(self.domain_name)
+        if domain_id is None:
+            return None
+        return await info.context.data_loaders.domain_by_id_loader.load(domain_id)
 
     @gql_added_field(
         BackendAIGQLMeta(added_version="26.3.0", description="The user who owns this session.")
     )  # type: ignore[misc]
     async def user(self, info: Info[StrawberryGQLContext]) -> UserV2GQL | None:
+        if self.user_id is None:
+            return None
         user_data = await info.context.data_loaders.user_loader.load(
             UserID(UUID(str(self.user_id)))
         )
@@ -522,6 +834,61 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The main kernel group of this session.",
+        )
+    )  # type: ignore[misc]
+    async def main_kernel_group(self, info: Info[StrawberryGQLContext]) -> KernelGroupGQL | None:
+        return await info.context.data_loaders.main_kernel_group_by_session_id_loader.load(
+            SessionID(UUID(str(self.id)))
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The kernel groups of this session, one per role.",
+        )
+    )  # type: ignore[misc]
+    async def kernel_groups(
+        self,
+        info: Info[StrawberryGQLContext],
+        filter: KernelGroupFilterGQL | None = None,
+        order_by: list[KernelGroupOrderByGQL] | None = None,
+        before: str | None = None,
+        after: str | None = None,
+        first: int | None = None,
+        last: int | None = None,
+        limit: int | None = None,
+        offset: int | None = None,
+    ) -> KernelGroupConnectionGQL | None:
+        payload = await info.context.adapters.session.scoped_search_kernel_groups(
+            ScopedSearchKernelGroupsInput(
+                scope=KernelGroupScope(session=[UUIDScope(value=UUID(str(self.id)))]),
+                filter=filter.to_pydantic() if filter else None,
+                order=[o.to_pydantic() for o in order_by] if order_by else None,
+                first=first,
+                after=after,
+                last=last,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+        )
+        nodes = [KernelGroupGQL.from_pydantic(item) for item in payload.items]
+        edges = [KernelGroupEdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+        return KernelGroupConnectionGQL(
+            edges=edges,
+            page_info=strawberry.relay.PageInfo(
+                has_next_page=payload.has_next_page,
+                has_previous_page=payload.has_previous_page,
+                start_cursor=edges[0].cursor if edges else None,
+                end_cursor=edges[-1].cursor if edges else None,
+            ),
+            count=payload.total_count,
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
             added_version="26.4.4",
             description=(
                 "The model deployment replica served by this session: a single replica "
@@ -547,6 +914,30 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The session group whose placement policy this session follows. Null when the "
+                "session belongs to no group or to a group a deployment's replica group holds."
+            ),
+        )
+    )  # type: ignore[misc]
+    async def session_group(
+        self, info: Info[StrawberryGQLContext]
+    ) -> (
+        Annotated[
+            SessionGroupGQL,
+            strawberry.lazy("ai.backend.manager.api.gql.session_group.types"),
+        ]
+        | None
+    ):
+        if self.resource.session_group_id is None:
+            return None
+        return await info.context.data_loaders.session_group_loader.load(
+            SessionGroupID(self.resource.session_group_id)
+        )
+
+    @gql_added_field(
+        BackendAIGQLMeta(
             added_version="26.8.0",
             description=(
                 "Resource allocation (requested / used / allocated) computed on-demand "
@@ -563,7 +954,7 @@ class SessionV2GQL(PydanticNodeMixin[SessionNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="The labels on this session.",
         )
     )  # type: ignore[misc]
@@ -760,7 +1151,18 @@ class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
     preopen_ports: list[int] | None = gql_field(default=None, description="Ports to pre-open.")
     bootstrap_script: str | None = gql_field(default=None, description="Bootstrap script.")
 
-    priority: int = gql_field(default=10, description="Scheduling priority (0-100).")
+    tier: int | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description="Scheduling tier (0-100).",
+        ),
+        default=None,
+    )
+    priority: int | None = gql_field(
+        default=None,
+        description="Scheduling tier (0-100).",
+        deprecation_reason=_PRIORITY_RENAMED,
+    )
     job_priority: int = gql_field(
         default=0,
         description="Scope-local preemption priority among the requester's own sessions.",
@@ -816,10 +1218,77 @@ class TerminateSessionsPayloadGQL:
     skipped: list[ID] = gql_field(description="Sessions already terminated or not found.")
 
 
+@gql_enum(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="What a termination request did to one session.",
+    ),
+    name="SessionTerminationStatus",
+)
+class SessionTerminationStatusGQL(StrEnum):
+    CANCELLED = "cancelled"
+    TERMINATING = "terminating"
+    FORCE_TERMINATED = "force-terminated"
+    SKIPPED = "skipped"
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for terminating several sessions, each answered for separately.",
+    ),
+    name="PartialBulkTerminateSessionsInput",
+)
+class PartialBulkTerminateSessionsInputGQL(
+    PydanticInputMixin[PartialBulkTerminateSessionsInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the sessions to terminate.")
+    forced: bool = gql_field(
+        default=False, description="Force-terminate without waiting for cleanup."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="What a termination request did to one session.",
+    ),
+    model=SessionTerminationInfoDTO,
+    name="SessionTerminationInfo",
+)
+class SessionTerminationInfoGQL(PydanticOutputMixin[SessionTerminationInfoDTO]):
+    id: UUID = gql_field(description="ID of the session.")
+    status: SessionTerminationStatusGQL = gql_field(
+        description="State the session ended in: cancelled, terminating, force-terminated, or skipped."
+    )
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk session termination: the sessions processed, each with "
+            "the state it ended in, and the ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[SessionTerminationInfoDTO],
+    name="PartialBulkTerminateSessionsPayload",
+)
+class PartialBulkTerminateSessionsPayloadGQL(
+    PydanticOutputMixin[PartialBulkPayload[SessionTerminationInfoDTO]]
+):
+    successes: list[SessionTerminationInfoGQL] = gql_field(
+        description="The sessions processed, each with the state it ended in."
+    )
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The sessions not processed, each with the reason."
+    )
+
+
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="One (checker, session) pair targeted by an idle-check exclusion or inclusion.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="SessionIdleCheckTargetInput",
 )
@@ -831,7 +1300,7 @@ class SessionIdleCheckTargetInputGQL(PydanticInputMixin[SessionIdleCheckTargetIn
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for excluding session pairs from idle checks.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="ExcludeSessionIdleChecksInput",
 )
@@ -844,7 +1313,7 @@ class ExcludeSessionIdleChecksInputGQL(PydanticInputMixin[ExcludeSessionIdleChec
 @gql_pydantic_input(
     BackendAIGQLMeta(
         description="Input for including session pairs into idle checks.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="IncludeSessionIdleChecksInput",
 )
@@ -856,7 +1325,7 @@ class IncludeSessionIdleChecksInputGQL(PydanticInputMixin[IncludeSessionIdleChec
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="One (checker, session) pair an idle-check exclusion or inclusion applied to.",
     ),
     model=SessionIdleCheckTargetInfoDTO,
@@ -869,7 +1338,7 @@ class SessionIdleCheckTargetInfoGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Why one pair could not be excluded from idle checks.",
     ),
     model=ExcludeSessionIdleChecksFailureInfoDTO,
@@ -883,7 +1352,7 @@ class ExcludeSessionIdleChecksFailureInfoGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Why one pair could not be included into idle checks.",
     ),
     model=IncludeSessionIdleChecksFailureInfoDTO,
@@ -897,7 +1366,7 @@ class IncludeSessionIdleChecksFailureInfoGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Payload returned after excluding session pairs from idle checks.",
     ),
     model=ExcludeSessionIdleChecksPayloadDTO,
@@ -914,7 +1383,7 @@ class ExcludeSessionIdleChecksPayloadGQL:
 
 @gql_pydantic_type(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Payload returned after including session pairs into idle checks.",
     ),
     model=IncludeSessionIdleChecksPayloadDTO,
@@ -935,7 +1404,7 @@ class IncludeSessionIdleChecksPayloadGQL:
             "Scope for the scoped session query. Each list is OR'd internally and "
             "across lists, and every scope named is authorized before the read runs."
         ),
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="SessionSearchScope",
 )
@@ -950,4 +1419,62 @@ class SessionScopeGQL(PydanticInputMixin[SessionScope]):
     )
     user: list[UUIDScopeGQL] | None = gql_field(
         default=None, description="Users whose sessions are being read."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Entities whose use of a session narrows the read.",
+        added_version="26.9.0",
+    ),
+    name="SessionUsedBy",
+)
+class SessionUsedByGQL(PydanticInputMixin[SessionUsedBy]):
+    """The entities whose use of a session narrows the read."""
+
+    deployment: list[UUID] | None = gql_field(
+        default=None, description="Deployments whose route rows the session serves as a replica."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Entities a session uses, whose ids narrow the read.",
+        added_version="26.9.0",
+    ),
+    name="SessionUses",
+)
+class SessionUsesGQL(PydanticInputMixin[SessionUses]):
+    """The entities a session uses, whose ids narrow the read."""
+
+    image: list[UUID] | None = gql_field(
+        default=None, description="Images the session's kernels run."
+    )
+    agent: list[UUID] | None = gql_field(
+        default=None, description="Agents running a kernel of the session."
+    )
+    resource_group: list[UUID] | None = gql_field(
+        default=None, description="Resource groups the session runs in."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description=(
+            "Uses narrowing a session query; every id is AND-ed. The caller must be able "
+            "to read each listed entity, or the request is refused. Only sessions the caller "
+            "can read are returned, even when a listed entity is tied to others."
+        ),
+        added_version="26.9.0",
+    ),
+    name="SessionUsage",
+)
+class SessionUsageGQL(PydanticInputMixin[SessionUsage]):
+    """The uses that narrow a session read."""
+
+    used_by: SessionUsedByGQL | None = gql_field(
+        default=None, description="Entities whose use of the session narrows the read."
+    )
+    uses: SessionUsesGQL | None = gql_field(
+        default=None, description="Entities the session uses, whose ids narrow the read."
     )

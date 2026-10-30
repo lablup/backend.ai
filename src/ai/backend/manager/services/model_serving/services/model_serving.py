@@ -46,7 +46,7 @@ from ai.backend.common.types import (
     ResourceSlotEntry,
     SessionTypes,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
@@ -57,6 +57,7 @@ from ai.backend.manager.data.deployment.types import (
     MountMetadata,
     RevisionDraft,
     RouteHealthStatus,
+    RouteStatus,
 )
 from ai.backend.manager.data.deployment.types import (
     ResourceSpecDraft as DeploymentResourceSpecDraft,
@@ -64,6 +65,7 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.model_serving.types import (
     CompactServiceInfo,
+    EndpointLifecycle,
     ErrorInfo,
     RouteInfo,
     ServiceInfo,
@@ -101,16 +103,12 @@ from ai.backend.manager.errors.service import (
     ModelServiceNotFound,
     RouteNotFound,
 )
-from ai.backend.manager.models.endpoint import EndpointLifecycle
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
+from ai.backend.manager.models.endpoint.searchers import DeploymentInfoSearcher
 from ai.backend.manager.models.endpoint.updaters import LegacyEndpointUpdater
-from ai.backend.manager.models.routing import RouteStatus
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.registry import AgentRegistry
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-)
-from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.model_serving.repository import ModelServingRepository
 from ai.backend.manager.repositories.runtime_variant.repository import RuntimeVariantRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
@@ -171,10 +169,12 @@ from ai.backend.manager.sokovan.deployment.deployment_controller import Deployme
 from ai.backend.manager.sokovan.deployment.route.route_controller import RouteController
 from ai.backend.manager.sokovan.deployment.route.types import RouteLifecycleType
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.types import MountOptionModel
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class ModelServingService:
@@ -326,11 +326,11 @@ class ModelServingService:
         )
 
     async def search_services(self, action: SearchServicesAction) -> SearchServicesActionResult:
-        querier = BatchQuerier(
+        searcher = DeploymentInfoSearcher(
             pagination=OffsetPagination(offset=action.offset, limit=action.limit),
             conditions=action.conditions,
         )
-        result = await self._repository.search_services_paginated(action.session_owner_id, querier)
+        result = await self._repository.search_services_paginated(action.session_owner_id, searcher)
         return SearchServicesActionResult(
             items=result.items,
             total_count=result.total_count,
@@ -428,8 +428,6 @@ class ModelServingService:
 
         # Get user with keypair
         created_user = await self._repository.get_user_with_keypair(action.request_user_id)
-        if not created_user:
-            raise InvalidAPIParameters("User not found")
 
         sudo_session_enabled = action.sudo_session_enabled
 
@@ -553,7 +551,7 @@ class ModelServingService:
                         if status == SessionStatus.RUNNING:
                             await self._scheduling_controller.mark_sessions_for_termination(
                                 [session_id],
-                                reason="DRY_RUN_COMPLETE",
+                                reason=KernelLifecycleEventReason.DRY_RUN_COMPLETE,
                             )
 
                         # Exit loop on terminal states
@@ -729,15 +727,10 @@ class ModelServingService:
         if route_data.status == RouteStatus.PROVISIONING:
             raise InvalidAPIParameters("Cannot remove route in PROVISIONING status")
 
-        # Get session for destruction
-        route_row = await self._repository.get_route_with_session(action.route_id)
-        if not route_row:
-            raise RouteNotFound
-
-        if route_row.session_row:
+        if route_data.session is not None:
             await self._scheduling_controller.mark_sessions_for_termination(
-                [route_row.session_row.id],
-                reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN.value,
+                [route_data.session],
+                reason=KernelLifecycleEventReason.SERVICE_SCALED_DOWN,
                 forced=False,
             )
 

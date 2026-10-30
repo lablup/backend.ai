@@ -16,8 +16,8 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.app_config.types import AppConfigFragmentData
 from ai.backend.manager.models.app_config_fragment.scopes import (
-    PublicAppConfigFragmentOperationScope,
-    VisibleAppConfigFragmentOperationScope,
+    PublicAppConfigFragmentTarget,
+    VisibleAppConfigFragmentTarget,
 )
 from ai.backend.manager.models.specs.searcher import SearcherResult
 from ai.backend.manager.repositories.ops.repository import OpsRepository
@@ -181,9 +181,7 @@ class TestAppConfigService:
         await service.search_app_configs(action)
 
         scopes, _searcher = mock_repository.search_in_scopes.call_args.args
-        assert scopes == (
-            VisibleAppConfigFragmentOperationScope(user_id=_USER_ID, domain_id=_DOMAIN_ID),
-        )
+        assert scopes == (VisibleAppConfigFragmentTarget(user_id=_USER_ID, domain_id=_DOMAIN_ID),)
         assert list(action.scope_targets()) == [_USER_ID]
 
     async def test_search_replaces_lists_wholesale(
@@ -303,5 +301,5 @@ class TestAppConfigService:
         )
 
         scopes, _searcher = mock_repository.search_in_scopes.call_args.args
-        assert scopes == (PublicAppConfigFragmentOperationScope(),)
+        assert scopes == (PublicAppConfigFragmentTarget(),)
         assert result.app_configs[0].config == {"theme": "light", "lang": "en"}

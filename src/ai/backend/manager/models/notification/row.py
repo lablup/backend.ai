@@ -7,21 +7,8 @@ from typing import Any
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
-from ai.backend.common.data.entity.notification import (
-    NotificationChannelID,
-    NotificationRuleID,
-)
+from ai.backend.common.data.entity.notification import NotificationChannelID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.notification import (
-    EmailSpec,
-    NotificationChannelType,
-    NotificationRuleType,
-    WebhookSpec,
-)
-from ai.backend.manager.data.notification import (
-    NotificationChannelData,
-    NotificationRuleData,
-)
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -72,31 +59,6 @@ class NotificationChannelRow(Base):
         onupdate=sa.func.now(),
     )
 
-    def to_data(self) -> NotificationChannelData:
-        """Convert Row to domain model data."""
-        # Parse channel_type string to enum
-        channel_type_enum = NotificationChannelType(self.channel_type)
-
-        # Parse config based on channel_type
-        parsed_config: WebhookSpec | EmailSpec
-        match channel_type_enum:
-            case NotificationChannelType.WEBHOOK:
-                parsed_config = WebhookSpec.model_validate(self.config)
-            case NotificationChannelType.EMAIL:
-                parsed_config = EmailSpec.model_validate(self.config)
-
-        return NotificationChannelData(
-            id=NotificationChannelID(self.id),
-            name=self.name,
-            description=self.description,
-            channel_type=channel_type_enum,
-            spec=parsed_config,
-            enabled=self.enabled,
-            created_by=self.created_by,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )
-
 
 class NotificationRuleRow(Base):
     __tablename__ = "notification_rules"
@@ -130,21 +92,3 @@ class NotificationRuleRow(Base):
         default=sa.func.now(),
         onupdate=sa.func.now(),
     )
-
-    def to_data(self) -> NotificationRuleData:
-        """Convert Row to domain model data."""
-        # Parse rule_type string to enum
-        rule_type_enum = NotificationRuleType(self.rule_type)
-
-        return NotificationRuleData(
-            id=NotificationRuleID(self.id),
-            name=self.name,
-            description=self.description,
-            rule_type=rule_type_enum,
-            channel_id=NotificationChannelID(self.channel_id),
-            message_template=self.message_template,
-            enabled=self.enabled,
-            created_by=self.created_by,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )

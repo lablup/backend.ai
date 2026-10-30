@@ -21,6 +21,7 @@ from ai.backend.manager.api.adapters.runtime_variant_preset.adapter import (
     RuntimeVariantPresetAdapter,
 )
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -42,11 +43,11 @@ from bai_scenario.components.runtime_variant_preset import (
     ThePresetsInTheOrderAsked,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Loaded = list[RuntimeVariantPresetNode | None]
-type ReadingStep = Scenario[SeedingSession, Any, RuntimeVariantPresetAdapter, Any]
+type ReadingStep = Scenario[TestSeedingSession, Any, RuntimeVariantPresetAdapter, Any]
 
 
 @dataclass(frozen=True)
@@ -136,7 +137,7 @@ class NothingComesBack(Then[Any, Loaded]):
 @dataclass(frozen=True)
 class AUserGrantedNothingReadsById(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
     started: datetime
@@ -150,7 +151,7 @@ class AUserGrantedNothingReadsById(
         return "아무 권한도 없는 사용자가 ID로 조회해도 해당 프리셋 전체가 반환된다. 이 조회는 인증 여부만 확인한다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
@@ -167,19 +168,22 @@ class AUserGrantedNothingReadsById(
 @dataclass(frozen=True)
 class AnIdNothingAnswersToIsNotFound(
     Scenario[
-        SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
+        TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, RuntimeVariantPresetNode
     ]
 ):
     @override
     def summary(self) -> str:
-        return "reading-a-preset-id-nothing-answers-to-is-not-found"
+        return "reading-a-preset-id-nothing-answers-to-is-refused"
 
     @override
     def describe(self) -> str:
-        return "존재하지 않는 ID로 조회하면 대상을 찾을 수 없어 요청이 거부된다"
+        return (
+            "존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 "
+            "닿지 못하는 것인지는 응답으로 드러나지 않는다"
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override
@@ -190,12 +194,12 @@ class AnIdNothingAnswersToIsNotFound(
 
     @override
     def then(self) -> Then[APresetAndACaller, RuntimeVariantPresetNode]:
-        return TheCallIsRefused(EntityNotFoundError)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
 class MixedIdsComeBackInOrder(
-    Scenario[SeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Loaded]
+    Scenario[TestSeedingSession, ManyPresetsAndACaller, RuntimeVariantPresetAdapter, Loaded]
 ):
     started: datetime
 
@@ -208,7 +212,7 @@ class MixedIdsComeBackInOrder(
         return "존재하는 ID 둘과 존재하지 않는 ID 하나를 함께 조회하면 요청한 순서대로 반환되고, 존재하지 않는 ID의 위치는 비어 있다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyPresetsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyPresetsAndACaller]:
         return ManyPresetsAndSomeone(besides=1)
 
     @override
@@ -222,7 +226,7 @@ class MixedIdsComeBackInOrder(
 
 @dataclass(frozen=True)
 class AnEmptyListAnswersEmpty(
-    Scenario[SeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Loaded]
+    Scenario[TestSeedingSession, APresetAndACaller, RuntimeVariantPresetAdapter, Loaded]
 ):
     @override
     def summary(self) -> str:
@@ -233,7 +237,7 @@ class AnEmptyListAnswersEmpty(
         return "빈 ID 목록으로 조회하면 빈 응답이 반환되며 하위 계층은 호출하지 않는다"
 
     @override
-    def given(self) -> Given[SeedingSession, APresetAndACaller]:
+    def given(self) -> Given[TestSeedingSession, APresetAndACaller]:
         return APresetAndSomeone()
 
     @override

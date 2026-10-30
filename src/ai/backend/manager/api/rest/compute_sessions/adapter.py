@@ -7,9 +7,10 @@ Also provides data-to-DTO conversion functions.
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any
+from typing import Any, assert_never
 from uuid import UUID
 
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.dto.manager.compute_session import (
     ComputeSessionDTO,
     ComputeSessionFilter,
@@ -24,10 +25,9 @@ from ai.backend.manager.data.kernel.types import KernelInfo
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.kernel.conditions import KernelConditions
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
-from ai.backend.manager.models.session.conditions import SessionConditions
-from ai.backend.manager.models.session.orders import SessionOrders
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
@@ -46,7 +46,11 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
 
     def build_kernel_searcher_for_sessions(self, session_ids: list[SessionId]) -> KernelSearcher:
         """Build a KernelSearcher for kernels belonging to the given sessions."""
-        conditions: list[QueryCondition] = [KernelConditions.by_session_ids(session_ids)]
+        conditions: list[QueryCondition] = [
+            KernelSearchableFields.own.session_id.filter.in_(
+                UUIDInMatchSpec(values=session_ids, negated=False)
+            )
+        ]
         return KernelSearcher(conditions=conditions, orders=[], pagination=NoPagination())
 
     def group_kernels_by_session(self, kernels: list[KernelInfo]) -> dict[UUID, list[KernelInfo]]:
@@ -103,70 +107,26 @@ class ComputeSessionsAdapter(BaseFilterAdapter):
 
     def _convert_session_filter(self, filter: ComputeSessionFilter) -> list[QueryCondition]:
         """Convert session filter to list of query conditions."""
+        fields = SessionSearchableFields.own
         conditions: list[QueryCondition] = []
-
-        if filter.status is not None and len(filter.status) > 0:
-            statuses = [SessionStatus(s) for s in filter.status]
-            conditions.append(SessionConditions.by_statuses(statuses))
-
-        if filter.name is not None:
-            condition = self.convert_string_filter(
-                filter.name,
-                contains_factory=SessionConditions.by_name_contains,
-                equals_factory=SessionConditions.by_name_equals,
-                starts_with_factory=SessionConditions.by_name_starts_with,
-                ends_with_factory=SessionConditions.by_name_ends_with,
-                in_factory=SessionConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.access_key is not None:
-            condition = self.convert_string_filter(
-                filter.access_key,
-                contains_factory=SessionConditions.by_access_key_contains,
-                equals_factory=SessionConditions.by_access_key_equals,
-                starts_with_factory=SessionConditions.by_access_key_starts_with,
-                ends_with_factory=SessionConditions.by_access_key_ends_with,
-                in_factory=SessionConditions.by_access_key_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.domain_name is not None:
-            condition = self.convert_string_filter(
-                filter.domain_name,
-                contains_factory=SessionConditions.by_domain_name_contains,
-                equals_factory=SessionConditions.by_domain_name_equals,
-                starts_with_factory=SessionConditions.by_domain_name_starts_with,
-                ends_with_factory=SessionConditions.by_domain_name_ends_with,
-                in_factory=SessionConditions.by_domain_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.scaling_group_name is not None:
-            condition = self.convert_string_filter(
-                filter.scaling_group_name,
-                contains_factory=SessionConditions.by_resource_group_contains,
-                equals_factory=SessionConditions.by_resource_group_equals,
-                starts_with_factory=SessionConditions.by_resource_group_starts_with,
-                ends_with_factory=SessionConditions.by_resource_group_ends_with,
-                in_factory=SessionConditions.by_resource_group_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
+        if filter.status:
+            conditions.append(fields.status.filter.in_([SessionStatus(s) for s in filter.status]))
+        conditions.extend(self.apply_string_filter(filter.name, fields.name.filter))
+        conditions.extend(self.apply_string_filter(filter.access_key, fields.access_key.filter))
+        conditions.extend(self.apply_string_filter(filter.domain_name, fields.domain_name.filter))
+        conditions.extend(
+            self.apply_string_filter(filter.scaling_group_name, fields.resource_group_name.filter)
+        )
         return conditions
 
     def _convert_session_order(self, order: ComputeSessionOrder) -> QueryOrder:
         """Convert session order specification to query order."""
+        fields = SessionSearchableFields.own
         ascending = order.direction == OrderDirection.ASC
-
         match order.field:
             case ComputeSessionOrderField.CREATED_AT:
-                return SessionOrders.created_at(ascending=ascending)
+                return fields.created_at.order.apply(ascending)
             case ComputeSessionOrderField.ID:
-                return SessionOrders.id(ascending=ascending)
-
-        raise ValueError(f"Unknown order field: {order.field}")
+                return fields.id.order.apply(ascending)
+            case _:
+                assert_never(order.field)

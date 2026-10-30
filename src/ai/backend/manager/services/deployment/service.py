@@ -18,7 +18,8 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.dto.appproxy_coordinator.v2.endpoint.request import (
     MintEndpointTokenRequest,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.common.exception import BackendAIError
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
@@ -31,6 +32,7 @@ from ai.backend.manager.data.deployment.types import (
     ExecutionSpec,
     LegacyDeploymentData,
     ModelDeploymentAccessTokenData,
+    ModelDeploymentAutoScalingRuleData,
     ModelDeploymentData,
     ModelDeploymentMetadataInfo,
     ModelRevisionData,
@@ -40,13 +42,17 @@ from ai.backend.manager.data.deployment.types import (
     RevisionRefreshResult,
 )
 from ai.backend.manager.errors.api import InvalidAPIParameters
-from ai.backend.manager.errors.service import EndpointTokenNotFound, RoutingNotFound
+from ai.backend.manager.errors.service import (
+    AutoScalingRuleNotFound,
+    EndpointTokenNotFound,
+    RoutingNotFound,
+)
 from ai.backend.manager.errors.user import UserNotFound
-from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
 from ai.backend.manager.models.endpoint.creators import EndpointTokenCreator
+from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
+from ai.backend.manager.models.endpoint.searchers import DeploymentIDSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.deployment_revision_preset.repository import (
     DeploymentPresetRepository,
 )
@@ -79,9 +85,11 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_s
     GetAutoScalingRuleAction,
     GetAutoScalingRuleActionResult,
 )
-from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
-    SearchAutoScalingRulesAction,
-    SearchAutoScalingRulesActionResult,
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.partial_bulk_purge_auto_scaling_rules import (
+    PartialBulkPurgeAutoScalingRulesAction,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.partial_bulk_update_auto_scaling_rules import (
+    PartialBulkUpdateAutoScalingRulesAction,
 )
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_auto_scaling_rule import (
     UpdateAutoScalingRuleAction,
@@ -95,11 +103,11 @@ from ai.backend.manager.services.deployment.actions.create_legacy_deployment imp
     CreateLegacyDeploymentAction,
     CreateLegacyDeploymentActionResult,
 )
-from ai.backend.manager.services.deployment.actions.deployment_policy import (
+from ai.backend.manager.services.deployment.actions.deployment_policy.get_deployment_policy import (
     GetDeploymentPolicyAction,
     GetDeploymentPolicyActionResult,
-    SearchDeploymentPoliciesAction,
-    SearchDeploymentPoliciesActionResult,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.upsert_deployment_policy import (
     UpsertDeploymentPolicyAction,
     UpsertDeploymentPolicyActionResult,
 )
@@ -131,23 +139,13 @@ from ai.backend.manager.services.deployment.actions.replace_deployment_options i
     ReplaceDeploymentOptionsAction,
     ReplaceDeploymentOptionsActionResult,
 )
-from ai.backend.manager.services.deployment.actions.revision_operations import (
+from ai.backend.manager.services.deployment.actions.revision_operations.activate_revision import (
     ActivateRevisionAction,
     ActivateRevisionActionResult,
 )
-from ai.backend.manager.services.deployment.actions.route import (
-    SearchRoutesAction,
-    SearchRoutesActionResult,
+from ai.backend.manager.services.deployment.actions.route.update_route_traffic_status import (
     UpdateRouteTrafficStatusAction,
     UpdateRouteTrafficStatusActionResult,
-)
-from ai.backend.manager.services.deployment.actions.scoped_search import (
-    ScopedSearchDeploymentsAction,
-    ScopedSearchDeploymentsActionResult,
-)
-from ai.backend.manager.services.deployment.actions.search_deployments import (
-    GlobalSearchDeploymentsAction,
-    GlobalSearchDeploymentsActionResult,
 )
 from ai.backend.manager.services.deployment.actions.search_legacy_deployments import (
     GlobalSearchLegacyDeploymentsAction,
@@ -161,10 +159,10 @@ from ai.backend.manager.services.deployment.actions.update_deployment import (
     UpdateDeploymentAction,
     UpdateDeploymentActionResult,
 )
-from ai.backend.manager.sokovan.deployment import DeploymentController
+from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
 from ai.backend.manager.sokovan.deployment.types import DeploymentLifecycleType
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 def _deployment_desired_replica_count(info: DeploymentInfo) -> int:
@@ -200,6 +198,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
         deploying_revision_id=info.deploying_revision_id,
         scaling_rule_ids=[],  # Not available in DeploymentInfo
         replica_state=ReplicaStateData(
+            replica_count=info.replica.replica_count,
             desired_replica_count=_deployment_desired_replica_count(info),
             replica_ids=[],  # Not available in DeploymentInfo
         ),
@@ -235,6 +234,7 @@ def _convert_deployment_info_to_legacy_data(info: DeploymentInfo) -> LegacyDeplo
         network_access=info.network,
         revision=info.current_revision,
         replica_state=ReplicaStateData(
+            replica_count=info.replica.replica_count,
             desired_replica_count=_deployment_desired_replica_count(info),
             replica_ids=[],  # Not available in DeploymentInfo
         ),
@@ -337,7 +337,7 @@ class DeploymentService:
         Returns:
             CreateDeploymentActionResult: Result containing the created deployment data
         """
-        log.info("Creating deployment with name: {}", action.creator.metadata.name)
+        log.trace("deployment creation requested", deployment_name=action.creator.metadata.name)
         deployment_info = await self._deployment_controller.create_deployment(action.creator)
         if action.creator.model_revision is not None:
             await self._deployment_controller.add_deployment_revision(
@@ -364,7 +364,7 @@ class DeploymentService:
         Returns:
             CreateLegacyDeploymentActionResult: Result containing the created deployment info
         """
-        log.info("Creating deployment with name: {}", action.draft.name)
+        log.trace("deployment creation requested", deployment_name=action.draft.name)
         creator, revision = await self._deployment_controller.build_creator_from_legacy_draft(
             action.draft
         )
@@ -396,7 +396,7 @@ class DeploymentService:
         Returns:
             UpdateDeploymentActionResult: Result containing the updated deployment data
         """
-        log.info("Updating deployment with ID: {}", action.updater.deployment_id)
+        log.trace("deployment update requested", deployment_id=action.updater.deployment_id)
         deployment_info = await self._deployment_controller.update_deployment(
             action.updater.deployment_id, action.updater
         )
@@ -411,7 +411,7 @@ class DeploymentService:
         via ``UPDATE ... RETURNING`` so this path does a single round-trip
         and does not re-materialise the surrounding deployment node.
         """
-        log.info("Replacing deployment options for ID: {}", action.deployment_id)
+        log.trace("deployment options replace requested", deployment_id=action.deployment_id)
         options = await self._deployment_repository.replace_deployment_options(
             action.deployment_id, action.options
         )
@@ -431,31 +431,14 @@ class DeploymentService:
         Raises:
             EndpointNotFound: If the endpoint does not exist
         """
-        log.info("Destroying deployment with ID: {}", action.deployment_id)
+        log.trace("deployment destroy requested", deployment_id=action.deployment_id)
         # Validate endpoint exists before attempting destruction
         await self._deployment_repository.get_endpoint_info(action.deployment_id)
         success = await self._deployment_controller.destroy_deployment(action.deployment_id)
         await self._deployment_controller.mark_lifecycle_needed(DeploymentLifecycleType.DESTROYING)
-        return DestroyDeploymentActionResult(success=success)
-
-    async def search_deployments(
-        self, action: GlobalSearchDeploymentsAction
-    ) -> GlobalSearchDeploymentsActionResult:
-        """Search deployments with filtering and pagination.
-
-        Args:
-            action: Action containing BatchQuerier for filtering and pagination
-
-        Returns:
-            GlobalSearchDeploymentsActionResult: Result containing list of deployments and pagination info
-        """
-        result = await self._deployment_repository.search_endpoints(action.querier)
-        deployments = [_convert_deployment_info_to_data(info) for info in result.items]
-        return GlobalSearchDeploymentsActionResult(
-            data=deployments,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
+        deployment_info = await self._deployment_repository.get_endpoint_info(action.deployment_id)
+        return DestroyDeploymentActionResult(
+            success=success, data=_convert_deployment_info_to_data(deployment_info)
         )
 
     async def search_legacy_deployments(
@@ -464,24 +447,10 @@ class DeploymentService:
         """Legacy (REST v1) search — full revision per item. DO NOT USE in new
         code; v2 uses :meth:`search_deployments`.
         """
-        result = await self._deployment_repository.search_legacy_endpoints(action.querier)
+        result = await self._deployment_repository.search_legacy_endpoints(action.searcher)
         deployments = [_convert_deployment_info_to_legacy_data(info) for info in result.items]
         return GlobalSearchLegacyDeploymentsActionResult(
             data=deployments,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def scoped_search_deployments(
-        self, action: ScopedSearchDeploymentsAction
-    ) -> ScopedSearchDeploymentsActionResult:
-        """Search deployments within the scopes the action names."""
-        result = await self._deployment_repository.search_endpoints_in_scopes(
-            action.querier, action.operation_scopes()
-        )
-        return ScopedSearchDeploymentsActionResult(
-            data=[_convert_deployment_info_to_data(info) for info in result.items],
             total_count=result.total_count,
             has_next_page=result.has_next_page,
             has_previous_page=result.has_previous_page,
@@ -533,18 +502,6 @@ class DeploymentService:
         """
         data = await self._deployment_repository.get_deployment_policy(action.deployment_id)
         return GetDeploymentPolicyActionResult(data=data)
-
-    async def search_deployment_policies(
-        self, action: SearchDeploymentPoliciesAction
-    ) -> SearchDeploymentPoliciesActionResult:
-        """Search deployment policies with pagination and ordering."""
-        result = await self._deployment_repository.search_deployment_policies(action.querier)
-        return SearchDeploymentPoliciesActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
 
     async def upsert_deployment_policy(
         self, action: UpsertDeploymentPolicyAction
@@ -612,14 +569,16 @@ class DeploymentService:
         # Bulk scan + independent per-deployment orchestration: multiple repo
         # and controller calls are required by design to preserve partial
         # success semantics. Each inner call owns its own transaction boundary.
-        active_querier = BatchQuerier(
+        active_searcher = DeploymentIDSearcher(
             pagination=NoPagination(),
             conditions=[
-                DeploymentConditions.by_lifecycle_stages(EndpointLifecycle.active_states()),
+                DeploymentSearchableFields.own.lifecycle_stage.filter.in_(
+                    EndpointLifecycle.active_states()
+                ),
             ],
         )
         deployment_ids = await self._deployment_repository.search_deployment_ids(
-            querier=active_querier,
+            searcher=active_searcher,
         )
         results: list[RevisionRefreshResult] = []
         succeeded = 0
@@ -645,12 +604,12 @@ class DeploymentService:
                 )
                 succeeded += 1
             except Exception as exc:
-                log.warning(
-                    "global_refresh_revisions failed for deployment {}: {}: {}",
-                    deployment_id,
-                    type(exc).__name__,
-                    exc,
-                )
+                if isinstance(exc, BackendAIError) and exc.is_client_error():
+                    log.trace(
+                        "deployment revision refresh rejected: {}", exc, deployment_id=deployment_id
+                    )
+                else:
+                    log.exception("deployment revision refresh failed", deployment_id=deployment_id)
                 results.append(
                     RevisionRefreshResult(
                         deployment_id=deployment_id,
@@ -660,11 +619,11 @@ class DeploymentService:
                     )
                 )
                 failed += 1
-        log.info(
-            "global_refresh_revisions summary: total={} succeeded={} failed={}",
-            len(deployment_ids),
-            succeeded,
-            failed,
+        log.trace(
+            "deployment revisions refreshed",
+            deployment_count=len(deployment_ids),
+            succeeded_count=succeeded,
+            failed_count=failed,
         )
         return GlobalRefreshDeploymentRevisionsActionResult(results=results)
 
@@ -687,26 +646,9 @@ class DeploymentService:
             DeploymentLifecycleType.CHECK_REPLICA
         )
 
-        log.info("Triggered replica sync for deployment {}", action.deployment_id)
+        log.trace("replica sync triggered", deployment_id=action.deployment_id)
 
         return SyncReplicaActionResult(success=True)
-
-    async def search_routes(self, action: SearchRoutesAction) -> SearchRoutesActionResult:
-        """Search routes with filtering and pagination.
-
-        Args:
-            action: Action containing BatchQuerier for filtering and pagination
-
-        Returns:
-            SearchRoutesActionResult: Result containing list of routes and pagination info
-        """
-        result = await self._deployment_repository.search_routes(action.querier)
-        return SearchRoutesActionResult(
-            routes=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
 
     async def search_revision_resource_slots(
         self, action: SearchRevisionResourceSlotsAction
@@ -717,9 +659,7 @@ class DeploymentService:
             total_count,
             has_next_page,
             has_previous_page,
-        ) = await self._deployment_repository.search_revision_resource_slots(
-            action.revision_id, action.querier
-        )
+        ) = await self._deployment_repository.search_revision_resource_slots(action.searcher)
         return SearchRevisionResourceSlotsActionResult(
             items=items,
             total_count=total_count,
@@ -838,6 +778,45 @@ class DeploymentService:
             ]
         )
 
+    async def partial_bulk_update_auto_scaling_rules(
+        self, action: PartialBulkUpdateAutoScalingRulesAction
+    ) -> BulkFieldOpsResult[ModelDeploymentAutoScalingRuleData]:
+        """Update each named rule in its own transaction, answering for every one."""
+        successes: dict[FieldIdentifier, ModelDeploymentAutoScalingRuleData] = {}
+        errors: dict[FieldIdentifier, Exception] = {}
+        for rule_id, modifier in action.modifiers.items():
+            try:
+                successes[
+                    rule_id
+                ] = await self._deployment_repository.update_model_deployment_autoscaling_rule(
+                    rule_id, modifier
+                )
+            except BackendAIError as e:
+                errors[rule_id] = e
+        return BulkFieldOpsResult(successes=successes, errors=errors)
+
+    async def partial_bulk_purge_auto_scaling_rules(
+        self, action: PartialBulkPurgeAutoScalingRulesAction
+    ) -> BulkFieldOpsResult[ModelDeploymentAutoScalingRuleData]:
+        """Delete the named rules, answering for every one with the rule as it stood."""
+        found: dict[FieldIdentifier, ModelDeploymentAutoScalingRuleData] = {}
+        errors: dict[FieldIdentifier, Exception] = {}
+        for rule_id in action.rule_ids:
+            try:
+                found[
+                    rule_id
+                ] = await self._deployment_repository.get_model_deployment_autoscaling_rule(rule_id)
+            except BackendAIError as e:
+                errors[rule_id] = e
+        deleted = set(await self._deployment_repository.bulk_delete_autoscaling_rules(list(found)))
+        successes: dict[FieldIdentifier, ModelDeploymentAutoScalingRuleData] = {}
+        for found_id, data in found.items():
+            if found_id in deleted:
+                successes[found_id] = data
+            else:
+                errors[found_id] = AutoScalingRuleNotFound(f"Autoscaling rule {found_id} not found")
+        return BulkFieldOpsResult(successes=successes, errors=errors)
+
     # ========== Access Token ==========
 
     async def _mint_endpoint_jwt(
@@ -940,15 +919,3 @@ class DeploymentService:
     # ========== Replica Operations ==========
 
     # ========== Search Operations ==========
-
-    async def search_auto_scaling_rules(
-        self, action: SearchAutoScalingRulesAction
-    ) -> SearchAutoScalingRulesActionResult:
-        """Search auto-scaling rules with pagination and ordering."""
-        result = await self._deployment_repository.search_auto_scaling_rules(action.querier)
-        return SearchAutoScalingRulesActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )

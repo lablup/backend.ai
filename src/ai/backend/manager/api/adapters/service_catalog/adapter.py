@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from functools import lru_cache
+from typing import assert_never
 
+from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.v2.service_catalog.request import (
     AdminSearchServiceCatalogsInput,
@@ -15,7 +18,8 @@ from ai.backend.common.dto.manager.v2.service_catalog.response import (
     ServiceCatalogNode,
 )
 from ai.backend.common.dto.manager.v2.service_catalog.types import (
-    EndpointInfo,
+    OrderDirection,
+    ServiceCatalogOrderField,
     ServiceCatalogStatusFilter,
 )
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
@@ -24,14 +28,20 @@ from ai.backend.manager.data.service_catalog.types import (
     ServiceCatalogData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.service_catalog.conditions import ServiceCatalogConditions
-from ai.backend.manager.models.service_catalog.orders import (
-    DEFAULT_FORWARD_ORDER,
-    resolve_order,
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
 )
 from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
+from ai.backend.manager.models.service_catalog.searchable_fields import (
+    ServiceCatalogSearchableFields,
+)
 from ai.backend.manager.models.service_catalog.searchers import ServiceCatalogSearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.services.service_catalog.actions.bulk_get import (
+    BulkGetServiceCatalogsAction,
+)
 from ai.backend.manager.services.service_catalog.actions.search import (
     SearchServiceCatalogsAction,
 )
@@ -41,7 +51,7 @@ from ai.backend.manager.services.service_catalog.processors import ServiceCatalo
 @lru_cache(maxsize=1)
 def _get_service_catalog_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=DEFAULT_FORWARD_ORDER,
+        forward_order=ServiceCatalogSearchableFields.own.registered_at.order.apply(ascending=False),
         cursor_column=ServiceCatalogRow.id,
     )
 
@@ -53,6 +63,20 @@ class ServiceCatalogAdapter(BaseAdapter):
 
     def __init__(self, service_catalog: ServiceCatalogProcessors) -> None:
         self._service_catalog = service_catalog
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[ServiceCatalogID]
+    ) -> list[ServiceCatalogNode | Exception | None]:
+        """Batch load service catalog entries by id for DataLoader use, one answer per id."""
+        if not ids:
+            return []
+        result = await self._service_catalog.bulk_get.run(BulkGetServiceCatalogsAction(ids=ids))
+        return [
+            self._data_to_dto(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def admin_search(
         self,
@@ -69,7 +93,7 @@ class ServiceCatalogAdapter(BaseAdapter):
         searcher = self.build_searcher(input)
 
         action_result = await self._service_catalog.global_search_service_catalogs.run(
-            SearchServiceCatalogsAction(searcher=searcher)
+            SearchServiceCatalogsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
         return AdminSearchServiceCatalogsPayload(
@@ -104,49 +128,72 @@ class ServiceCatalogAdapter(BaseAdapter):
                 conditions.append(condition)
         if filter.status is not None:
             conditions.extend(self._convert_status_filter(filter.status))
+        conditions.extend(
+            self.apply_uuid_filter(filter.entity_id, ServiceCatalogSearchableFields.own.id.filter)
+        )
         if filter.AND:
             for sub in filter.AND:
                 conditions.extend(self._convert_filter(sub))
         if filter.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter.OR:
-                or_conds.extend(self._convert_filter(sub))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter.NOT:
-                not_conds.extend(self._convert_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_string_filter(self, sf: StringFilter) -> QueryCondition | None:
+        conditions = ServiceCatalogSearchableFields.own.service_group.filter
         return self.convert_string_filter(
             sf,
-            contains_factory=ServiceCatalogConditions.by_service_group_contains,
-            equals_factory=ServiceCatalogConditions.by_service_group_equals,
-            starts_with_factory=ServiceCatalogConditions.by_service_group_starts_with,
-            ends_with_factory=ServiceCatalogConditions.by_service_group_ends_with,
-            in_factory=ServiceCatalogConditions.by_service_group_in,
+            contains_factory=conditions.contains,
+            equals_factory=conditions.equals,
+            starts_with_factory=conditions.starts_with,
+            ends_with_factory=conditions.ends_with,
+            in_factory=conditions.in_,
         )
 
     @staticmethod
     def _convert_status_filter(sf: ServiceCatalogStatusFilter) -> list[QueryCondition]:
+        conditions_of = ServiceCatalogSearchableFields.own.status.filter
         conditions: list[QueryCondition] = []
         if sf.equals is not None:
-            conditions.append(ServiceCatalogConditions.by_status_equals(sf.equals))
+            conditions.append(conditions_of.equals(sf.equals))
         if sf.in_ is not None:
-            conditions.append(ServiceCatalogConditions.by_status_in(sf.in_))
+            conditions.append(conditions_of.in_(sf.in_))
         if sf.not_equals is not None:
-            conditions.append(ServiceCatalogConditions.by_status_not_equals(sf.not_equals))
+            conditions.append(conditions_of.not_equals(sf.not_equals))
         if sf.not_in is not None:
-            conditions.append(ServiceCatalogConditions.by_status_not_in(sf.not_in))
+            conditions.append(conditions_of.not_in(sf.not_in))
         return conditions
 
     @staticmethod
     def _convert_orders(order: list[ServiceCatalogOrder]) -> list[QueryOrder]:
-        return [resolve_order(o.field, o.direction) for o in order]
+        fields = ServiceCatalogSearchableFields.own
+        result: list[QueryOrder] = []
+        for o in order:
+            ascending = o.direction != OrderDirection.DESC
+            match o.field:
+                case ServiceCatalogOrderField.SERVICE_GROUP:
+                    result.append(fields.service_group.order.apply(ascending))
+                case ServiceCatalogOrderField.DISPLAY_NAME:
+                    result.append(fields.display_name.order.apply(ascending))
+                case ServiceCatalogOrderField.REGISTERED_AT:
+                    result.append(fields.registered_at.order.apply(ascending))
+                case ServiceCatalogOrderField.LAST_HEARTBEAT:
+                    result.append(fields.last_heartbeat.order.apply(ascending))
+                case ServiceCatalogOrderField.STATUS:
+                    result.append(fields.status.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
+        return result
 
     @staticmethod
     def _data_to_dto(data: ServiceCatalogData) -> ServiceCatalogNode:
@@ -164,16 +211,4 @@ class ServiceCatalogAdapter(BaseAdapter):
             registered_at=data.registered_at,
             last_heartbeat=data.last_heartbeat,
             config_hash=data.config_hash,
-            endpoints=[
-                EndpointInfo(
-                    id=ep.id,
-                    role=ep.role,
-                    scope=ep.scope,
-                    address=ep.address,
-                    port=ep.port,
-                    protocol=ep.protocol,
-                    metadata=ep.metadata,
-                )
-                for ep in data.endpoints
-            ],
         )

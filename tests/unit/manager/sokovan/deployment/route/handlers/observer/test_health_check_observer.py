@@ -21,11 +21,11 @@ from ai.backend.common.data.entity.deployment_revision import DeploymentRevision
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.types import SessionId
 from ai.backend.manager.data.deployment.types import (
+    RouteData,
     RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
-from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.handlers.observer.health_check import (
     RouteHealthObserver,
 )
@@ -223,4 +223,4 @@ class TestRouteHealthObserverProbePolicy:
         await observer.observe([route])
 
         call = observer._http_health_check.call_args
-        assert call.args == ("10.0.0.1", 8000, "/livez", 42.0, 204)
+        assert call.args == (route.route_id, "10.0.0.1", 8000, "/livez", 42.0, 204)

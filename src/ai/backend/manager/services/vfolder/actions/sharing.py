@@ -7,7 +7,7 @@ from typing import Any, override
 
 from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.models.vfolder import VFolderOperationStatus
+from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 
 from .base import VFolderAction, VFolderGlobalAction
 

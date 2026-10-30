@@ -4,18 +4,16 @@ import logging
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.data.dotfile.types import DotfileEntries
-from ai.backend.manager.models.domain.row import verify_dotfile_name
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
+from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.dotfile.types import DotfileEntries, verify_dotfile_name
 from ai.backend.manager.models.domain.updaters import DomainDotfilesUpdater
 from ai.backend.manager.repositories.domain.repository import DomainRepository
+from ai.backend.manager.services.domain.actions.create_domain import CreateDomainAction
 from ai.backend.manager.services.domain.actions.create_domain_dotfile import (
     CreateDomainDotfileAction,
     CreateDomainDotfileActionResult,
-)
-from ai.backend.manager.services.domain.actions.create_domain_node import (
-    CreateDomainNodeAction,
-    CreateDomainNodeActionResult,
 )
 from ai.backend.manager.services.domain.actions.delete_domain_dotfile import (
     DeleteDomainDotfileAction,
@@ -29,12 +27,8 @@ from ai.backend.manager.services.domain.actions.update_domain_dotfile import (
     UpdateDomainDotfileAction,
     UpdateDomainDotfileActionResult,
 )
-from ai.backend.manager.services.domain.actions.update_domain_node import (
-    UpdateDomainNodeAction,
-    UpdateDomainNodeActionResult,
-)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class DomainService:
@@ -43,32 +37,14 @@ class DomainService:
     def __init__(self, repository: DomainRepository) -> None:
         self._repository = repository
 
-    async def create_domain_node(
-        self, action: CreateDomainNodeAction
-    ) -> CreateDomainNodeActionResult:
-        domain_data = await self._repository.create_domain_node(
-            action.creator, action.resource_group_ids
+    async def create(self, action: CreateDomainAction) -> CreatedEntityOpsResult[DomainData]:
+        """Register a domain. Not the generic create: a domain is registered with a
+        model-store project, in the same transaction."""
+        return CreatedEntityOpsResult(
+            data=await self._repository.create_domain(action.to_creator())
         )
-        return CreateDomainNodeActionResult(domain_data=domain_data)
 
-    async def update_domain_node(
-        self, action: UpdateDomainNodeAction
-    ) -> UpdateDomainNodeActionResult:
-        if action.sgroup_ids_to_add is not None and action.sgroup_ids_to_remove is not None:
-            if conflict := action.sgroup_ids_to_add & action.sgroup_ids_to_remove:
-                raise InvalidAPIParameters(
-                    "Should be no scaling groups included in both `sgroups_to_add` and "
-                    f"`sgroups_to_remove` (sg:{conflict})."
-                )
-        domain_data = await self._repository.update_domain_node(
-            action.updater.domain_id,
-            action.updater,
-            action.sgroup_ids_to_add,
-            action.sgroup_ids_to_remove,
-        )
-        return UpdateDomainNodeActionResult(domain_data=domain_data)
-
-    async def purge_domain(self, action: PurgeDomainAction) -> PurgeDomainActionResult:
+    async def purge(self, action: PurgeDomainAction) -> PurgeDomainActionResult:
         domain_data = await self._repository.purge_domain(action.domain_id, action.name)
         return PurgeDomainActionResult(domain_data=domain_data)
 

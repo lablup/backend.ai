@@ -6,7 +6,7 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
-from ai.backend.manager.data.retention.types import RetentionCategory, RetentionPolicyData
+from ai.backend.manager.data.retention.types import RetentionCategory
 from ai.backend.manager.models.base import GUID, Base, StrEnumType
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
@@ -33,14 +33,3 @@ class RetentionPolicyRow(LifecycleTimestampsMixin, Base):
     last_swept_at: Mapped[datetime | None] = mapped_column(
         "last_swept_at", sa.DateTime(timezone=True), nullable=True
     )
-
-    def to_data(self) -> RetentionPolicyData:
-        return RetentionPolicyData(
-            id=self.id,
-            category=self.category,
-            retention_period=self.retention_period,
-            enabled=self.enabled,
-            last_swept_at=self.last_swept_at,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )

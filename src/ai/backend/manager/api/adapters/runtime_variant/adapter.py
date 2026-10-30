@@ -3,10 +3,14 @@ from __future__ import annotations
 from collections.abc import Sequence
 from uuid import UUID
 
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.runtime_variant.request import (
     CreateRuntimeVariantInput,
     DeleteRuntimeVariantsInput,
+    PartialBulkPurgeRuntimeVariantsInput,
+    PartialBulkUpdateRuntimeVariantsInput,
     RuntimeVariantFilter,
     RuntimeVariantOrder,
     SearchRuntimeVariantsInput,
@@ -22,20 +26,32 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     SearchRuntimeVariantsPayload,
     UpdateRuntimeVariantPayload,
 )
-from ai.backend.common.dto.manager.v2.runtime_variant.types import RuntimeVariantOrderField
+from ai.backend.common.dto.manager.v2.runtime_variant.types import (
+    RuntimeVariantOrderField,
+    RuntimeVariantUsage,
+)
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.runtime_variant.conditions import RuntimeVariantConditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.runtime_variant.creators import RuntimeVariantCreator
-from ai.backend.manager.models.runtime_variant.orders import RuntimeVariantOrders
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.runtime_variant.scopes import PublicRuntimeVariantTarget
+from ai.backend.manager.models.runtime_variant.searchable_fields import (
+    RuntimeVariantSearchableFields,
+)
 from ai.backend.manager.models.runtime_variant.searchers import RuntimeVariantSearcher
 from ai.backend.manager.models.runtime_variant.updaters import RuntimeVariantUpdater
+from ai.backend.manager.models.specs.search.usage import UsedBy
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.services.runtime_variant.actions.bulk_get import (
-    PublicBulkGetRuntimeVariantsAction,
+    BulkGetRuntimeVariantsAction,
 )
 from ai.backend.manager.services.runtime_variant.actions.bulk_purge import (
     BulkPurgeRuntimeVariantsAction,
@@ -45,8 +61,13 @@ from ai.backend.manager.services.runtime_variant.actions.get import GetRuntimeVa
 from ai.backend.manager.services.runtime_variant.actions.lookup import (
     LookupRuntimeVariantAction,
 )
+from ai.backend.manager.services.runtime_variant.actions.partial_bulk_update import (
+    PartialBulkUpdateRuntimeVariantsAction,
+)
 from ai.backend.manager.services.runtime_variant.actions.purge import PurgeRuntimeVariantAction
-from ai.backend.manager.services.runtime_variant.actions.search import SearchRuntimeVariantsAction
+from ai.backend.manager.services.runtime_variant.actions.scoped_search import (
+    ScopedSearchRuntimeVariantsAction,
+)
 from ai.backend.manager.services.runtime_variant.actions.update import UpdateRuntimeVariantAction
 from ai.backend.manager.services.runtime_variant.processors import RuntimeVariantProcessors
 from ai.backend.manager.types import OptionalState, TriState
@@ -54,7 +75,7 @@ from ai.backend.manager.types import OptionalState, TriState
 
 def _runtime_variant_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RuntimeVariantOrders.created_at(ascending=False),
+        forward_order=RuntimeVariantSearchableFields.own.created_at.order.apply(ascending=False),
         cursor_column=RuntimeVariantRow.id,
     )
 
@@ -76,8 +97,8 @@ class RuntimeVariantAdapter(BaseAdapter):
         if not ids:
             return []
         entity_ids = [RuntimeVariantID(value) for value in ids]
-        result = await self._runtime_variant.public_bulk_get.run(
-            PublicBulkGetRuntimeVariantsAction(ids=entity_ids)
+        result = await self._runtime_variant.bulk_get.run(
+            BulkGetRuntimeVariantsAction(ids=entity_ids)
         )
         return [
             self._data_to_node(item.value)
@@ -104,8 +125,14 @@ class RuntimeVariantAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._runtime_variant.public_search.run(
-            SearchRuntimeVariantsAction(searcher=searcher)
+        result = await self._runtime_variant.scoped_search.run(
+            ScopedSearchRuntimeVariantsAction(
+                searcher=ScopedSearcher(
+                    scopes=[PublicRuntimeVariantTarget()],
+                    used_by=self._usage(input.usage),
+                    searcher=searcher,
+                )
+            )
         )
         return SearchRuntimeVariantsPayload(
             items=[self._data_to_node(d) for d in result.items],
@@ -115,7 +142,7 @@ class RuntimeVariantAdapter(BaseAdapter):
         )
 
     async def get(self, variant_id: UUID) -> RuntimeVariantNode:
-        result = await self._runtime_variant.public_get.run(
+        result = await self._runtime_variant.get.run(
             GetRuntimeVariantAction(variant_id=RuntimeVariantID(variant_id))
         )
         return self._data_to_node(result.data)
@@ -139,24 +166,44 @@ class RuntimeVariantAdapter(BaseAdapter):
         self,
         input: UpdateRuntimeVariantInput,
     ) -> UpdateRuntimeVariantPayload:
-        updater = RuntimeVariantUpdater(
-            variant_id=RuntimeVariantID(input.id),
-            name=OptionalState.from_unset(input.name),
-            description=TriState.from_unset(input.description),
+        result = await self._runtime_variant.update.run(
+            UpdateRuntimeVariantAction(updater=self._to_updater(input))
         )
-        result = await self._runtime_variant.update.run(UpdateRuntimeVariantAction(updater=updater))
         return UpdateRuntimeVariantPayload(
             runtime_variant=self._data_to_node(result.data),
         )
 
-    async def delete(self, variant_id: UUID) -> DeleteRuntimeVariantPayload:
+    async def purge(self, variant_id: UUID) -> DeleteRuntimeVariantPayload:
+        """Purge a runtime variant with the presets in its catalog."""
         result = await self._runtime_variant.purge.run(
             PurgeRuntimeVariantAction(id=RuntimeVariantID(variant_id))
         )
-        return DeleteRuntimeVariantPayload(id=result.data.id)
+        return DeleteRuntimeVariantPayload(id=result.data.id, entity_id=result.data.id)
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateRuntimeVariantsInput
+    ) -> PartialBulkPayload[RuntimeVariantNode]:
+        """Update several runtime variants, answering for each one."""
+        result = await self._runtime_variant.partial_bulk_update.run(
+            PartialBulkUpdateRuntimeVariantsAction(
+                updaters=[self._to_updater(item) for item in input.items]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeRuntimeVariantsInput
+    ) -> PartialBulkPayload[RuntimeVariantNode]:
+        """Purge several runtime variants with their presets, answering for each one."""
+        result = await self._runtime_variant.bulk_purge.run(
+            BulkPurgeRuntimeVariantsAction(
+                ids=[RuntimeVariantID(variant_id) for variant_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
 
     async def bulk_delete(self, input: DeleteRuntimeVariantsInput) -> DeleteRuntimeVariantsPayload:
-        """Delete the named runtime variants, answering for each one."""
+        """Deprecated. Use :meth:`partial_bulk_purge`."""
         result = await self._runtime_variant.bulk_purge.run(
             BulkPurgeRuntimeVariantsAction(
                 ids=[RuntimeVariantID(variant_id) for variant_id in input.ids]
@@ -183,50 +230,74 @@ class RuntimeVariantAdapter(BaseAdapter):
         not form part of the v2 surface — v2 clients pass the id
         directly.
         """
-        result = await self._runtime_variant.public_lookup.run(
-            LookupRuntimeVariantAction(name=name)
-        )
+        result = await self._runtime_variant.lookup.run(LookupRuntimeVariantAction(name=name))
         return result.entity_id()
 
+    def _to_updater(self, input: UpdateRuntimeVariantInput) -> RuntimeVariantUpdater:
+        return RuntimeVariantUpdater(
+            variant_id=RuntimeVariantID(input.id),
+            name=OptionalState.from_unset(input.name),
+            description=TriState.from_unset(input.description),
+        )
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[RuntimeVariantData]
+    ) -> PartialBulkPayload[RuntimeVariantNode]:
+        return PartialBulkPayload[RuntimeVariantNode](
+            successes=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
+
+    def _usage(self, usage: RuntimeVariantUsage | None) -> list[UsedBy]:
+        """The uses the request named, each of which the caller must be able to read."""
+        if usage is None or usage.used_by is None:
+            return []
+        linked = RuntimeVariantSearchableFields.linked.usage
+        return [
+            linked.deployments.used_by(DeploymentID(entity_id))
+            for entity_id in usage.used_by.deployment or ()
+        ]
+
     def _convert_filter(self, filter_: RuntimeVariantFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter_.name:
-            cond = self.convert_string_filter(
-                filter_.name,
-                contains_factory=RuntimeVariantConditions.by_name_contains,
-                equals_factory=RuntimeVariantConditions.by_name_equals,
-                starts_with_factory=RuntimeVariantConditions.by_name_starts_with,
-                ends_with_factory=RuntimeVariantConditions.by_name_ends_with,
-                in_factory=RuntimeVariantConditions.by_name_in,
-            )
-            if cond:
-                conditions.append(cond)
+        fields = RuntimeVariantSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_string_filter(filter_.name, fields.name.filter),
+            *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
+        ]
         if filter_.AND:
             for sub in filter_.AND:
                 conditions.extend(self._convert_filter(sub))
         if filter_.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter_.OR:
-                or_conds.extend(self._convert_filter(sub))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter_.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter_.NOT:
-                not_conds.extend(self._convert_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_orders(self, orders: list[RuntimeVariantOrder]) -> list[QueryOrder]:
+        fields = RuntimeVariantSearchableFields.own
         result = []
         for order in orders:
             ascending = order.direction.value == "ASC"
             match order.field:
                 case RuntimeVariantOrderField.NAME:
-                    result.append(RuntimeVariantOrders.name(ascending))
+                    result.append(fields.name.order.apply(ascending))
                 case RuntimeVariantOrderField.CREATED_AT:
-                    result.append(RuntimeVariantOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
         return result
 
     @staticmethod

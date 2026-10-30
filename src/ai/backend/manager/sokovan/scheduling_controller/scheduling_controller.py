@@ -11,8 +11,8 @@ from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.defs import RESERVED_VFOLDER_PATTERNS, RESERVED_VFOLDERS
 from ai.backend.common.events.dispatcher import EventProducer
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.events.event_types.session.broadcast import SchedulingBroadcastEvent
 from ai.backend.common.events.types import AbstractBroadcastEvent
 from ai.backend.common.exception import InvalidAPIParameters
@@ -24,7 +24,7 @@ from ai.backend.common.types import (
     ResourceSlotEntry,
     SessionId,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.session.compute_schedule import (
@@ -41,6 +41,7 @@ from ai.backend.manager.data.session.spec import (
     SessionSpec,
 )
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.data.vfolder.types import verify_vfolder_name
 from ai.backend.manager.errors.common import InternalServerError, RejectedByHook
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.metrics.scheduler import (
@@ -48,7 +49,7 @@ from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.repositories.scheduler import SchedulerRepository
+from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
 from ai.backend.manager.sokovan.scheduler.provisioner.selectors.selector import (
     AgentSelectionCriteria,
     AgentSelector,
@@ -61,7 +62,80 @@ from ai.backend.manager.sokovan.scheduler.provisioner.selectors.types import (
     ResourceRequirements,
 )
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.compute_kernel_resources_rule import (
+    ComputeKernelResourcesRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.drop_zero_resource_slots_rule import (
+    DropZeroResourceSlotsRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.expand_kernel_groups_rule import (
+    ExpandKernelGroupsRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.resources.merge_resource_group_defaults_rule import (
+    MergeResourceGroupDefaultsRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.session_spec_preparer import (
+    SessionSpecPreparer,
+    SessionSpecPreparerArgs,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.assign_container_user_mapping_rule import (
+    AssignContainerUserMappingRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.assign_network_config_rule import (
+    AssignNetworkConfigRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.assign_user_identity_rule import (
+    AssignUserIdentityRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.build_internal_data_rule import (
+    BuildInternalDataRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.inject_session_environ_rule import (
+    InjectSessionEnvironRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.resolve_vfolder_mounts_rule import (
+    ResolveVFolderMountsRule,
+)
 from ai.backend.manager.sokovan.scheduling_controller.types import SessionValidationSpec
+from ai.backend.manager.sokovan.scheduling_controller.validators.container_limit_rule import (
+    ContainerLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.dotfile_vfolder_conflict_rule import (
+    DotfileVFolderConflictRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.image_slot_type_rule import (
+    ImageSlotTypeRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.inference_model_folder_rule import (
+    InferenceModelFolderRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.mount_name_validation_rule import (
+    MountNameValidationRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.pending_session_count_limit_rule import (
+    PendingSessionCountLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.pending_session_resource_limit_rule import (
+    PendingSessionResourceLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.priority_limit_rule import (
+    PriorityLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.requested_slot_type_rule import (
+    RequestedSlotTypeRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.required_resource_slot_rule import (
+    RequiredResourceSlotRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.resource_limit_rule import (
+    ResourceLimitRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.service_port_rule import (
+    ServicePortRule,
+)
+from ai.backend.manager.sokovan.scheduling_controller.validators.session_spec_base import (
+    SessionSpecValidator,
+)
 from ai.backend.manager.views.sokovan.scheduling import ComputeScheduleData
 from ai.backend.manager.views.sokovan.session import MarkTerminatingResult
 from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext
@@ -69,35 +143,7 @@ from ai.backend.manager.views.sokovan.workload import (
     ResourceRequest,
 )
 
-from .preparers import (
-    AssignContainerUserMappingRule,
-    AssignNetworkConfigRule,
-    AssignUserIdentityRule,
-    BuildInternalDataRule,
-    ComputeKernelResourcesRule,
-    ExpandKernelGroupsRule,
-    InjectSessionEnvironRule,
-    MergeResourceGroupDefaultsRule,
-    ResolveVFolderMountsRule,
-    SessionSpecPreparer,
-)
-from .validators import (
-    ContainerLimitRule,
-    DotfileVFolderConflictRule,
-    ImageSlotTypeRule,
-    InferenceModelFolderRule,
-    MountNameValidationRule,
-    PendingSessionCountLimitRule,
-    PendingSessionResourceLimitRule,
-    PriorityLimitRule,
-    RequestedSlotTypeRule,
-    RequiredResourceSlotRule,
-    ResourceLimitRule,
-    ServicePortRule,
-    SessionSpecValidator,
-)
-
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -147,25 +193,31 @@ class SchedulingController:
         self._operation_metrics = SchedulerOperationMetricObserver.instance()
 
         # Draft-based spec preparer. Order matters — RG defaults merge
-        # first so later rules see the merged baseline; expand last on
-        # the options side so kernel specs exist before per-kernel rules
-        # run. The resource rules determine resource amounts (identity
-        # included so the draft can be promoted) and are runnable alone
-        # via prepare_resources() for the fitting check.
+        # first so the pre-expand rules see the merged baseline; those
+        # rules complete each group before expansion so a stored group
+        # and its kernels hold the same values; the per-kernel spec
+        # rules run after expansion. The resource rules determine
+        # resource amounts and run with expansion alone via
+        # prepare_resources() for the fitting check.
         self._spec_preparer = SessionSpecPreparer(
-            resource_rules=(
-                MergeResourceGroupDefaultsRule(),
-                ComputeKernelResourcesRule(),
-                ExpandKernelGroupsRule(),
-            ),
-            spec_rules=(
-                AssignUserIdentityRule(),
-                AssignNetworkConfigRule(),
-                AssignContainerUserMappingRule(),
-                InjectSessionEnvironRule(),
-                BuildInternalDataRule(),
-                ResolveVFolderMountsRule(),
-            ),
+            SessionSpecPreparerArgs(
+                resource_rules=(
+                    MergeResourceGroupDefaultsRule(),
+                    ComputeKernelResourcesRule(),
+                    DropZeroResourceSlotsRule(),
+                ),
+                pre_expand_spec_rules=(
+                    InjectSessionEnvironRule(),
+                    ResolveVFolderMountsRule(),
+                ),
+                expand_rule=ExpandKernelGroupsRule(),
+                spec_rules=(
+                    AssignUserIdentityRule(),
+                    AssignNetworkConfigRule(),
+                    AssignContainerUserMappingRule(),
+                    BuildInternalDataRule(),
+                ),
+            )
         )
 
         # Draft-based spec validator chain. Runs against the finalized
@@ -280,6 +332,7 @@ class SchedulingController:
                 spec.resource_spec.identity.session_id,
                 spec.resource_spec.identity.session_name,
                 spec.resource_spec.identity.access_key,
+                spec.resource_spec.identity.user_uuid,
             ),
             return_when=ALL_COMPLETED,
         )
@@ -288,10 +341,10 @@ class SchedulingController:
 
     async def _notify_session_enqueued(self, spec: SessionSpec, session_id: SessionId) -> None:
         """Post-enqueue side effects: broadcast, scheduling request, POST hook."""
-        log.info(
-            "Session {} ({}) enqueued successfully via draft path",
-            spec.resource_spec.identity.session_name,
-            session_id,
+        log.trace(
+            "session enqueued",
+            session_id=session_id,
+            session_name=spec.resource_spec.identity.session_name,
         )
 
         await self._event_producer.broadcast_events_batch([
@@ -306,17 +359,14 @@ class SchedulingController:
         try:
             await self.mark_scheduling_needed([ScheduleType.SCHEDULE])
         except Exception as e:
-            log.warning(
-                "Failed to request scheduling for session {}: {}",
-                session_id,
-                e,
-            )
+            log.warning("scheduling request failed", session_id=session_id, exc_info=e)
         await self._hook_plugin_ctx.notify(
             "POST_ENQUEUE_SESSION",
             (
                 session_id,
                 spec.resource_spec.identity.session_name,
                 spec.resource_spec.identity.access_key,
+                spec.resource_spec.identity.user_uuid,
             ),
         )
 
@@ -483,15 +533,12 @@ class SchedulingController:
         if not schedule_types:
             return
         await self._valkey_schedule.mark_schedules_needed_batch([st.value for st in schedule_types])
-        log.debug(
-            "Requested scheduling for type(s): {}",
-            ", ".join(st.value for st in schedule_types),
-        )
+        log.debug("scheduling requested: {}", ", ".join(st.value for st in schedule_types))
 
     async def mark_sessions_for_termination(
         self,
         session_ids: list[SessionId],
-        reason: str = "USER_REQUESTED",
+        reason: KernelLifecycleEventReason = KernelLifecycleEventReason.USER_REQUESTED,
         *,
         forced: bool = False,
         message: str = "mark_terminating success",
@@ -518,13 +565,12 @@ class SchedulingController:
             message=message,
         )
         if result.has_processed():
-            log.info(
-                "Marked {} sessions for termination"
-                " (cancelled: {}, terminating: {}, force_terminated: {})",
-                result.processed_count(),
-                len(result.cancelled_sessions),
-                len(result.terminating_sessions),
-                len(result.force_terminated_sessions),
+            log.trace(
+                "sessions marked for termination",
+                session_count=result.processed_count(),
+                cancelled_count=len(result.cancelled_sessions),
+                terminating_count=len(result.terminating_sessions),
+                force_terminated_count=len(result.force_terminated_sessions),
             )
 
             # Broadcast status events for cancelled, terminating, and force-terminated sessions
@@ -580,7 +626,7 @@ class SchedulingController:
         self,
         session_ids: list[SessionId],
         to_status: SessionStatus,
-        reason: str,
+        reason: KernelLifecycleEventReason,
     ) -> list[SessionId]:
         """
         Move sessions to ``to_status`` and broadcast the transition.
@@ -603,7 +649,9 @@ class SchedulingController:
         if not marked_sessions:
             return marked_sessions
 
-        log.info("Marked {} sessions as {}", len(marked_sessions), to_status)
+        log.trace(
+            "sessions marked with status", session_count=len(marked_sessions), to_status=to_status
+        )
         await self._event_producer.broadcast_events_batch([
             SchedulingBroadcastEvent(
                 session_id=session_id,
@@ -634,7 +682,7 @@ class SchedulingController:
                 alias_name = alias_name.replace("/home/work/", "")
             if alias_name == "":
                 raise InvalidAPIParameters("Alias name cannot be empty.")
-            if not _verify_vfolder_name(alias_name):
+            if not verify_vfolder_name(alias_name):
                 raise InvalidAPIParameters(str(alias_name) + " is reserved for internal path.")
             if alias_name in original_refs:
                 raise InvalidAPIParameters(
@@ -655,12 +703,3 @@ class SchedulingController:
         if user is None:
             raise InvalidAPIParameters("User context is required for image validation.")
         await self._repository.check_available_image(spec.image_id, user.domain_name, user.user_id)
-
-
-def _verify_vfolder_name(folder: str) -> bool:
-    if folder in RESERVED_VFOLDERS:
-        return False
-    for pattern in RESERVED_VFOLDER_PATTERNS:
-        if pattern.match(folder):
-            return False
-    return True

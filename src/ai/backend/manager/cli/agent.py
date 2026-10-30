@@ -8,14 +8,14 @@ import click
 from alembic.config import Config
 
 from ai.backend.common.types import AgentId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.utils import enforce_debug_logging
 from ai.backend.manager.errors.resource import ConfigurationLoadFailed
 
 if TYPE_CHECKING:
     from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @click.group()
@@ -75,7 +75,7 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
             manager_secret_key=SecretKey(manager_secret_key),
         )
         try:
-            log.info("Contacting ag:{} ...", agent_id)
+            log.info("contacting the agent", agent_id=agent_id)
             enforce_debug_logging(["callosum", "ai.backend.manager.agent_cache"])
             async with agent_cache.rpc_context(
                 AgentId(agent_id),
@@ -88,9 +88,9 @@ def ping(cli_ctx: CLIContext, agent_id: str, alembic_config: str, timeout: float
                 # print(f"Retrieved ag:{agent_id} hardware information as a health check:")
                 # pprint(result)
         except TimeoutError:
-            log.error("Timeout occurred while reading the response from ag:{}", agent_id)
+            log.error("timed out while reading the response from the agent", agent_id=agent_id)
         except Exception:
-            log.exception("Exception occurred while reading the response from ag:{}", agent_id)
+            log.exception("failed to read the response from the agent", agent_id=agent_id)
         finally:
             await db.dispose()
 

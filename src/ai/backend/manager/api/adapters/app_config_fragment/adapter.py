@@ -19,26 +19,28 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     AppConfigFragmentScope,
     AppConfigFragmentUpsertItem,
     AppConfigScopeRef,
-    BulkPurgeAppConfigFragmentInput,
     MyAppConfigFragmentsByNamesInput,
     MyUpsertAppConfigFragmentsInput,
+    PartialBulkPurgeAppConfigFragmentsInput,
     ScopedAppConfigFragmentsByNamesInput,
     ScopedSearchAppConfigFragmentInput,
     ScopedUpsertAppConfigFragmentsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
-    AppConfigFragmentBulkErrorInfo,
     AppConfigFragmentNode,
-    BulkPurgeAppConfigFragmentPayload,
+    AtomicBulkUpsertAppConfigFragmentsPayload,
     PurgeAppConfigFragmentPayload,
     SearchAppConfigFragmentPayload,
-    UpsertAppConfigFragmentsPayload,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.types import (
     AppConfigFragmentOrderField,
     AppConfigScopeTypeFilter,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import (
+    OrderDirection,
+    PartialBulkFailure,
+    PartialBulkPayload,
+)
 from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
@@ -61,7 +63,12 @@ from ai.backend.manager.models.app_config_fragment.upserters import (
     PublicAppConfigFragmentUpserter,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.app_config.actions.fragment.admin_search import (
     AdminSearchAppConfigFragmentAction,
 )
@@ -107,16 +114,16 @@ class AppConfigFragmentAdapter(BaseAdapter):
 
     # --- fragment writes and reads (RBAC-gated at the processor) ---
 
-    async def scoped_upsert_app_config_fragments(
+    async def scoped_atomic_bulk_upsert(
         self, input: ScopedUpsertAppConfigFragmentsInput
-    ) -> UpsertAppConfigFragmentsPayload:
-        """Upsert many fragments at the scope named in ``input`` (RBAC-authorized there)."""
+    ) -> AtomicBulkUpsertAppConfigFragmentsPayload:
+        """Upsert many fragments at the scope named in ``input``, all or none."""
         return await self._upsert(self._ref_owner(input.scope), input.items)
 
-    async def my_upsert_app_config_fragments(
+    async def my_atomic_bulk_upsert(
         self, input: MyUpsertAppConfigFragmentsInput
-    ) -> UpsertAppConfigFragmentsPayload:
-        """Upsert many fragments at the current user's own user scope.
+    ) -> AtomicBulkUpsertAppConfigFragmentsPayload:
+        """Upsert many fragments at the current user's own user scope, all or none.
 
         Calls ``current_user()`` internally — the caller does not pass a scope.
         """
@@ -129,7 +136,7 @@ class AppConfigFragmentAdapter(BaseAdapter):
         self,
         owner: EntityIdentifier | None,
         items: Sequence[AppConfigFragmentUpsertItem],
-    ) -> UpsertAppConfigFragmentsPayload:
+    ) -> AtomicBulkUpsertAppConfigFragmentsPayload:
         """Route by who owns the fragments: a public write answers to no scope, so it runs
         behind the SUPERADMIN gate instead."""
         if owner is None:
@@ -155,9 +162,8 @@ class AppConfigFragmentAdapter(BaseAdapter):
                     ],
                 )
             )
-        return UpsertAppConfigFragmentsPayload(
+        return AtomicBulkUpsertAppConfigFragmentsPayload(
             items=[self._fragment_to_node(fragment) for fragment in written.items],
-            failed=[],
         )
 
     async def get(self, fragment_id: AppConfigFragmentID) -> AppConfigFragmentNode:
@@ -170,25 +176,30 @@ class AppConfigFragmentAdapter(BaseAdapter):
         action_result = await self._app_config.fragment_purge.run(
             PurgeAppConfigFragmentAction(purger=AppConfigFragmentPurger(fragment_id=fragment_id))
         )
-        return PurgeAppConfigFragmentPayload(id=action_result.data.id)
+        return PurgeAppConfigFragmentPayload(
+            id=action_result.data.id, entity_id=action_result.data.id
+        )
 
-    async def bulk_purge(
-        self, input: BulkPurgeAppConfigFragmentInput
-    ) -> BulkPurgeAppConfigFragmentPayload:
-        action_result = await self._app_config.fragment_bulk_purge.run(
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeAppConfigFragmentsInput
+    ) -> PartialBulkPayload[AppConfigFragmentNode]:
+        """Purge several fragments, answering for each one."""
+        result = await self._app_config.fragment_bulk_purge.run(
             BulkPurgeAppConfigFragmentAction(
                 purgers=[
                     AppConfigFragmentPurger(fragment_id=fragment_id) for fragment_id in input.ids
                 ]
             )
         )
-        return BulkPurgeAppConfigFragmentPayload(
-            items=[item.value.id for item in action_result.items if item.value is not None],
+        return PartialBulkPayload[AppConfigFragmentNode](
+            successes=[
+                self._fragment_to_node(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
             failed=[
-                AppConfigFragmentBulkErrorInfo(
-                    id=AppConfigFragmentID(item.entity_id), message=str(item.error)
-                )
-                for item in action_result.items
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
                 if item.error is not None
             ],
         )
@@ -282,7 +293,9 @@ class AppConfigFragmentAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._app_config.fragment_admin_search.run(
-            AdminSearchAppConfigFragmentAction(searcher=searcher)
+            AdminSearchAppConfigFragmentAction(
+                searcher=GlobalSearcher(used_by=(), searcher=searcher)
+            )
         )
         return SearchAppConfigFragmentPayload(
             items=[self._fragment_to_node(item) for item in action_result.items],
@@ -390,21 +403,30 @@ class AppConfigFragmentAdapter(BaseAdapter):
             )
             if condition:
                 conditions.append(condition)
+        if filter_.entity_id:
+            condition = self.convert_uuid_filter(
+                filter_.entity_id,
+                equals_factory=AppConfigFragmentConditions.by_id_equals,
+                in_factory=AppConfigFragmentConditions.by_id_in,
+            )
+            if condition:
+                conditions.append(condition)
         if filter_.AND:
             for sub_filter in filter_.AND:
                 conditions.extend(self._convert_filter(sub_filter))
         if filter_.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in filter_.OR:
-                or_conditions.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if filter_.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in filter_.NOT:
-                not_conditions.extend(self._convert_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod

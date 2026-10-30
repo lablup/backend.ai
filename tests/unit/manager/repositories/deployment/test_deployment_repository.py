@@ -13,6 +13,7 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -32,7 +33,12 @@ from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.common.schema.deployment import BlueGreenSpec, IntOrPercent, RollingUpdateSpec
+from ai.backend.common.schema.deployment import (
+    BlueGreenSpec,
+    IntOrPercent,
+    ReplicaGroupRolloutSpec,
+    RollingUpdateSpec,
+)
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -44,8 +50,10 @@ from ai.backend.common.types import (
     ServicePort,
     ServicePortProtocols,
     SessionId,
+    SessionResult,
+    SessionTypes,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.deployment.types import (
     DeploymentLifecycleSubStep,
     DeploymentOptions,
@@ -57,65 +65,64 @@ from ai.backend.manager.data.deployment.types import (
     RouteTrafficStatus,
 )
 from ai.backend.manager.data.image.types import ImageType
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.session_group.types import (
     SessionGroupPlacementDirection,
     SessionGroupPlacementEnforcement,
 )
 from ai.backend.manager.errors.deployment import DeploymentRevisionNotFound
 from ai.backend.manager.errors.service import DeploymentPolicyNotFound
-from ai.backend.manager.models.agent import AgentRow, AgentStatus
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.deployment_policy.purgers import DeploymentPolicyPurger
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
 from ai.backend.manager.models.deployment_revision.creators import DeploymentRevisionCreator
-from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow, EndpointTokenRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.creators import (
     DeploymentCreator,
     DeploymentMetadataFields,
     DeploymentNetworkFields,
     DeploymentReplicaFields,
 )
+from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow, KernelStatus
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.entity_field import EntityFieldRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
 from ai.backend.manager.models.resource_slot.row import (
     DeploymentRevisionResourceSlotRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.routing import RoutingRow
 from ai.backend.manager.models.routing.creators import ReplicaCreator
+from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.models.routing.updaters import ReplicaUpdater
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.session import (
-    SessionResult,
-    SessionRow,
-    SessionStatus,
-    SessionTypes,
-)
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -125,8 +132,7 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.base.querier import BatchQuerier
-from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.types import OptionalState
@@ -165,6 +171,10 @@ def attach_primary_replica_group(
         deployment_id=endpoint.id,
         current_revision_id=current_revision_id,
         target_revision_id=target_revision_id,
+        rollout=ReplicaGroupRolloutSpec(
+            max_surge=IntOrPercent(count=1),
+            max_unavailable=IntOrPercent(count=0),
+        ),
     )
     db_sess.add(group)
     endpoint.primary_replica_group_id = ReplicaGroupID(group_id)
@@ -1993,12 +2003,12 @@ class TestDeploymentRevisionOperations:
         test_endpoint_id: DeploymentID,
     ) -> None:
         """Test search_revisions returns empty result when no revisions exist."""
-        querier = BatchQuerier(
+        searcher = ModelRevisionSearcher(
             pagination=OffsetPagination(limit=10),
             conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
         )
 
-        result = await deployment_repository.search_revisions(querier)
+        result = await deployment_repository.search_revisions(searcher)
 
         assert result.total_count == 0
         assert result.items == []
@@ -2012,12 +2022,12 @@ class TestDeploymentRevisionOperations:
         test_multiple_revisions: list[ModelRevisionData],
     ) -> None:
         """Test search_revisions returns correct results."""
-        querier = BatchQuerier(
+        searcher = ModelRevisionSearcher(
             pagination=OffsetPagination(limit=10),
             conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
         )
 
-        result = await deployment_repository.search_revisions(querier)
+        result = await deployment_repository.search_revisions(searcher)
 
         assert result.total_count == 3
         assert len(result.items) == 3
@@ -2032,11 +2042,11 @@ class TestDeploymentRevisionOperations:
     ) -> None:
         """Test search_revisions respects pagination."""
         # First page
-        querier = BatchQuerier(
+        searcher = ModelRevisionSearcher(
             pagination=OffsetPagination(limit=2, offset=0),
             conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
         )
-        result = await deployment_repository.search_revisions(querier)
+        result = await deployment_repository.search_revisions(searcher)
 
         assert result.total_count == 5
         assert len(result.items) == 2
@@ -2044,11 +2054,11 @@ class TestDeploymentRevisionOperations:
         assert result.has_previous_page is False
 
         # Second page
-        querier = BatchQuerier(
+        searcher = ModelRevisionSearcher(
             pagination=OffsetPagination(limit=2, offset=2),
             conditions=[lambda: DeploymentRevisionRow.endpoint == test_endpoint_id],
         )
-        result = await deployment_repository.search_revisions(querier)
+        result = await deployment_repository.search_revisions(searcher)
 
         assert result.total_count == 5
         assert len(result.items) == 2
@@ -2119,6 +2129,10 @@ class TestDeploymentRevisionOperations:
                     lifecycle=ReplicaGroupLifecycle.DRAINED,
                     desired_current_replica_count=0,
                     desired_target_replica_count=0,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
                 )
             )
             await db_sess.execute(
@@ -2744,142 +2758,17 @@ class TestSearchDeploymentPolicies:
     # Tests - Search with pagination
     # =========================================================================
 
-    async def test_search_first_page(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test first page of search results."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=2, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        assert len(result.items) == 2
-        assert result.total_count == 4
-        assert result.has_next_page is True
-        assert result.has_previous_page is False
-
-    async def test_search_second_page(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test second page of search results."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=2, offset=2),
-            conditions=[],
-            orders=[],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        assert len(result.items) == 2
-        assert result.total_count == 4
-        assert result.has_next_page is False
-        assert result.has_previous_page is True
-
     # =========================================================================
     # Tests - Search with filtering
     # =========================================================================
-
-    async def test_search_filter_by_strategy(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test filtering deployment policies by strategy."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                lambda: DeploymentPolicyRow.strategy == DeploymentStrategy.BLUE_GREEN,
-            ],
-            orders=[],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        assert len(result.items) == 1
-        assert result.items[0].strategy == DeploymentStrategy.BLUE_GREEN
-
-    async def test_search_filter_by_endpoint(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-        sample_endpoint_ids: list[DeploymentID],
-    ) -> None:
-        """Test filtering deployment policies by endpoint ID."""
-        target_endpoint_id = sample_endpoint_ids[0]
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                lambda: DeploymentPolicyRow.endpoint == target_endpoint_id,
-            ],
-            orders=[],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        assert len(result.items) == 1
-        assert result.items[0].endpoint == target_endpoint_id
 
     # =========================================================================
     # Tests - Search with ordering
     # =========================================================================
 
-    async def test_search_order_by_created_at_ascending(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test ordering deployment policies by created_at ascending."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[DeploymentPolicyRow.created_at.asc()],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        created_ats = [item.created_at for item in result.items]
-        assert created_ats == sorted(created_ats)
-
-    async def test_search_order_by_created_at_descending(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test ordering deployment policies by created_at descending."""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[],
-            orders=[DeploymentPolicyRow.created_at.desc()],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        created_ats = [item.created_at for item in result.items]
-        assert created_ats == sorted(created_ats, reverse=True)
-
     # =========================================================================
     # Tests - Empty results
     # =========================================================================
-
-    async def test_search_no_results(
-        self,
-        deployment_repository: DeploymentRepository,
-        sample_policies: list[DeploymentPolicyData],
-    ) -> None:
-        """Test search with no matching results."""
-        nonexistent_id = uuid.uuid4()
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=10, offset=0),
-            conditions=[
-                lambda: DeploymentPolicyRow.endpoint == nonexistent_id,
-            ],
-            orders=[],
-        )
-        result = await deployment_repository.search_deployment_policies(querier)
-
-        assert len(result.items) == 0
-        assert result.total_count == 0
 
 
 class TestRouteOperations:
@@ -3122,6 +3011,10 @@ class TestRouteOperations:
                     session_group_id=SessionGroupID(uuid.uuid4()),
                     id=group_id,
                     deployment_id=test_endpoint_id,
+                    rollout=ReplicaGroupRolloutSpec(
+                        max_surge=IntOrPercent(count=1),
+                        max_unavailable=IntOrPercent(count=0),
+                    ),
                 )
             )
             await db_sess.commit()

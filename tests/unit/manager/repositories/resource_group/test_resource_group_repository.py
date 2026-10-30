@@ -6,6 +6,7 @@ from typing import Any
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.exception import ResourceGroupConflict
@@ -16,57 +17,57 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionTypes,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.resource_group.types import PreemptionConfig as DataPreemptionConfig
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.errors.resource import (
     DefaultResourceGroupAlreadyExists,
     ResourceGroupNotFound,
 )
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
+    DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_group import (
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
+from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForDomainRow,
     ResourceGroupForKeypairsRow,
     ResourceGroupForProjectRow,
-    ResourceGroupOpts,
     ResourceGroupRow,
 )
-from ai.backend.manager.models.resource_group.creators import ResourceGroupCreator
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_group.updaters import ResourceGroupUpdater
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
     EntityMembershipCapRow,
@@ -76,9 +77,8 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.resource_group import ResourceGroupRepository
+from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.secret.types import SecretValue
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
@@ -434,121 +434,7 @@ class TestScalingGroupRepositoryDB:
 
         yield created.id, sgroup_name
 
-    async def test_search_scaling_groups_all(
-        self,
-        resource_group_repository: ResourceGroupRepository,
-        sample_scaling_groups_small: list[str],
-    ) -> None:
-        """Test searching all scaling groups without filters"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await resource_group_repository.search_resource_groups(querier=querier)
-
-        # Should have exactly 5 test scaling groups
-        assert len(result.items) == 5
-        assert result.total_count == 5
-
-        # Verify test scaling groups are in results
-        result_names = {sg.name for sg in result.items}
-        for test_sg_name in sample_scaling_groups_small:
-            assert test_sg_name in result_names
-
-    async def test_search_scaling_groups_with_querier(
-        self,
-        resource_group_repository: ResourceGroupRepository,
-        sample_scaling_groups_small: list[str],
-    ) -> None:
-        """Test searching scaling groups with querier"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await resource_group_repository.search_resource_groups(querier=querier)
-
-        assert len(result.items) == 5
-        assert result.total_count == 5
-
     # Pagination Tests
-
-    @pytest.mark.parametrize(
-        "limit,offset,expected_items,total_count,description",
-        [
-            (10, 0, 10, 25, "first page"),
-            (10, 10, 10, 25, "second page"),
-            (10, 20, 5, 25, "last page with partial results"),
-        ],
-        ids=["first_page", "second_page", "last_page"],
-    )
-    async def test_search_scaling_groups_offset_pagination(
-        self,
-        resource_group_repository: ResourceGroupRepository,
-        sample_scaling_groups_for_pagination: list[str],
-        limit: int,
-        offset: int,
-        expected_items: int,
-        total_count: int,
-        description: str,
-    ) -> None:
-        """Test offset-based pagination scenarios"""
-        querier = BatchQuerier(
-            conditions=[],
-            orders=[],
-            pagination=OffsetPagination(limit=limit, offset=offset),
-        )
-        result = await resource_group_repository.search_resource_groups(querier=querier)
-
-        assert len(result.items) == expected_items
-        assert result.total_count == total_count
-
-    @pytest.mark.parametrize(
-        "limit,offset,expected_items,total_count,description",
-        [
-            (100, 0, 5, 5, "limit exceeds total count"),
-            (10, 10000, 0, 5, "offset exceeds total count"),
-        ],
-        ids=["limit_exceeds", "offset_exceeds"],
-    )
-    async def test_search_scaling_groups_pagination_edge_cases(
-        self,
-        resource_group_repository: ResourceGroupRepository,
-        sample_scaling_groups_small: list[str],
-        limit: int,
-        offset: int,
-        expected_items: int,
-        total_count: int,
-        description: str,
-    ) -> None:
-        """Test pagination edge cases"""
-        querier = BatchQuerier(
-            conditions=[],
-            orders=[],
-            pagination=OffsetPagination(limit=limit, offset=offset),
-        )
-        result = await resource_group_repository.search_resource_groups(querier=querier)
-
-        assert len(result.items) == expected_items
-        assert result.total_count == total_count
-
-    async def test_search_scaling_groups_large_limit(
-        self,
-        resource_group_repository: ResourceGroupRepository,
-        sample_scaling_groups_medium: list[str],
-    ) -> None:
-        """Test searching scaling groups with large limit returns all items"""
-        querier = BatchQuerier(
-            pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[],
-            orders=[],
-        )
-        result = await resource_group_repository.search_resource_groups(querier=querier)
-
-        # Should have exactly 15 test scaling groups
-        assert len(result.items) == 15
-        assert result.total_count == 15
 
     # Create Tests
 

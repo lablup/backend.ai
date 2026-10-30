@@ -73,7 +73,7 @@ from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
-from ai.backend.common.exception import AliasResolutionFailed
+from ai.backend.common.exception import AliasResolutionFailed, UserNotFound
 from ai.backend.common.plugin.hook import HookPluginContext
 from ai.backend.common.types import (
     AbuseReport,
@@ -95,7 +95,8 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.common.utils import str_to_timedelta
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.clients.appproxy.types import CreateEndpointRequestBody
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
@@ -123,20 +124,48 @@ from ai.backend.manager.data.session.options import (
     ResourceOpts,
 )
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.image.conditions import ImageConditions
-from ai.backend.manager.models.image.orders import ImageOrders
-from ai.backend.manager.models.image.searchers import ImageSearcher
-from ai.backend.manager.models.resource_slot import ResourceAllocationRow
+from ai.backend.manager.data.vfolder.types import verify_vfolder_name
+from ai.backend.manager.models.agent.row import AgentRow, agents
+from ai.backend.manager.models.bootstrap_script_revision.searchable_fields import (
+    BootstrapScriptRevisionSearchableFields,
+)
+from ai.backend.manager.models.bootstrap_script_revision.searchers import (
+    DefaultBootstrapScriptRevisionSearcher,
+)
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.image.searchers import (
+    CanonicalImageSearcher,
+    ImageSearcher,
+    ReferenceImageSearcher,
+)
+from ai.backend.manager.models.kernel.row import (
+    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
+    KernelRow,
+    kernels,
+)
+from ai.backend.manager.models.network.row import NetworkRow, NetworkType
+from ai.backend.manager.models.resource_group.row import resource_groups
+from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow
+from ai.backend.manager.models.session.row import (
+    PRIVATE_SESSION_TYPES,
+    KernelLoadingStrategy,
+    SessionRow,
+    handle_session_exception,
+)
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.resource_slot import ResourceSlotRepository
+from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
 from ai.backend.manager.repositories.scheduler.repository import SchedulerRepository
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
 from ai.backend.manager.sokovan.scheduling_controller.resource_parse import parse_quantity
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 
 from .agent_cache import AgentRPCCache
-from .clients.agent import AgentClientPool
 from .clients.appproxy.client import AppProxyClient
 from .defs import DEFAULT_IMAGE_ARCH, DEFAULT_ROLE
 from .errors.agent import AgentNotAllocated, AgentNotFound
@@ -149,45 +178,22 @@ from .errors.kernel import (
     TooManySessionsMatched,
 )
 from .errors.resource import (
-    DatabaseConnectionUnavailable,
     NoCurrentTaskContext,
     ResourceGroupNotFound,
     ResourceGroupSessionTypeNotAllowed,
 )
-from .models.agent import AgentRow, agents
-from .models.domain import domains
-from .models.endpoint import EndpointRow
-from .models.kernel import (
-    AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    USER_RESOURCE_OCCUPYING_KERNEL_STATUSES,
-    KernelRow,
-    kernels,
-)
-from .models.keypair import query_bootstrap_script
-from .models.network import NetworkRow, NetworkType
-from .models.resource_group import resource_groups
 from .models.runtime_variant.row import RuntimeVariantRow
-from .models.session import (
-    PRIVATE_SESSION_TYPES,
-    KernelLoadingStrategy,
-    SessionRow,
-    handle_session_exception,
-)
-from .models.user import UserRow
 from .models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
     reenter_txn_session,
-)
-from .models.vfolder import (
-    verify_vfolder_name,
 )
 from .types import UserScope
 
 type MSetType = Mapping[str | bytes, bytes | float | int | str]
 __all__ = ["AgentRegistry"]
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 SESSION_NAME_LEN_LIMIT = 10
 DEFAULT_WAIT_TIMEOUT_SECONDS = 60
@@ -271,15 +277,19 @@ class AgentRegistry:
         ``"1g"``) for memory-like slots; normalise them to plain decimal
         strings so downstream ``Decimal(quantity)`` calls in the scheduler
         and ``ResourceSlotEntry.to_resource_slot`` keep working unchanged.
+        Zero-quantity slots are dropped.
         """
         if not resources:
             return ()
-        return tuple(
-            ResourceSlotEntry(
-                resource_type=ResourceSlotName(str(k)), quantity=str(parse_quantity(v))
+        entries: list[ResourceSlotEntry] = []
+        for k, v in resources.items():
+            quantity = parse_quantity(v)
+            if quantity == 0:
+                continue
+            entries.append(
+                ResourceSlotEntry(resource_type=ResourceSlotName(str(k)), quantity=str(quantity))
             )
-            for k, v in resources.items()
-        )
+        return tuple(entries)
 
     def __init__(
         self,
@@ -327,24 +337,10 @@ class AgentRegistry:
         self._client_pool = ClientPool(tcp_client_session_factory)
 
     def _canonical_image_searcher(self, canonical: str, architecture: str) -> ImageSearcher:
-        return ImageSearcher(
-            pagination=OffsetPagination(limit=1),
-            conditions=[
-                ImageConditions.by_canonical_and_architecture(canonical, architecture),
-                ImageConditions.by_statuses([ImageStatus.ALIVE]),
-            ],
-            orders=ImageOrders.alive_then_oldest(),
-        )
+        return CanonicalImageSearcher(canonical, architecture, [ImageStatus.ALIVE])
 
     def _reference_image_searcher(self, reference: str, architecture: str) -> ImageSearcher:
-        return ImageSearcher(
-            pagination=OffsetPagination(limit=1),
-            conditions=[
-                ImageConditions.by_canonical_and_architecture_or_alias(reference, architecture),
-                ImageConditions.by_statuses([ImageStatus.ALIVE]),
-            ],
-            orders=ImageOrders.canonical_match_then_alive_then_oldest(reference, architecture),
-        )
+        return ReferenceImageSearcher(reference, architecture, [ImageStatus.ALIVE])
 
     async def _first_image(self, searcher: ImageSearcher) -> ImageData:
         async with self._ops_provider.read_ops() as r:
@@ -482,7 +478,7 @@ class AgentRegistry:
         route_id: uuid.UUID | None = None,
         sudo_session_enabled: bool = False,
     ) -> Mapping[str, Any]:
-        log.debug("create_session():")
+        log.debug("session creating")
         resp: MutableMapping[str, Any] = {}
 
         current_task = asyncio.current_task()
@@ -614,7 +610,7 @@ class AgentRegistry:
                 starts_at = await self._scheduler_repository.get_db_now() + _td
 
         if cluster_size > 1:
-            log.debug(" -> cluster_mode:{} (replicate)", cluster_mode)
+            log.debug("session cluster mode replicating", cluster_mode=cluster_mode)
 
         if dependencies is None:
             dependencies = []
@@ -622,24 +618,28 @@ class AgentRegistry:
         session_creation_id = secrets.token_urlsafe(16)
 
         async with self.db.begin_readonly_session() as db_session:
-            conn = await db_session.connection()
-            if conn is None:
-                raise DatabaseConnectionUnavailable("Database connection not available")
             # check if network exists
             if _network_id := config.get("attach_network"):
                 network = await NetworkRow.get(db_session, _network_id)
             else:
                 network = None
 
-            # Use keypair bootstrap_script if it is not delivered as a parameter
-            if not bootstrap_script:
-                script, _ = await query_bootstrap_script(conn, owner_access_key)
-                bootstrap_script = script
-
             user_row = await db_session.scalar(
                 sa.select(UserRow).where(UserRow.uuid == user_scope.user_uuid)
             )
-            user_row = cast(UserRow, user_row)
+            if not user_row:
+                raise UserNotFound(f"User with UUID {user_scope.user_uuid} not found.")
+        if not bootstrap_script:
+            revision = BootstrapScriptRevisionSearchableFields.own
+            async with self._ops_provider.read_ops() as r:
+                revisions = await r.search_in_global(
+                    DefaultBootstrapScriptRevisionSearcher(
+                        user_id=UserID(user_scope.user_uuid),
+                        pagination=OffsetPagination(limit=1),
+                        orders=[revision.revision_number.order.apply(ascending=False)],
+                    )
+                )
+            bootstrap_script = revisions.items[0].script if revisions.items else ""
 
         public_sgroup_only = session_type not in PRIVATE_SESSION_TYPES
         if dry_run:
@@ -1421,27 +1421,32 @@ class AgentRegistry:
         result = await repo.reconcile_agent_resources()
         for r in result.reconciled_terminal_kernels:
             log.warning(
-                "reconciled terminal-session kernel drift: kernel={}, session={}, {} -> CANCELLED",
-                r.kernel_id,
-                r.session_id,
-                r.from_kernel_status,
+                "terminal session kernel drift reconciled to cancelled",
+                kernel_id=r.kernel_id,
+                session_id=r.session_id,
+                from_kernel_status=r.from_kernel_status,
             )
         for o in result.orphaned_allocations:
             log.warning(
-                "freed orphaned resource allocation: kernel={}, slot={}",
-                o.kernel_id,
-                o.slot_name,
+                "orphaned resource allocation freed", kernel_id=o.kernel_id, slot_name=o.slot_name
             )
         for d in result.agent_resource_drifts:
             log.warning(
-                "agent_resources drift detected for {}:{}: tracked={}, actual={}",
-                d.agent_id,
-                d.slot_name,
-                d.tracked,
-                d.actual,
+                "agent resource drift detected",
+                agent_id=d.agent_id,
+                slot_name=d.slot_name,
+                tracked_amount=d.tracked,
+                actual_amount=d.actual,
             )
 
     async def clean_session(
+        self,
+        session_id: SessionId,
+    ) -> None:
+        with with_log_context(session_id=session_id):
+            await self._clean_session_in_scope(session_id)
+
+    async def _clean_session_in_scope(
         self,
         session_id: SessionId,
     ) -> None:
@@ -1475,8 +1480,8 @@ class AgentRegistry:
                     agent_id = session.main_kernel.agent
                     if agent_id is None:
                         log.warning(
-                            "Cannot destroy network {}: main kernel has no agent allocated",
-                            network_ref_name,
+                            "network destroy skipped, main kernel has no agent allocated",
+                            network_ref_name=network_ref_name,
                         )
                     else:
                         try:
@@ -1484,7 +1489,9 @@ class AgentRegistry:
                                 await client.destroy_local_network(network_ref_name)
                         except Exception:
                             log.exception(
-                                "Failed to destroy the agent-local network {}", network_ref_name
+                                "agent-local network destroy failed",
+                                network_ref_name=network_ref_name,
+                                agent_id=agent_id,
                             )
             elif ClusterMode(session.cluster_mode) == ClusterMode.MULTI_NODE:
                 if network_ref_name is None:
@@ -1498,7 +1505,9 @@ class AgentRegistry:
                 try:
                     await network_plugin.destroy_network(network_ref_name)
                 except Exception:
-                    log.exception("Failed to destroy the overlay network {}", network_ref_name)
+                    log.exception(
+                        "overlay network destroy failed", network_ref_name=network_ref_name
+                    )
             else:
                 pass
 

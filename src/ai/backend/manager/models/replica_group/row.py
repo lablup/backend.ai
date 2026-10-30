@@ -10,9 +10,8 @@ from ai.backend.common.data.entity.deployment_revision import DeploymentRevision
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.schema.deployment import ReplicaGroupRolloutSpec
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
-    ReplicaGroupData,
     ReplicaGroupLifecycle,
     ReplicaGroupScalingStatus,
 )
@@ -25,7 +24,7 @@ from ai.backend.manager.views.replica_group import (
 
 __all__ = ("ReplicaGroupRow",)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ReplicaGroupRow(LifecycleTimestampsMixin, Base):
@@ -125,23 +124,6 @@ class ReplicaGroupRow(LifecycleTimestampsMixin, Base):
         PydanticColumn(ReplicaGroupRolloutSpec),
         nullable=False,
     )
-
-    def to_data(self) -> ReplicaGroupData:
-        return ReplicaGroupData(
-            id=self.id,
-            deployment_id=self.deployment_id,
-            current_revision_id=self.current_revision_id,
-            target_revision_id=self.target_revision_id,
-            desired_current_replica_count=self.desired_current_replica_count,
-            desired_target_replica_count=self.desired_target_replica_count,
-            traffic_weight=self.traffic_weight,
-            session_group_id=self.session_group_id,
-            lifecycle=self.lifecycle,
-            scaling_status=self.scaling_status,
-            rollout=self.rollout,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )
 
     def to_deploy_scheduling_view(self) -> ReplicaGroupDeploySchedulingView:
         return ReplicaGroupDeploySchedulingView(

@@ -15,6 +15,7 @@ from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.common.types import (
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
@@ -32,8 +33,8 @@ from ai.backend.manager.data.model_serving.types import (
     EndpointLifecycle,
 )
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.endpoint.conditions import DeploymentConditions
 from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow, EndpointRow
+from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -236,9 +237,14 @@ class EndpointLifecycleBatchUpdater(DataBatchUpdater[EndpointRow, DeploymentInfo
 
     @override
     def conditions(self) -> list[QueryCondition]:
-        conditions = [DeploymentConditions.by_ids(list(self.deployment_ids))]
+        fields = DeploymentSearchableFields.own
+        conditions = [
+            fields.entity_id.filter.in_(
+                UUIDInMatchSpec(values=list(self.deployment_ids), negated=False)
+            )
+        ]
         if self.lifecycle_stages:
-            conditions.append(DeploymentConditions.by_lifecycle_stages(list(self.lifecycle_stages)))
+            conditions.append(fields.lifecycle_stage.filter.in_(list(self.lifecycle_stages)))
         return conditions
 
     @property
@@ -250,7 +256,7 @@ class EndpointLifecycleBatchUpdater(DataBatchUpdater[EndpointRow, DeploymentInfo
     def build_values(self) -> dict[str, Any]:
         values: dict[str, Any] = {}
         if self.lifecycle_stage is not None:
-            values["lifecycle_stage"] = self.lifecycle_stage
+            values.update(EndpointRow.lifecycle_values(self.lifecycle_stage))
             values["sub_step"] = self.sub_step
         if self.scaling_state is not None:
             values["scaling_state"] = self.scaling_state
@@ -337,7 +343,11 @@ class DeploymentRolloutClearUpdater(DataBatchUpdater[EndpointRow, DeploymentInfo
 
     @override
     def conditions(self) -> list[QueryCondition]:
-        return [DeploymentConditions.by_ids(list(self.deployment_ids))]
+        return [
+            DeploymentSearchableFields.own.entity_id.filter.in_(
+                UUIDInMatchSpec(values=list(self.deployment_ids), negated=False)
+            )
+        ]
 
     @property
     @override

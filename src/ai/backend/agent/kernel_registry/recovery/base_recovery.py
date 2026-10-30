@@ -6,11 +6,10 @@ from collections.abc import MutableMapping
 from ai.backend.agent.kernel import AbstractKernel
 from ai.backend.agent.kernel_registry.loader.abc import AbstractKernelRegistryLoader
 from ai.backend.agent.kernel_registry.writer.abc import AbstractKernelRegistryWriter
-from ai.backend.agent.kernel_registry.writer.types import KernelRegistrySaveMetadata
 from ai.backend.common.types import KernelId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class BaseKernelRegistryRecovery:
@@ -22,11 +21,9 @@ class BaseKernelRegistryRecovery:
         self._loader = loader
         self._writers = writers
 
-    async def save_kernel_registry(
-        self, data: MutableMapping[KernelId, AbstractKernel], metadata: KernelRegistrySaveMetadata
-    ) -> None:
+    async def save_kernel(self, kernel: AbstractKernel) -> None:
         for writer in self._writers:
-            await writer.save_kernel_registry(data, metadata)
+            await writer.save_kernel(kernel)
 
     async def load_kernel_registry(self) -> MutableMapping[KernelId, AbstractKernel]:
         return await self._loader.load_kernel_registry()

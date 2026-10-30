@@ -30,14 +30,14 @@ from bai_scenario.components.resource_allocation import (
 )
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 UNKNOWN_KERNEL = uuid.UUID(int=0)
 UNKNOWN_SLOT = "no-such-slot"
 
 type ReadingStep = Scenario[
-    SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode
+    TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode
 ]
 
 
@@ -71,7 +71,7 @@ class ReadingAKernelSlot(When[AKernelAndACaller, ResourceSlotAdapter, ResourceAl
 
 @dataclass(frozen=True)
 class TheSuperadminReadsAKernelSlot(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
 ):
     @override
     def summary(self) -> str:
@@ -85,7 +85,7 @@ class TheSuperadminReadsAKernelSlot(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -99,7 +99,7 @@ class TheSuperadminReadsAKernelSlot(
 
 @dataclass(frozen=True)
 class AUserReadingSessionsInTheProjectReadsAKernelSlot(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
 ):
     @override
     def summary(self) -> str:
@@ -113,7 +113,7 @@ class AUserReadingSessionsInTheProjectReadsAKernelSlot(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(granted=Granted.THE_PROJECT)
 
     @override
@@ -127,7 +127,7 @@ class AUserReadingSessionsInTheProjectReadsAKernelSlot(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotReadAKernelSlot(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
 ):
     @override
     def summary(self) -> str:
@@ -142,7 +142,7 @@ class AUserGrantedNothingMayNotReadAKernelSlot(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone()
 
     @override
@@ -156,7 +156,7 @@ class AUserGrantedNothingMayNotReadAKernelSlot(
 
 @dataclass(frozen=True)
 class AKernelIdNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
 ):
     @override
     def summary(self) -> str:
@@ -170,7 +170,7 @@ class AKernelIdNothingAnswersToIsNotFound(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -184,7 +184,7 @@ class AKernelIdNothingAnswersToIsNotFound(
 
 @dataclass(frozen=True)
 class ASlotTheKernelDidNotAskForIsNotFound(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
 ):
     @override
     def summary(self) -> str:
@@ -195,7 +195,7 @@ class ASlotTheKernelDidNotAskForIsNotFound(
         return "슈퍼관리자가 그 커널이 요구하지 않은 슬롯 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -209,7 +209,7 @@ class ASlotTheKernelDidNotAskForIsNotFound(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingReadingAnUnknownKernelIsRefusedTheSameWay(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode]
 ):
     @override
     def summary(self) -> str:
@@ -223,7 +223,7 @@ class AUserGrantedNothingReadingAnUnknownKernelIsRefusedTheSameWay(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone()
 
     @override
@@ -237,7 +237,7 @@ class AUserGrantedNothingReadingAnUnknownKernelIsRefusedTheSameWay(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneReadAKernelSlot(
-    Scenario[SeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode],
+    Scenario[TestSeedingSession, AKernelAndACaller, ResourceSlotAdapter, ResourceAllocationNode],
     Configured,
 ):
     @override
@@ -253,7 +253,7 @@ class EnforcementOffLetsAnyoneReadAKernelSlot(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, AKernelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AKernelAndACaller]:
         return AKernelAndSomeone()
 
     @override

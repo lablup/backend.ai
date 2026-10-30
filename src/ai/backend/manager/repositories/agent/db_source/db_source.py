@@ -5,35 +5,37 @@ from collections.abc import Collection, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
-from sqlalchemy.orm import selectinload
 
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.types import AgentId, ImageID
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.common.types import AgentId, ImageID, ResourceSlot
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.agent.types import (
     AgentData,
-    AgentDetailData,
+    AgentDataForHeartbeatUpdate,
     AgentHeartbeatUpsert,
-    AgentListResult,
     UpsertResult,
 )
-from ai.backend.manager.data.image.types import ImageDataWithDetails, ImageIdentifier
+from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
 from ai.backend.manager.errors.agent import AgentHasConflictingSessions, AgentNotFound
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
-from ai.backend.manager.models.agent import AgentRow, agents
+from ai.backend.manager.models.agent.row import AgentRow, agents
+from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.agent.upserters import AgentHeartbeatUpserter
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_slot import AgentResourceRow
+from ai.backend.manager.models.deployment_designated_agent.row import DeploymentDesignatedAgentRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.resource_slot.upserters import AgentResourceUpserter
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,37 +51,24 @@ class AgentDBSource:
         self._db = db
         self._v2_ops = v2_ops
 
-    async def get_images_by_image_identifiers(
+    async def image_ids_by_identifiers(
         self, image_identifiers: list[ImageIdentifier]
-    ) -> dict[ImageID, ImageDataWithDetails]:
+    ) -> list[ImageID]:
+        """The ids of the images matching a canonical and architecture pair."""
+        identifier_tuples = [
+            (identifier.canonical, identifier.architecture) for identifier in image_identifiers
+        ]
+        query = sa.select(ImageRow.id).where(
+            sa.tuple_(ImageRow.name, ImageRow.architecture).in_(identifier_tuples)
+        )
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            identifier_tuples = [
-                (identifier.canonical, identifier.architecture) for identifier in image_identifiers
-            ]
+            return list((await db_session.scalars(query)).all())
 
-            query = (
-                sa.select(ImageRow)
-                .where(sa.tuple_(ImageRow.name, ImageRow.architecture).in_(identifier_tuples))
-                .options(selectinload(ImageRow.aliases))
-            )
-            image_rows = list((await db_session.scalars(query)).all())
-            images_data: dict[ImageID, ImageDataWithDetails] = {}
-            for image_row in image_rows:
-                images_data[ImageID(image_row.id)] = image_row.to_detailed_dataclass()
-            return images_data
-
-    async def get_images_by_digest(self, digests: list[str]) -> dict[ImageID, ImageDataWithDetails]:
+    async def image_ids_by_digest(self, digests: list[str]) -> list[ImageID]:
+        """The ids of the images whose config digest is one of the given digests."""
+        query = sa.select(ImageRow.id).where(ImageRow.config_digest.in_(digests))
         async with self._db.begin_readonly_session_read_committed() as db_session:
-            query = (
-                sa.select(ImageRow)
-                .where(ImageRow.config_digest.in_(digests))
-                .options(selectinload(ImageRow.aliases))
-            )
-            results = list((await db_session.scalars(query)).all())
-            images_data: dict[ImageID, ImageDataWithDetails] = {}
-            for image_row in results:
-                images_data[ImageID(image_row.id)] = image_row.to_detailed_dataclass()
-            return images_data
+            return list((await db_session.scalars(query)).all())
 
     async def agent_names_by_uuid(
         self, agent_uuids: Sequence[AgentUUID]
@@ -101,24 +90,48 @@ class AgentDBSource:
                 sa.select(AgentRow).where(AgentRow.id == agent_id)
             )
             if agent_row is None:
-                log.error("Agent with id {} not found", agent_id)
                 raise AgentNotFound(f"Agent with id {agent_id} not found")
-            return agent_row.to_data()
+            return AgentSearchableFields.own.to_data(agent_row)
+
+    async def _heartbeat_update_data(
+        self, session: AsyncSession, row: AgentRow
+    ) -> AgentDataForHeartbeatUpdate:
+        """The stored state a heartbeat is compared against.
+
+        ``available_slots`` is read from ``agent_resources`` in its own statement; the
+        remaining fields are columns of the agent row.
+        """
+        slot_rows = (
+            await session.execute(
+                sa.select(AgentResourceRow.slot_name, AgentResourceRow.capacity).where(
+                    AgentResourceRow.agent_id == row.id
+                )
+            )
+        ).all()
+        return AgentDataForHeartbeatUpdate(
+            status=row.status,
+            status_changed=row.status_changed,
+            available_slots=ResourceSlot({
+                slot_name: capacity for slot_name, capacity in slot_rows
+            }),
+            addr=row.addr,
+            public_host=row.public_host,
+            version=row.version,
+            architecture=row.architecture,
+            compute_plugins=row.compute_plugins,
+            public_key=row.public_key,
+            auto_terminate_abusing_kernel=row.auto_terminate_abusing_kernel,
+        )
 
     async def upsert_agent_with_state(self, upsert_data: AgentHeartbeatUpsert) -> UpsertResult:
         async with self._db.begin_session_read_committed() as session:
             query = (
-                sa.select(AgentRow)
-                .where(AgentRow.id == upsert_data.metadata.id)
-                .options(
-                    selectinload(AgentRow.agent_resource_rows).joinedload(
-                        AgentResourceRow.slot_type_row
-                    )
-                )
-                .with_for_update()
+                sa.select(AgentRow).where(AgentRow.id == upsert_data.metadata.id).with_for_update()
             )
             row: AgentRow | None = await session.scalar(query)
-            agent_data = row.to_heartbeat_update_data() if row is not None else None
+            agent_data = (
+                await self._heartbeat_update_data(session, row) if row is not None else None
+            )
             upsert_result = UpsertResult.from_state_comparison(agent_data, upsert_data)
 
             if row is not None:
@@ -189,8 +202,8 @@ class AgentDBSource:
         Finds the active kernels on the agent. If any exist and ``force`` is not
         set, raises without changing anything. Otherwise updates the agent's group
         (name + id columns) and returns those kernels so the caller can transition
-        their sessions. The lookup, the check, and the update run in one transaction; the
-        agent's own and govern edges move to the new group after it.
+        their sessions. The lookup, the check, the update and the designation drop run in one
+        transaction; the agent's own and govern edges move to the new group after it.
         Raises ScalingGroupNotFound when no resource group matches
         ``resource_group_id``, and AgentNotFound when no agent row matches
         ``agent_id``.
@@ -239,6 +252,26 @@ class AgentDBSource:
                     scaling_group=resource_group_name,
                 )
             )
+            await session.execute(
+                sa.delete(DeploymentDesignatedAgentRow).where(
+                    DeploymentDesignatedAgentRow.agent_uuid == agent.uuid,
+                    DeploymentDesignatedAgentRow.endpoint_id.in_(
+                        sa.select(EndpointRow.id)
+                        .join(ResourceGroupRow, ResourceGroupRow.name == EndpointRow.resource_group)
+                        .where(ResourceGroupRow.id != resource_group_id)
+                    ),
+                )
+            )
+            await session.execute(
+                sa.delete(SessionDesignatedAgentRow).where(
+                    SessionDesignatedAgentRow.agent_uuid == agent.uuid,
+                    SessionDesignatedAgentRow.session_id.in_(
+                        sa.select(SessionRow.id).where(
+                            SessionRow.resource_group_id != resource_group_id
+                        )
+                    ),
+                )
+            )
         if agent.resource_group_id != resource_group_id:
             async with self._v2_ops.write_ops() as w:
                 await w.transfer(
@@ -247,42 +280,6 @@ class AgentDBSource:
                     AgentUUID(agent.uuid),
                 )
         return kernels
-
-    async def search_agents(
-        self,
-        querier: BatchQuerier,
-    ) -> AgentListResult:
-        """Searches agents with total count."""
-
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(AgentRow).options(
-                selectinload(AgentRow.agent_resource_rows).joinedload(
-                    AgentResourceRow.slot_type_row
-                ),
-            )
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-            agent_rows: list[AgentRow] = [row.AgentRow for row in result.rows]
-            # The caller's permissions are the service's to resolve.
-            agents_with_permissions = [
-                AgentDetailData(
-                    agent=agent_row.to_data(),
-                    resources=agent_row.resources_by_rank(),
-                    permissions=[],
-                )
-                for agent_row in agent_rows
-            ]
-
-            return AgentListResult(
-                items=agents_with_permissions,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
 
     async def sync_agent_resource_capacity(
         self,

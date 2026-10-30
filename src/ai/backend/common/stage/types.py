@@ -3,9 +3,9 @@ import logging
 from abc import ABC, abstractmethod
 from typing import TypeVar, override
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 TSpec = TypeVar("TSpec")
@@ -107,8 +107,8 @@ class ProvisionStage(Stage[TSpec, TResource]):
         try:
             resource = await self._provisioner.setup(spec)
             self._resource = resource
-        except Exception as e:
-            log.error("Failed to setup resource: %s", e)
+        except Exception:
+            log.exception("stage resource setup failed")
         finally:
             self._setup_completed.set()
 

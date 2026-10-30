@@ -1,21 +1,21 @@
 from __future__ import annotations
 
-import asyncio
 import io
-import json
 from collections.abc import Iterator
-from http import HTTPStatus
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from unittest import mock
 from unittest.mock import AsyncMock
 
 import aiohttp
 import pytest
-from aioresponses import aioresponses
 
 from ai.backend.client.config import API_VERSION, get_config
-from ai.backend.client.exceptions import BackendAPIError, BackendClientError
-from ai.backend.client.request import AttachedFile, Request, Response
+from ai.backend.client.exceptions import (
+    BackendClientError,
+    BackendConnectError,
+    BackendConnectionRefusedError,
+)
+from ai.backend.client.request import AttachedFile, FetchContextManager, Request
 from ai.backend.client.session import AsyncSession, Session
 
 if TYPE_CHECKING:
@@ -130,89 +130,6 @@ async def test_fetch_invalid_method(mock_request_params: dict[str, Any]) -> None
             pass
 
 
-async def test_fetch(dummy_endpoint: str) -> None:
-    with aioresponses() as m, Session():
-        body = b"hello world"
-        m.post(
-            dummy_endpoint + "function",
-            status=HTTPStatus.OK,
-            body=body,
-            headers={"Content-Type": "text/plain; charset=utf-8", "Content-Length": str(len(body))},
-        )
-        rqst = Request("POST", "function")
-        async with rqst.fetch() as resp:
-            assert isinstance(resp, Response)
-            assert resp.status == HTTPStatus.OK
-            assert resp.content_type == "text/plain"
-            assert await resp.text() == body.decode()
-            assert resp.content_length == len(body)
-
-    with aioresponses() as m, Session():
-        body = b'{"a": 1234, "b": null}'
-        m.post(
-            dummy_endpoint + "function",
-            status=HTTPStatus.OK,
-            body=body,
-            headers={
-                "Content-Type": "application/json; charset=utf-8",
-                "Content-Length": str(len(body)),
-            },
-        )
-        rqst = Request("POST", "function")
-        async with rqst.fetch() as resp:
-            assert isinstance(resp, Response)
-            assert resp.status == HTTPStatus.OK
-            assert resp.content_type == "application/json"
-            assert await resp.text() == body.decode()
-            assert await resp.json() == {"a": 1234, "b": None}
-            assert resp.content_length == len(body)
-
-
-async def test_streaming_fetch(dummy_endpoint: str) -> None:
-    # Read content by chunks.
-    with aioresponses() as m, Session():
-        body = b"hello world"
-        m.post(
-            dummy_endpoint + "function",
-            status=HTTPStatus.OK,
-            body=body,
-            headers={"Content-Type": "text/plain; charset=utf-8", "Content-Length": str(len(body))},
-        )
-        rqst = Request("POST", "function")
-        async with rqst.fetch() as resp:
-            assert resp.status == HTTPStatus.OK
-            assert resp.content_type == "text/plain"
-            assert await resp.read(3) == b"hel"
-            assert await resp.read(2) == b"lo"
-            await resp.read()
-            with pytest.raises(AssertionError):
-                assert await resp.text()
-
-
-async def test_invalid_requests(dummy_endpoint: str) -> None:
-    with aioresponses() as m, Session():
-        body = json.dumps({
-            "type": "https://api.backend.ai/probs/kernel-not-found",
-            "title": "Kernel Not Found",
-        }).encode("utf8")
-        m.post(
-            dummy_endpoint,
-            status=HTTPStatus.NOT_FOUND,
-            body=body,
-            headers={
-                "Content-Type": "application/problem+json; charset=utf-8",
-                "Content-Length": str(len(body)),
-            },
-        )
-        rqst = Request("POST", "/")
-        with pytest.raises(BackendAPIError) as e:
-            async with rqst.fetch():
-                pass
-            assert e.status == HTTPStatus.NOT_FOUND
-            assert e.data["type"] == "https://api.backend.ai/probs/kernel-not-found"
-            assert e.data["title"] == "Kernel Not Found"
-
-
 async def test_fetch_invalid_method_async() -> None:
     async with AsyncSession():
         rqst = Request("STRANGE", "/")
@@ -221,49 +138,50 @@ async def test_fetch_invalid_method_async() -> None:
                 pass
 
 
-async def test_fetch_client_error_async(dummy_endpoint: str) -> None:
-    with aioresponses() as m:
-        async with AsyncSession():
-            m.post(dummy_endpoint, exception=aiohttp.ClientConnectionError())
-            rqst = Request("POST", "/")
-            with pytest.raises(BackendClientError):
-                async with rqst.fetch():
-                    pass
+class _FailingRequestContext:
+    _error: BaseException
+
+    def __init__(self, error: BaseException) -> None:
+        self._error = error
+
+    async def __aenter__(self) -> None:
+        raise self._error
+
+    async def __aexit__(self, *exc_info: Any) -> None:
+        return None
 
 
-@pytest.mark.xfail
-async def test_fetch_cancellation_async(dummy_endpoint: str) -> None:
-    # It seems that aiohttp swallows asyncio.CancelledError
-    with aioresponses() as m:
-        async with AsyncSession():
-            m.post(dummy_endpoint, exception=asyncio.CancelledError())
-            rqst = Request("POST", "/")
-            with pytest.raises(asyncio.CancelledError):
-                async with rqst.fetch():
-                    pass
+def _connector_error(os_error: OSError) -> aiohttp.ClientConnectorError:
+    return aiohttp.ClientConnectorError(mock.MagicMock(host="m1", port=80, ssl=False), os_error)
 
 
-async def test_fetch_timeout_async(dummy_endpoint: str) -> None:
-    with aioresponses() as m:
-        async with AsyncSession():
-            m.post(dummy_endpoint, exception=TimeoutError())
-            rqst = Request("POST", "/")
-            with pytest.raises(asyncio.TimeoutError):
-                async with rqst.fetch():
-                    pass
+@pytest.mark.parametrize(
+    ("error", "expected"),
+    [
+        pytest.param(
+            _connector_error(ConnectionRefusedError(111, "Connection refused")),
+            BackendConnectionRefusedError,
+            id="refused",
+        ),
+        pytest.param(
+            _connector_error(OSError(-2, "Name or service not known")),
+            BackendConnectError,
+            id="dns",
+        ),
+        pytest.param(aiohttp.ConnectionTimeoutError(), BackendConnectError, id="connect-timeout"),
+        pytest.param(aiohttp.SocketTimeoutError(), BackendClientError, id="read-timeout"),
+        pytest.param(aiohttp.ServerDisconnectedError(), BackendClientError, id="disconnected"),
+    ],
+)
+async def test_fetch_tells_whether_the_request_was_sent(
+    error: aiohttp.ClientConnectionError, expected: type[BackendClientError]
+) -> None:
+    session = mock.MagicMock()
+    session.config.endpoints = ["http://m1"]
+    fetch_ctx = FetchContextManager(session, lambda: cast(Any, _FailingRequestContext(error)))
 
+    with pytest.raises(BackendClientError) as exc_info:
+        await fetch_ctx.__aenter__()
 
-async def test_response_async(defconfig: APIConfig, dummy_endpoint: str) -> None:
-    body = b'{"test": 5678}'
-    with aioresponses() as m:
-        m.post(
-            dummy_endpoint + "function",
-            status=HTTPStatus.OK,
-            body=body,
-            headers={"Content-Type": "application/json", "Content-Length": str(len(body))},
-        )
-        async with AsyncSession(config=defconfig):
-            rqst = Request("POST", "/function")
-            async with rqst.fetch() as resp:
-                assert await resp.text() == '{"test": 5678}'
-                assert await resp.json() == {"test": 5678}
+    assert type(exc_info.value) is expected
+    assert exc_info.value.__cause__ is error

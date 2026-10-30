@@ -397,6 +397,9 @@ class BackendAIError(web.HTTPError, metaclass=ErrorMeta):
         self.body_dict = body
         self.body = dump_json(body)
 
+    def is_client_error(self) -> bool:
+        return 400 <= self.status_code < 500
+
     @override
     def __str__(self) -> str:
         lines = []
@@ -1043,6 +1046,23 @@ class ValkeySentinelMasterNotFound(BackendAIError, web.HTTPServiceUnavailable):
             domain=ErrorDomain.BACKENDAI,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.UNAVAILABLE,
+        )
+
+
+class ValkeySentinelMonitorNotFound(BackendAIError, web.HTTPInternalServerError):
+    """
+    Raised when a Valkey client for a Sentinel target is created without its Sentinel monitor.
+    """
+
+    error_type = "https://api.backend.ai/probs/valkey-sentinel-monitor-not-found"
+    error_title = "Valkey Sentinel Monitor Not Found"
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.BACKENDAI,
+            operation=ErrorOperation.GENERIC,
+            error_detail=ErrorDetail.INTERNAL_ERROR,
         )
 
 

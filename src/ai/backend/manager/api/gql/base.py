@@ -4,6 +4,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
+from decimal import Decimal
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 from uuid import UUID
@@ -16,6 +17,7 @@ from graphql_relay.utils import base64, unbase64
 from strawberry.relay import Edge, Node
 from strawberry.types import get_object_definition, has_object_definition
 
+from ai.backend.common.data.entity.types import EntityIdentifier, FieldIdentifier
 from ai.backend.common.data.filter_specs import (
     StringInMatchSpec,
     StringMatchSpec,
@@ -25,6 +27,7 @@ from ai.backend.common.data.filter_specs import (
 from ai.backend.common.dto.manager.query import ArrayFilter as ArrayFilterDTO
 from ai.backend.common.dto.manager.query import DateFilter as DateFilterDTO
 from ai.backend.common.dto.manager.query import DateTimeFilter as DateTimeFilterDTO
+from ai.backend.common.dto.manager.query import DecimalFilter as DecimalFilterDTO
 from ai.backend.common.dto.manager.query import IntFilter as IntFilterDTO
 from ai.backend.common.dto.manager.query import NullableDateTimeFilter as NullableDateTimeFilterDTO
 from ai.backend.common.dto.manager.query import StringFilter as StringFilterDTO
@@ -40,6 +43,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
 )
 from ai.backend.manager.data.common.types import SearchResult
+from ai.backend.manager.errors.api import InvalidAPIParameters
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.clauses import QueryCondition
@@ -266,6 +270,22 @@ class IntFilter(PydanticInputMixin[IntFilterDTO]):
 
 @gql_pydantic_input(
     BackendAIGQLMeta(
+        description="Filter for decimal fields supporting equality and comparison operations.",
+        added_version="26.9.0",
+    ),
+    name="DecimalFilter",
+)
+class DecimalFilter(PydanticInputMixin[DecimalFilterDTO]):
+    equals: Decimal | None = None
+    not_equals: Decimal | None = None
+    greater_than: Decimal | None = None
+    greater_than_or_equal: Decimal | None = None
+    less_than: Decimal | None = None
+    less_than_or_equal: Decimal | None = None
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
         description=(
             "Filter for integer array fields. Supports 'contains' (column contains this "
             "single value), 'contains_any' (column contains any of these values), and "
@@ -456,6 +476,33 @@ def resolve_global_id(global_id: str) -> tuple[str, str]:
     unbased_global_id = unbase64(global_id)
     type_, _, id_ = unbased_global_id.partition(":")
     return type_, id_
+
+
+def resolve_entity_id[TEntityId: EntityIdentifier](
+    global_id: str, id_type: type[TEntityId]
+) -> TEntityId:
+    _, raw_id = resolve_global_id(global_id)
+    try:
+        return id_type(UUID(raw_id))
+    except ValueError as e:
+        raise InvalidAPIParameters(f"Invalid id: {global_id}") from e
+
+
+def resolve_field_id[TFieldId: FieldIdentifier](
+    global_id: str, id_type: type[TFieldId]
+) -> TFieldId:
+    _, raw_id = resolve_global_id(global_id)
+    try:
+        return id_type(UUID(raw_id))
+    except ValueError as e:
+        raise InvalidAPIParameters(f"Invalid id: {global_id}") from e
+
+
+def parse_uuid(value: str) -> UUID:
+    try:
+        return UUID(value)
+    except ValueError as e:
+        raise InvalidAPIParameters(f"Invalid id: {value}") from e
 
 
 def build_pagination_options(

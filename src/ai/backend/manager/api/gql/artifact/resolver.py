@@ -6,6 +6,7 @@ from uuid import UUID
 import strawberry
 from strawberry import ID, UNSET, Info
 
+from ai.backend.common.data.entity.artifact import ArtifactID
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.data.storage.registries.types import ModelSortKey
 from ai.backend.common.dto.manager.v2.artifact.request import (
@@ -13,12 +14,23 @@ from ai.backend.common.dto.manager.v2.artifact.request import (
     AdminSearchArtifactsGQLInput,
 )
 from ai.backend.common.dto.manager.v2.artifact.request import (
+    PartialBulkUpdateArtifactItemInput as PartialBulkUpdateArtifactItemInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
+    PartialBulkUpdateArtifactsInput as PartialBulkUpdateArtifactsInputDTO,
+)
+from ai.backend.common.dto.manager.v2.artifact.request import (
     UpdateArtifactInput as UpdateArtifactInputDTO,
 )
+from ai.backend.common.dto.manager.v2.artifact.response import ArtifactNode
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET as DTO_UNSET
 from ai.backend.manager.api.gql.base import (
     encode_cursor,
+    parse_uuid,
 )
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -58,13 +70,19 @@ from .types import (
     DelegateImportArtifactsPayload,
     DelegateScanArtifactsInput,
     DelegateScanArtifactsPayload,
+    DeleteArtifactPayloadGQL,
     DeleteArtifactsInput,
     DeleteArtifactsPayload,
     ImportArtifactsInput,
     ImportArtifactsOptionsGQL,
     ImportArtifactsPayload,
+    PartialBulkArtifactsPayloadGQL,
+    PartialBulkDeleteArtifactsInputGQL,
+    PartialBulkRestoreArtifactsInputGQL,
+    PartialBulkUpdateArtifactsInputGQL,
     RejectArtifactInput,
     RejectArtifactPayload,
+    RestoreArtifactPayloadGQL,
     RestoreArtifactsInput,
     RestoreArtifactsPayload,
     ScanArtifactModelsInput,
@@ -146,7 +164,7 @@ async def artifacts(
     )
 )  # type: ignore[misc]
 async def artifact(id: ID, info: Info[StrawberryGQLContext]) -> Artifact | None:
-    artifact_id = UUID(id)
+    artifact_id = parse_uuid(id)
     artifact_node = await info.context.adapters.artifact.get(artifact_id)
 
     data_loaders = info.context.data_loaders
@@ -221,7 +239,7 @@ async def artifact_revisions(
     )
 )  # type: ignore[misc]
 async def artifact_revision(id: ID, info: Info[StrawberryGQLContext]) -> ArtifactRevision | None:
-    revision_node = await info.context.adapters.artifact.get_revision(UUID(id))
+    revision_node = await info.context.adapters.artifact.get_revision(parse_uuid(id))
     return make_artifact_revision_from_node(revision_node)
 
 
@@ -476,17 +494,117 @@ async def cleanup_artifact_revisions(
     return CleanupArtifactRevisionsPayload(artifact_revisions=artifacts_connection)
 
 
+async def _artifact_from_node(info: Info[StrawberryGQLContext], node: ArtifactNode) -> Artifact:
+    data_loaders = info.context.data_loaders
+    registry_url = await get_registry_url(data_loaders, node.registry_id, node.registry_type)
+    source_url = await get_registry_url(
+        data_loaders, node.source_registry_id, node.source_registry_type
+    )
+    return Artifact.from_pydantic(to_artifact_gql_node(node, registry_url, source_url))
+
+
+async def _partial_bulk_payload(
+    info: Info[StrawberryGQLContext], payload: PartialBulkPayload[ArtifactNode]
+) -> PartialBulkArtifactsPayloadGQL:
+    return PartialBulkArtifactsPayloadGQL(
+        successes=[await _artifact_from_node(info, node) for node in payload.successes],
+        failed=[PartialBulkFailureGQL.from_pydantic(failure) for failure in payload.failed],
+    )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Soft-delete an artifact.")
+)
+async def delete_artifact(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> DeleteArtifactPayloadGQL:
+    payload = await info.context.adapters.artifact.delete(ArtifactID(id))
+    return DeleteArtifactPayloadGQL(artifact=await _artifact_from_node(info, payload.artifact))
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Restore a soft-deleted artifact."
+    )
+)
+async def restore_artifact(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> RestoreArtifactPayloadGQL:
+    payload = await info.context.adapters.artifact.restore(ArtifactID(id))
+    return RestoreArtifactPayloadGQL(artifact=await _artifact_from_node(info, payload.artifact))
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update several artifacts, answering for each one.",
+    )
+)
+async def partial_bulk_update_artifacts(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkUpdateArtifactsInputGQL,
+) -> PartialBulkArtifactsPayloadGQL:
+    gql_input = input.to_pydantic()
+    payload = await info.context.adapters.artifact.partial_bulk_update(
+        PartialBulkUpdateArtifactsInputDTO(
+            items=[
+                PartialBulkUpdateArtifactItemInputDTO(
+                    id=item.artifact_id,
+                    input=UpdateArtifactInputDTO(
+                        readonly=item.readonly, description=item.description
+                    ),
+                )
+                for item in gql_input.items
+            ]
+        )
+    )
+    return await _partial_bulk_payload(info, payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Soft-delete several artifacts, answering for each one.",
+    )
+)
+async def partial_bulk_delete_artifacts(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkDeleteArtifactsInputGQL,
+) -> PartialBulkArtifactsPayloadGQL:
+    payload = await info.context.adapters.artifact.partial_bulk_delete(input.to_pydantic())
+    return await _partial_bulk_payload(info, payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Restore several soft-deleted artifacts, answering for each one.",
+    )
+)
+async def partial_bulk_restore_artifacts(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkRestoreArtifactsInputGQL,
+) -> PartialBulkArtifactsPayloadGQL:
+    payload = await info.context.adapters.artifact.partial_bulk_restore(input.to_pydantic())
+    return await _partial_bulk_payload(info, payload)
+
+
 @gql_mutation(
     BackendAIGQLMeta(
         added_version="25.15.0",
         description="Soft-delete artifacts from the system. Marks artifacts as deleted without permanently removing them. Deleted artifacts can be restored using the restore_artifacts mutation",
-    )
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `partialBulkDeleteArtifacts`."
+    ),
 )
 async def delete_artifacts(
     input: DeleteArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> DeleteArtifactsPayload | None:
     pydantic_input = input.to_pydantic()
-    payload = await info.context.adapters.artifact.delete(pydantic_input)
+    payload = await info.context.adapters.artifact.delete_artifacts(pydantic_input)
 
     data_loaders = info.context.data_loaders
 
@@ -507,13 +625,16 @@ async def delete_artifacts(
     BackendAIGQLMeta(
         added_version="25.15.0",
         description="Restore previously deleted artifacts. Reverses the soft-delete operation, making the artifacts available again for use in the system",
-    )
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `partialBulkRestoreArtifacts`."
+    ),
 )
 async def restore_artifacts(
     input: RestoreArtifactsInput, info: Info[StrawberryGQLContext]
 ) -> RestoreArtifactsPayload | None:
-    artifact_node_list = await info.context.adapters.artifact.restore(
-        artifact_ids=[UUID(id) for id in input.artifact_ids],
+    artifact_node_list = await info.context.adapters.artifact.restore_artifacts(
+        artifact_ids=[parse_uuid(id) for id in input.artifact_ids],
     )
 
     data_loaders = info.context.data_loaders

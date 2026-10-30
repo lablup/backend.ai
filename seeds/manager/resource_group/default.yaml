@@ -1,0 +1,12 @@
+kind: resource_group
+version: 1
+items:
+- id: 4d1e9b32-90c7-5b32-8f0e-6f470b8ed24a
+  name: default
+  description: The default agent scaling group
+  is_active: true
+  is_default: true
+  driver: static
+  driver_opts: {}
+  scheduler: fifo
+  scheduler_opts: {}

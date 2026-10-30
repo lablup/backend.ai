@@ -14,8 +14,7 @@ from ai.backend.manager.models.fair_share.upserters import (
     ProjectFairShareUpserter,
     UserFairShareUpserter,
 )
-from ai.backend.manager.repositories.fair_share import FairShareRepository
-from ai.backend.manager.services.fair_share import FairShareService
+from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
 from ai.backend.manager.services.fair_share.actions import (
     BulkUpsertDomainFairShareWeightAction,
     BulkUpsertDomainFairShareWeightActionResult,
@@ -27,6 +26,7 @@ from ai.backend.manager.services.fair_share.actions import (
     ProjectWeightInput,
     UserWeightInput,
 )
+from ai.backend.manager.services.fair_share.service import FairShareService
 from ai.backend.manager.types import TriState
 
 RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())

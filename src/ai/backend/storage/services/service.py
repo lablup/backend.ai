@@ -1,13 +1,14 @@
 import asyncio
 import logging
-import uuid
 import weakref
 from collections.abc import AsyncIterator
+from contextlib import AbstractContextManager
 from contextlib import asynccontextmanager as actxmgr
 from typing import Any
 
 from aiohttp import web
 
+from ai.backend.common.data.storage.types import StorageBackendCapability
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderDeletionFailureEvent,
@@ -15,7 +16,7 @@ from ai.backend.common.events.event_types.vfolder.anycast import (
 )
 from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import QuotaConfig, VFolderID, VolumeID
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.storage.errors import (
     ExternalStorageServiceError,
     InvalidQuotaConfig,
@@ -36,10 +37,12 @@ from ai.backend.storage.volumes.types import (
     VolumeMeta,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class VolumeService:
+    """Deprecated: serves the storage API that addresses volumes by `VolumeID`."""
+
     _volume_pool: VolumePool
     _event_producer: EventProducer
     _deletion_tasks: weakref.WeakValueDictionary[VFolderID, asyncio.Task[Any]]
@@ -55,7 +58,21 @@ class VolumeService:
         self._deletion_tasks = weakref.WeakValueDictionary[VFolderID, asyncio.Task[Any]]()
         self._background_tasks = set()
 
-    async def _get_capabilities(self, volume_id: VolumeID) -> list[str]:
+    def _quota_scope_log_context(
+        self, quota_scope_key: QuotaScopeKey
+    ) -> AbstractContextManager[None]:
+        return with_log_context(
+            volume_id=quota_scope_key.volume_id,
+            quota_scope_id=str(quota_scope_key.quota_scope_id),
+        )
+
+    def _vfolder_log_context(self, vfolder_key: VFolderKey) -> AbstractContextManager[None]:
+        return with_log_context(
+            volume_id=vfolder_key.volume_id,
+            vfolder_id=vfolder_key.vfolder_id.folder_id,
+        )
+
+    async def _get_capabilities(self, volume_id: VolumeID) -> list[StorageBackendCapability]:
         volume = self._volume_pool.get_volume(volume_id)
         return [*await volume.get_capabilities()]
 
@@ -64,7 +81,7 @@ class VolumeService:
         try:
             yield
         except ExternalStorageServiceError as e:
-            log.exception("An external error occurred: %s", str(e))
+            log.exception("external storage service error")
             # TODO: Extract exception handling to middleware
             raise web.HTTPInternalServerError(
                 text=dump_json_str({
@@ -91,7 +108,7 @@ class VolumeService:
         except OSError as e:
             msg = str(e) if e.strerror is None else e.strerror
             msg = f"{msg} (errno:{e.errno})"
-            log.exception("VFolder deletion task failed. (vfolder_id:{}, e:{})", vfolder_id, msg)
+            log.exception("vfolder deletion failed")
             await self._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(
                     vfid=vfolder_id,
@@ -99,7 +116,7 @@ class VolumeService:
                 )
             )
         except Exception as e:
-            log.exception("VFolder deletion task failed. (vfolder_id:{}, e:{!s})", vfolder_id, e)
+            log.exception("vfolder deletion failed")
             await self._event_producer.anycast_event(
                 VFolderDeletionFailureEvent(
                     vfid=vfolder_id,
@@ -107,32 +124,33 @@ class VolumeService:
                 )
             )
         except asyncio.CancelledError:
-            log.warning("Vfolder deletion task cancelled. (vfolder_id:{})", vfolder_id)
+            log.trace("vfolder deletion cancelled")
         else:
-            log.info("VFolder deletion task succeeded. (vfolder_id:{})", vfolder_id)
+            log.trace("vfolder deleted")
             await self._event_producer.anycast_event(VFolderDeletionSuccessEvent(vfid=vfolder_id))
 
     async def get_volume(self, volume_id: VolumeID) -> VolumeMeta:
-        await log_manager_api_entry_new(log, "get_volume", volume_id)
-        volume = self._volume_pool.get_volume_info(volume_id)
-        return VolumeMeta(
-            volume_id=volume_id,
-            backend=volume.backend,
-            path=volume.path,
-            fsprefix=volume.fsprefix,
-            capabilities=await self._get_capabilities(volume_id),
-        )
+        with with_log_context(volume_id=volume_id):
+            await log_manager_api_entry_new(log, "get_volume", volume_id)
+            volume = self._volume_pool.get_volume_info(volume_id)
+            return VolumeMeta(
+                volume_id=volume_id,
+                backend=volume.backend,
+                path=volume.path,
+                fsprefix=volume.fsprefix,
+                capabilities=await self._get_capabilities(volume_id),
+            )
 
     async def get_volumes(self) -> list[VolumeMeta]:
         await log_manager_api_entry_new(log, "get_volumes", params=None)
-        volumes = self._volume_pool.list_volumes()
+        volumes = self._volume_pool.list_volumes_by_id()
         return [
             VolumeMeta(
-                volume_id=VolumeID(uuid.UUID(volume_id)),
+                volume_id=volume_id,
                 backend=info.backend,
                 path=info.path,
                 fsprefix=info.fsprefix,
-                capabilities=await self._get_capabilities(VolumeID(uuid.UUID(volume_id))),
+                capabilities=await self._get_capabilities(volume_id),
             )
             for volume_id, info in volumes.items()
         ]
@@ -140,123 +158,132 @@ class VolumeService:
     async def create_quota_scope(
         self, quota_scope_key: QuotaScopeKey, options: QuotaConfig | None
     ) -> None:
-        quota_scope_id = quota_scope_key.quota_scope_id
-        await log_manager_api_entry_new(log, "create_quota_scope", quota_scope_key)
-        volume = self._volume_pool.get_volume(quota_scope_key.volume_id)
-        try:
-            async with self._handle_external_errors():
-                await volume.quota_model.create_quota_scope(
-                    quota_scope_id=quota_scope_id, options=options, extra_args=None
-                )
-        except QuotaScopeAlreadyExists as e:
-            raise web.HTTPConflict(reason="Volume already exists with given quota scope.") from e
+        with self._quota_scope_log_context(quota_scope_key):
+            quota_scope_id = quota_scope_key.quota_scope_id
+            await log_manager_api_entry_new(log, "create_quota_scope", quota_scope_key)
+            volume = self._volume_pool.get_volume(quota_scope_key.volume_id)
+            try:
+                async with self._handle_external_errors():
+                    await volume.quota_model.create_quota_scope(
+                        quota_scope_id=quota_scope_id, options=options, extra_args=None
+                    )
+            except QuotaScopeAlreadyExists as e:
+                raise web.HTTPConflict(
+                    reason="Volume already exists with given quota scope."
+                ) from e
 
     async def get_quota_scope(self, quota_scope_key: QuotaScopeKey) -> QuotaScopeMeta:
-        await log_manager_api_entry_new(log, "get_quota_scope", quota_scope_key)
-        volume = self._volume_pool.get_volume(quota_scope_key.volume_id)
-        async with self._handle_external_errors():
-            quota_usage = await volume.quota_model.describe_quota_scope(
-                quota_scope_key.quota_scope_id
+        with self._quota_scope_log_context(quota_scope_key):
+            await log_manager_api_entry_new(log, "get_quota_scope", quota_scope_key)
+            volume = self._volume_pool.get_volume(quota_scope_key.volume_id)
+            async with self._handle_external_errors():
+                quota_usage = await volume.quota_model.describe_quota_scope(
+                    quota_scope_key.quota_scope_id
+                )
+            if not quota_usage:
+                raise QuotaScopeNotFoundError
+            return QuotaScopeMeta(
+                used_bytes=quota_usage.used_bytes, limit_bytes=quota_usage.limit_bytes
             )
-        if not quota_usage:
-            raise QuotaScopeNotFoundError
-        return QuotaScopeMeta(
-            used_bytes=quota_usage.used_bytes, limit_bytes=quota_usage.limit_bytes
-        )
 
     async def update_quota_scope(
         self, quota_scope_key: QuotaScopeKey, options: QuotaConfig | None
     ) -> None:
-        quota_scope_id = quota_scope_key.quota_scope_id
-        await log_manager_api_entry_new(log, "update_quota_scope", quota_scope_key)
-        volume = self._volume_pool.get_volume(quota_scope_key.volume_id)
-        async with self._handle_external_errors():
-            quota_usage = await volume.quota_model.describe_quota_scope(quota_scope_id)
-            if not quota_usage:
-                await volume.quota_model.create_quota_scope(
-                    quota_scope_id=quota_scope_id, options=options, extra_args=None
-                )
-            else:
-                if options is None:
-                    raise InvalidQuotaConfig("options is required for updating quota scope")
-                try:
-                    await volume.quota_model.update_quota_scope(
-                        quota_scope_id=quota_scope_id,
-                        config=options,
+        with self._quota_scope_log_context(quota_scope_key):
+            quota_scope_id = quota_scope_key.quota_scope_id
+            await log_manager_api_entry_new(log, "update_quota_scope", quota_scope_key)
+            volume = self._volume_pool.get_volume(quota_scope_key.volume_id)
+            async with self._handle_external_errors():
+                quota_usage = await volume.quota_model.describe_quota_scope(quota_scope_id)
+                if not quota_usage:
+                    await volume.quota_model.create_quota_scope(
+                        quota_scope_id=quota_scope_id, options=options, extra_args=None
                     )
-                except InvalidQuotaConfig as e:
-                    raise web.HTTPBadRequest(reason="Invalid quota config option") from e
+                else:
+                    if options is None:
+                        raise InvalidQuotaConfig("options is required for updating quota scope")
+                    try:
+                        await volume.quota_model.update_quota_scope(
+                            quota_scope_id=quota_scope_id,
+                            config=options,
+                        )
+                    except InvalidQuotaConfig as e:
+                        raise web.HTTPBadRequest(reason="Invalid quota config option") from e
 
     async def delete_quota_scope(self, quota_scope_key: QuotaScopeKey) -> None:
-        quota_scope_id = quota_scope_key.quota_scope_id
-        await log_manager_api_entry_new(log, "delete_quota_scope", quota_scope_key)
-        volume = self._volume_pool.get_volume(quota_scope_key.volume_id)
-        async with self._handle_external_errors():
-            quota_usage = await volume.quota_model.describe_quota_scope(quota_scope_id)
-        if not quota_usage:
-            raise QuotaScopeNotFoundError
-        await volume.quota_model.unset_quota(quota_scope_id)
+        with self._quota_scope_log_context(quota_scope_key):
+            quota_scope_id = quota_scope_key.quota_scope_id
+            await log_manager_api_entry_new(log, "delete_quota_scope", quota_scope_key)
+            volume = self._volume_pool.get_volume(quota_scope_key.volume_id)
+            async with self._handle_external_errors():
+                quota_usage = await volume.quota_model.describe_quota_scope(quota_scope_id)
+            if not quota_usage:
+                raise QuotaScopeNotFoundError
+            await volume.quota_model.unset_quota(quota_scope_id)
 
     async def create_vfolder(self, vfolder_key: VFolderKey) -> None:
-        vfolder_id = vfolder_key.vfolder_id
-        quota_scope_id = vfolder_id.quota_scope_id
+        with self._vfolder_log_context(vfolder_key):
+            vfolder_id = vfolder_key.vfolder_id
+            quota_scope_id = vfolder_id.quota_scope_id
 
-        await log_manager_api_entry_new(log, "create_vfolder", vfolder_key)
-        if quota_scope_id is None:
-            raise InvalidQuotaScopeError("Quota scope ID is not set in the vfolder key.")
-        volume = self._volume_pool.get_volume(vfolder_key.volume_id)
-        try:
-            await volume.create_vfolder(vfolder_id)
-        except QuotaScopeNotFoundError:
-            await volume.quota_model.create_quota_scope(quota_scope_id)
+            await log_manager_api_entry_new(log, "create_vfolder", vfolder_key)
+            if quota_scope_id is None:
+                raise InvalidQuotaScopeError("Quota scope ID is not set in the vfolder key.")
+            volume = self._volume_pool.get_volume(vfolder_key.volume_id)
             try:
                 await volume.create_vfolder(vfolder_id)
-            except QuotaScopeNotFoundError as e:
-                raise ExternalStorageServiceError(
-                    "Failed to create vfolder due to quota scope not found"
-                ) from e
+            except QuotaScopeNotFoundError:
+                await volume.quota_model.create_quota_scope(quota_scope_id)
+                try:
+                    await volume.create_vfolder(vfolder_id)
+                except QuotaScopeNotFoundError as e:
+                    raise ExternalStorageServiceError(
+                        "Failed to create vfolder due to quota scope not found"
+                    ) from e
 
     async def clone_vfolder(self, vfolder_key: VFolderKey, dst_vfolder_id: VFolderID) -> None:
-        await log_manager_api_entry_new(log, "clone_vfolder", vfolder_key)
-        volume = self._volume_pool.get_volume(vfolder_key.volume_id)
-        await volume.clone_vfolder(vfolder_key.vfolder_id, dst_vfolder_id)
+        with self._vfolder_log_context(vfolder_key):
+            await log_manager_api_entry_new(log, "clone_vfolder", vfolder_key)
+            volume = self._volume_pool.get_volume(vfolder_key.volume_id)
+            await volume.clone_vfolder(vfolder_key.vfolder_id, dst_vfolder_id)
 
     async def get_vfolder_info(self, vfolder_key: VFolderKey, subpath: str) -> VFolderMeta:
-        vfolder_id = vfolder_key.vfolder_id
-        await log_manager_api_entry_new(log, "get_vfolder_info", vfolder_key)
-        volume = self._volume_pool.get_volume(vfolder_key.volume_id)
-        try:
-            mount_path = await volume.get_vfolder_mount(vfolder_id, subpath)
-            usage = await volume.get_usage(vfolder_id)
-            fs_usage = await volume.get_fs_usage()
-        except VFolderNotFoundError as e:
-            raise web.HTTPGone(reason="VFolder not found") from e
-        except InvalidSubpathError as e:
-            raise web.HTTPBadRequest(reason="Invalid vfolder subpath") from e
+        with self._vfolder_log_context(vfolder_key):
+            vfolder_id = vfolder_key.vfolder_id
+            await log_manager_api_entry_new(log, "get_vfolder_info", vfolder_key)
+            volume = self._volume_pool.get_volume(vfolder_key.volume_id)
+            try:
+                mount_path = await volume.get_vfolder_mount(vfolder_id, subpath)
+                usage = await volume.get_usage(vfolder_id)
+                fs_usage = await volume.get_fs_usage()
+            except VFolderNotFoundError as e:
+                raise web.HTTPGone(reason="VFolder not found") from e
+            except InvalidSubpathError as e:
+                raise web.HTTPBadRequest(reason="Invalid vfolder subpath") from e
 
-        return VFolderMeta(
-            mount_path=mount_path,
-            file_count=usage.file_count,
-            used_bytes=usage.used_bytes,
-            capacity_bytes=fs_usage.capacity_bytes,
-            fs_used_bytes=fs_usage.used_bytes,
-        )
+            return VFolderMeta(
+                mount_path=mount_path,
+                file_count=usage.file_count,
+                used_bytes=usage.used_bytes,
+                capacity_bytes=fs_usage.capacity_bytes,
+                fs_used_bytes=fs_usage.used_bytes,
+            )
 
     async def delete_vfolder(self, vfolder_key: VFolderKey) -> None:
-        vfolder_id = vfolder_key.vfolder_id
-        await log_manager_api_entry_new(log, "delete_vfolder", vfolder_key)
-        try:
-            volume = self._volume_pool.get_volume(vfolder_key.volume_id)
-            await volume.get_vfolder_mount(vfolder_id, ".")
-        except VFolderNotFoundError as e:
-            ongoing_task = self._deletion_tasks.get(vfolder_id)
-            if ongoing_task is not None:
-                ongoing_task.cancel()
-            raise web.HTTPGone(reason="VFolder not found") from e
-        else:
-            ongoing_task = self._deletion_tasks.get(vfolder_id)
-            if ongoing_task is not None and ongoing_task.done():
-                task = asyncio.create_task(self._delete_vfolder(vfolder_key))
-                self._background_tasks.add(task)
-                task.add_done_callback(self._background_tasks.discard)
-        return
+        with self._vfolder_log_context(vfolder_key):
+            vfolder_id = vfolder_key.vfolder_id
+            await log_manager_api_entry_new(log, "delete_vfolder", vfolder_key)
+            try:
+                volume = self._volume_pool.get_volume(vfolder_key.volume_id)
+                await volume.get_vfolder_mount(vfolder_id, ".")
+            except VFolderNotFoundError as e:
+                ongoing_task = self._deletion_tasks.get(vfolder_id)
+                if ongoing_task is not None:
+                    ongoing_task.cancel()
+                raise web.HTTPGone(reason="VFolder not found") from e
+            else:
+                ongoing_task = self._deletion_tasks.get(vfolder_id)
+                if ongoing_task is not None and ongoing_task.done():
+                    task = asyncio.create_task(self._delete_vfolder(vfolder_key))
+                    self._background_tasks.add(task)
+                    task.add_done_callback(self._background_tasks.discard)

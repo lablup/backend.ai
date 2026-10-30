@@ -90,6 +90,7 @@ follows it.
 | System | Shape | `every` on empty collection | Expressing "no match" |
 |--------|-------|-----------------------------|-----------------------|
 | Prisma | `some` / `every` / `none` | true (documented; also raised as counter-intuitive) | `none: {…}`; existence via `some: {}` / `none: {}` |
+| This BEP (revised 2026-09-21) | `exists` + `some` / `every` / `none` | true | `none: {…}`; existence via `exists` |
 | PostGraphile (connection-filter) | `some` / `every` / `none` | true | `none: {…}` |
 
 - **The `some`/`every`/`none` trio matches the established Prisma/PostGraphile convention** →
@@ -97,7 +98,8 @@ follows it.
 - The "`every` is true on an empty collection" behavior is the same in both (Prisma documents it
   explicitly).
 - **"has a child and all match"** (non-empty `every`) is expressed in both without a dedicated
-  shorthand, by combining **`some: {}` + `every: {…}`**. This BEP likewise adopts that idiom rather
+  shorthand, by combining **`some: {}` + `every: {…}`**. This BEP adopted that idiom and then
+  replaced it with an explicit `exists` field (Decision 1, revised), rather
   than adding a shorthand.
 
 ### Decision 1 — Shape: explicit `some` / `every` / `none`
@@ -131,7 +133,22 @@ children at all. "All children satisfy P" holds trivially when there are zero ch
 there is no child to violate it (`NOT EXISTS (child that violates P)` is true over an empty set).
 A deployment with zero replicas therefore matches `replicas.every`. This is standard behavior but
 surprises users, so the field description must state it. If you need "has a child and all match,"
-combine `some: {}` (has any child) with `every: {…}`, exactly as Prisma/PostGraphile do.
+combine `exists: true` with `every: {…}`.
+
+**Empty-condition rule (revised 2026-09-21, BA-8063).** A matching mode carrying no condition is
+refused with `EmptyMatchConditionError` (400). `some: {}` asked whether a child exists rather than
+constraining one, and a row filter whose every field is unset reduces to the same thing, so a
+request that meant to filter was answered as "has any child". Existence is now asked for by name:
+
+| Ask | Field |
+|-----|-------|
+| has at least one child | `exists: true` |
+| has no child | `exists: false` |
+| at least one child matching P | `some: {P}` |
+| every child matches P | `every: {P}` |
+| no child matches P | `none: {P}` |
+
+`exists` is a `Boolean`, not a row filter, so it cannot degenerate the same way.
 
 **Trade-off considered.** The house style to date is implicit-some (a bare embed = `some`). Keeping
 it would match the two precedents and add no new concept, but it cannot express `every` or `none`
@@ -180,6 +197,7 @@ by `ImageV2Filter.alias` ("at least one alias matching"):
 
 | Field | Required description form |
 |-------|---------------------------|
+| `exists` | "Matches parents that have at least one {child} when true, and parents with none when false. Says nothing about what the {child} rows hold." |
 | `some` | "Matches parents with **at least one** {child} satisfying all conditions." |
 | `every` | "Matches parents where **every** {child} satisfies all conditions (**also true when the parent has no {child}**)." |
 | `none` | "Matches parents with **no** {child} satisfying all conditions." |
@@ -250,6 +268,7 @@ adding a dedicated `--replicas-*` option group. That CLI work is part of this ap
 |------|----------|-----------|
 | 2026-07-10 | Shape = explicit `some`/`every`/`none` | implicit-some cannot express `every`/`none` — the operational queries driving BA-6818; matches the established Prisma/PostGraphile convention |
 | 2026-07-10 | Non-empty `every` uses `some: {}` + `every: {…}`, no dedicated shorthand | Prisma and PostGraphile both expose this idiom |
+| 2026-09-21 | Existence moves to an explicit `exists: Boolean`; a matching mode with no condition is a 400 (BA-8063) | `some: {}` encoded a different question in an empty value, and a row filter with nothing set reached it by accident. `every` with no condition produced invalid SQL |
 | 2026-07-10 | Shared `make_correlated_exists(child_row, correlate_row, join_predicate)` builder + per-entity binding (`by_replica_exists`) | Keeps correlated-`EXISTS` construction in one place while exposing a domain name per entity |
 | 2026-07-10 | some/every/none → EXISTS/NOT EXISTS mapping lives in the adapter | Keeps the conditions layer to one new symbol per entity, reusing `negate_conditions` |
 | 2026-07-10 | New `some/every/none` field name = **plural to-many relation** (e.g. `aliases`, `replicas`); the existing singular implicit-some field is only `@deprecated` | GraphQL forbids duplicate field names + preserves backward compatibility + consistent naming |

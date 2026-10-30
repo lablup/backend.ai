@@ -30,7 +30,7 @@ from ai.backend.common.container_registry import (
 )
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.dto.manager.registry.request import HarborWebhookRequestModel
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.dto.context import RequestCtx
 from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
@@ -60,7 +60,7 @@ from ai.backend.manager.services.container_registry.actions.update_container_reg
 from ai.backend.manager.services.container_registry.processors import ContainerRegistryProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RegistryIdPath(BaseRequestModel):
@@ -258,28 +258,28 @@ class ContainerRegistryHandler:
                 if params.ssl_verify is not None
                 else TriState.nop()
             ),
-            is_global=(
-                TriState.update(params.is_global)
-                if params.is_global is not None
-                else TriState.nop()
-            ),
             extra=(TriState.update(params.extra) if params.extra is not None else TriState.nop()),
         )
         result = await self._container_registry.update_container_registry.run(
             UpdateContainerRegistryAction(updater=updater)
         )
+        data = result.data
+        if params.is_global is not None:
+            data = await self._adapter.apply_global(
+                ContainerRegistryID(registry_id), params.is_global
+            )
 
         resp = PatchContainerRegistryResponseModel(
-            id=result.data.id,
-            url=result.data.url,
-            registry_name=result.data.registry_name,
-            type=result.data.type,
-            project=result.data.project,
-            username=result.data.username,
-            password=result.data.password,
-            ssl_verify=result.data.ssl_verify,
-            is_global=result.data.is_global,
-            extra=result.data.extra,
+            id=data.id,
+            url=data.url,
+            registry_name=data.registry_name,
+            type=data.type,
+            project=data.project,
+            username=data.username,
+            password=data.password,
+            ssl_verify=data.ssl_verify,
+            is_global=data.is_global,
+            extra=data.extra,
         )
         return APIResponse.build(HTTPStatus.OK, resp)
 

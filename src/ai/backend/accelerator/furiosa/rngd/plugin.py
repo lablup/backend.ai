@@ -1,4 +1,3 @@
-import asyncio
 import glob
 import logging
 import re
@@ -11,6 +10,7 @@ from typing import Any
 import aiodocker
 
 from ai.backend.accelerator.furiosa import __version__
+from ai.backend.common.asyncio import run_in_executor_with_context
 
 from .rngd_api import LibraryError, RngdAPI
 
@@ -45,13 +45,13 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 PREFIX = "rngd"
 _NPU_INDEX_RE = re.compile(r"/dev/rngd/npu(\d+)")
 
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.accelerator.rngd"))
+log = StructuredLogger(logging.getLogger("ai.backend.accelerator.rngd"))
 
 
 class RngdDevice(AbstractComputeDevice):
@@ -95,10 +95,12 @@ class RngdPlugin(AbstractComputePlugin):
 
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
-            log.info("RNGD acceleration is enabled.")
+            log.debug("detected devices:\n{}", pformat(detected_devices))
+            log.info(
+                "accelerator enabled", plugin_name=self.key, device_count=len(detected_devices)
+            )
         except ImportError:
-            log.warning("could not find Furiosa devices.")
+            log.warning("accelerator disabled: no devices found", plugin_name=self.key)
             self.enabled = False
 
     async def list_devices(self) -> list[RngdDevice]:
@@ -164,7 +166,7 @@ class RngdPlugin(AbstractComputePlugin):
                     util_total += avg_util
                     util_stats[device.device_id] = Measurement(Decimal(avg_util), Decimal(100))
             except (LibraryError, OSError) as e:
-                log.warning("failed to gather RNGD node measures: {}", e)
+                log.warning("RNGD node measure failed", exc_info=e)
         return [
             NodeMeasurement(
                 MetricKey("rngd_mem"),
@@ -214,7 +216,7 @@ class RngdPlugin(AbstractComputePlugin):
                     avg_util,
                 )
         except (LibraryError, OSError) as e:
-            log.warning("failed to gather RNGD device metrics: {}", e)
+            log.warning("RNGD device metric collection failed", exc_info=e)
             return []
 
         # Step 2: For each container, find allocated devices via Docker inspection
@@ -244,7 +246,7 @@ class RngdPlugin(AbstractComputePlugin):
                         util_stats[cid] += Decimal(str(avg_util))
                         num_devices_per_container[cid] += 1
                 except Exception:
-                    log.warning("failed to inspect container {} for RNGD measures", cid)
+                    log.warning("RNGD container inspection failed", container_id=cid, exc_info=True)
 
         return [
             ContainerMeasurement(
@@ -298,7 +300,7 @@ class RngdPlugin(AbstractComputePlugin):
         ]
         devices: dict[str, str] = {}
         for alloc_idx, device_id in enumerate(device_ids):
-            source_paths = await asyncio.get_running_loop().run_in_executor(
+            source_paths = await run_in_executor_with_context(
                 None, glob.glob, f"/dev/rngd/npu{device_id}*"
             )
             for source_path in source_paths:

@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import replace
 from decimal import Decimal
 from functools import lru_cache
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, assert_never
 from uuid import UUID
 
 from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResourceSlotRow
@@ -15,23 +15,31 @@ from ai.backend.manager.models.resource_slot.row import DeploymentRevisionResour
 if TYPE_CHECKING:
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 
+from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.config import (
     ModelConfig,
     ModelDefinition,
     ModelServiceConfig,
 )
-from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
+from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
     ModelDeploymentStatus,
@@ -42,25 +50,34 @@ from ai.backend.common.data.model_deployment.types import (
 from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
     BulkDeleteAutoScalingRulesInput,
     CreateAutoScalingRuleInput,
-    DeleteAutoScalingRuleInput,
+    PartialBulkPurgeAutoScalingRulesInput,
+    PartialBulkUpdateAutoScalingRulesInput,
     UpdateAutoScalingRuleInput,
 )
-from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInfo, ResourceSlotInfo
+from ai.backend.common.dto.manager.v2.common import (
+    PartialBulkFailure,
+    PartialBulkPayload,
+    ResourceSlotEntryInfo,
+    ResourceSlotInfo,
+)
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AccessTokenFilter,
+    AccessTokenOrder,
     ActivateRevisionInput,
     AddRevisionInput,
     AddRevisionOptions,
     AdminSearchDeploymentsInput,
     AdminSearchRevisionsInput,
     AutoScalingRuleFilter,
+    AutoScalingRuleOrder,
     BulkDeleteAccessTokensInput,
     CreateAccessTokenInput,
     CreateDeploymentInput,
-    DeleteAccessTokenInput,
     DeleteDeploymentInput,
     DeploymentFilter,
     DeploymentOrder,
+    DeploymentStatusFilter,
+    PartialBulkPurgeAccessTokensInput,
     ReplaceDeploymentOptionsInput,
     ReplicaFilter,
     ReplicaOrder,
@@ -115,6 +132,8 @@ from ai.backend.common.dto.manager.v2.deployment.response import (
     UpsertDeploymentPolicyPayload,
 )
 from ai.backend.common.dto.manager.v2.deployment.types import (
+    AccessTokenOrderField,
+    AutoScalingRuleOrderField,
     BlueGreenConfigInfo,
     BlueGreenStrategySpecInfo,
     ClusterConfigInfoDTO,
@@ -124,6 +143,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     DeploymentPolicyInfo,
     DeploymentScope,
     DeploymentStrategyInfoDTO,
+    DeploymentUsage,
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
     ExtraVFolderMountGQLDTO,
@@ -147,6 +167,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 )
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AllocatedResourceSlotFilter,
+    AllocatedResourceSlotOrder,
     SearchAllocatedResourceSlotsInput,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
@@ -154,12 +175,14 @@ from ai.backend.common.dto.manager.v2.resource_slot.response import (
     SearchAllocatedResourceSlotsPayload,
 )
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
+    AllocatedResourceSlotOrderField,
     ResourceOptsEntryInfoDTO,
     ResourceOptsInfoDTO,
 )
 from ai.backend.common.model_service_start_command_compat import to_legacy_start_command
 from ai.backend.common.schema.deployment import BlueGreenSpec, RollingUpdateSpec
 from ai.backend.common.tristate.unset import Unset
+from ai.backend.manager.actions.v2.ops.result import BulkFieldOpsResult
 from ai.backend.manager.api.adapter_options.deployment.options import (
     deployment_options_from_input,
     deployment_options_to_info,
@@ -218,40 +241,50 @@ from ai.backend.manager.models.condition_utils import (
     combine_conditions_or,
     negate_conditions,
 )
-from ai.backend.manager.models.deployment_policy.conditions import DeploymentPolicyConditions
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_policy.searchable_fields import (
+    DeploymentPolicySearchableFields,
+)
+from ai.backend.manager.models.deployment_policy.searchers import DeploymentPolicySearcher
 from ai.backend.manager.models.deployment_policy.upserters import DeploymentPolicyUpserter
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision.conditions import RevisionConditions
-from ai.backend.manager.models.deployment_revision.orders import RevisionOrders
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision.searchable_fields import (
+    ModelRevisionSearchableFields,
+)
 from ai.backend.manager.models.deployment_revision.searchers import ModelRevisionSearcher
-from ai.backend.manager.models.endpoint import (
+from ai.backend.manager.models.endpoint.row import (
     EndpointAutoScalingRuleRow,
     EndpointRow,
     EndpointTokenRow,
 )
-from ai.backend.manager.models.endpoint.conditions import (
-    AccessTokenConditions,
-    AutoScalingRuleConditions,
-    DeploymentConditions,
+from ai.backend.manager.models.endpoint.scopes import (
+    DeploymentTarget,
+    DomainDeploymentTarget,
+    ProjectDeploymentTarget,
+    UserDeploymentTarget,
 )
-from ai.backend.manager.models.endpoint.orders import (
-    AccessTokenOrders,
-    AutoScalingRuleOrders,
-    DeploymentOrders,
+from ai.backend.manager.models.endpoint.searchable_fields import (
+    AutoScalingRuleSearchableFields,
+    DeploymentAccessTokenSearchableFields,
+    DeploymentSearchableFields,
 )
-from ai.backend.manager.models.endpoint.searchers import DeploymentAccessTokenSearcher
+from ai.backend.manager.models.endpoint.searchers import (
+    AutoScalingRuleSearcher,
+    DeploymentAccessTokenSearcher,
+    DeploymentSearcher,
+)
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
-from ai.backend.manager.models.resource_slot.conditions import RevisionResourceSlotConditions
-from ai.backend.manager.models.resource_slot.orders import (
-    ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
-    resolve_allocated_slot_revision_order,
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    ResourceSlotTypeSearchableFields,
+    RevisionResourceSlotSearchableFields,
 )
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.routing.conditions import RouteConditions
-from ai.backend.manager.models.routing.orders import RouteOrders
-from ai.backend.manager.models.routing.searchers import ModelReplicaSearcher
-from ai.backend.manager.repositories.base import BatchQuerier
+from ai.backend.manager.models.resource_slot.searchers import RevisionResourceSlotSearcher
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
+from ai.backend.manager.models.routing.searchers import ModelReplicaSearcher, RouteInfoSearcher
+from ai.backend.manager.models.specs.search.usage import UsedBy
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
+from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.services.deployment.actions.access_token.bulk_delete_access_tokens import (
     BulkDeleteAccessTokensAction,
 )
@@ -285,6 +318,12 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.delete_aut
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.get_auto_scaling_rule import (
     GetAutoScalingRuleAction,
 )
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.partial_bulk_purge_auto_scaling_rules import (
+    PartialBulkPurgeAutoScalingRulesAction,
+)
+from ai.backend.manager.services.deployment.actions.auto_scaling_rule.partial_bulk_update_auto_scaling_rules import (
+    PartialBulkUpdateAutoScalingRulesAction,
+)
 from ai.backend.manager.services.deployment.actions.auto_scaling_rule.search_auto_scaling_rules import (
     SearchAutoScalingRulesAction,
 )
@@ -298,6 +337,9 @@ from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_d
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy.get_deployment_policy import (
     GetDeploymentPolicyAction,
+)
+from ai.backend.manager.services.deployment.actions.deployment_policy.partial_bulk_get_deployment_policies import (
+    PartialBulkGetDeploymentPoliciesAction,
 )
 from ai.backend.manager.services.deployment.actions.deployment_policy.search_deployment_policies import (
     SearchDeploymentPoliciesAction,
@@ -350,7 +392,7 @@ from ai.backend.manager.services.deployment.actions.replica.bulk_get_replicas im
 from ai.backend.manager.services.deployment.actions.replica_group.bulk_get_replica_groups import (
     BulkGetReplicaGroupsAction,
 )
-from ai.backend.manager.services.deployment.actions.revision_operations import (
+from ai.backend.manager.services.deployment.actions.revision_operations.activate_revision import (
     ActivateRevisionAction,
 )
 from ai.backend.manager.services.deployment.actions.route.bulk_get_routes import (
@@ -361,11 +403,7 @@ from ai.backend.manager.services.deployment.actions.route.update_route_traffic_s
     UpdateRouteTrafficStatusAction,
 )
 from ai.backend.manager.services.deployment.actions.scoped_search import (
-    DeploymentScopeItem,
-    DomainDeploymentScopeItem,
-    ProjectDeploymentScopeItem,
     ScopedSearchDeploymentsAction,
-    UserDeploymentScopeItem,
 )
 from ai.backend.manager.services.deployment.actions.search_deployments import (
     GlobalSearchDeploymentsAction,
@@ -444,7 +482,7 @@ def _model_definition_to_dto(
 @lru_cache(maxsize=1)
 def _get_deployment_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=DeploymentOrders.created_at(ascending=False),
+        forward_order=DeploymentSearchableFields.own.created_at.order.apply(ascending=False),
         cursor_column=EndpointRow.id,
     )
 
@@ -459,7 +497,7 @@ def _get_deployment_policy_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_revision_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RevisionOrders.created_at(ascending=False),
+        forward_order=ModelRevisionSearchableFields.own.created_at.order.apply(ascending=False),
         cursor_column=DeploymentRevisionRow.id,
     )
 
@@ -467,7 +505,7 @@ def _get_revision_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_route_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RouteOrders.created_at(ascending=False),
+        forward_order=ReplicaSearchableFields.own.created_at.order.apply(ascending=False),
         cursor_column=RoutingRow.id,
     )
 
@@ -475,7 +513,9 @@ def _get_route_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_access_token_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=AccessTokenOrders.created_at(ascending=False),
+        forward_order=DeploymentAccessTokenSearchableFields.own.created_at.order.apply(
+            ascending=False
+        ),
         cursor_column=EndpointTokenRow.id,
     )
 
@@ -483,7 +523,7 @@ def _get_access_token_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_auto_scaling_rule_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=AutoScalingRuleOrders.created_at(ascending=False),
+        forward_order=AutoScalingRuleSearchableFields.own.created_at.order.apply(ascending=False),
         cursor_column=EndpointAutoScalingRuleRow.id,
     )
 
@@ -491,7 +531,7 @@ def _get_auto_scaling_rule_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_replica_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RouteOrders.created_at(ascending=False),
+        forward_order=ReplicaSearchableFields.own.created_at.order.apply(ascending=False),
         cursor_column=RoutingRow.id,
     )
 
@@ -499,7 +539,7 @@ def _get_replica_pagination_spec() -> PaginationSpec:
 @lru_cache(maxsize=1)
 def _get_revision_resource_slot_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ALLOCATED_SLOT_DEFAULT_FORWARD_ORDER,
+        forward_order=ResourceSlotTypeSearchableFields.own.rank.order.apply(ascending=True),
         cursor_column=DeploymentRevisionResourceSlotRow.id,
     )
 
@@ -709,31 +749,58 @@ class DeploymentAdapter(BaseAdapter):
         input: AdminSearchDeploymentsInput,
     ) -> AdminSearchDeploymentsPayload:
         """Search deployments (admin, no scope)."""
-        querier = self._build_deployment_querier(input)
         action_result = await self._deployment.global_search.run(
-            GlobalSearchDeploymentsAction(querier=querier)
+            GlobalSearchDeploymentsAction(
+                searcher=GlobalSearcher(
+                    used_by=self._usage(input.usage),
+                    searcher=self._build_deployment_searcher(input),
+                )
+            )
         )
         return AdminSearchDeploymentsPayload(
-            items=[self._deployment_data_to_dto(item) for item in action_result.data],
+            items=[self._deployment_data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
         )
 
-    def _scope_items(self, scope: DeploymentScope) -> list[DeploymentScopeItem]:
-        """The scope items the request named, in the order the input lists them."""
-        items: list[DeploymentScopeItem] = [
-            DomainDeploymentScopeItem(domain_id=DomainID(entry.value))
-            for entry in scope.domain or ()
+    def _usage(self, usage: DeploymentUsage | None) -> list[UsedBy]:
+        """The uses the request named, in the order the input declares them."""
+        if usage is None or usage.uses is None:
+            return []
+        uses = usage.uses
+        linked = DeploymentSearchableFields.linked.usage
+        return [
+            *(
+                linked.resource_groups.uses(ResourceGroupID(entity_id))
+                for entity_id in uses.resource_group or ()
+            ),
+            *(linked.images.uses(ImageID(entity_id)) for entity_id in uses.image or ()),
+            *(linked.vfolders.uses(VFolderUUID(entity_id)) for entity_id in uses.vfolder or ()),
+            *(linked.sessions.uses(SessionID(entity_id)) for entity_id in uses.session or ()),
+            *(
+                linked.runtime_variants.uses(RuntimeVariantID(entity_id))
+                for entity_id in uses.runtime_variant or ()
+            ),
+            *(
+                linked.deployment_presets.uses(DeploymentPresetID(entity_id))
+                for entity_id in uses.deployment_preset or ()
+            ),
         ]
-        items.extend(
-            ProjectDeploymentScopeItem(project_id=ProjectID(entry.value))
+
+    def _scope_targets(self, scope: DeploymentScope) -> list[DeploymentTarget]:
+        """The scope targets the request named, in the order the input lists them."""
+        targets: list[DeploymentTarget] = [
+            DomainDeploymentTarget(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+        ]
+        targets.extend(
+            ProjectDeploymentTarget(project_id=ProjectID(entry.value))
             for entry in scope.project or ()
         )
-        items.extend(
-            UserDeploymentScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
+        targets.extend(
+            UserDeploymentTarget(user_id=UserID(entry.value)) for entry in scope.user or ()
         )
-        return items
+        return targets
 
     async def scoped_search(
         self,
@@ -742,33 +809,15 @@ class DeploymentAdapter(BaseAdapter):
         """Search the deployments the named scopes reach, combined with OR."""
         action_result = await self._deployment.scoped_search.run(
             ScopedSearchDeploymentsAction(
-                items=self._scope_items(input.scope),
-                querier=self._build_scoped_deployment_querier(input),
+                searcher=ScopedSearcher(
+                    scopes=self._scope_targets(input.scope),
+                    used_by=self._usage(input.usage),
+                    searcher=self._build_scoped_deployment_searcher(input),
+                )
             )
         )
         return AdminSearchDeploymentsPayload(
-            items=[self._deployment_data_to_dto(item) for item in action_result.data],
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-        )
-
-    async def my_search(
-        self,
-        input: AdminSearchDeploymentsInput,
-    ) -> AdminSearchDeploymentsPayload:
-        """Search deployments created by the current user."""
-        user = current_user()
-        if user is None:
-            raise RuntimeError("No authenticated user in context")
-        action_result = await self._deployment.scoped_search.run(
-            ScopedSearchDeploymentsAction(
-                items=[UserDeploymentScopeItem(user_id=UserID(user.user_id))],
-                querier=self._build_deployment_querier(input),
-            )
-        )
-        return AdminSearchDeploymentsPayload(
-            items=[self._deployment_data_to_dto(item) for item in action_result.data],
+            items=[self._deployment_data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -782,12 +831,15 @@ class DeploymentAdapter(BaseAdapter):
         """Search deployments within a specific project."""
         action_result = await self._deployment.scoped_search.run(
             ScopedSearchDeploymentsAction(
-                items=[ProjectDeploymentScopeItem(project_id=ProjectID(project_id))],
-                querier=self._build_deployment_querier(input),
+                searcher=ScopedSearcher(
+                    scopes=[ProjectDeploymentTarget(project_id=ProjectID(project_id))],
+                    used_by=self._usage(input.usage),
+                    searcher=self._build_deployment_searcher(input),
+                )
             )
         )
         return AdminSearchDeploymentsPayload(
-            items=[self._deployment_data_to_dto(item) for item in action_result.data],
+            items=[self._deployment_data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -900,10 +952,12 @@ class DeploymentAdapter(BaseAdapter):
 
     async def delete(self, input: DeleteDeploymentInput) -> DeleteDeploymentPayload:
         """Delete a deployment."""
-        await self._deployment.destroy_deployment.run(
+        action_result = await self._deployment.destroy_deployment.run(
             DestroyDeploymentAction(deployment_id=DeploymentID(input.id))
         )
-        return DeleteDeploymentPayload(id=input.id)
+        return DeleteDeploymentPayload(
+            id=input.id, deployment=self._deployment_data_to_dto(action_result.data)
+        )
 
     # ------------------------------------------------------------------
     # Access token operations
@@ -945,17 +999,31 @@ class DeploymentAdapter(BaseAdapter):
             access_token=self._access_token_data_to_dto(action_result.data)
         )
 
-    async def delete_access_token(
-        self,
-        input: DeleteAccessTokenInput,
-    ) -> DeleteAccessTokenPayload:
-        """Delete an access token."""
+    async def purge_access_token(self, token_id: UUID) -> DeleteAccessTokenPayload:
+        """Permanently remove an access token."""
         action_result = await self._deployment.delete_access_token.run(
-            DeleteAccessTokenAction(access_token_id=DeploymentTokenID(input.id))
+            DeleteAccessTokenAction(access_token_id=DeploymentTokenID(token_id))
         )
         if not action_result.success:
-            raise EndpointTokenNotFound(f"Access token {input.id} not found")
-        return DeleteAccessTokenPayload(id=input.id)
+            raise EndpointTokenNotFound(f"Access token {token_id} not found")
+        return DeleteAccessTokenPayload(id=token_id, field_id=token_id)
+
+    async def partial_bulk_purge_access_tokens(
+        self, input: PartialBulkPurgeAccessTokensInput
+    ) -> PartialBulkPayload[AccessTokenNode]:
+        """Permanently remove several access tokens, answering for each one."""
+        try:
+            result = await self._deployment.bulk_delete_access_tokens.run(
+                BulkDeleteAccessTokensAction(
+                    access_token_ids=[DeploymentTokenID(token_id) for token_id in input.ids]
+                )
+            )
+        except FieldNotFoundError as e:
+            return PartialBulkPayload[AccessTokenNode](
+                successes=[],
+                failed=[PartialBulkFailure(id=token_id, message=str(e)) for token_id in input.ids],
+            )
+        return self._to_partial_bulk_payload(input.ids, result, self._access_token_data_to_dto)
 
     async def bulk_delete_access_tokens(
         self,
@@ -985,7 +1053,7 @@ class DeploymentAdapter(BaseAdapter):
         searcher = self._build_access_token_searcher(input)
         action_result = await self._deployment.search_access_tokens.run(
             SearchAccessTokensAction(
-                deployment_id=DeploymentID(scope.deployment_id), searcher=searcher
+                deployment_ids=[DeploymentID(scope.deployment_id)], searcher=searcher
             )
         )
         return SearchAccessTokensPayload(
@@ -1031,12 +1099,19 @@ class DeploymentAdapter(BaseAdapter):
         input: SearchAutoScalingRulesInput,
     ) -> SearchAutoScalingRulesPayload:
         """Search auto-scaling rules scoped to a specific deployment."""
-        querier = self._build_auto_scaling_rule_querier(input, scope=scope)
+        querier = self._build_auto_scaling_rule_querier(input)
         action_result = await self._deployment.search_auto_scaling_rules.run(
-            SearchAutoScalingRulesAction(querier=querier)
+            SearchAutoScalingRulesAction(
+                deployment_ids=[DeploymentID(scope.deployment_id)],
+                searcher=AutoScalingRuleSearcher(
+                    pagination=querier.pagination,
+                    conditions=querier.conditions,
+                    orders=querier.orders,
+                ),
+            )
         )
         return SearchAutoScalingRulesPayload(
-            items=[self._auto_scaling_rule_data_to_dto(item) for item in action_result.data],
+            items=[self._auto_scaling_rule_data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -1059,7 +1134,69 @@ class DeploymentAdapter(BaseAdapter):
         input: UpdateAutoScalingRuleInput,
     ) -> UpdateAutoScalingRulePayload:
         """Update an auto-scaling rule."""
-        modifier = ModelDeploymentAutoScalingRuleModifier(
+        action_result = await self._deployment.update_auto_scaling_rule.run(
+            UpdateAutoScalingRuleAction(
+                deployment_id=await self._auto_scaling_rule_deployment(input.id),
+                auto_scaling_rule_id=input.id,
+                modifier=self._to_rule_modifier(input),
+            )
+        )
+        return UpdateAutoScalingRulePayload(
+            rule=self._auto_scaling_rule_data_to_dto(action_result.data)
+        )
+
+    async def purge_rule(self, rule_id: UUID) -> DeleteAutoScalingRulePayload:
+        """Permanently remove an auto-scaling rule."""
+        await self._deployment.delete_auto_scaling_rule.run(
+            DeleteAutoScalingRuleAction(
+                deployment_id=await self._auto_scaling_rule_deployment(rule_id),
+                auto_scaling_rule_id=rule_id,
+            )
+        )
+        return DeleteAutoScalingRulePayload(id=rule_id, field_id=rule_id)
+
+    async def partial_bulk_update_rules(
+        self, input: PartialBulkUpdateAutoScalingRulesInput
+    ) -> PartialBulkPayload[AutoScalingRuleNode]:
+        """Update several auto-scaling rules, answering for each one."""
+        ids = [item.id for item in input.items]
+        try:
+            result = await self._deployment.partial_bulk_update_auto_scaling_rules.run(
+                PartialBulkUpdateAutoScalingRulesAction(
+                    modifiers={
+                        AutoScalingRuleID(item.id): self._to_rule_modifier(item)
+                        for item in input.items
+                    }
+                )
+            )
+        except FieldNotFoundError as e:
+            return PartialBulkPayload[AutoScalingRuleNode](
+                successes=[],
+                failed=[PartialBulkFailure(id=rule_id, message=str(e)) for rule_id in ids],
+            )
+        return self._to_partial_bulk_payload(ids, result, self._auto_scaling_rule_data_to_dto)
+
+    async def partial_bulk_purge_rules(
+        self, input: PartialBulkPurgeAutoScalingRulesInput
+    ) -> PartialBulkPayload[AutoScalingRuleNode]:
+        """Permanently remove several auto-scaling rules, answering for each one."""
+        try:
+            result = await self._deployment.partial_bulk_purge_auto_scaling_rules.run(
+                PartialBulkPurgeAutoScalingRulesAction(
+                    rule_ids=[AutoScalingRuleID(rule_id) for rule_id in input.ids]
+                )
+            )
+        except FieldNotFoundError as e:
+            return PartialBulkPayload[AutoScalingRuleNode](
+                successes=[],
+                failed=[PartialBulkFailure(id=rule_id, message=str(e)) for rule_id in input.ids],
+            )
+        return self._to_partial_bulk_payload(input.ids, result, self._auto_scaling_rule_data_to_dto)
+
+    def _to_rule_modifier(
+        self, input: UpdateAutoScalingRuleInput
+    ) -> ModelDeploymentAutoScalingRuleModifier:
+        return ModelDeploymentAutoScalingRuleModifier(
             metric_source=OptionalState.from_unset(input.metric_source),
             metric_name=OptionalState.from_unset(input.metric_name),
             min_threshold=TriState.from_unset(input.min_threshold),
@@ -1070,26 +1207,20 @@ class DeploymentAdapter(BaseAdapter):
             max_replicas=TriState.from_unset(input.max_replicas),
             prometheus_query_preset_id=TriState.from_unset(input.prometheus_query_preset_id),
         )
-        action_result = await self._deployment.update_auto_scaling_rule.run(
-            UpdateAutoScalingRuleAction(
-                deployment_id=await self._auto_scaling_rule_deployment(input.id),
-                auto_scaling_rule_id=input.id,
-                modifier=modifier,
-            )
-        )
-        return UpdateAutoScalingRulePayload(
-            rule=self._auto_scaling_rule_data_to_dto(action_result.data)
-        )
 
-    async def delete_rule(self, input: DeleteAutoScalingRuleInput) -> DeleteAutoScalingRulePayload:
-        """Delete an auto-scaling rule."""
-        await self._deployment.delete_auto_scaling_rule.run(
-            DeleteAutoScalingRuleAction(
-                deployment_id=await self._auto_scaling_rule_deployment(input.id),
-                auto_scaling_rule_id=input.id,
-            )
+    def _to_partial_bulk_payload[TData, TNode: BaseResponseModel](
+        self,
+        ids: Sequence[UUID],
+        result: BulkFieldOpsResult[TData],
+        to_node: Callable[[TData], TNode],
+    ) -> PartialBulkPayload[TNode]:
+        """Answer in the order the caller named the rows."""
+        successes: dict[UUID, TData] = dict(result.successes.items())
+        errors: dict[UUID, Exception] = dict(result.errors.items())
+        return PartialBulkPayload[TNode](
+            successes=[to_node(successes[i]) for i in ids if i in successes],
+            failed=[PartialBulkFailure(id=i, message=str(errors[i])) for i in ids if i in errors],
         )
-        return DeleteAutoScalingRulePayload(id=input.id)
 
     async def bulk_delete_rules(
         self, input: BulkDeleteAutoScalingRulesInput
@@ -1128,10 +1259,19 @@ class DeploymentAdapter(BaseAdapter):
         """Search deployment policies with filters and pagination."""
         querier = self._build_policy_querier(input)
         action_result = await self._deployment.search_deployment_policies.run(
-            SearchDeploymentPoliciesAction(querier=querier)
+            SearchDeploymentPoliciesAction(
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=DeploymentPolicySearcher(
+                        pagination=querier.pagination,
+                        conditions=querier.conditions,
+                        orders=querier.orders,
+                    ),
+                )
+            )
         )
         return SearchDeploymentPoliciesPayload(
-            items=[self._policy_data_to_dto(item) for item in action_result.data],
+            items=[self._policy_data_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -1288,7 +1428,7 @@ class DeploymentAdapter(BaseAdapter):
         searcher = self._build_revision_searcher(input)
         action_result = await self._deployment.search_revisions.run(
             SearchRevisionsAction(
-                deployment_id=DeploymentID(scope.deployment_id), searcher=searcher
+                deployment_ids=[DeploymentID(scope.deployment_id)], searcher=searcher
             )
         )
         return AdminSearchRevisionsPayload(
@@ -1305,7 +1445,7 @@ class DeploymentAdapter(BaseAdapter):
         """Search model revisions without scope (admin, all deployments)."""
         searcher = self._build_revision_searcher(input)
         action_result = await self._deployment.global_search_revisions.run(
-            GlobalSearchRevisionsAction(searcher=searcher)
+            GlobalSearchRevisionsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return AdminSearchRevisionsPayload(
             items=[self._revision_data_to_dto(item) for item in action_result.items],
@@ -1324,11 +1464,11 @@ class DeploymentAdapter(BaseAdapter):
         input: SearchAllocatedResourceSlotsInput,
     ) -> SearchAllocatedResourceSlotsPayload:
         """Search resource slots allocated to a deployment revision."""
-        querier = self._build_revision_resource_slot_querier(input, revision_id=revision_id)
+        searcher = self._build_revision_resource_slot_searcher(input, revision_id=revision_id)
         action_result = await self._deployment.search_revision_resource_slots.run(
             SearchRevisionResourceSlotsAction(
                 revision_id=revision_id,
-                querier=querier,
+                searcher=searcher,
             )
         )
         return SearchAllocatedResourceSlotsPayload(
@@ -1351,12 +1491,19 @@ class DeploymentAdapter(BaseAdapter):
         input: SearchRoutesInput,
     ) -> SearchRoutesPayload:
         """Search routes scoped to a specific deployment."""
-        querier = self._build_route_querier(input, scope=scope)
+        querier = self._build_route_querier(input)
         action_result = await self._deployment.search_routes.run(
-            SearchRoutesAction(querier=querier)
+            SearchRoutesAction(
+                deployment_ids=[DeploymentID(scope.deployment_id)],
+                searcher=RouteInfoSearcher(
+                    pagination=querier.pagination,
+                    conditions=querier.conditions,
+                    orders=querier.orders,
+                ),
+            )
         )
         return SearchRoutesPayload(
-            items=[self._route_info_to_dto(item) for item in action_result.routes],
+            items=[self._route_info_to_dto(item) for item in action_result.items],
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
@@ -1374,7 +1521,9 @@ class DeploymentAdapter(BaseAdapter):
         """Search replicas scoped to a specific deployment."""
         searcher = self._build_replica_searcher(input)
         action_result = await self._deployment.search_replicas.run(
-            SearchReplicasAction(deployment_id=DeploymentID(scope.deployment_id), searcher=searcher)
+            SearchReplicasAction(
+                deployment_ids=[DeploymentID(scope.deployment_id)], searcher=searcher
+            )
         )
         return SearchReplicasPayload(
             items=[self._replica_data_to_dto(item) for item in action_result.items],
@@ -1390,7 +1539,7 @@ class DeploymentAdapter(BaseAdapter):
         """Search replicas without scope (admin, all deployments)."""
         searcher = self._build_replica_searcher(input)
         action_result = await self._deployment.global_search_replicas.run(
-            GlobalSearchReplicasAction(searcher=searcher)
+            GlobalSearchReplicasAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
         return SearchReplicasPayload(
             items=[self._replica_data_to_dto(item) for item in action_result.items],
@@ -1555,6 +1704,20 @@ class DeploymentAdapter(BaseAdapter):
             self._auto_scaling_rule_data_to_dto,
         )
 
+    async def batch_load_policies_by_ids(
+        self, ids: Sequence[DeploymentPolicyID]
+    ) -> list[DeploymentPolicyNode | Exception | None]:
+        """Batch load deployment policies for DataLoader use, checked per deployment."""
+        if not ids:
+            return []
+        policy_ids = [DeploymentPolicyID(policy_id) for policy_id in ids]
+        return await self.batch_load_fields(
+            self._deployment.partial_bulk_get_deployment_policies,
+            PartialBulkGetDeploymentPoliciesAction(ids=policy_ids),
+            policy_ids,
+            self._policy_data_to_dto,
+        )
+
     async def batch_load_policies_by_endpoint_ids(
         self,
         endpoint_ids: Sequence[DeploymentID],
@@ -1581,138 +1744,30 @@ class DeploymentAdapter(BaseAdapter):
     # ------------------------------------------------------------------
 
     def _convert_deployment_filter(self, f: DeploymentFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if f.name is not None:
-            condition = self.convert_string_filter(
-                f.name,
-                contains_factory=DeploymentConditions.by_name_contains,
-                equals_factory=DeploymentConditions.by_name_equals,
-                starts_with_factory=DeploymentConditions.by_name_starts_with,
-                ends_with_factory=DeploymentConditions.by_name_ends_with,
-                in_factory=DeploymentConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.status is not None:
-            if f.status.equals is not None:
-                lifecycles = _status_to_lifecycles(ModelDeploymentStatus(f.status.equals))
-                if lifecycles:
-                    conditions.append(DeploymentConditions.by_status_in(lifecycles))
-            if f.status.in_ is not None:
-                lifecycles = _statuses_to_lifecycles([
-                    ModelDeploymentStatus(s) for s in f.status.in_
-                ])
-                if lifecycles:
-                    conditions.append(DeploymentConditions.by_status_in(lifecycles))
-            if f.status.not_equals is not None:
-                lifecycles = _status_to_lifecycles(ModelDeploymentStatus(f.status.not_equals))
-                if lifecycles:
-                    conditions.append(DeploymentConditions.by_status_not_in(lifecycles))
-            if f.status.not_in is not None:
-                lifecycles = _statuses_to_lifecycles([
-                    ModelDeploymentStatus(s) for s in f.status.not_in
-                ])
-                if lifecycles:
-                    conditions.append(DeploymentConditions.by_status_not_in(lifecycles))
-        if f.open_to_public is not None:
-            conditions.append(DeploymentConditions.by_open_to_public(f.open_to_public))
-        if f.tags is not None:
-            condition = self.convert_string_filter(
-                f.tags,
-                contains_factory=DeploymentConditions.by_tag_contains,
-                equals_factory=DeploymentConditions.by_tag_equals,
-                starts_with_factory=DeploymentConditions.by_tag_starts_with,
-                ends_with_factory=DeploymentConditions.by_tag_ends_with,
-                in_factory=DeploymentConditions.by_tag_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.endpoint_url is not None:
-            condition = self.convert_string_filter(
-                f.endpoint_url,
-                contains_factory=DeploymentConditions.by_url_contains,
-                equals_factory=DeploymentConditions.by_url_equals,
-                starts_with_factory=DeploymentConditions.by_url_starts_with,
-                ends_with_factory=DeploymentConditions.by_url_ends_with,
-                in_factory=DeploymentConditions.by_url_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.domain_name is not None:
-            condition = self.convert_string_filter(
-                f.domain_name,
-                contains_factory=DeploymentConditions.by_domain_name_contains,
-                equals_factory=DeploymentConditions.by_domain_name_equals,
-                starts_with_factory=DeploymentConditions.by_domain_name_starts_with,
-                ends_with_factory=DeploymentConditions.by_domain_name_ends_with,
-                in_factory=DeploymentConditions.by_domain_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.project_id is not None:
-            uuid_condition = self.convert_uuid_filter(
-                f.project_id,
-                equals_factory=DeploymentConditions.by_project_filter_equals,
-                in_factory=DeploymentConditions.by_project_filter_in,
-            )
-            if uuid_condition is not None:
-                conditions.append(uuid_condition)
-        if f.resource_group is not None:
-            condition = self.convert_string_filter(
-                f.resource_group,
-                contains_factory=DeploymentConditions.by_resource_group_contains,
-                equals_factory=DeploymentConditions.by_resource_group_equals,
-                starts_with_factory=DeploymentConditions.by_resource_group_starts_with,
-                ends_with_factory=DeploymentConditions.by_resource_group_ends_with,
-                in_factory=DeploymentConditions.by_resource_group_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.created_user_id is not None:
-            uuid_condition = self.convert_uuid_filter(
-                f.created_user_id,
-                equals_factory=DeploymentConditions.by_created_user_filter_equals,
-                in_factory=DeploymentConditions.by_created_user_filter_in,
-            )
-            if uuid_condition is not None:
-                conditions.append(uuid_condition)
-        if f.created_at is not None:
-            dt_condition = f.created_at.build_query_condition(
-                before_factory=DeploymentConditions.by_created_at_before,
-                after_factory=DeploymentConditions.by_created_at_after,
-                equals_factory=DeploymentConditions.by_created_at_equals,
-            )
-            if dt_condition is not None:
-                conditions.append(dt_condition)
-        if f.destroyed_at is not None:
-            dt_condition = f.destroyed_at.build_query_condition(
-                before_factory=DeploymentConditions.by_destroyed_at_before,
-                after_factory=DeploymentConditions.by_destroyed_at_after,
-                equals_factory=DeploymentConditions.by_destroyed_at_equals,
-                is_null_factory=DeploymentConditions.by_destroyed_at_is_null,
-                is_not_null_factory=DeploymentConditions.by_destroyed_at_is_not_null,
-            )
-            if dt_condition is not None:
-                conditions.append(dt_condition)
-        if f.replicas is not None:
-            if f.replicas.some is not None:
-                replica_conditions = self._convert_replica_filter(f.replicas.some)
-                conditions.append(DeploymentConditions.by_replica_exists(replica_conditions))
-            if f.replicas.none is not None:
-                replica_conditions = self._convert_replica_filter(f.replicas.none)
-                conditions.append(
-                    negate_conditions([DeploymentConditions.by_replica_exists(replica_conditions)])
-                )
-            if f.replicas.every is not None:
-                replica_conditions = self._convert_replica_filter(f.replicas.every)
-                violating_replica = negate_conditions(replica_conditions)
-                conditions.append(
-                    negate_conditions([DeploymentConditions.by_replica_exists([violating_replica])])
-                )
-        if f.labels is not None:
-            conditions.extend(
-                self._convert_entity_label_nested_filter(f.labels, DeploymentConditions.labels)
-            )
+        fields = DeploymentSearchableFields.own
+        nested = DeploymentSearchableFields.nested
+        conditions: list[QueryCondition] = [
+            *self.apply_string_filter(f.name, fields.name.filter),
+            *self.apply_string_filter(f.tags, fields.tag.filter),
+            *self.apply_string_filter(f.endpoint_url, fields.url.filter),
+            *self.apply_string_filter(f.domain_name, fields.domain.filter),
+            *self.apply_string_filter(f.resource_group, fields.resource_group.filter),
+            *self.apply_uuid_filter(f.project_id, fields.project.filter),
+            *self.apply_uuid_filter(f.created_user_id, fields.created_user.filter),
+            *self.apply_bool_filter(f.open_to_public, fields.open_to_public.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+            *self.apply_nullable_datetime_filter(f.destroyed_at, fields.destroyed_at.filter),
+            *self._convert_deployment_status_filter(f.status),
+            *self.apply_uuid_filter(f.entity_id, fields.entity_id.filter),
+            *self.apply_int_filter(f.desired_replicas, fields.desired_replicas.filter),
+            *self.apply_enum_filter(f.scaling_state, fields.scaling_state.filter),
+            *self.apply_to_many_filter(
+                f.replicas, nested.replicas.correlation, self._convert_replica_filter
+            ),
+            *self.apply_to_many_filter(
+                f.labels, nested.labels.correlation, self._convert_entity_label_filter
+            ),
+        ]
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_deployment_filter(sub))
@@ -1731,14 +1786,39 @@ class DeploymentAdapter(BaseAdapter):
                     conditions.append(negate_conditions(sub_conditions))
         return conditions
 
-    def _build_scoped_deployment_querier(self, input: ScopedSearchDeploymentsInput) -> BatchQuerier:
+    def _convert_deployment_status_filter(
+        self, status: DeploymentStatusFilter | None
+    ) -> list[QueryCondition]:
+        """One deployment status covers several lifecycle stages, so it is not an enum filter."""
+        if status is None:
+            return []
+        stages = DeploymentSearchableFields.own.lifecycle_stage.filter
+        conditions: list[QueryCondition] = []
+        if status.equals is not None:
+            if matched := _status_to_lifecycles(status.equals):
+                conditions.append(stages.in_(matched))
+        if status.in_ is not None:
+            if matched := _statuses_to_lifecycles(status.in_):
+                conditions.append(stages.in_(matched))
+        if status.not_equals is not None:
+            if matched := _status_to_lifecycles(status.not_equals):
+                conditions.append(stages.not_in(matched))
+        if status.not_in is not None:
+            if matched := _statuses_to_lifecycles(status.not_in):
+                conditions.append(stages.not_in(matched))
+        return conditions
+
+    def _build_scoped_deployment_searcher(
+        self, input: ScopedSearchDeploymentsInput
+    ) -> DeploymentSearcher:
         conditions: list[QueryCondition] = []
         if input.filter:
             conditions.extend(self._convert_deployment_filter(input.filter))
         orders: list[QueryOrder] = (
             self._convert_deployment_orders(input.order) if input.order else []
         )
-        return self._build_querier(
+        return self._build_searcher(
+            DeploymentSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_get_deployment_pagination_spec(),
@@ -1750,14 +1830,15 @@ class DeploymentAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-    def _build_deployment_querier(self, input: AdminSearchDeploymentsInput) -> BatchQuerier:
+    def _build_deployment_searcher(self, input: AdminSearchDeploymentsInput) -> DeploymentSearcher:
         conditions: list[QueryCondition] = []
         if input.filter:
             conditions.extend(self._convert_deployment_filter(input.filter))
         orders: list[QueryOrder] = (
             self._convert_deployment_orders(input.order) if input.order else []
         )
-        return self._build_querier(
+        return self._build_searcher(
+            DeploymentSearcher,
             conditions=conditions,
             orders=orders,
             pagination_spec=_get_deployment_pagination_spec(),
@@ -1770,60 +1851,24 @@ class DeploymentAdapter(BaseAdapter):
         )
 
     def _convert_revision_filter(self, f: RevisionFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if f.revision_number is not None:
-            condition = self.convert_int_filter(
-                f.revision_number,
-                RevisionConditions.by_revision_number,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.image_id is not None:
-            uuid_condition = self.convert_uuid_filter(
-                f.image_id,
-                equals_factory=RevisionConditions.by_image_filter_equals,
-                in_factory=RevisionConditions.by_image_filter_in,
-            )
-            if uuid_condition is not None:
-                conditions.append(uuid_condition)
-        if f.model_vfolder_id is not None:
-            uuid_condition = self.convert_uuid_filter(
-                f.model_vfolder_id,
-                equals_factory=RevisionConditions.by_model_vfolder_filter_equals,
-                in_factory=RevisionConditions.by_model_vfolder_filter_in,
-            )
-            if uuid_condition is not None:
-                conditions.append(uuid_condition)
-        if f.resource_group is not None:
-            condition = self.convert_string_filter(
-                f.resource_group,
-                contains_factory=RevisionConditions.by_resource_group_contains,
-                equals_factory=RevisionConditions.by_resource_group_equals,
-                starts_with_factory=RevisionConditions.by_resource_group_starts_with,
-                ends_with_factory=RevisionConditions.by_resource_group_ends_with,
-                in_factory=RevisionConditions.by_resource_group_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.cluster_mode is not None:
-            condition = self.convert_string_filter(
-                f.cluster_mode,
-                contains_factory=RevisionConditions.by_cluster_mode_contains,
-                equals_factory=RevisionConditions.by_cluster_mode_equals,
-                starts_with_factory=RevisionConditions.by_cluster_mode_starts_with,
-                ends_with_factory=RevisionConditions.by_cluster_mode_ends_with,
-                in_factory=RevisionConditions.by_cluster_mode_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.created_at is not None:
-            dt_condition = f.created_at.build_query_condition(
-                before_factory=RevisionConditions.by_created_at_before,
-                after_factory=RevisionConditions.by_created_at_after,
-                equals_factory=RevisionConditions.by_created_at_equals,
-            )
-            if dt_condition is not None:
-                conditions.append(dt_condition)
+        fields = ModelRevisionSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_int_filter(f.revision_number, fields.revision_number.filter),
+            *self.apply_uuid_filter(f.image_id, fields.image.filter),
+            *self.apply_uuid_filter(f.model_vfolder_id, fields.model.filter),
+            *self.apply_string_filter(f.resource_group, fields.resource_group.filter),
+            *self.apply_string_filter(f.cluster_mode, fields.cluster_mode.filter),
+            *self.apply_uuid_filter(f.runtime_variant_id, fields.runtime_variant_id.filter),
+            *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
+            *self.apply_string_filter(
+                f.model_mount_destination, fields.model_mount_destination.filter
+            ),
+            *self.apply_string_filter(f.vfolder_subpath, fields.vfolder_subpath.filter),
+            *self.apply_string_filter(f.model_definition_path, fields.model_definition_path.filter),
+            *self.apply_int_filter(f.cluster_size, fields.cluster_size.filter),
+            *self.apply_uuid_filter(f.revision_preset_id, fields.revision_preset_id.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+        ]
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_revision_filter(sub))
@@ -1862,20 +1907,23 @@ class DeploymentAdapter(BaseAdapter):
         )
 
     def _convert_route_filter(self, f: RouteFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
+        fields = ReplicaSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
+        ]
         if f.status is not None:
             conditions.append(
-                RouteConditions.by_statuses([ManagerRouteStatus(s.value) for s in f.status])
+                fields.status.filter.in_([ManagerRouteStatus(s.value) for s in f.status])
             )
         if f.health_status is not None:
             conditions.append(
-                RouteConditions.by_health_statuses([
+                fields.health_status.filter.in_([
                     ManagerRouteHealthStatus(s.value) for s in f.health_status
                 ])
             )
         if f.traffic_status is not None:
             conditions.append(
-                RouteConditions.by_traffic_statuses([
+                fields.traffic_status.filter.in_([
                     ManagerRouteTrafficStatus(s.value) for s in f.traffic_status
                 ])
             )
@@ -1900,15 +1948,16 @@ class DeploymentAdapter(BaseAdapter):
     def _build_route_querier(
         self,
         input: SearchRoutesInput,
-        scope: RouteOperationScope | None = None,
     ) -> BatchQuerier:
         conditions: list[QueryCondition] = []
-        if scope is not None:
-            conditions.append(RouteConditions.by_endpoint_id(scope.deployment_id))
         if input.filter:
             f = input.filter
-            if scope is None and f.deployment_id is not None:
-                conditions.append(RouteConditions.by_endpoint_id(f.deployment_id))
+            if f.deployment_id is not None:
+                conditions.append(
+                    ReplicaSearchableFields.own.deployment_id.filter.equals(
+                        UUIDEqualMatchSpec(value=f.deployment_id, negated=False)
+                    )
+                )
             conditions.extend(self._convert_route_filter(f))
         orders: list[QueryOrder] = self._convert_route_orders(input.order) if input.order else []
         return self._build_querier(
@@ -1924,34 +1973,12 @@ class DeploymentAdapter(BaseAdapter):
         )
 
     def _convert_access_token_filter(self, f: AccessTokenFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if f.token is not None:
-            condition = self.convert_string_filter(
-                f.token,
-                contains_factory=AccessTokenConditions.by_token_contains,
-                equals_factory=AccessTokenConditions.by_token_equals,
-                starts_with_factory=AccessTokenConditions.by_token_starts_with,
-                ends_with_factory=AccessTokenConditions.by_token_ends_with,
-                in_factory=AccessTokenConditions.by_token_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.expires_at is not None:
-            condition = f.expires_at.build_query_condition(
-                before_factory=AccessTokenConditions.by_expires_at_before,
-                after_factory=AccessTokenConditions.by_expires_at_after,
-                equals_factory=AccessTokenConditions.by_expires_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.created_at is not None:
-            condition = f.created_at.build_query_condition(
-                before_factory=AccessTokenConditions.by_created_at_before,
-                after_factory=AccessTokenConditions.by_created_at_after,
-                equals_factory=AccessTokenConditions.by_created_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
+        fields = DeploymentAccessTokenSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_datetime_filter(f.expires_at, fields.expires_at.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+            *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
+        ]
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_access_token_filter(sub))
@@ -1971,25 +1998,25 @@ class DeploymentAdapter(BaseAdapter):
         return conditions
 
     def _convert_auto_scaling_rule_filter(self, f: AutoScalingRuleFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if f.created_at is not None:
-            condition = f.created_at.build_query_condition(
-                before_factory=AutoScalingRuleConditions.by_created_at_before,
-                after_factory=AutoScalingRuleConditions.by_created_at_after,
-                equals_factory=AutoScalingRuleConditions.by_created_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.last_triggered_at is not None:
-            condition = f.last_triggered_at.build_query_condition(
-                before_factory=AutoScalingRuleConditions.by_last_triggered_at_before,
-                after_factory=AutoScalingRuleConditions.by_last_triggered_at_after,
-                equals_factory=AutoScalingRuleConditions.by_last_triggered_at_equals,
-                is_null_factory=AutoScalingRuleConditions.by_last_triggered_at_is_null,
-                is_not_null_factory=AutoScalingRuleConditions.by_last_triggered_at_is_not_null,
-            )
-            if condition is not None:
-                conditions.append(condition)
+        fields = AutoScalingRuleSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+            *self.apply_nullable_datetime_filter(
+                f.last_triggered_at, fields.last_triggered_at.filter
+            ),
+            *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
+            *self.apply_enum_filter(f.metric_source, fields.metric_source.filter),
+            *self.apply_string_filter(f.metric_name, fields.metric_name.filter),
+            *self.apply_decimal_filter(f.min_threshold, fields.min_threshold.filter),
+            *self.apply_decimal_filter(f.max_threshold, fields.max_threshold.filter),
+            *self.apply_int_filter(f.step_size, fields.step_size.filter),
+            *self.apply_int_filter(f.time_window, fields.cooldown_seconds.filter),
+            *self.apply_int_filter(f.min_replicas, fields.min_replicas.filter),
+            *self.apply_int_filter(f.max_replicas, fields.max_replicas.filter),
+            *self.apply_uuid_filter(
+                f.prometheus_query_preset_id, fields.prometheus_query_preset_id.filter
+            ),
+        ]
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_auto_scaling_rule_filter(sub))
@@ -2011,24 +2038,18 @@ class DeploymentAdapter(BaseAdapter):
     def _build_auto_scaling_rule_querier(
         self,
         input: SearchAutoScalingRulesInput,
-        scope: AutoScalingRuleOperationScope | None = None,
     ) -> BatchQuerier:
         conditions: list[QueryCondition] = []
-        if scope is not None:
-            conditions.append(AutoScalingRuleConditions.by_deployment_id(scope.deployment_id))
-        elif input.filter and input.filter.deployment_id is not None:
+        if input.filter and input.filter.deployment_id is not None:
             conditions.append(
-                AutoScalingRuleConditions.by_deployment_id(input.filter.deployment_id)
+                AutoScalingRuleSearchableFields.own.deployment_id.filter.equals(
+                    UUIDEqualMatchSpec(value=input.filter.deployment_id, negated=False)
+                )
             )
         if input.filter:
             conditions.extend(self._convert_auto_scaling_rule_filter(input.filter))
         orders: list[QueryOrder] = (
-            [
-                AutoScalingRuleOrders.created_at(ascending=o.direction == OrderDirection.ASC)
-                for o in input.order
-            ]
-            if input.order
-            else []
+            [self._convert_auto_scaling_rule_order(o) for o in input.order] if input.order else []
         )
         return self._build_querier(
             conditions=conditions,
@@ -2046,7 +2067,9 @@ class DeploymentAdapter(BaseAdapter):
         conditions: list[QueryCondition] = []
         if input.filter and input.filter.deployment_id is not None:
             conditions.append(
-                DeploymentPolicyConditions.by_endpoint_ids([input.filter.deployment_id])
+                DeploymentPolicySearchableFields.own.endpoint.filter.equals(
+                    UUIDEqualMatchSpec(value=input.filter.deployment_id, negated=False)
+                )
             )
         return self._build_querier(
             conditions=conditions,
@@ -2057,84 +2080,16 @@ class DeploymentAdapter(BaseAdapter):
         )
 
     def _convert_replica_filter(self, f: ReplicaFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if f.status is not None:
-            st = f.status
-            if st.equals is not None:
-                conditions.append(
-                    RouteConditions.by_status_equals(ManagerRouteStatus(st.equals.value))
-                )
-            if st.in_ is not None:
-                conditions.append(
-                    RouteConditions.by_statuses([ManagerRouteStatus(s.value) for s in st.in_])
-                )
-            if st.not_equals is not None:
-                conditions.append(
-                    RouteConditions.by_status_not_equals(ManagerRouteStatus(st.not_equals.value))
-                )
-            if st.not_in is not None:
-                conditions.append(
-                    RouteConditions.by_status_not_in([
-                        ManagerRouteStatus(s.value) for s in st.not_in
-                    ])
-                )
-        if f.health_status is not None:
-            health_status = f.health_status
-            if health_status.equals is not None:
-                conditions.append(
-                    RouteConditions.by_health_statuses([
-                        ManagerRouteHealthStatus(health_status.equals.value)
-                    ])
-                )
-            if health_status.in_ is not None:
-                conditions.append(
-                    RouteConditions.by_health_statuses([
-                        ManagerRouteHealthStatus(status.value) for status in health_status.in_
-                    ])
-                )
-            if health_status.not_equals is not None:
-                conditions.append(
-                    negate_conditions([
-                        RouteConditions.by_health_statuses([
-                            ManagerRouteHealthStatus(health_status.not_equals.value)
-                        ])
-                    ])
-                )
-            if health_status.not_in is not None:
-                conditions.append(
-                    negate_conditions([
-                        RouteConditions.by_health_statuses([
-                            ManagerRouteHealthStatus(status.value)
-                            for status in health_status.not_in
-                        ])
-                    ])
-                )
-        if f.traffic_status is not None:
-            ts = f.traffic_status
-            if ts.equals is not None:
-                conditions.append(
-                    RouteConditions.by_traffic_status_equals(
-                        ManagerRouteTrafficStatus(ts.equals.value)
-                    )
-                )
-            if ts.in_ is not None:
-                conditions.append(
-                    RouteConditions.by_traffic_statuses([
-                        ManagerRouteTrafficStatus(s.value) for s in ts.in_
-                    ])
-                )
-            if ts.not_equals is not None:
-                conditions.append(
-                    RouteConditions.by_traffic_status_not_equals(
-                        ManagerRouteTrafficStatus(ts.not_equals.value)
-                    )
-                )
-            if ts.not_in is not None:
-                conditions.append(
-                    RouteConditions.by_traffic_status_not_in([
-                        ManagerRouteTrafficStatus(s.value) for s in ts.not_in
-                    ])
-                )
+        fields = ReplicaSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_enum_filter(f.status, fields.status.filter),
+            *self.apply_enum_filter(f.health_status, fields.health_status.filter),
+            *self.apply_enum_filter(f.traffic_status, fields.traffic_status.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+            *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
+            *self.apply_uuid_filter(f.session_id, fields.session.filter),
+            *self.apply_uuid_filter(f.revision_id, fields.revision.filter),
+        ]
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_replica_filter(sub))
@@ -2161,12 +2116,7 @@ class DeploymentAdapter(BaseAdapter):
             self._convert_access_token_filter(input.filter) if input.filter else []
         )
         orders: list[QueryOrder] = (
-            [
-                AccessTokenOrders.created_at(ascending=o.direction == OrderDirection.ASC)
-                for o in input.order
-            ]
-            if input.order
-            else []
+            [self._convert_access_token_order(o) for o in input.order] if input.order else []
         )
         return self._build_searcher(
             DeploymentAccessTokenSearcher,
@@ -2200,27 +2150,18 @@ class DeploymentAdapter(BaseAdapter):
             offset=input.offset,
         )
 
-    def _build_revision_resource_slot_querier(
+    def _build_revision_resource_slot_searcher(
         self,
         input: SearchAllocatedResourceSlotsInput,
         revision_id: DeploymentRevisionID,
-    ) -> BatchQuerier:
-        conditions: list[QueryCondition] = [
-            RevisionResourceSlotConditions.by_revision_id(revision_id),
-        ]
+    ) -> RevisionResourceSlotSearcher:
+        conditions: list[QueryCondition] = []
         if input.filter:
-            conditions.extend(
-                self._convert_allocated_slot_filter(
-                    input.filter,
-                    RevisionResourceSlotConditions,
-                )
-            )
+            conditions.extend(self._convert_allocated_slot_filter(input.filter))
         orders: list[QueryOrder] = (
-            [resolve_allocated_slot_revision_order(o.field, o.direction) for o in input.order]
-            if input.order
-            else []
+            self._convert_allocated_slot_orders(input.order) if input.order else []
         )
-        return self._build_querier(
+        querier = self._build_querier(
             conditions=conditions,
             orders=orders,
             pagination_spec=_get_revision_resource_slot_pagination_spec(),
@@ -2231,41 +2172,58 @@ class DeploymentAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
+        return RevisionResourceSlotSearcher(
+            pagination=querier.pagination,
+            conditions=querier.conditions,
+            orders=querier.orders,
+            revision_id=revision_id,
+        )
 
     def _convert_allocated_slot_filter(
         self,
         filter_: AllocatedResourceSlotFilter,
-        conditions_cls: type[RevisionResourceSlotConditions],
     ) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter_.slot_name is not None:
-            cond = self.convert_string_filter(
-                filter_.slot_name,
-                contains_factory=conditions_cls.by_slot_name_contains,
-                equals_factory=conditions_cls.by_slot_name_equals,
-                starts_with_factory=conditions_cls.by_slot_name_starts_with,
-                ends_with_factory=conditions_cls.by_slot_name_ends_with,
-                in_factory=conditions_cls.by_slot_name_in,
-            )
-            if cond is not None:
-                conditions.append(cond)
+        fields = RevisionResourceSlotSearchableFields.own
+        conditions = [*self.apply_string_filter(filter_.slot_name, fields.slot_name.filter)]
         if filter_.AND:
             for sub in filter_.AND:
-                conditions.extend(self._convert_allocated_slot_filter(sub, conditions_cls))
+                conditions.extend(self._convert_allocated_slot_filter(sub))
         if filter_.OR:
             or_groups: list[QueryCondition] = []
             for sub in filter_.OR:
-                sub_conditions = self._convert_allocated_slot_filter(sub, conditions_cls)
+                sub_conditions = self._convert_allocated_slot_filter(sub)
                 if sub_conditions:
                     or_groups.append(combine_conditions_and(sub_conditions))
             if or_groups:
                 conditions.append(combine_conditions_or(or_groups))
         if filter_.NOT:
             for sub in filter_.NOT:
-                sub_conditions = self._convert_allocated_slot_filter(sub, conditions_cls)
+                sub_conditions = self._convert_allocated_slot_filter(sub)
                 if sub_conditions:
                     conditions.append(negate_conditions(sub_conditions))
         return conditions
+
+    @staticmethod
+    def _convert_allocated_slot_orders(
+        orders: list[AllocatedResourceSlotOrder],
+    ) -> list[QueryOrder]:
+        fields = RevisionResourceSlotSearchableFields.own
+        converted: list[QueryOrder] = []
+        for o in orders:
+            ascending = o.direction == OrderDirection.ASC
+            match o.field:
+                case AllocatedResourceSlotOrderField.SLOT_NAME:
+                    converted.append(fields.slot_name.order.apply(ascending))
+                case AllocatedResourceSlotOrderField.QUANTITY:
+                    converted.append(fields.quantity.order.apply(ascending))
+                case AllocatedResourceSlotOrderField.RANK:
+                    # The searcher joins the slot catalog, so its own rank order applies.
+                    converted.append(
+                        ResourceSlotTypeSearchableFields.own.rank.order.apply(ascending)
+                    )
+                case _:
+                    assert_never(o.field)
+        return converted
 
     @staticmethod
     def _convert_tag_state(tags: list[str] | None | Unset) -> TriState[str]:
@@ -2279,71 +2237,166 @@ class DeploymentAdapter(BaseAdapter):
     # Order converters
     # ------------------------------------------------------------------
 
-    @staticmethod
-    def _convert_deployment_orders(orders: list[DeploymentOrder]) -> list[QueryOrder]:
-        result: list[QueryOrder] = []
-        for o in orders:
-            ascending = o.direction == OrderDirection.ASC
-            match o.field:
-                case DeploymentOrderField.NAME:
-                    result.append(DeploymentOrders.name(ascending))
-                case DeploymentOrderField.CREATED_AT:
-                    result.append(DeploymentOrders.created_at(ascending))
-                case DeploymentOrderField.DESTROYED_AT:
-                    result.append(DeploymentOrders.destroyed_at(ascending))
-                case DeploymentOrderField.DOMAIN:
-                    result.append(DeploymentOrders.domain(ascending))
-                case DeploymentOrderField.PROJECT:
-                    result.append(DeploymentOrders.project(ascending))
-                case DeploymentOrderField.RESOURCE_GROUP:
-                    result.append(DeploymentOrders.resource_group(ascending))
-                case DeploymentOrderField.TAG:
-                    result.append(DeploymentOrders.tag(ascending))
-        return result
+    def _convert_deployment_orders(self, orders: list[DeploymentOrder]) -> list[QueryOrder]:
+        return [self._convert_deployment_order(order) for order in orders]
 
-    @staticmethod
-    def _convert_revision_orders(orders: list[RevisionOrder]) -> list[QueryOrder]:
-        result: list[QueryOrder] = []
-        for o in orders:
-            ascending = o.direction == OrderDirection.ASC
-            match o.field:
-                case RevisionOrderField.REVISION_NUMBER:
-                    result.append(RevisionOrders.revision_number(ascending))
-                case RevisionOrderField.CREATED_AT:
-                    result.append(RevisionOrders.created_at(ascending))
-                case RevisionOrderField.RESOURCE_GROUP:
-                    result.append(RevisionOrders.resource_group(ascending))
-                case RevisionOrderField.CLUSTER_MODE:
-                    result.append(RevisionOrders.cluster_mode(ascending))
-                case RevisionOrderField.RUNTIME_VARIANT_NAME:
-                    result.append(RevisionOrders.runtime_variant_name(ascending))
-        return result
+    def _convert_deployment_order(self, order: DeploymentOrder) -> QueryOrder:
+        fields = DeploymentSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case DeploymentOrderField.NAME:
+                return fields.name.order.apply(ascending)
+            case DeploymentOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case DeploymentOrderField.DESTROYED_AT:
+                return fields.destroyed_at.order.apply(ascending)
+            case DeploymentOrderField.DOMAIN:
+                return fields.domain.order.apply(ascending)
+            case DeploymentOrderField.PROJECT:
+                return fields.project.order.apply(ascending)
+            case DeploymentOrderField.RESOURCE_GROUP:
+                return fields.resource_group.order.apply(ascending)
+            case DeploymentOrderField.TAG:
+                return fields.tag.order.apply(ascending)
+            case DeploymentOrderField.ENTITY_ID:
+                return fields.entity_id.order.apply(ascending)
+            case DeploymentOrderField.DESIRED_REPLICAS:
+                return fields.desired_replicas.order.apply(ascending)
+            case DeploymentOrderField.SCALING_STATE:
+                return fields.scaling_state.order.apply(ascending)
+            case DeploymentOrderField.CREATED_USER_ID:
+                return fields.created_user.order.apply(ascending)
+            case DeploymentOrderField.OPEN_TO_PUBLIC:
+                return fields.open_to_public.order.apply(ascending)
+            case DeploymentOrderField.ENDPOINT_URL:
+                return fields.url.order.apply(ascending)
+            case _:
+                assert_never(order.field)
 
-    @staticmethod
-    def _convert_route_orders(orders: list[RouteOrder]) -> list[QueryOrder]:
-        result: list[QueryOrder] = []
-        for o in orders:
-            ascending = o.direction == OrderDirection.ASC
-            match o.field:
-                case RouteOrderField.CREATED_AT:
-                    result.append(RouteOrders.created_at(ascending))
-                case RouteOrderField.STATUS:
-                    result.append(RouteOrders.status(ascending))
-                case RouteOrderField.TRAFFIC_RATIO:
-                    result.append(RouteOrders.traffic_ratio(ascending))
-        return result
+    def _convert_revision_orders(self, orders: list[RevisionOrder]) -> list[QueryOrder]:
+        return [self._convert_revision_order(order) for order in orders]
 
-    @staticmethod
-    def _convert_replica_orders(orders: list[ReplicaOrder]) -> list[QueryOrder]:
-        result: list[QueryOrder] = []
-        for o in orders:
-            ascending = o.direction == OrderDirection.ASC
-            match o.field:
-                case ReplicaOrderField.CREATED_AT:
-                    result.append(RouteOrders.created_at(ascending))
-                case ReplicaOrderField.ID:
-                    result.append(RouteOrders.id(ascending))
-        return result
+    def _convert_revision_order(self, order: RevisionOrder) -> QueryOrder:
+        fields = ModelRevisionSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case RevisionOrderField.REVISION_NUMBER:
+                return fields.revision_number.order.apply(ascending)
+            case RevisionOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case RevisionOrderField.RESOURCE_GROUP:
+                return fields.resource_group.order.apply(ascending)
+            case RevisionOrderField.CLUSTER_MODE:
+                return fields.cluster_mode.order.apply(ascending)
+            case RevisionOrderField.RUNTIME_VARIANT_NAME:
+                variant = ModelRevisionSearchableFields.nested.runtime_variant
+                return variant.correlation.order(variant.fields.name.column).apply(ascending)
+            case RevisionOrderField.FIELD_ID:
+                return fields.field_id.order.apply(ascending)
+            case RevisionOrderField.DEPLOYMENT_ID:
+                return fields.deployment_id.order.apply(ascending)
+            case RevisionOrderField.IMAGE_ID:
+                return fields.image.order.apply(ascending)
+            case RevisionOrderField.MODEL_VFOLDER_ID:
+                return fields.model.order.apply(ascending)
+            case RevisionOrderField.MODEL_MOUNT_DESTINATION:
+                return fields.model_mount_destination.order.apply(ascending)
+            case RevisionOrderField.VFOLDER_SUBPATH:
+                return fields.vfolder_subpath.order.apply(ascending)
+            case RevisionOrderField.MODEL_DEFINITION_PATH:
+                return fields.model_definition_path.order.apply(ascending)
+            case RevisionOrderField.CLUSTER_SIZE:
+                return fields.cluster_size.order.apply(ascending)
+            case RevisionOrderField.REVISION_PRESET_ID:
+                return fields.revision_preset_id.order.apply(ascending)
+            case _:
+                assert_never(order.field)
+
+    def _convert_route_orders(self, orders: list[RouteOrder]) -> list[QueryOrder]:
+        return [self._convert_route_order(order) for order in orders]
+
+    def _convert_route_order(self, order: RouteOrder) -> QueryOrder:
+        fields = ReplicaSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case RouteOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case RouteOrderField.STATUS:
+                return fields.status.order.apply(ascending)
+            case RouteOrderField.TRAFFIC_RATIO:
+                return fields.traffic_ratio.order.apply(ascending)
+            case _:
+                assert_never(order.field)
+
+    def _convert_access_token_order(self, order: AccessTokenOrder) -> QueryOrder:
+        fields = DeploymentAccessTokenSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case AccessTokenOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case AccessTokenOrderField.FIELD_ID:
+                return fields.field_id.order.apply(ascending)
+            case AccessTokenOrderField.EXPIRES_AT:
+                return fields.expires_at.order.apply(ascending)
+            case _:
+                assert_never(order.field)
+
+    def _convert_auto_scaling_rule_order(self, order: AutoScalingRuleOrder) -> QueryOrder:
+        fields = AutoScalingRuleSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case AutoScalingRuleOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case AutoScalingRuleOrderField.FIELD_ID:
+                return fields.field_id.order.apply(ascending)
+            case AutoScalingRuleOrderField.METRIC_SOURCE:
+                return fields.metric_source.order.apply(ascending)
+            case AutoScalingRuleOrderField.METRIC_NAME:
+                return fields.metric_name.order.apply(ascending)
+            case AutoScalingRuleOrderField.MIN_THRESHOLD:
+                return fields.min_threshold.order.apply(ascending)
+            case AutoScalingRuleOrderField.MAX_THRESHOLD:
+                return fields.max_threshold.order.apply(ascending)
+            case AutoScalingRuleOrderField.STEP_SIZE:
+                return fields.step_size.order.apply(ascending)
+            case AutoScalingRuleOrderField.TIME_WINDOW:
+                return fields.cooldown_seconds.order.apply(ascending)
+            case AutoScalingRuleOrderField.MIN_REPLICAS:
+                return fields.min_replicas.order.apply(ascending)
+            case AutoScalingRuleOrderField.MAX_REPLICAS:
+                return fields.max_replicas.order.apply(ascending)
+            case AutoScalingRuleOrderField.PROMETHEUS_QUERY_PRESET_ID:
+                return fields.prometheus_query_preset_id.order.apply(ascending)
+            case AutoScalingRuleOrderField.LAST_TRIGGERED_AT:
+                return fields.last_triggered_at.order.apply(ascending)
+            case _:
+                assert_never(order.field)
+
+    def _convert_replica_orders(self, orders: list[ReplicaOrder]) -> list[QueryOrder]:
+        return [self._convert_replica_order(order) for order in orders]
+
+    def _convert_replica_order(self, order: ReplicaOrder) -> QueryOrder:
+        fields = ReplicaSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case ReplicaOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case ReplicaOrderField.ID:
+                return fields.field_id.order.apply(ascending)
+            case ReplicaOrderField.DEPLOYMENT_ID:
+                return fields.deployment_id.order.apply(ascending)
+            case ReplicaOrderField.SESSION_ID:
+                return fields.session.order.apply(ascending)
+            case ReplicaOrderField.REVISION_ID:
+                return fields.revision.order.apply(ascending)
+            case ReplicaOrderField.STATUS:
+                return fields.status.order.apply(ascending)
+            case ReplicaOrderField.TRAFFIC_STATUS:
+                return fields.traffic_status.order.apply(ascending)
+            case ReplicaOrderField.HEALTH_STATUS:
+                return fields.health_status.order.apply(ascending)
+            case _:
+                assert_never(order.field)
 
     # ------------------------------------------------------------------
     # Data → DTO converters
@@ -2390,6 +2443,7 @@ class DeploymentAdapter(BaseAdapter):
                 open_to_public=data.network_access.open_to_public,
             ),
             replica_state=ReplicaStateInfo(
+                replica_count=data.replica_state.replica_count,
                 desired_replica_count=data.replica_state.desired_replica_count,
                 replica_ids=data.replica_state.replica_ids,
             ),

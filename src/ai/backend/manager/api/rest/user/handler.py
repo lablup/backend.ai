@@ -14,6 +14,7 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
@@ -33,12 +34,12 @@ from ai.backend.common.dto.manager.user import (
 )
 from ai.backend.common.dto.manager.user.response import UserDTO
 from ai.backend.common.types import AccessKey
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.data.user.types import UserStatus as ManagerUserStatus
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.user_request import GetUserPathParam, UpdateUserPathParam
-from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.user.actions.create_user import CreateUserAction
@@ -49,6 +50,7 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     SwitchDefaultAccessKeyAction,
 )
 from ai.backend.manager.services.user.actions.purge_user import PurgeUserAction
+from ai.backend.manager.services.user.actions.restore_user import RestoreUserAction
 from ai.backend.manager.services.user.actions.search_users import GlobalSearchUsersAction
 from ai.backend.manager.services.user.actions.update_user import UpdateUserAction
 from ai.backend.manager.types import OptionalState
@@ -60,7 +62,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.domain.processors import DomainProcessors
     from ai.backend.manager.services.user.processors import UserProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class UserHandler:
@@ -108,7 +110,7 @@ class UserHandler:
         )
 
         domain_id = (
-            await self._domain.lookup.run(
+            await self._domain.lookup_name.run(
                 LookupDomainAction(name=DomainName(body.parsed.domain_name))
             )
         ).entity_id()
@@ -171,7 +173,7 @@ class UserHandler:
         searcher = self._adapter.build_searcher(body.parsed)
 
         action_result = await self._user.global_search.run(
-            GlobalSearchUsersAction(searcher=searcher)
+            GlobalSearchUsersAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
         resp = SearchUsersResponse(
@@ -204,21 +206,47 @@ class UserHandler:
                 salt_size=self._config_provider.config.auth.password_hash_salt_size,
             )
 
+        user_id = UserID(path.parsed.user_id)
+        requested = (
+            ManagerUserStatus(body.parsed.status.value) if body.parsed.status is not None else None
+        )
+        current = (
+            ManagerUserStatus(
+                (await self._user.get_user.run(GetUserAction(user_id=user_id))).user.status
+            )
+            if requested is not None
+            else None
+        )
+        if requested is not None and current is not None and requested.restores_from(current):
+            await self._user.restore_user.run(RestoreUserAction(user_id=user_id))
         updater = self._adapter.build_updater(
-            body.parsed, UserID(path.parsed.user_id), password_info
+            body.parsed,
+            user_id,
+            password_info,
+            status=(
+                requested
+                if requested is not None
+                and current is not None
+                and requested.is_updater_value_from(current)
+                else None
+            ),
         )
 
         action_result = await self._user.update_user.run(UpdateUserAction(updater=updater))
+        data = action_result.data
 
         if body.parsed.main_access_key is not None:
             await self._user.switch_default_access_key.run(
                 SwitchDefaultAccessKeyAction(
-                    user_id=UserID(path.parsed.user_id),
+                    user_id=user_id,
                     access_key=AccessKey(body.parsed.main_access_key),
                 )
             )
+        if requested is not None and current is not None and requested.deletes_from(current):
+            await self._user.delete_user.run(DeleteUserAction(user_id=user_id))
+            data = (await self._user.get_user.run(GetUserAction(user_id=user_id))).user
 
-        resp = UpdateUserResponse(user=await self._user_dto(action_result.data))
+        resp = UpdateUserResponse(user=await self._user_dto(data))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=resp)
 
     # ------------------------------------------------------------------

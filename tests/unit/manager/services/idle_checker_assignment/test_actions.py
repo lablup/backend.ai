@@ -6,7 +6,7 @@ import pytest
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.manager.models.idle_checker.scopes import IdleCheckerAssignmentOperationScope
+from ai.backend.manager.models.idle_checker.scopes import IdleCheckerAssignmentTarget
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.services.idle_checker_assignment.actions.scoped_search import (
@@ -50,6 +50,6 @@ class TestScopedSearchIdleCheckerAssignmentsAction:
         project_id: ProjectID,
     ) -> None:
         assert action.operation_scopes() == [
-            IdleCheckerAssignmentOperationScope(scope=domain_id),
-            IdleCheckerAssignmentOperationScope(scope=project_id),
+            IdleCheckerAssignmentTarget(scope=domain_id),
+            IdleCheckerAssignmentTarget(scope=project_id),
         ]

@@ -35,7 +35,7 @@ from ai.backend.manager.actions.types import (
     ActionOperationType,
 )
 from ai.backend.manager.actions.v2.bulk.base import BaseBulkAction, BasePartialBulkAction
-from ai.backend.manager.actions.v2.bulk.monitor import BulkActionMonitor
+from ai.backend.manager.actions.v2.bulk.monitor.base import BulkActionMonitor
 from ai.backend.manager.actions.v2.bulk.partial_processor import (
     PartialBulkActionProcessor,
     PublicPartialBulkActionProcessor,
@@ -48,12 +48,16 @@ from ai.backend.manager.actions.v2.bulk.result import (
     BasePartialBulkActionResult,
     PartialBulkResult,
 )
-from ai.backend.manager.actions.v2.bulk.validator import (
+from ai.backend.manager.actions.v2.bulk.validator.base import (
     AtomicBulkActionValidator,
     PartialBulkActionValidator,
 )
 from ai.backend.manager.actions.v2.field.bulk_base import BaseBulkFieldAction
-from ai.backend.manager.actions.v2.field.bulk_lookup import LookupBulkFieldOwnerOpsAction
+from ai.backend.manager.actions.v2.field.bulk_lookup import (
+    BulkFieldKeyLookupOpsResult,
+    LookupBulkFieldByKeyOpsAction,
+    LookupBulkFieldOwnerOpsAction,
+)
 from ai.backend.manager.actions.v2.field.bulk_processor import (
     AtomicFieldResultJudge,
     BulkFieldActionProcessor,
@@ -68,21 +72,28 @@ from ai.backend.manager.actions.v2.field.processor import (
     OwnerLookupProcessor,
 )
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
-from ai.backend.manager.actions.v2.global_scope.monitor import GlobalActionMonitor
+from ai.backend.manager.actions.v2.global_scope.monitor.base import GlobalActionMonitor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     AnonymousGlobalActionProcessor,
     GlobalActionProcessor,
     PublicActionProcessor,
 )
-from ai.backend.manager.actions.v2.global_scope.validator import GlobalActionValidator
+from ai.backend.manager.actions.v2.global_scope.validator.base import GlobalActionValidator
 from ai.backend.manager.actions.v2.lookup.base import BaseLookupAction, BaseLookupActionResult
-from ai.backend.manager.actions.v2.lookup.bulk_monitor import BulkLookupActionMonitor
+from ai.backend.manager.actions.v2.lookup.bulk_monitor.base import BulkLookupActionMonitor
 from ai.backend.manager.actions.v2.lookup.bulk_processor import BulkLookupActionProcessor
-from ai.backend.manager.actions.v2.lookup.monitor import LookupActionMonitor
+from ai.backend.manager.actions.v2.lookup.monitor.base import LookupActionMonitor
+from ai.backend.manager.actions.v2.lookup.partial_bulk_processor import (
+    PartialBulkLookupActionProcessor,
+)
 from ai.backend.manager.actions.v2.lookup.processor import (
     LookupActionProcessor,
 )
-from ai.backend.manager.actions.v2.lookup.validator import LookupActionValidator
+from ai.backend.manager.actions.v2.lookup.validator.base import LookupActionValidator
+from ai.backend.manager.actions.v2.membership.base import BaseMembershipAction
+from ai.backend.manager.actions.v2.membership.monitor.base import MembershipActionMonitor
+from ai.backend.manager.actions.v2.membership.processor import MembershipActionProcessor
+from ai.backend.manager.actions.v2.membership.validator.base import MembershipActionValidator
 from ai.backend.manager.actions.v2.ops.base import (
     AtomicCreateEntityOpsAction,
     AtomicCreateGlobalEntityOpsAction,
@@ -104,6 +115,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     DeleteSingleEntityOpsAction,
     GetGlobalOpsAction,
     GetSingleEntityOpsAction,
+    GlobalSearcherOpsAction,
     LookupEntityOpsAction,
     OperationScopeOpsAction,
     PartialBulkGetEntityOpsAction,
@@ -112,6 +124,7 @@ from ai.backend.manager.actions.v2.ops.base import (
     PurgeEntityOpsAction,
     RestorePartialBulkOpsAction,
     RestoreSingleEntityOpsAction,
+    ScopedSearchOpsAction,
     SearchGlobalOpsAction,
     UpdateGlobalOpsAction,
     UpdatePartialBulkOpsAction,
@@ -132,21 +145,22 @@ from ai.backend.manager.actions.v2.ops.result import (
     ScopedBatchOpsResult,
 )
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
-from ai.backend.manager.actions.v2.scope.monitor import ScopeActionMonitor
+from ai.backend.manager.actions.v2.scope.monitor.base import ScopeActionMonitor
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
-from ai.backend.manager.actions.v2.scope.validator import ScopeActionValidator
+from ai.backend.manager.actions.v2.scope.validator.base import ScopeActionValidator
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
-from ai.backend.manager.actions.v2.single_entity.monitor import SingleEntityActionMonitor
+from ai.backend.manager.actions.v2.single_entity.monitor.base import SingleEntityActionMonitor
 from ai.backend.manager.actions.v2.single_entity.processor import (
     PublicSingleEntityActionProcessor,
     SingleEntityActionProcessor,
 )
-from ai.backend.manager.actions.v2.single_entity.validator import SingleEntityActionValidator
+from ai.backend.manager.actions.v2.single_entity.validator.base import SingleEntityActionValidator
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 from ai.backend.manager.services.ops.service import (
     BatchPurgeService,
     BatchUpdateService,
+    BulkFieldKeyLookupService,
     BulkFieldOwnerLookupService,
     BulkLookupService,
     DeleteService,
@@ -169,6 +183,7 @@ from ai.backend.manager.services.ops.service import (
     GlobalCreateWithFieldsService,
     GlobalPartialBulkPurgeService,
     GlobalRoleManagedEntityCreateService,
+    GlobalSearcherService,
     GlobalSearchService,
     GlobalUpsertService,
     LookupService,
@@ -179,6 +194,7 @@ from ai.backend.manager.services.ops.service import (
     RestoreService,
     RoleManagedEntityAtomicCreateService,
     RoleManagedEntityCreateService,
+    ScopedSearchService,
     SearchService,
     UpdateService,
 )
@@ -397,7 +413,7 @@ class ProcessorGroup[TData: EntityData]:
     ) -> PublicActionProcessor[TAction, TResult]:
         """Global state every authenticated caller may read.
 
-        The SUPERADMIN gate is replaced by an authentication check; the constructor
+        The global gate is replaced by an authentication check; the constructor
         rejects anything that is not a read, so a write cannot reach this path.
         """
         self._record(action_cls, ActionKind.GLOBAL, ActionGate.PUBLIC, ActionBacking.CUSTOM)
@@ -445,6 +461,22 @@ class ProcessorGroup[TData: EntityData]:
             func,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
+        )
+
+    def membership[TAction: BaseMembershipAction, TResult](
+        self,
+        action_cls: type[TAction],
+        func: Callable[[TAction], Awaitable[TResult]],
+        *,
+        validators: Sequence[MembershipActionValidator] = (),
+        monitors: Sequence[MembershipActionMonitor] = (),
+    ) -> MembershipActionProcessor[TAction, TResult]:
+        """An entity of this type entering scopes or leaving them."""
+        self._record(action_cls, ActionKind.MEMBERSHIP, ActionGate.PERMISSION, ActionBacking.CUSTOM)
+        return MembershipActionProcessor(
+            func,
+            monitors=(*self._deps.monitors.membership, *monitors),
+            validators=(*self._deps.validators.membership, *validators),
         )
 
     def lookup[TAction: BaseLookupAction, TResult: BaseLookupActionResult](
@@ -499,14 +531,14 @@ class ProcessorGroup[TData: EntityData]:
         action_cls: type[TAction],
         *,
         monitors: Sequence[BulkLookupActionMonitor] = (),
-    ) -> BulkLookupActionProcessor[TAction, BulkLookupOpsResult[Any, Any]]:
-        """Several keys resolved at once, each answered for; the entities they named
-        are then checked together, as a bulk read of them would be."""
+    ) -> PartialBulkLookupActionProcessor[TAction]:
+        """Several keys resolved at once, each answered for; the entity each key named
+        is checked on its own, so a denied key fails alone."""
         self._record(action_cls, ActionKind.LOOKUP, ActionGate.PERMISSION, ActionBacking.GENERIC)
-        return BulkLookupActionProcessor(
+        return PartialBulkLookupActionProcessor(
             BulkLookupService(self._deps.repository).execute,
+            partial_validators=self._deps.validators.partial_bulk,
             monitors=(*self._deps.monitors.bulk_lookup, *monitors),
-            post_validators=self._deps.validators.atomic_bulk,
         )
 
     def public_bulk_lookup_ops[TAction: BulkLookupEntityOpsAction[Any, Any]](
@@ -561,6 +593,23 @@ class ProcessorGroup[TData: EntityData]:
             monitors=(*self._deps.monitors.lookup, *monitors),
             validators=self._deps.validators.lookup,
             post_validators=self._deps.validators.single_entity,
+        )
+
+    def public_bulk_key_field_lookup_ops[TAction: LookupBulkFieldByKeyOpsAction[Any, Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        monitors: Sequence[BulkLookupActionMonitor] = (),
+    ) -> BulkLookupActionProcessor[TAction, BulkFieldKeyLookupOpsResult[Any, Any]]:
+        """The field rows several keys name, refusing nothing past authentication.
+
+        Wired only before a partial field read: that read checks each row's owner, so a
+        denied key fails as its own item instead of refusing the batch.
+        """
+        self._record(action_cls, ActionKind.LOOKUP, ActionGate.PUBLIC, ActionBacking.GENERIC)
+        return BulkLookupActionProcessor(
+            BulkFieldKeyLookupService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.bulk_lookup, *monitors),
         )
 
     def field_group[TFieldData: FieldData](
@@ -683,7 +732,21 @@ class ProcessorGroup[TData: EntityData]:
             validators=(*self._deps.validators.scope, *validators),
         )
 
-    def global_search_ops[TAction: SearchGlobalOpsAction[Any, Any]](
+    def scoped_search_ops[TAction: ScopedSearchOpsAction[Any, Any]](
+        self,
+        action_cls: type[TAction],
+        *,
+        validators: Sequence[ScopeActionValidator[ScopedSearchOpsAction[Any, Any]]] = (),
+        monitors: Sequence[ScopeActionMonitor] = (),
+    ) -> ScopeActionProcessor[TAction, ScopedBatchOpsResult[TData]]:
+        self._record(action_cls, ActionKind.SCOPE, ActionGate.PERMISSION, ActionBacking.GENERIC)
+        return ScopeActionProcessor(
+            ScopedSearchService(self._deps.repository).execute,
+            monitors=(*self._deps.monitors.scope, *monitors),
+            validators=(*self._deps.validators.scope, *validators),
+        )
+
+    def global_searcher_ops[TAction: GlobalSearcherOpsAction[Any, Any]](
         self,
         action_cls: type[TAction],
         *,
@@ -692,7 +755,7 @@ class ProcessorGroup[TData: EntityData]:
     ) -> GlobalActionProcessor[TAction, BatchOpsResult[TData]]:
         self._record(action_cls, ActionKind.GLOBAL, ActionGate.PERMISSION, ActionBacking.GENERIC)
         return GlobalActionProcessor(
-            GlobalSearchService(self._deps.repository).execute,
+            GlobalSearcherService(self._deps.repository).execute,
             monitors=(*self._deps.monitors.global_scope, *monitors),
             validators=(*self._deps.validators.global_scope, *validators),
         )

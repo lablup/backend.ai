@@ -65,8 +65,10 @@ if TYPE_CHECKING:
     from .domains_v2.secret import V2SecretClient
     from .domains_v2.service_catalog import V2ServiceCatalogClient
     from .domains_v2.session import V2SessionClient
+    from .domains_v2.session_lifecycle_handler import V2SessionLifecycleHandlerClient
     from .domains_v2.storage_host import V2StorageHostClient
     from .domains_v2.storage_namespace import V2StorageNamespaceClient
+    from .domains_v2.system_session_environ import V2SystemSessionEnvironClient
     from .domains_v2.user import V2UserClient
     from .domains_v2.vfolder import V2VFolderClient
     from .domains_v2.vfs_storage import V2VFSStorageClient
@@ -401,6 +403,12 @@ class V2ClientRegistry:
         return V2SessionClient(self._client)
 
     @cached_property
+    def session_lifecycle_handler(self) -> V2SessionLifecycleHandlerClient:
+        from .domains_v2.session_lifecycle_handler import V2SessionLifecycleHandlerClient
+
+        return V2SessionLifecycleHandlerClient(self._client)
+
+    @cached_property
     def storage_host(self) -> V2StorageHostClient:
         from .domains_v2.storage_host import V2StorageHostClient
 
@@ -411,6 +419,12 @@ class V2ClientRegistry:
         from .domains_v2.storage_namespace import V2StorageNamespaceClient
 
         return V2StorageNamespaceClient(self._client)
+
+    @cached_property
+    def system_session_environ(self) -> V2SystemSessionEnvironClient:
+        from .domains_v2.system_session_environ import V2SystemSessionEnvironClient
+
+        return V2SystemSessionEnvironClient(self._client)
 
     @cached_property
     def user(self) -> V2UserClient:

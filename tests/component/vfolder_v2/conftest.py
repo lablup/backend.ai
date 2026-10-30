@@ -36,11 +36,14 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
 )
-from ai.backend.manager.models.domain import domains
-from ai.backend.manager.models.resource_policy import keypair_resource_policies
+from ai.backend.manager.models.domain.row import domains
+from ai.backend.manager.models.resource_policy.row import keypair_resource_policies
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.vfolder.row import vfolders
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -101,6 +104,7 @@ def vfolder_processors(
         database_engine,
         V2DBOpsProvider(database_engine),
         ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = VFolderService(

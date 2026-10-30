@@ -8,6 +8,7 @@ from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
 from ai.backend.manager.actions.v2.scope.base import BaseScopeAction
 from ai.backend.manager.actions.v2.scope.result import BaseScopeActionResult
 from ai.backend.manager.actions.v2.single_entity.base import BaseSingleEntityAction
+from ai.backend.manager.models.image.scopes import ImageTarget
 
 
 @dataclass
@@ -33,12 +34,23 @@ class ImageSingleEntityAction(BaseSingleEntityAction):
 
 @dataclass
 class ImageScopeAction(BaseScopeAction):
-    """Base for an image operation bounded by a scope."""
+    """Base for an image read answered within the scopes the caller names.
+
+    An image belongs to the registry it was scanned from, to `public` when that registry
+    is registered there, and to the project it was built in. Naming a scope the caller
+    holds no permission at refuses the read.
+    """
+
+    targets: Sequence[ImageTarget]
 
     @override
     @classmethod
     def entity_type(cls) -> EntityType:
         return ImageEntityType()
+
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return [target.scope_id() for target in self.targets]
 
 
 @dataclass

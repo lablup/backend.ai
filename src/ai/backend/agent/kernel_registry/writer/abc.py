@@ -2,34 +2,24 @@ from __future__ import annotations
 
 import logging
 from abc import ABC, abstractmethod
-from collections.abc import MutableMapping
 from typing import TYPE_CHECKING
 
-from ai.backend.common.types import KernelId
-from ai.backend.logging import BraceStyleAdapter
-
-from .types import KernelRegistrySaveMetadata
+from ai.backend.logging.structured import StructuredLogger
 
 if TYPE_CHECKING:
     from ai.backend.agent.kernel import AbstractKernel
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class AbstractKernelRegistryWriter(ABC):
     """
-    Writer interface for saving kernel registry.
+    Writer interface for saving kernel recovery data.
     """
 
     @abstractmethod
-    async def save_kernel_registry(
-        self, data: MutableMapping[KernelId, AbstractKernel], metadata: KernelRegistrySaveMetadata
-    ) -> None:
+    async def save_kernel(self, kernel: AbstractKernel) -> None:
         """
-        Save the kernel registry to persistent storage.
-        args:
-            data: Kernel registry (mapping of KernelId to AbstractKernel) to be saved.
-            metadata: Metadata for the save operation.
-        Returns: None
+        Save the recovery data of a single kernel to persistent storage.
         """
         pass

@@ -9,6 +9,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainEntityType, DomainID, DomainName
 from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
@@ -19,29 +20,26 @@ from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.virtual_entity import VirtualEntityID
 from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.types import AccessKey, ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairSecrets
 from ai.backend.manager.data.permission.global_entity import global_entity_id
-from ai.backend.manager.data.permission.seed.loader import RoleSeedLoader
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow, ProjectType
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRow
 from ai.backend.manager.models.user.creators import UserCreator
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -55,6 +53,7 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.manager.repositories.ops.v2.user.provider import UserOpsProvider
 from ai.backend.manager.repositories.ops.v2.user.write import FullUserCreator
 from ai.backend.manager.secret.types import SecretValue
+from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
 from ai.backend.testutils.db import HasTable, with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -381,7 +380,6 @@ async def user_role_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:
                 name="preset-user",
                 scope_type=UserEntityType(),
                 auto_assign=True,
-                deleted=False,
             )
         )
         await session.flush()
@@ -522,8 +520,14 @@ async def public_role(db: ExtendedAsyncSAEngine) -> RoleID:
 
 @pytest.fixture
 async def declared_user_owner_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:
-    """The user_owner preset as the seed declaration states it."""
-    [seed] = [seed for seed in RoleSeedLoader().load() if seed.name == "user_owner"]
+    """The user_owner preset, as `seeds/manager/role_preset/` states its header."""
+    seed = RolePresetSeed.model_validate({
+        "id": "776c1366-dcf3-5abd-b8de-bc3ad3b759ad",
+        "name": "user_owner",
+        "scope_type": "user",
+        "auto_assign": True,
+        "permissions": {},
+    })
     async with db.begin_session() as session:
         session.add(
             RolePresetRow(
@@ -531,7 +535,6 @@ async def declared_user_owner_preset(db: ExtendedAsyncSAEngine) -> uuid.UUID:
                 name=seed.name,
                 scope_type=seed.scope_type,
                 auto_assign=seed.auto_assign,
-                deleted=False,
             )
         )
         await session.commit()

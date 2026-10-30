@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from decimal import Decimal
 
 from ai.backend.common.types import (
@@ -114,17 +113,6 @@ def get_quantity(
 def quantities_to_dict(quantities: list[SlotQuantity]) -> dict[str, str]:
     """Convert list[SlotQuantity] to a dict (order preserved)."""
     return {sq.slot_name: str(sq.quantity) for sq in quantities}
-
-
-def quantities_to_json(quantities: list[SlotQuantity]) -> str:
-    """Serialize list[SlotQuantity] to JSON string (order preserved)."""
-    return json.dumps(quantities_to_dict(quantities))
-
-
-def quantities_from_json(data: str) -> list[SlotQuantity]:
-    """Deserialize JSON string to list[SlotQuantity]."""
-    parsed = json.loads(data)
-    return [SlotQuantity(slot_name=k, quantity=Decimal(v)) for k, v in parsed.items()]
 
 
 def accumulate_to_quantities(

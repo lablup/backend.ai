@@ -11,7 +11,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import BulkScopedSearchOpsAction
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow
-from ai.backend.manager.models.resource_slot.scopes import AgentResourceOperationScope
+from ai.backend.manager.models.resource_slot.scopes import AgentResourceTarget
 from ai.backend.manager.models.resource_slot.searchers import AgentResourceSearcher
 from ai.backend.manager.models.scopes import OperationScope
 
@@ -40,7 +40,7 @@ class ScopedSearchAgentResourcesAction(
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return [AgentResourceOperationScope(agent_uuid=uuid) for uuid in self.agent_uuids]
+        return [AgentResourceTarget(agent_uuid=uuid) for uuid in self.agent_uuids]
 
     @override
     def to_searcher(self) -> AgentResourceSearcher:

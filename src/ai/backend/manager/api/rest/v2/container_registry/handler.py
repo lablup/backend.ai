@@ -6,19 +6,25 @@ import logging
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam
+from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.dto.manager.v2.container_registry.request import (
     AdminSearchContainerRegistriesInput,
     CreateContainerRegistryInput,
     DeleteContainerRegistryInput,
+    PartialBulkPurgeContainerRegistriesInput,
     UpdateContainerRegistryInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.common.dto.manager.v2.container_registry.response import (
+    DeleteContainerRegistryPayload,
+)
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.api.rest.v2.path_params import RegistryIdPathParam
 
 if TYPE_CHECKING:
     from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2ContainerRegistryHandler:
@@ -51,10 +57,29 @@ class V2ContainerRegistryHandler:
         result = await self._adapter.admin_update(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def admin_purge(
+        self,
+        path: PathParam[RegistryIdPathParam],
+    ) -> APIResponse:
+        """Purge a container registry (superadmin only)."""
+        result = await self._adapter.admin_purge(ContainerRegistryID(path.parsed.registry_id))
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def admin_partial_bulk_purge(
+        self,
+        body: BodyParam[PartialBulkPurgeContainerRegistriesInput],
+    ) -> APIResponse:
+        """Purge several container registries (superadmin only), answering for each one."""
+        result = await self._adapter.admin_partial_bulk_purge(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def admin_delete(
         self,
         body: BodyParam[DeleteContainerRegistryInput],
     ) -> APIResponse:
-        """Delete a container registry (superadmin only). Hard delete via Purger."""
-        result = await self._adapter.admin_delete(body.parsed)
-        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+        """Deprecated. Use `DELETE /v2/container-registries/{registry_id}`."""
+        result = await self._adapter.admin_purge(ContainerRegistryID(body.parsed.id))
+        return APIResponse.build(
+            status_code=HTTPStatus.OK,
+            response_model=DeleteContainerRegistryPayload(id=result.id, entity_id=result.entity_id),
+        )

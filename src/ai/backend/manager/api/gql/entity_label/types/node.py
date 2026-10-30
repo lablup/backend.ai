@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from datetime import datetime
-from typing import TYPE_CHECKING, Annotated, Any
+from typing import TYPE_CHECKING, Annotated, Any, Self, cast, override
 from uuid import UUID
 
 import strawberry
 from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
+from ai.backend.common.data.entity.entity_label import EntityLabelID
 from ai.backend.common.data.entity.types import EntityType, RuntimeEntityID
 from ai.backend.common.dto.manager.v2.entity_label.response import EntityLabelNode
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -36,7 +37,7 @@ __all__ = (
 @gql_node_type(
     BackendAIGQLMeta(
         description="One `key=value` label and the entity carrying it.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
     name="EntityLabel",
 )
@@ -44,7 +45,7 @@ class EntityLabelGQL(PydanticNodeMixin[EntityLabelNode]):
     id: NodeID[str] = gql_field(description="Label UUID (primary key).")
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the entity label.",
         ),
     )
@@ -57,7 +58,7 @@ class EntityLabelGQL(PydanticNodeMixin[EntityLabelNode]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="The labeled entity.",
         )
     )  # type: ignore[misc]
@@ -76,6 +77,20 @@ class EntityLabelGQL(PydanticNodeMixin[EntityLabelNode]):
             RuntimeEntityID(EntityType(self.entity_type), self.entity_id)
         )
 
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.entity_label_loader.load_many([
+            EntityLabelID(UUID(nid)) for nid in node_ids
+        ])
+        return cast(list[Self | None], results)
+
 
 EntityLabelEdge = Edge[EntityLabelGQL]
 
@@ -83,7 +98,7 @@ EntityLabelEdge = Edge[EntityLabelGQL]
 @gql_connection_type(
     BackendAIGQLMeta(
         description="Paginated connection for label records.",
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
     ),
 )
 class EntityLabelConnection(Connection[EntityLabelGQL]):

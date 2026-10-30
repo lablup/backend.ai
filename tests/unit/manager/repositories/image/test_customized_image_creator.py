@@ -2,19 +2,25 @@
 
 Covers what the scan writes — the creator column and the graph edge to that user's
 personal project — and the two readers that used to parse the owner label: the
-per-user image quota and the availability check a session start makes.
+per-user image quota and the availability check a session start makes. Also covers
+scanning a single image in its registry.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncGenerator, AsyncIterator
-from typing import Any, override
+from collections.abc import AsyncGenerator, AsyncIterator, Iterator
+from contextlib import asynccontextmanager
+from dataclasses import dataclass, field
+from typing import Any, Self, override
+from unittest.mock import patch
 from uuid import UUID, uuid4
 
 import aiohttp
 import pytest
 import sqlalchemy as sa
+import yarl
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import (
     ContainerRegistryEntityType,
@@ -25,6 +31,7 @@ from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.docker import LabelName
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.container_registry.base import (
     BaseContainerRegistry,
@@ -32,28 +39,27 @@ from ai.backend.manager.container_registry.base import (
     all_updates,
     rescan_counts,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
-from ai.backend.manager.data.image.types import ImageData, ImageStatus, ImageType
+from ai.backend.manager.data.image.types import ImageData, ImageIdentifier, ImageStatus, ImageType
 from ai.backend.manager.data.project.types import ProjectType
-from ai.backend.manager.errors.image import ImageNotFound
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.association_container_registries_groups import (
+from ai.backend.manager.errors.common import InternalServerError
+from ai.backend.manager.errors.image import ImageNotFound, RegistryNotFoundForImage
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
 )
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageAliasRow, ImageIdentifier, ImageRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.creators import ImageCreator
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
-from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -64,6 +70,7 @@ from ai.backend.manager.models.virtual_entity.entity_membership_field import (
 )
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.image.db_source.db_source import ImageDBSource
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
@@ -89,6 +96,57 @@ _ORM_CLUSTER = (
 )
 
 
+@dataclass(frozen=True)
+class _Reply:
+    status: int = 200
+    payload: Any = None
+    headers: dict[str, str] = field(default_factory=dict)
+
+    async def __aenter__(self) -> Self:
+        return self
+
+    async def __aexit__(self, *_: object) -> None:
+        return None
+
+    async def read(self) -> bytes:
+        return dump_json_str(self.payload).encode()
+
+    async def json(self) -> Any:
+        return self.payload
+
+    def raise_for_status(self) -> None:
+        if self.status >= 400:
+            raise aiohttp.ClientError(f"HTTP {self.status}")
+
+
+class _RegistrySession:
+    """Answers GETs by path, 404 for any other path, and records what was asked."""
+
+    requested: list[str]
+    _replies: dict[str, _Reply]
+
+    def __init__(self, replies: dict[str, _Reply]) -> None:
+        self.requested = []
+        self._replies = replies
+
+    def get(self, url: yarl.URL | str, **_: Any) -> _Reply:
+        path = yarl.URL(url).path
+        self.requested.append(path)
+        return self._replies.get(path, _Reply(status=404))
+
+
+def _serving(session: _RegistrySession) -> Any:
+    """Hand ``session`` to every scanner in place of the HTTP session it opens."""
+
+    @asynccontextmanager
+    async def prepare_client_session(
+        registry: BaseContainerRegistry,
+    ) -> AsyncIterator[tuple[yarl.URL, _RegistrySession]]:
+        yield registry.registry_url, session
+
+    return patch.object(BaseContainerRegistry, "prepare_client_session", prepare_client_session)
+
+
 class _FakeRegistryScanner(BaseContainerRegistry):
     """The rescan commit alone; nothing here reaches the registry over HTTP."""
 
@@ -100,95 +158,97 @@ class _FakeRegistryScanner(BaseContainerRegistry):
         raise NotImplementedError
 
 
+@pytest.fixture
+async def db_with_cleanup(
+    global_entity_ids: ExtendedAsyncSAEngine,
+) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+    """The global entities come with it: an image of a global registry joins
+    `public`, which needs that singleton's id."""
+    async with with_tables(
+        global_entity_ids,
+        [
+            DomainRow,
+            UserResourcePolicyRow,
+            ProjectResourcePolicyRow,
+            KeyPairResourcePolicyRow,
+            UserRow,
+            KeyPairRow,
+            ProjectRow,
+            AssocGroupUserRow,
+            ContainerRegistryRow,
+            AssociationContainerRegistriesGroupsRow,
+            ImageRow,
+            ImageAliasRow,
+            VirtualEntityRow,
+            EntityMembershipRow,
+            EntityMembershipCapRow,
+            EntityMembershipFieldRow,
+            ScopeBindingRow,
+        ],
+    ):
+        yield global_entity_ids
+
+
+@pytest.fixture
+async def domain_id(db_with_cleanup: ExtendedAsyncSAEngine) -> DomainID:
+    domain_id = DomainID(uuid4())
+    async with db_with_cleanup.begin_session() as sess:
+        sess.add(
+            DomainRow(
+                id=domain_id,
+                name=DOMAIN_NAME,
+                is_active=True,
+                total_resource_slots=ResourceSlot(),
+                allowed_vfolder_hosts={},
+                allowed_docker_registries=[REGISTRY_NAME],
+                dotfiles=b"\x90",
+            )
+        )
+        sess.add(
+            UserResourcePolicyRow(
+                name=USER_RESOURCE_POLICY_NAME,
+                max_vfolder_count=0,
+                max_quota_scope_size=0,
+                max_session_count_per_model_session=0,
+                max_customized_image_count=10,
+            )
+        )
+        sess.add(
+            ProjectResourcePolicyRow(
+                name=PROJECT_RESOURCE_POLICY_NAME,
+                max_vfolder_count=0,
+                max_quota_scope_size=0,
+                max_network_count=0,
+            )
+        )
+        await sess.commit()
+    return domain_id
+
+
+@pytest.fixture
+async def registry_id(
+    db_with_cleanup: ExtendedAsyncSAEngine, domain_id: DomainID
+) -> ContainerRegistryID:
+    registry_id = ContainerRegistryID(uuid4())
+    async with db_with_cleanup.begin_session() as sess:
+        sess.add(
+            ContainerRegistryRow(
+                id=registry_id,
+                url=f"https://{REGISTRY_NAME}",
+                registry_name=REGISTRY_NAME,
+                type=ContainerRegistryType.DOCKER,
+                project=REGISTRY_PROJECT,
+                is_global=True,
+            )
+        )
+        await VirtualEntitySeeder().get_or_create_node(
+            sess, ContainerRegistryEntityType(), registry_id
+        )
+        await sess.commit()
+    return registry_id
+
+
 class TestImageOwnershipGraph:
-    # -- fixtures ----------------------------------------------------------------------
-
-    @pytest.fixture
-    async def db_with_cleanup(
-        self,
-        database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        async with with_tables(
-            database_connection,
-            [
-                DomainRow,
-                UserResourcePolicyRow,
-                ProjectResourcePolicyRow,
-                KeyPairResourcePolicyRow,
-                UserRow,
-                KeyPairRow,
-                ProjectRow,
-                AssocGroupUserRow,
-                ContainerRegistryRow,
-                AssociationContainerRegistriesGroupsRow,
-                ImageRow,
-                ImageAliasRow,
-                VirtualEntityRow,
-                EntityMembershipRow,
-                EntityMembershipCapRow,
-                EntityMembershipFieldRow,
-                ScopeBindingRow,
-            ],
-        ):
-            yield database_connection
-
-    @pytest.fixture
-    async def domain_id(self, db_with_cleanup: ExtendedAsyncSAEngine) -> DomainID:
-        domain_id = DomainID(uuid4())
-        async with db_with_cleanup.begin_session() as sess:
-            sess.add(
-                DomainRow(
-                    id=domain_id,
-                    name=DOMAIN_NAME,
-                    is_active=True,
-                    total_resource_slots=ResourceSlot(),
-                    allowed_vfolder_hosts={},
-                    allowed_docker_registries=[REGISTRY_NAME],
-                    dotfiles=b"\x90",
-                )
-            )
-            sess.add(
-                UserResourcePolicyRow(
-                    name=USER_RESOURCE_POLICY_NAME,
-                    max_vfolder_count=0,
-                    max_quota_scope_size=0,
-                    max_session_count_per_model_session=0,
-                    max_customized_image_count=10,
-                )
-            )
-            sess.add(
-                ProjectResourcePolicyRow(
-                    name=PROJECT_RESOURCE_POLICY_NAME,
-                    max_vfolder_count=0,
-                    max_quota_scope_size=0,
-                    max_network_count=0,
-                )
-            )
-            await sess.commit()
-        return domain_id
-
-    @pytest.fixture
-    async def registry_id(
-        self, db_with_cleanup: ExtendedAsyncSAEngine, domain_id: DomainID
-    ) -> ContainerRegistryID:
-        registry_id = ContainerRegistryID(uuid4())
-        async with db_with_cleanup.begin_session() as sess:
-            sess.add(
-                ContainerRegistryRow(
-                    id=registry_id,
-                    url=f"https://{REGISTRY_NAME}",
-                    registry_name=REGISTRY_NAME,
-                    type=ContainerRegistryType.DOCKER,
-                    project=REGISTRY_PROJECT,
-                    is_global=True,
-                )
-            )
-            await VirtualEntitySeeder().get_or_create_node(
-                sess, ContainerRegistryEntityType(), registry_id
-            )
-            await sess.commit()
-        return registry_id
-
     # -- helpers -----------------------------------------------------------------------
 
     async def _create_user(
@@ -303,6 +363,10 @@ class TestImageOwnershipGraph:
     async def _owning_projects(self, db: ExtendedAsyncSAEngine, image_id: ImageID) -> list[UUID]:
         async with V2DBOpsProvider(db).read_ops() as r:
             return list(await r.scopes_owning(ProjectEntityType(), image_id))
+
+    async def _owning_registries(self, db: ExtendedAsyncSAEngine, image_id: ImageID) -> list[UUID]:
+        async with V2DBOpsProvider(db).read_ops() as r:
+            return list(await r.scopes_owning(ContainerRegistryEntityType(), image_id))
 
     async def _commit_rescan(
         self,
@@ -508,6 +572,7 @@ class TestImageOwnershipGraph:
         )
 
         assert [(image.customized, image.creator_id) for image in scanned] == [(True, user_id)]
+        assert await self._owning_registries(db_with_cleanup, scanned[0].id) == [registry_id]
         assert await self._owning_projects(db_with_cleanup, scanned[0].id) == [project_id]
 
     async def test_a_scanned_image_stays_unowned_without_a_personal_project(
@@ -582,3 +647,190 @@ class TestImageOwnershipGraph:
         )
 
         assert await self._kind_and_creator(db_with_cleanup, image_id) == (True, None)
+
+    async def test_a_scanned_image_owned_by_an_unknown_user_is_created_without_a_creator(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+        registry_id: ContainerRegistryID,
+    ) -> None:
+        canonical = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:a"
+
+        scanned = await self._commit_rescan(
+            db_with_cleanup,
+            registry_id,
+            {ImageIdentifier(canonical, "x86_64"): self._scan_payload(UserID(uuid4()))},
+        )
+
+        assert [(image.customized, image.creator_id) for image in scanned] == [(True, None)]
+        assert await self._owning_projects(db_with_cleanup, scanned[0].id) == []
+
+    async def test_an_unknown_owner_leaves_the_other_scanned_images_registered(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+        registry_id: ContainerRegistryID,
+    ) -> None:
+        unknown = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:a"
+        plain = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:b"
+
+        scanned = await self._commit_rescan(
+            db_with_cleanup,
+            registry_id,
+            {
+                ImageIdentifier(unknown, "x86_64"): self._scan_payload(UserID(uuid4())),
+                ImageIdentifier(plain, "x86_64"): self._scan_payload(None),
+            },
+        )
+
+        assert {(str(image.name), image.customized, image.creator_id) for image in scanned} == {
+            (unknown, True, None),
+            (plain, False, None),
+        }
+
+    async def test_rescanning_an_image_whose_creator_was_purged_clears_the_creator(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        domain_id: DomainID,
+        registry_id: ContainerRegistryID,
+    ) -> None:
+        owner_id = await self._create_user(db_with_cleanup, domain_id, "owner@test.io")
+        image_id, canonical = await self._create_image(
+            db_with_cleanup, registry_id, "a", owner_user_id=owner_id
+        )
+        async with db_with_cleanup.begin_session() as sess:
+            await sess.execute(sa.delete(UserRow).where(UserRow.uuid == owner_id))
+            await sess.commit()
+
+        await self._commit_rescan(
+            db_with_cleanup,
+            registry_id,
+            {ImageIdentifier(canonical, "x86_64"): self._scan_payload(owner_id)},
+        )
+
+        assert await self._kind_and_creator(db_with_cleanup, image_id) == (True, None)
+
+
+class TestScanImage:
+    @pytest.fixture
+    def source(self, db_with_cleanup: ExtendedAsyncSAEngine) -> ImageDBSource:
+        return ImageDBSource(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
+
+    @pytest.fixture
+    def registry_manifests(self) -> Iterator[_RegistrySession]:
+        repository = "/v2/stable/python"
+        replies = {
+            "/v2/": _Reply(),
+            f"{repository}/manifests/latest": _Reply(
+                payload={
+                    "manifests": [
+                        {
+                            "digest": f"sha256:{arch}",
+                            "platform": {"os": "linux", "architecture": arch},
+                        }
+                        for arch in ("amd64", "arm64")
+                    ]
+                },
+                headers={"Content-Type": BaseContainerRegistry.MEDIA_TYPE_DOCKER_MANIFEST_LIST},
+            ),
+        }
+        for arch in ("amd64", "arm64"):
+            replies[f"{repository}/manifests/sha256:{arch}"] = _Reply(
+                payload={"config": {"digest": f"sha256:config-{arch}", "size": 10}, "layers": []}
+            )
+            replies[f"{repository}/blobs/sha256:config-{arch}"] = _Reply(
+                payload={"architecture": arch, "config": {"Labels": {}}}
+            )
+        session = _RegistrySession(replies)
+        with _serving(session):
+            yield session
+
+    @pytest.mark.parametrize(
+        "architecture, expected_architecture",
+        [("x86_64", "x86_64"), ("aarch64", "aarch64"), ("arm64", "aarch64")],
+    )
+    async def test_scan_registers_new_image_and_returns_requested_architecture(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        registry_id: ContainerRegistryID,
+        source: ImageDBSource,
+        registry_manifests: _RegistrySession,
+        architecture: str,
+        expected_architecture: str,
+    ) -> None:
+        canonical = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python"
+
+        image = await source.scan_image(canonical, architecture)
+
+        assert image.architecture == expected_architecture
+        assert str(image.name) == canonical + ":latest"
+        async with db_with_cleanup.begin_readonly_session() as session:
+            rows = (await session.scalars(sa.select(ImageRow))).all()
+            assert {row.architecture for row in rows} == {"x86_64", "aarch64"}
+            assert any(
+                row.id == image.id and row.architecture == expected_architecture for row in rows
+            )
+
+    async def test_scan_existing_image_preserves_id_without_duplicates(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        registry_id: ContainerRegistryID,
+        source: ImageDBSource,
+        registry_manifests: _RegistrySession,
+    ) -> None:
+        canonical = f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:latest"
+        first = await source.scan_image(canonical, "x86_64")
+
+        second = await source.scan_image(canonical, "x86_64")
+
+        assert second.id == first.id
+        assert second.architecture == "x86_64"
+        async with db_with_cleanup.begin_readonly_session() as session:
+            assert await session.scalar(sa.select(sa.func.count()).select_from(ImageRow)) == 2
+
+    @pytest.mark.parametrize("canonical", ["unknown.example/stable/python:latest", REGISTRY_NAME])
+    async def test_canonical_scan_never_falls_back_to_registry_scan(
+        self,
+        registry_id: ContainerRegistryID,
+        source: ImageDBSource,
+        canonical: str,
+    ) -> None:
+        session = _RegistrySession({})
+        with _serving(session):
+            with pytest.raises(RegistryNotFoundForImage):
+                await source.scan_image(canonical, "x86_64")
+        assert not session.requested
+
+    async def test_canonical_scan_rejects_duplicate_registry_rows(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        registry_id: ContainerRegistryID,
+        source: ImageDBSource,
+    ) -> None:
+        async with db_with_cleanup.begin_session() as session:
+            session.add(
+                ContainerRegistryRow(
+                    id=ContainerRegistryID(uuid4()),
+                    url=f"https://{REGISTRY_NAME}",
+                    registry_name=REGISTRY_NAME,
+                    type=ContainerRegistryType.DOCKER,
+                    project=REGISTRY_PROJECT,
+                    is_global=True,
+                )
+            )
+        with pytest.raises(InternalServerError):
+            await source.scan_image(f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:latest", "x86_64")
+
+    @pytest.mark.parametrize("tag, architecture", [("latest", "s390x"), ("removed", "x86_64")])
+    async def test_scan_missing_image_raises_image_not_found(
+        self,
+        registry_id: ContainerRegistryID,
+        source: ImageDBSource,
+        registry_manifests: _RegistrySession,
+        tag: str,
+        architecture: str,
+    ) -> None:
+        with pytest.raises(ImageNotFound):
+            await source.scan_image(
+                f"{REGISTRY_NAME}/{REGISTRY_PROJECT}/python:{tag}", architecture
+            )

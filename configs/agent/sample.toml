@@ -277,6 +277,69 @@
       # Added in 26.4.4
       interval = 30.0
 
+  # User, privilege, resource limits, and healthcheck of the socket relay
+  # container that connects kernel containers to the agent socket.
+  # Added in 26.10.0
+  [agent.socket-relay]
+    # Run socat in the socket relay container as a non-root user. A root agent
+    # changes the owner of the socket directory to uid/gid 65534 and runs the
+    # relay as that user; a non-root agent runs the relay as its own user. The
+    # setting applies when the relay container is created, so remove the
+    # backendai-socket-relay.<agent id> container before restarting the agent
+    # after changing it.
+    # Added in 26.10.0
+    run-as-non-root = false
+    # Create the socket relay container with the no-new-privileges security
+    # option, so its processes cannot gain privileges through setuid binaries.
+    # Added in 26.10.0
+    no-new-privileges = false
+    # Drop all Linux capabilities from the socket relay container. Without run-
+    # as-non-root, the relay then runs as root that cannot write to a socket
+    # directory owned by another user, such as the directory of a non-root
+    # agent.
+    # Added in 26.10.0
+    drop-all-capabilities = false
+    # Mount the root filesystem of the socket relay container read-only.
+    # Added in 26.10.0
+    read-only-rootfs = false
+    # Maximum number of processes in the socket relay container. Unlimited if
+    # not set.
+    # Added in 26.10.0
+    ## pids-limit = 64
+    # Maximum number of connections that socat serves at once, each in its own
+    # child process. Must be smaller than pids-limit when both are set.
+    # Unlimited if not set.
+    # Added in 26.10.0
+    ## max-children = 32
+    # Memory limit of the socket relay container. Unlimited if not set.
+    # Added in 26.10.0
+    ## memory = "64M"
+    # CPU limit of the socket relay container, in cores. Unlimited if not set.
+    # Added in 26.10.0
+    ## cpus = 1.0
+
+    # Healthcheck of the socket relay container. The settings apply when the
+    # relay container is created, so remove the backendai-socket-relay.<agent
+    # id> container before restarting the agent after changing them.
+    # Added in 26.10.0
+    [agent.socket-relay.health-check]
+      # Add a healthcheck to the socket relay container that reports it
+      # unhealthy when the agent socket file in the container is missing or not
+      # a socket. The healthcheck only reports the status and does not restart
+      # the container.
+      # Added in 26.10.0
+      enable = true
+      # Seconds between healthcheck runs.
+      # Added in 26.10.0
+      interval = 30.0
+      # Seconds a healthcheck run may take before it counts as a failure.
+      # Added in 26.10.0
+      timeout = 30.0
+      # Number of consecutive failed healthcheck runs before the container is
+      # reported unhealthy.
+      # Added in 26.10.0
+      retries = 3
+
 # Container runtime configuration including execution modes, user settings, and
 # networking. In multi-agent mode (when 'agents' field is populated), this
 # serves as the default configuration that individual agents inherit and can
@@ -293,6 +356,12 @@
   # file permissions on mounted volumes.
   # Added in 25.12.0
   kernel-gid = "1000"
+  # User the kernel container entrypoint starts as, as the container runtime's
+  # User field ("uid", "uid:gid" or a name). None lets the container runtime
+  # decide. Agent-wide: it does not follow the per-user container_uid, so the
+  # two can conflict.
+  # Added in 26.10.0
+  ## entrypoint-user = "0:0"
   # Range of host ports allocated to containers for network services. Format is
   # [start, end] inclusive. Containers get ports from this range for SSH,
   # Jupyter, and other services. In multi-agent mode, ensure non-overlapping
@@ -753,11 +822,6 @@
   # keys will be stored under this namespace.
   # Added in 22.03.0
   namespace = "backend"
-  # Network address of the etcd server. Default is the standard etcd port on
-  # localhost. In production, should point to one or more etcd instance
-  # endpoint(s).
-  # Added in 22.03.0
-  addr = { host = "etcd-cluster", port = 2379 }
   # Username for authenticating with etcd. Optional if etcd doesn't require
   # authentication. Should be set along with password for secure deployments.
   # Added in 22.03.0
@@ -766,6 +830,29 @@
   # environments. Set together with the user field for authentication.
   # Added in 22.03.0
   ## password = "ETCD_PASSWORD"
+  # Seconds without a frame from an etcd member before a keep-alive ping is sent
+  # on a connection with requests in flight. Must not be below the server's
+  # --grpc-keepalive-min-time (5 seconds by default).
+  # Added in 26.10.0
+  keep-alive-interval = 5.0
+  # Seconds to wait for a keep-alive ping reply before the connection to that
+  # etcd member is closed and its requests go to the other members.
+  # Added in 26.10.0
+  keep-alive-timeout = 3.0
+
+  # Addresses of the etcd cluster members. List every member of an etcd cluster,
+  # or a single address of a standalone server.
+  # Added in 26.10.0
+  [[etcd.addrs]]
+  # Add multiple [[etcd.addrs]] sections as needed
+    # Host address of the service. Can be a hostname, IP address, or special
+    # addresses like 0.0.0.0 to bind to all interfaces.
+    # Added in 22.03.0
+    host = "etcd1.example.com"
+    # Port number of the service. Must be between 1 and 65535. Ports below 1024
+    # require root/admin privileges.
+    # Added in 22.03.0
+    port = 2379
 
 # Container log collection and retention configuration. Controls how container
 # stdout/stderr logs are collected, stored, and made available to users.
@@ -832,6 +919,16 @@
   # for containers with heavy startup processes.
   # Added in 25.12.0
   init-timeout-sec = 120.0
+
+# Configuration for the periodic status checks of the volumes.
+# Added in 26.10.0
+[volume-status-check]
+  # Seconds between two status checks of a volume.
+  # Added in 26.10.0
+  check-interval = 60.0
+  # Seconds to wait before the first status check of a volume.
+  # Added in 26.10.0
+  initial-delay = 5.0
 
 # Configuration overrides for running multiple agents from a single
 # configuration file. Use this field only when defining 2 or more agents;

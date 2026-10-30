@@ -3,13 +3,13 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 from .db_source.db_source import RuntimeVariantPresetDBSource
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RuntimeVariantPresetRepository:

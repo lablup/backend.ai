@@ -17,17 +17,17 @@ from ai.backend.common.types import (
     SessionId,
     SessionTypes,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.errors.agent import AgentNotAllocated
 from ai.backend.manager.errors.common import ServerMisconfiguredError
-from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class StatusTransitionHook(ABC):
@@ -87,10 +87,7 @@ class RunningTransitionHook(StatusTransitionHook):
             case SessionTypes.BATCH:
                 await self._execute_batch(session)
             case _:
-                log.debug(
-                    "No specific RUNNING hook for session type {}",
-                    session_type,
-                )
+                log.debug("no running hook for session type", session_type=session_type)
 
     async def _execute_batch(self, session: SessionWithKernels) -> None:
         """Trigger batch execution for BATCH sessions."""
@@ -120,11 +117,7 @@ class RunningTransitionHook(StatusTransitionHook):
                         main_kernel.runtime.startup_command or "",
                         float(session_batch_timeout) if session_batch_timeout is not None else None,
                     )
-        log.info(
-            "Successfully triggered batch execution for session {} on agent {}",
-            session_id,
-            agent_id,
-        )
+        log.trace("batch execution triggered", agent_id=agent_id)
 
 
 @dataclass
@@ -185,17 +178,7 @@ class TerminatedTransitionHook(StatusTransitionHook):
         if agent_id is None:
             raise AgentNotAllocated(f"Main kernel has no agent assigned for session {session_id}")
         async with self._deps.agent_client_pool.acquire(AgentId(agent_id)) as client:
-            try:
-                await client.destroy_local_network(network_id)
-            except Exception:
-                log.exception(
-                    "Failed to destroy local network on agent for session. "
-                    "Session ID: {}, Network ID: {}, Agent ID: {}",
-                    session_id,
-                    network_id,
-                    agent_id,
-                )
-                raise
+            await client.destroy_local_network(network_id)
 
     async def _destroy_overlay_network(self, session_id: SessionId, network_id: str) -> None:
         default_driver = self._deps.config_provider.config.network.inter_container.default_driver
@@ -208,14 +191,4 @@ class TerminatedTransitionHook(StatusTransitionHook):
                 f"For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'."
             )
         network_plugin = self._deps.network_plugin_ctx.plugins[default_driver]
-        try:
-            await network_plugin.destroy_network(network_id=network_id)
-        except Exception:
-            log.exception(
-                "Failed to destroy overlay network for session. "
-                "Session ID: {}, Network ID: {}, Driver: {}",
-                session_id,
-                network_id,
-                default_driver,
-            )
-            raise
+        await network_plugin.destroy_network(network_id=network_id)

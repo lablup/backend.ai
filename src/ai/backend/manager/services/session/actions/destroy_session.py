@@ -3,7 +3,7 @@ from typing import Any, override
 
 from ai.backend.common.types import AccessKey, SessionId
 from ai.backend.manager.actions.types import ActionOperationType
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.session.base import SessionAction
 
 

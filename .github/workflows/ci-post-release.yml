@@ -1,0 +1,88 @@
+name: ci-post-release
+
+# Work that follows a published release without holding up PyPI publishing,
+# called by `ci.yml` once `ci-release.yml` has finished.
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        description: The tag being released, e.g. 26.9.0
+        type: string
+        required: true
+      release-audience:
+        description: RELEASE_AUDIENCE from `scripts/determine-release-type.py`; `internal` skips the conda pack
+        type: string
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+
+  build-isla-sorna-image:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Isla Sorna repo image build
+        run: |
+          gh api /repos/lablup/isla-sorna/dispatches \
+              --method POST \
+              -f 'event_type=build-images' \
+              -F "client_payload[version]=${{ inputs.tag }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
+
+  build-conda-pack-for-windows:
+    if: inputs.release-audience != 'internal'
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+    - name: Check out the revision
+      uses: actions/checkout@v6
+    - name: Git LFS Pull
+      run: git lfs pull
+    - name: Extract Python version from pants.toml
+      shell: bash
+      run: |
+        export LANG=C.UTF-8
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+        cache: pip
+    - name: Install local dependencies for packaging
+      run: |
+        pip install -U 'packaging>=21.3'
+    - name: Normalize the package version
+      shell: bash
+      run: |
+        PKGVER=$(python -c "import packaging.version,pathlib; print(str(packaging.version.Version(pathlib.Path('VERSION').read_text())))")
+        echo "PKGVER=$PKGVER" >> $GITHUB_ENV
+    - name: Install conda-pack
+      uses: s-weigand/setup-conda@v1
+      with:
+        activate-conda: false
+    - name: Download wheels
+      uses: actions/download-artifact@v6
+      with:
+        name: wheels
+        path: dist
+    - name: Create conda environment
+      # FIXME: Let's think about resolving dependency of backend.ai-client package programmatically, instead of hardcoding it.
+      run: |
+        pip install conda-pack
+        conda create -n backend.ai-client python=${{ env.PROJECT_PYTHON_VERSION }}
+        conda activate backend.ai-client
+        pip install dist/backend_ai_client-${{ env.PKGVER }}-py3-none-any.whl dist/backend_ai_cli-${{ env.PKGVER }}-py3-none-any.whl dist/backend_ai_common-${{ env.PKGVER }}-py3-none-any.whl dist/backend_ai_plugin-${{ env.PKGVER }}-py3-none-any.whl
+        conda-pack -o backend.ai-client-${{ inputs.tag }}-windows-conda.zip
+    - name: Upload conda-pack to GitHub release
+      run: |
+        gh release upload ${{ inputs.tag }} backend.ai-client-${{ inputs.tag }}-windows-conda.zip
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

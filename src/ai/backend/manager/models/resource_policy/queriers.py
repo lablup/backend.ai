@@ -22,7 +22,12 @@ from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.resource_policy.searchable_fields import (
+    KeyPairResourcePolicySearchableFields,
+    ProjectResourcePolicySearchableFields,
+    UserResourcePolicySearchableFields,
+)
+from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
 @dataclass
@@ -46,7 +51,7 @@ class KeyPairResourcePolicyQuerier(
 
     @override
     def to_data(self, row: KeyPairResourcePolicyRow) -> KeyPairResourcePolicyData:
-        return row.to_dataclass()
+        return KeyPairResourcePolicySearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -70,7 +75,7 @@ class ProjectResourcePolicyQuerier(
 
     @override
     def to_data(self, row: ProjectResourcePolicyRow) -> ProjectResourcePolicyData:
-        return row.to_dataclass()
+        return ProjectResourcePolicySearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -92,4 +97,58 @@ class UserResourcePolicyQuerier(DataQuerier[UserResourcePolicyRow, UserResourceP
 
     @override
     def to_data(self, row: UserResourcePolicyRow) -> UserResourcePolicyData:
-        return row.to_dataclass()
+        return UserResourcePolicySearchableFields.own.to_data(row)
+
+
+class BulkKeyPairResourcePolicyQuerier(
+    BulkEntityQuerier[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
+):
+    """The policies the caller named."""
+
+    @override
+    def row_class(self) -> type[KeyPairResourcePolicyRow]:
+        return KeyPairResourcePolicyRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return KeyPairResourcePolicyRow.uuid
+
+    @override
+    def to_data(self, row: KeyPairResourcePolicyRow) -> KeyPairResourcePolicyData:
+        return KeyPairResourcePolicySearchableFields.own.to_data(row)
+
+
+class BulkProjectResourcePolicyQuerier(
+    BulkEntityQuerier[ProjectResourcePolicyRow, ProjectResourcePolicyData]
+):
+    """The policies the caller named."""
+
+    @override
+    def row_class(self) -> type[ProjectResourcePolicyRow]:
+        return ProjectResourcePolicyRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return ProjectResourcePolicyRow.uuid
+
+    @override
+    def to_data(self, row: ProjectResourcePolicyRow) -> ProjectResourcePolicyData:
+        return ProjectResourcePolicySearchableFields.own.to_data(row)
+
+
+class BulkUserResourcePolicyQuerier(
+    BulkEntityQuerier[UserResourcePolicyRow, UserResourcePolicyData]
+):
+    """The policies the caller named."""
+
+    @override
+    def row_class(self) -> type[UserResourcePolicyRow]:
+        return UserResourcePolicyRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return UserResourcePolicyRow.uuid
+
+    @override
+    def to_data(self, row: UserResourcePolicyRow) -> UserResourcePolicyData:
+        return UserResourcePolicySearchableFields.own.to_data(row)

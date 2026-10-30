@@ -39,14 +39,9 @@ from ai.backend.manager.models.idle_checker.upserters import (
     SessionIdleCheckExcluder,
     SessionIdleCheckIncluder,
 )
-from ai.backend.manager.models.session.conditions import SessionConditions
 from ai.backend.manager.models.session.row import SessionRow
-from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    execute_batch_querier,
-)
 from ai.backend.manager.repositories.idle_checker.types import (
     ExpiredIdleCheckBatchData,
     ExpiredIdleCheckData,
@@ -115,9 +110,8 @@ class IdleCheckerDBSource:
                 )),
             )
         )
-        querier = BatchQuerier(pagination=NoPagination())
         async with self._db.begin_readonly_session_read_committed() as db_sess:
-            rows = (await execute_batch_querier(db_sess, query, querier)).rows
+            rows = (await db_sess.execute(query)).all()
         return IdleCheckBatchData(
             assignments=[
                 IdleCheckAssignmentData(
@@ -150,20 +144,14 @@ class IdleCheckerDBSource:
             .where(
                 SessionIdleCheckRow.last_status == IdleCheckPhase.IDLE_EXPIRED,
                 SessionIdleCheckRow.expire_at.is_not(None),
+                SessionSearchableFields.own.status.filter.in_(session_statuses)(),
             )
-        )
-        querier = BatchQuerier(
-            pagination=NoPagination(),
-            conditions=[
-                SessionConditions.by_statuses(session_statuses),
-            ],
         )
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             now = await self._current_time(db_sess)
-            result_rows = (await execute_batch_querier(db_sess, check_query, querier)).rows
+            check_rows = (await db_sess.execute(check_query)).scalars().all()
         checks: list[ExpiredIdleCheckData] = []
-        for row in result_rows:
-            check_row: SessionIdleCheckRow = row.SessionIdleCheckRow
+        for check_row in check_rows:
             checks.append(
                 ExpiredIdleCheckData(
                     session_id=check_row.session_id,
@@ -194,10 +182,9 @@ class IdleCheckerDBSource:
                 SessionIdleCheckRow.last_status == IdleCheckPhase.NOT_CHECKED,
             )
         )
-        querier = BatchQuerier(pagination=NoPagination())
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             now = await self._current_time(db_sess)
-            rows = (await execute_batch_querier(db_sess, query, querier)).rows
+            rows = (await db_sess.execute(query)).all()
         return InitialGracePeriodBatchData(
             checks=tuple(
                 InitialGracePeriodCheckData(
@@ -264,11 +251,10 @@ class IdleCheckerDBSource:
             .join(SessionRow, SessionIdleCheckRow.session_id == SessionRow.id)
             .where(SessionRow.status.in_(session_statuses))
         )
-        querier = BatchQuerier(pagination=NoPagination())
         async with self._db.begin_readonly_session_read_committed() as db_sess:
             now = await self._current_time(db_sess)
-            desired_rows = (await execute_batch_querier(db_sess, desired_query, querier)).rows
-            current_rows = (await execute_batch_querier(db_sess, current_query, querier)).rows
+            desired_rows = (await db_sess.execute(desired_query)).all()
+            current_rows = (await db_sess.execute(current_query)).all()
         return SessionIdleCheckAssignmentData(
             desired_pairs=tuple(
                 SessionIdleCheckPair(

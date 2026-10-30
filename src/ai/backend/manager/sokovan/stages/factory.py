@@ -11,7 +11,9 @@ from ai.backend.manager.repositories.replica_group.repository import ReplicaGrou
 from ai.backend.manager.sokovan.reconciler.base import ReconcilerStageRunner, ReconcilerTaskSpec
 from ai.backend.manager.sokovan.reconciler.coordinator import ReconcilerCoordinator
 from ai.backend.manager.sokovan.reconciler.flag import ValkeyReconcilerFlag
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.manager.sokovan.stages.group_autoscale import build_group_autoscale_stage
 from ai.backend.manager.sokovan.stages.group_draining import build_group_draining_stage
 from ai.backend.manager.sokovan.stages.group_rolling import build_group_rolling_stage

@@ -26,33 +26,38 @@ from ai.backend.manager.api.adapter_options.cursor.cursor import encode_cursor
 from ai.backend.manager.api.adapters.resource_slot.adapter import ResourceSlotAdapter
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.resource_slot.types import (
+    AgentResourceData,
+    ResourceAllocationData,
+    ResourceSlotTypeData,
+)
 from ai.backend.manager.errors.api import InvalidGraphQLParameters
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_slot import (
+from ai.backend.manager.models.resource_slot.row import (
     AgentResourceRow,
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.resource_slot.repository import ResourceSlotRepository
-from ai.backend.manager.services.resource_slot.actions.search_resource_slot_types import (
-    SearchResourceSlotTypesAction,
+from ai.backend.manager.services.ops.service import GlobalSearcherService
+from ai.backend.manager.services.resource_slot.actions.scoped_search_resource_slot_types import (
+    ScopedSearchResourceSlotTypesAction,
 )
-from ai.backend.manager.services.resource_slot.service import ResourceSlotService
 from ai.backend.testutils.db import with_tables
 
 type _PageFetch = Callable[[str | None], Awaitable[tuple[list[uuid.UUID], bool]]]
@@ -104,13 +109,13 @@ class TestSlotTypePagination:
 
     @pytest.fixture
     def adapter(self, database: ExtendedAsyncSAEngine) -> ResourceSlotAdapter:
-        repository: OpsRepository[object] = OpsRepository(V2DBOpsProvider(database))
+        repository: OpsRepository[ResourceSlotTypeData] = OpsRepository(V2DBOpsProvider(database))
 
-        async def run(action: SearchResourceSlotTypesAction) -> object:
-            return await repository.search_in_global(action.searcher)
+        async def run(action: ScopedSearchResourceSlotTypesAction) -> object:
+            return await repository.scoped_search(action.searcher)
 
         processors = MagicMock()
-        processors.public_search_resource_slot_types.run = run
+        processors.scoped_search_resource_slot_types.run = run
         return ResourceSlotAdapter(resource_slot=processors, agent=MagicMock(), domain=MagicMock())
 
     async def test_forward_pages_visit_every_row_once(
@@ -218,9 +223,9 @@ class TestAgentResourcePagination:
 
     @pytest.fixture
     def adapter(self, database: ExtendedAsyncSAEngine) -> ResourceSlotAdapter:
-        service = ResourceSlotService(ResourceSlotRepository(database))
+        repository: OpsRepository[AgentResourceData] = OpsRepository(V2DBOpsProvider(database))
         processors = MagicMock()
-        processors.search_agent_resources.run = service.search_agent_resources
+        processors.search_agent_resources.run = GlobalSearcherService(repository).execute
         return ResourceSlotAdapter(resource_slot=processors, agent=MagicMock(), domain=MagicMock())
 
     async def test_forward_pages_visit_every_row_once(
@@ -295,8 +300,18 @@ class TestResourceAllocationPagination:
         domain_id = DomainID(uuid.uuid4())
         resource_group_id = ResourceGroupID(uuid.uuid4())
         project_id = uuid.uuid4()
+        user_id = uuid.uuid4()
         async with database.begin_session() as db_sess:
             db_sess.add(DomainRow(id=domain_id, name="default"))
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name="default",
+                    max_vfolder_count=10,
+                    max_quota_scope_size=0,
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
             db_sess.add(
                 ProjectResourcePolicyRow(
                     name="default",
@@ -321,6 +336,16 @@ class TestResourceAllocationPagination:
                     id=project_id,
                     name="default",
                     domain_name="default",
+                    resource_policy="default",
+                )
+            )
+            db_sess.add(
+                UserRow(
+                    uuid=user_id,
+                    username="default",
+                    email="default@example.com",
+                    domain_name="default",
+                    domain_id=domain_id,
                     resource_policy="default",
                 )
             )
@@ -351,7 +376,7 @@ class TestResourceAllocationPagination:
                         group_id=project_id,
                         resource_group_id=resource_group_id,
                         scaling_group_name="default",
-                        user_uuid=uuid.uuid4(),
+                        user_uuid=user_id,
                     )
                 )
                 await db_sess.flush()
@@ -361,7 +386,7 @@ class TestResourceAllocationPagination:
                         session_id=session_id,
                         domain_name="default",
                         group_id=project_id,
-                        user_uuid=uuid.uuid4(),
+                        user_uuid=user_id,
                         status=KernelStatus.RUNNING,
                         repl_in_port=0,
                         repl_out_port=0,
@@ -388,9 +413,9 @@ class TestResourceAllocationPagination:
 
     @pytest.fixture
     def adapter(self, database: ExtendedAsyncSAEngine) -> ResourceSlotAdapter:
-        service = ResourceSlotService(ResourceSlotRepository(database))
+        repository: OpsRepository[ResourceAllocationData] = OpsRepository(V2DBOpsProvider(database))
         processors = MagicMock()
-        processors.search_resource_allocations.run = service.search_resource_allocations
+        processors.search_resource_allocations.run = GlobalSearcherService(repository).execute
         return ResourceSlotAdapter(resource_slot=processors, agent=MagicMock(), domain=MagicMock())
 
     async def test_forward_pages_visit_every_row_once(

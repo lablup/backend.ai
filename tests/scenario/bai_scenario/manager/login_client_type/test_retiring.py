@@ -11,7 +11,7 @@ import pytest
 
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.login_client_type.response import (
-    DeleteLoginClientTypePayload,
+    PurgeLoginClientTypePayload,
 )
 from ai.backend.manager.api.adapters.login_client_type.adapter import LoginClientTypeAdapter
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
@@ -26,11 +26,11 @@ from bai_scenario.components.login_client_type import (
 )
 from bai_scenario.components.system import ENFORCEMENT
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
-type Deleted = DeleteLoginClientTypePayload
-type RetiringStep = Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]
+type Deleted = PurgeLoginClientTypePayload
+type RetiringStep = Scenario[TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]
 
 
 @dataclass(frozen=True)
@@ -41,7 +41,7 @@ class Deleting(When[ATypeAndACaller, LoginClientTypeAdapter, Deleted]):
 
     @override
     def operation(self) -> str:
-        return "admin_delete"
+        return "purge"
 
     @override
     def describe(self, laid: ATypeAndACaller) -> str:
@@ -51,12 +51,12 @@ class Deleting(When[ATypeAndACaller, LoginClientTypeAdapter, Deleted]):
     @override
     async def call(self, adapter: LoginClientTypeAdapter, laid: ATypeAndACaller) -> Deleted:
         with ActingAs(laid.caller):
-            return await adapter.admin_delete(uuid4() if self.unknown else laid.client_type.id)
+            return await adapter.purge(uuid4() if self.unknown else laid.client_type.id)
 
 
 @dataclass(frozen=True)
 class TheSuperadminDeletesAType(
-    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]
+    Scenario[TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -67,7 +67,7 @@ class TheSuperadminDeletesAType(
         return "슈퍼관리자가 종류를 삭제하면 삭제한 종류의 id를 담은 응답이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -81,7 +81,7 @@ class TheSuperadminDeletesAType(
 
 @dataclass(frozen=True)
 class AnIdNothingAnswersToIsNotFound(
-    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]
+    Scenario[TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -92,7 +92,7 @@ class AnIdNothingAnswersToIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -106,7 +106,7 @@ class AnIdNothingAnswersToIsNotFound(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotDelete(
-    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]
+    Scenario[TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted]
 ):
     @override
     def summary(self) -> str:
@@ -117,7 +117,7 @@ class AUserGrantedNothingMayNotDelete(
         return "아무 권한도 없는 사용자가 종류를 삭제하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone()
 
     @override
@@ -131,7 +131,7 @@ class AUserGrantedNothingMayNotDelete(
 
 @dataclass(frozen=True)
 class EnforcementOffLetsAnyoneDelete(
-    Scenario[SeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted], Configured
+    Scenario[TestSeedingSession, ATypeAndACaller, LoginClientTypeAdapter, Deleted], Configured
 ):
     @override
     def summary(self) -> str:
@@ -146,7 +146,7 @@ class EnforcementOffLetsAnyoneDelete(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ATypeAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ATypeAndACaller]:
         return ATypeAndSomeone()
 
     @override

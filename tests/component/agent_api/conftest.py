@@ -42,15 +42,8 @@ def async_etcd(
     bootstrap_config: Any,
 ) -> AsyncEtcd:
     etcd_config = bootstrap_config.etcd
-    etcd_addr = etcd_config.addr
-    if isinstance(etcd_addr, list):
-        addrs: HostPortPair | list[HostPortPair] = [
-            HostPortPair(host=a.host, port=a.port) for a in etcd_addr
-        ]
-    else:
-        addrs = HostPortPair(host=etcd_addr.host, port=etcd_addr.port)
     return AsyncEtcd(
-        addrs=addrs,
+        addrs=[HostPortPair(host=a.host, port=a.port) for a in etcd_config.addrs],
         namespace=etcd_config.namespace,
         scope_prefix_map={
             ConfigScopes.GLOBAL: "global",

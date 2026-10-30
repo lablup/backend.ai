@@ -7,7 +7,9 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
+from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.defs import REDIS_STREAM_LOCK, RedisRole
 from ai.backend.common.dependencies import NonMonitorableDependencyProvider
 from ai.backend.common.events.dispatcher import EventProducer
@@ -18,13 +20,14 @@ from ai.backend.common.leader import ValkeyLeaderElection, ValkeyLeaderElectionC
 from ai.backend.common.leader.tasks import EventProducerTask, LeaderCron, PeriodicTask
 from ai.backend.common.leader.tasks.event_task import EventTaskSpec
 from ai.backend.common.types import ValkeyProfileTarget
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.leader.tasks.retention_sweep import RetentionSweepTask
 from ai.backend.manager.repositories.retention.repository import RetentionRepository
 from ai.backend.manager.sokovan.sokovan import SokovanOrchestrator
+from ai.backend.manager.tasks.agent_lost_checker import AgentLostCheckerTask
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 @dataclass
@@ -32,11 +35,13 @@ class LeaderElectionInput:
     """Input required for leader election setup."""
 
     valkey_profile_target: ValkeyProfileTarget
+    sentinel_monitors: SentinelMonitorSet
     pidx: int
     config_provider: ManagerConfigProvider
     event_producer: EventProducer
     sokovan_orchestrator: SokovanOrchestrator
     retention_repository: RetentionRepository
+    valkey_live: ValkeyLiveClient
 
 
 class LeaderElectionDependency(
@@ -70,10 +75,12 @@ class LeaderElectionDependency(
             Started ValkeyLeaderElection instance
         """
         # Create ValkeyLeaderClient for leader election
+        leader_valkey_target = setup_input.valkey_profile_target.profile_target(RedisRole.STREAM)
         valkey_leader_client = await ValkeyLeaderClient.create(
-            valkey_target=setup_input.valkey_profile_target.profile_target(RedisRole.STREAM),
+            valkey_target=leader_valkey_target,
             db_id=REDIS_STREAM_LOCK,
             human_readable_name="leader",
+            sentinel_monitor=setup_input.sentinel_monitors.monitor_for(leader_valkey_target),
         )
 
         # Create leader election configuration
@@ -123,13 +130,23 @@ class LeaderElectionDependency(
             )
         )
 
+        # Detecting a lost agent reads cluster-wide state and emits an event per agent,
+        # so running it anywhere but the leader multiplies those events by the worker count.
+        leader_tasks.append(
+            AgentLostCheckerTask(
+                setup_input.config_provider,
+                setup_input.valkey_live,
+                setup_input.event_producer,
+            )
+        )
+
         # Register tasks with the election system
         leader_cron = LeaderCron(tasks=leader_tasks)
         leader_election.register_task(leader_cron)
 
         # Start leader election
         await leader_election.start()
-        log.info("Leader election started for server {}", server_id)
+        log.info("leader election started", server_id=server_id)
 
         try:
             yield leader_election

@@ -13,6 +13,9 @@ from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.errors.permission import PermissionAlreadyGranted
 from ai.backend.manager.errors.repository import UniqueConstraintViolationError
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
+from ai.backend.manager.models.rbac_models.permission.searchable_fields import (
+    PermissionSearchableFields,
+)
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -54,4 +57,4 @@ class RolePermissionCreator(FieldCreator[RoleID, PermissionRow, PermissionData])
 
     @override
     def to_data(self, row: PermissionRow) -> PermissionData:
-        return row.to_data()
+        return PermissionSearchableFields.own.to_data(row)

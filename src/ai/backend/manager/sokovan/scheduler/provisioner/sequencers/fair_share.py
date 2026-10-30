@@ -7,14 +7,14 @@ from typing import TYPE_CHECKING, override
 from uuid import UUID
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.manager.data.fair_share import ProjectUserIds, UserFairShareFactors
+from ai.backend.manager.data.fair_share.types import ProjectUserIds, UserFairShareFactors
 from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot
 from ai.backend.manager.views.sokovan.workload import SessionWorkload
 
 from .sequencer import WorkloadSequencer
 
 if TYPE_CHECKING:
-    from ai.backend.manager.repositories.fair_share import FairShareRepository
+    from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
 
 # Default factor for users without computed factors (lowest priority)
 # Factor 0 means no entitlement (maximum usage)

@@ -15,8 +15,22 @@ class ModelCardAccessLevel(StrEnum):
 
 
 class ModelCardOrderField(StrEnum):
+    ENTITY_ID = "entity_id"
     NAME = "name"
+    VFOLDER_ID = "vfolder_id"
+    DOMAIN_NAME = "domain_name"
+    PROJECT_ID = "project_id"
+    CREATOR_ID = "creator_id"
+    AUTHOR = "author"
+    TITLE = "title"
+    MODEL_VERSION = "model_version"
+    TASK = "task"
+    CATEGORY = "category"
+    ARCHITECTURE = "architecture"
+    LICENSE = "license"
+    ACCESS_LEVEL = "access_level"
     CREATED_AT = "created_at"
+    UPDATED_AT = "updated_at"
 
 
 class ProjectModelCardScope(BaseRequestModel):
@@ -30,6 +44,26 @@ class ModelCardAvailablePresetsScope(BaseRequestModel):
 
     model_card_id: UUID = Field(
         description="Model card UUID to check resource requirements against."
+    )
+
+
+class ModelCardUses(BaseRequestModel):
+    """Entities the model card uses, whose ids narrow the result."""
+
+    vfolder: list[UUID] | None = Field(
+        default=None, description="VFolders the model card is built on"
+    )
+
+
+class ModelCardUsage(BaseRequestModel):
+    """Uses narrowing the model cards read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Model cards the caller cannot
+    read are left out even when a listed entity is tied to them.
+    """
+
+    uses: ModelCardUses | None = Field(
+        default=None, description="Entities the model card uses, whose ids narrow the result"
     )
 
 

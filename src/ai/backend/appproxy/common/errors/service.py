@@ -38,6 +38,21 @@ class WorkerNotAvailable(BackendAIError, web.HTTPServiceUnavailable):
         )
 
 
+class WorkerFrontendLabelsInvalid(BackendAIError, web.HTTPInternalServerError):
+    """Raised when a worker registers frontend labels that do not parse."""
+
+    error_type = "https://api.backend.ai/probs/appproxy/worker-frontend-labels-invalid"
+    error_title = "Worker registered invalid frontend labels."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.APPPROXY,
+            operation=ErrorOperation.READ,
+            error_detail=ErrorDetail.INVALID_DATA_FORMAT,
+        )
+
+
 class PortNotAvailable(BackendAIError, web.HTTPConflict):
     """Raised when designated port is already occupied."""
 

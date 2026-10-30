@@ -12,10 +12,6 @@ from sqlalchemy.orm import (
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
-from ai.backend.manager.data.permission.role import (
-    RoleData,
-    RoleDetailData,
-)
 from ai.backend.manager.data.permission.status import (
     RoleStatus,
 )
@@ -108,36 +104,3 @@ class RoleRow(LifecycleTimestampsMixin, Base):
     def scope(self) -> EntityIdentifier:
         """The scope the role belongs to."""
         return RuntimeEntityID(EntityType(self.scope_type), self.scope_id)
-
-    def to_data(self) -> RoleData:
-        return RoleData(
-            id=self.id,
-            name=self.name,
-            source=self.source,
-            status=self.status,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-            deleted_at=self.deleted_at,
-            auto_assign=self.auto_assign,
-            description=self.description,
-            role_preset_id=self.role_preset_id,
-            scope_type=self.scope_type,
-            scope_id=self.scope_id,
-        )
-
-    def to_detail_data_without_users(self) -> RoleDetailData:
-        """Convert to detail data without assigned users."""
-        return RoleDetailData(
-            id=self.id,
-            name=self.name,
-            source=self.source,
-            status=self.status,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-            deleted_at=self.deleted_at,
-            auto_assign=self.auto_assign,
-            description=self.description,
-            role_preset_id=self.role_preset_id,
-            scope_type=self.scope_type,
-            scope_id=self.scope_id,
-        )

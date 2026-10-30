@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
-from typing import Any, override
+from dataclasses import dataclass
+from typing import Any, final, override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, FieldData, FieldIdentifier
 from ai.backend.common.data.entity.types import EntityIdentifier as OwnerEntityID
@@ -33,12 +34,11 @@ from ai.backend.manager.models.specs.querier import (
     FieldQuerier,
     OwnedFieldQuerier,
 )
-from ai.backend.manager.models.specs.searcher import Searcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher, Searcher
 from ai.backend.manager.models.specs.updater import DataBatchUpdater, GuardedDataUpdater
 from ai.backend.manager.models.specs.upserter import (
     EntityUpserter,
     FieldUpserter,
-    GlobalEntityUpserter,
 )
 
 __all__ = (
@@ -48,6 +48,8 @@ __all__ = (
     "LookupOpsAction",
     "BulkLookupOpsAction",
     "ScopeItem",
+    "ScopedSearchOpsAction",
+    "GlobalSearcherOpsAction",
     "SearchOpsAction",
     "GlobalSearchOpsAction",
     "GlobalEntityCreateOpsAction",
@@ -68,6 +70,7 @@ __all__ = (
     "GlobalEntityUpsertOpsAction",
     "EntityUpsertOpsAction",
     "FieldUpsertOpsAction",
+    "FieldPartialBulkUpsertOpsAction",
     "UpdateOpsAction",
     "PartialBulkUpdateOpsAction",
     "BatchUpdateOpsAction",
@@ -95,6 +98,7 @@ __all__ = (
     "UpsertGlobalOpsAction",
     "UpsertEntityOpsAction",
     "UpsertFieldOpsAction",
+    "PartialBulkUpsertFieldOpsAction",
     "UpdateGlobalOpsAction",
     "UpdateSingleEntityOpsAction",
     "DeleteSingleEntityOpsAction",
@@ -261,7 +265,7 @@ class SearchOpsAction[TRow: Base, TData](OpsBackendAction):
 class GlobalSearchOpsAction[TRow: Base, TData](OpsBackendAction):
     """A list read across an entire table, with no scope filter.
 
-    Mixed in alongside ``BaseGlobalAction``, whose SUPERADMIN gate is what makes an
+    Mixed in alongside ``BaseGlobalAction``, whose global gate is what makes an
     unscoped scan answerable for. Kept apart from :class:`SearchOpsAction` rather than
     signalled by an empty scope list, so the authority a query needs is visible in the
     action's shape instead of in the value of one of its fields.
@@ -532,6 +536,19 @@ class FieldUpsertOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData
         raise NotImplementedError
 
 
+class FieldPartialBulkUpsertOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](
+    OpsBackendAction
+):
+    """A create-or-update of field rows under several owners the caller named, each
+    owner answered for separately."""
+
+    @abstractmethod
+    def to_upserters(self) -> Mapping[TOwnerID, Sequence[FieldUpserter[TOwnerID, TRow, TData]]]:
+        """Return the upsert specs this action executes, grouped by the owner each
+        row is built under."""
+        raise NotImplementedError
+
+
 class UpdateOpsAction[TRow: Base, TData](OpsBackendAction):
     @abstractmethod
     def to_updater(self) -> GuardedDataUpdater[TRow, TData]:
@@ -673,6 +690,42 @@ class OperationScopeOpsAction[TRow: Base, TData](
         return ActionOperationType.SEARCH
 
 
+@dataclass(frozen=True)
+class ScopedSearchOpsAction[TRow: Base, TData](BaseScopeAction, OpsBackendAction, ABC):
+    """A page read from within the scopes the searcher names, narrowed by the uses it names.
+
+    Every scope is authorized and every using entity must be readable; both are read off
+    the searcher, so what is checked is what is queried.
+    """
+
+    searcher: ScopedSearcher[TRow, TData]
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+    @final
+    @override
+    def scope_targets(self) -> Sequence[EntityIdentifier]:
+        return [scope.scope_id() for scope in self.searcher.scopes]
+
+
+@dataclass(frozen=True)
+class GlobalSearcherOpsAction[TRow: Base, TData](BaseGlobalAction, OpsBackendAction, ABC):
+    """A page read across the whole table, narrowed by the uses the searcher names.
+
+    The global gate answers for the unscoped read by type, so the uses are not checked.
+    """
+
+    searcher: GlobalSearcher[TRow, TData]
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.SEARCH
+
+
 class BulkScopedSearchOpsAction[TRow: Base, TData](
     BaseBulkAction, SearchOpsAction[TRow, TData], ABC
 ):
@@ -804,7 +857,7 @@ class CreateGlobalRoleManagedEntityOpsAction[TRow: Base, TData](
     """An insert of one role-managed entity row that belongs under no other scope.
 
     Global-shaped rather than scope-shaped: a top-level entity has no parent scope to
-    target, and the SUPERADMIN gate is what answers for creating one.
+    target, and the global gate is what answers for creating one.
     """
 
     @override
@@ -964,6 +1017,22 @@ class UpsertFieldOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData
         return ActionOperationType.UPDATE
 
 
+class PartialBulkUpsertFieldOpsAction[TOwnerID: OwnerEntityID, TRow: Base, TData: FieldData](
+    BasePartialBulkAction, FieldPartialBulkUpsertOpsAction[TOwnerID, TRow, TData], ABC
+):
+    """A create-or-update of field rows under the owners the caller named, each
+    authorized on its own.
+
+    Bulk-shaped rather than field-shaped: the caller names the owners, so there is no
+    row to read an owner off. An owner the caller may not write is one failed item.
+    """
+
+    @override
+    @classmethod
+    def operation_type(cls) -> ActionOperationType:
+        return ActionOperationType.UPDATE
+
+
 class GetGlobalOpsAction[TRow: Base, TData](BaseGlobalAction, GetOpsAction[TRow, TData], ABC):
     """A read of one row of system-wide state, named by the key its querier carries.
 
@@ -982,7 +1051,7 @@ class UpdateGlobalOpsAction[TRow: Base, TData](BaseGlobalAction, UpdateOpsAction
     """A write to one row of system-wide state, named by a key that is not an ``EntityIdentifier``.
 
     Global rather than single-entity because the row it names belongs to no RBAC scope:
-    the SUPERADMIN gate is what answers for the write, and the catalogs this shape
+    the global gate is what answers for the write, and the catalogs this shape
     serves are keyed by a name that the caller passes as-is.
     """
 

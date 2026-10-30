@@ -17,7 +17,9 @@ from ai.backend.manager.repositories.idle_checker.types import (
 )
 from ai.backend.manager.sokovan.idle_check.handlers.sweep import IdleCheckSweepHandler
 from ai.backend.manager.sokovan.idle_check.sweep.types import IdleCheckSweepReconcileInfo
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 
 _NOW = datetime(2026, 7, 20, tzinfo=UTC)
 

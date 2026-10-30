@@ -38,7 +38,7 @@ class UserUtilizationMetricQueryInput(graphene.InputObjectType):  # type: ignore
 
     value_type = graphene.String(
         default_value="current",
-        description="One of 'current', 'capacity'. Default value is 'current'.",
+        description="One of 'current', 'capacity', 'pct'. Default value is 'current'.",
     )
     metric_name = graphene.String(
         required=True,

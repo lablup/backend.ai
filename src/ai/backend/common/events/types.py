@@ -1,5 +1,6 @@
 import enum
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from typing import Any, ClassVar, Self, final, override
 
 from pydantic import BaseModel, ConfigDict, ValidationError
@@ -8,6 +9,8 @@ from pydantic_core import PydanticSerializationError
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.message_queue.payload import BroadcastMessagePayload
 from ai.backend.common.message_queue.types import MessageName
+from ai.backend.common.types import AgentId
+from ai.backend.logging.structured import LogValue
 
 from .exceptions import EventPayloadDecodingError, EventPayloadEncodingError
 from .message import EventMessage
@@ -20,6 +23,7 @@ __all__ = (
     "BatchBroadcastEvent",
     "DeliveryPattern",
     "EventDomain",
+    "LogScopedEvent",
 )
 
 
@@ -40,6 +44,7 @@ class EventDomain(enum.StrEnum):
     LOG = "log"
     WORKFLOW = "workflow"
     SERVICE_DISCOVERY = "service_discovery"
+    STORAGE_STATUS = "storage_status"
 
 
 class EventCacheDomain(enum.StrEnum):
@@ -149,6 +154,14 @@ class AbstractEvent(BaseModel, ABC):
         Return the event as a UserEvent.
         If user event is not supported, return None.
         """
+        raise NotImplementedError
+
+
+class LogScopedEvent(ABC):
+    """An event whose handling runs in a log scope carrying the ids of the entity it is about."""
+
+    @abstractmethod
+    def log_fields(self, source: AgentId) -> Mapping[str, LogValue]:
         raise NotImplementedError
 
 

@@ -23,11 +23,11 @@ from sqlalchemy.orm import (
 )
 
 from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.kernel_group import KernelGroupID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.types import (
-    AccessKey,
     ClusterMode,
     KernelId,
     SessionId,
@@ -35,7 +35,7 @@ from ai.backend.common.types import (
     SessionTypes,
     VFolderMount,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import (
     ClusterConfig,
@@ -53,11 +53,11 @@ from ai.backend.manager.data.kernel.types import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.agent import AgentRow
-    from ai.backend.manager.models.image import ImageRow
-    from ai.backend.manager.models.project import ProjectRow
-    from ai.backend.manager.models.session import SessionRow
-    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.agent.row import AgentRow
+    from ai.backend.manager.models.image.row import ImageRow
+    from ai.backend.manager.models.project.row import ProjectRow
+    from ai.backend.manager.models.session.row import SessionRow
+    from ai.backend.manager.models.user.row import UserRow
 
 from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.errors.kernel import SessionNotFound
@@ -86,7 +86,7 @@ __all__ = (
     "kernels",
 )
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.manager.models.kernel"))
+log = StructuredLogger(logging.getLogger("ai.backend.manager.models.kernel"))
 
 
 # statuses to consider when calculating current resource usage
@@ -133,7 +133,7 @@ def default_hostname(context: Any) -> str:
 
 # Defined for avoiding circular import
 def _get_user_row_join_condition() -> sa.sql.elements.ColumnElement[Any]:
-    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.user.row import UserRow
 
     return UserRow.uuid == foreign(KernelRow.user_uuid)
 
@@ -156,6 +156,20 @@ class KernelRow(CreatedAtMixin, Base):
         unique=False,
         index=True,
         nullable=False,
+    )
+    # NULL until the enqueue write sets it. `use_alter` keeps the FK out of the
+    # CREATE TABLE so table subsets that omit ``kernel_groups`` still build.
+    kernel_group_id: Mapped[KernelGroupID | None] = mapped_column(
+        "kernel_group_id",
+        GUID(KernelGroupID),
+        sa.ForeignKey(
+            "kernel_groups.id",
+            ondelete="RESTRICT",
+            use_alter=True,
+            name="fk_kernels_kernel_group_id_kernel_groups",
+        ),
+        index=True,
+        nullable=True,
     )
     session_creation_id: Mapped[str | None] = mapped_column(
         "session_creation_id", sa.String(length=32), unique=False, index=False, nullable=True
@@ -220,7 +234,12 @@ class KernelRow(CreatedAtMixin, Base):
     group_id: Mapped[ProjectID] = mapped_column(
         "group_id", GUID(ProjectID), sa.ForeignKey("groups.id"), nullable=False
     )
-    user_uuid: Mapped[UserID] = mapped_column("user_uuid", GUID(UserID), nullable=False)
+    user_uuid: Mapped[UserID | None] = mapped_column(
+        "user_uuid",
+        GUID(UserID),
+        sa.ForeignKey("users.uuid", ondelete="SET NULL"),
+        nullable=True,
+    )
     access_key: Mapped[str | None] = mapped_column(
         "access_key", sa.String(length=20), nullable=True
     )
@@ -427,7 +446,7 @@ class KernelRow(CreatedAtMixin, Base):
     )
     agent_row: Mapped[AgentRow | None] = relationship("AgentRow")
     group_row: Mapped[ProjectRow] = relationship("ProjectRow")
-    user_row: Mapped[UserRow] = relationship(
+    user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         primaryjoin=_get_user_row_join_condition,
         foreign_keys="KernelRow.user_uuid",
@@ -463,7 +482,7 @@ class KernelRow(CreatedAtMixin, Base):
     async def get_kernel(
         db: ExtendedAsyncSAEngine, kern_id: uuid.UUID, allow_stale: bool = False
     ) -> KernelRow:
-        from ai.backend.manager.models.agent import AgentStatus
+        from ai.backend.manager.data.agent.types import AgentStatus
 
         async def _query() -> KernelRow:
             async with db.begin_readonly_session() as db_sess:
@@ -490,10 +509,6 @@ class KernelRow(CreatedAtMixin, Base):
                 return cand[0]
 
         return await execute_with_retry(_query)
-
-    def delegate_ownership(self, user_uuid: UserID, access_key: AccessKey) -> None:
-        self.user_uuid = user_uuid
-        self.access_key = access_key
 
     def to_kernel_info(self) -> KernelInfo:
         return KernelInfo(
@@ -585,6 +600,7 @@ class KernelRow(CreatedAtMixin, Base):
                 callback_url=str(self.callback_url) if self.callback_url else None,
                 internal_data=self.internal_data,
             ),
+            kernel_group_id=self.kernel_group_id,
         )
 
 

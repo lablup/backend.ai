@@ -26,15 +26,12 @@
 
 ## Version metadata
 
-- When adding a new type, field, enum, or mutation, use the `NEXT_RELEASE_VERSION` constant for `added_version` — do NOT
-  hardcode the version string (`scripts/release.sh` freezes it at release time). Do not change literal versions that are already released.
+- Rule: root `AGENTS.md` (Version metadata). A new type, field, enum, or mutation takes it through its decorator:
   ```python
   from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
   @gql_root_field(BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="..."))
   async def my_foo(...): ...
   ```
-- On a **version branch** (`YY.S`) the rule is inverted: that branch inherits a `NEXT_RELEASE_VERSION` it never releases, so write the
-  literal version the branch will ship (`added_version="26.8.3"`). CI rejects newly added `NEXT_RELEASE_VERSION` references there.
 
 ## import
 
@@ -49,9 +46,15 @@
 ## Relations
 
 Rules for a table row joining two entities with neither an entity type nor a field type declared for it
-(user↔role, scope↔idle checker, session↔idle checker). Background: `KNOWLEDGE.md`.
+(user↔role, scope↔idle checker, session↔idle checker). Background: `KNOWLEDGE.md`, BEP-1075.
 
-- Expose a relation row as a relation type, NOT a Node. It has no `id` field and no `node(id)` lookup.
+- Expose a relation row as a relation type. A relation type implements Node.
+- A relation type's `id` is a global ID built from the type name and the end UUIDs. A polymorphic side adds
+  its type (`IdleCheckerAssignment`: scope type, scope id, idle checker). Do NOT use a row id.
+- Build and decode the global ID in the GQL layer only. Adapters and DTOs carry the end UUIDs only.
+- Use the global ID for `node(id:)` and the Relay store key only. Individual queries and mutations take the end
+  UUIDs as arguments.
+- Reading a relation through `node(id:)` asks read on both end scopes.
 - A relation type carries both end entities as Node fields and the relation values as plain fields. One per
   relation, whichever direction it is read from (`SessionIdleCheck`).
 - Name a relation type after the relation's Data and DTO names, not its table. Append `V2` when the name is
@@ -63,14 +66,39 @@ Rules for a table row joining two entities with neither an entity type nor a fie
 - `filter` and `order_by` on relation connections and root queries are the relation type's Filter and OrderBy.
   They carry relation value conditions and end entity conditions (`checker: IdleCheckerFilter`), with
   `AND`/`OR`/`NOT`.
-- The cursor encodes the row's key: its surrogate key if it has one, its primary key columns otherwise.
-- A relation type has no data loader. Its end entity fields load through that entity's bulk data loader.
-- A mutation creating, removing or changing a relation takes the pair of end ids and returns the changed
-  relation type object.
+- The cursor encodes the end keys.
+- `node(id:)` and `nodes(ids:)` read a list of end keys at once. End entity fields load through that entity's
+  bulk data loader.
+- A mutation creating or changing a relation takes the end UUIDs. Its payload follows "Mutation payload" below.
 - A row declared as an entity type (`EntityShare`) is an entity, not a relation, and is a Node.
 - Keep an already published relation Node (`RoleAssignment`) deprecated and add no fields to it.
 - Do NOT change connections published before this rule that join two entities directly (`DomainV2.users`,
   `UserV2.projects`, ...).
+
+## Mutation payload
+
+Whether the target (entity, field row, relation) still exists when the response is sent decides the payload.
+Background: `KNOWLEDGE.md`.
+
+| Operation | Target at response time | Payload |
+|---|---|---|
+| create · update · soft delete · restore | exists | the target Node field |
+| purge finishing within the request | gone | `purgedId: ID!` + `entityId` for an entity, `fieldId` for a field row, the end UUIDs for a relation |
+| purge of an entity with `purge_status` | exists (`purgeStatus: PURGING`) | the target Node field, no `purgedId` |
+| force purge | gone | same as a purge finishing within the request |
+
+- `purgedId` is the removed target's global ID; Relay's `@deleteEdge` and `@deleteRecord` take it. The GQL
+  layer builds it from the DTO's UUID.
+- A purge mutation returns a payload type of its own, `Purge<X>Payload`. Do NOT share a payload type with a
+  delete (soft delete) mutation.
+- Do NOT put `purgedId` on a payload named `Delete*`. Leave a published `delete*` mutation that removes the row
+  as it is, add a `purge*` mutation returning `Purge<X>Payload`, and deprecate the old mutation.
+- Do NOT put a global ID in the payload's own `id`.
+- Do NOT return the removed target as a Node.
+- A purge of an entity with `purge_status` is complete when `node(id:)` answers null. A failure is
+  `purgeStatus: PURGE_ERROR` on the same Node.
+- Input arguments are UUIDs. Do not change the type of a published field or argument; add the new one and
+  deprecate the old.
 
 ## N+1 prevention
 
@@ -99,7 +127,9 @@ GQL types are thin wrappers over the v2 DTOs (`common/dto/manager/v2/`).
 
 ## Error handling & nullable schema
 
-- For queries/resolvers that may not find an object, declare the return type as **nullable** (`T | None`).
+- Any field that runs through a resolver declares a **nullable** return type (`T | None`): root `Query` / `Mutation` fields
+  and computed fields on Node / Connection / Payload types.
+  See `README.md` "Nullable Return Types".
 - Do NOT catch domain exceptions (`NotFound`, etc.) in the fetcher just to return `None` — propagate the exception.
   Per the Relay spec, only `resolve_nodes` may return `Iterable[Self | None]`.
 
@@ -120,7 +150,7 @@ The client must be free to choose cursor or offset. For per-mode behavior, see `
 **search — three variants:**
 - `adminFoosV2`: superadmin only, no scope — the entire system.
 - `scopedFoosV2` (e.g. `scopedSessionsV2`): non-admin, scope required — within that scope.
-- `myFoosV2`: self-service, the adapter resolves the current user as the scope internally.
+- `myFoosV2`: self-service — fills the current user in as the user scope and calls the same adapter `scoped_search` as `scopedFoosV2`.
 - There is no "unscoped system-wide query" for non-admins.
 
 **scoped search convention:**
@@ -140,8 +170,8 @@ The client must be free to choose cursor or offset. For per-mode behavior, see `
 - Legacy `{scope}FoosV2` (e.g. `projectSessionsV2`) predates this convention — do not create new ones.
 
 **`myFoosV2` resolver:**
-- The resolver does NOT call `current_user()` or build a scope — it passes only the search input DTO to the adapter.
-- The adapter builds the scope internally via `current_user()`.
+- The resolver builds the user scope from `current_user()`, puts it in `ScopedSearchFoosInput`, and calls the adapter's `scoped_search`.
+- Do not add `my_search` to the adapter.
 
 **create / update / get / delete / purge — criteria for splitting out `admin_`:**
 - admin-only entities: a single `admin_` mutation/query.
@@ -163,9 +193,9 @@ the name is identical to the single form, with no pluralisation —
 `myScopePermissions` / `myAtomicBulkScopePermissions`.
 
 **Where the existing surface stands**: 22 payloads carry a `failed` or an `errors` field
-and the names say nothing about which behaviour they have. 17 are genuinely partial.
-4 are atomic with a channel that is always empty — `BulkAddRolePermissionPresetsPayload`,
-`BulkAssignRolePayload`, `ReplaceRolePermissionsPayload`, `UpsertAppConfigFragmentsPayload`.
+and the names say nothing about which behaviour they have. 18 are genuinely partial.
+3 are atomic with a channel that is always empty — `BulkAddRolePermissionPresetsPayload`,
+`ReplaceRolePermissionsPayload`, `UpsertAppConfigFragmentsPayload`.
 The remaining one, `ScanProjectModelCardsV2Payload`, reports a scan summary in `errors`
 rather than a per-item channel. Renaming the 22 is breaking, so this states the policy
 and the migration is judged separately.

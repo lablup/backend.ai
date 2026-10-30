@@ -8,6 +8,8 @@ from ai.backend.client.v2.base_client import BackendAIAuthClient
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.domains.rbac import RBACClient
 from ai.backend.common.data.entity.project import ProjectEntityType
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.rbac.request import (
     AssignRoleRequest,
     CreateRoleRequest,
@@ -15,7 +17,6 @@ from ai.backend.common.dto.manager.rbac.request import (
     PurgeRoleRequest,
     RevokeRoleRequest,
     SearchRolesRequest,
-    SearchScopesRequest,
     SearchUsersAssignedToRoleRequest,
     UpdateRoleRequest,
 )
@@ -28,7 +29,6 @@ from ai.backend.common.dto.manager.rbac.response import (
     GetScopeTypesResponse,
     RevokeRoleResponse,
     SearchRolesResponse,
-    SearchScopesResponse,
     SearchUsersAssignedToRoleResponse,
     UpdateRoleResponse,
 )
@@ -228,7 +228,7 @@ class TestRBACClient:
         client = _make_client(mock_session)
         rbac = RBACClient(client)
 
-        request = AssignRoleRequest(user_id=_USER_ID, role_id=_ROLE_ID, granted_by=_GRANTED_BY)
+        request = AssignRoleRequest(user_id=UserID(_USER_ID), role_id=RoleID(_ROLE_ID))
         result = await rbac.assign_role(request)
 
         assert isinstance(result, AssignRoleResponse)
@@ -254,7 +254,7 @@ class TestRBACClient:
         client = _make_client(mock_session)
         rbac = RBACClient(client)
 
-        request = RevokeRoleRequest(user_id=_USER_ID, role_id=_ROLE_ID)
+        request = RevokeRoleRequest(user_id=UserID(_USER_ID), role_id=RoleID(_ROLE_ID))
         result = await rbac.revoke_role(request)
 
         assert isinstance(result, RevokeRoleResponse)
@@ -317,35 +317,6 @@ class TestRBACClient:
         assert call_args.args[0] == "GET"
         assert "/admin/rbac/scope-types" in str(call_args.args[1])
         assert call_args.kwargs["json"] is None
-
-    async def test_search_scopes(self) -> None:
-        mock_resp = AsyncMock()
-        mock_resp.status = 200
-        mock_resp.json = AsyncMock(
-            return_value={
-                "items": [
-                    {"scope_type": "domain", "scope_id": "default", "name": "Default Domain"}
-                ],
-                "pagination": {"total": 1, "offset": 0, "limit": 20},
-            }
-        )
-
-        mock_session = _make_request_session(mock_resp)
-        client = _make_client(mock_session)
-        rbac = RBACClient(client)
-
-        request = SearchScopesRequest()
-        result = await rbac.search_scopes("domain", request)
-
-        assert isinstance(result, SearchScopesResponse)
-        assert len(result.items) == 1
-        assert result.items[0].name == "Default Domain"
-
-        call_args = mock_session.request.call_args
-        assert call_args.args[0] == "POST"
-        assert "/admin/rbac/scopes/domain/search" in str(call_args.args[1])
-
-    # ---- Entity Management ----
 
     async def test_get_entity_types(self) -> None:
         mock_resp = AsyncMock()

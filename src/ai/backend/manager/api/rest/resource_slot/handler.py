@@ -16,13 +16,15 @@ from ai.backend.common.dto.manager.resource_slot.response import (
     PaginationInfo,
     SearchResourceSlotTypesResponse,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.models.resource_slot.scopes import PublicResourceSlotTypeTarget
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.services.resource_slot.actions.get import GetResourceSlotTypeAction
 from ai.backend.manager.services.resource_slot.actions.lookup import (
     LookupResourceSlotTypeAction,
 )
-from ai.backend.manager.services.resource_slot.actions.search_resource_slot_types import (
-    SearchResourceSlotTypesAction,
+from ai.backend.manager.services.resource_slot.actions.scoped_search_resource_slot_types import (
+    ScopedSearchResourceSlotTypesAction,
 )
 
 from .adapter import ResourceSlotAdapter
@@ -30,7 +32,7 @@ from .adapter import ResourceSlotAdapter
 if TYPE_CHECKING:
     from ai.backend.manager.services.resource_slot.processors import ResourceSlotProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourceSlotHandler:
@@ -48,8 +50,12 @@ class ResourceSlotHandler:
 
         searcher = self._adapter.build_searcher(body.parsed)
 
-        action_result = await self._resource_slot.public_search_resource_slot_types.run(
-            SearchResourceSlotTypesAction(searcher=searcher)
+        action_result = await self._resource_slot.scoped_search_resource_slot_types.run(
+            ScopedSearchResourceSlotTypesAction(
+                searcher=ScopedSearcher(
+                    scopes=[PublicResourceSlotTypeTarget()], used_by=(), searcher=searcher
+                )
+            )
         )
 
         resp = SearchResourceSlotTypesResponse(
@@ -69,10 +75,10 @@ class ResourceSlotHandler:
         """Get a single resource slot type by slot_name."""
         slot_name = path.parsed.slot_name
 
-        resolved = await self._resource_slot.public_lookup_resource_slot_type.run(
+        resolved = await self._resource_slot.lookup_resource_slot_type.run(
             LookupResourceSlotTypeAction(slot_name=slot_name)
         )
-        action_result = await self._resource_slot.public_get_resource_slot_type.run(
+        action_result = await self._resource_slot.get_resource_slot_type.run(
             GetResourceSlotTypeAction(slot_type_id=resolved.entity_id())
         )
 

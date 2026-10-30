@@ -27,7 +27,12 @@ from ai.backend.manager.errors.repository import (
     UpsertEmptyResultError,
 )
 from ai.backend.manager.models.base import Base
-from ai.backend.manager.models.specs.types import ConflictCheck, GuardCheck, IntegrityErrorCheck
+from ai.backend.manager.models.specs.types import (
+    ConflictCheck,
+    GuardCheck,
+    IntegrityErrorCheck,
+    PreconditionCheck,
+)
 from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
 
 
@@ -51,6 +56,13 @@ class V2WriteOpsBase(V2OpsBase):
         ("check constraint", CheckConstraintViolationError),
         ("exclusion constraint", ExclusionViolationError),
     )
+
+    async def _validate_precondition_checks(self, checks: Sequence[PreconditionCheck]) -> None:
+        """Refuse the write where the spec named a row that must not be there. What the
+        database cannot state for itself is stated here, each with its own error."""
+        for check in checks:
+            if (await self._sess.execute(check.finder)).first() is not None:
+                raise check.error
 
     async def _validate_conflict_checks(self, checks: Sequence[ConflictCheck]) -> None:
         """Validate the spec-declared conflict checks in a single query, raising the
@@ -269,21 +281,66 @@ class V2WriteOpsBase(V2OpsBase):
         update_values: dict[str, Any],
         checks: Sequence[IntegrityErrorCheck],
     ) -> TRow:
-        table = row_class.__table__
+        """Insert the row, or update it with ``update_values`` where a row holds its
+        ``index_elements``. With no update values the row there is left as it stands."""
+        if not update_values:
+            inserted = await self._insert_row_if_absent(
+                row_class, index_elements, insert_values, checks
+            )
+            if inserted is not None:
+                return inserted
+            return await self._row_holding_key(row_class, index_elements, insert_values)
         stmt = (
-            pg_insert(table)
+            pg_insert(row_class.__table__)
             .values(insert_values)
             .on_conflict_do_update(index_elements=index_elements, set_=update_values)
-            .returning(*table.columns)
+            .returning(*row_class.__table__.columns)
+        )
+        row = await self._returned_row(row_class, stmt, checks)
+        if row is None:
+            raise UpsertEmptyResultError
+        return row
+
+    async def _insert_row_if_absent[TRow: Base](
+        self,
+        row_class: type[TRow],
+        index_elements: list[str],
+        insert_values: dict[str, Any],
+        checks: Sequence[IntegrityErrorCheck],
+    ) -> TRow | None:
+        """Insert the row unless a row holds its ``index_elements``, answering the row
+        inserted, or ``None`` where it was left out."""
+        stmt = (
+            pg_insert(row_class.__table__)
+            .values(insert_values)
+            .on_conflict_do_nothing(index_elements=index_elements)
+            .returning(*row_class.__table__.columns)
+        )
+        return await self._returned_row(row_class, stmt, checks)
+
+    async def _row_holding_key[TRow: Base](
+        self, row_class: type[TRow], index_elements: list[str], insert_values: dict[str, Any]
+    ) -> TRow:
+        """The row holding the ``index_elements`` values an insert named."""
+        table = row_class.__table__
+        stmt = (
+            sa.select(row_class)
+            .where(*(table.c[column] == insert_values[column] for column in index_elements))
+            .execution_options(populate_existing=True)
+        )
+        return (await self._sess.scalars(stmt)).one()
+
+    async def _returned_row[TRow: Base](
+        self, row_class: type[TRow], stmt: Any, checks: Sequence[IntegrityErrorCheck]
+    ) -> TRow | None:
+        # from_statement maps the RETURNING columns onto the ORM class, as the purge does.
+        select_stmt = (
+            sa.select(row_class).from_statement(stmt).execution_options(populate_existing=True)
         )
         try:
-            result = await self._sess.execute(stmt)
+            row: TRow | None = (await self._sess.execute(select_stmt)).scalar_one_or_none()
         except sa.exc.IntegrityError as e:
             self._match_integrity_error(self._parse_integrity_error(e), checks)
-        row_data = result.fetchone()
-        if row_data is None:
-            raise UpsertEmptyResultError
-        row: TRow = row_class(**dict(row_data._mapping))
         return row
 
     async def _bulk_insert_ignore_conflicts(self, rows: Collection[Base]) -> None:

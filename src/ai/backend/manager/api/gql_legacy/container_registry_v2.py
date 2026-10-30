@@ -10,16 +10,17 @@ from graphql import Undefined
 
 from ai.backend.common.container_registry import AllowedGroupsModel
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
-from ai.backend.manager.models.container_registry import (
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
+from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
+from ai.backend.manager.models.container_registry.row import (
     ContainerRegistryValidator,
     ContainerRegistryValidatorArgs,
 )
-from ai.backend.manager.models.container_registry.creators import ContainerRegistryCreator
-from ai.backend.manager.models.container_registry.purgers import ContainerRegistryPurger
 from ai.backend.manager.models.container_registry.updaters import ContainerRegistryUpdater
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.container_registry.actions.create_container_registry import (
     CreateContainerRegistryAction,
 )
@@ -41,7 +42,7 @@ from .gql_relay import AsyncNode
 if TYPE_CHECKING:
     from .schema import GraphQueryContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 type WhereClauseType = sa.sql.expression.BinaryExpression[Any] | sa.sql.expression.BooleanClauseList
@@ -166,7 +167,6 @@ class ModifyContainerRegistryNodeInputV2(graphene.InputObjectType):  # type: ign
                 url=OptionalState.from_graphql(self.url),
                 type=OptionalState.from_graphql(self.type),
                 registry_name=OptionalState.from_graphql(self.registry_name),
-                is_global=TriState.from_graphql(self.is_global),
                 project=TriState.from_graphql(self.project),
                 username=TriState.from_graphql(self.username),
                 password=TriState.from_graphql(self.password),
@@ -202,7 +202,10 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         _, _id = AsyncNode.resolve_global_id(info, id)
-        reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        try:
+            reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid id: {id}") from e
 
         allowed_groups = props.to_allowed_groups()
         if allowed_groups is not None:
@@ -212,7 +215,12 @@ class ModifyContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
         result = await ctx.processors.container_registry.update_container_registry.run(
             props.to_action(reg_id)
         )
-        return cls(container_registry=ContainerRegistryNode.from_dataclass(result.data))
+        data = result.data
+        if props.is_global is not Undefined:
+            data = await ContainerRegistryAdapter(
+                ctx.processors.container_registry, ctx.processors.rbac
+            ).apply_global(ContainerRegistryID(reg_id), props.is_global)
+        return cls(container_registry=ContainerRegistryNode.from_dataclass(data))
 
 
 class DeleteContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
@@ -239,7 +247,10 @@ class DeleteContainerRegistryNodeV2(graphene.Mutation):  # type: ignore[misc]
         ctx: GraphQueryContext = info.context
 
         _, _id = AsyncNode.resolve_global_id(info, id)
-        reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        try:
+            reg_id = uuid.UUID(_id) if _id else uuid.UUID(id)
+        except ValueError as e:
+            raise InvalidAPIParameters(f"Invalid id: {id}") from e
 
         result = await ctx.processors.container_registry.delete_container_registry.run(
             DeleteContainerRegistryAction(

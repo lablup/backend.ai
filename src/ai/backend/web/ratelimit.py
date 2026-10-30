@@ -22,10 +22,10 @@ from ai.backend.common.clients.valkey_client.valkey_rate_limit.client import (
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.web.session import get_session
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.web.auth import get_client_ip
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 _RATELIMIT_WINDOW: Final = 60 * 15
 

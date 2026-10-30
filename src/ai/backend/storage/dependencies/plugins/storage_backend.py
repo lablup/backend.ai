@@ -5,12 +5,12 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import override
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.plugin import StoragePluginContext
 
 from .base import PluginDependency, PluginsInput
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class StorageBackendPluginDependency(PluginDependency[StoragePluginContext]):
@@ -26,7 +26,7 @@ class StorageBackendPluginDependency(PluginDependency[StoragePluginContext]):
     async def provide(self, setup_input: PluginsInput) -> AsyncIterator[StoragePluginContext]:
         ctx = StoragePluginContext(setup_input.etcd, setup_input.local_config)
         await ctx.init()
-        log.info("StoragePluginContext initialized with plugins: {}", list(ctx.plugins.keys()))
+        log.info("storage plugins loaded", plugin_names=", ".join(ctx.plugins.keys()))
         try:
             yield ctx
         finally:

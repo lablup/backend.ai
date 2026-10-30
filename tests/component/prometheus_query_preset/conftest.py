@@ -34,15 +34,17 @@ from ai.backend.manager.api.rest.v2.prometheus_query_preset.registry import (
 )
 from ai.backend.manager.clients.prometheus.client import PrometheusClient
 from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
-from ai.backend.manager.models.prometheus_query_preset import PrometheusQueryPresetRow
-from ai.backend.manager.models.prometheus_query_preset.row import PresetOptions
-from ai.backend.manager.models.prometheus_query_preset_category import (
+from ai.backend.manager.models.prometheus_query_preset.row import (
+    PresetOptions,
+    PrometheusQueryPresetRow,
+)
+from ai.backend.manager.models.prometheus_query_preset_category.row import (
     PrometheusQueryPresetCategoryRow,
 )
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.repositories.prometheus_query_preset import (
+from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
 from ai.backend.manager.services.processors import Processors
@@ -84,7 +86,9 @@ def prometheus_query_preset_processors(
     prometheus_client_mock: MagicMock,
     processor_registry: ProcessorRegistry[Any],
 ) -> PrometheusQueryPresetProcessors:
-    repo = PrometheusQueryPresetRepository(database_engine, prometheus_client_mock)
+    repo = PrometheusQueryPresetRepository(
+        database_engine, prometheus_client_mock, V2DBOpsProvider(database_engine)
+    )
     service = PrometheusQueryPresetService(
         repository=repo,
         prometheus_client=prometheus_client_mock,

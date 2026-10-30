@@ -20,11 +20,16 @@ from ai.backend.manager.data.kernel.types import KernelStatus
 if TYPE_CHECKING:
     from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 
-from .kernel import LIVE_STATUS, RESOURCE_USAGE_KERNEL_STATUSES, KernelRow
-from .project import ProjectRow
+from ai.backend.manager.models.kernel.row import (
+    LIVE_STATUS,
+    RESOURCE_USAGE_KERNEL_STATUSES,
+    KernelRow,
+)
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
+
 from .resource_slot.aggregates import batch_load_kernel_allocations
-from .session import SessionRow
-from .user import UserRow
 from .utils import ExtendedAsyncSAEngine
 
 __all__: Sequence[str] = (

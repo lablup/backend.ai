@@ -10,6 +10,9 @@ from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQuer
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.prometheus_query_preset.types import PrometheusQueryPresetData
 from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQueryPresetRow
+from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
+    PrometheusQueryPresetSearchableFields,
+)
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
@@ -40,4 +43,4 @@ class PrometheusQueryPresetPurger(
 
     @override
     def to_data(self, row: PrometheusQueryPresetRow) -> PrometheusQueryPresetData:
-        return row.to_data()
+        return PrometheusQueryPresetSearchableFields.own.to_data(row)

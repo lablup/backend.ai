@@ -2,15 +2,23 @@ import enum
 import os
 import socket
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 from pprint import pformat
-from typing import Annotated, Self
+from typing import Annotated, Any, Self
 
 import click
-from pydantic import Field, FilePath, IPvAnyNetwork, ValidationError, model_validator
+from pydantic import (
+    Field,
+    FilePath,
+    IPvAnyNetwork,
+    ValidationError,
+    model_validator,
+)
 
 from ai.backend.appproxy.common.config import (
     BaseSchema,
+    ContentEncodingConfig,
     DebugConfig,
     GroupIDValidator,
     HostPortPair,
@@ -30,6 +38,7 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -91,16 +100,42 @@ class DBConfig(BaseSchema):
         ),
     ]
     addr: Annotated[
-        HostPortPair,
-        Field(),
+        HostPortPair | None,
+        Field(default=None),
         BackendAIConfigMeta(
             description=(
                 "The network address (host:port) of the PostgreSQL database server. "
-                "In local development, typically points to localhost. "
-                "In production, should point to your PostgreSQL server or cluster endpoint."
+                "Read as a one-member addrs list when addrs is not set."
             ),
             added_version="25.9.0",
+            deprecated_version="26.9.0",
+            deprecation_hint="Use addrs instead.",
+        ),
+    ]
+    addrs: Annotated[
+        list[HostPortPair],
+        Field(min_length=1),
+        BackendAIConfigMeta(
+            description=(
+                "Addresses of the PostgreSQL cluster members. "
+                "List every member of an HA cluster, or a single address of a standalone "
+                "server or a proxy in front of the cluster."
+            ),
+            added_version="26.9.0",
+            composite=CompositeType.LIST,
             example=ConfigExample(local="127.0.0.1:5432", prod="db-server:5432"),
+        ),
+    ]
+    connect_timeout: Annotated[
+        float,
+        Field(default=10.0, gt=0),
+        BackendAIConfigMeta(
+            description=(
+                "Timeout in seconds for connecting to one member of addrs. "
+                "When it expires, the next member is tried."
+            ),
+            added_version="26.9.0",
+            example=ConfigExample(local="10", prod="5"),
         ),
     ]
     name: Annotated[
@@ -188,15 +223,25 @@ class DBConfig(BaseSchema):
         BackendAIConfigMeta(
             description=(
                 "Whether to test connections with a lightweight ping before using them. "
-                "Detects stale or disconnected connections at pool checkout and transparently "
-                "reconnects them with clean transaction state, preventing 'SAVEPOINT can only be "
-                "used in transaction blocks' errors after a Postgres connection drop or failover. "
+                "Detects connections closed by the server or the network at pool checkout "
+                "and replaces them. "
                 "Adds a small overhead per checkout but is recommended for production."
             ),
             added_version="26.8.0",
             example=ConfigExample(local="true", prod="true"),
         ),
     ]
+
+    @model_validator(mode="before")
+    @classmethod
+    def _read_addr_as_addrs(cls, data: Any) -> Any:
+        if (
+            not isinstance(data, Mapping)
+            or data.get("addr") is None
+            or data.get("addrs") is not None
+        ):
+            return data
+        return {**data, "addrs": [data["addr"]]}
 
 
 class ClientIPStrategyConfig(BaseSchema):
@@ -372,6 +417,15 @@ class ProxyCoordinatorConfig(BaseSchema):
             example=ConfigExample(local="0.0.0.0:10200", prod="0.0.0.0:10200"),
         ),
     ]
+    max_header_field_size: Annotated[
+        int,
+        Field(default=8190, gt=0),
+        BackendAIConfigMeta(
+            description="Maximum bytes of a single request header. Larger ones get 400.",
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="8190", prod="8190"),
+        ),
+    ]
     advertised_addr: Annotated[
         HostPortPair | None,
         Field(default=None),
@@ -477,6 +531,20 @@ class ProxyCoordinatorConfig(BaseSchema):
             ),
             added_version="25.9.0",
             example=ConfigExample(local="false", prod="false"),
+        ),
+    ]
+
+    content_encoding: Annotated[
+        ContentEncodingConfig,
+        Field(default_factory=lambda: ContentEncodingConfig()),
+        BackendAIConfigMeta(
+            description=(
+                "Rules applied to the Content-Encoding of requests before they are forwarded to "
+                "session apps. Applies to both the built-in proxy workers and Traefik. Built-in "
+                "workers read it when they register, so restart them after changing it."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
         ),
     ]
 

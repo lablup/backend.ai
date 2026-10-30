@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import cast
+from typing import Annotated, cast
 
 import strawberry
 from strawberry import Info
@@ -12,6 +12,7 @@ from ai.backend.manager.api.gql.agent.types import (
     AgentOrderByGQL,
     AgentResourceGQL,
     AgentStatsGQL,
+    AgentUsageGQL,
     AgentV2Connection,
     AgentV2Edge,
     AgentV2GQL,
@@ -49,6 +50,16 @@ async def agent_stats(info: Info[StrawberryGQLContext]) -> AgentStatsGQL | None:
 )  # type: ignore[misc]
 async def agents_v2(
     info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        AgentUsageGQL | None,
+        strawberry.argument(
+            description=(
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; agents the caller cannot read are "
+                "left out."
+            )
+        ),
+    ] = None,
     filter: AgentFilterGQL | None = None,
     order_by: list[AgentOrderByGQL] | None = None,
     before: str | None = None,
@@ -61,6 +72,7 @@ async def agents_v2(
     check_admin_only()
     result = await info.context.adapters.agent.admin_search(
         AdminSearchAgentsInput(
+            usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,

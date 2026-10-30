@@ -39,6 +39,7 @@ from ai.backend.manager.clients.prometheus.metric_types import (
 from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.clients.prometheus.types import ValueType
 from ai.backend.manager.repositories.metric.repository import MetricRepository
+from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.services.metric.actions.search_container_metrics import (
     GlobalSearchContainerMetricsAction,
 )
@@ -84,6 +85,7 @@ def _make_metric_repository(
         db=MagicMock(),
         prometheus_client=mock_prometheus_client,
         default_timewindow=timewindow,
+        v2_ops_provider=MagicMock(spec=V2DBOpsProvider),
     )
 
 

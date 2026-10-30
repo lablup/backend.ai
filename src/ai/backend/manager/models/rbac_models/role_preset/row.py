@@ -10,21 +10,21 @@ from sqlalchemy.orm import (
 
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
 )
+from ai.backend.manager.models.mixins.soft_delete import SoftDeleteMixin
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 
-class RolePresetRow(LifecycleTimestampsMixin, Base):
+class RolePresetRow(SoftDeleteMixin, LifecycleTimestampsMixin, Base):
     __tablename__ = "role_presets"
     __table_args__ = (
         sa.Index(
-            "ix_role_presets_scope_type_deleted",
+            "ix_role_presets_scope_type_deleted_at",
             "scope_type",
-            "deleted",
+            "deleted_at",
         ),
     )
 
@@ -45,20 +45,3 @@ class RolePresetRow(LifecycleTimestampsMixin, Base):
     auto_assign: Mapped[bool] = mapped_column(
         "auto_assign", sa.Boolean, nullable=False, server_default=sa.false()
     )
-    # Soft-delete flag. Toggled by the Delete / Restore service operations;
-    # the Update API never mutates this column directly.
-    deleted: Mapped[bool] = mapped_column(
-        "deleted", sa.Boolean, nullable=False, server_default=sa.false()
-    )
-
-    def to_data(self) -> RolePresetData:
-        return RolePresetData(
-            id=self.id,
-            name=self.name,
-            role_name_template=self.role_name_template,
-            scope_type=self.scope_type,
-            auto_assign=self.auto_assign,
-            deleted=self.deleted,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )

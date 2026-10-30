@@ -19,6 +19,7 @@ from ai.backend.common.data.entity.deployment_revision import DeploymentRevision
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerOptions,
     ReplicaGroupHandlerCategory,
@@ -29,10 +30,10 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.reconciler.types import LastHistory
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
-from ai.backend.manager.models.replica_group_history.conditions import (
-    ReplicaGroupHistoryConditions,
-)
 from ai.backend.manager.models.replica_group_history.row import ReplicaGroupHistoryRow
+from ai.backend.manager.models.replica_group_history.searchable_fields import (
+    ReplicaGroupHistorySearchableFields,
+)
 from ai.backend.manager.models.routing.row import RoutingRow
 from ai.backend.manager.repositories.ops.v2.base import V2OpsBase
 from ai.backend.manager.views.replica_group import (
@@ -105,8 +106,12 @@ class ReplicaGroupQueryOps(V2OpsBase):
             return {}
         query = (
             sa.select(ReplicaGroupHistoryRow)
-            .where(ReplicaGroupHistoryConditions.by_replica_group_ids(group_ids)())
-            .where(ReplicaGroupHistoryConditions.by_category(category)())
+            .where(
+                ReplicaGroupHistorySearchableFields.own.replica_group_id.filter.in_(
+                    UUIDInMatchSpec(values=list(group_ids), negated=False)
+                )()
+            )
+            .where(ReplicaGroupHistorySearchableFields.own.category.filter.equals(category)())
             .order_by(
                 ReplicaGroupHistoryRow.replica_group_id,
                 ReplicaGroupHistoryRow.created_at.desc(),

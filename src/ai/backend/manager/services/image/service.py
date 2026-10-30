@@ -1,21 +1,22 @@
 import logging
-from collections.abc import Collection
+from collections.abc import Collection, Sequence
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.exception import UnknownImageReference
 from ai.backend.common.types import AgentId, ImageID
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.config.provider import ManagerConfigProvider
-from ai.backend.manager.data.image.types import ImageStatus, ImageWithAgentInstallStatus
-from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
-from ai.backend.manager.models.image import (
+from ai.backend.manager.data.image.types import (
     ImageIdentifier,
+    ImageStatus,
 )
+from ai.backend.manager.errors.image import ImageAccessForbiddenError, ImageNotFound
 from ai.backend.manager.models.image.creators import ImageAliasCreator
+from ai.backend.manager.models.image.scopes import ImageTarget
 from ai.backend.manager.models.image.updaters import ImageUpdater
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.image.repository import ImageRepository
 from ai.backend.manager.services.image.actions.alias_image import (
@@ -24,6 +25,7 @@ from ai.backend.manager.services.image.actions.alias_image import (
     AliasImageByIdAction,
     AliasImageByIdActionResult,
 )
+from ai.backend.manager.services.image.actions.base import ImageScopeAction
 from ai.backend.manager.services.image.actions.clear_image_custom_resource_limit import (
     ClearImageCustomResourceLimitAction,
     ClearImageCustomResourceLimitActionResult,
@@ -40,21 +42,9 @@ from ai.backend.manager.services.image.actions.forget_image import (
     ForgetImageByIdAction,
     ForgetImageByIdActionResult,
 )
-from ai.backend.manager.services.image.actions.get_all_images import (
-    PublicGetAllImagesAction,
-    PublicGetAllImagesActionResult,
-)
 from ai.backend.manager.services.image.actions.get_image_installed_agents import (
     GetImageInstalledAgentsAction,
     GetImageInstalledAgentsActionResult,
-)
-from ai.backend.manager.services.image.actions.get_images import (
-    PublicGetImageByIdAction,
-    PublicGetImageByIdActionResult,
-    PublicGetImageByIdentifierAction,
-    PublicGetImageByIdentifierActionResult,
-    PublicGetImagesByCanonicalsAction,
-    PublicGetImagesByCanonicalsActionResult,
 )
 from ai.backend.manager.services.image.actions.preload_image import (
     PreloadImageAction,
@@ -69,25 +59,19 @@ from ai.backend.manager.services.image.actions.purge_images import (
     PurgeImagesAction,
     PurgeImagesActionResult,
 )
-from ai.backend.manager.services.image.actions.restore_image import (
-    RestoreImageByIdAction,
-    RestoreImageByIdActionResult,
-)
 from ai.backend.manager.services.image.actions.scan_image import (
+    GlobalScanImageAction,
+    GlobalScanImageActionResult,
     ScanImageAction,
     ScanImageActionResult,
-)
-from ai.backend.manager.services.image.actions.scoped_search import (
-    ScopedSearchImagesAction,
-    ScopedSearchImagesActionResult,
 )
 from ai.backend.manager.services.image.actions.search_aliases import (
     SearchAliasesAction,
     SearchAliasesActionResult,
 )
-from ai.backend.manager.services.image.actions.search_images import (
-    SearchImagesAction,
-    SearchImagesActionResult,
+from ai.backend.manager.services.image.actions.search_install_status import (
+    SearchImagesWithInstallStatusAction,
+    SearchImagesWithInstallStatusActionResult,
 )
 from ai.backend.manager.services.image.actions.set_image_resource_limit import (
     SetImageResourceLimitByIdAction,
@@ -106,12 +90,8 @@ from ai.backend.manager.services.image.actions.update_image import (
     UpdateImageActionResult,
     UpdateImageActionUnknownImageReferenceError,
 )
-from ai.backend.manager.services.image.actions.update_image_by_id import (
-    UpdateImageByIdAction,
-    UpdateImageByIdActionResult,
-)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ImageService:
@@ -142,45 +122,18 @@ class ImageService:
         if not await self._image_repository.validate_image_ownership(image_id, user_id, statuses):
             raise ImageAccessForbiddenError()
 
-    async def get_images_by_canonicals(
-        self, action: PublicGetImagesByCanonicalsAction
-    ) -> PublicGetImagesByCanonicalsActionResult:
-        """
-        Deprecated. Use get_images_by_ids instead.
-        """
-        user = current_user()
-        is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
-        hide_agents = False if is_superadmin else self._config_provider.config.manager.hide_agents
-        images_with_agent_install_status: list[
-            ImageWithAgentInstallStatus
-        ] = await self._image_repository.get_images_by_canonicals(
-            action.image_canonicals,
-            status_filter=action.image_status,
-            hide_agents=hide_agents,
+    async def search_images_with_install_status(
+        self, action: SearchImagesWithInstallStatusAction
+    ) -> SearchImagesWithInstallStatusActionResult:
+        is_superadmin = self._is_superadmin()
+        items = await self._image_repository.search_images_with_install_status(
+            self._read_scopes(action),
+            action.searcher,
+            hide_agents=False
+            if is_superadmin
+            else self._config_provider.config.manager.hide_agents,
         )
-        return PublicGetImagesByCanonicalsActionResult(
-            images_with_agent_install_status=images_with_agent_install_status
-        )
-
-    async def get_image_by_identifier(
-        self, action: PublicGetImageByIdentifierAction
-    ) -> PublicGetImageByIdentifierActionResult:
-        """
-        Deprecated. Use get_image_by_id instead.
-        """
-        user = current_user()
-        is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
-        hide_agents = False if is_superadmin else self._config_provider.config.manager.hide_agents
-        image_with_agent_install_status: ImageWithAgentInstallStatus = (
-            await self._image_repository.get_image_by_identifier(
-                action.image_identifier,
-                status_filter=action.image_status,
-                hide_agents=hide_agents,
-            )
-        )
-        return PublicGetImageByIdentifierActionResult(
-            image_with_agent_install_status=image_with_agent_install_status
-        )
+        return SearchImagesWithInstallStatusActionResult(items=items)
 
     async def get_image_installed_agents(
         self, action: GetImageInstalledAgentsAction
@@ -189,29 +142,14 @@ class ImageService:
         agent_counts_per_image = await self._image_repository.get_image_installed_agents(image_ids)
         return GetImageInstalledAgentsActionResult(data=agent_counts_per_image)
 
-    async def get_all_images(
-        self, action: PublicGetAllImagesAction
-    ) -> PublicGetAllImagesActionResult:
-        images = await self._image_repository.get_all_images(status_filter=action.status_filter)
-        return PublicGetAllImagesActionResult(data=images)
-
-    async def get_image_by_id(
-        self, action: PublicGetImageByIdAction
-    ) -> PublicGetImageByIdActionResult:
+    def _is_superadmin(self) -> bool:
         user = current_user()
-        is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
-        hide_agents = False if is_superadmin else self._config_provider.config.manager.hide_agents
-        image_with_agent_install_status: ImageWithAgentInstallStatus = (
-            await self._image_repository.get_image_by_id(
-                action.image_id,
-                load_aliases=True,
-                status_filter=action.image_status,
-                hide_agents=hide_agents,
-            )
-        )
-        return PublicGetImageByIdActionResult(
-            image_with_agent_install_status=image_with_agent_install_status
-        )
+        return user is not None and user.role == UserRole.SUPERADMIN
+
+    def _read_scopes(self, action: ImageScopeAction) -> Sequence[ImageTarget]:
+        """The scopes the read is narrowed to. A superadmin names none, which is the
+        unscoped read the SUPERADMIN gate already answers for."""
+        return () if self._is_superadmin() else action.targets
 
     async def forget_image(self, action: ForgetImageAction) -> ForgetImageActionResult:
         """
@@ -242,19 +180,6 @@ class ImageService:
             )
         data = await self._image_repository.soft_delete_image_by_id(action.image_id)
         return ForgetImageByIdActionResult(image=data)
-
-    async def restore_image_by_id(
-        self, action: RestoreImageByIdAction
-    ) -> RestoreImageByIdActionResult:
-        # Regular users need ownership validation
-        user = current_user()
-        is_superadmin = user is not None and user.role == UserRole.SUPERADMIN
-        if not is_superadmin and user is not None:
-            await self._validate_image_ownership(
-                action.image_id, UserID(user.user_id), ImageStatus.restorable()
-            )
-        data = await self._image_repository.restore_image_by_id(action.image_id)
-        return RestoreImageByIdActionResult(image=data)
 
     async def alias_image(self, action: AliasImageAction) -> AliasImageActionResult:
         """
@@ -291,13 +216,6 @@ class ImageService:
             raise UpdateImageActionUnknownImageReferenceError from e
 
         return UpdateImageActionResult(image=updated_image_data)
-
-    async def update_image_by_id(
-        self, action: UpdateImageByIdAction
-    ) -> UpdateImageByIdActionResult:
-        updater = ImageUpdater(image_id=action.image_id, update=action.update)
-        updated_image_data = await self._image_repository.update_image_properties(updater)
-        return UpdateImageByIdActionResult(image=updated_image_data)
 
     async def purge_image_by_id(self, action: PurgeImageByIdAction) -> PurgeImageByIdActionResult:
         # Regular users need ownership validation
@@ -403,7 +321,11 @@ class ImageService:
             total_reserved_bytes=total_reserved_bytes,
         )
 
-    async def scan_image(self, action: ScanImageAction) -> ScanImageActionResult:
+    async def global_scan_image(self, action: GlobalScanImageAction) -> GlobalScanImageActionResult:
+        image = await self._image_repository.scan_image(action.canonical, action.architecture)
+        return GlobalScanImageActionResult(image=image)
+
+    async def scan_already_registered_image(self, action: ScanImageAction) -> ScanImageActionResult:
         image_canonical = action.canonical
         architecture = action.architecture
 
@@ -422,32 +344,6 @@ class ImageService:
             action.image_canonical, action.architecture
         )
         return ClearImageCustomResourceLimitActionResult(image_data=image_data)
-
-    async def search_images(self, action: SearchImagesAction) -> SearchImagesActionResult:
-        """
-        Search images using a batch querier with conditions, pagination, and ordering.
-        """
-        result = await self._image_repository.search_images(action.querier)
-        return SearchImagesActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
-    async def scoped_search_images(
-        self, action: ScopedSearchImagesAction
-    ) -> ScopedSearchImagesActionResult:
-        """Search images within the scopes the action names."""
-        result = await self._image_repository.search_images_in_scopes(
-            action.querier, action.operation_scopes()
-        )
-        return ScopedSearchImagesActionResult(
-            data=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
 
     async def alias_image_by_id(self, action: AliasImageByIdAction) -> AliasImageByIdActionResult:
         """

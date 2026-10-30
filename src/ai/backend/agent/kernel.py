@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import codecs
+import functools
 import io
 import json
 import logging
@@ -19,6 +20,7 @@ from collections.abc import (
     Sequence,
 )
 from dataclasses import dataclass
+from importlib.resources import files
 from typing import (
     Any,
     Literal,
@@ -33,6 +35,7 @@ import zmq
 import zmq.asyncio
 from async_timeout import timeout
 
+from ai.backend.agent.errors.kernel import KernelRunnerReplyTimeoutError
 from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_task, current_loop
 from ai.backend.common.docker import ImageRef
@@ -58,8 +61,10 @@ from ai.backend.common.types import (
     SessionTypes,
     aobject,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.plugin.entrypoint import scan_entrypoints
 
+from .defs import KRUNNER_ENTRYPOINT_GROUP
 from .errors import (
     InvalidArgumentError,
     InvalidSocket,
@@ -74,11 +79,15 @@ from .types import AgentEventData, KernelLifecycleStatus, KernelOwnershipData
 
 __all__ = ["KernelOwnershipData"]
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Must exceed the launch timeout that ai.backend.kernel.base grants a service port, which cannot
 # be imported here because that package runs inside the container.
 SERVICE_START_REPLY_TIMEOUT_SEC = 35.0
+
+#: How long one request to the kernel runner may wait for its reply. Every wait needs a bound:
+#: `create_kernel` retries status-then-apps under one shared `stop_after_delay` budget.
+KERNEL_REPLY_TIMEOUT_SEC = 10.0
 
 # msg types visible to the API client.
 # (excluding control signals such as 'finished' and 'waiting-input'
@@ -243,10 +252,10 @@ class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
 
     async def init(self, event_producer: EventProducer) -> None:
         log.debug(
-            "kernel.init(k:{0}, api-ver:{1}, client-features:{2}): starting new runner",
-            self.kernel_id,
-            default_api_version,
-            default_client_features,
+            "code runner starting",
+            kernel_id=self.kernel_id,
+            api_version=default_api_version,
+            client_features=str(default_client_features),
         )
         try:
             self.runner = await self.create_code_runner(
@@ -254,8 +263,7 @@ class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
                 client_features=default_client_features,
                 api_version=default_api_version,
             )
-        except Exception as e:
-            log.error("kernel.init(k:{0}): failed to create code runner: {1}", self.kernel_id, e)
+        except Exception:
             self.runner = None
             raise
 
@@ -442,11 +450,11 @@ class AbstractKernel(UserDict[str, Any], aobject, metaclass=ABCMeta):
             raise KernelRunnerNotInitializedError("Kernel runner is not initialized")
         try:
             log.debug(
-                "kernel.execute(k:{0}, run_id:{1}, mode:{2}, opts:{3})",
-                self.kernel_id,
-                run_id,
-                mode,
-                opts,
+                "kernel code executing",
+                kernel_id=self.kernel_id,
+                run_id=run_id,
+                execution_mode=mode,
+                execution_opts=str(opts),
             )
             await self.runner.attach_output_queue(run_id)
             try:
@@ -649,9 +657,9 @@ class SocketPair:
         except zmq.ZMQError as e:
             if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
                 log.warning(
-                    "Socket invalid, recreating socket (addr: {}, err: {!r})",
-                    self.input_sock.addr,
-                    e,
+                    "code runner socket invalid, recreating",
+                    socket_addr=self.input_sock.addr,
+                    error_repr=repr(e),
                 )
                 self.input_sock.recreate_socket()
                 self.output_sock.recreate_socket()
@@ -664,7 +672,7 @@ class SocketPair:
             return await self.output_sock.socket.recv_multipart()
         except zmq.ZMQError as e:
             if e.errno in (zmq.ENOTSOCK, zmq.ETERM):
-                log.exception("Socket invalid (addr: {}, err: {!r})", self.output_sock.addr, e)
+                log.exception("code runner socket invalid", socket_addr=self.output_sock.addr)
                 raise InvalidSocket from e
 
             raise
@@ -824,7 +832,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             # destroying zmq contexts here with possibility of re-entrance
             # may cause deadlocks.
         except Exception:
-            log.exception("AbstractCodeRunner.close(): unexpected error")
+            log.exception("code runner close failed", kernel_id=self.kernel_id)
 
     async def _create_tasks(self) -> None:
         # close the previous task if any
@@ -850,8 +858,11 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def ping(self) -> dict[str, float] | None:
         try:
             return await self.feed_and_get_status()
+        except KernelRunnerReplyTimeoutError:
+            log.warning("code runner ping got no reply", kernel_id=self.kernel_id)
+            return None
         except Exception:
-            log.exception("AbstractCodeRunner.ping(): unexpected error")
+            log.exception("code runner ping failed", kernel_id=self.kernel_id)
             return None
 
     async def ping_status(self) -> None:
@@ -861,14 +872,19 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         """
         try:
             while True:
-                ret = await self.feed_and_get_status()
-                if ret is None:
-                    break
+                try:
+                    ret = await self.feed_and_get_status()
+                except KernelRunnerReplyTimeoutError:
+                    # A runner slow to start serving is not gone: keep the NAT entry alive.
+                    log.debug("code runner status ping got no reply", kernel_id=self.kernel_id)
+                else:
+                    if ret is None:
+                        break
                 await asyncio.sleep(10)
         except asyncio.CancelledError:
             pass
         except Exception:
-            log.exception("AbstractCodeRunner.ping_status(): unexpected error")
+            log.exception("code runner ping status failed", kernel_id=self.kernel_id)
 
     async def feed_batch(self, opts: Mapping[str, Any]) -> None:
         sock = await self._get_socket_pair()
@@ -917,12 +933,19 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
     async def feed_and_get_status(self) -> dict[str, float] | None:
         sock = await self._get_socket_pair()
         await sock.send_multipart([b"status", b""])
+        # A reply that arrives after its request timed out is consumed by the next request.
+        # Status replies are interchangeable snapshots, so that is tolerated rather than drained.
         try:
-            result = await self.status_queue.get()
+            async with asyncio.timeout(KERNEL_REPLY_TIMEOUT_SEC):
+                result = await self.status_queue.get()
             self.status_queue.task_done()
             return cast(dict[str, float] | None, msgpack.unpackb(result))
         except asyncio.CancelledError:
             return None
+        except TimeoutError as e:
+            raise KernelRunnerReplyTimeoutError(
+                f"kernel runner did not answer status within {KERNEL_REPLY_TIMEOUT_SEC}s"
+            ) from e
 
     async def feed_and_get_completion(
         self, code_text: str, opts: Mapping[str, Any]
@@ -996,7 +1019,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             b"",
         ])
         try:
-            with timeout(10):
+            async with asyncio.timeout(KERNEL_REPLY_TIMEOUT_SEC):
                 result = await self.service_apps_info_queue.get()
             self.service_apps_info_queue.task_done()
             return cast(dict[str, Any], load_json(result))
@@ -1156,7 +1179,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
                 "exitCode": None,
                 "options": None,
             }
-            log.warning("Execution timeout detected on kernel {}", self.kernel_id)
+            log.trace("code execution timed out", kernel_id=self.kernel_id)
             type(self).aggregate_console(result, records, api_ver)
             self.next_output_queue()
             return result
@@ -1171,7 +1194,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             self.resume_output_queue()
             return result
         except Exception:
-            log.exception("unexpected error")
+            log.exception("code runner result fetch failed", kernel_id=self.kernel_id)
             raise
 
     async def attach_output_queue(self, run_id: str | None) -> None:
@@ -1187,10 +1210,10 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         else:
             activated, q = self.pending_queues[run_id]
         log.debug(
-            "CodeRunner.attach_output_queue(k:{0}, run_id:{1}, is running event set:{2})",
-            self.kernel_id,
-            run_id,
-            activated.is_set(),
+            "code runner output queue attached",
+            kernel_id=self.kernel_id,
+            run_id=run_id,
+            run_activated=activated.is_set(),
         )
         if self.output_queue is None:
             self.output_queue = q
@@ -1238,6 +1261,13 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             # from the kernel.
             self.output_queue = None
 
+    def _enqueue_status(self, msg_data: bytes) -> None:
+        # Late replies pile up here; replace the oldest so `read_output` never blocks on status.
+        if self.status_queue.full():
+            self.status_queue.get_nowait()
+            self.status_queue.task_done()
+        self.status_queue.put_nowait(msg_data)
+
     async def read_output(self) -> None:
         # We should use incremental decoder because some kernels may
         # send us incomplete UTF-8 byte sequences (e.g., Julia).
@@ -1250,13 +1280,17 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             try:
                 data = await sock.recv_multipart()
                 if len(data) != 2:
-                    log.warning("Invalid data from output socket, skip. (data: {})", data)
+                    log.warning(
+                        "code runner output invalid, skipped",
+                        kernel_id=self.kernel_id,
+                        output_data=str(data),
+                    )
                     continue
                 msg_type, msg_data = data
                 try:
                     match msg_type:
                         case b"status":
-                            await self.status_queue.put(msg_data)
+                            self._enqueue_status(msg_data)
                         case b"completion":
                             await self.completion_queue.put(msg_data)
                         case b"service-result":
@@ -1318,7 +1352,7 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
             except (asyncio.CancelledError, GeneratorExit):
                 break
             except Exception:
-                log.exception("unexpected error")
+                log.exception("code runner output read failed", kernel_id=self.kernel_id)
                 break
 
 
@@ -1349,13 +1383,14 @@ def match_distro_data(data: Mapping[str, Any], distro: str) -> tuple[str, Any]:
         distro_ver = tuple(map(int, m.group(1).split(".")))
 
     # Check if there are static-build krunners first.
+    # krunner-alpine 5.x names its volume with the wheel platform tag (e.g., "musllinux_1_2").
     if distro_prefix == "alpine":
-        libc_flavor = "musl"
+        static_keys: tuple[str, ...] = ("static-musl", "musllinux_")
     else:
-        libc_flavor = "gnu"
-    distro_key = f"static-{libc_flavor}"
-    if volume := data.get(distro_key):
-        return distro_key, volume
+        static_keys = ("static-gnu",)
+    for key, volume in data.items():
+        if key.startswith(static_keys):
+            return key, volume
 
     # Search through the per-distro versions
     match_list = [
@@ -1373,3 +1408,18 @@ def match_distro_data(data: Mapping[str, Any], distro: str) -> tuple[str, Any]:
                 return (distro_key, value)
         return match_list[-1][:-1]  # fallback to the latest of its kind
     raise UnsupportedBaseDistroError(distro)
+
+
+@functools.cache
+def read_krunner_python_version(matched_distro: str) -> str | None:
+    """
+    Read the Python version of the krunner volume selected by `match_distro_data()`.
+    The key does not always name its package (krunner-alpine 5.x uses "musllinux_1_2").
+    """
+    for entrypoint in scan_entrypoints(KRUNNER_ENTRYPOINT_GROUP):
+        path = files(f"ai.backend.krunner.{entrypoint.name}").joinpath(
+            f"krunner-python.{matched_distro}.txt"
+        )
+        if path.is_file():
+            return path.read_text().strip()
+    return None

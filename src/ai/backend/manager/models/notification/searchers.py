@@ -15,6 +15,10 @@ from ai.backend.manager.models.notification.row import (
     NotificationChannelRow,
     NotificationRuleRow,
 )
+from ai.backend.manager.models.notification.searchable_fields import (
+    NotificationChannelSearchableFields,
+    NotificationRuleSearchableFields,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -26,7 +30,7 @@ class NotificationChannelSearcher(Searcher[NotificationChannelRow, NotificationC
 
     @override
     def to_data(self, row: NotificationChannelRow) -> NotificationChannelData:
-        return row.to_data()
+        return NotificationChannelSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -37,4 +41,4 @@ class NotificationRuleSearcher(Searcher[NotificationRuleRow, NotificationRuleDat
 
     @override
     def to_data(self, row: NotificationRuleRow) -> NotificationRuleData:
-        return row.to_data()
+        return NotificationRuleSearchableFields.own.to_data(row)

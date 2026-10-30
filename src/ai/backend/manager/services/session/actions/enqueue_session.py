@@ -8,13 +8,14 @@ from typing import override
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.types import EntityIdentifier
-from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT
+from ai.backend.common.defs.session import JOB_PRIORITY_DEFAULT, SESSION_PRIORITY_DEFAULT
 from ai.backend.common.types import AccessKey, ClusterMode, MountInfoEntry, SessionTypes
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.data.session.options import AgentSelectionPolicy
 from ai.backend.manager.data.session.types import SessionData
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.session.base import (
     SessionScopeAction,
     SessionScopeActionResult,
@@ -54,7 +55,7 @@ class SessionExecutionSpec:
 class SessionSchedulingSpec:
     """Scheduling constraints and preferences."""
 
-    priority: int = 10
+    tier: int = SESSION_PRIORITY_DEFAULT
     job_priority: int = JOB_PRIORITY_DEFAULT
     is_preemptible: bool = True
     dependencies: list[uuid.UUID] | None = None
@@ -128,3 +129,7 @@ class EnqueueSessionActionResult(SessionScopeActionResult):
     """Returns full session data for SessionNode conversion."""
 
     session_data: SessionData
+
+    @override
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return (SessionID(self.session_data.id),)

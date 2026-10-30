@@ -57,7 +57,7 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from . import __version__
 from .defs import AllocationModes
@@ -70,7 +70,7 @@ __all__ = (
     "MockPlugin",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))  # type: ignore
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 MIN_MEM_UNIT = 512 * (2**20)  # 512 MiB
@@ -146,7 +146,7 @@ class MockPlugin(AbstractComputePlugin):
         # Read the mockup device config.
         raw_cfg, cfg_src_path = config.read_from_file(None, "mock-accelerator")
         self.mock_config = _mock_config_iv.check(raw_cfg)
-        log.info("Read mocked device configs from {}", cfg_src_path)
+        log.info("mock device config loaded", config_path=str(cfg_src_path))
         self.key = DeviceName(self.mock_config["slot_name"])
         if self.mock_config["slot_name"] == "cuda":
             _cuda_devices_config_iv.check(self.mock_config["devices"])
@@ -155,14 +155,17 @@ class MockPlugin(AbstractComputePlugin):
         # Set the allocation mode.
         mode = self.plugin_config.get("allocation_mode")
         if mode is None:
-            log.warning('{} allocation mode is not set. Using "discrete" mode.', self.key)
+            log.warning("allocation mode not set, using discrete mode", plugin_name=self.key)
             self._mode = AllocationModes.DISCRETE
         else:
             try:
                 self._mode = AllocationModes(mode)
             except ValueError:
-                log.error("Invalid fractional mode value.")
-                log.info("{} acceleration is disabled.", self.key)
+                log.error(
+                    "accelerator disabled: invalid allocation mode",
+                    plugin_name=self.key,
+                    allocation_mode=str(mode),
+                )
                 self.enabled = False
                 return
 
@@ -176,7 +179,11 @@ class MockPlugin(AbstractComputePlugin):
             case AllocationModes.FRACTIONAL:
                 self.slot_types.append((SlotName(f"{self.key}.shares"), SlotTypes.COUNT))
             case _:
-                log.error("Invalid allocation mode: {}", self._mode)
+                log.error(
+                    "accelerator disabled: invalid allocation mode",
+                    plugin_name=self.key,
+                    allocation_mode=self._mode,
+                )
                 self.enabled = False
                 return
 
@@ -195,8 +202,9 @@ class MockPlugin(AbstractComputePlugin):
                 stdout, _ = await proc.communicate()
                 lines = stdout.decode().splitlines()
             except FileNotFoundError:
-                log.error('could not execute the "docker version" command.')
-                log.warning("CUDA acceleration is disabled.")
+                log.error(
+                    "accelerator disabled: docker version command failed", plugin_name=self.key
+                )
                 self.enabled = False
                 return
             rx_triple_version = re.compile(r"(\d+\.\d+\.\d+)")
@@ -205,16 +213,15 @@ class MockPlugin(AbstractComputePlugin):
             if m:
                 self.docker_version = tuple(map(int, m.group(1).split(".")))
             else:
-                log.error("could not detect docker version!")
-                log.warning("CUDA acceleration is disabled.")
+                log.error("accelerator disabled: docker version not detected", plugin_name=self.key)
                 self.enabled = False
                 return
             log.info(
-                "NVIDIA driver version: {} (mocked)",
-                self.mock_config["attributes"]["nvidia_driver"],
+                "mock cuda runtime detected",
+                nvidia_driver_version=str(self.mock_config["attributes"]["nvidia_driver"]),
+                nvdocker_version=".".join(map(str, self.nvdocker_version)),
+                docker_version=".".join(map(str, self.docker_version)),
             )
-            log.info("nvidia-docker version (mocked): {}", self.nvdocker_version)
-            log.info("docker version: {}", self.docker_version)
 
         # Read the configurations.
         raw_unit_mem = self.plugin_config.get("unit_mem")
@@ -243,15 +250,17 @@ class MockPlugin(AbstractComputePlugin):
         raw_quantum_size = self.plugin_config.get("quantum_size", "0.1")
         self.quantum_size = Decimal(raw_quantum_size)
         if self._mode == AllocationModes.FRACTIONAL:
-            log.info("The fraction quantum size: {}", self.quantum_size)
+            log.info("fraction quantum size configured", quantum_size=self.quantum_size)
 
         # Detect devices.
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices (mocked):\n" + pformat(detected_devices))
-            log.info("{} acceleration is enabled.", self.key)
+            log.debug("detected devices:\n{}", pformat(detected_devices))
+            log.info(
+                "accelerator enabled", plugin_name=self.key, device_count=len(detected_devices)
+            )
         except ImportError:
-            log.warning("{} acceleration is disabled.", self.key)
+            log.warning("accelerator disabled: no devices found", plugin_name=self.key)
             self.enabled = False
             return
 

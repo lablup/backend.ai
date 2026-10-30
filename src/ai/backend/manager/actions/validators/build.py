@@ -2,6 +2,12 @@ from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualEntityAtomicBulkActionRBACValidator,
     VirtualEntityPartialBulkActionRBACValidator,
 )
+from ai.backend.manager.actions.v2.global_scope.validator.rbac import (
+    VirtualEntityGlobalActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.membership.validator.rbac import (
+    VirtualEntityMembershipActionRBACValidator,
+)
 from ai.backend.manager.actions.v2.relation.validator.rbac import (
     VirtualEntityRelationActionRBACValidator,
 )
@@ -31,6 +37,12 @@ def build_action_validators(
         partial_bulk=VirtualEntityPartialBulkActionRBACValidator(permission_check_repository),
         atomic_bulk=VirtualEntityAtomicBulkActionRBACValidator(permission_check_repository),
         relation=VirtualEntityRelationActionRBACValidator(
+            permission_check_repository, config_provider
+        ),
+        membership=VirtualEntityMembershipActionRBACValidator(
+            permission_check_repository, config_provider
+        ),
+        global_scope=VirtualEntityGlobalActionRBACValidator(
             permission_check_repository, config_provider
         ),
     )

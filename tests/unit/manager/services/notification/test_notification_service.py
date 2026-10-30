@@ -24,23 +24,23 @@ from ai.backend.common.data.notification import (
 )
 from ai.backend.common.events.event_types.notification import NotificationTriggeredEvent
 from ai.backend.common.exception import BackendAISchemaValidationFailed
-from ai.backend.manager.data.notification import (
+from ai.backend.manager.data.notification.types import (
+    MatchingNotificationRuleData,
     NotificationChannelData,
     NotificationRuleData,
 )
-from ai.backend.manager.data.notification.types import MatchingNotificationRuleData
 from ai.backend.manager.errors.notification import (
     NotificationChannelNotFound,
     NotificationRuleNotFound,
     NotificationTemplateRenderingFailure,
 )
 from ai.backend.manager.notification.notification_center import NotificationCenter
-from ai.backend.manager.repositories.notification import NotificationRepository
-from ai.backend.manager.services.notification.actions import (
+from ai.backend.manager.repositories.notification.repository import NotificationRepository
+from ai.backend.manager.services.notification.actions.process_notification import (
     ProcessNotificationAction,
-    ValidateChannelAction,
-    ValidateRuleAction,
 )
+from ai.backend.manager.services.notification.actions.validate_channel import ValidateChannelAction
+from ai.backend.manager.services.notification.actions.validate_rule import ValidateRuleAction
 from ai.backend.manager.services.notification.service import NotificationService
 
 

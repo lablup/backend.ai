@@ -87,6 +87,26 @@ class EmptyOperationScopeError(RepositoryError, web.HTTPBadRequest):
         )
 
 
+class EmptyMatchConditionError(RepositoryError, web.HTTPBadRequest):
+    """Raised when a matching mode is given no condition.
+
+    ``some``/``every``/``none``/``has`` take the conditions one related row must meet.
+    With none given they stop constraining the rows and start answering whether a
+    related row exists at all, which ``exists``/``not_exists`` say by name.
+    """
+
+    error_type = "https://api.backend.ai/probs/empty-match-condition"
+    error_title = "Matching mode must carry at least one condition."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.DATABASE,
+            operation=ErrorOperation.SEARCH,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class AmbiguousEntityKeyError(RepositoryError, web.HTTPConflict):
     """Raised when a lookup key matches more than one row.
 

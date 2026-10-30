@@ -36,12 +36,15 @@ class ProjectType(StrEnum):
 class ProjectOrderField(StrEnum):
     """Fields available for ordering projects."""
 
+    ID = "id"
     NAME = "name"
     CREATED_AT = "created_at"
     MODIFIED_AT = "modified_at"
     IS_ACTIVE = "is_active"
     TYPE = "type"
     DOMAIN_NAME = "domain_name"
+    DESCRIPTION = "description"
+    INTEGRATION_NAME = "integration_name"
     USER_USERNAME = "user_username"
     USER_EMAIL = "user_email"
 

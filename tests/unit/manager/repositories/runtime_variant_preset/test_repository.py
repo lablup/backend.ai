@@ -8,6 +8,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     PresetTarget,
@@ -16,17 +17,16 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
-from ai.backend.manager.models.runtime_variant_preset.conditions import (
-    RuntimeVariantPresetConditions,
-)
 from ai.backend.manager.models.runtime_variant_preset.creators import (
     RANK_GAP,
     RuntimeVariantPresetCreator,
 )
-from ai.backend.manager.models.runtime_variant_preset.orders import RuntimeVariantPresetOrders
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
+from ai.backend.manager.models.runtime_variant_preset.searchable_fields import (
+    RuntimeVariantPresetSearchableFields,
+)
 from ai.backend.manager.models.runtime_variant_preset.searchers import (
     RuntimeVariantPresetSearcher,
 )
@@ -82,6 +82,7 @@ async def runtime_variant_id(
                 id=variant_id,
                 name=f"test-variant-{variant_id.hex[:8]}",
                 description=None,
+                default_model_definition=DefaultModelDefinition(),
             )
         )
         await db_sess.flush()
@@ -195,13 +196,13 @@ class TestRuntimeVariantPresetVersionRange:
         before = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("0.8.5")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("0.8.5"),
             )
         )
         at = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("0.9.0")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("0.9.0"),
             )
         )
 
@@ -234,13 +235,13 @@ class TestRuntimeVariantPresetVersionRange:
         before = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("0.8.5")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("0.8.5"),
             )
         )
         at = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("0.9.0")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("0.9.0"),
             )
         )
 
@@ -274,7 +275,7 @@ class TestRuntimeVariantPresetVersionRange:
         result = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("0.10.0")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("0.10.0"),
             )
         )
 
@@ -311,7 +312,7 @@ class TestRuntimeVariantPresetVersionRange:
         result = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=1),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("0.8.0")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("0.8.0"),
             )
         )
 
@@ -342,13 +343,13 @@ class TestRuntimeVariantPresetVersionRange:
         at_the_release = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("0.9.0")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("0.9.0"),
             )
         )
         before_it = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("0.8.9")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("0.8.9"),
             )
         )
 
@@ -378,7 +379,7 @@ class TestRuntimeVariantPresetVersionRange:
         result = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("10.0.0")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("10.0.0"),
             )
         )
 
@@ -417,7 +418,7 @@ class TestRuntimeVariantPresetVersionOrder:
         result = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                orders=RuntimeVariantPresetOrders.added_version(ascending=True),
+                orders=RuntimeVariantPresetSearchableFields.own.added_version_order(True),
             )
         )
 
@@ -453,7 +454,7 @@ class TestRuntimeVariantPresetVersionOrder:
         result = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                orders=RuntimeVariantPresetOrders.deprecated_version(ascending=True),
+                orders=RuntimeVariantPresetSearchableFields.own.deprecated_version_order(True),
             )
         )
 
@@ -497,7 +498,7 @@ class TestRuntimeVariantPresetVersionSegmentCount:
         result = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version("1")],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version("1"),
             )
         )
 
@@ -548,7 +549,7 @@ class TestRuntimeVariantPresetVersionSegmentCount:
         result = await preset_ops.search_in_global(
             RuntimeVariantPresetSearcher(
                 pagination=OffsetPagination(limit=10),
-                conditions=[RuntimeVariantPresetConditions.by_valid_at_version(version)],
+                conditions=RuntimeVariantPresetSearchableFields.own.valid_at_version(version),
             )
         )
 

@@ -2,20 +2,20 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import override
+from typing import final, override
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.manager.actions.v2.ops.base import OperationScopeOpsAction
 from ai.backend.manager.data.resource_usage_history.types import UserUsageBucketData
 from ai.backend.manager.models.resource_usage_history.row import UserUsageBucketRow
+from ai.backend.manager.models.resource_usage_history.scopes import (
+    UserUsageBucketTarget,
+)
 from ai.backend.manager.models.resource_usage_history.searchers import (
     UserUsageBucketSearcher,
 )
 from ai.backend.manager.models.scopes import OperationScope
-from ai.backend.manager.services.resource_usage.actions.scope_items import (
-    UserUsageBucketScopeItem,
-)
 
 
 @dataclass
@@ -24,7 +24,7 @@ class SearchUserUsageBucketsAction(
 ):
     """Page through the user usage buckets the named resource groups hold, combined with OR."""
 
-    items: Sequence[UserUsageBucketScopeItem]
+    targets: Sequence[UserUsageBucketTarget]
     searcher: UserUsageBucketSearcher
 
     @override
@@ -37,13 +37,15 @@ class SearchUserUsageBucketsAction(
     def action_name(cls) -> str:
         return "search_user_usage_buckets"
 
+    @final
     @override
     def scope_targets(self) -> Sequence[EntityIdentifier]:
-        return [item.scope_id() for item in self.items]
+        return [target.scope_id() for target in self.targets]
 
+    @final
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return [item.operation_scope() for item in self.items]
+        return self.targets
 
     @override
     def to_searcher(self) -> UserUsageBucketSearcher:

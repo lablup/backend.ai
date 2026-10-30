@@ -1,0 +1,57 @@
+name: ci-alembic
+
+# Checks that the models and the alembic migrations agree, called by `ci.yml`
+# when the models changed, for a release PR, and for a tag.
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+
+  alembic:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Check out the revision
+      uses: actions/checkout@v6
+      with:
+        lfs: false
+    - name: Parse versions from config
+      run: |
+        PYTHON_VERSION=$(grep -m 1 -oP '(?<=CPython==)([^"]+)' pants.toml)
+        echo "PANTS_CONFIG_FILES=pants.ci.toml" >> $GITHUB_ENV
+        echo "PROJECT_PYTHON_VERSION=$PYTHON_VERSION" >> $GITHUB_ENV
+    - name: Set up Python as Runtime
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ env.PROJECT_PYTHON_VERSION }}
+    - name: Check for multiple heads
+      run: python scripts/check-multiple-alembic-heads.py
+    - name: Restore the Pants caches
+      uses: ./.github/actions/pants-caches
+      with:
+        mode: restore
+    - name: Bootstrap Pants
+      uses: pantsbuild/actions/init-pants@v11
+      with:
+        named-caches-hash: disable
+        cache-lmdb-store: 'false'
+    - name: Prepare DB
+      run: docker compose -f docker-compose.halfstack-main.yml up -d backendai-half-db --wait
+    - name: Pants export
+      run: pants export --resolve=python-default
+    - name: Prepare the alembic configuration file
+      run: cp configs/manager/halfstack.alembic.ini alembic.ini
+    - name: Prepare database schema
+      run: ./backend.ai mgr schema oneshot
+    - name: Try creating alembic migration
+      id: create-revision
+      run: |
+        output=$(./py -m alembic revision --autogenerate)
+        revision_file=$(echo "$output" | grep -oP '(?<=Generating ).*\.py')
+        echo "REVISION_FILE=$revision_file" >> $GITHUB_OUTPUT
+    - name: Verify that revision is empty
+      run: python scripts/check-alembic-revision.py ${{ steps.create-revision.outputs.REVISION_FILE }}

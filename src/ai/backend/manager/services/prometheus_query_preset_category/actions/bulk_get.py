@@ -21,19 +21,19 @@ from ai.backend.manager.models.prometheus_query_preset_category.row import (
 
 
 @dataclass
-class PublicBulkGetCategoriesAction(
+class BulkGetCategoriesAction(
     PartialBulkGetEntityOpsAction[
         PrometheusQueryPresetCategoryRow, PrometheusQueryPresetCategoryData
     ]
 ):
-    """Read the categories the caller named; every authenticated user may."""
+    """Read the categories the caller named, one permission check per category."""
 
     ids: Sequence[PrometheusQueryPresetCategoryID]
 
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "public_bulk_get_prometheus_query_preset_categories"
+        return "bulk_get_prometheus_query_preset_categories"
 
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:

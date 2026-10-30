@@ -5,6 +5,7 @@ Request DTOs for resource policy DTO v2.
 from __future__ import annotations
 
 from typing import Self
+from uuid import UUID
 
 from pydantic import Field, field_validator
 
@@ -17,10 +18,12 @@ from ai.backend.common.dto.manager.query import (
 )
 from ai.backend.common.dto.manager.v2.common import (
     BinarySizeInput,
+    NonEmptyList,
     OrderDirection,
     ResourceSlotEntryInput,
     VFolderHostPermissionEntryInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
@@ -49,6 +52,15 @@ __all__ = (
     "UpdateKeypairResourcePolicyInput",
     "UpdateProjectResourcePolicyInput",
     "UpdateUserResourcePolicyInput",
+    "PartialBulkPurgeKeypairResourcePoliciesInput",
+    "PartialBulkPurgeProjectResourcePoliciesInput",
+    "PartialBulkPurgeUserResourcePoliciesInput",
+    "PartialBulkUpdateKeypairResourcePoliciesInput",
+    "PartialBulkUpdateKeypairResourcePolicyItemInput",
+    "PartialBulkUpdateProjectResourcePoliciesInput",
+    "PartialBulkUpdateProjectResourcePolicyItemInput",
+    "PartialBulkUpdateUserResourcePoliciesInput",
+    "PartialBulkUpdateUserResourcePolicyItemInput",
 )
 
 
@@ -164,6 +176,27 @@ class DeleteKeypairResourcePolicyInput(BaseRequestModel):
     name: str = Field(description="Name of the keypair resource policy to delete.")
 
 
+class PartialBulkUpdateKeypairResourcePolicyItemInput(BaseRequestModel):
+    """One keypair resource policy of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the keypair resource policy to update.")
+    input: UpdateKeypairResourcePolicyInput = Field(description="Fields to update on the policy.")
+
+
+class PartialBulkUpdateKeypairResourcePoliciesInput(BaseRequestModel):
+    """Input for updating several keypair resource policies, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateKeypairResourcePolicyItemInput] = Field(
+        description="The keypair resource policies to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeKeypairResourcePoliciesInput(BaseRequestModel):
+    """Input for purging several keypair resource policies, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the keypair resource policies to purge.")
+
+
 class CreateUserResourcePolicyInput(BaseRequestModel):
     """Input for creating a new user resource policy."""
 
@@ -240,6 +273,27 @@ class DeleteUserResourcePolicyInput(BaseRequestModel):
     name: str = Field(description="Name of the user resource policy to delete.")
 
 
+class PartialBulkUpdateUserResourcePolicyItemInput(BaseRequestModel):
+    """One user resource policy of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the user resource policy to update.")
+    input: UpdateUserResourcePolicyInput = Field(description="Fields to update on the policy.")
+
+
+class PartialBulkUpdateUserResourcePoliciesInput(BaseRequestModel):
+    """Input for updating several user resource policies, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateUserResourcePolicyItemInput] = Field(
+        description="The user resource policies to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeUserResourcePoliciesInput(BaseRequestModel):
+    """Input for purging several user resource policies, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the user resource policies to purge.")
+
+
 class CreateProjectResourcePolicyInput(BaseRequestModel):
     """Input for creating a new project resource policy."""
 
@@ -291,6 +345,27 @@ class DeleteProjectResourcePolicyInput(BaseRequestModel):
     name: str = Field(description="Name of the project resource policy to delete.")
 
 
+class PartialBulkUpdateProjectResourcePolicyItemInput(BaseRequestModel):
+    """One project resource policy of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the project resource policy to update.")
+    input: UpdateProjectResourcePolicyInput = Field(description="Fields to update on the policy.")
+
+
+class PartialBulkUpdateProjectResourcePoliciesInput(BaseRequestModel):
+    """Input for updating several project resource policies, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateProjectResourcePolicyItemInput] = Field(
+        description="The project resource policies to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeProjectResourcePoliciesInput(BaseRequestModel):
+    """Input for purging several project resource policies, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the project resource policies to purge.")
+
+
 # ── Filter & Order DTOs ──
 
 
@@ -337,6 +412,10 @@ class KeypairResourcePolicyFilter(BaseRequestModel):
     max_priority: IntFilter | None = Field(
         default=None, description="Filter by max scheduling priority."
     )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by keypair resource policy ID.",
+    )
     AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
     OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")
     NOT: list[Self] | None = Field(default=None, description="Negate the given sub-filters.")
@@ -362,6 +441,10 @@ class UserResourcePolicyFilter(BaseRequestModel):
     max_customized_image_count: IntFilter | None = Field(
         default=None, description="Filter by max customized image count."
     )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by user resource policy ID.",
+    )
     AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
     OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")
     NOT: list[Self] | None = Field(default=None, description="Negate the given sub-filters.")
@@ -380,6 +463,10 @@ class ProjectResourcePolicyFilter(BaseRequestModel):
     )
     max_network_count: IntFilter | None = Field(
         default=None, description="Filter by max network count."
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by project resource policy ID.",
     )
     AND: list[Self] | None = Field(default=None, description="Match all of the given sub-filters.")
     OR: list[Self] | None = Field(default=None, description="Match any of the given sub-filters.")

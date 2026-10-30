@@ -5,10 +5,10 @@ from ai.backend.manager.actions.types import ActionOperationType
 
 
 class BaseGlobalAction(ABC):
-    """Base for super-admin actions on system-wide state.
+    """Base for actions on system-wide state.
 
-    Declares no target and no permission: a global action belongs to no RBAC scope,
-    so authorization is the SUPERADMIN role gate rather than scope resolution.
+    Declares no target: the `global` singleton is the scope, and what it grants on the
+    action's entity type is the check.
     """
 
     @classmethod

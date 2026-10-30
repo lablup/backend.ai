@@ -23,7 +23,7 @@ from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
-from ai.backend.manager.models.object_storage import ObjectStorageRow
+from ai.backend.manager.models.object_storage.row import ObjectStorageRow
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.artifact.repository import ArtifactRepository
@@ -59,7 +59,9 @@ def object_storage_processors(
     processor_registry: ProcessorRegistry[Any],
 ) -> ObjectStorageProcessors:
     artifact_repository = ArtifactRepository(database_engine, V2DBOpsProvider(database_engine))
-    object_storage_repository = ObjectStorageRepository(database_engine)
+    object_storage_repository = ObjectStorageRepository(
+        database_engine, V2DBOpsProvider(database_engine)
+    )
     storage_namespace_repository = StorageNamespaceRepository(database_engine)
     service = ObjectStorageService(
         artifact_repository=artifact_repository,
@@ -84,9 +86,12 @@ def object_storage_processors(
 @pytest.fixture()
 def storage_namespace_processors(
     database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
 ) -> StorageNamespaceProcessors:
     return StorageNamespaceProcessors(
-        group=ops_processor_group(database_engine, GroupMeta(StorageNamespaceEntityType()))
+        group=ops_processor_group(
+            database_engine, GroupMeta(StorageNamespaceEntityType()), config_provider
+        )
     )
 
 

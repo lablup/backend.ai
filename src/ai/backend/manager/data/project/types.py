@@ -9,6 +9,7 @@ from typing import Any, override
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityData
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.types import OptionalState, PartialModifier, TriState
 
@@ -65,7 +66,7 @@ class ProjectData(EntityData):
     dotfiles: bytes
     resource_policy: str
     type: ProjectType
-    container_registry: dict[str, str] | None
+    container_registry: ImageCommitRegistry | None
 
     @override
     def entity_id(self) -> ProjectID:
@@ -101,8 +102,8 @@ class ProjectModifier(PartialModifier):
     )
     integration_name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     resource_policy: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    container_registry: TriState[dict[str, str]] = field(
-        default_factory=TriState[dict[str, str]].nop
+    container_registry: TriState[ImageCommitRegistry] = field(
+        default_factory=TriState[ImageCommitRegistry].nop
     )
 
     @override
@@ -117,7 +118,9 @@ class ProjectModifier(PartialModifier):
         # Field is named integration_name above model layer; DB column remains integration_id.
         self.integration_name.update_dict(to_update, "integration_id")
         self.resource_policy.update_dict(to_update, "resource_policy")
-        self.container_registry.update_dict(to_update, "container_registry")
+        if not self.container_registry.is_nop():
+            registry = self.container_registry.optional_value()
+            to_update["container_registry"] = registry.to_json() if registry is not None else None
         return to_update
 
 

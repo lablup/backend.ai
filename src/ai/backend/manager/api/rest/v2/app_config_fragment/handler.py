@@ -13,13 +13,17 @@ from ai.backend.common.dto.manager.v2.app_config_fragment.request import (
     BulkPurgeAppConfigFragmentInput,
     MyAppConfigFragmentsByNamesInput,
     MyUpsertAppConfigFragmentsInput,
+    PartialBulkPurgeAppConfigFragmentsInput,
     ScopedAppConfigFragmentsByNamesInput,
     ScopedUpsertAppConfigFragmentsInput,
 )
 from ai.backend.common.dto.manager.v2.app_config_fragment.response import (
+    AppConfigFragmentBulkErrorInfo,
     AppConfigFragmentsByNamesPayload,
+    BulkPurgeAppConfigFragmentPayload,
+    UpsertAppConfigFragmentsPayload,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import AppConfigFragmentIdPathParam
 
 if TYPE_CHECKING:
@@ -27,7 +31,7 @@ if TYPE_CHECKING:
         AppConfigFragmentAdapter,
     )
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2AppConfigFragmentHandler:
@@ -54,12 +58,31 @@ class V2AppConfigFragmentHandler:
         result = await self._adapter.purge(AppConfigFragmentID(path.parsed.fragment_id))
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
+    async def partial_bulk_purge(
+        self,
+        body: BodyParam[PartialBulkPurgeAppConfigFragmentsInput],
+    ) -> APIResponse:
+        """Purge several fragments, answering for each one (auth, RBAC-gated)."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def bulk_purge(
         self,
         body: BodyParam[BulkPurgeAppConfigFragmentInput],
     ) -> APIResponse:
-        """Purge many fragments by id, with per-item partial success (auth, RBAC)."""
-        result = await self._adapter.bulk_purge(body.parsed)
+        """Deprecated. Use `POST /v2/app-config-fragments/partial-bulk-purge`."""
+        payload = await self._adapter.partial_bulk_purge(
+            PartialBulkPurgeAppConfigFragmentsInput(ids=body.parsed.ids)
+        )
+        result = BulkPurgeAppConfigFragmentPayload(
+            items=[node.id for node in payload.successes],
+            failed=[
+                AppConfigFragmentBulkErrorInfo(
+                    id=AppConfigFragmentID(failure.id), message=failure.message
+                )
+                for failure in payload.failed
+            ],
+        )
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def admin_search(
@@ -90,25 +113,36 @@ class V2AppConfigFragmentHandler:
             status_code=HTTPStatus.OK, response_model=AppConfigFragmentsByNamesPayload(nodes)
         )
 
+    async def scoped_atomic_bulk_upsert(
+        self,
+        body: BodyParam[ScopedUpsertAppConfigFragmentsInput],
+    ) -> APIResponse:
+        """Upsert many fragments at one scope, all or none (auth, RBAC)."""
+        result = await self._adapter.scoped_atomic_bulk_upsert(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def my_atomic_bulk_upsert(
+        self,
+        body: BodyParam[MyUpsertAppConfigFragmentsInput],
+    ) -> APIResponse:
+        """Upsert many fragments at the caller's own user scope, all or none (auth)."""
+        result = await self._adapter.my_atomic_bulk_upsert(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
     async def scoped_bulk_upsert(
         self,
         body: BodyParam[ScopedUpsertAppConfigFragmentsInput],
     ) -> APIResponse:
-        """Upsert many fragments at one scope, with per-item partial success (auth, RBAC).
-
-        Not in effect yet: still all-or-nothing.
-        """
-        result = await self._adapter.scoped_upsert_app_config_fragments(body.parsed)
+        """Deprecated. Use `POST /v2/app-config-fragments/scoped/atomic-bulk-upsert`."""
+        payload = await self._adapter.scoped_atomic_bulk_upsert(body.parsed)
+        result = UpsertAppConfigFragmentsPayload(items=payload.items, failed=[])
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def my_bulk_upsert(
         self,
         body: BodyParam[MyUpsertAppConfigFragmentsInput],
     ) -> APIResponse:
-        """Upsert many fragments at the caller's own user scope, with per-item partial
-        success (auth).
-
-        Not in effect yet: still all-or-nothing.
-        """
-        result = await self._adapter.my_upsert_app_config_fragments(body.parsed)
+        """Deprecated. Use `POST /v2/app-config-fragments/my/atomic-bulk-upsert`."""
+        payload = await self._adapter.my_atomic_bulk_upsert(body.parsed)
+        result = UpsertAppConfigFragmentsPayload(items=payload.items, failed=[])
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

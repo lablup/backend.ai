@@ -6,8 +6,8 @@ from ai.backend.common.data.user.types import UserData
 from ai.backend.common.exception import UnreachableError
 from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
 from ai.backend.manager.errors.storage import VFolderNotFound
-from ai.backend.manager.models.vfolder import VFolderOwnershipType
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.services.vfolder.actions.sharing import (

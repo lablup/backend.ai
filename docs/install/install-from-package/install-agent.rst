@@ -173,6 +173,13 @@ Save the contents to ``${HOME}/.config/backend.ai/agent.toml``. Backend.AI
 will automatically recognize the location. Adjust each field to conform to your
 system.
 
+.. note::
+
+   Make sure ``[container].port-range`` does not overlap with the host's ephemeral
+   port range. Check it with ``sysctl net.ipv4.ip_local_port_range``; the default on
+   Linux is ``32768 60999``. If the ranges overlap, an outgoing connection of the host
+   may take a port assigned to a container, and the container service cannot bind it.
+
 
 Run Backend.AI Agent service
 ----------------------------
@@ -287,7 +294,7 @@ Then, create a systemd service file at
    KillMode=process
    KillSignal=SIGINT
    PrivateTmp=false
-   Restart=on-failure
+   Restart=always
    RestartSec=10
    LimitNOFILE=5242880
    LimitNPROC=131072
@@ -311,7 +318,7 @@ And for Watcher at ``/etc/systemd/system/backendai-watcher.service``:
    KillMode=process
    KillSignal=SIGTERM
    PrivateTmp=false
-   Restart=on-failure
+   Restart=always
    RestartSec=5
 
    [Install]

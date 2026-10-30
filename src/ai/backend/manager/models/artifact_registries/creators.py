@@ -8,6 +8,9 @@ from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.manager.data.artifact_registries.types import ArtifactRegistryData
 from ai.backend.manager.models.artifact_registries.row import ArtifactRegistryRow
+from ai.backend.manager.models.artifact_registries.searchable_fields import (
+    ArtifactRegistrySearchableFields,
+)
 
 
 @dataclass
@@ -30,4 +33,4 @@ class ArtifactRegistryMetaCreator:
         )
 
     def to_data(self, row: ArtifactRegistryRow) -> ArtifactRegistryData:
-        return row.to_dataclass()
+        return ArtifactRegistrySearchableFields.own.to_data(row)

@@ -27,8 +27,8 @@ from ai.backend.manager.data.permission.virtual_entity import (
 )
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_field import PermissionFieldRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.specs.permission import PermissionEntry
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
@@ -45,7 +45,7 @@ class _GroupKey:
     """Keys resolved in one round-trip: ``entity_type`` matches the graph rows,
     ``subject_entity_type`` the permission rows."""
 
-    user_id: uuid.UUID
+    user_id: UserID
     entity_type: EntityType
     subject_entity_type: EntityType
 

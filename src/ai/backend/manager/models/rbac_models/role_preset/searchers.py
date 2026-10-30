@@ -14,7 +14,13 @@ from ai.backend.manager.data.role_preset.types import (
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
+from ai.backend.manager.models.rbac_models.role_permission_preset.searchable_fields import (
+    RolePermissionPresetSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
+    RolePresetSearchableFields,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -26,7 +32,7 @@ class RolePresetSearcher(Searcher[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -37,4 +43,4 @@ class RolePermissionPresetSearcher(Searcher[RolePermissionPresetRow, RolePermiss
 
     @override
     def to_data(self, row: RolePermissionPresetRow) -> RolePermissionPresetData:
-        return row.to_data()
+        return RolePermissionPresetSearchableFields.own.to_data(row)

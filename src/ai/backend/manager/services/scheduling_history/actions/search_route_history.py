@@ -5,18 +5,14 @@ from typing import override
 
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.manager.actions.v2.ops.base import GlobalSearcherOpsAction
 from ai.backend.manager.data.deployment.types import RouteHistoryData
-from ai.backend.manager.repositories.base import BatchQuerier
-
-from .base import SchedulingHistoryAction
+from ai.backend.manager.models.scheduling_history.row import RouteHistoryRow
 
 
-@dataclass
-class SearchRouteHistoryAction(SchedulingHistoryAction):
-    """Action to search route history (admin API)."""
-
-    querier: BatchQuerier
+@dataclass(frozen=True)
+class SearchRouteHistoryAction(GlobalSearcherOpsAction[RouteHistoryRow, RouteHistoryData]):
+    """Page through every route history row."""
 
     @override
     @classmethod
@@ -27,18 +23,3 @@ class SearchRouteHistoryAction(SchedulingHistoryAction):
     @classmethod
     def action_name(cls) -> str:
         return "search_route_history"
-
-    @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
-
-
-@dataclass
-class SearchRouteHistoryActionResult:
-    """Result of searching route history."""
-
-    histories: list[RouteHistoryData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool

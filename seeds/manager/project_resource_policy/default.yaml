@@ -1,0 +1,8 @@
+kind: project_resource_policy
+version: 1
+items:
+- uuid: 2f0e7303-bb2b-40a7-9fcf-c1acf34ec6f5
+  name: default
+  max_vfolder_count: 0
+  max_quota_scope_size: -1
+  max_network_count: 3

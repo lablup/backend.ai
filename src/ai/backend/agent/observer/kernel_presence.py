@@ -6,13 +6,13 @@ from typing import TYPE_CHECKING, Any, override
 from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
 from ai.backend.common.observer.types import AbstractObserver
 from ai.backend.common.types import ContainerStatus, KernelId
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 if TYPE_CHECKING:
     from ai.backend.agent.agent import AbstractAgent
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class KernelPresenceObserver(AbstractObserver):

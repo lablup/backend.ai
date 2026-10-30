@@ -10,6 +10,9 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.models.reservoir_registry.row import ReservoirRegistryRow
+from ai.backend.manager.models.reservoir_registry.searchable_fields import (
+    ReservoirRegistrySearchableFields,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -23,4 +26,4 @@ class ReservoirRegistrySearcher(Searcher[ReservoirRegistryRow, ReservoirRegistry
 
     @override
     def to_data(self, row: ReservoirRegistryRow) -> ReservoirRegistryData:
-        return row.to_dataclass()
+        return ReservoirRegistrySearchableFields.own.to_data(row)

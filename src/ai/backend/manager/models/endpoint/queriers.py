@@ -18,6 +18,11 @@ from ai.backend.manager.models.endpoint.row import (
     EndpointRow,
     EndpointTokenRow,
 )
+from ai.backend.manager.models.endpoint.searchable_fields import (
+    AutoScalingRuleSearchableFields,
+    DeploymentAccessTokenSearchableFields,
+    DeploymentSearchableFields,
+)
 from ai.backend.manager.models.specs.querier import (
     BulkEntityQuerier,
     BulkFieldQuerier,
@@ -43,7 +48,7 @@ class DeploymentAccessTokenQuerier(FieldQuerier[EndpointTokenRow, ModelDeploymen
 
     @override
     def to_data(self, row: EndpointTokenRow) -> ModelDeploymentAccessTokenData:
-        return row.to_access_token_data()
+        return DeploymentAccessTokenSearchableFields.own.to_data(row)
 
 
 class BulkDeploymentQuerier(BulkEntityQuerier[EndpointRow, ModelDeploymentData]):
@@ -59,7 +64,7 @@ class BulkDeploymentQuerier(BulkEntityQuerier[EndpointRow, ModelDeploymentData])
 
     @override
     def to_data(self, row: EndpointRow) -> ModelDeploymentData:
-        return row.to_model_deployment_data()
+        return DeploymentSearchableFields.own.to_data(row)
 
 
 class BulkAutoScalingRuleQuerier(
@@ -77,7 +82,7 @@ class BulkAutoScalingRuleQuerier(
 
     @override
     def to_data(self, row: EndpointAutoScalingRuleRow) -> ModelDeploymentAutoScalingRuleData:
-        return row.to_model_deployment_data()
+        return AutoScalingRuleSearchableFields.own.to_data(row)
 
 
 class BulkDeploymentAccessTokenQuerier(
@@ -95,4 +100,4 @@ class BulkDeploymentAccessTokenQuerier(
 
     @override
     def to_data(self, row: EndpointTokenRow) -> ModelDeploymentAccessTokenData:
-        return row.to_access_token_data()
+        return DeploymentAccessTokenSearchableFields.own.to_data(row)

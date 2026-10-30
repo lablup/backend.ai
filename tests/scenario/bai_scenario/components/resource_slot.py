@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, override
 
+from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeEntityType
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.resource_slot.response import (
     AdminSearchResourceSlotTypesPayload,
@@ -30,8 +31,13 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
-from bai_scenario.seeds.resource_slot.slot_type import SeedResourceSlotType
+from bai_scenario.components.system import (
+    KEPT,
+    Kept,
+    lay_a_public_reader,
+    role_named,
+)
+from bai_scenario.seeds.resource_slot.slot_type import TestSeedResourceSlotType
 
 DISPLAYED = "미리 만들어 둔 슬롯"
 """시드가 미리 만들어 두는 슬롯 종류의 표시 이름. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""
@@ -70,8 +76,8 @@ class ASlotTypeAndSomeone(Given[Any, ASlotTypeAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ASlotTypeAndACaller:
-        slot_type = await seeding.creating(SeedResourceSlotType(enabled=self.enabled))
-        caller = await lay_a_caller(seeding, self.role)
+        slot_type = await seeding.creating(TestSeedResourceSlotType(enabled=self.enabled))
+        caller = await lay_a_public_reader(seeding, ResourceSlotTypeEntityType(), self.role)
         return ASlotTypeAndACaller(seeding.made(slot_type), seeding.made(caller))
 
 
@@ -91,17 +97,17 @@ class ManySlotTypesAndSomeone(Given[Any, ManySlotTypesAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManySlotTypesAndACaller:
         wanted = await seeding.creating(
-            SeedResourceSlotType(
+            TestSeedResourceSlotType(
                 name_hint="wanted",
                 slot_type=self.named_kind,
                 display_name=self.named_display_name,
             )
         )
         others = [
-            await seeding.creating(SeedResourceSlotType(name_hint="other"))
+            await seeding.creating(TestSeedResourceSlotType(name_hint="other"))
             for _ in range(self.besides)
         ]
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_public_reader(seeding, ResourceSlotTypeEntityType(), self.role)
         return ManySlotTypesAndACaller(
             laid=tuple(seeding.made(one) for one in [wanted, *others]),
             named=seeding.made(wanted),
@@ -122,21 +128,22 @@ def slot_type_verdicts(
     display_icon: str,
     number_format: NumberFormatInfo,
     rank: int,
+    at: str = "",
 ) -> list[Verdict]:
     """Every place of one slot type node. The id is the name, so it is seen and the uuid is not."""
     return [
-        Same("id", node.id, named),
-        Skipped("uuid", "데이터베이스가 만든다"),
-        Same("slot_name", node.slot_name, named),
-        Same("slot_type", node.slot_type, slot_type.value),
-        Same("required", node.required, required),
-        Same("enabled", node.enabled, enabled),
-        Same("display_name", node.display_name, display_name),
-        Same("description", node.description, description),
-        Same("display_unit", node.display_unit, display_unit),
-        Same("display_icon", node.display_icon, display_icon),
-        Same("number_format", node.number_format, number_format),
-        Same("rank", node.rank, rank),
+        Same(f"{at}id", node.id, named),
+        Skipped(f"{at}uuid", "데이터베이스가 만든다"),
+        Same(f"{at}slot_name", node.slot_name, named),
+        Same(f"{at}slot_type", node.slot_type, slot_type.value),
+        Same(f"{at}required", node.required, required),
+        Same(f"{at}enabled", node.enabled, enabled),
+        Same(f"{at}display_name", node.display_name, display_name),
+        Same(f"{at}description", node.description, description),
+        Same(f"{at}display_unit", node.display_unit, display_unit),
+        Same(f"{at}display_icon", node.display_icon, display_icon),
+        Same(f"{at}number_format", node.number_format, number_format),
+        Same(f"{at}rank", node.rank, rank),
     ]
 
 

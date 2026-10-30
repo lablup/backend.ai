@@ -22,6 +22,9 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     VFolderUserMountPolicyRow,
 )
+from ai.backend.manager.models.vfolder.searchable_fields import (
+    VFolderSearchableFields,
+)
 
 
 @dataclass
@@ -54,7 +57,7 @@ class VFolderPurger(EntityPurger[VFolderRow, VFolderData]):
 
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
-        return row.to_data()
+        return VFolderSearchableFields.own.to_data(row)
 
 
 @dataclass

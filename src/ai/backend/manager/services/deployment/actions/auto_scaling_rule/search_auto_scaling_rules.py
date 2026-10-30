@@ -1,15 +1,31 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import override
 
-from ai.backend.manager.actions.types import ActionOperationType
+from ai.backend.common.data.entity.deployment import DeploymentID
+from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.manager.actions.v2.ops.base import BulkScopedSearchOpsAction
 from ai.backend.manager.data.deployment.types import ModelDeploymentAutoScalingRuleData
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.services.deployment.actions.base import DeploymentGlobalAction
+from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow
+from ai.backend.manager.models.endpoint.scopes import DeploymentAutoScalingRuleTarget
+from ai.backend.manager.models.endpoint.searchers import AutoScalingRuleSearcher
+from ai.backend.manager.models.scopes import OperationScope
 
 
 @dataclass
-class SearchAutoScalingRulesAction(DeploymentGlobalAction):
-    querier: BatchQuerier
+class SearchAutoScalingRulesAction(
+    BulkScopedSearchOpsAction[EndpointAutoScalingRuleRow, ModelDeploymentAutoScalingRuleData]
+):
+    """Page through the auto-scaling rules of the deployments named, combined with OR.
+
+    Every deployment is authorized before the read runs. Reading every deployment's
+    rules is the global variant, which says so in its shape.
+    """
+
+    deployment_ids: Sequence[DeploymentID]
+    searcher: AutoScalingRuleSearcher
 
     @override
     @classmethod
@@ -17,14 +33,16 @@ class SearchAutoScalingRulesAction(DeploymentGlobalAction):
         return "search_auto_scaling_rules"
 
     @override
-    @classmethod
-    def operation_type(cls) -> ActionOperationType:
-        return ActionOperationType.SEARCH
+    def entity_ids(self) -> Sequence[EntityIdentifier]:
+        return tuple(self.deployment_ids)
 
+    @override
+    def operation_scopes(self) -> Sequence[OperationScope]:
+        return [
+            DeploymentAutoScalingRuleTarget(deployment_id=deployment_id)
+            for deployment_id in self.deployment_ids
+        ]
 
-@dataclass
-class SearchAutoScalingRulesActionResult:
-    data: list[ModelDeploymentAutoScalingRuleData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
+    @override
+    def to_searcher(self) -> AutoScalingRuleSearcher:
+        return self.searcher

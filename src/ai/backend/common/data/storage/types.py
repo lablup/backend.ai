@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import enum
+from collections.abc import Mapping
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from typing import Any, Final, NewType
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 
 from ai.backend.common.type_adapters import VFolderIDField
 from ai.backend.common.types import BackendAISchema
@@ -26,6 +30,12 @@ class NamedStorageTarget(BackendAISchema):
 ArtifactStorageTarget = NamedStorageTarget | VFolderStorageTarget
 
 
+# A storage backend implementation's name, as the storage proxy registers it and as
+# ``storage_backend_types.name`` records it. Not a closed set: a storage backend plugin
+# registers names of its own.
+StorageBackendType = NewType("StorageBackendType", str)
+
+
 class ArtifactStorageType(enum.StrEnum):
     OBJECT_STORAGE = "object_storage"
     VFS_STORAGE = "vfs_storage"
@@ -36,3 +46,88 @@ class ArtifactStorageImportStep(enum.StrEnum):
     DOWNLOAD = "download"
     VERIFY = "verify"
     ARCHIVE = "archive"
+
+
+# How long a volume may go without a fresh check before it counts as stale.
+# The per-row ``status_stale_after`` column overrides it; this is only its default.
+DEFAULT_STATUS_STALE_AFTER: Final[timedelta] = timedelta(hours=1)
+
+
+class StorageBackendCapability(enum.StrEnum):
+    """What a volume implementation can do, as it reports through ``get_capabilities()``."""
+
+    VFOLDER = "vfolder"
+    METRIC = "metric"
+    QUOTA = "quota"
+    FAST_FS_SIZE = "fast-fs-size"
+    FAST_SCAN = "fast-scan"
+    FAST_SIZE = "fast-size"
+
+
+class StorageBackendCapabilities(BackendAISchema):
+    """What a volume implementation reports through ``get_capabilities()``.
+
+    A capability absent from the set is not supported, so a capability added later
+    reads as absent on the rows written before it existed.
+    """
+
+    supported: frozenset[StorageBackendCapability] = Field(default_factory=frozenset)
+
+
+class StorageVolumeUsageField(enum.StrEnum):
+    """A usage figure a volume may show a user, named as the ``exposed_volume_info``
+    setting names it."""
+
+    PERCENTAGE = "percentage"
+    USED_BYTES = "used_bytes"
+    CAPACITY_BYTES = "capacity_bytes"
+
+
+class StorageVolumeUsageExposure(BackendAISchema):
+    """Which usage figures a volume shows a user.
+
+    A percentage tells how full the volume is without disclosing its size, which is why
+    it alone is exposed by default.
+    """
+
+    exposed: frozenset[StorageVolumeUsageField] = Field(
+        default_factory=lambda: frozenset({StorageVolumeUsageField.PERCENTAGE})
+    )
+
+
+class StorageCheckState(enum.StrEnum):
+    """Whether a service has checked a storage backend or volume it relates to.
+
+    not_checked: declared, but no check has run yet.
+    checked: a check has run.
+    """
+
+    NOT_CHECKED = "not_checked"
+    CHECKED = "checked"
+
+
+class StorageAnomaly(enum.StrEnum):
+    """Whether an anomaly was detected in a storage backend's or volume's reports."""
+
+    NONE = "none"
+    DETECTED = "detected"
+
+
+class StorageStatusCheckType(enum.StrEnum):
+    """Which status check a result comes from, deciding how the result is read."""
+
+    VFS = "vfs"
+
+
+@dataclass(frozen=True)
+class StorageStatusResultData:
+    """What one status check observed, in the shape every check reports. ``error_msg`` is
+    null where the observation succeeded; ``extra`` holds what only its check type records."""
+
+    check_type: StorageStatusCheckType
+    check_state: StorageCheckState
+    check_started_at: datetime | None
+    duration: timedelta | None
+    error_msg: str | None
+    device_id: str | None
+    extra: Mapping[str, Any] | None

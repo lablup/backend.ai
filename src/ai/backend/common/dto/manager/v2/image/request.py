@@ -11,10 +11,27 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import (
+    DateTimeFilter,
+    EnumFilter,
+    IntFilter,
+    StringFilter,
+    UUIDFilter,
+)
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
-from .types import ImageOrderField, ImageScope, ImageStatusType, OrderDirection
+from .types import (
+    ImageAliasOrderField,
+    ImageOrderField,
+    ImageScope,
+    ImageStatusType,
+    ImageTypeEnum,
+    ImageUsage,
+    OrderDirection,
+)
 
 __all__ = (
     "AdminSearchImageAliasesInput",
@@ -33,10 +50,18 @@ __all__ = (
     "ImageOrderByInputDTO",
     "ImageScopeInputDTO",
     "ImageStatusFilterInputDTO",
+    "ImageTypeFilterInputDTO",
+    "ImageUsage",
+    "PartialBulkDeleteImagesInput",
+    "PartialBulkRestoreImagesInput",
+    "PartialBulkUpdateImageItemInput",
+    "PartialBulkUpdateImagesInput",
     "PurgeImageInput",
-    "RescanImagesInput",
+    "ScanImageInput",
     "ScopedSearchImagesInput",
+    "SearchImageAliasesInput",
     "SearchImagesInput",
+    "UpdateImageBody",
     "UpdateImageInput",
     "UUIDFilter",
 )
@@ -54,21 +79,12 @@ class ImageScopeInputDTO(BaseRequestModel):
     image_id: UUID = Field(description="UUID of the image to scope the query to.")
 
 
-class ImageStatusFilterInputDTO(BaseRequestModel):
+class ImageStatusFilterInputDTO(EnumFilter[ImageStatusType]):
     """Filter for image status."""
 
-    equals: ImageStatusType | None = Field(
-        default=None, description="Matches images with this exact status."
-    )
-    in_: list[ImageStatusType] | None = Field(
-        default=None, description="Matches images whose status is in this list."
-    )
-    not_equals: ImageStatusType | None = Field(
-        default=None, description="Excludes images with this exact status."
-    )
-    not_in: list[ImageStatusType] | None = Field(
-        default=None, description="Excludes images whose status is in this list."
-    )
+
+class ImageTypeFilterInputDTO(EnumFilter[ImageTypeEnum]):
+    """Filter for the image type category."""
 
 
 class ImageAliasNestedFilterInputDTO(BaseRequestModel):
@@ -80,18 +96,57 @@ class ImageAliasNestedFilterInputDTO(BaseRequestModel):
 class ImageFilterInputDTO(BaseRequestModel):
     """Filter options for images."""
 
-    id: UUIDFilter | None = Field(default=None, description="Filter by image UUID.")
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entity_id`.",
+        deprecated=True,
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by image ID.",
+    )
     status: ImageStatusFilterInputDTO | None = Field(default=None, description="Filter by status.")
     name: StringFilter | None = Field(default=None, description="Filter by name.")
     architecture: StringFilter | None = Field(default=None, description="Filter by architecture.")
     registry_id: UUIDFilter | None = Field(
         default=None, description="Filter by container registry ID."
     )
+    image: StringFilter | None = Field(
+        default=None, description="Filter by namespace/path within the registry."
+    )
+    registry: StringFilter | None = Field(default=None, description="Filter by registry hostname.")
+    project: StringFilter | None = Field(
+        default=None, description="Filter by project (namespace) within the registry."
+    )
+    tag: StringFilter | None = Field(default=None, description="Filter by image tag.")
+    config_digest: StringFilter | None = Field(
+        default=None, description="Filter by image config digest."
+    )
+    accelerators: StringFilter | None = Field(
+        default=None, description="Filter by accelerator requirement string."
+    )
+    size_bytes: IntFilter | None = Field(default=None, description="Filter by image size in bytes.")
+    is_local: bool | None = Field(default=None, description="Filter by local-only status.")
+    customized: bool | None = Field(
+        default=None, description="Filter by whether a session commit made the image."
+    )
+    creator_id: UUIDFilter | None = Field(
+        default=None, description="Filter by the user a customized image was committed for."
+    )
+    type: ImageTypeFilterInputDTO | None = Field(
+        default=None, description="Filter by image type category."
+    )
+    created_at: DateTimeFilter | None = Field(
+        default=None, description="Filter by creation datetime (before/after)."
+    )
     alias: ImageAliasNestedFilterInputDTO | None = Field(
         default=None, description="Filter by nested alias conditions."
     )
     last_used: DateTimeFilter | None = Field(
         default=None, description="Filter by last used datetime (before/after)."
+    )
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None, description="Filter by the labels on the entity"
     )
     AND: list[ImageFilterInputDTO] | None = Field(
         default=None, description="Combine with AND logic."
@@ -115,6 +170,7 @@ class ImageAliasFilterInputDTO(BaseRequestModel):
 
     alias: StringFilter | None = Field(default=None, description="Filter by alias string.")
     image_id: UUIDFilter | None = Field(default=None, description="Filter by image ID.")
+    field_id: UUIDFilter | None = Field(default=None, description="Filter by alias row ID.")
     AND: list[ImageAliasFilterInputDTO] | None = Field(
         default=None, description="Combine with AND logic."
     )
@@ -130,7 +186,7 @@ ImageAliasFilterInputDTO.model_rebuild()
 class ImageAliasOrderByInputDTO(BaseRequestModel):
     """Order specification for image alias queries."""
 
-    field: str = Field(description="Field to order by.")
+    field: ImageAliasOrderField = Field(description="Field to order by.")
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Order direction.")
 
 
@@ -159,11 +215,15 @@ class SearchImagesInput(BaseRequestModel):
     offset: int = Field(default=0, ge=0, description="Number of items to skip")
 
 
-class RescanImagesInput(BaseRequestModel):
-    """Input for rescanning images from a registry."""
+class ScanImageInput(BaseRequestModel):
+    """Input for scanning an image tag and selecting its architecture."""
 
-    canonical: str = Field(min_length=1, description="Image canonical name to rescan")
-    architecture: str = Field(min_length=1, description="Image architecture to rescan")
+    canonical: str = Field(
+        min_length=1,
+        description="Image canonical name to scan. Defaults to latest when the tag is omitted.",
+    )
+
+    architecture: str = Field(min_length=1, description="Image architecture to return")
 
 
 class AliasImageInput(BaseRequestModel):
@@ -208,6 +268,13 @@ class PurgeImageInput(BaseRequestModel):
 class AdminSearchImagesInput(BaseRequestModel):
     """Input for admin search of images with cursor and offset pagination."""
 
+    usage: ImageUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "images the caller cannot read are left out."
+        ),
+    )
     filter: ImageFilterInputDTO | None = Field(default=None, description="Filter conditions.")
     order: list[ImageOrderByInputDTO] | None = Field(
         default=None, description="Order specifications."
@@ -224,6 +291,13 @@ class ScopedSearchImagesInput(BaseRequestModel):
     """Input for searching the images the named scopes reach."""
 
     scope: ImageScope = Field(description="Scope (OR across all items).")
+    usage: ImageUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "images the caller cannot read are left out."
+        ),
+    )
     filter: ImageFilterInputDTO | None = Field(default=None, description="Filter conditions.")
     order: list[ImageOrderByInputDTO] | None = Field(
         default=None, description="Order specifications."
@@ -251,10 +325,24 @@ class AdminSearchImageAliasesInput(BaseRequestModel):
     offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
 
 
-class UpdateImageInput(BaseRequestModel):
-    """Input for updating an image by ID. All fields optional -- only provided fields will be updated."""
+class SearchImageAliasesInput(BaseRequestModel):
+    """Input for searching the aliases of one image with cursor and offset pagination."""
 
-    image_id: UUID = Field(description="ID of the image to update.")
+    filter: ImageAliasFilterInputDTO | None = Field(default=None, description="Filter conditions.")
+    order: list[ImageAliasOrderByInputDTO] | None = Field(
+        default=None, description="Order specifications."
+    )
+    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
+    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
+    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
+    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
+    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
+    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class UpdateImageBody(BaseRequestModel):
+    """Fields to update on an image. All fields optional -- only provided fields will be updated."""
+
     name: str | None | Unset = Field(
         default=UNSET, description="Updated canonical name. Omit to leave unchanged."
     )
@@ -294,3 +382,36 @@ class UpdateImageInput(BaseRequestModel):
     resource_limits: dict[str, Any] | None | Unset = Field(
         default=UNSET, description="Updated resource limits dict. Omit to leave unchanged."
     )
+
+
+class UpdateImageInput(UpdateImageBody):
+    """Input for updating an image by ID, carrying the image ID in the body."""
+
+    image_id: UUID = Field(description="ID of the image to update.")
+
+
+class PartialBulkUpdateImageItemInput(BaseRequestModel):
+    """One image of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the image to update.")
+    input: UpdateImageBody = Field(description="Fields to update on the image.")
+
+
+class PartialBulkUpdateImagesInput(BaseRequestModel):
+    """Input for updating several images, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateImageItemInput] = Field(
+        description="The images to update, each with its fields."
+    )
+
+
+class PartialBulkDeleteImagesInput(BaseRequestModel):
+    """Input for forgetting several images, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the images to forget.")
+
+
+class PartialBulkRestoreImagesInput(BaseRequestModel):
+    """Input for restoring several forgotten images, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the images to restore.")

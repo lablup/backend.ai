@@ -27,7 +27,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.project import ProjectID
@@ -40,6 +40,7 @@ from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import PASSED, HookResult, HookResults
 from ai.backend.common.types import (
     AccessKey,
+    BinarySize,
     ClusterMode,
     MountInfoEntry,
     MountPermission,
@@ -79,8 +80,9 @@ from ai.backend.manager.data.session.options import (
     SessionHandlerOptions,
 )
 from ai.backend.manager.data.session.spec import SessionSpec
+from ai.backend.manager.defs import DEFAULT_SHARED_MEMORY_SIZE
 from ai.backend.manager.errors.common import RejectedByHook
-from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
     SchedulingController,
     SchedulingControllerArgs,
@@ -230,6 +232,7 @@ def _spec_context(
             policy=_user_policy(),
             container_user=ContainerUserInfo(uid=1000, main_gid=1000, supplementary_gids=[]),
             dotfiles=DotfileBundle(),
+            default_bootstrap_script=None,
             pending_session_count=0,
             pending_session_resource_slots={},
             vfolder_mounts_by_role={"main": (_vfolder_mount(),)},
@@ -304,7 +307,7 @@ class TestEnqueueSessionFromDraft:
 
         user = _make_user()
 
-        with with_user(user):
+        with with_user_context(user):
             returned_id = await controller.enqueue_session_from_draft(draft)
 
         assert returned_id == expected_session_id
@@ -336,6 +339,11 @@ class TestEnqueueSessionFromDraft:
         # vfolder mounts flowed through context → resolved on the kernel spec
         assert len(kernel.vfolder_mounts) == 1
         assert kernel.vfolder_mounts[0].kernel_path == PurePosixPath("/home/work/data")
+        # ... and narrowed onto the group the kernel was expanded from
+        enqueued_groups = enqueued_spec.resource_spec.options.kernel_groups
+        assert len(enqueued_groups) == 1
+        group_mounts = enqueued_groups[0].execution_spec.mounts
+        assert [m.mount_destination for m in group_mounts] == ["/home/work/data"]
 
         # PRE + POST hooks fired
         assert hook_plugin_ctx.dispatch.await_count == 1
@@ -377,7 +385,7 @@ class TestEnqueueSessionFromDraft:
 
         controller, _, _ = _build_controller(repository)
 
-        with with_user(_make_user()):
+        with with_user_context(_make_user()):
             await controller.enqueue_session_from_draft(draft_jp)
 
         enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
@@ -419,7 +427,7 @@ class TestEnqueueSessionFromDraft:
 
         controller, _, _ = _build_controller(repository)
 
-        with with_user(_make_user()):
+        with with_user_context(_make_user()):
             await controller.enqueue_session_from_draft(draft_strict)
 
         enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
@@ -448,7 +456,7 @@ class TestEnqueueSessionFromDraft:
 
         controller, _, _ = _build_controller(repository)
 
-        with with_user(_make_user()):
+        with with_user_context(_make_user()):
             await controller.enqueue_session_from_draft(draft)
 
         enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
@@ -475,7 +483,7 @@ class TestEnqueueSessionFromDraft:
 
         user = _make_user()
 
-        with with_user(user), pytest.raises(RejectedByHook):
+        with with_user_context(user), pytest.raises(RejectedByHook):
             await controller.enqueue_session_from_draft(draft)
 
         # Writer path must not be reached
@@ -496,11 +504,91 @@ class TestEnqueueSessionFromDraft:
         controller, _event_producer, _hook_plugin_ctx = _build_controller(repository)
 
         user = _make_user()
-        with with_user(user):
+        with with_user_context(user):
             await controller.enqueue_session_from_draft(draft)
 
         enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
         assert enqueued_spec.resource_spec.network.network_type == NetworkType.VOLATILE
+
+
+class TestZeroResourceSlots:
+    def _with_resources(
+        self, draft: SessionSpecDraft, resources: dict[str, str]
+    ) -> SessionSpecDraft:
+        resource = draft.resource_spec.resource
+        assert resource.options.kernel_groups is not None
+        group = resource.options.kernel_groups[0]
+        resource_input = group.execution_spec.resource_input.model_copy(
+            update={
+                "resources": tuple(
+                    ResourceSlotEntry(resource_type=ResourceSlotName(k), quantity=v)
+                    for k, v in resources.items()
+                )
+            }
+        )
+        group = group.model_copy(
+            update={
+                "execution_spec": group.execution_spec.model_copy(
+                    update={"resource_input": resource_input}
+                )
+            }
+        )
+        options = resource.options.model_copy(update={"kernel_groups": (group,)})
+        return draft.model_copy(
+            update={
+                "resource_spec": draft.resource_spec.model_copy(
+                    update={"resource": resource.model_copy(update={"options": options})}
+                )
+            }
+        )
+
+    async def _enqueued_slots(
+        self, draft: SessionSpecDraft, image_id: ImageID
+    ) -> dict[str, Decimal]:
+        repository = AsyncMock()
+        repository.fetch_session_spec_context.return_value = _spec_context(image_id)
+        repository.query_accessible_resource_group_ids.return_value = frozenset({
+            draft.scope.resource_group_id
+        })
+        repository.enqueue_session_from_spec.return_value = SessionID(uuid.uuid4())
+        controller, _, _ = _build_controller(repository)
+
+        with with_user_context(_make_user()):
+            await controller.enqueue_session_from_draft(draft)
+
+        enqueued_spec = repository.enqueue_session_from_spec.await_args.args[0]
+        (kernel,) = enqueued_spec.resource_spec.kernel_specs
+        return {
+            str(entry.resource_type): Decimal(entry.quantity)
+            for entry in kernel.execution_spec.resource_input.resources
+        }
+
+    async def test_zero_accelerator_slots_are_not_enqueued(
+        self,
+        draft: SessionSpecDraft,
+        image_id: ImageID,
+    ) -> None:
+        """Zero accelerator slots in a resource group serving only cpu/mem do not reach the spec."""
+        draft = self._with_resources(
+            draft,
+            {"cpu": "1", "mem": "1140850688", "cuda.device": "0", "cuda.shares": "0"},
+        )
+
+        slots = await self._enqueued_slots(draft, image_id)
+
+        assert slots == {"cpu": Decimal(1), "mem": Decimal(1140850688)}
+
+    async def test_zero_intrinsic_slots_are_filled_from_image_minimum(
+        self,
+        draft: SessionSpecDraft,
+        image_id: ImageID,
+    ) -> None:
+        draft = self._with_resources(draft, {"cpu": "0", "mem": "0", "cuda.shares": "0"})
+
+        slots = await self._enqueued_slots(draft, image_id)
+
+        shmem = Decimal(int(BinarySize.finite_from_str(DEFAULT_SHARED_MEMORY_SIZE)))
+        assert slots == {"cpu": Decimal(1), "mem": Decimal(256 * 1024 * 1024) + shmem}
 
 
 class TestResourceGroupAccessibility:
@@ -516,7 +604,7 @@ class TestResourceGroupAccessibility:
         controller, _event_producer, _hook_plugin_ctx = _build_controller(repository)
 
         user = _make_user()
-        with with_user(user), pytest.raises(InvalidAPIParameters):
+        with with_user_context(user), pytest.raises(InvalidAPIParameters):
             await controller.enqueue_session_from_draft(draft)
 
         repository.fetch_session_spec_context.assert_not_called()
@@ -537,7 +625,7 @@ class TestResourceGroupAccessibility:
         controller, _event_producer, _hook_plugin_ctx = _build_controller(repository)
 
         user = _make_user()
-        with with_user(user):
+        with with_user_context(user):
             await controller.enqueue_session_from_draft(draft)
 
         repository.query_accessible_resource_group_ids.assert_awaited_once()

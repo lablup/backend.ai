@@ -1,17 +1,9 @@
-"""User config handler class using constructor dependency injection.
+"""HTTP bindings for the existing user-config API."""
 
-A keypair's dotfiles and bootstrap script are columns of the keypair row, which
-belongs to a user, so every operation here is answered for by that user.
-"""
-
-from __future__ import annotations
-
-import logging
 from http import HTTPStatus
-from typing import Final
 
 from ai.backend.common.api_handlers import APIResponse, BodyParam, QueryParam
-from ai.backend.common.data.entity.keypair import KeyPairID
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.config.request import (
     CreateUserDotfileRequest,
@@ -21,142 +13,112 @@ from ai.backend.common.dto.manager.config.request import (
     UpdateUserDotfileRequest,
 )
 from ai.backend.common.dto.manager.config.response import (
-    CreateDotfileResponse,
-    DeleteDotfileResponse,
-    DotfileListItem,
     GetBootstrapScriptResponse,
-    GetDotfileResponse,
     ListDotfilesResponse,
     UpdateBootstrapScriptResponse,
-    UpdateDotfileResponse,
 )
 from ai.backend.common.types import AccessKey
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry
+from ai.backend.manager.api.adapters.user.config import UserConfigAdapter
+from ai.backend.manager.data.dotfile.types import normalize_newlines
 from ai.backend.manager.dto.context import UserContext
+from ai.backend.manager.dto.user_config_input import (
+    CreateDotfileInput,
+    DeleteDefaultDotfileInput,
+    UpdateDefaultDotfileInput,
+)
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     PublicResolveAccessKeyScopeAction,
 )
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.user.actions.bootstrap_script import (
-    GetBootstrapScriptAction,
-    UpdateBootstrapScriptAction,
-)
-from ai.backend.manager.services.user.actions.create_keypair_dotfile import (
-    CreateKeypairDotfileAction,
-)
-from ai.backend.manager.services.user.actions.delete_keypair_dotfile import (
-    DeleteKeypairDotfileAction,
-)
-from ai.backend.manager.services.user.actions.keypair_ops import GetKeypairAction
-from ai.backend.manager.services.user.actions.lookup_keypair import (
-    LookupKeypairByAccessKeyAction,
+    GetDefaultBootstrapScriptAction,
+    UpdateDefaultBootstrapScriptAction,
 )
 from ai.backend.manager.services.user.actions.lookup_keypair_owner import (
     LookupKeypairOwnerByAccessKeyAction,
 )
-from ai.backend.manager.services.user.actions.update_keypair_dotfile import (
-    UpdateKeypairDotfileAction,
-)
 from ai.backend.manager.services.user.processors import UserProcessors
-
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 class UserConfigHandler:
-    """User config (dotfile) API handler with constructor-injected dependencies."""
+    _auth: AuthProcessors
+    _user: UserProcessors
+    _user_config: UserConfigAdapter
 
-    def __init__(self, *, auth: AuthProcessors, user: UserProcessors) -> None:
+    def __init__(
+        self, *, auth: AuthProcessors, user: UserProcessors, user_config: UserConfigAdapter
+    ) -> None:
         self._auth = auth
         self._user = user
+        self._user_config = user_config
 
-    async def _owner_access_key(self, owner: str | None) -> AccessKey:
-        scope = await self._auth.public_resolve_access_key_scope.run(
-            PublicResolveAccessKeyScopeAction(owner_access_key=owner)
-        )
-        return AccessKey(scope.owner_access_key)
-
-    async def _keypair_id(self, access_key: AccessKey) -> KeyPairID:
-        result = await self._user.lookup_keypair.run(
-            LookupKeypairByAccessKeyAction(access_key=access_key)
-        )
-        return KeyPairID(result.field_id)
-
-    async def _owner(self, access_key: AccessKey) -> UserID:
+    async def _lookup_keypair_owner(self, access_key: AccessKey) -> UserID:
         result = await self._user.lookup_keypair_owner.run(
             LookupKeypairOwnerByAccessKeyAction(access_key=access_key)
         )
         return UserID(result.entity_id())
 
+    async def _authorize_keypair_owner(self, requester_id: UserID, owner_access_key: str) -> UserID:
+        """Another user's key needs delegation rights; the requester's own keys do not."""
+        owner_id = await self._lookup_keypair_owner(AccessKey(owner_access_key))
+        if owner_id != requester_id:
+            await self._auth.public_resolve_access_key_scope.run(
+                PublicResolveAccessKeyScopeAction(owner_access_key=owner_access_key)
+            )
+        return owner_id
+
     async def create(
-        self,
-        body: BodyParam[CreateUserDotfileRequest],
-        ctx: UserContext,
+        self, body: BodyParam[CreateUserDotfileRequest], ctx: UserContext
     ) -> APIResponse:
         params = body.parsed
-        access_key = await self._owner_access_key(params.owner_access_key)
-        await self._user.create_dotfile.run(
-            CreateKeypairDotfileAction(
-                user_id=await self._owner(access_key),
-                access_key=access_key,
-                entry=DotfileEntry(path=params.path, perm=params.permission, data=params.data),
+        user_id = UserID(ctx.user_uuid)
+        if params.owner_access_key is not None:
+            user_id = await self._authorize_keypair_owner(user_id, params.owner_access_key)
+        result = await self._user_config.create_dotfile(
+            CreateDotfileInput(
+                user_id=user_id, path=params.path, perm=params.permission, data=params.data
             )
         )
-        return APIResponse.build(HTTPStatus.OK, CreateDotfileResponse())
+        return APIResponse.build(HTTPStatus.OK, result)
 
     async def list_or_get(
-        self,
-        query: QueryParam[GetUserDotfileRequest],
-        ctx: UserContext,
+        self, query: QueryParam[GetUserDotfileRequest], ctx: UserContext
     ) -> APIResponse:
         params = query.parsed
-        access_key = await self._owner_access_key(params.owner_access_key)
-        keypair = await self._user.get_keypair.run(
-            GetKeypairAction(keypair_id=await self._keypair_id(access_key))
-        )
-        entries = DotfileEntries.unpack(keypair.keypair.dotfiles)
+        user_id = UserID(ctx.user_uuid)
+        if params.owner_access_key is not None:
+            user_id = await self._authorize_keypair_owner(user_id, params.owner_access_key)
         if params.path:
-            entry = entries.get(params.path)
-            return APIResponse.build(
-                HTTPStatus.OK,
-                GetDotfileResponse(path=entry.path, perm=entry.perm, data=entry.data),
-            )
-        items = [
-            DotfileListItem(path=e.path, permission=e.perm, data=e.data) for e in entries.entries
-        ]
+            result = await self._user_config.get_default_dotfile(user_id, params.path)
+            return APIResponse.build(HTTPStatus.OK, result)
+        items = await self._user_config.get_default_dotfiles(user_id)
         return APIResponse.build(HTTPStatus.OK, ListDotfilesResponse(root=items))
 
     async def update(
-        self,
-        body: BodyParam[UpdateUserDotfileRequest],
-        ctx: UserContext,
+        self, body: BodyParam[UpdateUserDotfileRequest], ctx: UserContext
     ) -> APIResponse:
         params = body.parsed
-        access_key = await self._owner_access_key(params.owner_access_key)
-        await self._user.update_dotfile.run(
-            UpdateKeypairDotfileAction(
-                user_id=await self._owner(access_key),
-                access_key=access_key,
-                entry=DotfileEntry(path=params.path, perm=params.permission, data=params.data),
+        user_id = UserID(ctx.user_uuid)
+        if params.owner_access_key is not None:
+            user_id = await self._authorize_keypair_owner(user_id, params.owner_access_key)
+        result = await self._user_config.update_default_dotfile(
+            UpdateDefaultDotfileInput(
+                user_id=user_id, path=params.path, perm=params.permission, data=params.data
             )
         )
-        return APIResponse.build(HTTPStatus.OK, UpdateDotfileResponse())
+        return APIResponse.build(HTTPStatus.OK, result)
 
     async def delete(
-        self,
-        query: QueryParam[DeleteUserDotfileRequest],
-        ctx: UserContext,
+        self, query: QueryParam[DeleteUserDotfileRequest], ctx: UserContext
     ) -> APIResponse:
         params = query.parsed
-        access_key = await self._owner_access_key(params.owner_access_key)
-        await self._user.delete_dotfile.run(
-            DeleteKeypairDotfileAction(
-                user_id=await self._owner(access_key),
-                access_key=access_key,
-                path=params.path,
-            )
+        user_id = UserID(ctx.user_uuid)
+        if params.owner_access_key is not None:
+            user_id = await self._authorize_keypair_owner(user_id, params.owner_access_key)
+        result = await self._user_config.delete_default_dotfile(
+            DeleteDefaultDotfileInput(user_id=user_id, path=params.path)
         )
-        return APIResponse.build(HTTPStatus.OK, DeleteDotfileResponse(success=True))
+        return APIResponse.build(HTTPStatus.OK, result)
 
     async def update_bootstrap_script(
         self,
@@ -164,11 +126,12 @@ class UserConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         access_key = AccessKey(ctx.access_key)
-        await self._user.update_bootstrap_script.run(
-            UpdateBootstrapScriptAction(
-                user_id=await self._owner(access_key),
-                access_key=access_key,
-                script=body.parsed.script,
+        owner_user_id = await self._lookup_keypair_owner(access_key)
+        await self._user.update_default_bootstrap_script.run(
+            UpdateDefaultBootstrapScriptAction(
+                user_id=owner_user_id,
+                script=BootstrapScript(normalize_newlines(body.parsed.script).strip()),
+                creator_id=owner_user_id,
             )
         )
         return APIResponse.build(HTTPStatus.OK, UpdateBootstrapScriptResponse())
@@ -178,7 +141,8 @@ class UserConfigHandler:
         ctx: UserContext,
     ) -> APIResponse:
         access_key = AccessKey(ctx.access_key)
-        result = await self._user.get_bootstrap_script.run(
-            GetBootstrapScriptAction(user_id=await self._owner(access_key), access_key=access_key)
+        owner_user_id = await self._lookup_keypair_owner(access_key)
+        result = await self._user.get_default_bootstrap_script.run(
+            GetDefaultBootstrapScriptAction(user_id=owner_user_id)
         )
         return APIResponse.build(HTTPStatus.OK, GetBootstrapScriptResponse(root=result.script))

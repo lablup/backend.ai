@@ -27,8 +27,8 @@ from ai.backend.common.dto.manager.vfolder import (
 )
 from ai.backend.common.types import VFolderMountPolicy
 from ai.backend.manager.data.vfolder.types import VFolderOwnershipType
-from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.vfolder import VFolderUserMountPolicyRow
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.vfolder.row import VFolderUserMountPolicyRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow

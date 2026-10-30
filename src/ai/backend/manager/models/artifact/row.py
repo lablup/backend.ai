@@ -8,31 +8,29 @@ from typing import TYPE_CHECKING, Any, override
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, foreign, mapped_column, relationship
 
-from ai.backend.common.data.artifact.types import ArtifactRegistryType
 from ai.backend.common.data.entity.artifact import ArtifactID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.artifact.types import (
     ArtifactAvailability,
-    ArtifactData,
     ArtifactType,
 )
 from ai.backend.manager.models.base import (
     GUID,
     Base,
 )
-from ai.backend.manager.models.huggingface_registry import HuggingFaceRegistryRow
-from ai.backend.manager.models.reservoir_registry import ReservoirRegistryRow
+from ai.backend.manager.models.huggingface_registry.row import HuggingFaceRegistryRow
+from ai.backend.manager.models.reservoir_registry.row import ReservoirRegistryRow
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
+    from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("ArtifactRow",)
 
 
 def _get_artifact_revision_join_cond() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.artifact_revision import ArtifactRevisionRow
+    from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
 
     return foreign(ArtifactRevisionRow.artifact_id) == ArtifactRow.id
 
@@ -124,20 +122,3 @@ class ArtifactRow(Base):
     @override
     def __repr__(self) -> str:
         return self.__str__()
-
-    def to_dataclass(self) -> ArtifactData:
-        return ArtifactData(
-            id=self.id,
-            type=self.type,
-            name=self.name,
-            registry_id=self.registry_id,
-            registry_type=ArtifactRegistryType(self.registry_type),
-            source_registry_id=self.source_registry_id,
-            source_registry_type=ArtifactRegistryType(self.source_registry_type),
-            description=self.description,
-            availability=ArtifactAvailability(self.availability),
-            scanned_at=self.scanned_at,
-            updated_at=self.updated_at,
-            readonly=self.readonly,
-            extra=self.extra,
-        )

@@ -59,20 +59,23 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
-from ai.backend.manager.models.domain import domains
+from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.project import ProjectRow, ProjectType
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
-from ai.backend.manager.models.resource_policy import keypair_resource_policies
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.resource_policy.row import keypair_resource_policies
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.vfolder.row import vfolders
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.rbac.permission_check_repository import (
     RbacPermissionCheckRepository,
@@ -120,15 +123,8 @@ def async_etcd(
     bootstrap_config: Any,
 ) -> AsyncEtcd:
     etcd_config = bootstrap_config.etcd
-    etcd_addr = etcd_config.addr
-    if isinstance(etcd_addr, list):
-        addrs: HostPortPair | list[HostPortPair] = [
-            HostPortPair(host=a.host, port=a.port) for a in etcd_addr
-        ]
-    else:
-        addrs = HostPortPair(host=etcd_addr.host, port=etcd_addr.port)
     return AsyncEtcd(
-        addrs=addrs,
+        addrs=[HostPortPair(host=a.host, port=a.port) for a in etcd_config.addrs],
         namespace=etcd_config.namespace,
         scope_prefix_map={
             ConfigScopes.GLOBAL: "global",
@@ -153,6 +149,7 @@ def vfolder_processors(
         database_engine,
         V2DBOpsProvider(database_engine),
         ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     # The registry here runs no RBAC validator, so the own check answers as enforcement off.
@@ -185,6 +182,7 @@ def vfolder_file_processors(
         database_engine,
         V2DBOpsProvider(database_engine),
         ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = VFolderFileService(
@@ -207,6 +205,7 @@ def vfolder_invite_processors(
         database_engine,
         V2DBOpsProvider(database_engine),
         ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = VFolderInviteService(
@@ -230,6 +229,7 @@ def vfolder_sharing_processors(
         database_engine,
         V2DBOpsProvider(database_engine),
         ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = VFolderSharingService(
@@ -251,6 +251,7 @@ def user_processors(
         database_engine,
         V2DBOpsProvider(database_engine),
         ShareOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
     )
     service = UserService(

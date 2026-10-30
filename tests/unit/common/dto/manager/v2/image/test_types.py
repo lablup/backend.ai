@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 
 from ai.backend.common.dto.manager.v2.image.types import (
+    ImageAliasOrderField,
     ImageLabelInfo,
     ImageOrderField,
     ImageResourceLimitInfo,
@@ -94,8 +95,25 @@ class TestImageOrderField:
     def test_last_used_value(self) -> None:
         assert ImageOrderField.LAST_USED.value == "last_used"
 
-    def test_enum_members_count(self) -> None:
-        assert len(list(ImageOrderField)) == 3
+    def test_members_are_the_orders_the_api_offers(self) -> None:
+        assert {field.value for field in ImageOrderField} == {
+            "name",
+            "created_at",
+            "last_used",
+            "entity_id",
+            "image",
+            "project",
+            "tag",
+            "registry",
+            "registry_id",
+            "architecture",
+            "config_digest",
+            "size_bytes",
+            "is_local",
+            "type",
+            "status",
+            "accelerators",
+        }
 
     def test_from_string_name(self) -> None:
         assert ImageOrderField("name") is ImageOrderField.NAME
@@ -105,6 +123,16 @@ class TestImageOrderField:
 
     def test_from_string_last_used(self) -> None:
         assert ImageOrderField("last_used") is ImageOrderField.LAST_USED
+
+
+class TestImageAliasOrderField:
+    """Tests for ImageAliasOrderField enum."""
+
+    def test_members_are_the_orders_the_api_offers(self) -> None:
+        assert {field.value for field in ImageAliasOrderField} == {"alias", "field_id"}
+
+    def test_from_string_alias(self) -> None:
+        assert ImageAliasOrderField("alias") is ImageAliasOrderField.ALIAS
 
 
 class TestImageTagInfo:

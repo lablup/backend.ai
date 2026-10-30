@@ -1,3 +1,70 @@
+// Removals decided deliberately. graphql-inspector reports every removal as BREAKING,
+// so an element taken out on purpose needs an entry here naming why it went.
+// Drop an entry once the removal is on main: the base schema no longer carries the
+// element, so the change stops being reported.
+// Every `usedBy` element the `usage` rename took out shares one reason.
+const USAGE_RENAME =
+  "The `usedBy` search input became `usage`, which splits the relation into `usedBy` and `uses` so a condition says which side uses which. It was added in this same unreleased cycle and went out in no release tag.";
+// Both service catalog endpoint elements share one reason.
+const SERVICE_CATALOG_ENDPOINTS =
+  "A service catalog node carries only the values of the `service_catalog` table. The endpoints will return in a follow-up as a connection on the node, searched within that service catalog. The web UI does not read them.";
+
+const ACCEPTED_REMOVALS = {
+  "AccessTokenFilter.token":
+    "The token value is the credential itself, so no search condition may take it: a partial match narrows the value one character at a time even when the response never carries it.",
+  "DeploymentUsedBy": USAGE_RENAME,
+  "ModelCardUsedBy": USAGE_RENAME,
+  "RoleUsedBy": USAGE_RENAME,
+  "Query.adminDeployments.usedBy": USAGE_RENAME,
+  "Query.projectDeployments.usedBy": USAGE_RENAME,
+  "Query.scopedDeployments.usedBy": USAGE_RENAME,
+  "Query.myDeployments.usedBy": USAGE_RENAME,
+  "Query.adminImagesV2.usedBy": USAGE_RENAME,
+  "Query.scopedImagesV2.usedBy": USAGE_RENAME,
+  "Query.adminSessionsV2.usedBy": USAGE_RENAME,
+  "Query.projectSessionsV2.usedBy": USAGE_RENAME,
+  "Query.scopedSessionsV2.usedBy": USAGE_RENAME,
+  "Query.adminRoles.usedBy": USAGE_RENAME,
+  "Query.myRolesV2.usedBy": USAGE_RENAME,
+  "Query.projectRoles.usedBy": USAGE_RENAME,
+  "Query.runtimeVariants.usedBy": USAGE_RENAME,
+  "Query.deploymentRevisionPresets.usedBy": USAGE_RENAME,
+  "Query.adminModelCardsV2.usedBy": USAGE_RENAME,
+  "Query.projectModelCardsV2.usedBy": USAGE_RENAME,
+  "Query.scopedModelCardsV2.usedBy": USAGE_RENAME,
+  "Query.adminVfoldersV2.usedBy": USAGE_RENAME,
+  "Query.projectVfolders.usedBy": USAGE_RENAME,
+  "Query.scopedVFoldersV2.usedBy": USAGE_RENAME,
+  "Query.myVfolders.usedBy": USAGE_RENAME,
+  "SessionUsedBy.agent": USAGE_RENAME,
+  "SessionUsedBy.resourceGroup": USAGE_RENAME,
+  "ServiceCatalogEndpoint": SERVICE_CATALOG_ENDPOINTS,
+  "ServiceCatalog.endpoints": SERVICE_CATALOG_ENDPOINTS,
+};
+
+// Type changes decided deliberately, keyed and dropped the same way as ACCEPTED_REMOVALS.
+const ENTITY_SHARE_FILTER_RETYPE =
+  "The old type failed DTO validation for every value, so no client could use the field.";
+const NULLABLE_MUTATION_PAYLOAD =
+  "The payload became nullable so a failed mutation leaves the other fields of the response. It was added in this same unreleased cycle and went out in no release tag.";
+
+const ACCEPTED_TYPE_CHANGES = {
+  "EntityShareFilter.status": ENTITY_SHARE_FILTER_RETYPE,
+  "EntityShareFilter.recipientEntityId": ENTITY_SHARE_FILTER_RETYPE,
+  "EntityShareFilter.recipientEmail": ENTITY_SHARE_FILTER_RETYPE,
+  "Mutation.purgeSessionGroup": NULLABLE_MUTATION_PAYLOAD,
+};
+
+const TYPE_CHANGES = ["INPUT_FIELD_TYPE_CHANGED", "FIELD_TYPE_CHANGED"];
+
+const REMOVAL_CHANGES = [
+  "INPUT_FIELD_REMOVED",
+  "FIELD_REMOVED",
+  "FIELD_ARGUMENT_REMOVED",
+  "TYPE_REMOVED",
+  "ENUM_VALUE_REMOVED",
+];
+
 module.exports = (props) => {
   const { changes, newSchema, oldSchema } = props;
   const oldTypes = oldSchema.getTypeMap();
@@ -9,10 +76,25 @@ module.exports = (props) => {
     typeIsNew(typeName) ||
     oldTypes[typeName].getFields()[fieldName] === undefined;
 
+  // NON_BREAKING changes are dropped: each would only add a notice annotation on the PR diff.
   return changes.map((change) => {
     // Allowed version notations: 'XX.XX.X', 'XX.X.X'
     const deprecateNotationRegex = /Deprecated since (\d{2}\.\d{1,2}\.\d{1})/;
     const addNotationRegex = /Added in (\d{2}\.\d{1,2}\.\d{1})/;
+    const acceptedRemovalReason = ACCEPTED_REMOVALS[change.path];
+    if (REMOVAL_CHANGES.includes(change.type) && acceptedRemovalReason !== undefined) {
+      change.criticality.level = "DANGEROUS";
+      change.criticality.reason = acceptedRemovalReason;
+      change.message = `${change.message} (accepted: ${acceptedRemovalReason})`;
+      return change;
+    }
+    const acceptedTypeChangeReason = ACCEPTED_TYPE_CHANGES[change.path];
+    if (TYPE_CHANGES.includes(change.type) && acceptedTypeChangeReason !== undefined) {
+      change.criticality.level = "DANGEROUS";
+      change.criticality.reason = acceptedTypeChangeReason;
+      change.message = `${change.message} (accepted: ${acceptedTypeChangeReason})`;
+      return change;
+    }
     if (
       [
         "FIELD_DEPRECATION_REASON_ADDED",
@@ -90,6 +172,6 @@ module.exports = (props) => {
       }
     }
     return change;
-  });
+  }).filter((change) => change.criticality.level !== "NON_BREAKING");
 };
 // TODO: update the rule to check for the version number in the description.

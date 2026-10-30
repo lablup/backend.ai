@@ -14,6 +14,7 @@ from uuid import UUID
 
 from ai.backend.common.data.notification import NotificationChannelType, NotificationRuleType
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.notification.response import (
     NotificationChannelNode,
     NotificationRuleNode,
@@ -26,7 +27,7 @@ from ai.backend.common.dto.manager.v2.notification.types import (
     NotificationChannelTypeDTO,
     WebhookSpecInfo,
 )
-from ai.backend.manager.data.notification import NotificationChannelData, NotificationRuleData
+from ai.backend.manager.data.notification.types import NotificationChannelData, NotificationRuleData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
@@ -41,7 +42,7 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.domain import WrittenByThisRun
+from bai_scenario.components.domain import Mentions, WrittenByThisRun
 from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
 from bai_scenario.seeds.notification.channel import (
     FROM_EMAIL,
@@ -50,10 +51,10 @@ from bai_scenario.seeds.notification.channel import (
     SMTP_USERNAME,
     TO_EMAIL,
     WEBHOOK_URL,
-    SeedEmailChannel,
-    SeedWebhookChannel,
+    TestSeedEmailChannel,
+    TestSeedWebhookChannel,
 )
-from bai_scenario.seeds.notification.rule import TEMPLATE, SeedRuleOf, SeedRuleOfNoChannel
+from bai_scenario.seeds.notification.rule import TEMPLATE, TestSeedRuleOf, TestSeedRuleOfNoChannel
 
 type LoadedChannels = list[NotificationChannelNode | Exception | None]
 type LoadedRules = list[NotificationRuleNode | Exception | None]
@@ -130,8 +131,8 @@ class AChannelARuleAndSomeone(Given[Any, AChannelAndACaller]):
     @override
     async def lay(self, seeding: Any) -> AChannelAndACaller:
         caller = await lay_a_caller(seeding, self.role)
-        channel = await seeding.creating_from(SeedWebhookChannel(), caller)
-        await seeding.creating_from_two(SeedRuleOf(), channel, caller)
+        channel = await seeding.creating_from(TestSeedWebhookChannel(), caller)
+        await seeding.creating_from_two(TestSeedRuleOf(), channel, caller)
         return AChannelAndACaller(seeding.made(channel), seeding.made(caller))
 
 
@@ -148,8 +149,8 @@ class TwoChannelsAndSomeone(Given[Any, ManyChannelsAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManyChannelsAndACaller:
         caller = await lay_a_caller(seeding, self.role)
-        wanted = await seeding.creating_from(SeedWebhookChannel(name_hint="wanted"), caller)
-        other = await seeding.creating_from(SeedWebhookChannel(name_hint="other"), caller)
+        wanted = await seeding.creating_from(TestSeedWebhookChannel(name_hint="wanted"), caller)
+        other = await seeding.creating_from(TestSeedWebhookChannel(name_hint="other"), caller)
         return ManyChannelsAndACaller(
             laid=(seeding.made(wanted), seeding.made(other)),
             named=seeding.made(wanted),
@@ -170,8 +171,8 @@ class AWebhookAndAnEmailChannel(Given[Any, ManyChannelsAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManyChannelsAndACaller:
         caller = await lay_a_caller(seeding, self.role)
-        webhook = await seeding.creating_from(SeedWebhookChannel(), caller)
-        email = await seeding.creating_from(SeedEmailChannel(), caller)
+        webhook = await seeding.creating_from(TestSeedWebhookChannel(), caller)
+        email = await seeding.creating_from(TestSeedEmailChannel(), caller)
         return ManyChannelsAndACaller(
             laid=(seeding.made(webhook), seeding.made(email)),
             named=seeding.made(email),
@@ -192,8 +193,8 @@ class AnEnabledAndADisabledChannel(Given[Any, ManyChannelsAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManyChannelsAndACaller:
         caller = await lay_a_caller(seeding, self.role)
-        active = await seeding.creating_from(SeedWebhookChannel(), caller)
-        await seeding.creating_from(SeedWebhookChannel(enabled=False), caller)
+        active = await seeding.creating_from(TestSeedWebhookChannel(), caller)
+        await seeding.creating_from(TestSeedWebhookChannel(enabled=False), caller)
         return ManyChannelsAndACaller(
             laid=(seeding.made(active),),
             named=seeding.made(active),
@@ -217,9 +218,9 @@ class ARuleAndSomeone(Given[Any, ARuleAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ARuleAndACaller:
         caller = await lay_a_caller(seeding, self.role)
-        channel = await seeding.creating_from(SeedWebhookChannel(), caller)
+        channel = await seeding.creating_from(TestSeedWebhookChannel(), caller)
         rule = await seeding.creating_from_two(
-            SeedRuleOf(
+            TestSeedRuleOf(
                 message_template=self.message_template,
                 description=self.description,
                 enabled=self.enabled,
@@ -243,8 +244,8 @@ class AnOrphanRuleAndSomeone(Given[Any, ARuleAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ARuleAndACaller:
         caller = await lay_a_caller(seeding, self.role)
-        channel = await seeding.creating_from(SeedWebhookChannel(), caller)
-        rule = await seeding.creating_from(SeedRuleOfNoChannel(), caller)
+        channel = await seeding.creating_from(TestSeedWebhookChannel(), caller)
+        rule = await seeding.creating_from(TestSeedRuleOfNoChannel(), caller)
         return ARuleAndACaller(seeding.made(rule), seeding.made(channel), seeding.made(caller))
 
 
@@ -262,10 +263,12 @@ class TwoRulesAndSomeone(Given[Any, ManyRulesAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManyRulesAndACaller:
         caller = await lay_a_caller(seeding, self.role)
-        channel = await seeding.creating_from(SeedWebhookChannel(), caller)
-        wanted = await seeding.creating_from_two(SeedRuleOf(name_hint="wanted"), channel, caller)
+        channel = await seeding.creating_from(TestSeedWebhookChannel(), caller)
+        wanted = await seeding.creating_from_two(
+            TestSeedRuleOf(name_hint="wanted"), channel, caller
+        )
         other = await seeding.creating_from_two(
-            SeedRuleOf(name_hint="other", rule_type=self.other_rule_type), channel, caller
+            TestSeedRuleOf(name_hint="other", rule_type=self.other_rule_type), channel, caller
         )
         return ManyRulesAndACaller(
             laid=(seeding.made(wanted), seeding.made(other)),
@@ -287,9 +290,9 @@ class AnEnabledAndADisabledRule(Given[Any, ManyRulesAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManyRulesAndACaller:
         caller = await lay_a_caller(seeding, self.role)
-        channel = await seeding.creating_from(SeedWebhookChannel(), caller)
-        active = await seeding.creating_from_two(SeedRuleOf(), channel, caller)
-        await seeding.creating_from_two(SeedRuleOf(enabled=False), channel, caller)
+        channel = await seeding.creating_from(TestSeedWebhookChannel(), caller)
+        active = await seeding.creating_from_two(TestSeedRuleOf(), channel, caller)
+        await seeding.creating_from_two(TestSeedRuleOf(enabled=False), channel, caller)
         return ManyRulesAndACaller(
             laid=(seeding.made(active),),
             named=seeding.made(active),
@@ -299,14 +302,14 @@ class AnEnabledAndADisabledRule(Given[Any, ManyRulesAndACaller]):
 
 def _channel_seed(
     given: AChannelAndSomeone, name_hint: str
-) -> SeedWebhookChannel | SeedEmailChannel:
+) -> TestSeedWebhookChannel | TestSeedEmailChannel:
     match given.channel_type:
         case NotificationChannelType.WEBHOOK:
-            return SeedWebhookChannel(
+            return TestSeedWebhookChannel(
                 name_hint=name_hint, description=given.description, enabled=given.enabled
             )
         case NotificationChannelType.EMAIL:
-            return SeedEmailChannel(name_hint=name_hint, enabled=given.enabled)
+            return TestSeedEmailChannel(name_hint=name_hint, enabled=given.enabled)
 
 
 # ------------------------------------------------------------------ verdicts
@@ -866,3 +869,139 @@ class TheRenderedMessage(Then[ARuleAndACaller, ValidateNotificationRulePayload])
         if payload is None:
             return [Refused(EntityNotFoundError, answered.raised)]
         return [Same("message", payload.message, self.rendered)]
+
+
+@dataclass(frozen=True)
+class TheChannelsComeBack(
+    Then[ManyChannelsAndACaller, PartialBulkPayload[NotificationChannelNode]]
+):
+    """미리 만들어 둔 채널이 모두 처리된 목록에 온다. ``missing``이 있으면 그 id 만 실패 목록에 온다."""
+
+    started: datetime
+    described: str | None | Kept = KEPT
+    missing: UUID | None = None
+
+    @override
+    def says(self) -> str:
+        if self.missing is None:
+            return "미리 만들어 둔 채널이 모두 처리된 목록에 오고, 실패한 것은 없다"
+        return (
+            "미리 만들어 둔 채널이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 "
+            "실패 목록에 온다"
+        )
+
+    @override
+    def look(
+        self,
+        laid: ManyChannelsAndACaller,
+        answered: Answered[PartialBulkPayload[NotificationChannelNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        written = WrittenByThisRun(self.started)
+        verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.laid))]
+        for i, (node, seed) in enumerate(zip(payload.successes, laid.laid, strict=False)):
+            verdicts += channel_verdicts(
+                f"successes[{i}].",
+                node,
+                name=seed.name,
+                description=(
+                    seed.description if isinstance(self.described, Kept) else self.described
+                ),
+                channel_type=seed.channel_type,
+                url=WEBHOOK_URL,
+                enabled=seed.enabled,
+                created_by=seed.created_by,
+                written=written,
+            )
+        return verdicts + failed_verdicts(payload, self.missing)
+
+
+@dataclass(frozen=True)
+class TheRulesComeBack(Then[ManyRulesAndACaller, PartialBulkPayload[NotificationRuleNode]]):
+    """미리 만들어 둔 규칙이 모두 처리된 목록에 온다. ``missing``이 있으면 그 id 만 실패 목록에 온다."""
+
+    started: datetime
+    described: str | None | Kept = KEPT
+    missing: UUID | None = None
+
+    @override
+    def says(self) -> str:
+        if self.missing is None:
+            return "미리 만들어 둔 규칙이 모두 처리된 목록에 오고, 실패한 것은 없다"
+        return (
+            "미리 만들어 둔 규칙이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 "
+            "실패 목록에 온다"
+        )
+
+    @override
+    def look(
+        self,
+        laid: ManyRulesAndACaller,
+        answered: Answered[PartialBulkPayload[NotificationRuleNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        written = WrittenByThisRun(self.started)
+        verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.laid))]
+        for i, (node, seed) in enumerate(zip(payload.successes, laid.laid, strict=False)):
+            verdicts += rule_verdicts(
+                f"successes[{i}].",
+                node,
+                name=seed.name,
+                description=(
+                    seed.description if isinstance(self.described, Kept) else self.described
+                ),
+                rule_type=seed.rule_type,
+                channel_id=seed.channel_id,
+                message_template=seed.message_template,
+                enabled=seed.enabled,
+                created_by=seed.created_by,
+                written=written,
+            )
+        return verdicts + failed_verdicts(payload, self.missing)
+
+
+def failed_verdicts(payload: PartialBulkPayload[Any], missing: UUID | None) -> list[Verdict]:
+    """The failed list of a partial bulk answer: empty, or the one id nothing answers to."""
+    if missing is None:
+        return [Same("failed", payload.failed, [])]
+    verdicts: list[Verdict] = [Same("failed count", len(payload.failed), 1)]
+    for failure in payload.failed:
+        verdicts += [
+            Held[UUID]("failed[0].id", failure.id, SameAs(missing, "요청에 넣은 없는 id")),
+            Held("failed[0].message", failure.message, Mentions("not found")),
+        ]
+    return verdicts
+
+
+@dataclass(frozen=True)
+class NothingIsProcessed(Then[Any, PartialBulkPayload[Any]]):
+    """처리된 것 없이, 미리 만들어 둔 것이 모두 같은 이유로 실패 목록에 온다."""
+
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return "처리된 것 없이 미리 만들어 둔 것이 모두 실패 목록에 온다"
+
+    @override
+    def look(self, laid: Any, answered: Answered[PartialBulkPayload[Any]]) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        targets = laid.laid
+        verdicts: list[Verdict] = [
+            Same("successes", payload.successes, []),
+            Same("failed count", len(payload.failed), len(targets)),
+        ]
+        for i, (failure, seed) in enumerate(zip(payload.failed, targets, strict=False)):
+            verdicts += [
+                Held[UUID](
+                    f"failed[{i}].id", failure.id, SameAs(seed.id, "미리 만들어 둔 것의 id")
+                ),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+            ]
+        return verdicts

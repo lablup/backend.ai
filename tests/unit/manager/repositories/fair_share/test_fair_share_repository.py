@@ -12,61 +12,64 @@ from decimal import Decimal
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.errors.resource import DomainNotFound
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.fair_share import (
+from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.fair_share.row import (
     DomainFairShareRow,
     ProjectFairShareRow,
     UserFairShareRow,
+)
+from ai.backend.manager.models.fair_share.searchable_fields import (
+    DomainFairShareSearchableFields,
 )
 from ai.backend.manager.models.fair_share.upserters import (
     DomainFairShareUpserter,
     ProjectFairShareUpserter,
     UserFairShareUpserter,
 )
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import AssocGroupUserRow, ProjectRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.resource_group import (
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForDomainRow,
     ResourceGroupForProjectRow,
-    ResourceGroupOpts,
     ResourceGroupRow,
 )
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.user import (
-    PasswordHashAlgorithm,
-    PasswordInfo,
-    UserRole,
-    UserRow,
-    UserStatus,
-)
+from ai.backend.manager.models.user.row import PasswordHashAlgorithm, UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.fair_share import (
-    DomainFairShareConditions,
-    DomainFairShareOrders,
+from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
+from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
+from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
+from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.fair_share.repository import (
     FairShareRepository,
 )
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.types import OptionalState, TriState
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
+from ai.backend.testutils.virtual_entity import VirtualEntitySeeder
 
 RESOURCE_GROUP_ID = ResourceGroupID(uuid.uuid4())
 
@@ -109,6 +112,9 @@ class TestFairShareRepository:
                 DomainFairShareRow,
                 ProjectFairShareRow,
                 UserFairShareRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+                ScopeBindingRow,
             ],
         ):
             yield database_connection
@@ -256,8 +262,7 @@ class TestFairShareRepository:
             db_sess.add(user)
             await db_sess.flush()
 
-            # Associate user with project
-            db_sess.add(AssocGroupUserRow(group_id=test_project_id, user_id=user_uuid))
+            await VirtualEntitySeeder().enroll_user_in_project(db_sess, test_project_id, user_uuid)
             await db_sess.commit()
 
         return user_uuid
@@ -412,8 +417,12 @@ class TestFairShareRepository:
         # Search with BatchQuerier
         querier = BatchQuerier(
             pagination=OffsetPagination(limit=100, offset=0),
-            conditions=[DomainFairShareConditions.by_resource_group(test_scaling_group)],
-            orders=[DomainFairShareOrders.by_domain_name()],
+            conditions=[
+                DomainFairShareSearchableFields.own.resource_group.filter.equals(
+                    StringMatchSpec(test_scaling_group, case_insensitive=False, negated=False)
+                )
+            ],
+            orders=[DomainFairShareSearchableFields.own.domain_name.order.apply(True)],
         )
         result = await fair_share_repository.search_domain_fair_shares(querier)
 
@@ -525,6 +534,57 @@ class TestFairShareRepository:
 
         assert result.user_uuid == test_user_uuid
         assert result.project_id == test_project_id
+
+    async def test_get_user_fair_share_without_record_returns_default(
+        self,
+        fair_share_repository: FairShareRepository,
+        test_scaling_group: str,
+        test_domain: DomainFixtureData,
+        test_project_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+    ) -> None:
+        """A project member without a record gets the resource group's defaults."""
+        result = await fair_share_repository.get_user_fair_share(
+            resource_group_id=RESOURCE_GROUP_ID,
+            project_id=test_project_id,
+            user_uuid=test_user_uuid,
+        )
+
+        assert result.user_uuid == test_user_uuid
+        assert result.domain_name == test_domain.domain_name
+        assert result.data.use_default is True
+
+    async def test_get_user_fair_share_ignores_legacy_membership(
+        self,
+        fair_share_repository: FairShareRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_scaling_group: str,
+        test_project_id: uuid.UUID,
+        test_user_uuid: uuid.UUID,
+    ) -> None:
+        """A membership written only to the legacy table does not count."""
+        other_project_id = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            project = await db_sess.get_one(ProjectRow, test_project_id)
+            db_sess.add(
+                ProjectRow(
+                    id=other_project_id,
+                    name=f"test-project-{other_project_id.hex[:8]}",
+                    domain_name=project.domain_name,
+                    description="Project with a legacy membership only",
+                    resource_policy=project.resource_policy,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(AssocGroupUserRow(group_id=other_project_id, user_id=test_user_uuid))
+            await db_sess.commit()
+
+        with pytest.raises(UserNotFound):
+            await fair_share_repository.get_user_fair_share(
+                resource_group_id=RESOURCE_GROUP_ID,
+                project_id=other_project_id,
+                user_uuid=test_user_uuid,
+            )
 
     # ==================== Upsert Without Resource Group Tests ====================
 

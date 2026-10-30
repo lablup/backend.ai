@@ -15,10 +15,10 @@ import pytest
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.entity.kernel import KernelFieldType
+from ai.backend.common.data.entity.kernel_group import KernelGroupFieldType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
 from ai.backend.common.etcd import AbstractKVStore
-from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.events.fetcher import EventFetcher
 from ai.backend.common.events.hub.hub import EventHub
 from ai.backend.common.plugin.hook import HookPluginContext
@@ -35,9 +35,11 @@ from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.data.kernel_group.types import KernelGroupData
 from ai.backend.manager.idle import IdleCheckerHost
 from ai.backend.manager.plugin.network import NetworkPluginContext
 from ai.backend.manager.registry import AgentRegistry
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -49,11 +51,17 @@ from ai.backend.manager.repositories.scheduler.repository import SchedulerReposi
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.idle_checker.processors import IdleCheckerProcessors
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_group_owner import (
+    LookupBulkKernelGroupOwnerAction,
+)
 from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
     LookupBulkKernelOwnerAction,
 )
 from ai.backend.manager.services.session.actions.lookup_kernel_field_owner import (
     LookupKernelFieldOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_group_field_owner import (
+    LookupKernelGroupFieldOwnerAction,
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
@@ -65,6 +73,7 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
     SchedulingController,
     SchedulingControllerArgs,
 )
+from bai_scenario.fakes.events import SilentEventProducer
 from bai_scenario.fakes.storage_proxy import (
     FakeStorageProxyManagerFacingClient,
     FakeStorageSessionManager,
@@ -112,7 +121,9 @@ async def adapter(
     )
     service = SessionService(
         SessionServiceArgs(
-            session_repository=SessionRepository(engine, provider),
+            session_repository=SessionRepository(
+                engine, provider, registry_db_source=ContainerRegistryDBSource(provider)
+            ),
             scheduler_repository=scheduler_repository,
             user_repository=unwired(UserRepository, "only writes resolve the owner"),
             agent_registry=unwired(AgentRegistry, "only session writes reach the agents"),
@@ -126,7 +137,7 @@ async def adapter(
                     repository=scheduler_repository,
                     config_provider=config,
                     storage_manager=FakeStorageSessionManager({"local": storage}),
-                    event_producer=unwired(EventProducer, "nothing here waits on the event"),
+                    event_producer=SilentEventProducer(),
                     valkey_schedule=valkey.schedule,
                     network_plugin_ctx=unwired(
                         NetworkPluginContext, "no session asks for a network"
@@ -148,6 +159,12 @@ async def adapter(
                 KernelInfo,
                 LookupKernelFieldOwnerAction,
                 LookupBulkKernelOwnerAction,
+            ),
+            registry.group(GroupMeta(SessionEntityType())).field_group(
+                FieldGroupMeta(KernelGroupFieldType()),
+                KernelGroupData,
+                LookupKernelGroupFieldOwnerAction,
+                LookupBulkKernelGroupOwnerAction,
             ),
             unwired(ResourceAllocationProcessors, "only allocation reads reach it"),
             service,

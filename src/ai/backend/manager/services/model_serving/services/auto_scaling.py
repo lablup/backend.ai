@@ -4,7 +4,7 @@ import decimal
 import logging
 
 from ai.backend.common.contexts.user import current_user
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.common import GenericForbidden
 from ai.backend.manager.errors.service import (
@@ -32,7 +32,7 @@ from ai.backend.manager.services.model_serving.actions.update_auto_scaling_rule 
 )
 from ai.backend.manager.services.model_serving.services.utils import validate_endpoint_access
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class AutoScalingService:

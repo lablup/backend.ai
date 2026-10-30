@@ -34,7 +34,6 @@ python_requirements(
         "types-Jinja2": ["jinja2"],
         "types-python-dateutil": ["dateutil", "dateutil.parser", "dateutil.tz"],
         "types-PyYAML": ["yaml"],
-        "types-redis": ["redis"],
         "types-setuptools": [
             "setuptools",
             "pkg_resources",

@@ -24,7 +24,7 @@ def register_health_routes(
       Manager version. Public-facing, no internal connectivity is exposed.
     - ``/health/livez`` and ``/health/readyz`` — status-only K8s-style
       probes that mirror the internal liveness / readiness tiers but omit
-      the response body so the per-component matrix never leaks externally.
+      the response body except for draining errors; connectivity details stay internal.
     """
     reg = RouteRegistry.create("health", route_deps.cors_options)
 

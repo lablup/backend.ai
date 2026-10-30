@@ -31,6 +31,7 @@ from ai.backend.common.dto.manager.infra import (
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.resource_preset.creators import ResourcePresetCreator
+from ai.backend.manager.models.resource_preset.scopes import PublicResourcePresetTarget
 from ai.backend.manager.models.resource_preset.updaters import ResourcePresetUpdater
 from ai.backend.manager.services.resource_preset.actions.create_preset import (
     CreateResourcePresetAction,
@@ -93,6 +94,7 @@ class TestPresetCRUD:
     ) -> list[Any]:
         """List presets through the processor layer."""
         action = ListResourcePresetsAction(
+            targets=[PublicResourcePresetTarget()],
             access_key=access_key,
             resource_group=resource_group,
         )

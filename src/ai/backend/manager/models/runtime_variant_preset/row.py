@@ -7,18 +7,7 @@ from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     VERSION_PREFIX_PATTERN,
-    PresetTarget,
-    PresetValueType,
     UIOption,
-)
-from ai.backend.manager.data.runtime_variant_preset.types import (
-    ChoiceItemData,
-    ChoiceOptionData,
-    NumberOptionData,
-    RuntimeVariantPresetData,
-    SliderOptionData,
-    TextOptionData,
-    UIOptionData,
 )
 from ai.backend.manager.models.base import GUID, Base, PydanticColumn
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
@@ -124,44 +113,3 @@ class RuntimeVariantPresetRow(LifecycleTimestampsMixin, Base):
     ui_option: Mapped[UIOption | None] = mapped_column(
         "ui_option", PydanticColumn(UIOption), nullable=True
     )
-
-    @staticmethod
-    def _convert_ui_option_to_data(opt: UIOption | None) -> UIOptionData | None:
-        if opt is None:
-            return None
-        return UIOptionData(
-            ui_type=opt.ui_type.value,
-            slider=SliderOptionData(min=opt.slider.min, max=opt.slider.max, step=opt.slider.step)
-            if opt.slider
-            else None,
-            number=NumberOptionData(min=opt.number.min, max=opt.number.max) if opt.number else None,
-            choices=ChoiceOptionData(
-                items=[ChoiceItemData(value=c.value, label=c.label) for c in opt.choices.items]
-            )
-            if opt.choices
-            else None,
-            text=TextOptionData(placeholder=opt.text.placeholder) if opt.text else None,
-        )
-
-    def to_data(self) -> RuntimeVariantPresetData:
-        ui_option_data = self._convert_ui_option_to_data(self.ui_option)
-        return RuntimeVariantPresetData(
-            id=RuntimeVariantPresetID(self.id),
-            runtime_variant_id=RuntimeVariantID(self.runtime_variant),
-            name=self.name,
-            description=self.description,
-            rank=self.rank,
-            preset_target=PresetTarget(self.preset_target),
-            value_type=PresetValueType(self.value_type),
-            default_value=self.default_value,
-            key=self.key,
-            required=self.required,
-            added_version=self.added_version,
-            deprecated_version=self.deprecated_version,
-            category=self.category,
-            ui_type=ui_option_data.ui_type if ui_option_data is not None else None,
-            display_name=self.display_name,
-            ui_option=ui_option_data,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )

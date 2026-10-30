@@ -10,8 +10,12 @@ from collections.abc import Mapping
 
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.manager.data.permission.id import ScopeId
-from ai.backend.manager.models.vfolder import VFolderOwnershipType as OriginalVFolderOwnershipType
-from ai.backend.manager.models.vfolder import VFolderPermission as OriginalVFolderPermission
+from ai.backend.manager.data.vfolder.types import (
+    VFolderMountPermission as OriginalVFolderPermission,
+)
+from ai.backend.manager.data.vfolder.types import (
+    VFolderOwnershipType as OriginalVFolderOwnershipType,
+)
 
 from .enums import (
     OperationType,
@@ -37,7 +41,7 @@ class VFolderOwnershipType(enum.StrEnum):
 class VFolderPermission(enum.StrEnum):
     """
     Mount permission for vfolder.
-    Refer to `ai.backend.manager.models.vfolder.VFolderPermission`.
+    Refer to `ai.backend.manager.data.vfolder.types.VFolderMountPermission`.
     """
 
     READ_ONLY = "ro"

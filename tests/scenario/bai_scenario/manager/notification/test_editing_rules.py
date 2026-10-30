@@ -20,11 +20,11 @@ from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.notification import ARuleAndACaller, ARuleAndSomeone, TheRuleNode
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type EditingStep = Scenario[
-    SeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode
+    TestSeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode
 ]
 
 WAS_DESCRIBED = "이미 있던 규칙"
@@ -81,7 +81,7 @@ class Editing(When[ARuleAndACaller, NotificationAdapter, NotificationRuleNode]):
 
 @dataclass(frozen=True)
 class TheSuperadminRenamesARule(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     started: datetime
 
@@ -94,7 +94,7 @@ class TheSuperadminRenamesARule(
         return "슈퍼관리자가 이름만 바꾸면 이름은 새 값이고 나머지는 그대로인 규칙 전체가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -108,7 +108,7 @@ class TheSuperadminRenamesARule(
 
 @dataclass(frozen=True)
 class ChangingTheTemplate(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     started: datetime
 
@@ -121,7 +121,7 @@ class ChangingTheTemplate(
         return "규칙의 템플릿을 바꾸면 템플릿이 새 값인 규칙이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -135,7 +135,7 @@ class ChangingTheTemplate(
 
 @dataclass(frozen=True)
 class ClearingTheDescription(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     started: datetime
 
@@ -148,7 +148,7 @@ class ClearingTheDescription(
         return "설명이 있는 규칙의 설명을 비우면 설명이 비어 있는 규칙이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone(role=UserRole.SUPERADMIN, description=WAS_DESCRIBED)
 
     @override
@@ -162,7 +162,7 @@ class ClearingTheDescription(
 
 @dataclass(frozen=True)
 class DisablingARule(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     started: datetime
 
@@ -175,7 +175,7 @@ class DisablingARule(
         return "활성 규칙을 비활성으로 바꾸면 비활성인 규칙이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -189,7 +189,7 @@ class DisablingARule(
 
 @dataclass(frozen=True)
 class AnEmptyEditChangesNothing(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     started: datetime
 
@@ -202,7 +202,7 @@ class AnEmptyEditChangesNothing(
         return "아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 규칙이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -216,7 +216,7 @@ class AnEmptyEditChangesNothing(
 
 @dataclass(frozen=True)
 class TheSuperadminEditingAnUnknownIdIsNotFound(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     @override
     def summary(self) -> str:
@@ -227,7 +227,7 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -241,7 +241,7 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotEdit(
-    Scenario[SeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
+    Scenario[TestSeedingSession, ARuleAndACaller, NotificationAdapter, NotificationRuleNode]
 ):
     @override
     def summary(self) -> str:
@@ -252,7 +252,7 @@ class AUserGrantedNothingMayNotEdit(
         return "아무 권한도 없는 사용자가 이름을 바꾸려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ARuleAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ARuleAndACaller]:
         return ARuleAndSomeone()
 
     @override

@@ -14,11 +14,11 @@ import logging
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.session.spec import SessionSpec
 from ai.backend.manager.views.sokovan.session_creation import SessionSpecContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class SessionSpecValidatorRule(ABC):
@@ -58,5 +58,5 @@ class SessionSpecValidator:
         context: SessionSpecContext,
     ) -> None:
         for rule in self._rules:
-            log.debug("Applying SessionSpec validation rule: {}", rule.name())
+            log.trace("session spec validation rule applying: {}", rule.name())
             rule.validate(spec, context)

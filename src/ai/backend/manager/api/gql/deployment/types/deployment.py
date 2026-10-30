@@ -39,6 +39,9 @@ from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentOrder as DeploymentOrderDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
+    DeploymentScalingStateFilter as DeploymentScalingStateFilterDTO,
+)
+from ai.backend.common.dto.manager.v2.deployment.request import (
     DeploymentStatusFilter as DeploymentStatusFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
@@ -109,6 +112,7 @@ from ai.backend.common.dto.manager.v2.scheduling_history.types import (
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import (
     DateTimeFilter,
+    IntFilter,
     NullableDateTimeFilter,
     OrderDirection,
     StringFilter,
@@ -166,13 +170,13 @@ from ai.backend.manager.api.gql.deployment.types.revision import (
     ModelRevisionOrderBy,
 )
 from ai.backend.manager.api.gql.domain import Domain
-from ai.backend.manager.api.gql.entity_label.types import (
-    EntityLabelConnection,
+from ai.backend.manager.api.gql.entity_label.types.field import resolve_entity_labels
+from ai.backend.manager.api.gql.entity_label.types.filters import (
     EntityLabelFilterGQL,
     EntityLabelNestedFilterGQL,
     EntityLabelOrderByGQL,
-    resolve_entity_labels,
 )
+from ai.backend.manager.api.gql.entity_label.types.node import EntityLabelConnection
 from ai.backend.manager.api.gql.project import Project
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
@@ -245,6 +249,15 @@ class DeploymentStrategyGQL:
 )
 class ReplicaState:
     desired_replica_count: int
+    replica_count: int = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description=(
+                "The replica count the user set. Autoscaling changes only desiredReplicaCount,"
+                " so the two differ when an autoscaling rule set the count."
+            ),
+        )
+    )
 
 
 @gql_pydantic_type(
@@ -338,7 +351,10 @@ class ModelDeploymentMetadata:
         ]
         | None
     ):
-        return await info.context.data_loaders.domain_loader.load(self.domain_name)
+        domain_id = await info.context.data_loaders.domain_id_by_name_loader.load(self.domain_name)
+        if domain_id is None:
+            return None
+        return await info.context.data_loaders.domain_by_id_loader.load(domain_id)
 
 
 @gql_pydantic_type(
@@ -365,7 +381,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
     id: NodeID[str]
     entity_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the deployment.",
         ),
     )
@@ -696,7 +712,7 @@ class ModelDeployment(PydanticNodeMixin[DeploymentNodeDTO]):
 
     @gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="The labels on this deployment.",
         )
     )  # type: ignore[misc]
@@ -776,6 +792,16 @@ class ProjectDeploymentScopeGQL(PydanticInputMixin[ProjectDeploymentScopeDTO]):
     name="ReplicaNestedFilter",
 )
 class ReplicaNestedFilterGQL(PydanticInputMixin[ReplicaNestedFilterDTO]):
+    exists: bool | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description=(
+                "Matches parents that have at least one replica when true, and parents "
+                "with none when false. Says nothing about what the replicas hold."
+            ),
+        ),
+        default=None,
+    )
     some: ReplicaFilter | None = gql_field(
         description="Matches parents with at least one replica satisfying all conditions.",
         default=None,
@@ -790,6 +816,28 @@ class ReplicaNestedFilterGQL(PydanticInputMixin[ReplicaNestedFilterDTO]):
     none: ReplicaFilter | None = gql_field(
         description="Matches parents with no replica satisfying all conditions.",
         default=None,
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for the deployment scaling state.",
+        added_version="26.9.0",
+    ),
+    name="ScalingStateFilter",
+)
+class ScalingStateFilterGQL(PydanticInputMixin[DeploymentScalingStateFilterDTO]):
+    in_: list[ScalingStateGQL] | None = gql_field(
+        description="Scaling states to match.", name="in", default=None
+    )
+    equals: ScalingStateGQL | None = gql_field(
+        description="Exact scaling state match.", default=None
+    )
+    not_in: list[ScalingStateGQL] | None = gql_field(
+        description="Excludes scaling states in the list.", name="notIn", default=None
+    )
+    not_equals: ScalingStateGQL | None = gql_field(
+        description="Excludes exact scaling state match.", name="notEquals", default=None
     )
 
 
@@ -846,9 +894,27 @@ class DeploymentFilter(PydanticInputMixin[DeploymentFilterDTO]):
 
     labels: EntityLabelNestedFilterGQL | None = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="Select entities by the labels on them.",
         ),
+        default=None,
+    )
+    entity_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by deployment ID."),
+        default=None,
+    )
+    desired_replicas: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0",
+            description=(
+                "Filter by the desired replica count."
+                " Falls back to the user-set replica count until autoscaling sets one."
+            ),
+        ),
+        default=None,
+    )
+    scaling_state: ScalingStateFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by scaling state."),
         default=None,
     )
 
@@ -893,7 +959,16 @@ class UpdateDeploymentPayload:
     model=DeleteDeploymentPayloadDTO,
 )
 class DeleteDeploymentPayload:
-    id: ID
+    id: ID = gql_field(
+        description="ID of the deleted deployment.",
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deployment`.",
+    )
+    deployment: ModelDeployment = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="The soft-deleted deployment.",
+        ),
+    )
 
 
 @gql_pydantic_type(

@@ -29,11 +29,11 @@ from bai_scenario.components.notification import (
     TheChannelNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type EditingStep = Scenario[
-    SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode
+    TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode
 ]
 
 WAS_DESCRIBED = "이미 있던 채널"
@@ -102,7 +102,7 @@ class Editing(When[AChannelAndACaller, NotificationAdapter, NotificationChannelN
 
 @dataclass(frozen=True)
 class TheSuperadminRenamesAChannel(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     started: datetime
 
@@ -115,7 +115,7 @@ class TheSuperadminRenamesAChannel(
         return "슈퍼관리자가 이름만 바꾸면 이름은 새 값이고 나머지는 그대로인 채널 전체가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -129,7 +129,7 @@ class TheSuperadminRenamesAChannel(
 
 @dataclass(frozen=True)
 class ClearingTheDescription(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     started: datetime
 
@@ -142,7 +142,7 @@ class ClearingTheDescription(
         return "설명이 있는 채널의 설명을 비우면 설명이 비어 있는 채널이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN, description=WAS_DESCRIBED)
 
     @override
@@ -156,7 +156,7 @@ class ClearingTheDescription(
 
 @dataclass(frozen=True)
 class ChangingTheSpec(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     started: datetime
 
@@ -169,7 +169,7 @@ class ChangingTheSpec(
         return "webhook 채널의 명세를 다른 주소로 바꾸면 주소가 새 값인 채널이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -183,7 +183,7 @@ class ChangingTheSpec(
 
 @dataclass(frozen=True)
 class DisablingAChannel(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     started: datetime
 
@@ -196,7 +196,7 @@ class DisablingAChannel(
         return "활성 채널을 비활성으로 바꾸면 비활성인 채널이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -210,7 +210,7 @@ class DisablingAChannel(
 
 @dataclass(frozen=True)
 class AnEmptyEditChangesNothing(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     started: datetime
 
@@ -223,7 +223,7 @@ class AnEmptyEditChangesNothing(
         return "아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 채널이 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -237,7 +237,7 @@ class AnEmptyEditChangesNothing(
 
 @dataclass(frozen=True)
 class AnEmptySpecIsRefused(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     @override
     def summary(self) -> str:
@@ -248,7 +248,7 @@ class AnEmptySpecIsRefused(
         return "webhook도 email도 주지 않은 명세로 수정하려 하면 잘못된 입력으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -262,7 +262,7 @@ class AnEmptySpecIsRefused(
 
 @dataclass(frozen=True)
 class TheSuperadminEditingAnUnknownIdIsNotFound(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     @override
     def summary(self) -> str:
@@ -273,7 +273,7 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
         return "슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -287,7 +287,7 @@ class TheSuperadminEditingAnUnknownIdIsNotFound(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotEdit(
-    Scenario[SeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
+    Scenario[TestSeedingSession, AChannelAndACaller, NotificationAdapter, NotificationChannelNode]
 ):
     @override
     def summary(self) -> str:
@@ -298,7 +298,7 @@ class AUserGrantedNothingMayNotEdit(
         return "아무 권한도 없는 사용자가 이름을 바꾸려 하면 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, AChannelAndACaller]:
+    def given(self) -> Given[TestSeedingSession, AChannelAndACaller]:
         return AChannelAndSomeone()
 
     @override

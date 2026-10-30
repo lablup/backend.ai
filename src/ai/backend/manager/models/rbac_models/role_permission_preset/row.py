@@ -7,7 +7,6 @@ from ai.backend.common.data.entity.role_permission_preset import RolePermissionP
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import EntityType
 from ai.backend.manager.data.permission.types import Permission
-from ai.backend.manager.data.role_preset.types import RolePermissionPresetData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -46,12 +45,3 @@ class RolePermissionPresetRow(CreatedAtMixin, Base):
     permission: Mapped[Permission] = mapped_column(
         "permission", IntFlagType(Permission), nullable=False
     )
-
-    def to_data(self) -> RolePermissionPresetData:
-        return RolePermissionPresetData(
-            id=self.id,
-            role_preset_id=self.role_preset_id,
-            entity_type=self.entity_type,
-            permission=self.permission,
-            created_at=self.created_at,
-        )

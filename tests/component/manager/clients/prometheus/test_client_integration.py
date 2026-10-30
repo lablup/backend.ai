@@ -9,13 +9,12 @@ import pytest
 from ai.backend.common.clients.http_client.client_pool import ClientPool, tcp_client_session_factory
 from ai.backend.common.dto.clients.prometheus import PrometheusResponse, QueryTimeRange
 from ai.backend.common.exception import FailedToGetMetric
-from ai.backend.manager.clients.prometheus import (
+from ai.backend.manager.clients.prometheus.client import PrometheusClient
+from ai.backend.manager.clients.prometheus.fixed_query_builder import (
     ContainerLiveStatQueryBuilder,
     ContainerMetricQueryBuilder,
-    LabelMatcher,
-    MetricPreset,
-    PrometheusClient,
 )
+from ai.backend.manager.clients.prometheus.preset import LabelMatcher, MetricPreset
 
 if TYPE_CHECKING:
     from ai.backend.testutils.bootstrap import PrometheusContainerFixture

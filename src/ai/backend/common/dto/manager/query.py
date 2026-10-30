@@ -3,6 +3,8 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from datetime import date, datetime
+from decimal import Decimal
+from enum import Enum
 from typing import TypeVar, override
 
 from pydantic import Field
@@ -25,6 +27,21 @@ class DateFilter(BaseRequestModel):
     after: date | None = Field(default=None, description="After this date (inclusive)")
     equals: date | None = Field(default=None, description="Exact date match")
     not_equals: date | None = Field(default=None, description="Not equal to this date")
+
+
+class DecimalFilter(BaseRequestModel):
+    """Filter for decimal fields supporting equality and comparison operations."""
+
+    equals: Decimal | None = Field(default=None, description="Exact decimal match")
+    not_equals: Decimal | None = Field(default=None, description="Not equal to this decimal")
+    greater_than: Decimal | None = Field(default=None, description="Greater than this decimal")
+    greater_than_or_equal: Decimal | None = Field(
+        default=None, description="Greater than or equal to this decimal"
+    )
+    less_than: Decimal | None = Field(default=None, description="Less than this decimal")
+    less_than_or_equal: Decimal | None = Field(
+        default=None, description="Less than or equal to this decimal"
+    )
 
 
 class IntFilter(BaseRequestModel):
@@ -126,6 +143,38 @@ class ArrayFilter[T](BaseRequestModel):
         if self.contains_all is not None:
             return contains_all_factory(self.contains_all)
         return None
+
+
+class EnumFilter[E: Enum](BaseRequestModel):
+    """Filter for enum fields supporting equality and membership operations."""
+
+    equals: E | None = Field(default=None, description="Exact match.")
+    in_: list[E] | None = Field(
+        default=None, alias="in", description="Match any of the provided values."
+    )
+    not_equals: E | None = Field(default=None, description="Exclude an exact match.")
+    not_in: list[E] | None = Field(default=None, description="Exclude any of the provided values.")
+
+
+class ToManyFilter[F](BaseRequestModel):
+    """Filter over the rows a to-many relation reaches.
+
+    Each matching mode takes one row filter and must carry a condition; ``exists``
+    answers whether there is a related row at all.
+    """
+
+    exists: bool | None = Field(
+        default=None,
+        description=(
+            "True for a row that has at least one related row, false for one that has none. "
+            "Asks nothing about what the related rows hold."
+        ),
+    )
+    some: F | None = Field(default=None, description="At least one related row matches.")
+    every: F | None = Field(
+        default=None, description="Every related row matches; true when there is none."
+    )
+    none: F | None = Field(default=None, description="No related row matches.")
 
 
 class DateTimeFilter(BaseRequestModel):

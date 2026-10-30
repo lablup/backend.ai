@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterable
 
 from ai.backend.common.types import SessionId
-from ai.backend.manager.sokovan.recorder import RecorderContext
+from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.views.sokovan.snapshot import SystemSnapshot
 from ai.backend.manager.views.sokovan.workload import SessionWorkload
 

@@ -14,9 +14,13 @@ import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.config import DefaultModelDefinition
-from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
+from ai.backend.common.data.entity.deployment_preset import (
+    DeploymentPresetEntityType,
+    DeploymentPresetID,
+)
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
+from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
 from ai.backend.manager.data.deployment_revision_preset.types import (
     DeploymentRevisionPresetData,
@@ -32,22 +36,27 @@ from ai.backend.manager.models.deployment_revision_preset.creators import (
 from ai.backend.manager.models.deployment_revision_preset.purgers import DeploymentPresetPurger
 from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
 from ai.backend.manager.models.deployment_revision_preset.scopes import (
-    DeploymentPresetSlotOperationScope,
+    DeploymentPresetSlotTarget,
+)
+from ai.backend.manager.models.deployment_revision_preset.searchable_fields import (
+    DeploymentPresetSearchableFields,
 )
 from ai.backend.manager.models.deployment_revision_preset.searchers import (
+    DeploymentPresetSearcher,
     PresetResourceSlotSearcher,
 )
 from ai.backend.manager.models.deployment_revision_preset.updaters import DeploymentPresetUpdater
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
+from ai.backend.manager.models.entity_label.searchable_fields import EntityLabelSearchableFields
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 from ai.backend.manager.models.resource_slot.row import PresetResourceSlotRow, ResourceSlotTypeRow
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -156,7 +165,7 @@ async def _slot_map(
 ) -> dict[str, Decimal]:
     async with V2DBOpsProvider(database).read_ops() as r:
         result = await r.search_with_scopes(
-            (DeploymentPresetSlotOperationScope(preset_id=preset_id),),
+            (DeploymentPresetSlotTarget(preset_id=preset_id),),
             PresetResourceSlotSearcher(pagination=NoPagination()),
         )
     return {item.slot_name: item.quantity for item in result.items}
@@ -270,6 +279,50 @@ class TestReadAndPurge:
         with pytest.raises(DeploymentRevisionPresetNotFound):
             await repository.get_by_id(created.data.id)
         assert await _slot_map(database, created.data.id) == {}
+
+
+class TestSearchByLabel:
+    async def test_keeps_only_the_preset_carrying_the_label(
+        self,
+        database: ExtendedAsyncSAEngine,
+        ops: OpsRepository[DeploymentRevisionPresetData],
+    ) -> None:
+        prod = await ops.create_entity_with_fields(_creator("preset-prod"), _slots())
+        dev = await ops.create_entity_with_fields(_creator("preset-dev"), _slots())
+        async with database.begin_session() as session:
+            session.add_all([
+                EntityLabelRow(
+                    entity_type=DeploymentPresetEntityType(),
+                    entity_id=prod.data.id,
+                    key="env",
+                    value="prod",
+                ),
+                EntityLabelRow(
+                    entity_type=DeploymentPresetEntityType(),
+                    entity_id=dev.data.id,
+                    key="env",
+                    value="dev",
+                ),
+            ])
+        labels = EntityLabelSearchableFields.own
+        searcher = DeploymentPresetSearcher(
+            conditions=[
+                DeploymentPresetSearchableFields.nested.labels.correlation.some([
+                    labels.key.filter.equals(
+                        StringMatchSpec(value="env", case_insensitive=False, negated=False)
+                    ),
+                    labels.value.filter.equals(
+                        StringMatchSpec(value="prod", case_insensitive=False, negated=False)
+                    ),
+                ])
+            ],
+            orders=[],
+            pagination=NoPagination(),
+        )
+
+        result = await ops.search_in_global(searcher)
+
+        assert [item.id for item in result.items] == [prod.data.id]
 
 
 class TestReadingBackWhatSqlComputed:

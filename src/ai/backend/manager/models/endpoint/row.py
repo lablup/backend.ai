@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import (
-    Collection,
     Iterable,
     Sequence,
 )
@@ -12,9 +11,8 @@ from decimal import Decimal
 from typing import (
     TYPE_CHECKING,
     Any,
-    Self,
 )
-from uuid import UUID, uuid4
+from uuid import UUID
 
 import sqlalchemy as sa
 import yarl
@@ -22,9 +20,9 @@ from sqlalchemy.exc import NoResultFound
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import (
     Mapped,
-    contains_eager,
     foreign,
     mapped_column,
+    query_expression,
     relationship,
     selectinload,
 )
@@ -38,24 +36,17 @@ from ai.backend.common.data.entity.prometheus_query_preset import PrometheusQuer
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.data.model_deployment.types import DeploymentStrategy, ModelDeploymentStatus
 from ai.backend.common.types import (
-    AccessKey,
     AutoScalingMetricComparator,
     AutoScalingMetricSource,
     ClusterMode,
     ResourceSlot,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.scale import (
     AutoScalingAction,
     AutoScalingCondition,
     AutoScalingRule,
-    AutoScalingRuleCreator,
-    ModelDeploymentAutoScalingRuleCreator,
-)
-from ai.backend.manager.data.deployment.scale_modifier import (
-    ModelDeploymentAutoScalingRuleModifier,
 )
 from ai.backend.manager.data.deployment.types import (
     DeploymentInfo,
@@ -65,13 +56,8 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentOptions,
     DeploymentPolicyData,
     DeploymentState,
-    ModelDeploymentAccessTokenData,
-    ModelDeploymentAutoScalingRuleData,
-    ModelDeploymentData,
-    ModelDeploymentMetadataInfo,
     ModelRevisionData,
     ReplicaData,
-    ReplicaStateData,
 )
 from ai.backend.manager.data.model_serving.types import (
     EndpointAutoScalingRuleData,
@@ -88,15 +74,17 @@ from ai.backend.manager.models.base import (
     PydanticColumn,
     StrEnumType,
 )
-from ai.backend.manager.models.routing import RouteStatus
+from ai.backend.manager.models.deployment_policy.searchable_fields import (
+    DeploymentPolicySearchableFields,
+)
+from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
+from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
 
 if TYPE_CHECKING:
-    from ai.backend.manager.data.deployment.creator import DeploymentCreator
-    from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+    from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
     from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
-    from ai.backend.manager.models.replica_group import ReplicaGroupRow
-    from ai.backend.manager.models.routing import RoutingRow
-    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.routing.row import RoutingRow
+    from ai.backend.manager.models.user.row import UserRow
 
 __all__ = (
     "EndpointAutoScalingRuleRow",
@@ -106,60 +94,44 @@ __all__ = (
 )
 
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-
-
-def _get_endpoint_tokens_join_condition() -> Any:
-    from ai.backend.manager.models.endpoint import EndpointTokenRow
-
-    return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 def _get_primary_replica_group_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.replica_group import ReplicaGroupRow
+    from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 
     return foreign(EndpointRow.primary_replica_group_id) == ReplicaGroupRow.id
 
 
-def _get_target_replica_group_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.replica_group import ReplicaGroupRow
-
-    return foreign(EndpointRow.target_replica_group_id) == ReplicaGroupRow.id
-
-
 def _get_current_revision_secondaryjoin() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-    from ai.backend.manager.models.replica_group import ReplicaGroupRow
+    from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+    from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 
     return foreign(ReplicaGroupRow.current_revision_id) == DeploymentRevisionRow.id
 
 
 def _get_deploying_revision_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+    from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 
     return foreign(EndpointRow.deploying_revision_id) == DeploymentRevisionRow.id
 
 
 def _get_deployment_policy_join_condition() -> Any:
-    from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
+    from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 
     return EndpointRow.id == foreign(DeploymentPolicyRow.endpoint)
 
 
 def _get_created_user_row_join_condition() -> Any:
-    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.user.row import UserRow
 
     return foreign(EndpointRow.created_user) == UserRow.uuid
 
 
 def _get_session_owner_row_join_condition() -> Any:
-    from ai.backend.manager.models.user import UserRow
+    from ai.backend.manager.models.user.row import UserRow
 
     return foreign(EndpointRow.session_owner) == UserRow.uuid
-
-
-def _get_endpoint_token_endpoint_row_join_condition() -> Any:
-    return foreign(EndpointTokenRow.endpoint) == EndpointRow.id
 
 
 class EndpointRow(Base):
@@ -277,40 +249,35 @@ class EndpointRow(Base):
         default=DeploymentOptions,
     )
 
+    # Read by gql_legacy (api/gql_legacy/endpoint.py) and to_data. Delete once to_data
+    # stops reading relationships; the pair RoutingRow.endpoint_row stays (D-6).
     routings: Mapped[list[RoutingRow]] = relationship("RoutingRow", back_populates="endpoint_row")
-    tokens: Mapped[list[EndpointTokenRow]] = relationship(
-        "EndpointTokenRow",
-        back_populates="endpoint_row",
-        primaryjoin=_get_endpoint_tokens_join_condition,
-    )
+    # Read only by gql_legacy (api/gql_legacy/endpoint.py) and to_data. Delete once
+    # to_data stops reading relationships.
     created_user_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         foreign_keys=[created_user],
         primaryjoin=_get_created_user_row_join_condition,
     )
+    # Read only by gql_legacy (api/gql_legacy/endpoint.py) and to_data; v2 readers join
+    # UserRow explicitly. Delete once to_data stops reading relationships.
     session_owner_row: Mapped[UserRow | None] = relationship(
         "UserRow",
         foreign_keys=[session_owner],
         primaryjoin=_get_session_owner_row_join_condition,
     )
 
-    primary_replica_group_row: Mapped[ReplicaGroupRow | None] = relationship(
-        "ReplicaGroupRow",
-        primaryjoin=_get_primary_replica_group_join_condition,
-        viewonly=True,
-        uselist=False,
-    )
-    target_replica_group_row: Mapped[ReplicaGroupRow | None] = relationship(
-        "ReplicaGroupRow",
-        primaryjoin=_get_target_replica_group_join_condition,
-        viewonly=True,
-        uselist=False,
-    )
+    # The primary replica group's current revision. Filled only where the query passes
+    # with_expression(current_revision_id_subquery()); None otherwise.
+    current_revision_id: Mapped[DeploymentRevisionID | None] = query_expression()
     # Sourced from the replica groups: the current revision is the primary
     # group's ``current_revision_id`` and the deploying revision is the
     # target group's ``target_revision_id`` (``None`` when no rollout is in
     # progress). Joined through ``replica_groups`` so existing consumers
     # (``to_deployment_info`` and the ``selectinload`` paths) are unchanged.
+    # current_revision_row and deploying_revision_row are read by DeploymentSearcher,
+    # DeploymentInfoSearcher, the deployment db_source, to_deployment_info and to_data.
+    # Deleted by the story that moves those to subqueries (B-3).
     current_revision_row: Mapped[DeploymentRevisionRow | None] = relationship(
         "DeploymentRevisionRow",
         secondary="replica_groups",
@@ -326,12 +293,28 @@ class EndpointRow(Base):
         uselist=False,
     )
 
+    # Read by DeploymentSearcher, DeploymentInfoSearcher, the deployment db_source and
+    # to_deployment_info. Deleted by the story that moves those to subqueries (B-3).
     deployment_policy: Mapped[DeploymentPolicyRow | None] = relationship(
         "DeploymentPolicyRow",
         primaryjoin=_get_deployment_policy_join_condition,
         uselist=False,
     )
 
+    @classmethod
+    def lifecycle_values(cls, lifecycle: EndpointLifecycle) -> dict[str, Any]:
+        """Column values every write that advances ``lifecycle_stage`` must apply.
+
+        Reaching ``DESTROYED`` stamps ``destroyed_at``, which the retention
+        sweep and the searchable fields read.
+        """
+        values: dict[str, Any] = {"lifecycle_stage": lifecycle}
+        if lifecycle == EndpointLifecycle.DESTROYED:
+            values["destroyed_at"] = sa.func.now()
+        return values
+
+    # Read only by gql_legacy (endpoint.py); v2 queries EndpointRow directly.
+    # Delete it together with the gql_legacy cleanup.
     @classmethod
     async def get(
         cls,
@@ -341,7 +324,6 @@ class EndpointRow(Base):
         project: UUID | None = None,
         user_uuid: UUID | None = None,
         load_routes: bool = False,
-        load_tokens: bool = False,
         load_created_user: bool = False,
         load_session_owner: bool = False,
         load_revisions: bool = False,
@@ -349,13 +331,11 @@ class EndpointRow(Base):
         """
         :raises: sqlalchemy.orm.exc.NoResultFound
         """
-        from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+        from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 
         query = sa.select(EndpointRow).filter(EndpointRow.id == endpoint_id)
         if load_routes:
             query = query.options(selectinload(EndpointRow.routings))
-        if load_tokens:
-            query = query.options(selectinload(EndpointRow.tokens))
         if load_created_user:
             query = query.options(selectinload(EndpointRow.created_user_row))
         if load_session_owner:
@@ -385,6 +365,8 @@ class EndpointRow(Base):
             raise NoResultFound
         return row
 
+    # Read only by gql_legacy (endpoint.py).
+    # Delete it together with the gql_legacy cleanup.
     @classmethod
     async def list_endpoint(
         cls,
@@ -393,13 +375,12 @@ class EndpointRow(Base):
         project: UUID | None = None,
         user_uuid: UUID | None = None,
         load_routes: bool = False,
-        load_tokens: bool = False,
         load_created_user: bool = False,
         load_session_owner: bool = False,
         load_revisions: bool = False,
         status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
     ) -> list[EndpointRow]:
-        from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
+        from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
 
         query = (
             sa.select(EndpointRow)
@@ -408,8 +389,6 @@ class EndpointRow(Base):
         )
         if load_routes:
             query = query.options(selectinload(EndpointRow.routings))
-        if load_tokens:
-            query = query.options(selectinload(EndpointRow.tokens))
         if load_created_user:
             query = query.options(selectinload(EndpointRow.created_user_row))
         if load_session_owner:
@@ -435,221 +414,6 @@ class EndpointRow(Base):
             query = query.filter(EndpointRow.session_owner == user_uuid)
         result = await session.execute(query)
         return list(result.scalars().all())
-
-    @classmethod
-    async def batch_load(
-        cls,
-        session: AsyncSession,
-        endpoint_ids: Sequence[DeploymentID],
-        domain: str | None = None,
-        project: UUID | None = None,
-        user_uuid: UUID | None = None,
-        load_routes: bool = False,
-        load_tokens: bool = False,
-        load_created_user: bool = False,
-        load_session_owner: bool = False,
-        load_revisions: bool = False,
-        status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
-    ) -> Sequence[EndpointRow]:
-        from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-
-        query = (
-            sa.select(EndpointRow)
-            .order_by(sa.desc(EndpointRow.created_at))
-            .filter(
-                EndpointRow.lifecycle_stage.in_(status_filter) & EndpointRow.id.in_(endpoint_ids)
-            )
-        )
-        if load_routes:
-            query = query.options(selectinload(EndpointRow.routings))
-        if load_tokens:
-            query = query.options(selectinload(EndpointRow.tokens))
-        if load_created_user:
-            query = query.options(selectinload(EndpointRow.created_user_row))
-        if load_session_owner:
-            query = query.options(selectinload(EndpointRow.session_owner_row))
-        if load_revisions:
-            query = query.options(
-                # Revision-resolution helpers (``_find_current_revision`` /
-                # ``_find_active_revision``) read the group-sourced
-                # current/deploying revision relationships, so load only those
-                # two revision rows — not the full revision history.
-                selectinload(EndpointRow.current_revision_row).selectinload(
-                    DeploymentRevisionRow.image_row
-                ),
-                selectinload(EndpointRow.deploying_revision_row).selectinload(
-                    DeploymentRevisionRow.image_row
-                ),
-            )
-        if project:
-            query = query.filter(EndpointRow.project == project)
-        if domain:
-            query = query.filter(EndpointRow.domain == domain)
-        if user_uuid:
-            query = query.filter(EndpointRow.session_owner == user_uuid)
-        result = await session.execute(query)
-        return result.scalars().all()
-
-    @classmethod
-    async def list_by_model(
-        cls,
-        session: AsyncSession,
-        model_id: UUID,
-        domain: str | None = None,
-        project: UUID | None = None,
-        user_uuid: UUID | None = None,
-        load_routes: bool = False,
-        load_tokens: bool = False,
-        load_created_user: bool = False,
-        load_session_owner: bool = False,
-        load_revisions: bool = False,
-        status_filter: Iterable[EndpointLifecycle] = frozenset([EndpointLifecycle.CREATED]),
-    ) -> Sequence[EndpointRow]:
-        from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-        from ai.backend.manager.models.replica_group import ReplicaGroupRow
-
-        # Join through the primary replica group's current revision to find
-        # endpoints by model.
-        query = (
-            sa.select(EndpointRow)
-            .join(
-                ReplicaGroupRow,
-                EndpointRow.primary_replica_group_id == ReplicaGroupRow.id,
-            )
-            .join(
-                DeploymentRevisionRow,
-                ReplicaGroupRow.current_revision_id == DeploymentRevisionRow.id,
-            )
-            .where(
-                EndpointRow.lifecycle_stage.in_(status_filter)
-                & (DeploymentRevisionRow.model == model_id)
-            )
-            .order_by(sa.desc(EndpointRow.created_at))
-        )
-        if load_routes:
-            query = query.options(selectinload(EndpointRow.routings))
-        if load_tokens:
-            query = query.options(selectinload(EndpointRow.tokens))
-        if load_created_user:
-            query = query.options(selectinload(EndpointRow.created_user_row))
-        if load_session_owner:
-            query = query.options(selectinload(EndpointRow.session_owner_row))
-        if load_revisions:
-            query = query.options(
-                # Revision-resolution helpers (``_find_current_revision`` /
-                # ``_find_active_revision``) read the group-sourced
-                # current/deploying revision relationships, so load only those
-                # two revision rows — not the full revision history.
-                selectinload(EndpointRow.current_revision_row).selectinload(
-                    DeploymentRevisionRow.image_row
-                ),
-                selectinload(EndpointRow.deploying_revision_row).selectinload(
-                    DeploymentRevisionRow.image_row
-                ),
-            )
-        if project:
-            query = query.filter(EndpointRow.project == project)
-        if domain:
-            query = query.filter(EndpointRow.domain == domain)
-        if user_uuid:
-            query = query.filter(EndpointRow.session_owner == user_uuid)
-        result = await session.execute(query)
-        return result.scalars().all()
-
-    async def create_auto_scaling_rule(
-        self,
-        session: AsyncSession,
-        metric_source: AutoScalingMetricSource,
-        metric_name: str,
-        min_threshold: Decimal | None,
-        max_threshold: Decimal | None,
-        step_size: int,
-        cooldown_seconds: int = 300,
-        min_replicas: int | None = None,
-        max_replicas: int | None = None,
-    ) -> EndpointAutoScalingRuleRow:
-        row = EndpointAutoScalingRuleRow(
-            id=uuid4(),
-            endpoint=self.id,
-            metric_source=metric_source,
-            metric_name=metric_name,
-            min_threshold=min_threshold,
-            max_threshold=max_threshold,
-            step_size=step_size,
-            cooldown_seconds=cooldown_seconds,
-            min_replicas=min_replicas,
-            max_replicas=max_replicas,
-        )
-        session.add(row)
-        return row
-
-    @property
-    def terminatable_route_statuses(self) -> set[RouteStatus]:
-        if self.lifecycle_stage == EndpointLifecycle.DESTROYING:
-            return {
-                RouteStatus.PROVISIONING,
-                RouteStatus.RUNNING,
-                RouteStatus.FAILED_TO_START,
-            }
-        return {
-            RouteStatus.RUNNING,
-            RouteStatus.FAILED_TO_START,
-        }
-
-    @staticmethod
-    async def delegate_endpoint_ownership(
-        db_session: AsyncSession,
-        owner_user_uuid: UUID,
-        target_user_uuid: UserID,
-        target_access_key: AccessKey,
-    ) -> None:
-        from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-        from ai.backend.manager.models.session import KernelLoadingStrategy, SessionRow
-        from ai.backend.manager.models.session_group.row import SessionGroupRow
-
-        endpoint_rows = await EndpointRow.list_endpoint(
-            db_session,
-            user_uuid=owner_user_uuid,
-            load_session_owner=True,
-            load_routes=True,
-            load_tokens=True,
-        )
-        session_ids: list[UUID] = []
-        for row in endpoint_rows:
-            row.session_owner = target_user_uuid
-            for token_row in row.tokens:
-                token_row.delegate_ownership(target_user_uuid)
-            for routing_row in row.routings:
-                routing_row.delegate_ownership(target_user_uuid)
-                if routing_row.session is not None:
-                    session_ids.append(routing_row.session)
-        session_rows = await SessionRow.list_sessions(
-            db_session, session_ids, kernel_loading_strategy=KernelLoadingStrategy.ALL_KERNELS
-        )
-        for session_row in session_rows:
-            session_row.delegate_ownership(target_user_uuid, target_access_key)
-        # The placement groups of the delegated replica groups follow their
-        # members: a group's members all belong to its owner (BEP-1064).
-        await db_session.execute(
-            sa.update(SessionGroupRow)
-            .where(
-                SessionGroupRow.id.in_(
-                    sa.select(ReplicaGroupRow.session_group_id).where(
-                        ReplicaGroupRow.deployment_id.in_([row.id for row in endpoint_rows])
-                    )
-                )
-            )
-            .values(owner_user_id=target_user_uuid)
-        )
-
-    @property
-    def current_revision_id(self) -> DeploymentRevisionID | None:
-        """Active revision id, sourced from the primary replica group.
-
-        Requires ``primary_replica_group_row`` to be eagerly loaded.
-        """
-        group = self.primary_replica_group_row
-        return group.current_revision_id if group is not None else None
 
     def _find_current_revision(self) -> DeploymentRevisionRow | None:
         """Active revision row, sourced from the primary replica group.
@@ -692,7 +456,7 @@ class EndpointRow(Base):
             id=self.id,
             name=self.name,
             image=(
-                current_rev.image_row.to_dataclass()
+                ImageSearchableFields.own.to_data(current_rev.image_row)
                 if current_rev is not None and current_rev.image_row is not None
                 else None
             ),
@@ -752,36 +516,11 @@ class EndpointRow(Base):
             extra_mounts=current_rev.extra_mounts if current_rev is not None else [],
             scaling_state=self.scaling_state,
             model_definition=current_rev.model_definition if current_rev is not None else None,
-            routings=[routing.to_data() for routing in self.routings]
+            routings=[
+                ReplicaSearchableFields.own.to_routing_data(routing) for routing in self.routings
+            ]
             if self.routings is not None
             else [],
-        )
-
-    @classmethod
-    def from_deployment_creator(
-        cls,
-        creator: DeploymentCreator,
-    ) -> Self:
-        """Create an EndpointRow instance from a DeploymentCreator.
-
-        Revision-level fields (image, resources, etc.) are not set on EndpointRow;
-        they belong in DeploymentRevisionRow.
-        """
-        return cls(
-            name=creator.metadata.name,
-            created_user=creator.metadata.created_user,
-            session_owner=creator.metadata.session_owner,
-            replicas=creator.replica_spec.replica_count,
-            domain=creator.metadata.domain,
-            project=creator.metadata.project,
-            resource_group=creator.metadata.resource_group,
-            tag=creator.metadata.tag,
-            open_to_public=creator.network.open_to_public,
-            url=creator.network.url,
-            # Fields not in creator - use defaults
-            lifecycle_stage=EndpointLifecycle.PENDING,
-            retries=0,
-            revision_history_limit=creator.metadata.revision_history_limit,
         )
 
     def to_deployment_info(self) -> DeploymentInfo:
@@ -790,28 +529,41 @@ class EndpointRow(Base):
         (legacy REST v1 / engine read paths). The revision ids are derived from
         those rows, so no separate replica-group load is needed.
         """
+        from ai.backend.manager.models.deployment_revision.searchable_fields import (
+            ModelRevisionSearchableFields,
+        )
+
+        revisions = ModelRevisionSearchableFields.own
         current_row = self.current_revision_row
         deploying_row = self.deploying_revision_row
         return self._build_deployment_info(
             current_revision_id=DeploymentRevisionID(current_row.id) if current_row else None,
             deploying_revision_id=DeploymentRevisionID(deploying_row.id) if deploying_row else None,
-            current_revision=current_row.to_data() if current_row else None,
-            deploying_revision=deploying_row.to_data() if deploying_row else None,
-            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
+            current_revision=revisions.to_data(current_row) if current_row else None,
+            deploying_revision=revisions.to_data(deploying_row) if deploying_row else None,
+            policy=(
+                DeploymentPolicySearchableFields.own.to_data(self.deployment_policy)
+                if self.deployment_policy is not None
+                else None
+            ),
         )
 
     def to_modern_deployment_info(self) -> DeploymentInfo:
         """Lightweight DeploymentInfo carrying only the revision *ids* (sourced
         from the replica groups), without loading the full revision rows. Used
-        by the modern (v2) read path, which only needs the ids. Requires the
-        replica-group relationships to be eagerly loaded.
+        by the modern (v2) read path, which only needs the ids. Requires
+        ``current_revision_id`` to be filled with ``with_expression``.
         """
         return self._build_deployment_info(
             current_revision_id=self.current_revision_id,
             deploying_revision_id=self.deploying_revision_id,
             current_revision=None,
             deploying_revision=None,
-            policy=self.deployment_policy.to_data() if self.deployment_policy is not None else None,
+            policy=(
+                DeploymentPolicySearchableFields.own.to_data(self.deployment_policy)
+                if self.deployment_policy is not None
+                else None
+            ),
         )
 
     def to_bare_deployment_info(self) -> DeploymentInfo:
@@ -825,48 +577,6 @@ class EndpointRow(Base):
             deploying_revision_id=None,
             current_revision=None,
             deploying_revision=None,
-        )
-
-    def to_model_deployment_data(self) -> ModelDeploymentData:
-        """The v2 deployment projection read off this row's own columns.
-
-        ``current_revision_id`` and ``policy`` live on other rows and come back ``None``.
-        """
-        created_at = self.created_at
-        return ModelDeploymentData(
-            id=self.id,
-            metadata=ModelDeploymentMetadataInfo(
-                name=self.name,
-                status=ModelDeploymentStatus.from_lifecycle(self.lifecycle_stage),
-                tags=[self.tag] if self.tag else [],
-                project_id=self.project,
-                domain_name=self.domain,
-                resource_group_name=self.resource_group,
-                created_at=created_at,
-                updated_at=created_at,
-            ),
-            network_access=DeploymentNetworkData(
-                open_to_public=self.open_to_public if self.open_to_public is not None else False,
-                access_token_ids=None,
-                url=self.url,
-                preferred_domain_name=None,
-            ),
-            current_revision_id=None,
-            deploying_revision_id=self.deploying_revision_id,
-            revision_history_ids=[],
-            scaling_rule_ids=[],
-            replica_state=ReplicaStateData(
-                desired_replica_count=self.desired_replicas
-                if self.desired_replicas is not None
-                else self.replicas,
-                replica_ids=[],
-            ),
-            default_deployment_strategy=DeploymentStrategy.ROLLING,
-            created_user_id=self.created_user,
-            options=self.options,
-            scaling_state=self.scaling_state,
-            sub_step=self.sub_step,
-            primary_replica_group_id=self.primary_replica_group_id,
         )
 
     def _build_deployment_info(
@@ -957,13 +667,6 @@ class EndpointTokenRow(Base):
         "created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False
     )
 
-    endpoint_row: Mapped[EndpointRow | None] = relationship(
-        "EndpointRow",
-        back_populates="tokens",
-        foreign_keys=[endpoint],
-        primaryjoin=_get_endpoint_token_endpoint_row_join_condition,
-    )
-
     def __init__(
         self,
         id: DeploymentTokenID,
@@ -982,6 +685,8 @@ class EndpointTokenRow(Base):
         self.session_owner = session_owner
         self.expires_at = expires_at
 
+    # Read only by gql_legacy (endpoint.py); v2 reads tokens through the deployment
+    # db_source. Delete it together with the gql_legacy cleanup.
     @classmethod
     async def list(
         cls,
@@ -991,15 +696,12 @@ class EndpointTokenRow(Base):
         domain: str | None = None,
         project: UUID | None = None,
         user_uuid: UUID | None = None,
-        load_endpoint: bool = False,
     ) -> Sequence[EndpointTokenRow]:
         query = (
             sa.select(EndpointTokenRow)
             .filter(EndpointTokenRow.endpoint == endpoint_id)
             .order_by(sa.desc(EndpointTokenRow.created_at))
         )
-        if load_endpoint:
-            query = query.options(selectinload(EndpointTokenRow.endpoint_row))
         if project:
             query = query.filter(EndpointTokenRow.project == project)
         if domain:
@@ -1009,6 +711,8 @@ class EndpointTokenRow(Base):
         result = await session.execute(query)
         return result.scalars().all()
 
+    # Read only by gql_legacy (endpoint.py); v2 reads tokens through the deployment
+    # db_source. Delete it together with the gql_legacy cleanup.
     @classmethod
     async def get(
         cls,
@@ -1018,11 +722,8 @@ class EndpointTokenRow(Base):
         domain: str | None = None,
         project: UUID | None = None,
         user_uuid: UUID | None = None,
-        load_endpoint: bool = False,
     ) -> EndpointTokenRow:
         query = sa.select(EndpointTokenRow).filter(EndpointTokenRow.token == token)
-        if load_endpoint:
-            query = query.options(selectinload(EndpointTokenRow.endpoint_row))
         if project:
             query = query.filter(EndpointTokenRow.project == project)
         if domain:
@@ -1035,9 +736,6 @@ class EndpointTokenRow(Base):
             raise NoResultFound
         return row
 
-    def delegate_ownership(self, user_uuid: UserID) -> None:
-        self.session_owner = user_uuid
-
     def to_dataclass(self) -> EndpointTokenData:
         return EndpointTokenData(
             id=self.id,
@@ -1046,14 +744,6 @@ class EndpointTokenRow(Base):
             domain=self.domain,
             project=self.project,
             session_owner=self.session_owner,
-            created_at=self.created_at,
-        )
-
-    def to_access_token_data(self) -> ModelDeploymentAccessTokenData:
-        return ModelDeploymentAccessTokenData(
-            id=self.id,
-            token=self.token,
-            expires_at=self.expires_at,
             created_at=self.created_at,
         )
 
@@ -1111,26 +801,12 @@ class EndpointAutoScalingRuleRow(Base):
         nullable=False,
     )
 
+    # Read only by gql_legacy (endpoint.py).
+    # Delete it together with the gql_legacy cleanup.
     endpoint_row: Mapped[EndpointRow] = relationship("EndpointRow", lazy="joined")
 
-    @classmethod
-    async def list(
-        cls,
-        session: AsyncSession,
-        endpoint_status_filter: Collection[EndpointLifecycle] = frozenset([
-            EndpointLifecycle.CREATED
-        ]),
-    ) -> Sequence[EndpointAutoScalingRuleRow]:
-        query = sa.select(EndpointAutoScalingRuleRow)
-        if endpoint_status_filter:
-            query = (
-                query.join(EndpointAutoScalingRuleRow.endpoint_row)
-                .filter(EndpointRow.lifecycle_stage.in_(endpoint_status_filter))
-                .options(contains_eager(EndpointAutoScalingRuleRow.endpoint_row))
-            )
-        result = await session.execute(query)
-        return result.scalars().all()
-
+    # Read only by gql_legacy (endpoint.py), which passes load_endpoint.
+    # Delete it together with the gql_legacy cleanup.
     @classmethod
     async def get(
         cls, session: AsyncSession, id: UUID, load_endpoint: bool = False
@@ -1143,12 +819,6 @@ class EndpointAutoScalingRuleRow(Base):
         if not row:
             raise AutoScalingRuleNotFound()
         return row
-
-    async def remove_rule(
-        self,
-        session: AsyncSession,
-    ) -> None:
-        await session.delete(self)
 
     def to_data(self) -> EndpointAutoScalingRuleData:
         if self.max_threshold is not None:
@@ -1175,22 +845,6 @@ class EndpointAutoScalingRuleRow(Base):
             endpoint=self.endpoint,
         )
 
-    @classmethod
-    def from_creator(cls, endpoint_id: UUID, creator: AutoScalingRuleCreator) -> Self:
-        return cls(
-            id=uuid4(),
-            endpoint=endpoint_id,
-            metric_source=creator.condition.metric_source,
-            metric_name=creator.condition.metric_name,
-            min_threshold=creator.condition.scale_down_threshold,
-            max_threshold=creator.condition.scale_up_threshold,
-            step_size=creator.action.step_size,
-            cooldown_seconds=creator.action.cooldown_seconds,
-            min_replicas=creator.action.min_replicas,
-            max_replicas=creator.action.max_replicas,
-            prometheus_query_preset_id=creator.condition.prometheus_query_preset_id,
-        )
-
     def to_autoscaling_rule(self) -> AutoScalingRule:
         return AutoScalingRule(
             id=self.id,
@@ -1210,54 +864,3 @@ class EndpointAutoScalingRuleRow(Base):
             created_at=self.created_at,
             last_triggered_at=self.last_triggered_at,
         )
-
-    # New type conversion methods for Model Deployment
-
-    @classmethod
-    def from_model_deployment_creator(cls, creator: ModelDeploymentAutoScalingRuleCreator) -> Self:
-        """Create from ModelDeploymentAutoScalingRuleCreator (new type)."""
-        return cls(
-            id=uuid4(),
-            endpoint=creator.model_deployment_id,
-            metric_source=creator.metric_source,
-            metric_name=creator.metric_name,
-            min_threshold=creator.min_threshold,
-            max_threshold=creator.max_threshold,
-            step_size=creator.step_size,
-            cooldown_seconds=creator.time_window,
-            min_replicas=creator.min_replicas,
-            max_replicas=creator.max_replicas,
-            prometheus_query_preset_id=creator.prometheus_query_preset_id,
-        )
-
-    def to_model_deployment_data(self) -> ModelDeploymentAutoScalingRuleData:
-        """Convert to ModelDeploymentAutoScalingRuleData (new type)."""
-        return ModelDeploymentAutoScalingRuleData(
-            id=self.id,
-            model_deployment_id=self.endpoint,
-            metric_source=self.metric_source,
-            metric_name=self.metric_name,
-            min_threshold=self.min_threshold,
-            max_threshold=self.max_threshold,
-            step_size=self.step_size,
-            time_window=self.cooldown_seconds,
-            min_replicas=self.min_replicas,
-            max_replicas=self.max_replicas,
-            created_at=self.created_at,
-            last_triggered_at=self.last_triggered_at,
-            prometheus_query_preset_id=self.prometheus_query_preset_id,
-        )
-
-    def apply_model_deployment_modifier(
-        self, modifier: ModelDeploymentAutoScalingRuleModifier
-    ) -> None:
-        """Apply ModelDeploymentAutoScalingRuleModifier to update fields.
-
-        Uses fields_to_update() which honours both OptionalState (NOP/UPDATE)
-        and TriState (NOP/UPDATE/NULLIFY). Dict keys match DB column names so
-        each entry can be applied directly via setattr, preserving NULLIFY
-        semantics for nullable columns (min/max_threshold, min/max_replicas,
-        prometheus_query_preset_id).
-        """
-        for column_name, value in modifier.fields_to_update().items():
-            setattr(self, column_name, value)

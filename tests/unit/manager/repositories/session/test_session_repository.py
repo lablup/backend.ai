@@ -15,11 +15,14 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.types import (
     AccessKey,
+    AgentId,
     ClusterMode,
     DefaultForUnspecified,
     KernelId,
@@ -28,29 +31,33 @@ from ai.backend.common.types import (
     SessionResult,
     SessionTypes,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.manager.data.agent.types import AgentStatus
+from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.errors.kernel import SessionNotFound
+from ai.backend.manager.data.session_template.types import TemplateType
+from ai.backend.manager.errors.kernel import SessionAlreadyExists, SessionNotFound
 from ai.backend.manager.models.agent.row import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow, KernelStatus
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_slot import ResourceAllocationRow, ResourceSlotTypeRow
 from ai.backend.manager.models.resource_slot.aggregates import batch_load_session_allocations
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.session_template import SessionTemplateRow, TemplateType
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.resource_slot.row import ResourceAllocationRow, ResourceSlotTypeRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
+from ai.backend.manager.models.session_template.row import SessionTemplateRow
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.secret.types import SecretValue
@@ -111,7 +118,11 @@ class TestSessionRepository:
 
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> SessionRepository:
-        return SessionRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
+        return SessionRepository(
+            db_with_cleanup,
+            V2DBOpsProvider(db_with_cleanup),
+            registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(db_with_cleanup)),
+        )
 
     @pytest.fixture
     async def session_with_kernel(
@@ -385,6 +396,25 @@ class TestSessionRepository:
             await db_sess.commit()
         return session_id
 
+    async def _insert_other_keypair(
+        self, db: ExtendedAsyncSAEngine, base: SessionTestData
+    ) -> AccessKey:
+        other_key = AccessKey("OTHERKEY1234567")
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                KeyPairRow(
+                    user=base.user_id,
+                    access_key=other_key,
+                    secret_key=SecretValue("other-secret-key"),
+                    is_active=True,
+                    is_admin=False,
+                    resource_policy="default-keypair-policy",
+                    rate_limit=1000,
+                )
+            )
+            await db_sess.commit()
+        return other_key
+
     async def test_resolve_session_id_by_name_and_user(
         self,
         repository: SessionRepository,
@@ -412,20 +442,7 @@ class TestSessionRepository:
     ) -> None:
         """A terminal (TERMINATED) session sharing the name must not shadow the live one,
         even when created under a different access key of the same user."""
-        other_key = AccessKey("OTHERKEY1234567")
-        async with db_with_cleanup.begin_session() as db_sess:
-            db_sess.add(
-                KeyPairRow(
-                    user=session_with_kernel.user_id,
-                    access_key=other_key,
-                    secret_key=SecretValue("other-secret-key"),
-                    is_active=True,
-                    is_admin=False,
-                    resource_policy="default-keypair-policy",
-                    rate_limit=1000,
-                )
-            )
-            await db_sess.commit()
+        other_key = await self._insert_other_keypair(db_with_cleanup, session_with_kernel)
         await self._insert_session(
             db_with_cleanup,
             session_with_kernel,
@@ -448,6 +465,24 @@ class TestSessionRepository:
         some_id = uuid.uuid4()
         resolved = await repository.resolve_session_id(str(some_id), session_with_kernel.user_id)
         assert resolved == SessionId(some_id)
+
+    async def test_rename_rejects_name_of_same_user_session_under_other_keypair(
+        self,
+        repository: SessionRepository,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        session_with_kernel: SessionTestData,
+    ) -> None:
+        other_key = await self._insert_other_keypair(db_with_cleanup, session_with_kernel)
+        await self._insert_session(
+            db_with_cleanup,
+            session_with_kernel,
+            name="taken",
+            access_key=other_key,
+            status=SessionStatus.RUNNING,
+        )
+
+        with pytest.raises(SessionAlreadyExists):
+            await repository.update_session_name(session_with_kernel.session_id, "taken")
 
     # =========================================================================
     # Tests - get_session_with_routing_minimal
@@ -515,6 +550,7 @@ class TestBatchLoadSessionAllocations:
                 KernelRow,
                 ResourceSlotTypeRow,
                 ResourceAllocationRow,
+                SessionDesignatedAgentRow,
             ],
         ):
             yield database_connection
@@ -781,6 +817,72 @@ class TestBatchLoadSessionAllocations:
         async with db_with_resource_tables.begin_readonly_session() as db_sess:
             assert await batch_load_session_allocations(db_sess, []) == {}
 
+    @pytest.fixture
+    async def designated_agent_id(
+        self,
+        db_with_resource_tables: ExtendedAsyncSAEngine,
+        session_with_allocations: SessionTestData,
+    ) -> AgentId:
+        """An agent the session designates."""
+        agent_id = AgentId(f"i-{uuid.uuid4().hex[:12]}")
+        agent_uuid = AgentUUID(uuid.uuid4())
+        async with db_with_resource_tables.begin_session() as db_sess:
+            db_sess.add(
+                AgentRow(
+                    id=agent_id,
+                    uuid=agent_uuid,
+                    status=AgentStatus.ALIVE,
+                    region="local",
+                    scaling_group="default",
+                    resource_group_id=session_with_allocations.resource_group_id,
+                    addr="127.0.0.1:6001",
+                    version="1.0.0",
+                    architecture="x86_64",
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                SessionDesignatedAgentRow(
+                    session_id=SessionID(session_with_allocations.session_id),
+                    agent_uuid=agent_uuid,
+                )
+            )
+        return agent_id
+
+    async def test_the_designated_agents_come_back_by_agent_id(
+        self,
+        db_with_resource_tables: ExtendedAsyncSAEngine,
+        session_with_allocations: SessionTestData,
+        designated_agent_id: AgentId,
+    ) -> None:
+        repository = SessionRepository(
+            db_with_resource_tables,
+            V2DBOpsProvider(db_with_resource_tables),
+            registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(db_with_resource_tables)),
+        )
+        session_id = SessionID(session_with_allocations.session_id)
+
+        designated = await repository.bulk_get_designated_agent_ids_by_session([session_id])
+
+        assert designated == {session_id: [designated_agent_id]}
+
+    async def test_a_session_designating_no_agent_is_absent(
+        self,
+        db_with_resource_tables: ExtendedAsyncSAEngine,
+        session_with_allocations: SessionTestData,
+    ) -> None:
+        repository = SessionRepository(
+            db_with_resource_tables,
+            V2DBOpsProvider(db_with_resource_tables),
+            registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(db_with_resource_tables)),
+        )
+
+        designated = await repository.bulk_get_designated_agent_ids_by_session([
+            SessionID(session_with_allocations.session_id)
+        ])
+
+        assert designated == {}
+
     async def test_repository_aggregate_returns_computed_slots(
         self,
         db_with_resource_tables: ExtendedAsyncSAEngine,
@@ -789,7 +891,9 @@ class TestBatchLoadSessionAllocations:
         """Verify the repository aggregate returns values computed from
         resource_allocations, not the empty JSONB column."""
         repository = SessionRepository(
-            db_with_resource_tables, V2DBOpsProvider(db_with_resource_tables)
+            db_with_resource_tables,
+            V2DBOpsProvider(db_with_resource_tables),
+            registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(db_with_resource_tables)),
         )
         session_id = SessionId(session_with_allocations.session_id)
         aggregates = await repository.batch_get_resource_allocation_by_session([session_id])
@@ -835,7 +939,11 @@ class TestGetTemplateInfoById:
 
     @pytest.fixture
     def repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> SessionRepository:
-        return SessionRepository(db_with_cleanup, V2DBOpsProvider(db_with_cleanup))
+        return SessionRepository(
+            db_with_cleanup,
+            V2DBOpsProvider(db_with_cleanup),
+            registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(db_with_cleanup)),
+        )
 
     @pytest.fixture
     async def active_template(

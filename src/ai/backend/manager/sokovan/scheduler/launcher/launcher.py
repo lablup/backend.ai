@@ -29,8 +29,8 @@ from ai.backend.common.types import (
     KernelId,
     SessionId,
 )
-from ai.backend.logging.utils import BraceStyleAdapter
-from ai.backend.manager.clients.agent import AgentClientPool
+from ai.backend.logging.structured import StructuredLogger, with_log_context
+from ai.backend.manager.clients.agent.pool import AgentClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.dotfile.types import normalize_newlines
 from ai.backend.manager.defs import START_SESSION_TIMEOUT_SEC
@@ -38,10 +38,20 @@ from ai.backend.manager.exceptions import convert_to_status_data
 from ai.backend.manager.metrics.scheduler import (
     SchedulerPhaseMetricObserver,
 )
-from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.network.row import NetworkType
+from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.system_session_environ.searchable_fields import (
+    SystemSessionEnvironSearchableFields,
+)
+from ai.backend.manager.models.system_session_environ.searchers import (
+    SystemSessionEnvironSearcher,
+)
 from ai.backend.manager.plugin.network import NetworkPluginContext
-from ai.backend.manager.repositories.scheduler import (
+from ai.backend.manager.repositories.scheduler.repository import (
     SchedulerRepository,
+)
+from ai.backend.manager.repositories.system_session_environ.repository import (
+    SystemSessionEnvironRepository,
 )
 from ai.backend.manager.sokovan.recorder.context import RecorderContext
 from ai.backend.manager.views.sokovan.config import NetworkSetup
@@ -52,12 +62,13 @@ from ai.backend.manager.views.sokovan.lifecycle import (
     SessionDataForStart,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
 class SessionLauncherArgs:
-    repository: SchedulerRepository
+    scheduler_repository: SchedulerRepository
+    system_session_environ_repository: SystemSessionEnvironRepository
     agent_client_pool: AgentClientPool
     network_plugin_ctx: NetworkPluginContext
     config_provider: ManagerConfigProvider
@@ -74,7 +85,8 @@ class SessionLauncher:
     3. Retry operations for stuck sessions
     """
 
-    _repository: SchedulerRepository
+    _scheduler_repository: SchedulerRepository
+    _system_session_environ_repository: SystemSessionEnvironRepository
     _agent_client_pool: AgentClientPool
     _network_plugin_ctx: NetworkPluginContext
     _config_provider: ManagerConfigProvider
@@ -82,7 +94,8 @@ class SessionLauncher:
     _phase_metrics: SchedulerPhaseMetricObserver
 
     def __init__(self, args: SessionLauncherArgs) -> None:
-        self._repository = args.repository
+        self._scheduler_repository = args.scheduler_repository
+        self._system_session_environ_repository = args.system_session_environ_repository
         self._agent_client_pool = args.agent_client_pool
         self._network_plugin_ctx = args.network_plugin_ctx
         self._config_provider = args.config_provider
@@ -143,11 +156,14 @@ class SessionLauncher:
         async def pull_for_agent(
             agent_id: AgentId, images: dict[str, ImageConfig]
         ) -> Mapping[str, str]:
-            async with self._agent_client_pool.acquire(agent_id) as client:
-                return await client.check_and_pull(images)
+            with with_log_context(agent_id=agent_id):
+                async with self._agent_client_pool.acquire(agent_id) as client:
+                    return await client.check_and_pull(images)
 
+        pull_agent_ids: list[AgentId] = []
         pull_tasks: list[Awaitable[Mapping[str, str]]] = []
         for agent_id, agent_images in agent_image_configs.items():
+            pull_agent_ids.append(agent_id)
             pull_tasks.append(pull_for_agent(agent_id, agent_images))
 
         if pull_tasks:
@@ -159,7 +175,10 @@ class SessionLauncher:
                     "check_and_pull_images",
                     success_detail="Image pull triggered",
                 ):
-                    await asyncio.gather(*pull_tasks, return_exceptions=True)
+                    results = await asyncio.gather(*pull_tasks, return_exceptions=True)
+            for agent_id, result in zip(pull_agent_ids, results, strict=True):
+                if isinstance(result, Exception):
+                    log.warning("image pull request failed", exc_info=result, agent_id=agent_id)
 
     async def start_sessions_for_handler(
         self,
@@ -199,10 +218,24 @@ class SessionLauncher:
         :param sessions: List of sessions to start
         :param image_configs: Image configurations indexed by image ID
         """
+        if not sessions:
+            return
+        system_session_environ_by_session = await self._system_session_environ_repository.resolve(
+            sessions,
+            SystemSessionEnvironSearcher(
+                pagination=NoPagination(),
+                conditions=[SystemSessionEnvironSearchableFields.own.deleted_at.filter.is_null()],
+            ),
+        )
 
         async def start_with_timeout(session: SessionDataForStart) -> None:
-            async with async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC):
-                await self._start_single_session(session, image_configs)
+            with with_log_context(session_id=session.session_id):
+                async with async_timeout.timeout(delay=START_SESSION_TIMEOUT_SEC):
+                    await self._start_single_session(
+                        session,
+                        image_configs,
+                        system_session_environ_by_session[session.session_id],
+                    )
 
         results = await asyncio.gather(
             *[start_with_timeout(session) for session in sessions],
@@ -211,8 +244,8 @@ class SessionLauncher:
         for session, result in zip(sessions, results, strict=True):
             if isinstance(result, BaseException):
                 log.warning(
-                    "start-session(s:{}): failed with unhandled exception",
-                    session.session_id,
+                    "session start failed with unhandled exception",
+                    session_id=session.session_id,
                     exc_info=result,
                 )
 
@@ -220,22 +253,22 @@ class SessionLauncher:
         self,
         session: SessionDataForStart,
         image_configs: dict[UUID, ImageConfigData],
+        system_session_environ: Mapping[str, str],
     ) -> None:
         """
         Start a single session by creating kernels on agents.
 
         :param session: Session data to start
         :param image_configs: Image configurations indexed by image ID
+        :param system_session_environ: The system session environ the session receives
         """
-        log_fmt = "start-session(s:{}, type:{}, name:{}, ak:{}, cluster_mode:{}): "
-        log_args = (
-            session.session_id,
-            session.session_type,
-            session.name,
-            session.access_key,
-            session.cluster_mode,
+        log.debug(
+            "session start attempted",
+            session_type=session.session_type,
+            session_name=session.name,
+            access_key=session.access_key,
+            cluster_mode=session.cluster_mode,
         )
-        log.debug(log_fmt + "try-starting", *log_args)
 
         try:
             # Ensure we have kernels to start
@@ -245,9 +278,6 @@ class SessionLauncher:
             # Get resource policy and idle timeout
             # In production, this would come from database lookups
             idle_timeout = 600  # Default timeout in seconds
-            if hasattr(self, "_repository") and hasattr(self._repository, "_db_source"):
-                # Would need proper resource policy lookup
-                pass
 
             # Setup network configuration
             network_setup = await self._setup_network_configuration(session)
@@ -263,27 +293,7 @@ class SessionLauncher:
                     key=keyfunc,
                 )
             }
-            environ: dict[str, str] = {
-                **session.environ,
-                "BACKENDAI_USER_UUID": str(session.user_uuid),
-                "BACKENDAI_USER_EMAIL": session.user_email,
-                "BACKENDAI_USER_NAME": session.user_name,
-                "BACKENDAI_SESSION_ID": str(session.session_id),
-                "BACKENDAI_SESSION_NAME": str(session.name),
-                "BACKENDAI_CLUSTER_SIZE": str(len(session.kernels)),
-                "BACKENDAI_CLUSTER_REPLICAS": ",".join(f"{k}:{v}" for k, v in replicas.items()),
-                "BACKENDAI_CLUSTER_HOSTS": ",".join(
-                    k.cluster_hostname or f"{k.cluster_role}{k.cluster_idx}"
-                    for k in session.kernels
-                ),
-                "BACKENDAI_ACCESS_KEY": session.access_key,
-                # BACKENDAI_SERVICE_PORTS are set as per-kernel env-vars.
-                "BACKENDAI_PREOPEN_PORTS": (
-                    ",".join(str(port) for port in session.kernels[0].preopen_ports)
-                    if session.kernels and session.kernels[0].preopen_ports
-                    else ""
-                ),
-            }
+            environ = {**session.environ, **system_session_environ}
 
             # Group kernels by agent to minimize RPC calls
             kernels_by_agent: defaultdict[AgentId, list[KernelBindingData]] = defaultdict(list)
@@ -318,10 +328,9 @@ class SessionLauncher:
                     # Use resolved image config by image_id
                     if k.image_id is None or k.image_id not in image_configs_by_id:
                         log.error(
-                            "Image ID {} (canonical: {}) not found in resolved configs"
-                            " - this indicates precondition check failed",
-                            k.image_id,
-                            image_str,
+                            "image not found in resolved configs",
+                            image_id=k.image_id,
+                            image_name=image_str,
                         )
                         raise ValueError(
                             f"Image {image_str} (id={k.image_id}) not found in database"
@@ -427,37 +436,34 @@ class SessionLauncher:
 
             if create_tasks:
                 results = await asyncio.gather(*create_tasks, return_exceptions=True)
-                failed_agent_ids = [
-                    aid
-                    for aid, result in zip(agent_ids_ordered, results, strict=True)
-                    if isinstance(result, BaseException)
-                ]
+                failed_agent_ids: list[AgentId] = []
+                for aid, result in zip(agent_ids_ordered, results, strict=True):
+                    if isinstance(result, BaseException):
+                        log.error("kernel creation failed on agent", agent_id=aid, exc_info=result)
+                        failed_agent_ids.append(aid)
                 if failed_agent_ids:
-                    log.warning(
-                        log_fmt + "recording failed agents: {}",
-                        *log_args,
-                        failed_agent_ids,
-                    )
                     try:
                         await self._valkey_schedule.record_session_failed_agents(
                             session.session_id, failed_agent_ids
                         )
                     except Exception:
-                        log.warning(
-                            log_fmt + "failed to record failed agents in Valkey",
-                            *log_args,
-                            exc_info=True,
-                        )
+                        log.warning("failed agents not recorded in Valkey", exc_info=True)
 
-            log.info(log_fmt + "started", *log_args)
+            log.trace(
+                "session started",
+                session_type=session.session_type,
+                cluster_mode=session.cluster_mode,
+            )
 
         except Exception as e:
             # Convert exception to error status info
             error_info = convert_to_status_data(e, self._config_provider.config.debug.enabled)
-            log.warning(log_fmt + "failed-starting", *log_args, exc_info=True)
+            log.warning("session start failed", exc_info=True)
             # Update error info in status_data without changing status
             # Session will be handled by timeout detection in Coordinator
-            await self._repository.update_session_error_info(session.session_id, error_info)
+            await self._scheduler_repository.update_session_error_info(
+                session.session_id, error_info
+            )
 
     async def _setup_network_configuration(
         self,
@@ -478,7 +484,7 @@ class SessionLauncher:
         if network_type == NetworkType.PERSISTENT:
             # For persistent networks, use pre-created network
             if session.network_id:
-                network = await self._repository.get_attached_network(
+                network = await self._scheduler_repository.get_attached_network(
                     NetworkID(UUID(session.network_id))
                 )
                 network_name = network.ref_name
@@ -494,7 +500,7 @@ class SessionLauncher:
                     async with self._agent_client_pool.acquire(first_kernel.agent_id) as client:
                         await client.create_local_network(network_name)
                 except Exception:
-                    log.exception("Failed to create agent-local network {}", network_name)
+                    log.exception("agent-local network creation failed", network_name=network_name)
                     raise
                 network_config = {
                     "mode": "bridge",
@@ -510,9 +516,9 @@ class SessionLauncher:
                 if driver not in self._network_plugin_ctx.plugins:
                     available_plugins = list(self._network_plugin_ctx.plugins.keys())
                     log.error(
-                        "Network plugin '{}' not found. Available plugins: {}. For overlay networks, ensure Docker Swarm is initialized with 'docker swarm init'.",
-                        driver,
-                        available_plugins,
+                        "network plugin not found",
+                        driver_name=driver,
+                        available_plugins=", ".join(available_plugins),
                     )
                     raise KeyError(
                         f"Network plugin '{driver}' not found. Available plugins: {available_plugins}. "
@@ -527,9 +533,7 @@ class SessionLauncher:
                     network_config = dict(network_info.options)
                     network_name = network_info.network_id
                 except Exception:
-                    log.exception(
-                        "Failed to create the inter-container network (plugin: {})", driver
-                    )
+                    log.exception("inter-container network creation failed", driver_name=driver)
                     raise
         elif network_type == NetworkType.HOST:
             network_config = {"mode": "host"}
@@ -541,8 +545,8 @@ class SessionLauncher:
                 for kernel in session.kernels:
                     if not kernel.agent_id:
                         log.warning(
-                            "No agent assigned for kernel {}, skipping port mapping",
-                            kernel.kernel_id,
+                            "no agent assigned for kernel, port mapping skipped",
+                            kernel_id=kernel.kernel_id,
                         )
                         continue
                     async with self._agent_client_pool.acquire(kernel.agent_id) as client:
@@ -559,7 +563,7 @@ class SessionLauncher:
                 cluster_ssh_port_mapping = ClusterSSHPortMapping(port_mapping)
 
         if network_type != NetworkType.PERSISTENT:
-            await self._repository.update_session_network_id(
+            await self._scheduler_repository.update_session_network_id(
                 session.session_id,
                 network_name,
             )

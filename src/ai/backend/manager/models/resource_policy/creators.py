@@ -22,6 +22,11 @@ from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_policy.searchable_fields import (
+    KeyPairResourcePolicySearchableFields,
+    ProjectResourcePolicySearchableFields,
+    UserResourcePolicySearchableFields,
+)
 from ai.backend.manager.models.specs.created_in import CreatedInGlobal
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -72,7 +77,7 @@ class KeyPairResourcePolicyCreator(
 
     @override
     def to_data(self, row: KeyPairResourcePolicyRow) -> KeyPairResourcePolicyData:
-        return row.to_dataclass()
+        return KeyPairResourcePolicySearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -108,7 +113,7 @@ class UserResourcePolicyCreator(
 
     @override
     def to_data(self, row: UserResourcePolicyRow) -> UserResourcePolicyData:
-        return row.to_dataclass()
+        return UserResourcePolicySearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -140,4 +145,4 @@ class ProjectResourcePolicyCreator(
 
     @override
     def to_data(self, row: ProjectResourcePolicyRow) -> ProjectResourcePolicyData:
-        return row.to_dataclass()
+        return ProjectResourcePolicySearchableFields.own.to_data(row)

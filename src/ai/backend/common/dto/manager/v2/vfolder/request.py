@@ -11,10 +11,12 @@ from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
+from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
-from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope
+from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope, VFolderUsage
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.typed_validators import VFolderName
 
@@ -45,6 +47,10 @@ __all__ = (
     "ListFilesInput",
     "MkdirInput",
     "MoveFileInput",
+    "PartialBulkDeleteVFoldersInput",
+    "PartialBulkRestoreVFoldersInput",
+    "PartialBulkUpdateVFolderItemInput",
+    "PartialBulkUpdateVFoldersInput",
     "PurgeVFolderInput",
     "PurgeVFolderOptions",
     "RenameFileInput",
@@ -70,9 +76,9 @@ class CreateVFolderInput(BaseRequestModel):
     usage_mode: VFolderUsageMode = Field(
         default=VFolderUsageMode.GENERAL, description="Usage mode of the vfolder"
     )
-    permission: VFolderPermissionField = Field(
-        default=VFolderPermissionField.READ_WRITE,
-        description="Default permission of the vfolder",
+    permission: VFolderPermissionField | None = Field(
+        default=None,
+        description="Default permission of the vfolder. The folder type's default when omitted.",
     )
     project_id: UUID | None = Field(
         default=None, description="Project ID for project-owned vfolder"
@@ -115,9 +121,9 @@ class CreateVFolderInScopeInput(BaseRequestModel):
     usage_mode: VFolderUsageMode = Field(
         default=VFolderUsageMode.GENERAL, description="Usage mode of the vfolder"
     )
-    permission: VFolderPermissionField = Field(
-        default=VFolderPermissionField.READ_WRITE,
-        description="Default permission of the vfolder",
+    permission: VFolderPermissionField | None = Field(
+        default=None,
+        description="Default permission of the vfolder. The folder type's default when omitted.",
     )
     cloneable: bool = Field(default=False, description="Whether the vfolder is cloneable")
 
@@ -235,6 +241,33 @@ class RestoreVFolderInput(BaseRequestModel):
     id: UUID = Field(description="VFolder ID to restore")
 
 
+class PartialBulkUpdateVFolderItemInput(BaseRequestModel):
+    """One vfolder of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the vfolder to update.")
+    input: UpdateVFolderInput = Field(description="Fields to update on the vfolder.")
+
+
+class PartialBulkUpdateVFoldersInput(BaseRequestModel):
+    """Input for updating several vfolders, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateVFolderItemInput] = Field(
+        description="The vfolders to update, each with its fields."
+    )
+
+
+class PartialBulkDeleteVFoldersInput(BaseRequestModel):
+    """Input for soft-deleting several vfolders, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the vfolders to soft-delete.")
+
+
+class PartialBulkRestoreVFoldersInput(BaseRequestModel):
+    """Input for restoring several soft-deleted vfolders, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the vfolders to restore.")
+
+
 class CloneVFolderInput(BaseRequestModel):
     """Input for cloning a virtual folder.
 
@@ -250,9 +283,9 @@ class CloneVFolderInput(BaseRequestModel):
     usage_mode: VFolderUsageMode = Field(
         default=VFolderUsageMode.GENERAL, description="Usage mode of the cloned vfolder"
     )
-    permission: VFolderPermissionField = Field(
-        default=VFolderPermissionField.READ_WRITE,
-        description="Permission level of the cloned vfolder",
+    permission: VFolderPermissionField | None = Field(
+        default=None,
+        description="Permission level of the cloned vfolder. The folder type's default when omitted.",
     )
     cloneable: bool = Field(default=False, description="Whether the cloned vfolder is cloneable")
 
@@ -398,6 +431,10 @@ class VFolderFilter(BaseRequestModel):
     labels: EntityLabelNestedFilter | None = Field(
         default=None, description="Filter by the labels on the entity"
     )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by vfolder ID.",
+    )
     AND: list[VFolderFilter] | None = Field(default=None, description="AND logical combinator.")
     OR: list[VFolderFilter] | None = Field(default=None, description="OR logical combinator.")
     NOT: list[VFolderFilter] | None = Field(default=None, description="NOT logical combinator.")
@@ -413,23 +450,16 @@ class VFolderOrder(BaseRequestModel):
     direction: OrderDirection
 
 
-class ScopedSearchVFoldersInput(BaseRequestModel):
-    """Input for searching the vfolders the named scopes reach."""
-
-    scope: VFolderScope = Field(description="Scope (OR across all items).")
-    filter: VFolderFilter | None = Field(default=None, description="Filter conditions.")
-    order: list[VFolderOrder] | None = Field(default=None, description="Order specifications.")
-    first: int | None = Field(default=None, description="Cursor pagination: number of items.")
-    after: str | None = Field(default=None, description="Cursor pagination: after cursor.")
-    last: int | None = Field(default=None, description="Cursor pagination: last N items.")
-    before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
-    limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
-    offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
-
-
 class SearchVFoldersInput(BaseRequestModel):
     """Input for vfolder search with cursor and offset pagination (shared by admin and scoped searches)."""
 
+    usage: VFolderUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "vfolders the caller cannot read are left out."
+        ),
+    )
     filter: VFolderFilter | None = Field(default=None, description="Filter conditions.")
     order: list[VFolderOrder] | None = Field(default=None, description="Order specifications.")
     first: int | None = Field(default=None, description="Cursor pagination: number of items.")
@@ -438,6 +468,12 @@ class SearchVFoldersInput(BaseRequestModel):
     before: str | None = Field(default=None, description="Cursor pagination: before cursor.")
     limit: int | None = Field(default=None, description="Offset pagination: maximum items.")
     offset: int | None = Field(default=None, description="Offset pagination: number to skip.")
+
+
+class ScopedSearchVFoldersInput(SearchVFoldersInput):
+    """Input for searching the vfolders the named scopes reach."""
+
+    scope: VFolderScope = Field(description="Scope (OR across all items).")
 
 
 # ============================================================

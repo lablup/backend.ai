@@ -33,14 +33,16 @@ from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
 from ai.backend.manager.models.idle_checker.creators import (
     IdleCheckerAssignmentCreator,
     IdleCheckerCreator,
 )
 from ai.backend.manager.models.idle_checker.purgers import IdleCheckerAssignmentPurger
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow, IdleCheckerRow
-from ai.backend.manager.models.idle_checker.scopes import IdleCheckerAssignmentOperationScope
+from ai.backend.manager.models.idle_checker.scopes import IdleCheckerAssignmentTarget
+from ai.backend.manager.models.idle_checker.searchable_fields import (
+    IdleCheckerAssignmentSearchableFields,
+)
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.models.idle_checker.updaters import (
     IdleCheckerAssignmentDisabler,
@@ -48,9 +50,10 @@ from ai.backend.manager.models.idle_checker.updaters import (
 )
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
@@ -525,7 +528,7 @@ class TestIdleCheckerAssignmentRepository:
 
         result = await repository.admin_search_assignments(
             IdleCheckerAssignmentSearcher(
-                conditions=[IdleCheckerAssignmentConditions.by_enabled_equals(False)],
+                conditions=[IdleCheckerAssignmentSearchableFields.own.enabled.filter.equals(False)],
                 pagination=NoPagination(),
             )
         )
@@ -556,14 +559,14 @@ class TestIdleCheckerAssignmentRepository:
         )
 
         single_scope_result = await repository.scoped_search_assignments(
-            [IdleCheckerAssignmentOperationScope(scope=domain_id)],
+            [IdleCheckerAssignmentTarget(scope=domain_id)],
             IdleCheckerAssignmentSearcher(pagination=NoPagination()),
         )
         mixed_union_result = await repository.scoped_search_assignments(
             [
-                IdleCheckerAssignmentOperationScope(scope=domain_id),
-                IdleCheckerAssignmentOperationScope(scope=resource_group_id),
-                IdleCheckerAssignmentOperationScope(scope=project_id),
+                IdleCheckerAssignmentTarget(scope=domain_id),
+                IdleCheckerAssignmentTarget(scope=resource_group_id),
+                IdleCheckerAssignmentTarget(scope=project_id),
             ],
             IdleCheckerAssignmentSearcher(pagination=NoPagination()),
         )

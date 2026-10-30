@@ -25,8 +25,8 @@ from ai.backend.common.dto.manager.session.response import (
 from ai.backend.common.types import SessionTypes
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.testutils.fixtures import DomainFixtureData
 
 from .conftest import SessionSeedData, UserFixtureData

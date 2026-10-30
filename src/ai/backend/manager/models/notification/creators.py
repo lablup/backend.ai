@@ -29,6 +29,10 @@ from ai.backend.manager.models.notification.row import (
     NotificationChannelRow,
     NotificationRuleRow,
 )
+from ai.backend.manager.models.notification.searchable_fields import (
+    NotificationChannelSearchableFields,
+    NotificationRuleSearchableFields,
+)
 from ai.backend.manager.models.specs.created_in import CreatedInGlobal
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -67,7 +71,7 @@ class NotificationChannelCreator(
 
     @override
     def to_data(self, row: NotificationChannelRow) -> NotificationChannelData:
-        return row.to_data()
+        return NotificationChannelSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -104,4 +108,4 @@ class NotificationRuleCreator(
 
     @override
     def to_data(self, row: NotificationRuleRow) -> NotificationRuleData:
-        return row.to_data()
+        return NotificationRuleSearchableFields.own.to_data(row)

@@ -23,6 +23,9 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForProjectRow,
     ResourceGroupRow,
 )
+from ai.backend.manager.models.resource_group.searchable_fields import (
+    ResourceGroupSearchableFields,
+)
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.relation import RelationPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
@@ -52,7 +55,7 @@ class ResourceGroupPurger(EntityPurger[ResourceGroupRow, ResourceGroupData]):
 
     @override
     def to_data(self, row: ResourceGroupRow) -> ResourceGroupData:
-        return row.to_dataclass()
+        return ResourceGroupSearchableFields.own.to_data(row)
 
 
 @dataclass

@@ -22,7 +22,7 @@ from ai.backend.manager.models.base import Base, IDColumn
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import (
+from ai.backend.manager.repositories.base.querier import (
     BatchQuerier,
     BatchQuerierResult,
     Querier,

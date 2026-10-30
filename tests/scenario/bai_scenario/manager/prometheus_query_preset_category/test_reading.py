@@ -9,11 +9,11 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapters.prometheus_query_preset_category.adapter import (
     PrometheusQueryPresetCategoryAdapter,
 )
-from ai.backend.manager.errors.base.entity import EntityNotFoundError
-from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import Given, Scenario, Then, When
 from bai_scenario.components.answers import TheCallIsRefused
@@ -26,12 +26,12 @@ from bai_scenario.components.prometheus_query_preset_category import (
     TheCategoryNode,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Adapter = PrometheusQueryPresetCategoryAdapter
-type ReadingStep = Scenario[SeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
-type NobodyStep = Scenario[SeedingSession, ACategoryAlone, Adapter, CategoryNodeAnswer]
+type ReadingStep = Scenario[TestSeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
+type NobodyStep = Scenario[TestSeedingSession, ACategoryAlone, Adapter, CategoryNodeAnswer]
 
 
 @dataclass(frozen=True)
@@ -77,7 +77,7 @@ class ReadingAsNobody(When[ACategoryAlone, Adapter, CategoryNodeAnswer]):
 
 @dataclass(frozen=True)
 class AUserGrantedNothingReadsIt(
-    Scenario[SeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
+    Scenario[TestSeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
 ):
     started: datetime
 
@@ -90,7 +90,7 @@ class AUserGrantedNothingReadsIt(
         return "카테고리 하나가 있고 아무 권한도 없는 사용자가 id로 조회하면, 그 카테고리 전체가 반환된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACategoryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACategoryAndACaller]:
         return ACategoryAndSomeone()
 
     @override
@@ -104,21 +104,21 @@ class AUserGrantedNothingReadsIt(
 
 @dataclass(frozen=True)
 class AnUnknownIdIsNotFound(
-    Scenario[SeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
+    Scenario[TestSeedingSession, ACategoryAndACaller, Adapter, CategoryNodeAnswer]
 ):
     @override
     def summary(self) -> str:
-        return "an-id-nothing-answers-to-is-not-found-for-anyone"
+        return "an-id-nothing-answers-to-is-refused"
 
     @override
     def describe(self) -> str:
         return (
-            "아무 권한도 없는 사용자가 존재하지 않는 id로 조회하면, 대상을 찾을 수 없다는 "
-            "이유로 거부된다. 조회는 인증만 확인하므로 권한 검사가 먼저 막지 않는다"
+            "public 에서 읽을 수 있는 사용자가 존재하지 않는 id로 조회하면 거부된다. 권한을 "
+            "물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다"
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ACategoryAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ACategoryAndACaller]:
         return ACategoryAndSomeone()
 
     @override
@@ -127,21 +127,23 @@ class AnUnknownIdIsNotFound(
 
     @override
     def then(self) -> Then[ACategoryAndACaller, CategoryNodeAnswer]:
-        return TheCallIsRefused(EntityNotFoundError)
+        return TheCallIsRefused(NotEnoughPermission)
 
 
 @dataclass(frozen=True)
-class NobodyMayNotRead(Scenario[SeedingSession, ACategoryAlone, Adapter, CategoryNodeAnswer]):
+class NobodyMayNotRead(Scenario[TestSeedingSession, ACategoryAlone, Adapter, CategoryNodeAnswer]):
     @override
     def summary(self) -> str:
         return "a-call-carrying-no-user-may-not-read-a-category"
 
     @override
     def describe(self) -> str:
-        return "카테고리 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 인증 실패로 거부된다"
+        return (
+            "카테고리 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 호출자를 알 수 없어 거부된다"
+        )
 
     @override
-    def given(self) -> Given[SeedingSession, ACategoryAlone]:
+    def given(self) -> Given[TestSeedingSession, ACategoryAlone]:
         return ACategoryAndNobody()
 
     @override
@@ -150,7 +152,7 @@ class NobodyMayNotRead(Scenario[SeedingSession, ACategoryAlone, Adapter, Categor
 
     @override
     def then(self) -> Then[ACategoryAlone, CategoryNodeAnswer]:
-        return TheCallIsRefused(UserNotFound)
+        return TheCallIsRefused(UnreachableError)
 
 
 SCENARIOS: list[ReadingStep] = [

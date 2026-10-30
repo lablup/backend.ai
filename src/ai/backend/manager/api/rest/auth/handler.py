@@ -49,7 +49,7 @@ from ai.backend.common.dto.manager.auth.types import (
     AuthTokenType,
 )
 from ai.backend.common.exception import UnreachableError
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.middleware.auth import extract_client_ip
 from ai.backend.manager.dto.context import RequestCtx, UserContext
 from ai.backend.manager.errors.auth import AuthorizationFailed
@@ -68,7 +68,7 @@ from ai.backend.manager.services.auth.actions.update_password_no_auth import (
 from ai.backend.manager.services.auth.actions.upload_ssh_keypair import UploadSSHKeypairAction
 from ai.backend.manager.services.auth.processors import AuthProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class AuthHandler:

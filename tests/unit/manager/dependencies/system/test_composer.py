@@ -150,6 +150,7 @@ class TestSystemComposer:
                 db=mock_db,
                 event_producer=mock_event_producer,
                 valkey_profile_target=mock_valkey_profile_target,
+                sentinel_monitors=MagicMock(),
                 prometheus_client=mock_prometheus_client,
             )
 

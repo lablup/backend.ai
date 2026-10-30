@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ai.backend.manager.api.rest.middleware.auth import superadmin_required
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
 from ai.backend.manager.api.rest.routing import RouteRegistry
 
 from .handler import V2ImageHandler
@@ -28,8 +28,15 @@ def register_v2_image_routes(
     )
     registry.add(
         "POST",
+        "/my/search",
+        handler.my_search_images,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "POST",
         "/scoped/search",
         handler.scoped_search_images,
+        middlewares=[auth_required],
     )
     registry.add(
         "POST",
@@ -37,17 +44,17 @@ def register_v2_image_routes(
         handler.admin_search_image_aliases,
         middlewares=[superadmin_required],
     )
+    registry.add("PATCH", "/{image_id}", handler.update, middlewares=[auth_required])
+    registry.add("POST", "/{image_id}/delete", handler.delete, middlewares=[auth_required])
+    registry.add("POST", "/{image_id}/restore", handler.restore, middlewares=[auth_required])
     registry.add(
-        "POST",
-        "/forget",
-        handler.admin_forget,
-        middlewares=[superadmin_required],
+        "POST", "/partial-bulk-update", handler.partial_bulk_update, middlewares=[auth_required]
     )
     registry.add(
-        "POST",
-        "/restore",
-        handler.admin_restore,
-        middlewares=[superadmin_required],
+        "POST", "/partial-bulk-delete", handler.partial_bulk_delete, middlewares=[auth_required]
+    )
+    registry.add(
+        "POST", "/partial-bulk-restore", handler.partial_bulk_restore, middlewares=[auth_required]
     )
     registry.add(
         "POST",
@@ -67,11 +74,9 @@ def register_v2_image_routes(
         handler.admin_dealias,
         middlewares=[superadmin_required],
     )
-    registry.add(
-        "PATCH",
-        "",
-        handler.admin_update,
-        middlewares=[superadmin_required],
-    )
+    # Deprecated since NEXT_RELEASE_VERSION.
+    registry.add("POST", "/forget", handler.admin_forget, middlewares=[superadmin_required])
+    registry.add("POST", "/restore", handler.admin_restore, middlewares=[superadmin_required])
+    registry.add("PATCH", "", handler.admin_update, middlewares=[superadmin_required])
 
     return registry

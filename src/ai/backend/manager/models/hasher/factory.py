@@ -6,15 +6,15 @@ from __future__ import annotations
 
 import logging
 
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
+from ai.backend.common.auth.password import HashInfo, PasswordHashAlgorithm
+from ai.backend.logging.structured import StructuredLogger
 
 from .base import PasswordHasher
 from .bcrypt import BcryptHasher
 from .pbkdf2 import PBKDF2_SHA3_256Hasher, PBKDF2_SHA256Hasher
 from .sha import SHA3_256Hasher, SHA256Hasher
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class PasswordHasherFactory:
@@ -35,3 +35,10 @@ class PasswordHasherFactory:
         if hasher is None:
             raise ValueError(f"Unsupported password hash algorithm: {algorithm}")
         return hasher
+
+
+def compare_to_hashed_password(raw_password: str, hashed_password: str) -> bool:
+    """Compare a raw string password value to hashed password."""
+    hash_info = HashInfo.from_hash_string(hashed_password)
+    hasher = PasswordHasherFactory.get_hasher(hash_info.algorithm)
+    return hasher.verify(raw_password, hash_info)

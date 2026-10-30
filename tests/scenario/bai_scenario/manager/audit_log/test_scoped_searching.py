@@ -15,6 +15,7 @@ import pytest
 
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.query import UUIDFilter
 from ai.backend.common.dto.manager.v2.audit_log.request import (
     AuditLogFilter,
     AuditLogScope,
@@ -35,12 +36,13 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     When,
 )
-from bai_scenario.components.answers import TheCallIsRefused
+from bai_scenario.components.answers import NothingIsFound, TheCallIsRefused
 from bai_scenario.components.audit_log import (
     ActorRecords,
     ARecordScopedToAProject,
     OneProjectManyRecords,
     OneProjectMixedStatus,
+    OneProjectOneRun,
     ProjectRecords,
     ScopedActors,
     ScopedEntities,
@@ -48,12 +50,12 @@ from bai_scenario.components.audit_log import (
     TheRecordsAnswered,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = SearchAuditLogsPayload
-type EntityStep = Scenario[SeedingSession, ScopedEntities, AuditLogAdapter, Searched]
-type ActorStep = Scenario[SeedingSession, ScopedActors, AuditLogAdapter, Searched]
+type EntityStep = Scenario[TestSeedingSession, ScopedEntities, AuditLogAdapter, Searched]
+type ActorStep = Scenario[TestSeedingSession, ScopedActors, AuditLogAdapter, Searched]
 ENFORCEMENT = "manager.rbac.enforcement_enabled"
 
 
@@ -115,6 +117,34 @@ class ScopedSearchingEntitiesBySuccess(When[ScopedEntities, AuditLogAdapter, Sea
 
 
 @dataclass(frozen=True)
+class ScopedSearchingEntitiesByRun(When[ScopedEntities, AuditLogAdapter, Searched]):
+    """지정한 엔티티 안에서 한 실행의 기록을 필터로 검색한다."""
+
+    @override
+    def operation(self) -> str:
+        return "scoped_search"
+
+    @override
+    def describe(self, laid: ScopedEntities) -> str:
+        return f"{laid.caller.username}이 엔티티를 지정하고 실행 필터로 검색"
+
+    @override
+    async def call(self, adapter: AuditLogAdapter, laid: ScopedEntities) -> Searched:
+        with ActingAs(laid.caller):
+            return await adapter.scoped_search(
+                ScopedSearchAuditLogsInput(
+                    scope=AuditLogScope(
+                        entity=[
+                            EntityTypeScope(entity_type=ProjectEntityType(), entity_id=str(one))
+                            for one in laid.named
+                        ]
+                    ),
+                    filter=AuditLogFilter(action_id=UUIDFilter(equals=laid.filter_action)),
+                )
+            )
+
+
+@dataclass(frozen=True)
 class ScopedSearchingBadId(When[ScopedEntities, AuditLogAdapter, Searched]):
     """엔티티 id 필드에 id 형식이 아닌 문자열을 넣는다."""
 
@@ -164,7 +194,7 @@ class ScopedSearchingActors(When[ScopedActors, AuditLogAdapter, Searched]):
 
 @dataclass(frozen=True)
 class TheGrantedUserReadsAnEntity(
-    Scenario[SeedingSession, ScopedEntities, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, ScopedEntities, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -178,7 +208,7 @@ class TheGrantedUserReadsAnEntity(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ScopedEntities]:
+    def given(self) -> Given[TestSeedingSession, ScopedEntities]:
         return ProjectRecords(grant_first=True, name="first")
 
     @override
@@ -192,7 +222,7 @@ class TheGrantedUserReadsAnEntity(
 
 @dataclass(frozen=True)
 class NamingSeveralEntitiesMerges(
-    Scenario[SeedingSession, ScopedEntities, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, ScopedEntities, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -206,7 +236,7 @@ class NamingSeveralEntitiesMerges(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ScopedEntities]:
+    def given(self) -> Given[TestSeedingSession, ScopedEntities]:
         return ProjectRecords(grant_first=True, grant_second=True, name="both")
 
     @override
@@ -220,7 +250,7 @@ class NamingSeveralEntitiesMerges(
 
 @dataclass(frozen=True)
 class AStatusFilterNarrowsWithinScope(
-    Scenario[SeedingSession, ScopedEntities, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, ScopedEntities, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -234,7 +264,7 @@ class AStatusFilterNarrowsWithinScope(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ScopedEntities]:
+    def given(self) -> Given[TestSeedingSession, ScopedEntities]:
         return OneProjectMixedStatus()
 
     @override
@@ -247,8 +277,36 @@ class AStatusFilterNarrowsWithinScope(
 
 
 @dataclass(frozen=True)
+class ARunFilterNarrowsWithinScope(
+    Scenario[TestSeedingSession, ScopedEntities, AuditLogAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "a-run-filter-narrows-within-the-named-scope"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "한 엔티티에 두 실행이 남긴 기록이 있을 때 그것을 지정하고 한 실행 필터로 검색하면, "
+            "그 실행이 남긴 기록만 모두 반환된다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ScopedEntities]:
+        return OneProjectOneRun()
+
+    @override
+    def when(self) -> When[ScopedEntities, AuditLogAdapter, Searched]:
+        return ScopedSearchingEntitiesByRun()
+
+    @override
+    def then(self) -> Then[ScopedEntities, Searched]:
+        return TheRecordsAnswered()
+
+
+@dataclass(frozen=True)
 class OmittingThePageSizeCapsThePage(
-    Scenario[SeedingSession, ScopedEntities, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, ScopedEntities, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -259,7 +317,7 @@ class OmittingThePageSizeCapsThePage(
         return "지정한 엔티티에 기록이 많고 페이지 크기를 지정하지 않으면, 10건까지 반환되고 다음 페이지가 있다고 응답한다"
 
     @override
-    def given(self) -> Given[SeedingSession, ScopedEntities]:
+    def given(self) -> Given[TestSeedingSession, ScopedEntities]:
         return OneProjectManyRecords(total=11)
 
     @override
@@ -273,7 +331,7 @@ class OmittingThePageSizeCapsThePage(
 
 @dataclass(frozen=True)
 class AnUnreadableEntityRefusesTheWhole(
-    Scenario[SeedingSession, ScopedEntities, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, ScopedEntities, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -287,7 +345,7 @@ class AnUnreadableEntityRefusesTheWhole(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ScopedEntities]:
+    def given(self) -> Given[TestSeedingSession, ScopedEntities]:
         return ProjectRecords(grant_first=True, name="both")
 
     @override
@@ -301,7 +359,7 @@ class AnUnreadableEntityRefusesTheWhole(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotScopeSearch(
-    Scenario[SeedingSession, ScopedEntities, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, ScopedEntities, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -312,7 +370,7 @@ class AUserGrantedNothingMayNotScopeSearch(
         return "아무 권한도 없는 사용자가 엔티티를 지정해 검색하면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ScopedEntities]:
+    def given(self) -> Given[TestSeedingSession, ScopedEntities]:
         return ProjectRecords(name="first")
 
     @override
@@ -326,7 +384,7 @@ class AUserGrantedNothingMayNotScopeSearch(
 
 @dataclass(frozen=True)
 class TheMonitorRoleGetsNoScopeForFree(
-    Scenario[SeedingSession, ScopedEntities, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, ScopedEntities, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -340,7 +398,7 @@ class TheMonitorRoleGetsNoScopeForFree(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ScopedEntities]:
+    def given(self) -> Given[TestSeedingSession, ScopedEntities]:
         return ProjectRecords(role=UserRole.MONITOR, name="first")
 
     @override
@@ -354,7 +412,7 @@ class TheMonitorRoleGetsNoScopeForFree(
 
 @dataclass(frozen=True)
 class NamingAnUnknownEntityIsRefused(
-    Scenario[SeedingSession, ScopedEntities, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, ScopedEntities, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -368,7 +426,7 @@ class NamingAnUnknownEntityIsRefused(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ScopedEntities]:
+    def given(self) -> Given[TestSeedingSession, ScopedEntities]:
         return ProjectRecords(grant_first=True, name="unknown")
 
     @override
@@ -381,22 +439,22 @@ class NamingAnUnknownEntityIsRefused(
 
 
 @dataclass(frozen=True)
-class TheSuperadminNamingAnUnknownEntityIsRefused(
-    Scenario[SeedingSession, ScopedEntities, AuditLogAdapter, Searched]
+class TheSuperadminNamingAnUnknownEntityFindsNothing(
+    Scenario[TestSeedingSession, ScopedEntities, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
-        return "the-superadmin-naming-an-entity-nothing-answers-to-is-refused-as-permission"
+        return "the-superadmin-naming-an-entity-nothing-answers-to-finds-nothing"
 
     @override
     def describe(self) -> str:
         return (
-            "슈퍼관리자가 어느 엔티티도 아닌 id를 지정해 검색하면, 없는 엔티티에는 슈퍼관리자도 권한이 "
-            "없으므로 권한 부족으로 거부된다. 대상 없음으로 거부하는 경우가 아니다"
+            "슈퍼관리자가 어느 엔티티도 아닌 id를 지정해 검색하면, 권한 검사를 지나가므로 거부되지 "
+            "않고 빈 페이지가 온다"
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ScopedEntities]:
+    def given(self) -> Given[TestSeedingSession, ScopedEntities]:
         return ProjectRecords(role=UserRole.SUPERADMIN, name="unknown")
 
     @override
@@ -405,12 +463,12 @@ class TheSuperadminNamingAnUnknownEntityIsRefused(
 
     @override
     def then(self) -> Then[ScopedEntities, Searched]:
-        return TheCallIsRefused(NotEnoughPermission)
+        return NothingIsFound()
 
 
 @dataclass(frozen=True)
 class EnforcementOffReadsWithoutAGrant(
-    Scenario[SeedingSession, ScopedEntities, AuditLogAdapter, Searched], Configured
+    Scenario[TestSeedingSession, ScopedEntities, AuditLogAdapter, Searched], Configured
 ):
     @override
     def summary(self) -> str:
@@ -425,7 +483,7 @@ class EnforcementOffReadsWithoutAGrant(
         return {ENFORCEMENT: False}
 
     @override
-    def given(self) -> Given[SeedingSession, ScopedEntities]:
+    def given(self) -> Given[TestSeedingSession, ScopedEntities]:
         return ProjectRecords(name="first")
 
     @override
@@ -438,7 +496,9 @@ class EnforcementOffReadsWithoutAGrant(
 
 
 @dataclass(frozen=True)
-class ANonEntityIdIsRefused(Scenario[SeedingSession, ScopedEntities, AuditLogAdapter, Searched]):
+class ANonEntityIdIsRefused(
+    Scenario[TestSeedingSession, ScopedEntities, AuditLogAdapter, Searched]
+):
     @override
     def summary(self) -> str:
         return "a-scope-id-that-is-not-an-entity-id-is-refused"
@@ -448,7 +508,7 @@ class ANonEntityIdIsRefused(Scenario[SeedingSession, ScopedEntities, AuditLogAda
         return "지정한 id가 id 형식이 아니면, 잘못된 입력으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, ScopedEntities]:
+    def given(self) -> Given[TestSeedingSession, ScopedEntities]:
         return ProjectRecords(grant_first=True, name="first")
 
     @override
@@ -462,7 +522,7 @@ class ANonEntityIdIsRefused(Scenario[SeedingSession, ScopedEntities, AuditLogAda
 
 @dataclass(frozen=True)
 class TheGrantedReaderReadsByActor(
-    Scenario[SeedingSession, ScopedActors, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, ScopedActors, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -476,7 +536,7 @@ class TheGrantedReaderReadsByActor(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ScopedActors]:
+    def given(self) -> Given[TestSeedingSession, ScopedActors]:
         return ActorRecords(grant=True)
 
     @override
@@ -490,7 +550,7 @@ class TheGrantedReaderReadsByActor(
 
 @dataclass(frozen=True)
 class ReadingOnesOwnActorRecordsNeedsAGrant(
-    Scenario[SeedingSession, ScopedActors, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, ScopedActors, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -504,7 +564,7 @@ class ReadingOnesOwnActorRecordsNeedsAGrant(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ScopedActors]:
+    def given(self) -> Given[TestSeedingSession, ScopedActors]:
         return ActorRecords(caller_is_first=True)
 
     @override
@@ -518,7 +578,7 @@ class ReadingOnesOwnActorRecordsNeedsAGrant(
 
 @dataclass(frozen=True)
 class ARecordIsFoundByItsScopeTag(
-    Scenario[SeedingSession, ScopedEntities, AuditLogAdapter, Searched]
+    Scenario[TestSeedingSession, ScopedEntities, AuditLogAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -532,7 +592,7 @@ class ARecordIsFoundByItsScopeTag(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ScopedEntities]:
+    def given(self) -> Given[TestSeedingSession, ScopedEntities]:
         return ARecordScopedToAProject()
 
     @override
@@ -549,12 +609,13 @@ ENTITY_SCENARIOS: list[EntityStep] = [
     ARecordIsFoundByItsScopeTag(),
     NamingSeveralEntitiesMerges(),
     AStatusFilterNarrowsWithinScope(),
+    ARunFilterNarrowsWithinScope(),
     OmittingThePageSizeCapsThePage(),
     AnUnreadableEntityRefusesTheWhole(),
     AUserGrantedNothingMayNotScopeSearch(),
     TheMonitorRoleGetsNoScopeForFree(),
     NamingAnUnknownEntityIsRefused(),
-    TheSuperadminNamingAnUnknownEntityIsRefused(),
+    TheSuperadminNamingAnUnknownEntityFindsNothing(),
     EnforcementOffReadsWithoutAGrant(),
     ANonEntityIdIsRefused(),
 ]

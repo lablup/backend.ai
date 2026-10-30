@@ -22,15 +22,16 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 
 ## Searching within scopes
 
-- A `scope`-shaped search takes `items: Sequence[<Entity>ScopeItem]` and nothing else
+- A `scope`-shaped search takes `targets: Sequence[<Entity>Target]` and nothing else
   standing for a scope. One action per entity, never one per scope kind.
-- `ScopeItem` (`actions/v2/ops/base.py`) declares the pair every item answers with:
-  `scope_ref()` names the scope the read is authorized against, `operation_scope()` the
-  rows it is restricted to. Declaring them together is what keeps a read from being
-  authorized against one thing and served another.
-- The action lists both back: `scope_targets()` is every item's `scope_ref()`, and
-  `operation_scopes()` every item's `operation_scope()`. Ops ORs the conditions; the gate
-  authorizes each scope, so a caller naming one they cannot see is refused the whole read.
+- A `ScopeTarget` (`models/scopes.py`) answers both axes: `scope_id()` names the scope the
+  read is authorized against, `to_condition()` the rows it is restricted to. Declaring them
+  on one class is what keeps a read from being authorized against one thing and served
+  another.
+- The action derives both from that one list and marks them `@final`: `scope_targets()` is
+  every target's `scope_id()`, `operation_scopes()` the targets themselves. Ops ORs the
+  conditions; the gate authorizes each scope, so a caller naming one they cannot see is
+  refused the whole read.
 
 ## Linking two entities
 
@@ -186,9 +187,17 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 
 ## Gates
 
-- `global` extends `scope` to the whole system and runs behind the SUPERADMIN
-  gate. Global reads open to all authenticated users are wired via the `public_*`
-  factories — read operations only; the constructor rejects writes.
+- `global` extends `scope` to the whole system. The gate is what the `global`
+  singleton grants on the action's entity type, and the check is by type, so it puts no
+  row condition on the query. A super admin passes everything and a monitor passes the
+  reads — both are read off the user role, so neither needs a role row. With RBAC
+  enforcement off those two bypasses are the whole gate. Global reads open to all
+  authenticated users are wired via the `public_*` factories — read operations only;
+  the constructor rejects writes.
+- The global gate is a validator the wiring supplies, as it is for every other shape.
+  `GlobalActionProcessor` refuses an empty validator list, so a wiring that states no
+  gate fails where it is made rather than at request time. A tool that only reads the
+  wiring states `RefusingGlobalActionValidator`, which lets no one through.
 - `anonymous_global` takes no gate at all and accepts writes. Wire through any other
   factory that fits. It is available only when both hold — the caller is an external
   system that can never hold a principal, and the service checks that caller itself
@@ -200,18 +209,20 @@ decides the shape. Do not create new subclasses of the legacy `BaseAction` bases
 - `lookup_ops` and `bulk_lookup_ops` check authentication first and the permission on
   whatever the key resolved to after. The check splits in two because the entity a key
   names is not known until the run produces it. The second half takes the
-  `single_entity` and `atomic_bulk` validators respectively — `LOOKUP` is a read, so it
+  `single_entity` and `partial_bulk` validators respectively — `LOOKUP` is a read, so it
   asks for read on that entity.
+- `bulk_lookup_ops` decides per key. A refused key fails alone; the rest still answer.
 - A key that named nothing offers no entity to check. It is one failed key.
 - Wiring through `public_lookup_ops` / `public_bulk_lookup_ops` leaves the second half
   empty, so every authenticated caller may resolve. A bulk lookup feeding a
-  `partial_bulk_get_ops` read is wired public: the read answers per entity, and a
-  lookup refusing the whole batch over one entity would take that away.
-- A lookup with post-validators answers a key naming nothing and a key the caller may
-  not reach with one exception, so no status code says whether the key exists. The
-  processor merges them; adapters must not split them apart again. The audit record
-  keeps the two causes apart. A superadmin passes every check, so the miss reaches
-  them unmerged.
+  `partial_bulk_get_ops` read may be wired public: the read checks each entity. An
+  entity whose existence the key alone must not reveal (a user's email) is wired
+  through `bulk_lookup_ops`.
+- A lookup with a second half answers a key naming nothing and a key the caller may not
+  reach with the same exception (`GenericBadRequest`), so no status code says whether
+  the key exists. A bulk lookup puts that answer in `failures` per key. The processor
+  merges the two; adapters must not split them apart again. The audit record keeps the
+  two causes apart. A superadmin passes every check, so the miss reaches them unmerged.
 - The owner lookup a field operation runs first is checked the same way. It is a
   different permission from the write that follows — the lookup asks for read, the
   write for write.

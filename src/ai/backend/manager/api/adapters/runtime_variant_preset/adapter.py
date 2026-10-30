@@ -5,8 +5,12 @@ from uuid import UUID
 
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.request import (
     CreateRuntimeVariantPresetInput,
+    PartialBulkPurgeRuntimeVariantPresetsInput,
+    PartialBulkUpdateRuntimeVariantPresetsInput,
     RuntimeVariantPresetFilter,
     RuntimeVariantPresetOrder,
     SearchRuntimeVariantPresetsInput,
@@ -30,6 +34,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
     UIOption,
     UIType,
 )
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.runtime_variant_preset.types import (
@@ -37,15 +42,21 @@ from ai.backend.manager.data.runtime_variant_preset.types import (
     UIOptionData,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.runtime_variant_preset.conditions import (
-    RuntimeVariantPresetConditions,
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
 )
 from ai.backend.manager.models.runtime_variant_preset.creators import (
     RuntimeVariantPresetCreator,
 )
-from ai.backend.manager.models.runtime_variant_preset.orders import RuntimeVariantPresetOrders
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
+from ai.backend.manager.models.runtime_variant_preset.scopes import (
+    PublicRuntimeVariantPresetTarget,
+)
+from ai.backend.manager.models.runtime_variant_preset.searchable_fields import (
+    RuntimeVariantPresetSearchableFields,
+)
 from ai.backend.manager.models.runtime_variant_preset.searchers import (
     RuntimeVariantPresetSearcher,
 )
@@ -53,17 +64,24 @@ from ai.backend.manager.models.runtime_variant_preset.updaters import (
     RuntimeVariantPresetUpdater,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import ScopedSearcher
 from ai.backend.manager.services.runtime_variant_preset.actions.create import (
     CreateRuntimeVariantPresetAction,
 )
 from ai.backend.manager.services.runtime_variant_preset.actions.get import (
     GetRuntimeVariantPresetAction,
 )
+from ai.backend.manager.services.runtime_variant_preset.actions.partial_bulk_purge import (
+    PartialBulkPurgeRuntimeVariantPresetsAction,
+)
+from ai.backend.manager.services.runtime_variant_preset.actions.partial_bulk_update import (
+    PartialBulkUpdateRuntimeVariantPresetsAction,
+)
 from ai.backend.manager.services.runtime_variant_preset.actions.purge import (
     PurgeRuntimeVariantPresetAction,
 )
-from ai.backend.manager.services.runtime_variant_preset.actions.search import (
-    SearchRuntimeVariantPresetsAction,
+from ai.backend.manager.services.runtime_variant_preset.actions.scoped_search import (
+    ScopedSearchRuntimeVariantPresetsAction,
 )
 from ai.backend.manager.services.runtime_variant_preset.actions.update import (
     UpdateRuntimeVariantPresetAction,
@@ -76,7 +94,9 @@ from ai.backend.manager.types import OptionalState, TriState
 
 def _preset_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=RuntimeVariantPresetOrders.created_at(ascending=False),
+        forward_order=RuntimeVariantPresetSearchableFields.own.created_at.order.apply(
+            ascending=False
+        ),
         cursor_column=RuntimeVariantPresetRow.id,
     )
 
@@ -123,9 +143,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             limit=input.limit,
             offset=input.offset,
         )
-        result = await self._runtime_variant_preset.public_search.run(
-            SearchRuntimeVariantPresetsAction(searcher=searcher)
-        )
+        result = await self._runtime_variant_preset.scoped_search.run(self._scoped_search(searcher))
         return SearchRuntimeVariantPresetsPayload(
             items=[self._data_to_node(d) for d in result.items],
             total_count=result.total_count,
@@ -134,7 +152,7 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
         )
 
     async def get(self, preset_id: UUID) -> RuntimeVariantPresetNode:
-        result = await self._runtime_variant_preset.public_get.run(
+        result = await self._runtime_variant_preset.get.run(
             GetRuntimeVariantPresetAction(preset_id=RuntimeVariantPresetID(preset_id))
         )
         return self._data_to_node(result.data)
@@ -147,11 +165,13 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             return []
         searcher = RuntimeVariantPresetSearcher(
             pagination=OffsetPagination(limit=len(ids)),
-            conditions=[RuntimeVariantPresetConditions.by_ids(ids)],
+            conditions=[
+                RuntimeVariantPresetSearchableFields.own.id.filter.in_(
+                    UUIDInMatchSpec(values=list(ids), negated=False)
+                )
+            ],
         )
-        result = await self._runtime_variant_preset.public_search.run(
-            SearchRuntimeVariantPresetsAction(searcher=searcher)
-        )
+        result = await self._runtime_variant_preset.scoped_search.run(self._scoped_search(searcher))
         node_map = {item.id: self._data_to_node(item) for item in result.items}
         return [node_map.get(RuntimeVariantPresetID(preset_id)) for preset_id in ids]
 
@@ -183,7 +203,42 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
         self,
         input: UpdateRuntimeVariantPresetInput,
     ) -> UpdateRuntimeVariantPresetPayload:
-        updater = RuntimeVariantPresetUpdater(
+        result = await self._runtime_variant_preset.update.run(
+            UpdateRuntimeVariantPresetAction(updater=self._to_updater(input))
+        )
+        return UpdateRuntimeVariantPresetPayload(preset=self._data_to_node(result.preset))
+
+    async def purge(self, preset_id: UUID) -> DeleteRuntimeVariantPresetPayload:
+        """Purge a runtime variant preset."""
+        result = await self._runtime_variant_preset.purge.run(
+            PurgeRuntimeVariantPresetAction(id=RuntimeVariantPresetID(preset_id))
+        )
+        return DeleteRuntimeVariantPresetPayload(id=result.data.id, entity_id=result.data.id)
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateRuntimeVariantPresetsInput
+    ) -> PartialBulkPayload[RuntimeVariantPresetNode]:
+        """Update several runtime variant presets, answering for each one."""
+        result = await self._runtime_variant_preset.partial_bulk_update.run(
+            PartialBulkUpdateRuntimeVariantPresetsAction(
+                updaters=[self._to_updater(item) for item in input.items]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeRuntimeVariantPresetsInput
+    ) -> PartialBulkPayload[RuntimeVariantPresetNode]:
+        """Purge several runtime variant presets, answering for each one."""
+        result = await self._runtime_variant_preset.partial_bulk_purge.run(
+            PartialBulkPurgeRuntimeVariantPresetsAction(
+                ids=[RuntimeVariantPresetID(preset_id) for preset_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_updater(self, input: UpdateRuntimeVariantPresetInput) -> RuntimeVariantPresetUpdater:
+        return RuntimeVariantPresetUpdater(
             preset_id=RuntimeVariantPresetID(input.id),
             name=OptionalState.from_unset(input.name),
             description=TriState.from_unset(input.description),
@@ -199,74 +254,73 @@ class RuntimeVariantPresetAdapter(BaseAdapter):
             display_name=TriState.from_unset(input.display_name),
             ui_option=TriState.from_unset(input.ui_option),
         )
-        result = await self._runtime_variant_preset.update.run(
-            UpdateRuntimeVariantPresetAction(updater=updater)
-        )
-        return UpdateRuntimeVariantPresetPayload(preset=self._data_to_node(result.preset))
 
-    async def delete(self, preset_id: UUID) -> DeleteRuntimeVariantPresetPayload:
-        result = await self._runtime_variant_preset.purge.run(
-            PurgeRuntimeVariantPresetAction(id=RuntimeVariantPresetID(preset_id))
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[RuntimeVariantPresetData]
+    ) -> PartialBulkPayload[RuntimeVariantPresetNode]:
+        return PartialBulkPayload[RuntimeVariantPresetNode](
+            successes=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
         )
-        return DeleteRuntimeVariantPresetPayload(id=result.data.id)
+
+    def _scoped_search(
+        self, searcher: RuntimeVariantPresetSearcher
+    ) -> ScopedSearchRuntimeVariantPresetsAction:
+        return ScopedSearchRuntimeVariantPresetsAction(
+            searcher=ScopedSearcher(
+                scopes=[PublicRuntimeVariantPresetTarget()], used_by=(), searcher=searcher
+            )
+        )
 
     def _convert_filter(self, filter_: RuntimeVariantPresetFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if filter_.runtime_variant_id is not None:
-            cond = self.convert_uuid_filter(
-                filter_.runtime_variant_id,
-                equals_factory=RuntimeVariantPresetConditions.by_runtime_variant_id_equals,
-                in_factory=RuntimeVariantPresetConditions.by_runtime_variant_id_in,
-            )
-            if cond is not None:
-                conditions.append(cond)
-        if filter_.name:
-            cond = self.convert_string_filter(
-                filter_.name,
-                contains_factory=RuntimeVariantPresetConditions.by_name_contains,
-                equals_factory=RuntimeVariantPresetConditions.by_name_equals,
-                starts_with_factory=RuntimeVariantPresetConditions.by_name_starts_with,
-                ends_with_factory=RuntimeVariantPresetConditions.by_name_ends_with,
-                in_factory=RuntimeVariantPresetConditions.by_name_in,
-            )
-            if cond:
-                conditions.append(cond)
+        fields = RuntimeVariantPresetSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_uuid_filter(filter_.runtime_variant_id, fields.runtime_variant_id.filter),
+            *self.apply_string_filter(filter_.name, fields.name.filter),
+            *self.apply_uuid_filter(filter_.entity_id, fields.id.filter),
+        ]
         if filter_.runtime_version is not None:
-            conditions.append(
-                RuntimeVariantPresetConditions.by_valid_at_version(filter_.runtime_version)
-            )
+            conditions.extend(fields.valid_at_version(filter_.runtime_version))
         if filter_.AND:
             for sub in filter_.AND:
                 conditions.extend(self._convert_filter(sub))
         if filter_.OR:
             or_conds: list[QueryCondition] = []
             for sub in filter_.OR:
-                or_conds.extend(self._convert_filter(sub))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    or_conds.append(combine_conditions_and(sub_conditions))
             if or_conds:
                 conditions.append(combine_conditions_or(or_conds))
         if filter_.NOT:
-            not_conds: list[QueryCondition] = []
             for sub in filter_.NOT:
-                not_conds.extend(self._convert_filter(sub))
-            if not_conds:
-                conditions.append(negate_conditions(not_conds))
+                sub_conditions = self._convert_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     def _convert_orders(self, orders: list[RuntimeVariantPresetOrder]) -> list[QueryOrder]:
+        fields = RuntimeVariantPresetSearchableFields.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction.value == "ASC"
             match order.field:
                 case RuntimeVariantPresetOrderField.NAME:
-                    result.append(RuntimeVariantPresetOrders.name(ascending))
+                    result.append(fields.name.order.apply(ascending))
                 case RuntimeVariantPresetOrderField.RANK:
-                    result.append(RuntimeVariantPresetOrders.rank(ascending))
+                    result.append(fields.rank.order.apply(ascending))
                 case RuntimeVariantPresetOrderField.CREATED_AT:
-                    result.append(RuntimeVariantPresetOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
                 case RuntimeVariantPresetOrderField.ADDED_VERSION:
-                    result.extend(RuntimeVariantPresetOrders.added_version(ascending))
+                    result.extend(fields.added_version_order(ascending))
                 case RuntimeVariantPresetOrderField.DEPRECATED_VERSION:
-                    result.extend(RuntimeVariantPresetOrders.deprecated_version(ascending))
+                    result.extend(fields.deprecated_version_order(ascending))
         return result
 
     @staticmethod

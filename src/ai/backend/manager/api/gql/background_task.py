@@ -20,7 +20,7 @@ from ai.backend.common.events.event_types.bgtask.broadcast import (
 )
 from ai.backend.common.events.hub.propagators.cache import WithCachePropagator
 from ai.backend.common.events.types import EventCacheDomain, EventDomain
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_enum,
@@ -30,7 +30,7 @@ from ai.backend.manager.api.gql.decorators import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.errors.bgtask import InvalidBgtaskId
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @gql_enum(BackendAIGQLMeta(added_version="24.3.0", description="Type of background task event"))
@@ -139,7 +139,6 @@ async def background_task_events(
     try:
         task_uuid = uuid.UUID(task_id)
     except (ValueError, AttributeError) as e:
-        log.warning("Invalid task ID format: {}", task_id)
         raise InvalidBgtaskId(f"Invalid task ID format: {task_id}") from e
 
     event_hub = info.context.event_hub
@@ -173,8 +172,8 @@ async def background_task_events(
                 is_close_event = True
             else:
                 log.warning(
-                    "Unknown background task event type: {}",
-                    type(event).__name__,
+                    "unknown background task event type",
+                    event_type=type(event).__name__,
                 )
                 continue
 
@@ -183,7 +182,7 @@ async def background_task_events(
 
             # End subscription on close events
             if is_close_event:
-                log.debug("Received close event: {}", event.event_name())
+                log.trace("background task close event received", event_name=event.event_name())
                 break
 
     finally:

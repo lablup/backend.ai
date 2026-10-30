@@ -10,7 +10,10 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
 from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 from ai.backend.manager.models.login_client_type.row import LoginClientTypeRow
-from ai.backend.manager.models.specs.querier import DataQuerier
+from ai.backend.manager.models.login_client_type.searchable_fields import (
+    LoginClientTypeSearchableFields,
+)
+from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
 @dataclass
@@ -32,4 +35,20 @@ class LoginClientTypeQuerier(DataQuerier[LoginClientTypeRow, LoginClientTypeData
 
     @override
     def to_data(self, row: LoginClientTypeRow) -> LoginClientTypeData:
-        return row.to_dataclass()
+        return LoginClientTypeSearchableFields.own.to_data(row)
+
+
+class BulkLoginClientTypeQuerier(BulkEntityQuerier[LoginClientTypeRow, LoginClientTypeData]):
+    """The login client types the caller named."""
+
+    @override
+    def row_class(self) -> type[LoginClientTypeRow]:
+        return LoginClientTypeRow
+
+    @override
+    def entity_id_column(self) -> InstrumentedAttribute[Any]:
+        return LoginClientTypeRow.id
+
+    @override
+    def to_data(self, row: LoginClientTypeRow) -> LoginClientTypeData:
+        return LoginClientTypeSearchableFields.own.to_data(row)

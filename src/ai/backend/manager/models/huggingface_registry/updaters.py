@@ -11,6 +11,9 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.models.huggingface_registry.row import HuggingFaceRegistryRow
+from ai.backend.manager.models.huggingface_registry.searchable_fields import (
+    HuggingFaceRegistrySearchableFields,
+)
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState
@@ -51,4 +54,4 @@ class HuggingFaceRegistryUpdater(DataUpdater[HuggingFaceRegistryRow, HuggingFace
 
     @override
     def to_data(self, row: HuggingFaceRegistryRow) -> HuggingFaceRegistryData:
-        return row.to_dataclass()
+        return HuggingFaceRegistrySearchableFields.own.to_data(row)

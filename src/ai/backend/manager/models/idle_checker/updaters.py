@@ -17,11 +17,14 @@ from ai.backend.manager.data.idle_checker.types import (
     SessionIdleCheckData,
 )
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.idle_checker.conditions import SessionIdleCheckConditions
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
     IdleCheckerRow,
     SessionIdleCheckRow,
+)
+from ai.backend.manager.models.idle_checker.searchable_fields import (
+    IdleCheckerSearchableFields,
+    SessionIdleCheckSearchableFields,
 )
 from ai.backend.manager.models.specs.relation import RelationLifecycleUpdater
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -76,7 +79,7 @@ class IdleCheckerUpdater(DataUpdater[IdleCheckerRow, IdleCheckerData]):
 
     @override
     def to_data(self, row: IdleCheckerRow) -> IdleCheckerData:
-        return row.to_data()
+        return IdleCheckerSearchableFields.own.to_data(row)
 
 
 class IdleCheckerAssignmentSwitch(
@@ -116,30 +119,24 @@ class IdleCheckerAssignmentEnabler(IdleCheckerAssignmentSwitch):
 
 
 @dataclass
-class SessionIdleCheckPhaseBatchUpdater(
-    DataBatchUpdater[SessionIdleCheckRow, SessionIdleCheckData]
-):
-    """Move the named pairs from one phase to another."""
-
-    pairs: Sequence[tuple[SessionId, IdleCheckerID]]
-    from_phase: IdleCheckPhase
-    to_phase: IdleCheckPhase
+class SessionIdleCheckBatchUpdater(DataBatchUpdater[SessionIdleCheckRow, SessionIdleCheckData]):
+    """A batch write over the session-checker pairs named."""
 
     @property
     @override
     def row_class(self) -> type[SessionIdleCheckRow]:
         return SessionIdleCheckRow
 
-    @override
-    def conditions(self) -> list[QueryCondition]:
-        return [
-            SessionIdleCheckConditions.by_pairs(self.pairs),
-            SessionIdleCheckConditions.by_status_equals(self.from_phase),
-        ]
+    def _pairs_condition(self, pairs: Sequence[tuple[SessionId, IdleCheckerID]]) -> QueryCondition:
+        """The composite primary key of the rows named, which no single column carries."""
 
-    @override
-    def build_values(self) -> dict[str, Any]:
-        return {"last_status": self.to_phase}
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.tuple_(
+                SessionIdleCheckRow.session_id,
+                SessionIdleCheckRow.idle_checker_id,
+            ).in_(pairs)
+
+        return inner
 
     @property
     @override
@@ -148,29 +145,42 @@ class SessionIdleCheckPhaseBatchUpdater(
 
     @override
     def to_data(self, row: SessionIdleCheckRow) -> SessionIdleCheckData:
-        return row.to_data()
+        return SessionIdleCheckSearchableFields.own.to_data(row)
 
 
 @dataclass
-class SessionIdleCheckJudgmentBatchUpdater(
-    DataBatchUpdater[SessionIdleCheckRow, SessionIdleCheckData]
-):
-    """Write each pair's judgment, leaving the pairs no longer being checked alone."""
+class SessionIdleCheckPhaseBatchUpdater(SessionIdleCheckBatchUpdater):
+    """Move the named pairs from one phase to another."""
 
-    judgments: Sequence[IdleJudgmentData]
-
-    @property
-    @override
-    def row_class(self) -> type[SessionIdleCheckRow]:
-        return SessionIdleCheckRow
+    pairs: Sequence[tuple[SessionId, IdleCheckerID]]
+    from_phase: IdleCheckPhase
+    to_phase: IdleCheckPhase
 
     @override
     def conditions(self) -> list[QueryCondition]:
         return [
-            SessionIdleCheckConditions.by_pairs([
+            self._pairs_condition(self.pairs),
+            SessionIdleCheckSearchableFields.own.last_status.filter.equals(self.from_phase),
+        ]
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"last_status": self.to_phase}
+
+
+@dataclass
+class SessionIdleCheckJudgmentBatchUpdater(SessionIdleCheckBatchUpdater):
+    """Write each pair's judgment, leaving the pairs no longer being checked alone."""
+
+    judgments: Sequence[IdleJudgmentData]
+
+    @override
+    def conditions(self) -> list[QueryCondition]:
+        return [
+            self._pairs_condition([
                 (judgment.session_id, judgment.checker_id) for judgment in self.judgments
             ]),
-            SessionIdleCheckConditions.by_statuses((
+            SessionIdleCheckSearchableFields.own.last_status.filter.in_((
                 IdleCheckPhase.READY_TO_CHECK,
                 IdleCheckPhase.ACTIVE,
                 IdleCheckPhase.IDLE,
@@ -196,12 +206,3 @@ class SessionIdleCheckJudgmentBatchUpdater(
             "expire_at": self._per_pair(lambda judgment: judgment.expire_at),
             "last_message": self._per_pair(lambda judgment: judgment.message),
         }
-
-    @property
-    @override
-    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
-
-    @override
-    def to_data(self, row: SessionIdleCheckRow) -> SessionIdleCheckData:
-        return row.to_data()

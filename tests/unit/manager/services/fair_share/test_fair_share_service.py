@@ -11,7 +11,7 @@ import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot, SlotQuantity
-from ai.backend.manager.data.fair_share import (
+from ai.backend.manager.data.fair_share.types import (
     DomainFairShareData,
     DomainFairShareSearchResult,
     FairShareCalculationSnapshot,
@@ -27,20 +27,19 @@ from ai.backend.manager.data.resource_group.types import FairShareResourceGroupS
 from ai.backend.manager.errors.resource import DomainNotFound, ProjectNotFound
 from ai.backend.manager.errors.user import UserNotFound
 from ai.backend.manager.models.fair_share.scopes import (
-    DomainFairShareOperationScope,
-    ProjectFairShareOperationScope,
-    UserFairShareOperationScope,
+    DomainFairShareTarget,
+    ProjectFairShareTarget,
+    UserFairShareTarget,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.fair_share import FairShareRepository
+from ai.backend.manager.repositories.base.querier import BatchQuerier
+from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
 from ai.backend.manager.repositories.fair_share.types import (
     DomainFairShareEntitySearchResult,
     ProjectFairShareEntitySearchResult,
     UserFairShareEntitySearchResult,
 )
-from ai.backend.manager.services.fair_share import (
-    FairShareService,
+from ai.backend.manager.services.fair_share.actions import (
     GetDomainFairShareAction,
     GetProjectFairShareAction,
     GetUserFairShareAction,
@@ -50,12 +49,11 @@ from ai.backend.manager.services.fair_share import (
     SearchRGDomainFairSharesAction,
     SearchRGProjectFairSharesAction,
     SearchRGUserFairSharesAction,
-)
-from ai.backend.manager.services.fair_share.actions import (
     UpsertDomainFairShareWeightAction,
     UpsertProjectFairShareWeightAction,
     UpsertUserFairShareWeightAction,
 )
+from ai.backend.manager.services.fair_share.service import FairShareService
 
 RESOURCE_GROUP_ID = ResourceGroupID(uuid.UUID("00000000-0000-0000-0000-000000000001"))
 
@@ -811,7 +809,7 @@ class TestSearchDomainFairShareEntities:
 
         mock_repository.search_rg_domain_fair_shares = AsyncMock(return_value=entity_result)
 
-        scope = DomainFairShareOperationScope(resource_group_id=RESOURCE_GROUP_ID)
+        scope = DomainFairShareTarget(resource_group_id=RESOURCE_GROUP_ID)
         querier = BatchQuerier(
             pagination=OffsetPagination(offset=0, limit=100),
             conditions=[],
@@ -865,7 +863,7 @@ class TestSearchDomainFairShareEntities:
 
         mock_repository.search_rg_domain_fair_shares = AsyncMock(return_value=entity_result)
 
-        scope = DomainFairShareOperationScope(resource_group_id=RESOURCE_GROUP_ID)
+        scope = DomainFairShareTarget(resource_group_id=RESOURCE_GROUP_ID)
         querier = BatchQuerier(
             pagination=OffsetPagination(offset=0, limit=100),
             conditions=[],
@@ -923,7 +921,7 @@ class TestSearchDomainFairShareEntities:
 
         mock_repository.search_rg_domain_fair_shares = AsyncMock(return_value=entity_result)
 
-        scope = DomainFairShareOperationScope(resource_group_id=RESOURCE_GROUP_ID)
+        scope = DomainFairShareTarget(resource_group_id=RESOURCE_GROUP_ID)
         querier = BatchQuerier(
             pagination=OffsetPagination(offset=0, limit=100),
             conditions=[],
@@ -1007,7 +1005,7 @@ class TestSearchProjectFairShareEntities:
 
         mock_repository.search_rg_project_fair_shares = AsyncMock(return_value=entity_result)
 
-        scope = ProjectFairShareOperationScope(
+        scope = ProjectFairShareTarget(
             domain_name="test-domain", resource_group_id=RESOURCE_GROUP_ID
         )
         querier = BatchQuerier(
@@ -1092,7 +1090,7 @@ class TestSearchUserFairShareEntities:
 
         mock_repository.search_rg_user_fair_shares = AsyncMock(return_value=entity_result)
 
-        scope = UserFairShareOperationScope(
+        scope = UserFairShareTarget(
             domain_name="test-domain",
             project_id=project_id,
             resource_group_id=RESOURCE_GROUP_ID,

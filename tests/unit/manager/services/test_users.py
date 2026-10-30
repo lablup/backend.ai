@@ -13,13 +13,13 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import AccessKey
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.user.types import (
     UserCreateResultData,
@@ -28,7 +28,6 @@ from ai.backend.manager.data.user.types import (
     UserStatus,
 )
 from ai.backend.manager.errors.user import UserNotFound, UserPurgeFailure
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -118,8 +117,6 @@ class TestCreateUser:
             rate_limit=60000,
             ssh_public_key=None,
             ssh_private_key=None,
-            dotfiles=b"",
-            bootstrap_script="",
         )
 
     @pytest.fixture
@@ -350,14 +347,15 @@ class TestDeleteUser:
         mock_user_repository: MagicMock,
     ) -> None:
         """Delete existing user should return success result."""
-        mock_user_repository.delete_user_by_uuid_validated = AsyncMock(return_value=None)
+        deleted_user = MagicMock(spec=UserData)
+        mock_user_repository.delete_user_by_uuid_validated = AsyncMock(return_value=deleted_user)
         user_id = UserID(uuid.uuid4())
 
         action = DeleteUserAction(user_id=user_id)
 
         result = await service.delete_user(action)
 
-        assert result is not None
+        assert result.user is deleted_user
         mock_user_repository.delete_user_by_uuid_validated.assert_called_once_with(
             user_uuid=user_id,
         )

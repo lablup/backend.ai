@@ -33,7 +33,7 @@ from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.errors.permission import InvalidFieldPermission
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.permission_field import PermissionFieldRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.specs.permission import (
     PermissionEntry,
     PermissionRevocation,

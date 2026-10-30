@@ -10,33 +10,32 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy import Table
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.common.data.entity.role import RoleEntityType
 from ai.backend.common.data.permission.types import Permission, RoleStatus
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.models.alembic.versions.e7d2a9c41b60_assign_every_user_their_domain_member_role import (
     _PRESET_ID,
     backfill,
     mark_auto_assign,
 )
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
 )
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
@@ -80,6 +79,13 @@ async def db(
     database_connection: ExtendedAsyncSAEngine,
 ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
     async with with_tables(database_connection, _TABLES):
+        async with database_connection.begin() as conn:
+            await conn.execute(
+                sa.text(
+                    "ALTER TABLE role_presets "
+                    "ADD COLUMN IF NOT EXISTS deleted BOOLEAN NOT NULL DEFAULT false"
+                )
+            )
         yield database_connection
 
 
@@ -239,6 +245,9 @@ class TestAssignDomainMemberRoles:
 
         async with db.begin_readonly_session() as session:
             preset = await session.get(RolePresetRow, _PRESET_UUID)
+            deleted = await session.scalar(
+                sa.text("SELECT deleted FROM role_presets WHERE id = :id"), {"id": _PRESET_UUID}
+            )
             grants = set(
                 (
                     await session.execute(
@@ -253,7 +262,7 @@ class TestAssignDomainMemberRoles:
         assert preset.name == "domain_member"
         assert preset.scope_type == _DOMAIN_ENTITY_TYPE
         assert preset.auto_assign is True
-        assert preset.deleted is False
+        assert deleted is False
         assert {(str(entity_type), permission) for entity_type, permission in grants} == _GRANTS
 
     async def test_a_domain_gets_the_role_and_its_users_hold_it(

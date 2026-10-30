@@ -6,7 +6,6 @@ Tests the repository layer with real database operations.
 from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Mapping
-from copy import copy
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -24,6 +23,7 @@ from ai.backend.common.clients.valkey_client.valkey_image.client import ValkeyIm
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.agent.types import AgentInfo
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.agent import AgentEntityType, AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType, ResourceGroupID
@@ -50,43 +50,48 @@ from ai.backend.manager.errors.agent import (
     AgentNotFound,
 )
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
-from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.errors.resource_slot import ResourceSlotTypeNotFound
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.agent.updaters import AgentExitStatusUpdater
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
+    DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_designated_agent.row import DeploymentDesignatedAgentRow
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.resource_slot import AgentResourceRow, ResourceSlotTypeRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow, ResourceSlotTypeRow
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.agent.db_source.db_source import AgentDBSource
 from ai.backend.manager.repositories.agent.repository import AgentRepository
-from ai.backend.manager.repositories.base.querier import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.types import OptionalState
 from ai.backend.testutils.db import with_tables
@@ -642,6 +647,35 @@ class TestAgentRepositoryDB:
         assert result.need_resource_slot_update is True
         mock_config_provider.legacy_etcd_config_loader.update_resource_slots.assert_called_once()
 
+    async def test_sync_agent_heartbeat_unregistered_slot_type_names_the_slot(
+        self,
+        agent_repository: AgentRepository,
+        sample_agent_info: AgentInfo,
+    ) -> None:
+        agent_id = AgentId("agent-unregistered-slot")
+        agent_info = sample_agent_info.model_copy(
+            update={
+                "available_resource_slots": [
+                    *sample_agent_info.available_resource_slots,
+                    ResourceSlotEntry(
+                        resource_type=ResourceSlotName("tt-n300.device"), quantity="0"
+                    ),
+                ],
+                "slot_key_and_units": {
+                    **sample_agent_info.slot_key_and_units,
+                    ResourceSlotName("tt-n300.device"): SlotTypes.COUNT,
+                },
+            }
+        )
+        upsert_data = AgentHeartbeatUpsert.from_agent_info(
+            agent_id=agent_id,
+            agent_info=agent_info,
+            heartbeat_received=datetime.now(tzutc()),
+        )
+
+        with pytest.raises(ResourceSlotTypeNotFound, match=r"'tt-n300\.device'"):
+            await agent_repository.sync_agent_heartbeat(agent_id, upsert_data)
+
     # ==================== upsert_agent_with_state tests ====================
 
     @pytest.fixture
@@ -1156,18 +1190,6 @@ class TestAgentRepositoryCache:
         }
 
 
-@dataclass
-class KernelFilteringTestCase:
-    """Test case for kernel filtering validation via actual_occupied_slots"""
-
-    test_id: str
-    agent_id: AgentId
-    occupied_kernel_count: int
-    non_occupied_kernel_count: int
-    cpu_per_kernel: Decimal
-    expected_actual_occupied_cpu: Decimal
-
-
 class TestAgentDBSourceKernelFiltering:
     """Test kernel filtering with with_loader_criteria at db_source level"""
 
@@ -1211,6 +1233,8 @@ class TestAgentDBSourceKernelFiltering:
                 EntityMembershipRow,
                 EntityMembershipCapRow,
                 ScopeBindingRow,
+                DeploymentDesignatedAgentRow,
+                SessionDesignatedAgentRow,
             ],
         ):
             # Seed default resource slot types
@@ -1284,6 +1308,39 @@ class TestAgentDBSourceKernelFiltering:
         yield (str(group_id), test_domain)
 
     @pytest.fixture
+    async def test_user(
+        self,
+        db_with_tables: ExtendedAsyncSAEngine,
+        test_domain: str,
+        test_domain_id: DomainID,
+    ) -> AsyncGenerator[UUID, None]:
+        """Create a user to own the seeded sessions and kernels"""
+        policy_name = str(uuid4())
+        user_uuid = uuid4()
+        async with db_with_tables.begin_session() as db_sess:
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=0,
+                    max_quota_scope_size=-1,
+                    max_session_count_per_model_session=10,
+                    max_customized_image_count=10,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                UserRow(
+                    uuid=user_uuid,
+                    username=f"testuser-{user_uuid.hex[:8]}",
+                    email=f"{user_uuid.hex[:8]}@example.com",
+                    domain_name=test_domain,
+                    domain_id=test_domain_id,
+                    resource_policy=policy_name,
+                )
+            )
+        yield user_uuid
+
+    @pytest.fixture
     async def resource_group(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
@@ -1308,168 +1365,6 @@ class TestAgentDBSourceKernelFiltering:
         yield name
 
     @pytest.fixture
-    async def agent_with_kernels(
-        self,
-        request: pytest.FixtureRequest,
-        db_with_tables: ExtendedAsyncSAEngine,
-        test_group: tuple[str, str],
-        test_domain_id: DomainID,
-        resource_group: str,
-        test_scaling_group_id: ResourceGroupID,
-    ) -> AsyncGenerator[KernelFilteringTestCase, None]:
-        """Create ONE agent with kernels based on the test case from indirect parametrization"""
-        test_case: KernelFilteringTestCase = request.param
-        group_id_str, domain_name = test_group
-
-        # Generate random IDs and values for this test execution
-        random_suffix = uuid4().hex[:8]
-        actual_agent_id = AgentId(f"{test_case.agent_id}-{random_suffix}")
-        random_ip_suffix = uuid4().int % 256  # Random IP octet (0-255)
-        random_ip = f"192.168.1.{random_ip_suffix}"
-        session_id = uuid4()
-        session_name = f"test-session-{uuid4().hex[:12]}"
-
-        async with db_with_tables.begin_session() as db_sess:
-            # Create agent
-            agent = AgentRow(
-                id=actual_agent_id,
-                status=AgentStatus.ALIVE,
-                status_changed=datetime.now(tzutc()),
-                region="us-west-1",
-                scaling_group=resource_group,
-                resource_group_id=test_scaling_group_id,
-                addr=f"tcp://{random_ip}:6001",
-                first_contact=datetime.now(tzutc()),
-                lost_at=None,
-                public_host=random_ip,
-                public_key=PublicKey(f"test-key-{random_suffix}".encode()),
-                version="24.12.0",
-                architecture="x86_64",
-                compute_plugins={},
-                schedulable=True,
-                auto_terminate_abusing_kernel=False,
-            )
-            db_sess.add(agent)
-            await db_sess.flush()
-
-            # Seed AgentResourceRow with expected occupied value
-            expected_used = test_case.cpu_per_kernel * test_case.occupied_kernel_count
-            db_sess.add(
-                AgentResourceRow(
-                    agent_id=actual_agent_id,
-                    agent_uuid=await _agent_uuid(db_sess, actual_agent_id),
-                    slot_name="cpu",
-                    capacity=Decimal("16"),
-                    used=expected_used,
-                )
-            )
-            await db_sess.flush()
-
-            # Create session for all kernels
-            session = SessionRow(
-                id=session_id,
-                name=session_name,
-                session_type=SessionTypes.INTERACTIVE,
-                domain_id=test_domain_id,
-                domain_name=domain_name,
-                group_id=UUID(group_id_str),
-                user_uuid=uuid4(),
-                resource_group_id=test_scaling_group_id,
-                scaling_group_name=resource_group,
-                status=SessionStatus.RUNNING,
-                status_info="test",
-                cluster_mode=ClusterMode.SINGLE_NODE,
-                created_at=datetime.now(tzutc()),
-                images=["python:3.11"],
-                vfolder_mounts=[],
-                environ={},
-                result=SessionResult.UNDEFINED,
-            )
-            db_sess.add(session)
-            await db_sess.flush()
-
-            # Create resource-occupied kernels
-            # Only RUNNING and TERMINATING are considered resource-occupied
-            occupied_statuses = [
-                KernelStatus.RUNNING,
-                KernelStatus.TERMINATING,
-            ]
-            for i in range(test_case.occupied_kernel_count):
-                status = occupied_statuses[i % len(occupied_statuses)]
-                kernel = KernelRow(
-                    id=uuid4(),
-                    session_id=session_id,
-                    agent=actual_agent_id,
-                    agent_addr=f"{random_ip}:6001",
-                    scaling_group=resource_group,
-                    resource_group_id=test_scaling_group_id,
-                    cluster_idx=i,
-                    cluster_role="main",
-                    cluster_hostname=f"main{i}-{uuid4().hex[:6]}",
-                    image="python:3.11",
-                    architecture="x86_64",
-                    registry="docker.io",
-                    container_id=f"container-{uuid4().hex[:8]}",
-                    status=status,
-                    domain_name=domain_name,
-                    group_id=UUID(group_id_str),
-                    user_uuid=uuid4(),
-                    access_key="AKTEST" + uuid4().hex[:12],
-                    environ={},
-                    mounts=[],
-                    vfolder_mounts=[],
-                    preopen_ports=[],
-                    repl_in_port=2001 + i * 4,
-                    repl_out_port=2002 + i * 4,
-                    stdin_port=2003 + i * 4,
-                    stdout_port=2004 + i * 4,
-                )
-                db_sess.add(kernel)
-
-            # Create non-occupied kernels
-            non_occupied_statuses = [
-                KernelStatus.TERMINATED,
-                KernelStatus.CANCELLED,
-            ]
-            for i in range(test_case.non_occupied_kernel_count):
-                status = non_occupied_statuses[i % len(non_occupied_statuses)]
-                kernel = KernelRow(
-                    id=uuid4(),
-                    session_id=session_id,
-                    agent=actual_agent_id,
-                    agent_addr=f"{random_ip}:6001",
-                    scaling_group=resource_group,
-                    resource_group_id=test_scaling_group_id,
-                    cluster_idx=test_case.occupied_kernel_count + i,
-                    cluster_role="main",
-                    cluster_hostname=f"main{test_case.occupied_kernel_count + i}-{uuid4().hex[:6]}",
-                    image="python:3.11",
-                    architecture="x86_64",
-                    registry="docker.io",
-                    container_id=f"container-{uuid4().hex[:8]}",
-                    status=status,
-                    domain_name=domain_name,
-                    group_id=UUID(group_id_str),
-                    user_uuid=uuid4(),
-                    access_key="AKTEST" + uuid4().hex[:12],
-                    environ={},
-                    mounts=[],
-                    vfolder_mounts=[],
-                    preopen_ports=[],
-                    repl_in_port=2001 + (test_case.occupied_kernel_count + i) * 4,
-                    repl_out_port=2002 + (test_case.occupied_kernel_count + i) * 4,
-                    stdin_port=2003 + (test_case.occupied_kernel_count + i) * 4,
-                    stdout_port=2004 + (test_case.occupied_kernel_count + i) * 4,
-                )
-                db_sess.add(kernel)
-
-        # Create a copy of test_case with the actual random agent_id
-        test_case_with_random_id = copy(test_case)
-        test_case_with_random_id.agent_id = actual_agent_id
-
-        yield test_case_with_random_id
-
-    @pytest.fixture
     async def db_source(
         self,
         db_with_tables: ExtendedAsyncSAEngine,
@@ -1477,66 +1372,6 @@ class TestAgentDBSourceKernelFiltering:
         """Create AgentDBSource for testing"""
         db_source = AgentDBSource(db_with_tables, ShareOpsProvider(db_with_tables))
         yield db_source
-
-    @pytest.mark.parametrize(
-        "agent_with_kernels",
-        [
-            KernelFilteringTestCase(
-                test_id="mixed_kernels",
-                agent_id=AgentId(f"agent-mixed-{uuid4().hex[:8]}"),
-                occupied_kernel_count=3,
-                non_occupied_kernel_count=2,
-                cpu_per_kernel=Decimal("1.0"),
-                expected_actual_occupied_cpu=Decimal("3.0"),
-            ),
-            KernelFilteringTestCase(
-                test_id="only_occupied",
-                agent_id=AgentId(f"agent-only-occupied-{uuid4().hex[:8]}"),
-                occupied_kernel_count=4,
-                non_occupied_kernel_count=0,
-                cpu_per_kernel=Decimal("2.0"),
-                expected_actual_occupied_cpu=Decimal("8.0"),
-            ),
-            KernelFilteringTestCase(
-                test_id="only_non_occupied",
-                agent_id=AgentId(f"agent-only-non-occupied-{uuid4().hex[:8]}"),
-                occupied_kernel_count=0,
-                non_occupied_kernel_count=5,
-                cpu_per_kernel=Decimal("1.0"),
-                expected_actual_occupied_cpu=Decimal("0.0"),
-            ),
-            KernelFilteringTestCase(
-                test_id="no_kernels",
-                agent_id=AgentId(f"agent-no-kernels-{uuid4().hex[:8]}"),
-                occupied_kernel_count=0,
-                non_occupied_kernel_count=0,
-                cpu_per_kernel=Decimal("0.0"),
-                expected_actual_occupied_cpu=Decimal("0.0"),
-            ),
-        ],
-        indirect=True,
-        ids=["mixed_kernels", "only_occupied", "only_non_occupied", "no_kernels"],
-    )
-    async def test_search_agents_validates_actual_occupied_slots(
-        self,
-        db_source: AgentDBSource,
-        agent_with_kernels: KernelFilteringTestCase,
-    ) -> None:
-        """Test that actual_occupied_slots correctly reflects kernel filtering via with_loader_criteria"""
-        # Filter to only this test case's agent
-        querier = BatchQuerier(
-            pagination=OffsetPagination(offset=0, limit=10),
-            conditions=[lambda: AgentRow.id == agent_with_kernels.agent_id],
-        )
-
-        result = await db_source.search_agents(querier)
-
-        assert len(result.items) == 1
-        agent_detail = result.items[0]
-
-        # Validate actual_occupied_slots reflects only resource-occupied kernels
-        actual_cpu = agent_detail.occupied_slots().get("cpu", 0)
-        assert Decimal(str(actual_cpu)) == agent_with_kernels.expected_actual_occupied_cpu
 
     # ==================== update_resource_group tests ====================
 
@@ -1546,7 +1381,7 @@ class TestAgentDBSourceKernelFiltering:
         agent_id: AgentId,
         resource_group_name: str,
         resource_group_id: ResourceGroupID,
-    ) -> None:
+    ) -> AgentUUID:
         agent_uuid = AgentUUID(uuid4())
         async with db.begin_session() as db_sess:
             db_sess.add(
@@ -1576,6 +1411,7 @@ class TestAgentDBSourceKernelFiltering:
                 agent_uuid,
                 [(ResourceGroupEntityType(), resource_group_id)],
             )
+        return agent_uuid
 
     async def _seed_target_group(self, db: ExtendedAsyncSAEngine) -> tuple[str, ResourceGroupID]:
         name = str(uuid4())
@@ -1607,6 +1443,7 @@ class TestAgentDBSourceKernelFiltering:
         domain_id: DomainID,
         domain_name: str,
         group_id: UUID,
+        user_uuid: UUID,
     ) -> SessionId:
         session_id = SessionId(uuid4())
         async with db.begin_session() as db_sess:
@@ -1618,7 +1455,7 @@ class TestAgentDBSourceKernelFiltering:
                     domain_id=domain_id,
                     domain_name=domain_name,
                     group_id=group_id,
-                    user_uuid=uuid4(),
+                    user_uuid=user_uuid,
                     resource_group_id=resource_group_id,
                     scaling_group_name=resource_group_name,
                     status=SessionStatus.RUNNING,
@@ -1650,7 +1487,7 @@ class TestAgentDBSourceKernelFiltering:
                     status=KernelStatus.RUNNING,
                     domain_name=domain_name,
                     group_id=group_id,
-                    user_uuid=uuid4(),
+                    user_uuid=user_uuid,
                     access_key="AKTEST" + uuid4().hex[:12],
                     environ={},
                     mounts=[],
@@ -1706,6 +1543,7 @@ class TestAgentDBSourceKernelFiltering:
         test_domain: str,
         test_domain_id: DomainID,
         test_group: tuple[str, str],
+        test_user: UUID,
     ) -> None:
         group_id_str, domain_name = test_group
         agent_id = AgentId(str(uuid4()))
@@ -1719,6 +1557,7 @@ class TestAgentDBSourceKernelFiltering:
             test_domain_id,
             domain_name,
             UUID(group_id_str),
+            test_user,
         )
 
         # force unset: rejected, agent group left unchanged
@@ -1733,6 +1572,172 @@ class TestAgentDBSourceKernelFiltering:
         result = await db_source.update_resource_group(agent_id, target_id, force=True)
         assert [kernel.session.session_id for kernel in result] == [str(session_id)]
         assert await self._agent_group(db_with_tables, agent_id) == (target_name, target_id)
+
+    async def _seed_designating_session(
+        self,
+        db: ExtendedAsyncSAEngine,
+        agent_uuid: AgentUUID,
+        resource_group_name: str,
+        resource_group_id: ResourceGroupID,
+        domain_id: DomainID,
+        domain_name: str,
+        group_id: UUID,
+        user_uuid: UUID,
+    ) -> SessionId:
+        """A pending session of the resource group designating the agent."""
+        session_id = SessionId(uuid4())
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                SessionRow(
+                    id=session_id,
+                    name=f"test-session-{uuid4().hex[:8]}",
+                    session_type=SessionTypes.INTERACTIVE,
+                    domain_id=domain_id,
+                    domain_name=domain_name,
+                    group_id=group_id,
+                    user_uuid=user_uuid,
+                    resource_group_id=resource_group_id,
+                    scaling_group_name=resource_group_name,
+                    status=SessionStatus.PENDING,
+                    status_info="test",
+                    cluster_mode=ClusterMode.SINGLE_NODE,
+                    created_at=datetime.now(tzutc()),
+                    images=["python:3.11"],
+                    vfolder_mounts=[],
+                    environ={},
+                    result=SessionResult.UNDEFINED,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(SessionDesignatedAgentRow(session_id=session_id, agent_uuid=agent_uuid))
+        return session_id
+
+    async def _seed_designating_deployment(
+        self,
+        db: ExtendedAsyncSAEngine,
+        agent_uuid: AgentUUID,
+        resource_group_name: str,
+        domain_name: str,
+        group_id: UUID,
+        user_uuid: UUID,
+    ) -> UUID:
+        """A deployment of the resource group designating the agent."""
+        deployment_id = uuid4()
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                EndpointRow(
+                    id=deployment_id,
+                    name=f"ep-{deployment_id.hex[:8]}",
+                    created_user=user_uuid,
+                    session_owner=user_uuid,
+                    domain=domain_name,
+                    project=group_id,
+                    resource_group=resource_group_name,
+                    lifecycle_stage=EndpointLifecycle.CREATED,
+                    replicas=1,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                DeploymentDesignatedAgentRow(endpoint_id=deployment_id, agent_uuid=agent_uuid)
+            )
+        return deployment_id
+
+    async def _deployment_designators(
+        self, db: ExtendedAsyncSAEngine, agent_uuid: AgentUUID
+    ) -> set[UUID]:
+        """The deployments designating the agent."""
+        async with db.begin_readonly_session() as db_sess:
+            return set(
+                await db_sess.scalars(
+                    sa.select(DeploymentDesignatedAgentRow.endpoint_id).where(
+                        DeploymentDesignatedAgentRow.agent_uuid == agent_uuid
+                    )
+                )
+            )
+
+    async def _session_designators(
+        self, db: ExtendedAsyncSAEngine, agent_uuid: AgentUUID
+    ) -> set[UUID]:
+        """The sessions designating the agent."""
+        async with db.begin_readonly_session() as db_sess:
+            return set(
+                await db_sess.scalars(
+                    sa.select(SessionDesignatedAgentRow.session_id).where(
+                        SessionDesignatedAgentRow.agent_uuid == agent_uuid
+                    )
+                )
+            )
+
+    async def test_update_resource_group_drops_designations_left_in_the_original_group(
+        self,
+        db_source: AgentDBSource,
+        db_with_tables: ExtendedAsyncSAEngine,
+        resource_group: str,
+        test_scaling_group_id: ResourceGroupID,
+        test_domain_id: DomainID,
+        test_group: tuple[str, str],
+        test_user: UUID,
+    ) -> None:
+        group_id_str, domain_name = test_group
+        agent_id = AgentId(str(uuid4()))
+        agent_uuid = await self._seed_agent(
+            db_with_tables, agent_id, resource_group, test_scaling_group_id
+        )
+        _, target_id = await self._seed_target_group(db_with_tables)
+        await self._seed_designating_deployment(
+            db_with_tables, agent_uuid, resource_group, domain_name, UUID(group_id_str), test_user
+        )
+        await self._seed_designating_session(
+            db_with_tables,
+            agent_uuid,
+            resource_group,
+            test_scaling_group_id,
+            test_domain_id,
+            domain_name,
+            UUID(group_id_str),
+            test_user,
+        )
+
+        await db_source.update_resource_group(agent_id, target_id, force=False)
+
+        assert await self._deployment_designators(db_with_tables, agent_uuid) == set()
+        assert await self._session_designators(db_with_tables, agent_uuid) == set()
+
+    async def test_update_resource_group_keeps_designations_in_the_target_group(
+        self,
+        db_source: AgentDBSource,
+        db_with_tables: ExtendedAsyncSAEngine,
+        resource_group: str,
+        test_scaling_group_id: ResourceGroupID,
+        test_domain_id: DomainID,
+        test_group: tuple[str, str],
+        test_user: UUID,
+    ) -> None:
+        group_id_str, domain_name = test_group
+        agent_id = AgentId(str(uuid4()))
+        agent_uuid = await self._seed_agent(
+            db_with_tables, agent_id, resource_group, test_scaling_group_id
+        )
+        target_name, target_id = await self._seed_target_group(db_with_tables)
+        deployment_id = await self._seed_designating_deployment(
+            db_with_tables, agent_uuid, target_name, domain_name, UUID(group_id_str), test_user
+        )
+        session_id = await self._seed_designating_session(
+            db_with_tables,
+            agent_uuid,
+            target_name,
+            target_id,
+            test_domain_id,
+            domain_name,
+            UUID(group_id_str),
+            test_user,
+        )
+
+        await db_source.update_resource_group(agent_id, target_id, force=False)
+
+        assert await self._deployment_designators(db_with_tables, agent_uuid) == {deployment_id}
+        assert await self._session_designators(db_with_tables, agent_uuid) == {session_id}
 
     async def test_update_resource_group_nonexistent_agent_raises(
         self,

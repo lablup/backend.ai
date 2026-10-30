@@ -16,29 +16,31 @@ from sqlalchemy.engine import CursorResult
 from ai.backend.common.data.entity.kernel import KernelID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import ResourceSlot
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.resource_usage_history.types import (
     KernelUsageRecordData,
 )
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.resource_usage_history import (
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.resource_usage_history.creators import KernelUsageRecordCreator
+from ai.backend.manager.models.resource_usage_history.row import (
     DomainUsageBucketRow,
     KernelUsageRecordRow,
     ProjectUsageBucketRow,
     UsageBucketEntryRow,
     UserUsageBucketRow,
 )
-from ai.backend.manager.models.resource_usage_history.creators import KernelUsageRecordCreator
 from ai.backend.manager.models.resource_usage_history.scopes import (
-    DomainUsageBucketOperationScope,
-    ProjectUsageBucketOperationScope,
-    UserUsageBucketOperationScope,
+    DomainUsageBucketTarget,
+    ProjectUsageBucketTarget,
+    UserUsageBucketTarget,
+)
+from ai.backend.manager.models.resource_usage_history.searchers import (
+    DomainUsageBucketSearcher,
+    KernelUsageRecordSearcher,
+    ProjectUsageBucketSearcher,
+    UserUsageBucketSearcher,
 )
 from ai.backend.manager.models.specs.creator import NestedFieldToCreate
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    execute_batch_querier,
-)
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.resource_usage_history.types import (
     DomainUsageBucketSearchResult,
@@ -50,7 +52,7 @@ from ai.backend.manager.repositories.resource_usage_history.types import (
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-    from ai.backend.manager.data.fair_share import (
+    from ai.backend.manager.data.fair_share.types import (
         DomainUsageBucketKey,
         ProjectUsageBucketKey,
         UsageBucketAggregationResult,
@@ -58,7 +60,7 @@ if TYPE_CHECKING:
     )
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("ResourceUsageHistoryDBSource",)
 
@@ -192,21 +194,19 @@ class ResourceUsageHistoryDBSource:
             Tuple of (created records data, number of kernels with updated observation times)
         """
         log.debug(
-            "[DBSource] record_fair_share_observation: specs_count={}, "
-            "kernel_observation_times_count={}, user_deltas={}, project_deltas={}, "
-            "domain_deltas={}",
-            len(creations),
-            len(kernel_observation_times),
-            len(aggregation_result.user_usage_deltas),
-            len(aggregation_result.project_usage_deltas),
-            len(aggregation_result.domain_usage_deltas),
+            "fair share observation recording",
+            usage_record_count=len(creations),
+            observed_kernel_count=len(kernel_observation_times),
+            user_delta_count=len(aggregation_result.user_usage_deltas),
+            project_delta_count=len(aggregation_result.project_usage_deltas),
+            domain_delta_count=len(aggregation_result.domain_usage_deltas),
         )
 
         async with self._db.begin_session() as db_sess:
             # Step 1: Bulk create kernel usage records
             records = await self._add_usage_records(db_sess, creations)
 
-            log.debug("[DBSource] Created {} kernel usage records", len(records))
+            log.debug("kernel usage records created", usage_record_count=len(records))
 
             # Step 2: Update last_observed_at for kernels
             updated_count = 0
@@ -224,7 +224,7 @@ class ResourceUsageHistoryDBSource:
                     update_result = await db_sess.execute(update_stmt)
                     updated_count += cast(CursorResult[Any], update_result).rowcount
 
-            log.debug("[DBSource] Updated last_observed_at for {} kernels", updated_count)
+            log.debug("kernel last observation time updated", kernel_count=updated_count)
 
             # Step 3: Increment usage buckets
             await self._increment_user_usage_buckets(
@@ -237,88 +237,86 @@ class ResourceUsageHistoryDBSource:
                 db_sess, aggregation_result.domain_usage_deltas, decay_unit_days
             )
 
-            log.debug("[DBSource] Incremented usage buckets successfully")
+            log.debug("usage buckets incremented")
 
             return records, updated_count
 
     async def search_kernel_usage_records(
         self,
-        querier: BatchQuerier,
+        searcher: KernelUsageRecordSearcher,
     ) -> KernelUsageRecordSearchResult:
         """Search kernel usage records with pagination."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(KernelUsageRecordRow)
-            result = await execute_batch_querier(db_sess, query, querier)
-            items = [row.KernelUsageRecordRow.to_data() for row in result.rows]
-            return KernelUsageRecordSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return KernelUsageRecordSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     # ==================== Domain Usage Buckets ====================
 
     async def search_domain_usage_buckets(
         self,
-        querier: BatchQuerier,
-        scope: DomainUsageBucketOperationScope | None = None,
+        searcher: DomainUsageBucketSearcher,
+        scope: DomainUsageBucketTarget | None = None,
     ) -> DomainUsageBucketSearchResult:
         """Search domain usage buckets with pagination."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(DomainUsageBucketRow)
-            result = await execute_batch_querier(
-                db_sess, query, querier, scopes=[scope] if scope is not None else ()
+        async with self._v2_ops.read_ops() as r:
+            result = (
+                await r.search_in_global(searcher)
+                if scope is None
+                else await r.search_with_scopes([scope], searcher)
             )
-            items = [row.DomainUsageBucketRow.to_data() for row in result.rows]
-            return DomainUsageBucketSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        return DomainUsageBucketSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     # ==================== Project Usage Buckets ====================
 
     async def search_project_usage_buckets(
         self,
-        querier: BatchQuerier,
-        scope: ProjectUsageBucketOperationScope | None = None,
+        searcher: ProjectUsageBucketSearcher,
+        scope: ProjectUsageBucketTarget | None = None,
     ) -> ProjectUsageBucketSearchResult:
         """Search project usage buckets with pagination."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ProjectUsageBucketRow)
-            result = await execute_batch_querier(
-                db_sess, query, querier, scopes=[scope] if scope is not None else ()
+        async with self._v2_ops.read_ops() as r:
+            result = (
+                await r.search_in_global(searcher)
+                if scope is None
+                else await r.search_with_scopes([scope], searcher)
             )
-            items = [row.ProjectUsageBucketRow.to_data() for row in result.rows]
-            return ProjectUsageBucketSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        return ProjectUsageBucketSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     # ==================== User Usage Buckets ====================
 
     async def search_user_usage_buckets(
         self,
-        querier: BatchQuerier,
-        scope: UserUsageBucketOperationScope | None = None,
+        searcher: UserUsageBucketSearcher,
+        scope: UserUsageBucketTarget | None = None,
     ) -> UserUsageBucketSearchResult:
         """Search user usage buckets with pagination."""
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(UserUsageBucketRow)
-            result = await execute_batch_querier(
-                db_sess, query, querier, scopes=[scope] if scope is not None else ()
+        async with self._v2_ops.read_ops() as r:
+            result = (
+                await r.search_in_global(searcher)
+                if scope is None
+                else await r.search_with_scopes([scope], searcher)
             )
-            items = [row.UserUsageBucketRow.to_data() for row in result.rows]
-            return UserUsageBucketSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        return UserUsageBucketSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     # ==================== Aggregation Queries ====================
 

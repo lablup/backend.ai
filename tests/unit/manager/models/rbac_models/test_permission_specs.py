@@ -8,7 +8,7 @@ from ai.backend.manager.models.rbac_models.permission.creators import RolePermis
 from ai.backend.manager.models.rbac_models.permission.lookups import RolePermissionOwnerLookup
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
 from ai.backend.manager.models.rbac_models.permission.purgers import RolePermissionPurger
-from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
+from ai.backend.manager.models.rbac_models.permission.scopes import RolePermissionTarget
 
 
 class TestRolePermissionCreator:
@@ -66,7 +66,7 @@ class TestRolePermissionReadSpecs:
     def test_the_operation_scope_bounds_the_read_to_one_role(self) -> None:
         role_id = RoleID(uuid.uuid4())
 
-        condition = PermissionOperationScope(role_id=role_id).to_condition()()
+        condition = RolePermissionTarget(role_id=role_id).to_condition()()
 
         assert str(condition) == "permissions.role_id = :role_id_1"
 

@@ -31,6 +31,13 @@ pants_ignore = [
 ]
 build_file_prelude_globs = ["tools/build-macros.py"]
 unmatched_build_file_globs = "error"
+# A repo-wide goal (`check ::`, `test ::`) holds more than the 4GiB default, so pantsd
+# is restarted mid-run. The restart lands in the middle of a write to the machine-wide
+# LMDB store at ~/.cache/pants/lmdb_store, which every checkout shares, and a torn
+# freelist there stops pants in all of them until the store is rebuilt.
+# The value is a resident-size ceiling per daemon, and there is one daemon per
+# checkout, so a machine running several at once needs headroom for each.
+pantsd_max_memory_usage = "6GiB"
 
 [anonymous-telemetry]
 enabled = false
@@ -77,8 +84,9 @@ enable_resolves = true
 # * Let other developers do:
 #   - Run `pants export` again
 #   - Update their local IDE/editor's interpreter path configurations
-interpreter_constraints = ["CPython==3.13.7"]
+interpreter_constraints = ["CPython==3.13.18"]
 resolver = "uv"
+pip_version = "26.2.2"
 tailor_pex_binary_targets = false
 
 [python-bootstrap]
@@ -97,10 +105,7 @@ unowned_dependency_behavior = "error"
 python-default = "python.lock"
 python-kernel = "python-kernel.lock"
 pants-plugins = "tools/pants-plugins.lock"
-black = "tools/black.lock"
-pytest = "tools/pytest.lock"
 coverage-py = "tools/coverage-py.lock"
-mypy = "tools/mypy.lock"
 towncrier = "tools/towncrier.lock"
 setuptools = "tools/setuptools.lock"
 
@@ -114,19 +119,28 @@ bin = [
 
 [pex-cli]
 # Pin the PEX version to get benefits from a-scie/lift#116.
-version = "v2.95.1"
+version = "v2.104.1"
 known_versions = [
-    "v2.95.1|macos_arm64|2cc018cf1a112ae7f94e78456f90da2d15c1a3c1327da4c73c98701ab1f8f732|5124990",
-    "v2.95.1|macos_x86_64|2cc018cf1a112ae7f94e78456f90da2d15c1a3c1327da4c73c98701ab1f8f732|5124990",
-    "v2.95.1|linux_arm64|2cc018cf1a112ae7f94e78456f90da2d15c1a3c1327da4c73c98701ab1f8f732|5124990",
-    "v2.95.1|linux_x86_64|2cc018cf1a112ae7f94e78456f90da2d15c1a3c1327da4c73c98701ab1f8f732|5124990",
+    "v2.104.1|macos_arm64|09b82471a777606cc1b74af13c3a4c8d09982dfb2d448d5dd0ce5d408ea1035b|5408285",
+    "v2.104.1|macos_x86_64|09b82471a777606cc1b74af13c3a4c8d09982dfb2d448d5dd0ce5d408ea1035b|5408285",
+    "v2.104.1|linux_arm64|09b82471a777606cc1b74af13c3a4c8d09982dfb2d448d5dd0ce5d408ea1035b|5408285",
+    "v2.104.1|linux_x86_64|09b82471a777606cc1b74af13c3a4c8d09982dfb2d448d5dd0ce5d408ea1035b|5408285",
 ]
 # When trying a new pex version, you could find out the hash and size-in-bytes as follows:
 # $ curl -s -L https://github.com/pantsbuild/pex/releases/download/v2.28.1/pex | tee >(wc -c) >(shasum -a 256) >/dev/null
 # As of PEX v2.18, the GitHub release descriptions include the checksum and size for reference.
 
-[black]
-install_from_resolve = "black"
+[uv]
+version = "0.13.4"
+known_versions = [
+    "0.13.4|macos_arm64|e0b1d4743ce64c55d9f0f4a444afa6b81125680070ee04e853fcd0f6c1ebf8f1|14326193",
+    "0.13.4|macos_x86_64|7be2dcd316122f4b3e5a0a7889f6248266c14425374e105ff7dc9779184603a6|17217446",
+    "0.13.4|linux_arm64|253a17cadcb659ae77a0fe3b9a2f1c14297528d480c421899e61e64d64f24e8f|17045416",
+    "0.13.4|linux_x86_64|28d4385f9f9d1d1c7654d85b3855e0e2615b2f6cc13136a2edff858bbdc16ff1|18450841",
+]
+
+[update-build-files]
+formatter = "ruff"
 
 [ruff]
 version = "0.14.0"
@@ -139,7 +153,17 @@ known_versions = [
 ]
 
 [pytest]
-install_from_resolve = "pytest"
+install_from_resolve = "python-default"
+requirements = [
+    "pytest",
+    "pytest-aiohttp",
+    "pytest-asyncio",
+    "pytest-cov",
+    "pytest-custom_exit_code",
+    "pytest-dependency",
+    "pytest-mock",
+    "pytest-timeout",
+]
 args = ["-v", "--suppress-no-test-exit-code"]
 execution_slot_var = "BACKEND_TEST_EXEC_SLOT"
 
@@ -148,7 +172,8 @@ install_from_resolve = "coverage-py"
 report = ["xml", "console"]
 
 [mypy]
-install_from_resolve = "mypy"
+install_from_resolve = "python-default"
+requirements = ["mypy", "pydantic", "strawberry-graphql"]
 config = "pyproject.toml"
 
 [setuptools]

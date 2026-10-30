@@ -1,11 +1,17 @@
 from collections.abc import AsyncIterator, Sequence
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, override
+from typing import Any, ClassVar, override
 
-from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE, NOOP_STORAGE_BACKEND_TYPE
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
+from ai.backend.common.data.storage.types import (
+    StorageBackendCapability,
+    StorageBackendType,
+)
+from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE, NOOP_STORAGE_VOLUME_NAME
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.storage.probe.volume import AbstractVolumeStatusCheck
 from ai.backend.common.types import BinarySize, HardwareMetadata, QuotaScopeID
 from ai.backend.storage.types import (
     CapacityUsage,
@@ -132,12 +138,12 @@ class NoopFSOpModel(AbstractFSOpModel):
 
 
 class NoopVolume(AbstractVolume):
-    name = NOOP_STORAGE_BACKEND_TYPE
+    name: ClassVar[StorageBackendType] = StorageBackendType("noop")
 
     @override
     def info(self) -> VolumeInfo:
         return VolumeInfo(
-            backend=NOOP_STORAGE_BACKEND_TYPE,
+            backend=StorageBackendType("noop"),
             path=self.mount_path,
             fsprefix=None,
             options=None,
@@ -151,10 +157,14 @@ class NoopVolume(AbstractVolume):
     async def create_fsop_model(self) -> AbstractFSOpModel:
         return NoopFSOpModel()
 
+    @override
+    def volume_status_checker(self) -> AbstractVolumeStatusCheck | None:
+        return None
+
     # ------ volume operations -------
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
         return frozenset()
 
     @override
@@ -328,4 +338,6 @@ def init_noop_volume(
         event_producer=event_producer,
         watcher=None,
         options=None,
+        volume_name=StorageVolumeName(NOOP_STORAGE_VOLUME_NAME),
+        status_check_config=None,
     )

@@ -12,8 +12,6 @@ from ai.backend.common.data.entity.error_log import ErrorLogFieldType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID, ResourceGroupName
 from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.user import UserEntityType
-from ai.backend.common.etcd import AsyncEtcd, ConfigScopes
-from ai.backend.common.types import HostPortPair
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import (
     FieldGroupMeta,
@@ -25,11 +23,10 @@ from ai.backend.manager.api.rest.manager.handler import ManagerHandler
 from ai.backend.manager.api.rest.manager.registry import register_manager_api_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
 from ai.backend.manager.api.rest.types import RouteDeps
-from ai.backend.manager.config.bootstrap import BootstrapConfig
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
-from ai.backend.manager.models.agent import agents
+from ai.backend.manager.models.agent.row import agents
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.manager_admin.repository import ManagerAdminRepository
@@ -44,9 +41,14 @@ from ai.backend.testutils.processors import ops_processor_group
 
 
 @pytest.fixture()
-def error_log_processors(database_engine: ExtendedAsyncSAEngine) -> ErrorLogProcessors:
+def error_log_processors(
+    database_engine: ExtendedAsyncSAEngine,
+    config_provider: ManagerConfigProvider,
+) -> ErrorLogProcessors:
     return ErrorLogProcessors(
-        ops_processor_group(database_engine, GroupMeta(UserEntityType())).field_group(
+        ops_processor_group(
+            database_engine, GroupMeta(UserEntityType()), config_provider
+        ).field_group(
             FieldGroupMeta(ErrorLogFieldType()),
             ErrorLogData,
             LookupErrorLogOwnerAction,
@@ -59,32 +61,13 @@ def error_log_processors(database_engine: ExtendedAsyncSAEngine) -> ErrorLogProc
 def manager_admin_processors(
     database_engine: ExtendedAsyncSAEngine,
     config_provider: ManagerConfigProvider,
-    bootstrap_config: BootstrapConfig,
     valkey_clients: ValkeyClients,
     processor_registry: ProcessorRegistry[Any],
 ) -> ManagerAdminProcessors:
-    etcd_config = bootstrap_config.etcd
-    etcd_addr = etcd_config.addr
-    if isinstance(etcd_addr, list):
-        addrs: HostPortPair | list[HostPortPair] = [
-            HostPortPair(host=a.host, port=a.port) for a in etcd_addr
-        ]
-    else:
-        addrs = HostPortPair(host=etcd_addr.host, port=etcd_addr.port)
-    etcd = AsyncEtcd(
-        addrs=addrs,
-        namespace=etcd_config.namespace,
-        scope_prefix_map={
-            ConfigScopes.GLOBAL: "global",
-            ConfigScopes.SGROUP: "sgroup/default",
-            ConfigScopes.NODE: "node/test",
-        },
-    )
     repo = ManagerAdminRepository(database_engine)
     service = ManagerAdminService(
         repository=repo,
         config_provider=config_provider,
-        etcd=etcd,
         db=database_engine,
         valkey_stat=valkey_clients.stat,
     )

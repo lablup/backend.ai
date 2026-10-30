@@ -6,7 +6,7 @@ from datetime import timedelta
 from decimal import Decimal
 from typing import override
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
     CheckerAssignment,
     IdleActivityDecision,
@@ -14,7 +14,7 @@ from ai.backend.manager.sokovan.idle_check.checkers.base import (
     IdleCheckerContext,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class SessionLifetimeChecker(IdleChecker):
@@ -32,9 +32,9 @@ class SessionLifetimeChecker(IdleChecker):
             lifetime_spec = assignment.definition.spec.session_lifetime
             if lifetime_spec is None:
                 log.error(
-                    "Session lifetime checker {} has mismatched spec type: {}",
-                    assignment.definition.checker_id,
-                    assignment.definition.spec.type,
+                    "session lifetime checker has mismatched spec type",
+                    idle_checker_id=assignment.definition.checker_id,
+                    spec_type=assignment.definition.spec.type,
                 )
                 continue
             max_lifetime_seconds = Decimal(lifetime_spec.max_lifetime_seconds)

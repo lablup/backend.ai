@@ -1,9 +1,13 @@
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.manager.actions.registry.group import ProcessorGroup
 from ai.backend.manager.actions.v2.bulk.partial_processor import PartialBulkActionProcessor
 from ai.backend.manager.actions.v2.global_scope.processor import (
     AnonymousGlobalActionProcessor,
     GlobalActionProcessor,
 )
+from ai.backend.manager.actions.v2.lookup.processor import LookupActionProcessor
+from ai.backend.manager.actions.v2.membership.processor import MembershipActionProcessor
+from ai.backend.manager.actions.v2.ops.result import BatchOpsResult, LookupOpsResult
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.services.container_registry.actions.bulk_get import (
     BulkGetContainerRegistriesAction,
@@ -44,6 +48,12 @@ from ai.backend.manager.services.container_registry.actions.load_container_regis
     LoadContainerRegistriesAction,
     LoadContainerRegistriesActionResult,
 )
+from ai.backend.manager.services.container_registry.actions.lookup import (
+    LookupContainerRegistryAction,
+)
+from ai.backend.manager.services.container_registry.actions.partial_bulk_purge_container_registries import (
+    PartialBulkPurgeContainerRegistriesAction,
+)
 from ai.backend.manager.services.container_registry.actions.read_registry_quota import (
     ReadRegistryQuotaAction,
     ReadRegistryQuotaActionResult,
@@ -54,7 +64,10 @@ from ai.backend.manager.services.container_registry.actions.rescan_images import
 )
 from ai.backend.manager.services.container_registry.actions.search_container_registries import (
     SearchContainerRegistriesAction,
-    SearchContainerRegistriesActionResult,
+)
+from ai.backend.manager.services.container_registry.actions.set_container_registry_global import (
+    SetContainerRegistryGlobalAction,
+    SetContainerRegistryGlobalActionResult,
 )
 from ai.backend.manager.services.container_registry.actions.update_container_registry import (
     UpdateContainerRegistryAction,
@@ -68,6 +81,10 @@ from ai.backend.manager.services.container_registry.service import ContainerRegi
 
 
 class ContainerRegistryProcessors:
+    lookup_by_name_and_registry_project: LookupActionProcessor[
+        LookupContainerRegistryAction, LookupOpsResult[ContainerRegistryID]
+    ]
+
     rescan_images: GlobalActionProcessor[RescanImagesAction, RescanImagesActionResult]
     clear_images: GlobalActionProcessor[ClearImagesAction, ClearImagesActionResult]
     load_container_registries: GlobalActionProcessor[
@@ -85,33 +102,40 @@ class ContainerRegistryProcessors:
     update_container_registry: GlobalActionProcessor[
         UpdateContainerRegistryAction, UpdateContainerRegistryActionResult
     ]
+    set_container_registry_global: MembershipActionProcessor[
+        SetContainerRegistryGlobalAction, SetContainerRegistryGlobalActionResult
+    ]
     delete_container_registry: GlobalActionProcessor[
         DeleteContainerRegistryAction, DeleteContainerRegistryActionResult
     ]
+    partial_bulk_purge_container_registries: PartialBulkActionProcessor[
+        PartialBulkPurgeContainerRegistriesAction, ContainerRegistryData
+    ]
     search_container_registries: GlobalActionProcessor[
-        SearchContainerRegistriesAction, SearchContainerRegistriesActionResult
+        SearchContainerRegistriesAction, BatchOpsResult[ContainerRegistryData]
     ]
     # What the DataLoader reads: checked per registry.
     bulk_get: PartialBulkActionProcessor[BulkGetContainerRegistriesAction, ContainerRegistryData]
     handle_harbor_webhook: AnonymousGlobalActionProcessor[
         HandleHarborWebhookAction, HandleHarborWebhookActionResult
     ]
-    create_registry_quota: GlobalActionProcessor[
+    create_registry_quota: AnonymousGlobalActionProcessor[
         CreateRegistryQuotaAction, CreateRegistryQuotaActionResult
     ]
-    read_registry_quota: GlobalActionProcessor[
+    read_registry_quota: AnonymousGlobalActionProcessor[
         ReadRegistryQuotaAction, ReadRegistryQuotaActionResult
     ]
-    update_registry_quota: GlobalActionProcessor[
+    update_registry_quota: AnonymousGlobalActionProcessor[
         UpdateRegistryQuotaAction, UpdateRegistryQuotaActionResult
     ]
-    delete_registry_quota: GlobalActionProcessor[
+    delete_registry_quota: AnonymousGlobalActionProcessor[
         DeleteRegistryQuotaAction, DeleteRegistryQuotaActionResult
     ]
 
     def __init__(
         self, group: ProcessorGroup[ContainerRegistryData], service: ContainerRegistryService
     ) -> None:
+        self.lookup_by_name_and_registry_project = group.lookup_ops(LookupContainerRegistryAction)
         self.rescan_images = group.global_scope(RescanImagesAction, service.rescan_images)
         self.clear_images = group.global_scope(ClearImagesAction, service.clear_images)
         self.load_container_registries = group.global_scope(
@@ -129,26 +153,33 @@ class ContainerRegistryProcessors:
         self.update_container_registry = group.global_scope(
             UpdateContainerRegistryAction, service.update_container_registry
         )
+        self.set_container_registry_global = group.membership(
+            SetContainerRegistryGlobalAction, service.set_container_registry_global
+        )
         self.delete_container_registry = group.global_scope(
             DeleteContainerRegistryAction, service.delete_container_registry
         )
-        self.search_container_registries = group.global_scope(
-            SearchContainerRegistriesAction, service.search_container_registries
+        self.partial_bulk_purge_container_registries = group.global_partial_bulk_purge_ops(
+            PartialBulkPurgeContainerRegistriesAction
+        )
+        self.search_container_registries = group.global_searcher_ops(
+            SearchContainerRegistriesAction
         )
         self.bulk_get = group.partial_bulk_get_ops(BulkGetContainerRegistriesAction)
         # Harbor holds no keypair; the service checks its webhook secret instead.
         self.handle_harbor_webhook = group.anonymous_global(
             HandleHarborWebhookAction, service.handle_harbor_webhook
         )
-        self.create_registry_quota = group.global_scope(
+        # Gated at the API layer (REST middleware, legacy GraphQL allowed_roles), not here.
+        self.create_registry_quota = group.anonymous_global(
             CreateRegistryQuotaAction, service.create_registry_quota
         )
-        self.read_registry_quota = group.global_scope(
+        self.read_registry_quota = group.anonymous_global(
             ReadRegistryQuotaAction, service.read_registry_quota
         )
-        self.update_registry_quota = group.global_scope(
+        self.update_registry_quota = group.anonymous_global(
             UpdateRegistryQuotaAction, service.update_registry_quota
         )
-        self.delete_registry_quota = group.global_scope(
+        self.delete_registry_quota = group.anonymous_global(
             DeleteRegistryQuotaAction, service.delete_registry_quota
         )

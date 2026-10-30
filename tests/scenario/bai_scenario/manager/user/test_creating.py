@@ -7,19 +7,18 @@ from typing import Any, override
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.user.request import CreateUserInput
 from ai.backend.common.dto.manager.v2.user.types import UserRole as UserRoleDTO
 from ai.backend.common.dto.manager.v2.user.types import UserStatus as UserStatusDTO
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.user.creators import UserCreator
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.user.creators import UserCreateSpec
@@ -29,9 +28,9 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.user import AGrant
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
+from bai_scenario.seeds.domain.domain import TestSeedDomain
 
 MADE = "made"
 """만들려는 사용자의 이름. 시나리오가 정한 값이다."""
@@ -59,7 +58,7 @@ class SomeoneInADomain(Given[Any, ADomainAndACaller]):
 
     @override
     async def lay(self, seeding: Any) -> ADomainAndACaller:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         caller = await seeding.within(SomeoneOf(domain))
         if self.granted:
             await seeding.within(AGrant.on_domain(domain, caller, Permission.CREATE))
@@ -139,7 +138,7 @@ class BulkCreatingAUser(When[ADomainAndACaller, UserAdapter, Any]):
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotCreateAUser(
-    Scenario[SeedingSession, ADomainAndACaller, UserAdapter, Any]
+    Scenario[TestSeedingSession, ADomainAndACaller, UserAdapter, Any]
 ):
     @override
     def summary(self) -> str:
@@ -150,7 +149,7 @@ class AUserGrantedNothingMayNotCreateAUser(
         return "역할을 받지 않은 사용자가 만들려 하면, 도메인 스코프 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return SomeoneInADomain(granted=False)
 
     @override
@@ -164,7 +163,7 @@ class AUserGrantedNothingMayNotCreateAUser(
 
 @dataclass(frozen=True)
 class ANameNoDomainHoldsMayNotHoldAUser(
-    Scenario[SeedingSession, ADomainAndACaller, UserAdapter, Any]
+    Scenario[TestSeedingSession, ADomainAndACaller, UserAdapter, Any]
 ):
     @override
     def summary(self) -> str:
@@ -178,7 +177,7 @@ class ANameNoDomainHoldsMayNotHoldAUser(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return SomeoneInADomain(granted=True)
 
     @override
@@ -191,7 +190,9 @@ class ANameNoDomainHoldsMayNotHoldAUser(
 
 
 @dataclass(frozen=True)
-class OnlyTheSuperadminMayBulkCreate(Scenario[SeedingSession, ADomainAndACaller, UserAdapter, Any]):
+class OnlyTheSuperadminMayBulkCreate(
+    Scenario[TestSeedingSession, ADomainAndACaller, UserAdapter, Any]
+):
     @override
     def summary(self) -> str:
         return "a-user-who-is-not-the-superadmin-may-not-bulk-create-users"
@@ -204,7 +205,7 @@ class OnlyTheSuperadminMayBulkCreate(Scenario[SeedingSession, ADomainAndACaller,
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return SomeoneInADomain(granted=True)
 
     @override
@@ -218,7 +219,7 @@ class OnlyTheSuperadminMayBulkCreate(Scenario[SeedingSession, ADomainAndACaller,
 
 @dataclass(frozen=True)
 class OnlyTheSuperadminMayBulkCreateWithKeypairs(
-    Scenario[SeedingSession, ADomainAndACaller, UserAdapter, Any]
+    Scenario[TestSeedingSession, ADomainAndACaller, UserAdapter, Any]
 ):
     @override
     def summary(self) -> str:
@@ -229,7 +230,7 @@ class OnlyTheSuperadminMayBulkCreateWithKeypairs(
         return "권한 받은 사용자가 이 일괄 생성을 하려 하면, 전역 역할 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, ADomainAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ADomainAndACaller]:
         return SomeoneInADomain(granted=True)
 
     @override
@@ -241,7 +242,7 @@ class OnlyTheSuperadminMayBulkCreateWithKeypairs(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Any]] = [
+SCENARIOS: list[Scenario[TestSeedingSession, Any, UserAdapter, Any]] = [
     AUserGrantedNothingMayNotCreateAUser(),
     ANameNoDomainHoldsMayNotHoldAUser(),
     OnlyTheSuperadminMayBulkCreate(),
@@ -251,7 +252,7 @@ SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Any]] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_creating(
-    scenario: Scenario[SeedingSession, Any, UserAdapter, Any],
+    scenario: Scenario[TestSeedingSession, Any, UserAdapter, Any],
     adapter: UserAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

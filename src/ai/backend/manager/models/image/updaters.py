@@ -9,10 +9,12 @@ from typing import Any, override
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.image import ImageID
-from ai.backend.manager.data.image.types import ImageData, ImageType
+from ai.backend.manager.data.image.types import ImageData, ImageStatus, ImageType
+from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.models.image.row import ImageRow
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
+from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
+from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState, TriState
 
 
@@ -87,4 +89,88 @@ class ImageUpdater(DataUpdater[ImageRow, ImageData]):
 
     @override
     def to_data(self, row: ImageRow) -> ImageData:
-        return row.to_dataclass()
+        return ImageSearchableFields.own.to_data(row)
+
+
+@dataclass
+class ImageSoftDeleteUpdater(GuardedDataUpdater[ImageRow, ImageData]):
+    """Forgets a live image."""
+
+    image_id: ImageID
+
+    @property
+    @override
+    def row_class(self) -> type[ImageRow]:
+        return ImageRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ImageRow.id
+
+    @override
+    def target_id_value(self) -> ImageID:
+        return self.image_id
+
+    @override
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=ImageSearchableFields.own.status.filter.equals(ImageStatus.ALIVE),
+                error=ImageNotFound(f"Image not found (id:{self.image_id})"),
+            ),
+        )
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"status": ImageStatus.DELETED}
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: ImageRow) -> ImageData:
+        return ImageSearchableFields.own.to_data(row)
+
+
+@dataclass
+class ImageRestoreUpdater(GuardedDataUpdater[ImageRow, ImageData]):
+    """Puts a forgotten image back in service; a live one is left alive."""
+
+    image_id: ImageID
+
+    @property
+    @override
+    def row_class(self) -> type[ImageRow]:
+        return ImageRow
+
+    @override
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return ImageRow.id
+
+    @override
+    def target_id_value(self) -> ImageID:
+        return self.image_id
+
+    @override
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=ImageSearchableFields.own.status.filter.in_(ImageStatus.restorable()),
+                error=ImageNotFound(f"Image not found (id:{self.image_id})"),
+            ),
+        )
+
+    @override
+    def build_values(self) -> dict[str, Any]:
+        return {"status": ImageStatus.ALIVE}
+
+    @property
+    @override
+    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
+        return ()
+
+    @override
+    def to_data(self, row: ImageRow) -> ImageData:
+        return ImageSearchableFields.own.to_data(row)

@@ -9,18 +9,19 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.audit_log import AuditLogID
+from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.types import ActionKind, OperationStatus
-from ai.backend.manager.data.audit_log.types import AuditLogData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
+    EntityTypeColumn,
     IPAddressColumn,
     StrEnumType,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("AuditLogRow",)
 
@@ -42,17 +43,17 @@ class AuditLogRow(Base):
     )
 
     # NULL for a relation operation: it names two scopes and no entity kind.
-    entity_type: Mapped[str | None] = mapped_column(
-        "entity_type", sa.String, index=True, nullable=True
+    entity_type: Mapped[EntityType | None] = mapped_column(
+        "entity_type", EntityTypeColumn(), index=True, nullable=True
     )
     operation: Mapped[str] = mapped_column("operation", sa.String, index=True, nullable=False)
 
     # Declared by v2 actions; legacy rows carry the "entity_type:operation" spec type.
     action_name: Mapped[str] = mapped_column("action_name", sa.String, index=True, nullable=False)
 
-    entity_id: Mapped[str | None] = mapped_column(
+    entity_id: Mapped[uuid.UUID | None] = mapped_column(
         "entity_id",
-        sa.String,
+        GUID(),
         nullable=True,
         index=True,
     )
@@ -111,24 +112,3 @@ class AuditLogRow(Base):
     @override
     def __repr__(self) -> str:
         return self.__str__()
-
-    def to_dataclass(self) -> AuditLogData:
-        return AuditLogData(
-            id=AuditLogID(self.id),
-            action_id=self.action_id,
-            action_kind=self.action_kind,
-            action_name=self.action_name,
-            entity_type=self.entity_type,
-            operation=self.operation,
-            created_at=self.created_at,
-            description=self.description,
-            status=self.status,
-            target_entity_id=self.entity_id,
-            lookup_kind=self.lookup_kind,
-            lookup_key=self.lookup_key,
-            request_id=self.request_id,
-            triggered_by=self.triggered_by,
-            acted_as=self.acted_as,
-            duration=self.duration,
-            client_ip=self.client_ip,
-        )

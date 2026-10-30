@@ -5,19 +5,16 @@ from typing import override
 
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
 from ai.backend.common.data.entity.types import EntityType
-from ai.backend.manager.actions.v2.ops.base import SearchGlobalOpsAction
+from ai.backend.manager.actions.v2.ops.base import GlobalSearcherOpsAction
 from ai.backend.manager.data.storage_namespace.types import StorageNamespaceData
 from ai.backend.manager.models.storage_namespace.row import StorageNamespaceRow
-from ai.backend.manager.models.storage_namespace.searchers import StorageNamespaceSearcher
 
 
-@dataclass
+@dataclass(frozen=True)
 class SearchStorageNamespacesAction(
-    SearchGlobalOpsAction[StorageNamespaceRow, StorageNamespaceData]
+    GlobalSearcherOpsAction[StorageNamespaceRow, StorageNamespaceData]
 ):
     """Page through registered namespaces."""
-
-    searcher: StorageNamespaceSearcher
 
     @override
     @classmethod
@@ -28,7 +25,3 @@ class SearchStorageNamespacesAction(
     @classmethod
     def action_name(cls) -> str:
         return "search_storage_namespaces"
-
-    @override
-    def to_searcher(self) -> StorageNamespaceSearcher:
-        return self.searcher

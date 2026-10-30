@@ -8,8 +8,9 @@ import yarl
 from aiohttp import web
 from pytest_mock import MockerFixture
 
+from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
+from ai.backend.common.endpoint_pool.types import AcquiredEndpoint
 from ai.backend.web import server
-from ai.backend.web.clients.endpoint_pool import AcquiredEndpoint, HealthyEndpointPool
 from ai.backend.web.config.unified import WebServerUnifiedConfig
 
 from .conftest import DummyApiConfig, DummyConfig

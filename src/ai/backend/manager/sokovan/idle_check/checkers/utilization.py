@@ -7,7 +7,7 @@ from typing import override
 
 from ai.backend.common.data.idle_checker.types import UtilizationSpec
 from ai.backend.common.types import SessionId
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.idle_checker.types import SessionUtilizationQuery
 from ai.backend.manager.repositories.metric.repository import MetricRepository
 from ai.backend.manager.sokovan.idle_check.checkers.base import (
@@ -17,7 +17,7 @@ from ai.backend.manager.sokovan.idle_check.checkers.base import (
     IdleCheckerContext,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class UtilizationChecker(IdleChecker):
@@ -42,9 +42,9 @@ class UtilizationChecker(IdleChecker):
             spec = assignment.definition.spec.utilization
             if spec is None:
                 log.error(
-                    "Utilization checker has mismatched spec type: checker_id={} spec_type={}",
-                    assignment.definition.checker_id,
-                    assignment.definition.spec.type,
+                    "utilization checker has mismatched spec type",
+                    idle_checker_id=assignment.definition.checker_id,
+                    spec_type=assignment.definition.spec.type,
                 )
                 continue
             valid_assignments.append((assignment, spec))

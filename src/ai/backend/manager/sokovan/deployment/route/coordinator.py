@@ -17,7 +17,7 @@ from ai.backend.common.events.event_types.schedule.anycast import (
 )
 from ai.backend.common.leader.tasks import EventTaskSpec
 from ai.backend.common.service_discovery import ServiceDiscovery
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.deployment.types import (
@@ -28,33 +28,41 @@ from ai.backend.manager.data.deployment.types import (
 from ai.backend.manager.data.session.types import SchedulingResult
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.condition_utils import combine_conditions_and, combine_conditions_or
-from ai.backend.manager.models.routing.conditions import RouteConditions
+from ai.backend.manager.models.routing.searchable_fields import ReplicaSearchableFields
+from ai.backend.manager.models.routing.searchers import RouteDataSearcher
 from ai.backend.manager.models.routing.updaters import ReplicaBatchUpdater
 from ai.backend.manager.models.scheduling_history.creators import RouteHistoryCreator
 from ai.backend.manager.models.specs.pagination import NoPagination
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.deployment import DeploymentRepository
-from ai.backend.manager.repositories.deployment.types import RouteHistoryToCreate
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
+from ai.backend.manager.repositories.deployment.types.endpoint import RouteHistoryToCreate
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
-from ai.backend.manager.sokovan.deployment.route.handlers import (
+from ai.backend.manager.sokovan.deployment.route.handlers.appproxy_sync import (
     AppProxySyncRouteHandler,
-    DrainingRouteHandler,
+)
+from ai.backend.manager.sokovan.deployment.route.handlers.base import RouteHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.draining import DrainingRouteHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.health_check import (
     HealthCheckRouteHandler,
-    ProvisioningRouteHandler,
-    ReplicaProbeTargetSyncHandler,
-    RouteEvictionHandler,
-    RouteHandler,
-    RunningRouteHandler,
-    ServiceDiscoverySyncHandler,
-    StartingRouteHandler,
-    TerminatingRouteHandler,
-    WarmingUpRouteHandler,
 )
-from ai.backend.manager.sokovan.deployment.route.handlers.observer import (
+from ai.backend.manager.sokovan.deployment.route.handlers.observer.base import RouteObserver
+from ai.backend.manager.sokovan.deployment.route.handlers.observer.health_check import (
     RouteHealthObserver,
-    RouteObserver,
 )
-from ai.backend.manager.sokovan.deployment.route.recorder import RouteRecorderContext
+from ai.backend.manager.sokovan.deployment.route.handlers.probe_target_sync import (
+    ReplicaProbeTargetSyncHandler,
+)
+from ai.backend.manager.sokovan.deployment.route.handlers.provisioning import (
+    ProvisioningRouteHandler,
+)
+from ai.backend.manager.sokovan.deployment.route.handlers.route_eviction import RouteEvictionHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.running import RunningRouteHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.service_discovery_sync import (
+    ServiceDiscoverySyncHandler,
+)
+from ai.backend.manager.sokovan.deployment.route.handlers.starting import StartingRouteHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.terminating import TerminatingRouteHandler
+from ai.backend.manager.sokovan.deployment.route.handlers.warming_up import WarmingUpRouteHandler
+from ai.backend.manager.sokovan.deployment.route.recorder.context import RouteRecorderContext
 from ai.backend.manager.sokovan.deployment.route.types import (
     RouteExecutionResult,
     RouteLifecycleType,
@@ -66,7 +74,7 @@ from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller impo
 )
 from ai.backend.manager.types import DistributedLockFactory, OptionalState, TriState
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 @dataclass
@@ -209,14 +217,19 @@ class RouteCoordinator:
         # Check for observer first (no state transitions)
         observer = self._route_observers.get(lifecycle_type)
         if observer:
-            await self._process_observer(observer)
+            with with_log_context(lifecycle_type=lifecycle_type, handler_name=observer.name()):
+                await self._process_observer(observer)
             return
 
         handler = self._route_handlers.get(lifecycle_type)
         if not handler:
-            log.warning("No handler for route lifecycle type: {}", lifecycle_type.value)
+            log.warning("no handler for route lifecycle", lifecycle_type=lifecycle_type)
             return
 
+        with with_log_context(lifecycle_type=lifecycle_type, handler_name=handler.name()):
+            await self._run_handler(lifecycle_type, handler)
+
+    async def _run_handler(self, lifecycle_type: RouteLifecycleType, handler: RouteHandler) -> None:
         async with AsyncExitStack() as stack:
             if handler.lock_id is not None:
                 lock_lifetime = self._config_provider.config.manager.session_schedule_lock_lifetime
@@ -224,24 +237,25 @@ class RouteCoordinator:
 
             # Build filter conditions from handler target statuses
             target = handler.target_statuses()
+            fields = ReplicaSearchableFields.own
             conditions: list[QueryCondition] = []
             if target.lifecycle is not None:
-                conditions.append(RouteConditions.by_lifecycle_statuses(target.lifecycle))
+                conditions.append(fields.status.filter.in_(target.lifecycle))
             if target.health is not None:
-                conditions.append(RouteConditions.by_health_statuses(target.health))
+                conditions.append(fields.health_status.filter.in_(target.health))
             if target.traffic is not None:
-                conditions.append(RouteConditions.by_traffic_statuses(target.traffic))
+                conditions.append(fields.traffic_status.filter.in_(target.traffic))
             if target.sub_status is not None:
-                conditions.append(RouteConditions.by_sub_statuses(target.sub_status))
+                conditions.append(fields.sub_status.filter.in_(target.sub_status))
             routes = await self._deployment_repository.search_route_datas_with_last_history(
-                querier=BatchQuerier(pagination=NoPagination(), conditions=conditions),
+                searcher=RouteDataSearcher(pagination=NoPagination(), conditions=conditions),
                 category=handler.category(),
             )
             if not routes:
-                log.trace("No routes to process for handler: {}", handler.name())
+                log.trace("no routes to process")
                 return
 
-            log.trace("handler: {}, routes: {}", handler.name(), routes)
+            log.debug("route handler processing", route_count=len(routes))
 
             # Execute handler with recorder context
             route_ids = [r.route_id for r in routes]
@@ -254,8 +268,8 @@ class RouteCoordinator:
 
             try:
                 await handler.post_process(result)
-            except Exception as e:
-                log.error("Error during post-processing: {}", e)
+            except Exception:
+                log.exception("route handler post-processing failed")
 
     async def _process_observer(self, observer: RouteObserver) -> None:
         """Process a route observer (no state transitions).
@@ -270,19 +284,20 @@ class RouteCoordinator:
           Without this, warming-up routes have no one writing to Valkey
           and time out after `initial_delay`.
         """
+        replica_fields = ReplicaSearchableFields.own
         try:
             routes = await self._deployment_repository.search_route_datas(
-                querier=BatchQuerier(
+                searcher=RouteDataSearcher(
                     pagination=NoPagination(),
                     conditions=[
                         combine_conditions_or([
                             combine_conditions_and([
-                                RouteConditions.by_lifecycle_statuses([RouteStatus.RUNNING]),
-                                RouteConditions.by_health_statuses(list(RouteHealthStatus)),
+                                replica_fields.status.filter.in_([RouteStatus.RUNNING]),
+                                replica_fields.health_status.filter.in_(list(RouteHealthStatus)),
                             ]),
                             combine_conditions_and([
-                                RouteConditions.by_lifecycle_statuses([RouteStatus.PROVISIONING]),
-                                RouteConditions.by_sub_statuses([RouteSubStatus.WARMING_UP]),
+                                replica_fields.status.filter.in_([RouteStatus.PROVISIONING]),
+                                replica_fields.sub_status.filter.in_([RouteSubStatus.WARMING_UP]),
                             ]),
                         ]),
                     ],
@@ -292,13 +307,9 @@ class RouteCoordinator:
                 return
 
             result = await observer.observe(routes)
-            log.debug(
-                "Observer {}: observed {} routes",
-                observer.name(),
-                result.observed_count,
-            )
+            log.debug("route observer completed", observed_count=result.observed_count)
         except Exception:
-            log.exception("Error in route observer {}", observer.name())
+            log.exception("route observer failed")
 
     async def _handle_status_transitions(
         self,

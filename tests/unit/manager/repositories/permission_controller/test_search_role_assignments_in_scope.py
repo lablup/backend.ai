@@ -8,29 +8,30 @@ from dataclasses import dataclass
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.errors.permission import RoleNotFound
-from ai.backend.manager.models.agent import AgentRow
+from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.rbac_models import UserRoleRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.rbac_models.user_role.scopes import (
-    RoleRoleAssignmentOperationScope,
-    UserRoleAssignmentOperationScope,
+    RoleRoleAssignmentTarget,
+    UserRoleAssignmentTarget,
 )
 from ai.backend.manager.models.rbac_models.user_role.searchers import RoleAssignmentSearcher
-from ai.backend.manager.models.resource_group import ResourceGroupForDomainRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_group.row import ResourceGroupForDomainRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.user import PasswordHashAlgorithm, PasswordInfo, UserRow, UserStatus
+from ai.backend.manager.models.user.row import PasswordHashAlgorithm, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.permission_controller.repository import (
     PermissionControllerRepository,
@@ -157,7 +158,7 @@ class TestSearchRoleAssignmentsInScope:
         seeded: SeededAssignments,
     ) -> None:
         result = await repository.search_role_assignments_in_scope(
-            [UserRoleAssignmentOperationScope(user_id=seeded.alice)], searcher
+            [UserRoleAssignmentTarget(user_id=seeded.alice)], searcher
         )
 
         assert result.total_count == 2
@@ -173,7 +174,7 @@ class TestSearchRoleAssignmentsInScope:
         seeded: SeededAssignments,
     ) -> None:
         result = await repository.search_role_assignments_in_scope(
-            [RoleRoleAssignmentOperationScope(role_id=seeded.role_a)], searcher
+            [RoleRoleAssignmentTarget(role_id=seeded.role_a)], searcher
         )
 
         assert result.total_count == 2
@@ -190,8 +191,8 @@ class TestSearchRoleAssignmentsInScope:
     ) -> None:
         result = await repository.search_role_assignments_in_scope(
             [
-                UserRoleAssignmentOperationScope(user_id=seeded.bob),
-                RoleRoleAssignmentOperationScope(role_id=seeded.role_b),
+                UserRoleAssignmentTarget(user_id=seeded.bob),
+                RoleRoleAssignmentTarget(role_id=seeded.role_b),
             ],
             searcher,
         )
@@ -214,7 +215,7 @@ class TestSearchRoleAssignmentsInScope:
     ) -> None:
         with pytest.raises(RoleNotFound):
             await repository.search_role_assignments_in_scope(
-                [RoleRoleAssignmentOperationScope(role_id=RoleID(uuid.uuid4()))], searcher
+                [RoleRoleAssignmentTarget(role_id=RoleID(uuid.uuid4()))], searcher
             )
 
     async def test_user_scope_without_assignments_is_empty(
@@ -224,7 +225,7 @@ class TestSearchRoleAssignmentsInScope:
         seeded: SeededAssignments,
     ) -> None:
         result = await repository.search_role_assignments_in_scope(
-            [UserRoleAssignmentOperationScope(user_id=seeded.charlie)], searcher
+            [UserRoleAssignmentTarget(user_id=seeded.charlie)], searcher
         )
 
         assert result.total_count == 0

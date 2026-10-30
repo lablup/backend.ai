@@ -38,6 +38,7 @@ def resolve_info(metric_observer: MagicMock) -> MagicMock:
     info.operation.name.value = "TestQuery"
     info.field_name = "test_field"
     info.parent_type.name = "Query"
+    info.path.prev = None
     return info
 
 
@@ -68,7 +69,7 @@ class TestGQLMetricMiddlewareSyncResolver:
         assert call_kwargs["duration"] >= 0
         assert call_kwargs["field_name"] == "test_field"
         assert call_kwargs["parent_type"] == "Query"
-        assert call_kwargs["operation_name"] == "TestQuery"
+        assert "operation_name" not in call_kwargs
 
     def test_sync_resolver_backend_ai_error(
         self,
@@ -119,8 +120,7 @@ class TestGQLMetricMiddlewareSyncResolver:
 
         middleware.resolve(sync_resolver, None, resolve_info)
 
-        call_kwargs = metric_observer.observe_request.call_args.kwargs
-        assert call_kwargs["operation_name"] == "anonymous"
+        metric_observer.observe_request.assert_called_once()
 
 
 class TestGQLMetricMiddlewareAsyncAnonymousOperation:
@@ -139,8 +139,35 @@ class TestGQLMetricMiddlewareAsyncAnonymousOperation:
 
         await middleware.resolve(async_resolver, None, resolve_info)
 
-        call_kwargs = metric_observer.observe_request.call_args.kwargs
-        assert call_kwargs["operation_name"] == "anonymous"
+        metric_observer.observe_request.assert_called_once()
+
+
+class TestGQLMetricMiddlewareNestedField:
+    """Tests that nested fields are traced but not recorded as metrics."""
+
+    @pytest.fixture
+    def nested_resolve_info(self, resolve_info: MagicMock) -> MagicMock:
+        resolve_info.path.prev = MagicMock()
+        resolve_info.parent_type.name = "User"
+        return resolve_info
+
+    async def test_nested_field_skips_metrics(
+        self,
+        middleware: GQLMetricMiddleware,
+        nested_resolve_info: MagicMock,
+        metric_observer: MagicMock,
+        span_exporter: InMemorySpanExporter,
+    ) -> None:
+        async def async_resolver(root: Any, info: Any, **kwargs: Any) -> str:
+            return "nested"
+
+        result = await middleware.resolve(async_resolver, None, nested_resolve_info)
+
+        assert result == "nested"
+        metric_observer.observe_request.assert_not_called()
+        spans = span_exporter.get_finished_spans()
+        assert len(spans) == 1
+        assert spans[0].name == "gql.TestQuery.test_field"
 
 
 class TestGQLMetricMiddlewareAsyncResolver:

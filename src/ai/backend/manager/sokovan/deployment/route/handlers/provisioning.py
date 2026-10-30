@@ -5,8 +5,9 @@ from collections.abc import Sequence
 from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
+    RouteData,
     RouteHandlerCategory,
     RouteStatus,
     RouteStatusTransitions,
@@ -15,13 +16,12 @@ from ai.backend.manager.data.deployment.types import (
     RouteTransitionTarget,
 )
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResult
 
 from .base import RouteHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class ProvisioningRouteHandler(RouteHandler):
@@ -77,16 +77,14 @@ class ProvisioningRouteHandler(RouteHandler):
     @override
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute provisioning for routes."""
-        log.debug("Provisioning {} routes", len(routes))
-
         # Execute route provisioning logic via executor
         return await self._route_executor.provision_routes(routes)
 
     @override
     async def post_process(self, result: RouteExecutionResult) -> None:
         """Handle post-processing after provisioning routes."""
-        log.info(
-            "Provisioned {} routes successfully, {} failed",
-            len(result.successes),
-            len(result.errors),
+        log.debug(
+            "routes provisioned",
+            success_count=len(result.successes),
+            failure_count=len(result.errors),
         )

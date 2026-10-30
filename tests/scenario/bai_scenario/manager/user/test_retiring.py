@@ -1,4 +1,7 @@
-"""사용자 물리기, 되살리기, 지우기 — 무엇이 바뀌고 누가 할 수 있는가."""
+"""사용자 물리기, 되살리기, 지우기 — 무엇이 바뀌고 누가 할 수 있는가.
+
+수정의 `status`로 물리고 되살리는 경로도 여기서 본다.
+"""
 
 from __future__ import annotations
 
@@ -13,24 +16,29 @@ import pytest
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.dto.manager.v2.user.request import (
+    BulkUpdateUserItemInput,
+    BulkUpdateUsersInput,
     DeleteUserInput,
     PurgeUserInput,
     RestoreUserInput,
+    UpdateUserInput,
 )
 from ai.backend.common.dto.manager.v2.user.response import (
     BulkPurgeUsersPayload,
+    BulkUpdateUsersPayload,
     DeleteUserPayload,
     PurgeUserPayload,
     RestoreUserPayload,
     UserNode,
 )
+from ai.backend.common.dto.manager.v2.user.types import UserStatus as UserStatusDTO
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.data.permission.types import Permission
 from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.errors.user import UserNotFound
+from ai.backend.manager.errors.user import UserDeleted, UserModificationBadRequest, UserNotFound
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.user.actions.purge_user import BulkPurgeUserAction
 from ai.backend.testutils.scenario_steps import (
@@ -51,14 +59,14 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.user import AGrant, UserNodeLook
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.resource_policy.user import SeedUserPolicy
-from bai_scenario.seeds.seeder import Laid, Seeder, SeedNest
-from bai_scenario.seeds.user.user import SeedUserOf
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.resource_policy.keypair import TestSeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.resource_policy.user import TestSeedUserPolicy
+from bai_scenario.seeds.seeder import Laid, TestSeeder, TestSeedNest
+from bai_scenario.seeds.user.user import TestSeedUserOf
 
 type Loaded = list[UserNode | Exception | None]
 type Answer = (
@@ -68,7 +76,12 @@ type Answer = (
     | RestoreUserPayload
     | PurgeUserPayload
     | BulkPurgeUsersPayload
+    | UserNode
+    | BulkUpdateUsersPayload
 )
+
+RENAMED = "renamed"
+"""수정으로 바꿔 넣는 전체 이름. 시나리오가 정한 값이다."""
 
 
 @dataclass(frozen=True)
@@ -90,7 +103,7 @@ class ASuperadminAndUsers:
 
 
 @dataclass(frozen=True)
-class SomeoneStandingAs(SeedNest[Laid[UserData]]):
+class SomeoneStandingAs(TestSeedNest[Laid[UserData]]):
     """그 도메인에 속한 사용자 한 명을 `status` 상태로. 매니저가 사용자를 만드는 경로를 그대로 탄다."""
 
     domain: Laid[DomainData]
@@ -101,12 +114,12 @@ class SomeoneStandingAs(SeedNest[Laid[UserData]]):
         return f"도메인에 속한 {self.status.value} 상태 사용자 한 명 준비"
 
     @override
-    def lay(self, seed: Seeder) -> Laid[UserData]:
-        seed.once(SeedProjectPolicy())
-        policy = seed.creating(SeedUserPolicy())
-        key_policy = seed.creating(SeedKeypairPolicy())
+    def lay(self, seed: TestSeeder) -> Laid[UserData]:
+        seed.once(TestSeedProjectPolicy())
+        policy = seed.creating(TestSeedUserPolicy())
+        key_policy = seed.creating(TestSeedKeypairPolicy())
         return seed.provisioning(
-            SeedUserOf(is_active=False, status=self.status), self.domain, policy, key_policy
+            TestSeedUserOf(is_active=False, status=self.status), self.domain, policy, key_policy
         )
 
 
@@ -134,7 +147,7 @@ class ATargetAndSomeone(Given[Any, ACallerAndATarget]):
 
     @override
     async def lay(self, seeding: Any) -> ACallerAndATarget:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         target = await seeding.within(
             SomeoneOf(domain)
             if self.target_status == UserStatus.ACTIVE
@@ -169,7 +182,7 @@ class ASuperadminAndSomeUsers(Given[Any, ASuperadminAndUsers]):
 
     @override
     async def lay(self, seeding: Any) -> ASuperadminAndUsers:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         users = [await seeding.within(SomeoneOf(domain)) for _ in range(self.count)]
         caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
         return ASuperadminAndUsers(
@@ -189,7 +202,7 @@ class SomeoneGrantedOnTheDomain(Given[Any, ASuperadminAndUsers]):
 
     @override
     async def lay(self, seeding: Any) -> ASuperadminAndUsers:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         user = await seeding.within(SomeoneOf(domain))
         caller = await seeding.within(SomeoneOf(domain))
         await seeding.within(AGrant.on_domain(domain, caller, Permission.HARD_DELETE))
@@ -405,7 +418,9 @@ class EveryoneIsPurged(Then[ASuperadminAndUsers, Answer]):
 
 
 @dataclass(frozen=True)
-class AGrantedUserDeletesAUser(Scenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]):
+class AGrantedUserDeletesAUser(
+    Scenario[TestSeedingSession, ACallerAndATarget, UserAdapter, Answer]
+):
     started: datetime
 
     @override
@@ -417,7 +432,7 @@ class AGrantedUserDeletesAUser(Scenario[SeedingSession, ACallerAndATarget, UserA
         return "대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 물리면, 성공이 오고 그 사용자 상태가 삭제로 바뀐다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAndATarget]:
+    def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
         return ATargetAndSomeone(permissions=(Permission.SOFT_DELETE, Permission.READ))
 
     @override
@@ -431,7 +446,7 @@ class AGrantedUserDeletesAUser(Scenario[SeedingSession, ACallerAndATarget, UserA
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotDelete(
-    Scenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]
+    Scenario[TestSeedingSession, ACallerAndATarget, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -442,7 +457,7 @@ class AUserGrantedNothingMayNotDelete(
         return "역할 없이 물리려 하면, 엔티티 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAndATarget]:
+    def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
         return ATargetAndSomeone()
 
     @override
@@ -456,7 +471,7 @@ class AUserGrantedNothingMayNotDelete(
 
 @dataclass(frozen=True)
 class AGrantedUserRestoresADeletedUser(
-    Scenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]
+    Scenario[TestSeedingSession, ACallerAndATarget, UserAdapter, Answer]
 ):
     started: datetime
 
@@ -469,7 +484,7 @@ class AGrantedUserRestoresADeletedUser(
         return "대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 삭제 상태 사용자를 되살리면, 성공이 오고 상태가 활성으로 바뀐다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAndATarget]:
+    def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
         return ATargetAndSomeone(
             permissions=(Permission.SOFT_DELETE, Permission.READ),
             target_status=UserStatus.DELETED,
@@ -485,21 +500,19 @@ class AGrantedUserRestoresADeletedUser(
 
 
 @dataclass(frozen=True)
-class RestoringAnInactiveUserMakesThemActive(
-    Scenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]
+class RestoringAUserWhoWasNotDeletedIsRefused(
+    Scenario[TestSeedingSession, ACallerAndATarget, UserAdapter, Answer]
 ):
-    started: datetime
-
     @override
     def summary(self) -> str:
-        return "restoring-a-user-who-was-never-deleted-still-makes-them-active"
+        return "restoring-a-user-who-was-not-deleted-is-refused"
 
     @override
     def describe(self) -> str:
-        return "권한 받은 사용자가 비활성 사용자를 되살리면, 현재 상태와 무관하게 활성이 된다"
+        return "권한 받은 사용자가 물리지 않은 비활성 사용자를 되살리려 하면, 삭제 상태가 아니라 막힌다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAndATarget]:
+    def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
         return ATargetAndSomeone(
             permissions=(Permission.SOFT_DELETE, Permission.READ),
             target_status=UserStatus.INACTIVE,
@@ -507,16 +520,16 @@ class RestoringAnInactiveUserMakesThemActive(
 
     @override
     def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
-        return RestoringTheTarget()
+        return RestoringTheTarget(then_reading=False)
 
     @override
     def then(self) -> Then[ACallerAndATarget, Answer]:
-        return TheTargetNowStands(started=self.started, status="active", key_is_active=False)
+        return TheCallIsRefused(UserModificationBadRequest)
 
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotRestore(
-    Scenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]
+    Scenario[TestSeedingSession, ACallerAndATarget, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -527,7 +540,7 @@ class AUserGrantedNothingMayNotRestore(
         return "역할 없이 되살리려 하면, 엔티티 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAndATarget]:
+    def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
         return ATargetAndSomeone(target_status=UserStatus.DELETED)
 
     @override
@@ -540,7 +553,7 @@ class AUserGrantedNothingMayNotRestore(
 
 
 @dataclass(frozen=True)
-class AGrantedUserPurgesAUser(Scenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]):
+class AGrantedUserPurgesAUser(Scenario[TestSeedingSession, ACallerAndATarget, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "a-user-granted-hard-delete-purges-a-user-with-no-folders-or-sessions"
@@ -550,7 +563,7 @@ class AGrantedUserPurgesAUser(Scenario[SeedingSession, ACallerAndATarget, UserAd
         return "대상 사용자 스코프에서 HARD_DELETE를 받은 사용자가 물리지 않은 사용자를 지워도, 성공이 오고 그 사용자를 더 찾을 수 없다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAndATarget]:
+    def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
         return ATargetAndSomeone(permissions=(Permission.HARD_DELETE,), overseer=True)
 
     @override
@@ -564,7 +577,7 @@ class AGrantedUserPurgesAUser(Scenario[SeedingSession, ACallerAndATarget, UserAd
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotPurge(
-    Scenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]
+    Scenario[TestSeedingSession, ACallerAndATarget, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -575,7 +588,7 @@ class AUserGrantedNothingMayNotPurge(
         return "역할 없이 지우려 하면, 엔티티 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAndATarget]:
+    def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
         return ATargetAndSomeone()
 
     @override
@@ -588,7 +601,9 @@ class AUserGrantedNothingMayNotPurge(
 
 
 @dataclass(frozen=True)
-class PurgingToNobodyIsRefused(Scenario[SeedingSession, ACallerAndATarget, UserAdapter, Answer]):
+class PurgingToNobodyIsRefused(
+    Scenario[TestSeedingSession, ACallerAndATarget, UserAdapter, Answer]
+):
     @override
     def summary(self) -> str:
         return "purging-a-user-to-an-admin-who-does-not-exist-is-refused"
@@ -598,7 +613,7 @@ class PurgingToNobodyIsRefused(Scenario[SeedingSession, ACallerAndATarget, UserA
         return "권한 받은 사용자가 넘겨받을 관리자로 없는 id를 주면, 입력 검증이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, ACallerAndATarget]:
+    def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
         return ATargetAndSomeone(permissions=(Permission.HARD_DELETE,))
 
     @override
@@ -612,7 +627,7 @@ class PurgingToNobodyIsRefused(Scenario[SeedingSession, ACallerAndATarget, UserA
 
 @dataclass(frozen=True)
 class TheSuperadminPurgesTwoInBulk(
-    Scenario[SeedingSession, ASuperadminAndUsers, UserAdapter, Answer]
+    Scenario[TestSeedingSession, ASuperadminAndUsers, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -625,7 +640,7 @@ class TheSuperadminPurgesTwoInBulk(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, ASuperadminAndUsers]:
+    def given(self) -> Given[TestSeedingSession, ASuperadminAndUsers]:
         return ASuperadminAndSomeUsers(count=2)
 
     @override
@@ -639,7 +654,7 @@ class TheSuperadminPurgesTwoInBulk(
 
 @dataclass(frozen=True)
 class ABulkPurgeRecordsAMissingIdAsAFailure(
-    Scenario[SeedingSession, ASuperadminAndUsers, UserAdapter, Answer]
+    Scenario[TestSeedingSession, ASuperadminAndUsers, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -650,7 +665,7 @@ class ABulkPurgeRecordsAMissingIdAsAFailure(
         return "슈퍼관리자가 있는 사용자와 없는 id를 함께 주면, 하나는 지워지고 없는 id는 실패로 담긴다"
 
     @override
-    def given(self) -> Given[SeedingSession, ASuperadminAndUsers]:
+    def given(self) -> Given[TestSeedingSession, ASuperadminAndUsers]:
         return ASuperadminAndSomeUsers(count=1, with_missing=True)
 
     @override
@@ -664,7 +679,7 @@ class ABulkPurgeRecordsAMissingIdAsAFailure(
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotPurgeInBulk(
-    Scenario[SeedingSession, ASuperadminAndUsers, UserAdapter, Answer]
+    Scenario[TestSeedingSession, ASuperadminAndUsers, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -675,7 +690,7 @@ class AUserWhoIsNotTheSuperadminMayNotPurgeInBulk(
         return "도메인 스코프에서 HARD_DELETE를 받은 사용자라도 일괄 지우기를 하려 하면, 전역 역할 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, ASuperadminAndUsers]:
+    def given(self) -> Given[TestSeedingSession, ASuperadminAndUsers]:
         return SomeoneGrantedOnTheDomain()
 
     @override
@@ -687,11 +702,418 @@ class AUserWhoIsNotTheSuperadminMayNotPurgeInBulk(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Answer]] = [
+@dataclass(frozen=True)
+class ASuperadminAndThreeTargets:
+    """일괄로 고치는 슈퍼관리자와, 활성 사용자 하나, 삭제 상태 사용자 둘."""
+
+    caller: UserData
+    active: UserData
+    deleted: UserData
+    other_deleted: UserData
+
+
+@dataclass(frozen=True)
+class ASuperadminWithActiveAndDeleted(Given[Any, ASuperadminAndThreeTargets]):
+    """한 도메인의 슈퍼관리자와, 활성 사용자 하나, 삭제 상태 사용자 둘."""
+
+    @override
+    def describe(self) -> str:
+        return "도메인 하나와 슈퍼관리자 하나, 활성 사용자 하나, 삭제 상태 사용자 둘"
+
+    @override
+    async def lay(self, seeding: Any) -> ASuperadminAndThreeTargets:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        active = await seeding.within(SomeoneOf(domain))
+        deleted = await seeding.within(SomeoneStandingAs(domain, UserStatus.DELETED))
+        other_deleted = await seeding.within(SomeoneStandingAs(domain, UserStatus.DELETED))
+        caller = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
+        return ASuperadminAndThreeTargets(
+            seeding.made(caller),
+            seeding.made(active),
+            seeding.made(deleted),
+            seeding.made(other_deleted),
+        )
+
+
+@dataclass(frozen=True)
+class EditingTheTarget(When[ACallerAndATarget, UserAdapter, Answer]):
+    """대상 사용자를 `input`으로 수정한다."""
+
+    input: UpdateUserInput
+    says_what: str
+
+    @override
+    def operation(self) -> str:
+        return "update_user_by_id"
+
+    @override
+    def describe(self, laid: ACallerAndATarget) -> str:
+        return f"{laid.caller.username}이 {laid.target.username}의 {self.says_what}"
+
+    @override
+    async def call(self, adapter: UserAdapter, laid: ACallerAndATarget) -> Answer:
+        with ActingAs(laid.caller):
+            payload = await adapter.update_user_by_id(laid.target.id, self.input)
+        return payload.user
+
+
+@dataclass(frozen=True)
+class BulkEditingTheStatuses(When[ASuperadminAndThreeTargets, UserAdapter, Answer]):
+    """활성 사용자는 DELETED로, 삭제 상태 사용자 하나는 ACTIVE로, 다른 하나는 전체 이름만 고친다."""
+
+    @override
+    def operation(self) -> str:
+        return "bulk_update_users"
+
+    @override
+    def describe(self, laid: ASuperadminAndThreeTargets) -> str:
+        return (
+            f"{laid.caller.username}이 {laid.active.username}에 DELETED, "
+            f"{laid.deleted.username}에 ACTIVE, {laid.other_deleted.username}에 전체 이름을 "
+            "일괄 수정으로 줌"
+        )
+
+    @override
+    async def call(self, adapter: UserAdapter, laid: ASuperadminAndThreeTargets) -> Answer:
+        input = BulkUpdateUsersInput(
+            users=[
+                BulkUpdateUserItemInput(
+                    user_id=laid.active.id, input=UpdateUserInput(status=UserStatusDTO.DELETED)
+                ),
+                BulkUpdateUserItemInput(
+                    user_id=laid.deleted.id, input=UpdateUserInput(status=UserStatusDTO.ACTIVE)
+                ),
+                BulkUpdateUserItemInput(
+                    user_id=laid.other_deleted.id, input=UpdateUserInput(full_name=RENAMED)
+                ),
+            ]
+        )
+        with ActingAs(laid.caller):
+            return await adapter.bulk_update_users(input)
+
+
+@dataclass(frozen=True)
+class TheEditedNodeStands(Then[ACallerAndATarget, Answer]):
+    """수정의 답으로 `status` 상태의 사용자 전체가 온다."""
+
+    started: datetime
+    status: str
+    key_is_active: bool = True
+
+    @override
+    def says(self) -> str:
+        return f"{self.status} 상태의 사용자 전체가 온다"
+
+    @override
+    def look(self, laid: ACallerAndATarget, answered: Answered[Answer]) -> list[Verdict]:
+        node = answered.response
+        if not isinstance(node, UserNode):
+            return [Refused(NotEnoughPermission, answered.raised)]
+        expected = dataclasses.replace(
+            laid.target, status=self.status, status_info="admin-requested"
+        )
+        return UserNodeLook(self.started).verdicts(
+            node, expected, main_access_key=None if self.key_is_active else NoKey()
+        )
+
+
+@dataclass(frozen=True)
+class TheDeletedTargetIsUntouched(Then[ACallerAndATarget, Answer]):
+    """이미 삭제 상태인 대상 사용자가 그대로 온다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return "삭제 상태 그대로인 사용자 전체가 온다"
+
+    @override
+    def look(self, laid: ACallerAndATarget, answered: Answered[Answer]) -> list[Verdict]:
+        node = answered.response
+        if not isinstance(node, UserNode):
+            return [Refused(NotEnoughPermission, answered.raised)]
+        return UserNodeLook(self.started).verdicts(node, laid.target, main_access_key=NoKey())
+
+
+@dataclass(frozen=True)
+class DeletedAndRestoredOneRefused(Then[ASuperadminAndThreeTargets, Answer]):
+    """물린 사용자와 되살린 사용자는 수정 목록에, 삭제 상태에서 이름만 고친 사용자는 실패로 온다."""
+
+    started: datetime
+
+    @override
+    def says(self) -> str:
+        return "물린 사용자와 되살린 사용자가 수정 목록에, 나머지 하나가 실패 목록에 온다"
+
+    @override
+    def look(self, laid: ASuperadminAndThreeTargets, answered: Answered[Answer]) -> list[Verdict]:
+        payload = answered.response
+        if not isinstance(payload, BulkUpdateUsersPayload):
+            return [Refused(InsufficientPrivilege, answered.raised)]
+        by_id = {node.id: node for node in payload.updated_users}
+        seen: list[Verdict] = [
+            Held(
+                "updated_users.id",
+                sorted(str(node.id) for node in payload.updated_users),
+                SameAs(
+                    sorted([str(laid.active.id), str(laid.deleted.id)]),
+                    "DELETED와 ACTIVE를 준 사용자",
+                ),
+            ),
+            Held(
+                "failed.user_id",
+                [one.user_id for one in payload.failed],
+                SameAs([laid.other_deleted.id], "삭제 상태에서 전체 이름만 고친 사용자"),
+            ),
+            Skipped("failed.message", "예외 문장은 바뀌어도 되는 값이다"),
+        ]
+        if laid.active.id in by_id:
+            seen.extend(
+                UserNodeLook(self.started).verdicts(
+                    by_id[laid.active.id],
+                    dataclasses.replace(
+                        laid.active, status="deleted", status_info="admin-requested"
+                    ),
+                    at="updated_users[물린 사용자].",
+                )
+            )
+        if laid.deleted.id in by_id:
+            seen.extend(
+                UserNodeLook(self.started).verdicts(
+                    by_id[laid.deleted.id],
+                    dataclasses.replace(
+                        laid.deleted, status="active", status_info="admin-requested"
+                    ),
+                    main_access_key=NoKey(),
+                    at="updated_users[되살린 사용자].",
+                )
+            )
+        return seen
+
+
+@dataclass(frozen=True)
+class EditingToDeletedDeletes(Scenario[TestSeedingSession, ACallerAndATarget, UserAdapter, Answer]):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "an-edit-to-deleted-soft-deletes-the-user"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 수정으로 DELETED를 주면, "
+            "물리기와 같이 삭제 상태가 된다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
+        return ATargetAndSomeone(permissions=(Permission.SOFT_DELETE, Permission.READ))
+
+    @override
+    def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
+        return EditingTheTarget(
+            UpdateUserInput(status=UserStatusDTO.DELETED), "상태에 DELETED를 줌"
+        )
+
+    @override
+    def then(self) -> Then[ACallerAndATarget, Answer]:
+        return TheEditedNodeStands(started=self.started, status="deleted")
+
+
+@dataclass(frozen=True)
+class EditingToDeletedNeedsSoftDelete(
+    Scenario[TestSeedingSession, ACallerAndATarget, UserAdapter, Answer]
+):
+    @override
+    def summary(self) -> str:
+        return "an-edit-to-deleted-is-refused-without-soft-delete"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "대상 사용자 스코프에서 UPDATE와 READ만 받은 사용자가 수정으로 DELETED를 주면, "
+            "물리기의 엔티티 권한 문이 막는다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
+        return ATargetAndSomeone(permissions=(Permission.UPDATE, Permission.READ))
+
+    @override
+    def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
+        return EditingTheTarget(
+            UpdateUserInput(status=UserStatusDTO.DELETED), "상태에 DELETED를 줌"
+        )
+
+    @override
+    def then(self) -> Then[ACallerAndATarget, Answer]:
+        return TheCallIsRefused(NotEnoughPermission)
+
+
+@dataclass(frozen=True)
+class EditingADeletedUserToDeletedChangesNothing(
+    Scenario[TestSeedingSession, ACallerAndATarget, UserAdapter, Answer]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "an-edit-to-deleted-on-a-deleted-user-changes-nothing"
+
+    @override
+    def describe(self) -> str:
+        return "삭제 상태 사용자에 수정으로 DELETED만 주면, 아무것도 바뀌지 않고 그 사용자가 온다"
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
+        return ATargetAndSomeone(
+            permissions=(Permission.SOFT_DELETE, Permission.READ),
+            target_status=UserStatus.DELETED,
+        )
+
+    @override
+    def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
+        return EditingTheTarget(
+            UpdateUserInput(status=UserStatusDTO.DELETED), "상태에 DELETED를 줌"
+        )
+
+    @override
+    def then(self) -> Then[ACallerAndATarget, Answer]:
+        return TheDeletedTargetIsUntouched(started=self.started)
+
+
+@dataclass(frozen=True)
+class EditingADeletedUserToActiveRestores(
+    Scenario[TestSeedingSession, ACallerAndATarget, UserAdapter, Answer]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "an-edit-to-active-on-a-deleted-user-restores-the-user"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 삭제 상태 사용자에 "
+            "수정으로 ACTIVE를 주면, 되살리기와 같이 활성이 된다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
+        return ATargetAndSomeone(
+            permissions=(Permission.SOFT_DELETE, Permission.READ),
+            target_status=UserStatus.DELETED,
+        )
+
+    @override
+    def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
+        return EditingTheTarget(UpdateUserInput(status=UserStatusDTO.ACTIVE), "상태에 ACTIVE를 줌")
+
+    @override
+    def then(self) -> Then[ACallerAndATarget, Answer]:
+        return TheEditedNodeStands(started=self.started, status="active", key_is_active=False)
+
+
+@dataclass(frozen=True)
+class EditingADeletedUserIsRefused(
+    Scenario[TestSeedingSession, ACallerAndATarget, UserAdapter, Answer]
+):
+    @override
+    def summary(self) -> str:
+        return "an-edit-of-another-field-on-a-deleted-user-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 삭제 상태 사용자의 "
+            "전체 이름을 고치면, 삭제된 사용자라 막힌다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
+        return ATargetAndSomeone(
+            permissions=(Permission.UPDATE, Permission.READ),
+            target_status=UserStatus.DELETED,
+        )
+
+    @override
+    def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
+        return EditingTheTarget(UpdateUserInput(full_name=RENAMED), "전체 이름을 바꿈")
+
+    @override
+    def then(self) -> Then[ACallerAndATarget, Answer]:
+        return TheCallIsRefused(UserDeleted)
+
+
+@dataclass(frozen=True)
+class EditingToAnotherStatusIsRefused(
+    Scenario[TestSeedingSession, ACallerAndATarget, UserAdapter, Answer]
+):
+    @override
+    def summary(self) -> str:
+        return "an-edit-to-a-status-other-than-active-or-inactive-is-refused"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 수정으로 BEFORE_VERIFICATION을 주면, "
+            "입력 검증이 막는다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ACallerAndATarget]:
+        return ATargetAndSomeone(permissions=(Permission.UPDATE, Permission.READ))
+
+    @override
+    def when(self) -> When[ACallerAndATarget, UserAdapter, Answer]:
+        return EditingTheTarget(
+            UpdateUserInput(status=UserStatusDTO.BEFORE_VERIFICATION),
+            "상태에 BEFORE_VERIFICATION을 줌",
+        )
+
+    @override
+    def then(self) -> Then[ACallerAndATarget, Answer]:
+        return TheCallIsRefused(UserModificationBadRequest)
+
+
+@dataclass(frozen=True)
+class ABulkEditDeletesAndRestoresPerItem(
+    Scenario[TestSeedingSession, ASuperadminAndThreeTargets, UserAdapter, Answer]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "a-bulk-edit-deletes-and-restores-per-item-and-refuses-a-deleted-user-edit"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "슈퍼관리자가 일괄 수정으로 활성 사용자에 DELETED, 삭제 상태 사용자에 ACTIVE, "
+            "다른 삭제 상태 사용자에 전체 이름을 주면, 둘은 물리고 되살린 뒤 수정 목록에, "
+            "하나는 실패로 담긴다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ASuperadminAndThreeTargets]:
+        return ASuperadminWithActiveAndDeleted()
+
+    @override
+    def when(self) -> When[ASuperadminAndThreeTargets, UserAdapter, Answer]:
+        return BulkEditingTheStatuses()
+
+    @override
+    def then(self) -> Then[ASuperadminAndThreeTargets, Answer]:
+        return DeletedAndRestoredOneRefused(started=self.started)
+
+
+SCENARIOS: list[Scenario[TestSeedingSession, Any, UserAdapter, Answer]] = [
     AGrantedUserDeletesAUser(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotDelete(),
     AGrantedUserRestoresADeletedUser(started=datetime.now(UTC)),
-    RestoringAnInactiveUserMakesThemActive(started=datetime.now(UTC)),
+    RestoringAUserWhoWasNotDeletedIsRefused(),
     AUserGrantedNothingMayNotRestore(),
     AGrantedUserPurgesAUser(),
     AUserGrantedNothingMayNotPurge(),
@@ -699,12 +1121,19 @@ SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Answer]] = [
     TheSuperadminPurgesTwoInBulk(),
     ABulkPurgeRecordsAMissingIdAsAFailure(),
     AUserWhoIsNotTheSuperadminMayNotPurgeInBulk(),
+    EditingToDeletedDeletes(started=datetime.now(UTC)),
+    EditingToDeletedNeedsSoftDelete(),
+    EditingADeletedUserToDeletedChangesNothing(started=datetime.now(UTC)),
+    EditingADeletedUserToActiveRestores(started=datetime.now(UTC)),
+    EditingADeletedUserIsRefused(),
+    EditingToAnotherStatusIsRefused(),
+    ABulkEditDeletesAndRestoresPerItem(started=datetime.now(UTC)),
 ]
 
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_retiring(
-    scenario: Scenario[SeedingSession, Any, UserAdapter, Answer],
+    scenario: Scenario[TestSeedingSession, Any, UserAdapter, Answer],
     adapter: UserAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

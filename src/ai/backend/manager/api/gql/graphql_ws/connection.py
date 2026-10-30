@@ -19,7 +19,7 @@ from aiohttp import WSMsgType, web
 from pydantic import TypeAdapter, ValidationError
 from strawberry.types.execution import ExecutionResult, PreExecutionError
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .types import (
     ClientMessage,
@@ -33,7 +33,7 @@ from .types import (
     ServerMessage,
 )
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 _PROTOCOL: Final = "graphql-transport-ws"
 _client_message_adapter: Final[TypeAdapter[ClientMessage]] = TypeAdapter(ClientMessage)
@@ -71,7 +71,9 @@ class WSReceiver:
                 try:
                     yield _client_message_adapter.validate_python(data)
                 except ValidationError:
-                    log.warning("GQL WS: ignoring malformed client message: {}", data)
+                    log.trace(
+                        "malformed graphql-ws client message ignored", client_message=str(data)
+                    )
             elif msg.type in (WSMsgType.ERROR, WSMsgType.CLOSE):
                 break
 
@@ -179,8 +181,8 @@ class GraphQLWSConnection:
                 return False
             await self.sender.send_ack()
             return True
-        except Exception as e:
-            log.exception("GQL WS: error during connection initialization (error: {})", repr(e))
+        except Exception:
+            log.exception("graphql-ws connection initialization failed")
             await self.sender.close()
             return False
 

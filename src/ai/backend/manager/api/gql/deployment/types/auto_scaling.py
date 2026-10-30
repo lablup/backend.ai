@@ -23,7 +23,17 @@ from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
     DeleteAutoScalingRuleInput as DeleteAutoScalingRuleInputDTO,
 )
 from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
+    PartialBulkPurgeAutoScalingRulesInput as PartialBulkPurgeAutoScalingRulesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
+    PartialBulkUpdateAutoScalingRulesInput as PartialBulkUpdateAutoScalingRulesInputDTO,
+)
+from ai.backend.common.dto.manager.v2.auto_scaling_rule.request import (
     UpdateAutoScalingRuleInput as UpdateAutoScalingRuleInputDTO,
+)
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
+from ai.backend.common.dto.manager.v2.deployment.request import (
+    AutoScalingMetricSourceFilter as AutoScalingMetricSourceFilterDTO,
 )
 from ai.backend.common.dto.manager.v2.deployment.request import (
     AutoScalingRuleFilter as AutoScalingRuleFilterDTO,
@@ -47,7 +57,16 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
     AutoScalingRuleOrderField,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import DateTimeFilter, NullableDateTimeFilter, OrderDirection
+from ai.backend.manager.api.gql.base import (
+    DateTimeFilter,
+    DecimalFilter,
+    IntFilter,
+    NullableDateTimeFilter,
+    OrderDirection,
+    StringFilter,
+    UUIDFilter,
+)
+from ai.backend.manager.api.gql.common_types import PartialBulkFailureGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     PydanticInputMixin,
@@ -59,7 +78,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
-from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin
+from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 if TYPE_CHECKING:
@@ -76,6 +95,28 @@ class AutoScalingMetricSource(StrEnum):
 
 
 @gql_pydantic_input(
+    BackendAIGQLMeta(
+        description="Filter for the auto-scaling metric source.",
+        added_version="26.9.0",
+    ),
+    name="AutoScalingMetricSourceFilter",
+)
+class AutoScalingMetricSourceFilterGQL(PydanticInputMixin[AutoScalingMetricSourceFilterDTO]):
+    in_: list[AutoScalingMetricSource] | None = gql_field(
+        description="Metric sources to match.", name="in", default=None
+    )
+    equals: AutoScalingMetricSource | None = gql_field(
+        description="Exact metric source match.", default=None
+    )
+    not_in: list[AutoScalingMetricSource] | None = gql_field(
+        description="Excludes metric sources in the list.", name="notIn", default=None
+    )
+    not_equals: AutoScalingMetricSource | None = gql_field(
+        description="Excludes exact metric source match.", name="notEquals", default=None
+    )
+
+
+@gql_pydantic_input(
     BackendAIGQLMeta(description="", added_version="25.19.0"),
     name="AutoScalingRuleFilter",
 )
@@ -85,6 +126,48 @@ class AutoScalingRuleFilter(PydanticInputMixin[AutoScalingRuleFilterDTO]):
     created_at: DateTimeFilter | None = None
     last_triggered_at: NullableDateTimeFilter | None = None
 
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by rule ID."),
+        default=None,
+    )
+    metric_source: AutoScalingMetricSourceFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by metric source."),
+        default=None,
+    )
+    metric_name: StringFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by metric name."),
+        default=None,
+    )
+    min_threshold: DecimalFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by the scale-down threshold."),
+        default=None,
+    )
+    max_threshold: DecimalFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by the scale-up threshold."),
+        default=None,
+    )
+    step_size: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by step size."),
+        default=None,
+    )
+    time_window: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by the cooldown window."),
+        default=None,
+    )
+    min_replicas: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by the replica floor."),
+        default=None,
+    )
+    max_replicas: IntFilter | None = gql_added_field(
+        BackendAIGQLMeta(added_version="26.9.0", description="Filter by the replica ceiling."),
+        default=None,
+    )
+    prometheus_query_preset_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version="26.9.0", description="Filter by the Prometheus query preset."
+        ),
+        default=None,
+    )
     AND: list[Self] | None = None
     OR: list[Self] | None = None
     NOT: list[Self] | None = None
@@ -107,7 +190,7 @@ class AutoScalingRule(PydanticNodeMixin[AutoScalingRuleNodeDTO]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the auto scaling rule.",
         ),
     )
@@ -268,3 +351,66 @@ class UpdateAutoScalingRulePayload:
 )
 class DeleteAutoScalingRulePayload:
     id: ID
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Payload for auto-scaling rule purge."
+    ),
+    model=DeleteAutoScalingRulePayloadDTO,
+    name="PurgeAutoScalingRulePayload",
+)
+class PurgeAutoScalingRulePayload(PydanticOutputMixin[DeleteAutoScalingRulePayloadDTO]):
+    purged_id: ID = gql_field(description="Global ID of the purged auto-scaling rule.")
+    field_id: UUID = gql_field(description="UUID of the purged auto-scaling rule.")
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Input for updating several auto-scaling rules, each answered for separately.",
+    ),
+    name="PartialBulkUpdateAutoScalingRulesInput",
+)
+class PartialBulkUpdateAutoScalingRulesInput(
+    PydanticInputMixin[PartialBulkUpdateAutoScalingRulesInputDTO]
+):
+    items: list[UpdateAutoScalingRuleInput] = gql_field(
+        description="The rules to update, each naming its rule by `id`."
+    )
+
+
+@gql_pydantic_input(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Input for permanently removing several auto-scaling rules, each answered for "
+            "separately."
+        ),
+    ),
+    name="PartialBulkPurgeAutoScalingRulesInput",
+)
+class PartialBulkPurgeAutoScalingRulesInput(
+    PydanticInputMixin[PartialBulkPurgeAutoScalingRulesInputDTO]
+):
+    ids: list[UUID] = gql_field(description="IDs of the auto-scaling rules to purge.")
+
+
+@gql_pydantic_type(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description=(
+            "Result of a partial bulk auto-scaling rule operation: the rules processed and the "
+            "ones that failed."
+        ),
+    ),
+    model=PartialBulkPayload[AutoScalingRuleNodeDTO],
+    name="PartialBulkAutoScalingRulesPayload",
+)
+class PartialBulkAutoScalingRulesPayload(
+    PydanticOutputMixin[PartialBulkPayload[AutoScalingRuleNodeDTO]]
+):
+    successes: list[AutoScalingRule] = gql_field(description="The rules processed.")
+    failed: list[PartialBulkFailureGQL] = gql_field(
+        description="The rules not processed, each with the reason."
+    )

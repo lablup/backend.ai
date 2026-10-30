@@ -16,9 +16,9 @@ import trafaret as t
 from aiohttp import web
 from aiohttp.typedefs import Middleware
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.common.web.session"))
+log = StructuredLogger(logging.getLogger("ai.backend.common.web.session"))
 
 extra_config_headers = t.Dict({
     t.Key("X-BackendAI-Version", default=None): t.Null | t.String,

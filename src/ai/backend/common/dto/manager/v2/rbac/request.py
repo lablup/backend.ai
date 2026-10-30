@@ -9,9 +9,20 @@ from uuid import UUID
 from pydantic import Field, field_validator, model_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.types import DeclaredEntityType
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.query import (
+    DateTimeFilter,
+    StringFilter,
+    ToManyFilter,
+    UUIDFilter,
+)
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 
 from .types import (
@@ -42,6 +53,11 @@ __all__ = (
     "EntityOrderBy",
     "MyAtomicBulkScopePermissionsInput",
     "MyScopePermissionsInput",
+    "PartialBulkDeleteRolesInput",
+    "PartialBulkPurgeRolesInput",
+    "PartialBulkRestoreRolesInput",
+    "PartialBulkUpdateRoleItemInput",
+    "PartialBulkUpdateRolesInput",
     "PermissionFilter",
     "PermissionNestedFilter",
     "PermissionOrderBy",
@@ -53,6 +69,9 @@ __all__ = (
     "RoleAssignmentOrderBy",
     "RoleFilter",
     "RoleNestedFilter",
+    "RolePermissionNestedFilter",
+    "RoleUsage",
+    "RoleUses",
     "RoleOrderBy",
     "UpdatePermissionInput",
     "UpdateRoleInput",
@@ -117,7 +136,13 @@ class UpdateRoleInput(BaseRequestModel):
         default=UNSET, description="Updated role description. Omit to leave unchanged; null clears."
     )
     status: RoleStatus | None | Unset = Field(
-        default=UNSET, description="Updated role status. Omit to leave unchanged."
+        default=UNSET,
+        description=(
+            f"Deprecated since {NEXT_RELEASE_VERSION}. Use the role delete and restore "
+            "operations. DELETED is handled as delete, ACTIVE on a deleted role as restore; "
+            "other values are ignored."
+        ),
+        deprecated=True,
     )
     auto_assign: bool | None | Unset = Field(
         default=UNSET,
@@ -149,6 +174,39 @@ class PurgeRoleInput(BaseRequestModel):
     """Input for purging a role."""
 
     id: UUID = Field(description="Role ID to purge")
+
+
+class PartialBulkUpdateRoleItemInput(BaseRequestModel):
+    """One role of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the role to update.")
+    input: UpdateRoleInput = Field(description="Fields to update on the role.")
+
+
+class PartialBulkUpdateRolesInput(BaseRequestModel):
+    """Input for updating several roles, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateRoleItemInput] = Field(
+        description="The roles to update, each with its fields."
+    )
+
+
+class PartialBulkDeleteRolesInput(BaseRequestModel):
+    """Input for soft-deleting several roles, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the roles to soft-delete.")
+
+
+class PartialBulkRestoreRolesInput(BaseRequestModel):
+    """Input for restoring several soft-deleted roles, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the roles to restore.")
+
+
+class PartialBulkPurgeRolesInput(BaseRequestModel):
+    """Input for permanently removing several roles, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the roles to purge.")
 
 
 class CreatePermissionInput(BaseRequestModel):
@@ -190,9 +248,9 @@ class DeletePermissionInput(BaseRequestModel):
 class AssignRoleInput(BaseRequestModel):
     """Input for assigning a role to a user."""
 
-    user_id: UUID = Field(description="User ID to assign the role to")
-    role_id: UUID = Field(description="Role ID to assign")
-    project_id: UUID | None = Field(
+    user_id: UserID = Field(description="User ID to assign the role to")
+    role_id: RoleID = Field(description="Role ID to assign")
+    project_id: ProjectID | None = Field(
         default=None,
         description="When provided, also add the user to this project",
     )
@@ -201,16 +259,16 @@ class AssignRoleInput(BaseRequestModel):
 class RevokeRoleInput(BaseRequestModel):
     """Input for revoking a role from a user."""
 
-    user_id: UUID = Field(description="User ID to revoke the role from")
-    role_id: UUID = Field(description="Role ID to revoke")
+    user_id: UserID = Field(description="User ID to revoke the role from")
+    role_id: RoleID = Field(description="Role ID to revoke")
 
 
 class BulkAssignRoleInput(BaseRequestModel):
     """Input for bulk assigning a role to multiple users."""
 
-    role_id: UUID = Field(description="Role ID to assign")
-    user_ids: list[UUID] = Field(description="List of user IDs to assign the role to")
-    project_id: UUID | None = Field(
+    role_id: RoleID = Field(description="Role ID to assign")
+    user_ids: list[UserID] = Field(description="List of user IDs to assign the role to")
+    project_id: ProjectID | None = Field(
         default=None,
         description="When provided, also add the users to this project",
     )
@@ -219,8 +277,8 @@ class BulkAssignRoleInput(BaseRequestModel):
 class BulkRevokeRoleInput(BaseRequestModel):
     """Input for bulk revoking a role from multiple users."""
 
-    role_id: UUID = Field(description="Role ID to revoke")
-    user_ids: list[UUID] = Field(description="List of user IDs to revoke the role from")
+    role_id: RoleID = Field(description="Role ID to revoke")
+    user_ids: list[UserID] = Field(description="List of user IDs to revoke the role from")
 
 
 class BulkAddRolePermissionsInput(BaseRequestModel):
@@ -295,15 +353,61 @@ class PermissionNestedFilter(BaseRequestModel):
 PermissionNestedFilter.model_rebuild()
 
 
+class PermissionFilter(BaseRequestModel):
+    """Filter for scoped permissions."""
+
+    role_id: UUIDFilter | None = None
+    entity_type: StringFilter | None = None
+    permission: PermissionBitFilter | None = Field(
+        default=None, description="Filter by the permission bit the entry grants."
+    )
+    created_at: DateTimeFilter | None = None
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by permission ID.",
+    )
+    AND: list[PermissionFilter] | None = None
+    OR: list[PermissionFilter] | None = None
+    NOT: list[PermissionFilter] | None = None
+
+
+PermissionFilter.model_rebuild()
+
+
+class RolePermissionNestedFilter(ToManyFilter[PermissionFilter]):
+    """The `permissions` field of a role filter.
+
+    Each quantifier matches one permission entry at a time. To require two different
+    entries, combine two of these with the role filter's own `AND`.
+    """
+
+
 class RoleFilter(BaseRequestModel):
     """Filter for roles."""
 
     name: StringFilter | None = None
     source: RoleSourceFilter | None = None
     status: RoleStatusFilter | None = None
-    assigned_user: UserNestedFilter | None = None
+    assigned_user: UserNestedFilter | None = Field(
+        default=None,
+        description=(
+            "Filter by the users holding the role. Deprecated: read a user's roles "
+            "through the role search scoped to that user."
+        ),
+        deprecated=True,
+    )
     mapped_scope: MappedScopeNestedFilter | None = None
-    permission: PermissionNestedFilter | None = None
+    permissions: RolePermissionNestedFilter | None = Field(
+        default=None, description="Filter by conditions on the role's permission entries."
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by role ID.",
+    )
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by the labels on the entity.",
+    )
     AND: list[RoleFilter] | None = None
     OR: list[RoleFilter] | None = None
     NOT: list[RoleFilter] | None = None
@@ -318,7 +422,6 @@ class RoleNestedFilter(BaseRequestModel):
     name: StringFilter | None = None
     source: RoleSourceFilter | None = None
     status: RoleStatusFilter | None = None
-    mapped_scope: MappedScopeNestedFilter | None = None
     AND: list[RoleNestedFilter] | None = None
     OR: list[RoleNestedFilter] | None = None
     NOT: list[RoleNestedFilter] | None = None
@@ -331,8 +434,22 @@ class RoleAssignmentFilter(BaseRequestModel):
     """Filter for role assignments."""
 
     role_id: UUIDFilter | None = None
-    role: RoleNestedFilter | None = None
-    permission: PermissionNestedFilter | None = None
+    role: RoleNestedFilter | None = Field(
+        default=None,
+        description=(
+            "Filter by the role the assignment names. Deprecated: search roles first, "
+            "then narrow by `role_id`."
+        ),
+        deprecated=True,
+    )
+    permission: PermissionNestedFilter | None = Field(
+        default=None,
+        description=(
+            "Filter by the permissions the assignment's role carries. Deprecated: search "
+            "roles by permission first, then narrow by `role_id`."
+        ),
+        deprecated=True,
+    )
     username: StringFilter | None = None
     email: StringFilter | None = None
     AND: list[RoleAssignmentFilter] | None = None
@@ -356,20 +473,6 @@ class EntityFilter(BaseRequestModel):
 
 
 EntityFilter.model_rebuild()
-
-
-class PermissionFilter(BaseRequestModel):
-    """Filter for scoped permissions."""
-
-    role_id: UUIDFilter | None = None
-    entity_type: StringFilter | None = None
-    created_at: DateTimeFilter | None = None
-    AND: list[PermissionFilter] | None = None
-    OR: list[PermissionFilter] | None = None
-    NOT: list[PermissionFilter] | None = None
-
-
-PermissionFilter.model_rebuild()
 
 
 class RoleOrderBy(BaseRequestModel):
@@ -413,9 +516,30 @@ class AdminSearchPermissionsGQLInput(BaseRequestModel):
     offset: int | None = None
 
 
+class RoleUses(BaseRequestModel):
+    """Entities the role uses, whose ids narrow the result."""
+
+    role_preset: list[UUID] | None = Field(
+        default=None, description="Role presets the roles were instantiated from"
+    )
+
+
+class RoleUsage(BaseRequestModel):
+    """Uses narrowing the roles read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Roles the caller cannot read
+    are left out even when a listed entity is tied to them.
+    """
+
+    uses: RoleUses | None = Field(
+        default=None, description="Entities the role uses, whose ids narrow the result"
+    )
+
+
 class SearchRolesInput(BaseRequestModel):
     """Pagination search input for roles."""
 
+    usage: RoleUsage | None = None
     filter: RoleFilter | None = None
     order: list[RoleOrderBy] | None = None
     first: int | None = None

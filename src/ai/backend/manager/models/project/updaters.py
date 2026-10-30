@@ -10,14 +10,15 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import ResourceSlot
+from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
 from ai.backend.manager.data.project.types import ProjectData, ProjectStatus, ProjectType
 from ai.backend.manager.errors.resource import (
     PersonalProjectDeletionError,
     ProjectPurgeInProgress,
 )
 from ai.backend.manager.models.condition_utils import negate_conditions
-from ai.backend.manager.models.project.conditions import ProjectConditions
 from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -30,7 +31,6 @@ class ProjectUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
     project_id: ProjectID
     name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
-    is_active: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
     domain_name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     total_resource_slots: OptionalState[ResourceSlot] = field(
         default_factory=OptionalState[ResourceSlot].nop
@@ -40,8 +40,8 @@ class ProjectUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
     )
     integration_name: TriState[str] = field(default_factory=TriState[str].nop)
     resource_policy: OptionalState[str] = field(default_factory=OptionalState[str].nop)
-    container_registry: TriState[dict[str, str]] = field(
-        default_factory=TriState[dict[str, str]].nop
+    container_registry: TriState[ImageCommitRegistry] = field(
+        default_factory=TriState[ImageCommitRegistry].nop
     )
     dotfiles: OptionalState[bytes] = field(default_factory=OptionalState[bytes].nop)
 
@@ -62,7 +62,9 @@ class ProjectUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=ProjectConditions.not_being_purged(),
+                condition=ProjectSearchableFields.own.status.filter.not_in(
+                    ProjectStatus.purge_in_progress()
+                ),
                 error=ProjectPurgeInProgress(f"Project is being purged: {self.project_id}"),
             ),
         )
@@ -72,14 +74,15 @@ class ProjectUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
         to_update: dict[str, Any] = {}
         self.name.update_dict(to_update, "name")
         self.description.update_dict(to_update, "description")
-        self.is_active.update_dict(to_update, "is_active")
         self.domain_name.update_dict(to_update, "domain_name")
         self.total_resource_slots.update_dict(to_update, "total_resource_slots")
         self.allowed_vfolder_hosts.update_dict(to_update, "allowed_vfolder_hosts")
         # Field is named integration_name above model layer; DB column remains integration_id.
         self.integration_name.update_dict(to_update, "integration_id")
         self.resource_policy.update_dict(to_update, "resource_policy")
-        self.container_registry.update_dict(to_update, "container_registry")
+        if not self.container_registry.is_nop():
+            registry = self.container_registry.optional_value()
+            to_update["container_registry"] = registry.to_json() if registry is not None else None
         self.dotfiles.update_dict(to_update, "dotfiles")
         return to_update
 
@@ -90,7 +93,7 @@ class ProjectUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
-        return row.to_data()
+        return ProjectSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -124,7 +127,7 @@ class ProjectDotfilesUpdater(DataUpdater[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
-        return row.to_data()
+        return ProjectSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -151,12 +154,14 @@ class ProjectSoftDeleteUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=ProjectConditions.not_being_purged(),
+                condition=ProjectSearchableFields.own.status.filter.not_in(
+                    ProjectStatus.purge_in_progress()
+                ),
                 error=ProjectPurgeInProgress(f"Project is being purged: {self.project_id}"),
             ),
             GuardCheck(
                 condition=negate_conditions([
-                    ProjectConditions.by_type_equals(ProjectType.PERSONAL)
+                    ProjectSearchableFields.own.type.filter.equals(ProjectType.PERSONAL)
                 ]),
                 error=PersonalProjectDeletionError(
                     f"Project {self.project_id} is a personal project."
@@ -175,7 +180,7 @@ class ProjectSoftDeleteUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
-        return row.to_data()
+        return ProjectSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -202,7 +207,9 @@ class ProjectRestoreUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=ProjectConditions.not_being_purged(),
+                condition=ProjectSearchableFields.own.status.filter.not_in(
+                    ProjectStatus.purge_in_progress()
+                ),
                 error=ProjectPurgeInProgress(f"Project is being purged: {self.project_id}"),
             ),
         )
@@ -218,4 +225,4 @@ class ProjectRestoreUpdater(GuardedDataUpdater[ProjectRow, ProjectData]):
 
     @override
     def to_data(self, row: ProjectRow) -> ProjectData:
-        return row.to_data()
+        return ProjectSearchableFields.own.to_data(row)

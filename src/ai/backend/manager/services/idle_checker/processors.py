@@ -59,7 +59,7 @@ class IdleCheckerProcessors:
         session_group: ProcessorGroup[SessionData],
         service: IdleCheckerService,
     ) -> None:
-        self.admin_search = group.global_search_ops(AdminSearchIdleCheckersAction)
+        self.admin_search = group.global_searcher_ops(AdminSearchIdleCheckersAction)
         self.bulk_get = group.partial_bulk_get_ops(BulkGetIdleCheckersAction)
         self.create = group.global_scope(CreateIdleCheckerAction, service.create)
         self.update = group.global_scope(UpdateIdleCheckerAction, service.update)

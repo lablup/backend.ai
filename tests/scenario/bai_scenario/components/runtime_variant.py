@@ -13,7 +13,9 @@ from typing import Any, override
 from uuid import UUID
 
 from ai.backend.common.config import DefaultModelDefinition
+from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.runtime_variant.response import (
     DeleteRuntimeVariantPayload,
     DeleteRuntimeVariantsPayload,
@@ -24,6 +26,7 @@ from ai.backend.common.dto.manager.v2.runtime_variant.response import (
 from ai.backend.manager.data.runtime_variant.types import RuntimeVariantData
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
+from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
@@ -35,9 +38,14 @@ from ai.backend.testutils.scenario_steps import (
     Then,
     Verdict,
 )
-from bai_scenario.components.domain import WrittenByThisRun
-from bai_scenario.components.system import KEPT, Kept, lay_a_caller, role_named
-from bai_scenario.seeds.runtime_variant.runtime_variant import SeedRuntimeVariant
+from bai_scenario.components.domain import Mentions, WrittenByThisRun
+from bai_scenario.components.system import (
+    KEPT,
+    Kept,
+    lay_a_public_reader,
+    role_named,
+)
+from bai_scenario.seeds.runtime_variant.runtime_variant import TestSeedRuntimeVariant
 
 DESCRIBED = "미리 만들어 둔 런타임 변형"
 """시드가 미리 만들어 두는 변형의 설명. 시나리오가 기대값으로 다시 쓰므로 한 곳에 둔다."""
@@ -79,9 +87,9 @@ class AVariantAndSomeone(Given[Any, AVariantAndACaller]):
     @override
     async def lay(self, seeding: Any) -> AVariantAndACaller:
         variant = await seeding.creating(
-            SeedRuntimeVariant(name_hint="variant", description=self.described)
+            TestSeedRuntimeVariant(name_hint="variant", description=self.described)
         )
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_public_reader(seeding, RuntimeVariantEntityType(), self.role)
         return AVariantAndACaller(seeding.made(variant), seeding.made(caller))
 
 
@@ -99,13 +107,13 @@ class ManyVariantsAndSomeone(Given[Any, ManyVariantsAndACaller]):
     @override
     async def lay(self, seeding: Any) -> ManyVariantsAndACaller:
         wanted = await seeding.creating(
-            SeedRuntimeVariant(name_hint="wanted", description=DESCRIBED)
+            TestSeedRuntimeVariant(name_hint="wanted", description=DESCRIBED)
         )
         others = [
-            await seeding.creating(SeedRuntimeVariant(name_hint="other", description=DESCRIBED))
+            await seeding.creating(TestSeedRuntimeVariant(name_hint="other", description=DESCRIBED))
             for _ in range(self.besides)
         ]
-        caller = await lay_a_caller(seeding, self.role)
+        caller = await lay_a_public_reader(seeding, RuntimeVariantEntityType(), self.role)
         return ManyVariantsAndACaller(
             laid=tuple(seeding.made(one) for one in [wanted, *others]),
             named=seeding.made(wanted),
@@ -266,13 +274,13 @@ class TheFirstPageOfVariants(Then[ManyVariantsAndACaller, SearchRuntimeVariantsP
 class TheVariantsInTheOrderAsked(
     Then[ManyVariantsAndACaller, list[RuntimeVariantNode | Exception | None]]
 ):
-    """요청한 순서대로 한 항목씩 반환된다. 미리 만들어 둔 것은 노드로, 없는 id는 빈 항목으로."""
+    """요청한 순서대로 한 항목씩 반환된다. 미리 만들어 둔 것은 노드로, 없는 id는 거부로."""
 
     started: datetime
 
     @override
     def says(self) -> str:
-        return "요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 비어 있다"
+        return "요청한 순서대로 반환되고, 없는 id에 해당하는 항목은 거부가 담긴다"
 
     @override
     def look(
@@ -300,8 +308,8 @@ class TheVariantsInTheOrderAsked(
                     written=written,
                 )
             )
-        last = items[asked - 1] if len(items) >= asked else "없음"
-        seen.append(Same(f"items[{asked - 1}]", last, None))
+        last = items[asked - 1] if len(items) >= asked else None
+        seen.append(Refused(NotEnoughPermission, last if isinstance(last, BaseException) else None))
         return seen
 
 
@@ -405,3 +413,80 @@ class EveryLaidVariantIsRefused(Then[ManyVariantsAndACaller, DeleteRuntimeVarian
             Skipped("failed[*].message", MESSAGE_IS_FREE_TEXT),
             Same("deleted_count", payload.deleted_count, 0),
         ]
+
+
+@dataclass(frozen=True)
+class EveryLaidVariantComesBack(
+    Then[ManyVariantsAndACaller, PartialBulkPayload[RuntimeVariantNode]]
+):
+    """미리 만들어 둔 변형이 모두 처리된 목록에 온다. `missing`이 있으면 그 id 만 실패 목록에 온다."""
+
+    started: datetime
+    described: str = DESCRIBED
+    missing: UUID | None = None
+
+    @override
+    def says(self) -> str:
+        if self.missing is None:
+            return "미리 만들어 둔 변형이 모두 처리된 목록에 오고, 실패한 것은 없다"
+        return "미리 만들어 둔 변형이 모두 처리된 목록에 오고, 없는 id 는 실패 목록에 온다"
+
+    @override
+    def look(
+        self,
+        laid: ManyVariantsAndACaller,
+        answered: Answered[PartialBulkPayload[RuntimeVariantNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        written = WrittenByThisRun(self.started)
+        verdicts: list[Verdict] = [Same("successes count", len(payload.successes), len(laid.laid))]
+        for i, (node, one) in enumerate(zip(payload.successes, laid.laid, strict=False)):
+            verdicts += variant_verdicts(
+                f"successes[{i}].", node, named=one.name, described=self.described, written=written
+            )
+        if self.missing is None:
+            return [*verdicts, Same("failed", payload.failed, [])]
+        verdicts.append(Same("failed count", len(payload.failed), 1))
+        for failure in payload.failed:
+            verdicts += [
+                Held[UUID]("failed[0].id", failure.id, SameAs(self.missing, "요청에 넣은 없는 id")),
+                Skipped("failed[0].message", MESSAGE_IS_FREE_TEXT),
+            ]
+        return verdicts
+
+
+@dataclass(frozen=True)
+class NoLaidVariantIsProcessed(
+    Then[ManyVariantsAndACaller, PartialBulkPayload[RuntimeVariantNode]]
+):
+    """처리된 변형 없이, 미리 만들어 둔 변형이 모두 같은 이유로 실패 목록에 온다."""
+
+    reason: str
+
+    @override
+    def says(self) -> str:
+        return "처리된 변형 없이 미리 만들어 둔 변형이 모두 실패 목록에 온다"
+
+    @override
+    def look(
+        self,
+        laid: ManyVariantsAndACaller,
+        answered: Answered[PartialBulkPayload[RuntimeVariantNode]],
+    ) -> list[Verdict]:
+        payload = answered.response
+        if payload is None:
+            return [Refused(NotEnoughPermission, answered.raised)]
+        verdicts: list[Verdict] = [
+            Same("successes", payload.successes, []),
+            Same("failed count", len(payload.failed), len(laid.laid)),
+        ]
+        for i, (failure, one) in enumerate(zip(payload.failed, laid.laid, strict=False)):
+            verdicts += [
+                Held[UUID](
+                    f"failed[{i}].id", failure.id, SameAs(one.id, "미리 만들어 둔 변형의 id")
+                ),
+                Held(f"failed[{i}].message", failure.message, Mentions(self.reason)),
+            ]
+        return verdicts

@@ -9,7 +9,6 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "AdminSearchObjectStoragesPayload",
@@ -19,6 +18,7 @@ __all__ = (
     "ObjectStorageNode",
     "PresignedDownloadURLPayload",
     "PresignedUploadURLPayload",
+    "PurgeObjectStoragePayload",
     "UpdateObjectStoragePayload",
 )
 
@@ -28,7 +28,7 @@ class ObjectStorageNode(BaseResponseModel):
 
     id: UUID = Field(description="Object storage ID")
     entity_id: UUID = Field(
-        description=f"UUID of the object storage. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the object storage. Added in 26.9.0.",
     )
     name: str = Field(description="Object storage name")
     host: str = Field(description="Host address of the object storage")
@@ -54,6 +54,14 @@ class DeleteObjectStoragePayload(BaseResponseModel):
     """Payload for object storage deletion mutation result."""
 
     id: UUID = Field(description="ID of the deleted object storage")
+    entity_id: UUID = Field(description="UUID of the deleted object storage. Added in 26.10.0.")
+
+
+class PurgeObjectStoragePayload(BaseResponseModel):
+    """Payload for object storage permanent purge."""
+
+    id: UUID = Field(description="ID of the purged object storage")
+    entity_id: UUID = Field(description="UUID of the purged object storage. Added in 26.10.0.")
 
 
 class PresignedUploadURLPayload(BaseResponseModel):

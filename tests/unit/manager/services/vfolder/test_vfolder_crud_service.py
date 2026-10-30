@@ -17,14 +17,12 @@ from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     QuotaScopeID,
     QuotaScopeType,
-    VFolderHostPermissionMap,
     VFolderMountPolicy,
     VFolderUsageMode,
 )
 from ai.backend.manager.data.project.types import ProjectResourceInfo
 from ai.backend.manager.data.vfolder.dto import UserIdentity
 from ai.backend.manager.data.vfolder.types import (
-    UserWithVFolderHostPermissions,
     VFolderData,
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -38,15 +36,15 @@ from ai.backend.manager.errors.storage import (
     VFolderInvalidParameter,
     VFolderNotFound,
 )
-from ai.backend.manager.models.project import ProjectType
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.project.row import ProjectType
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.vfolder.creators import (
     PersonalVFolderCreator,
     ProjectVFolderCreator,
 )
 from ai.backend.manager.models.vfolder.scopes import (
-    ProjectVFolderOperationScope,
-    UserVFolderOperationScope,
+    ProjectVFolderTarget,
+    UserVFolderTarget,
 )
 from ai.backend.manager.models.vfolder.updaters import VFolderAttributeUpdater
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
@@ -165,10 +163,6 @@ def _make_vfolder_data(
         quota_scope_id=QuotaScopeID(QuotaScopeType.USER, user_id),
         usage_mode=usage_mode,
         default_mount_permission=VFolderMountPolicy.READ_WRITE,
-        max_files=0,
-        max_size=None,
-        num_files=0,
-        cur_size=0,
         created_at=datetime(2025, 1, 1, tzinfo=UTC),
         last_used=None,
         updated_at=datetime(2025, 1, 1, tzinfo=UTC),
@@ -208,15 +202,7 @@ class TestCreateVFolderAction:
         repository: MagicMock,
         project_info: ProjectResourceInfo,
     ) -> None:
-        repository.get_user_with_keypair_policy_vfolder_hosts = AsyncMock(
-            return_value=UserWithVFolderHostPermissions(
-                email="test@example.com",
-                role=UserRole.USER,
-                allowed_vfolder_hosts=VFolderHostPermissionMap(),
-            )
-        )
         repository.get_group_resource_info = AsyncMock(return_value=project_info)
-        repository.get_user_resource_info = AsyncMock(return_value=(10, 0, None))
         repository.ensure_host_permission_allowed = AsyncMock()
         repository.create_vfolder_with_permission = AsyncMock()
 
@@ -1015,7 +1001,7 @@ class TestCloneVFolderV2Action:
             target_name="cloned-vfolder",
             target_host=None,
             usage_mode="general",
-            permission="rw",
+            permission=VFolderMountPolicy.READ_WRITE,
             cloneable=True,
         )
 
@@ -1073,8 +1059,8 @@ class TestGetAccessibleVFolderAction:
         assert result.row["name"] == "my-folder"
         mock_vfolder_repository.resolve_vfolder_id_by_name.assert_awaited_once_with(
             [
-                UserVFolderOperationScope(user_id=UserID(user_uuid)),
-                ProjectVFolderOperationScope(project_id=ProjectID(group_uuid)),
+                UserVFolderTarget(user_id=UserID(user_uuid)),
+                ProjectVFolderTarget(project_id=ProjectID(group_uuid)),
             ],
             "my-folder",
         )

@@ -24,6 +24,9 @@ Applies to every generated artifact — docs, code comments, BEPs, PR descriptio
 - Leave out how an individual value is composed and why a choice reads as natural.
 - Do not coin a term to group things. Name what is there and say how many. A term
   invented for one document spreads before anyone agrees it is the right one.
+- 계층이나 값을 가리킬 때는 코드에 있는 이름을 그대로 쓴다. REST handler, GQL resolver,
+  GQL DataLoader, adapter, processor, service, Action, repository, validator, `current_user()`,
+  user id 등. "표면", "행위자" 같은 서술어로 대신하지 않는다.
 - A comment or docstring stops at three lines. Anything longer is background: put it
   in `KNOWLEDGE.md` and point at it.
 
@@ -71,6 +74,14 @@ Skills source: `.claude/skills/{name}/SKILL.md`
 - **Imports**: Do NOT use parent relative imports (`from ..module`) — use absolute imports.
 - **re-export**: Where possible, do NOT use `__init__.py` re-exports; import modules directly.
 - **Class fields**: Declare the instance fields a class uses at the top of the class body with their types (assign them in `__init__`).
+
+**Version metadata:**
+- A new GQL type/field, config field, or DTO field records its version as `NEXT_RELEASE_VERSION`
+  (`ai.backend.common.meta.meta`): `added_version=NEXT_RELEASE_VERSION`, or `f"Added in {NEXT_RELEASE_VERSION}."`
+  in a description. Do NOT write the version literal; `scripts/release.sh` freezes it at release.
+- Do not change a literal version that is already released.
+- On a version branch (`YY.S`), write the literal version the branch will ship instead — CI rejects new
+  `NEXT_RELEASE_VERSION` references there.
 
 **BUILD files:**
 - ❌ Do NOT add BUILD files to the `src/` directory.
@@ -126,6 +137,39 @@ API Handler → Processor → Service → Repository → DB
 
 **After implementing new API endpoints, verify with the live server** — check both admin and non-admin. For the server restart, `./bai`
 test, and log-checking procedures, see the `/local-dev`, `/bai-cli`, and `/observability` skills.
+
+## Logging
+
+Levels:
+
+| Level | Use for |
+|---|---|
+| error | A server fault. Logged once, where it happens. Where an exception is caught, log it with `exception()` so the traceback is kept |
+| warning | A transient server-side failure, a retry, degradation |
+| info | Server lifecycle events an operator needs (start, stop, config applied, leader change) |
+| debug | Per-cycle summaries of periodic work, progress steps |
+| trace | Outcomes of user and admin requests (scheduling failure, resource exhaustion, quota exceeded, 4xx, bulk-operation results). History, the audit log and the API are the record |
+
+Use `info` only when all three hold:
+
+1. An operator needs to know it without looking for it
+2. It does not occur in proportion to requests or time
+3. No other record holds it (history, the audit log, the API)
+
+| `info` target | Examples |
+|---|---|
+| Process lifecycle | Startup finished and the listen address, shutdown |
+| Config applied | Config loaded, an etcd config change applied, a plugin loaded |
+| Role change | Leader election won or lost, service discovery registered or deregistered |
+| Membership change | A new agent's first registration, a volume mounted |
+| State changed by the system without a request | Rows removed by a retention purge, stuck sessions cleaned up. A cycle that changed nothing is `debug` |
+
+Writing rules:
+
+- New code and touched log lines use `StructuredLogger` (`ai.backend.logging.structured`).
+- At `info` and above, the message is a constant and values are keyword fields. Field names follow BEP-1066 section 4.
+- A layer that re-raises does not log.
+- Unit-of-work identifiers are set once at the entry point with `with_log_context`, not repeated on every line.
 
 ## Development guidelines
 

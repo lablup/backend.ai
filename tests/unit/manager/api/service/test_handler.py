@@ -19,7 +19,7 @@ from ai.backend.common.dto.manager.model_serving.request import (
 )
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.api.rest.service.handler import ServiceHandler
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.services.auth.actions.resolve_access_key_scope import (
     PublicResolveAccessKeyScopeResult,
 )

@@ -30,6 +30,7 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 |---|---|---|---|---|---|
 | resolve_domain_id | 217 | — | `DomainID` | 도메인 이름 | `LookupDomainAction` |
 | batch_load_by_ids | 224 | — | `list[UserNode \| Exception \| None]` | 사용자 id 목록 | `BulkGetUsersAction` |
+| batch_lookup_by_emails | 240 | — | `list[UserID \| Exception]` | email 목록 | `BulkLookupUsersAction` |
 | gql_admin_search | 240 | `AdminSearchUsersInput` | `AdminSearchUsersPayload` | — | `GlobalSearchUsersAction` |
 | gql_search_by_domain | 267 | `AdminSearchUsersInput` | `AdminSearchUsersPayload` | 도메인 이름 | `LookupDomainAction`, `ScopedSearchUsersAction` |
 | gql_search_by_project | 300 | `AdminSearchUsersInput` | `AdminSearchUsersPayload` | 프로젝트 id | `ScopedSearchUsersAction` |
@@ -41,13 +42,13 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 | role_search | 462 | `SearchUsersRequest` | `SearchUsersPayload` | 역할 id | `GlobalSearchUsersAction` |
 | get | 482 | — | `UserPayload` | 사용자 id | `GetUserAction` |
 | create_user | 489 | `CreateUserInput` | `CreateUserPayload` | — | `LookupDomainAction`, `CreateUserAction` |
-| update_user_by_id | 525 | `UpdateUserInput` | `UpdateUserPayload` | 사용자 id | `UpdateUserAction`, 기본 키를 줄 때 `SwitchDefaultAccessKeyAction` |
+| update_user_by_id | 595 | `UpdateUserInput` | `UpdateUserPayload` | 사용자 id | `UpdateUserAction`, 기본 키를 줄 때 `SwitchDefaultAccessKeyAction`, `status`에 따라 `GetUserAction`, `DeleteUserAction`, `RestoreUserAction` (아래 표) |
 | delete_user_by_id | 626 | `DeleteUserInput` | `DeleteUserPayload` | — | `DeleteUserAction` |
 | restore_user_by_id | 631 | `RestoreUserInput` | `RestoreUserPayload` | — | `RestoreUserAction` |
 | purge_user_by_id | 636 | `PurgeUserInput` | `PurgeUserPayload` | 관리자 사용자 id | `PurgeUserAction` |
 | bulk_create_users | 660 | `BulkCreateUserAction` | `BulkCreateUsersPayload` | — | `BulkCreateUserAction` |
 | bulk_create_users_with_keypair | 679 | `BulkCreateUserAction` | `BulkCreateUsersWithKeypairPayload` | — | `BulkCreateUserAction` |
-| bulk_modify_users | 706 | `BulkUpdateUserAction` | `BulkUpdateUsersPayload` | 사용자별 기본 키 전환 목록 | `BulkUpdateUserAction`, `SwitchDefaultAccessKeyAction` |
+| bulk_update_users | 771 | `BulkUpdateUsersInput` | `BulkUpdateUsersPayload` | — | `BulkUpdateUserAction`, `SwitchDefaultAccessKeyAction`, `status`에 따라 `BulkGetUsersAction`, `DeleteUserAction`, `RestoreUserAction`, `GetUserAction` |
 | bulk_purge_users | 736 | `BulkPurgeUserAction` | `BulkPurgeUsersPayload` | — | `BulkPurgeUserAction` |
 | update_user | 752 | `UpdateUserAction` | `UpdateMyAllowedClientIPPayload` | — | `UpdateUserAction` |
 | issue_my_keypair | 759 | — | `IssueMyKeypairPayload` | 사용자 id | `IssueMyKeypairAction` |
@@ -70,6 +71,27 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 
 `bulk_*`와 `update_user`는 요청으로 액션을 그대로 받는다. 변환은 GQL 리졸버의 몫이다
 (`api/gql/user/resolver/mutation.py:178,210,369,561,645`).
+
+### 수정 요청의 `status`
+
+update_user_by_id와 bulk_update_users는 같은 기준으로 `status`를 나눈다(`adapter.py:626-641`). 기준은
+`UserStatus`의 `deletes_from`, `restores_from`, `is_updater_value_from` 셋이다(`data/user/types.py:57-67`).
+legacy GQL `modify_user`와 legacy REST `PATCH /admin/users/{user_id}`도 같은 셋을 같은 순서로 쓴다. bulk는
+항목마다 따로 나누고, 실패는 그 항목의 `failed`에 담는다.
+
+| 준 `status` | 현재 상태 | 동작 |
+|---|---|---|
+| DELETED | DELETED 아님 | 나머지 필드 수정, 기본 키 전환 뒤 `DeleteUserAction`. 답은 뒤이어 읽은 사용자 |
+| DELETED | DELETED | 물리지 않는다. 나머지 필드가 있으면 수정이 `UserDeleted`로 막힌다 |
+| ACTIVE | DELETED | `RestoreUserAction` 뒤 나머지 필드 수정 |
+| ACTIVE, INACTIVE | 그 밖 | `UserUpdater`가 쓴다 |
+| BEFORE_VERIFICATION | 상관없음 | `UserUpdater`가 `UserModificationBadRequest`로 막는다(`models/user/updaters.py:54-59`) |
+
+- DELETED는 deprecated다. 입력 설명에 물리기와 되살리기로 처리된다고 적었다. 다음 LTS에서 뺀다.
+- 물리기와 되살리기는 각 액션의 권한(사용자 SOFT_DELETE)을 따로 받는다. UPDATE만 받은 사용자가 DELETED를
+  주면 `NotEnoughPermission`이다.
+- `UserUpdater`는 삭제 상태와 퍼지 중인 사용자를 막는 guard 둘을 갖는다(`models/user/updaters.py:75-87`).
+  리포지토리가 수정 문에 guard를 싣고, 막히면 첫 실패 guard의 예외를 낸다(`db_source.py:360-371`).
 
 ### 로그인 세션 어댑터 (`api/adapters/login_session/adapter.py`)
 
@@ -112,6 +134,7 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 |---|---|---|---|
 | resolve_domain_id | 인증만 | — | 없는 이름은 `EntityNotFoundError` (`repositories/ops/repository.py:127-132`). 사용자 시나리오가 아니라 9절에 행이 없다(10절) |
 | batch_load_by_ids | 엔티티 권한, 원소마다 | 각 사용자에 READ | 원소 단위. 4절 아래 표 |
+| batch_lookup_by_emails | 인증 → 엔티티 권한, 키마다 (`bulk_lookup_ops`) | 찾은 각 사용자에 READ | 없는 email 과 읽을 수 없는 사용자의 email 은 둘 다 `GenericBadRequest` 원소. 슈퍼관리자는 없는 email 에 `EntityNotFoundError` 원소 |
 | gql_admin_search, admin_search | 전역 역할 | — | `InsufficientPrivilege` |
 | role_search | 전역 역할 | — | `InsufficientPrivilege`. 이름과 달리 스코프 검색이 아니라 전역 검색에 역할 조건을 붙인다(`adapter.py:469-470`) |
 | gql_search_by_domain, domain_search | 인증(도메인 이름 조회) → 스코프 권한 | 도메인 스코프에 사용자 READ | `EntityNotFoundError`, `NotEnoughPermission` |
@@ -119,11 +142,11 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 | scoped_search, gql_scoped_search | 스코프 권한, 항목마다 | 도메인, 프로젝트, 역할 스코프 각각에 사용자 READ (`services/user/actions/scoped_search.py:40-77,106-107`) | `NotEnoughPermission` |
 | get | 엔티티 권한 | 사용자 READ | `NotEnoughPermission` |
 | create_user | 인증(도메인 이름 조회) → 스코프 권한 → 입력 검증 | 도메인 스코프에 사용자 CREATE (`create_user.py:39-40`) | `EntityNotFoundError`, `NotEnoughPermission`, `UserConflict` |
-| update_user_by_id | 엔티티 권한 → 입력 검증 | 사용자 UPDATE | `NotEnoughPermission`, `UserModificationBadRequest`, `UserNotFound`, 기본 키 전환에서 `KeyPairNotFound`/`KeyPairForbidden` |
-| delete_user_by_id, restore_user_by_id | 엔티티 권한 | 사용자 SOFT_DELETE | `NotEnoughPermission` |
+| update_user_by_id | 엔티티 권한 → 입력 검증 | 사용자 UPDATE. DELETED와 삭제 상태 사용자에 ACTIVE를 주면 사용자 SOFT_DELETE도, 그때 상태를 읽느라 READ도 | `NotEnoughPermission`, `UserModificationBadRequest`, `UserNotFound`, `UserDeleted`, `UserPurgeInProgress`, 기본 키 전환에서 `KeyPairNotFound`/`KeyPairForbidden` |
+| delete_user_by_id, restore_user_by_id | 엔티티 권한 → 입력 검증 | 사용자 SOFT_DELETE | `NotEnoughPermission`, restore_user_by_id는 삭제 상태가 아닌 사용자에 `UserModificationBadRequest` |
 | purge_user_by_id | 엔티티 권한 → 입력 검증 | 사용자 HARD_DELETE | `NotEnoughPermission`, 관리자 id가 없으면 `UserNotFound` (`services/user/service.py:186`), 활성 커널에 폴더가 걸려 있으면 `UserPurgeFailure` |
 | bulk_create_users, bulk_create_users_with_keypair | 전역 역할 → 입력 검증 | 슈퍼관리자만 (쓰기라 모니터 불가) | `InsufficientPrivilege`, 항목별 실패는 답에 담긴다 |
-| bulk_modify_users, bulk_purge_users | 전역 역할 → 입력 검증 | 슈퍼관리자만 | `InsufficientPrivilege`, 항목별 실패는 답에 담긴다 |
+| bulk_update_users, bulk_purge_users | 전역 역할 → 입력 검증 | 슈퍼관리자만 | `InsufficientPrivilege`, 항목별 실패는 답에 담긴다. bulk_update_users의 물리기와 되살리기는 항목마다 엔티티 권한을 따로 본다 |
 | update_user | 엔티티 권한 | 사용자 UPDATE | `NotEnoughPermission` |
 | issue_my_keypair | 엔티티 권한 | 사용자 UPDATE | `NotEnoughPermission` |
 | switch_default_access_key | 엔티티 권한 → 입력 검증 | 사용자 UPDATE | `NotEnoughPermission`, 남의 키나 비활성 키는 `KeyPairForbidden`, 없는 키는 `KeyPairNotFound` (`repositories/user/db_source/db_source.py:920-929`) |
@@ -153,7 +176,7 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 
 - 사용자 자기 자신의 가상 엔티티가 자기를 소유하고 다스린다(`repositories/ops/v2/graph_write.py:59-74`). 사용자 스코프에 둔 역할이 사용자 권한을 주면 그 사용자에 대한 엔티티 권한 검사와 스코프 권한 검사가 모두 통과한다.
 - 도메인이 사용자를 소유하고 다스린다(`graph_write.py:146-176`). 도메인 스코프에 둔 역할은 그 도메인 사용자 전원에 대해 통한다.
-- 사용자 스코프의 프리셋 역할을 만든다(`repositories/ops/v2/entity_write.py:131,323-360`). 소유자 프리셋은 `auto_assign: false`라 본인에게 자동으로 배정되지 않는다(`data/permission/seed/roles/user-owner.yaml:4,49`).
+- 사용자 스코프의 프리셋 역할을 만든다(`repositories/ops/v2/entity_write.py:131,323-360`). 소유자 프리셋은 `auto_assign: true`라 사용자를 만들 때 본인에게 배정된다(`seeds/manager/role_preset/user-owner.yaml:7`, `repositories/ops/v2/user/write.py:99-101`). 그 전에 만든 사용자는 마이그레이션 `dc61fa027fc1`이 배정했다.
 - 시나리오 템플릿 데이터베이스에는 프리셋 행이 없어서 프리셋 역할이 하나도 생기지 않는다(`entity_write.py:379-380`). 필요한 권한은 역할을 직접 심어 준다.
 
 ## 4. 요청에 없는데 필요한 값
@@ -164,7 +187,7 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 | 사용자 리소스 정책 | 요청의 기본값 `"default"` | `common/dto/manager/v2/user/request.py:89-92`, `models/user/creators.py:116` |
 | 개인 프로젝트의 리소스 정책 | 코드가 못박은 이름 `"default"` | `models/project/creators.py:66-67` |
 | 개인 프로젝트 이름 | 사용자 이름. 겹치면 `-2`부터 `-999`, 그래도 겹치면 사용자 id | `repositories/ops/v2/user/write.py:175-199` |
-| access key, secret key, SSH 키쌍 | 생성한다. secret은 키 제공자 풀로 암호화한다 | `models/keypair/row.py:158-202` |
+| access key, secret key, SSH 키쌍 | 생성한다. secret은 키 제공자 풀로 암호화한다 | `common/auth/keypair.py`, `repositories/auth/keypair_secrets.py:10-18` |
 | 기본 키페어의 활성, 관리자 표시 | 사용자 상태가 ACTIVE인지, 역할이 SUPERADMIN이나 ADMIN인지 | `write.py:106-107` |
 | 비밀번호 해시 설정 | 매니저 설정 `auth.password_hash_*` | `adapter.py:491-496` |
 | 도메인 id | 이름으로 조회한다 | `adapter.py:217-220` |
@@ -298,6 +321,9 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 | 일괄 읽기는 원소마다 노드와 거부를 입력 순서대로 답한다 | 한 사용자에게만 READ를 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 id를 한 번에 요청하면, 입력 순서대로 원소별 결과가 온다 | 권한 받은 사용자 | 도메인 하나, 사용자 둘, 행위자 하나, 첫 사용자 스코프에 READ를 준 역할을 행위자에게 | 원소 표 참고 |
 | 슈퍼관리자의 일괄 읽기에서 없는 id는 비어 온다 | 슈퍼관리자가 있는 id와 없는 id를 함께 요청하면, 권한 문을 지나 없는 원소 자리에 빈 값이 온다 | 슈퍼관리자 | 도메인 하나, 사용자 하나 | 있는 id는 노드, 없는 id는 None |
 | 빈 목록으로 일괄 읽기를 하면 빈 목록이 온다 | 권한 없는 사용자가 빈 id 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다 | 권한 없는 사용자 | 도메인 하나, 행위자 하나 | 빈 목록 |
+| 읽기 권한 받은 사용자가 email 로 찾으면 그 사용자 id 가 온다 | 대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 그 사용자의 email 을 찾으면, 그 사용자의 id 가 답으로 온다 | 권한 받은 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나, 대상 사용자 스코프에 READ 를 준 역할을 행위자에게 | 대상 사용자 id |
+| 읽을 수 없는 사용자와 없는 email 은 같은 거부로 온다 | 한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 email 을 한 번에 찾으면, 첫째는 id, 나머지 둘은 같은 거부가 입력 순서대로 온다 | 권한 받은 사용자 | 도메인 하나, 사용자 둘, 행위자 하나, 첫 사용자 스코프에 READ 를 준 역할을 행위자에게 | 사용자 id, `GenericBadRequest` 예외 원소 둘 |
+| 빈 목록으로 email 을 찾으면 빈 목록이 온다 | 권한 없는 사용자가 빈 email 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다 | 권한 없는 사용자 | 도메인 하나, 행위자 하나 | 빈 목록 |
 
 일괄 읽기 원소 표 (권한 받은 사용자 행):
 
@@ -353,6 +379,8 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 |---|---|---|---|---|
 | 권한 받은 사용자가 전체 이름만 바꾸면 나머지는 그대로다 | 대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 전체 이름만 주면, 전체 이름만 바뀐 노드가 온다 | 권한 받은 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나, 대상 스코프에 UPDATE와 READ를 준 역할 | 노드 전체, 전체 이름만 새 값, 수정 시각은 이 실행이 쓴 시각 |
 | 권한 없는 사용자는 다른 사용자를 수정할 수 없다 | 역할을 받지 않은 사용자가 수정하려 하면, 엔티티 권한 문이 막는다 | 권한 없는 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나 | `NotEnoughPermission` |
+| 다른 사용자의 비밀번호만 바꾸면 그 사용자의 비밀번호 변경 요구는 그대로다 | 대상 사용자 스코프에서 UPDATE와 READ를 받은 다른 사용자가 비밀번호 변경을 요구받는 사용자에게 새 비밀번호만 주면, 요구가 남은 노드가 온다 | 권한 받은 사용자 | 도메인 하나, 비밀번호 변경을 요구받는 대상 사용자 하나, 행위자 하나, 대상 스코프에 UPDATE와 READ를 준 역할 | 노드 전체, 비밀번호 변경 요구 참, 수정 시각은 이 실행이 쓴 시각 |
+| 본인이 새 비밀번호를 정하면 비밀번호 변경 요구가 풀린다 | 비밀번호 변경을 요구받는 사용자가 자기 사용자 스코프에서 UPDATE와 READ를 받고, 새 비밀번호와 요구 해제를 함께 주면, 요구가 풀린 노드가 온다 | 본인 | 도메인 하나, 비밀번호 변경을 요구받는 사용자 하나, 자기 스코프에 UPDATE와 READ를 준 역할 | 노드 전체, 비밀번호 변경 요구 거짓, 수정 시각은 이 실행이 쓴 시각 |
 | 다른 사용자가 쓰는 이름으로는 사용자 이름을 바꿀 수 없다 | 권한 받은 사용자가 이미 쓰이는 사용자 이름을 주면, 입력 검증이 막는다 | 권한 받은 사용자 | 도메인 하나, 사용자 둘, 행위자 하나, 첫 사용자 스코프에 UPDATE를 준 역할 | `UserModificationBadRequest` |
 | 소속 프로젝트를 비우라고 빈 값을 줘도 소속은 그대로다 | 권한 받은 사용자가 소속 프로젝트 자리에 빈 값을 주면, 소속을 건드리지 않고 나머지 수정만 반영된다 | 권한 받은 사용자 | 도메인 하나, 프로젝트 하나, 그 명부의 대상 사용자, 행위자 하나, 대상 스코프에 UPDATE와 READ를 준 역할 | 노드 전체 변화 없음, 수정 뒤 프로젝트 검색에 대상이 남는다 |
 | 기본 키를 함께 주면 수정 뒤 그 키가 기본 키가 된다 | 권한 받은 사용자가 대상 사용자의 다른 키를 기본 키로 주면, 수정이 반영된 뒤 기본 키가 옮겨간 노드가 온다 | 권한 받은 사용자 | 도메인 하나, 대상 사용자 하나와 기본 아닌 키 하나, 행위자 하나, 대상 스코프에 UPDATE와 READ를 준 역할 | 노드 전체, 기본 키가 추가한 키와 같다 |
@@ -362,6 +390,8 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 | 일괄 수정에서 기본 키 전환이 실패한 사용자는 실패로 옮겨진다 | 슈퍼관리자가 일괄 수정과 함께 남의 키로 기본 키 전환을 주면, 그 사용자는 수정 목록에서 빠지고 실패로 담긴다 | 슈퍼관리자 | 도메인 하나, 사용자 둘 | 수정 목록 비어 있음, 실패 목록 사용자 id 하나 |
 | 슈퍼관리자가 아니면 일괄 수정할 수 없다 | 도메인 스코프에서 UPDATE를 받은 사용자라도 일괄 수정을 하려 하면, 전역 역할 문이 막는다 | 권한 받은 사용자 | 도메인 하나, 행위자 하나, 도메인 스코프에 UPDATE를 준 역할 | `InsufficientPrivilege` |
 
+본인 비밀번호 변경에 요구 해제를 싣는 것은 GQL resolver `updateUserV2`의 몫이다. 어댑터는 본인과 다른 사용자를 가리지 않는다.
+
 ### 사용자 물리기, 되살리기, 지우기
 
 | summary | description | 행위자 | 전제 | 기대 |
@@ -369,8 +399,15 @@ auth 7, 필드는 error_log 4, keypair 4, login_session 3, login_history 2다. B
 | 권한 받은 사용자가 사용자를 물리면 그 사용자는 삭제 상태가 된다 | 대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 물리면, 성공이 오고 그 사용자 상태가 삭제로 바뀐다 | 권한 받은 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나, 대상 스코프에 SOFT_DELETE를 준 역할 | 성공 참, 뒤이은 읽기에서 상태 삭제, 상태 사유 `"admin-requested"` |
 | 권한 없는 사용자는 사용자를 물릴 수 없다 | 역할 없이 물리려 하면, 엔티티 권한 문이 막는다 | 권한 없는 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나 | `NotEnoughPermission` |
 | 권한 받은 사용자가 물린 사용자를 되살리면 활성이 된다 | 대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 삭제 상태 사용자를 되살리면, 성공이 오고 상태가 활성으로 바뀐다 | 권한 받은 사용자 | 도메인 하나, 삭제 상태 대상 사용자 하나, 행위자 하나, 대상 스코프에 SOFT_DELETE를 준 역할 | 성공 참, 뒤이은 읽기에서 상태 활성 |
-| 물리지 않은 사용자를 되살려도 활성이 된다 | 권한 받은 사용자가 비활성 사용자를 되살리면, 현재 상태와 무관하게 활성이 된다 | 권한 받은 사용자 | 도메인 하나, 비활성 대상 사용자 하나, 행위자 하나, 대상 스코프에 SOFT_DELETE를 준 역할 | 성공 참, 뒤이은 읽기에서 상태 활성 |
+| 물리지 않은 사용자는 되살릴 수 없다 | 권한 받은 사용자가 물리지 않은 비활성 사용자를 되살리려 하면, 삭제 상태가 아니라 막힌다 | 권한 받은 사용자 | 도메인 하나, 비활성 대상 사용자 하나, 행위자 하나, 대상 스코프에 SOFT_DELETE를 준 역할 | `UserModificationBadRequest` |
 | 권한 없는 사용자는 사용자를 되살릴 수 없다 | 역할 없이 되살리려 하면, 엔티티 권한 문이 막는다 | 권한 없는 사용자 | 도메인 하나, 삭제 상태 대상 사용자 하나, 행위자 하나 | `NotEnoughPermission` |
+| 수정으로 DELETED를 주면 물리기와 같다 | 대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 수정으로 DELETED를 주면, 물리기와 같이 삭제 상태가 된다 | 권한 받은 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나, 대상 스코프에 SOFT_DELETE와 READ를 준 역할 | 노드 전체, 상태 삭제, 상태 사유 `"admin-requested"` |
+| SOFT_DELETE 없이 수정으로 DELETED를 줄 수 없다 | 대상 사용자 스코프에서 UPDATE와 READ만 받은 사용자가 수정으로 DELETED를 주면, 물리기의 엔티티 권한 문이 막는다 | 권한 받은 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나, 대상 스코프에 UPDATE와 READ를 준 역할 | `NotEnoughPermission` |
+| 삭제 상태 사용자에 수정으로 DELETED만 주면 아무것도 바뀌지 않는다 | 삭제 상태 사용자에 수정으로 DELETED만 주면, 아무것도 바뀌지 않고 그 사용자가 온다 | 권한 받은 사용자 | 도메인 하나, 삭제 상태 대상 사용자 하나, 행위자 하나, 대상 스코프에 SOFT_DELETE와 READ를 준 역할 | 노드 전체 변화 없음 |
+| 삭제 상태 사용자에 수정으로 ACTIVE를 주면 되살리기와 같다 | 대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 삭제 상태 사용자에 수정으로 ACTIVE를 주면, 되살리기와 같이 활성이 된다 | 권한 받은 사용자 | 도메인 하나, 삭제 상태 대상 사용자 하나, 행위자 하나, 대상 스코프에 SOFT_DELETE와 READ를 준 역할 | 노드 전체, 상태 활성, 상태 사유 `"admin-requested"` |
+| 삭제 상태 사용자의 다른 필드는 수정할 수 없다 | 대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 삭제 상태 사용자의 전체 이름을 고치면, 삭제된 사용자라 막힌다 | 권한 받은 사용자 | 도메인 하나, 삭제 상태 대상 사용자 하나, 행위자 하나, 대상 스코프에 UPDATE와 READ를 준 역할 | `UserDeleted` |
+| 수정으로 ACTIVE, INACTIVE, DELETED 밖의 상태를 줄 수 없다 | 대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 수정으로 BEFORE_VERIFICATION을 주면, 입력 검증이 막는다 | 권한 받은 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나, 대상 스코프에 UPDATE와 READ를 준 역할 | `UserModificationBadRequest` |
+| 일괄 수정은 항목마다 물리고 되살린다 | 슈퍼관리자가 일괄 수정으로 활성 사용자에 DELETED, 삭제 상태 사용자에 ACTIVE, 다른 삭제 상태 사용자에 전체 이름을 주면, 둘은 물리고 되살린 뒤 수정 목록에, 하나는 실패로 담긴다 | 슈퍼관리자 | 도메인 하나, 활성 사용자 하나, 삭제 상태 사용자 둘 | 수정 목록 두 노드(상태 삭제, 상태 활성), 실패 목록 사용자 id 하나, 메시지 무시 |
 | 권한 받은 사용자가 폴더와 세션이 없는 사용자를 지우면 그 사용자가 사라진다 | 대상 사용자 스코프에서 HARD_DELETE를 받은 사용자가 물리지 않은 사용자를 지워도, 성공이 오고 그 사용자를 더 찾을 수 없다 | 권한 받은 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나, 대상 스코프에 HARD_DELETE를 준 역할 | 성공 참, 뒤이은 슈퍼관리자 일괄 읽기에서 None |
 | 권한 없는 사용자는 사용자를 지울 수 없다 | 역할 없이 지우려 하면, 엔티티 권한 문이 막는다 | 권한 없는 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나 | `NotEnoughPermission` |
 | 없는 관리자 id로는 사용자를 지울 수 없다 | 권한 받은 사용자가 넘겨받을 관리자로 없는 id를 주면, 입력 검증이 막는다 | 권한 받은 사용자 | 도메인 하나, 대상 사용자 하나, 행위자 하나, 대상 스코프에 HARD_DELETE를 준 역할 | `UserNotFound` |

@@ -13,17 +13,17 @@ from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 
 
 @dataclass
-class PublicBulkGetRuntimeVariantsAction(
+class BulkGetRuntimeVariantsAction(
     PartialBulkGetEntityOpsAction[RuntimeVariantRow, RuntimeVariantData]
 ):
-    """Read the runtime variants the caller named; every authenticated user may."""
+    """Read the runtime variants the caller named, one permission check per variant."""
 
     ids: Sequence[RuntimeVariantID]
 
     @override
     @classmethod
     def action_name(cls) -> str:
-        return "public_bulk_get_runtime_variants"
+        return "bulk_get_runtime_variants"
 
     @override
     def entity_ids(self) -> Sequence[EntityIdentifier]:

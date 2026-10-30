@@ -10,35 +10,39 @@ from uuid import UUID
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType, ResourceSlot, VFolderUsageMode
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.model_card.types import (
     ModelCardData,
     ModelCardResourceRequirementData,
     ResourceRequirementEntry,
 )
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.model_card.creators import (
     ModelCardCreator,
     ModelCardResourceRequirementCreator,
 )
 from ai.backend.manager.models.model_card.row import ModelCardRow
+from ai.backend.manager.models.model_card.scopes import UserModelCardTarget
+from ai.backend.manager.models.model_card.searchable_fields import (
+    ModelCardResourceRequirementSearchableFields,
+)
 from ai.backend.manager.models.model_card.updaters import ModelCardUpdater
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
@@ -47,9 +51,9 @@ from ai.backend.manager.models.resource_slot.row import (
     ModelCardResourceRequirementRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.model_card.db_source.db_source import ModelCardDBSource
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
@@ -208,6 +212,7 @@ class TestModelCardCreatorResourceRequirements:
                 resource_policy=test_user_resource_policy.name,
             )
             db_sess.add(user)
+            db_sess.add(VirtualEntityRow(entity_type=UserEntityType(), entity_id=user.uuid))
             await db_sess.flush()
         return user
 
@@ -371,6 +376,64 @@ class TestModelCardCreatorResourceRequirements:
         ).data
         assert await self._requirements(db_with_cleanup, data.id) == []
 
+    async def _owners(self, db: ExtendedAsyncSAEngine, card_id: UUID) -> set[tuple[str, UUID]]:
+        """The (entity type, entity id) of every other entity holding an own edge to the card."""
+        scope = VirtualEntityRow.__table__.alias("scope")
+        node = VirtualEntityRow.__table__.alias("node")
+        async with db.begin_readonly_session() as sess:
+            rows = (
+                await sess.execute(
+                    sa.select(scope.c.entity_type, scope.c.entity_id)
+                    .select_from(EntityMembershipRow)
+                    .join(scope, scope.c.id == EntityMembershipRow.virtual_entity_id)
+                    .join(node, node.c.id == EntityMembershipRow.member_entity_id)
+                    .where(
+                        node.c.entity_id == card_id,
+                        scope.c.id != node.c.id,
+                        EntityMembershipRow.capped.is_(False),
+                    )
+                )
+            ).all()
+        return {(str(entity_type), entity_id) for entity_type, entity_id in rows}
+
+    async def test_create_joins_the_project_and_the_creator(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        ops: OpsRepository[ModelCardData],
+        creator_without_min_resource: _CardCreators,
+        test_user: UserRow,
+        test_group: ProjectRow,
+    ) -> None:
+        data: ModelCardData = (
+            await ops.create_entity_with_fields(
+                creator_without_min_resource.card, creator_without_min_resource.requirements
+            )
+        ).data
+
+        assert await self._owners(db_with_cleanup, data.id) == {
+            ("project", test_group.id),
+            ("user", test_user.uuid),
+        }
+
+    async def test_user_scope_reaches_a_creator_outside_the_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        ops: OpsRepository[ModelCardData],
+        creator_without_min_resource: _CardCreators,
+        test_user: UserRow,
+    ) -> None:
+        data: ModelCardData = (
+            await ops.create_entity_with_fields(
+                creator_without_min_resource.card, creator_without_min_resource.requirements
+            )
+        ).data
+
+        condition = UserModelCardTarget(user_id=UserID(test_user.uuid)).to_condition()
+        async with db_with_cleanup.begin_readonly_session() as sess:
+            found = (await sess.scalars(sa.select(ModelCardRow.id).where(condition()))).all()
+
+        assert found == [data.id]
+
     async def _requirements(
         self, db: ExtendedAsyncSAEngine, card_id: UUID
     ) -> list[ModelCardResourceRequirementData]:
@@ -387,7 +450,7 @@ class TestModelCardCreatorResourceRequirements:
                 .scalars()
                 .all()
             )
-        return [row.to_data() for row in rows]
+        return [ModelCardResourceRequirementSearchableFields.own.to_data(row) for row in rows]
 
     async def test_resource_requirements_persisted_in_db(
         self,

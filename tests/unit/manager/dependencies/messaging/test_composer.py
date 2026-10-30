@@ -52,7 +52,7 @@ class TestMessagingComposer:
         mock_stack.enter_dependency = AsyncMock(side_effect=mock_enter_dependency)
 
         config = _make_mock_config()
-        messaging_input = MessagingInput(config=config)
+        messaging_input = MessagingInput(config=config, sentinel_monitors=MagicMock())
 
         composer = MessagingComposer()
         assert composer.stage_name == "messaging"
@@ -75,7 +75,7 @@ class TestMessagingComposer:
     async def test_compose_passes_config_correctly(self) -> None:
         """Composer should pass config to message queue and event producer."""
         config = _make_mock_config()
-        messaging_input = MessagingInput(config=config)
+        messaging_input = MessagingInput(config=config, sentinel_monitors=MagicMock())
 
         captured_inputs: dict[str, Any] = {}
 

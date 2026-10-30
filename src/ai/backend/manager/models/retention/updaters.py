@@ -11,6 +11,9 @@ from ai.backend.common.data.entity.retention_policy import RetentionPolicyID
 from ai.backend.common.data.retention.types import RetentionCategory
 from ai.backend.manager.data.retention.types import RetentionPolicyData
 from ai.backend.manager.models.retention.row import RetentionPolicyRow
+from ai.backend.manager.models.retention.searchable_fields import (
+    RetentionPolicySearchableFields,
+)
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState
@@ -53,7 +56,7 @@ class RetentionPolicyUpdater(DataUpdater[RetentionPolicyRow, RetentionPolicyData
 
     @override
     def to_data(self, row: RetentionPolicyRow) -> RetentionPolicyData:
-        return row.to_data()
+        return RetentionPolicySearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -87,4 +90,4 @@ class LastSweptAtUpdater(DataUpdater[RetentionPolicyRow, RetentionPolicyData]):
 
     @override
     def to_data(self, row: RetentionPolicyRow) -> RetentionPolicyData:
-        return row.to_data()
+        return RetentionPolicySearchableFields.own.to_data(row)

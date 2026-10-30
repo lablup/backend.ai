@@ -1,12 +1,15 @@
 ---
 name: runtime-variant-preset-adapter-scenarios
 type: reference
-description: what the runtime variant preset adapter guarantees, as scenarios; the rank the insert fills in, the value-type rule checked by the request on create and by the service on update, the batch read that is a search, the variant column with no foreign key in the ORM
+description: what the runtime variant preset adapter guarantees, as scenarios; the rank the insert fills in, the value-type rule checked by the request on create and by the service on update, the batch read that is a search, the partial bulk update and purge that answer per id, the variant column with no foreign key in the ORM
 scope: src/ai/backend/manager/api/adapters/runtime_variant_preset
-keywords: [runtime variant preset, scenario, adapter, superadmin, rank, value type, flag, public read]
+keywords: [runtime variant preset, scenario, adapter, superadmin, rank, value type, flag, public read, partial bulk update, partial bulk purge]
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
+updated:
+  by: claude-code/opus-5
+  at: 2026-10-16
 status: draft
 ---
 # runtime_variant_preset 어댑터 — 시나리오
@@ -14,10 +17,11 @@ status: draft
 규칙은 상위 디렉터리의 `AGENTS.md`에 있다. 여기 적힌 내용과 실행 결과가 어긋나면 문장을 먼저
 검토한다.
 
-`runtime_variant_preset` 엔티티는 `runtime_variant` 하나에 속하지만 그 스코프 안에서 생성되지는
-않는다. `runtime_variant` 컬럼으로 참조할 뿐 어느 스코프에도 속하지 않는다. 생성은 호출한 사용자가
-슈퍼관리자인지 검사한다. 수정과 삭제에는 프리셋별 권한이 필요하지만 현재는 그 권한을 부여할 방법이 없다. 조회와
-검색은 인증만 확인한다.
+`runtime_variant_preset` 엔티티는 `runtime_variant` 하나를 컬럼으로 참조하지만 그 스코프 안에서
+생성되지는 않는다. 행은 global 과 public 양쪽에 소속된다. 생성은 호출한 사용자가 슈퍼관리자인지
+검사한다. 수정과 삭제에 필요한 프리셋별 권한은 global 에서만 나오므로 슈퍼관리자만 통과한다. 조회와
+검색은 public 에서 READ 를 검사한다. 모든 계정이 public 소속 역할을 자동으로 받으므로 로그인한
+사용자는 모두 읽을 수 있다.
 
 `runtime_variant` 어댑터의 시나리오는 `../runtime_variant/KNOWLEDGE.md`에 있다.
 
@@ -55,13 +59,14 @@ status: draft
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
-| 아무 권한도 없는 사용자가 ID로 조회한다 | 프리셋 하나, 아무 권한도 없음 | ID로 조회 | 해당 프리셋 전체 |
-| 존재하지 않는 ID로 조회한다 | 다른 프리셋만 있음 | ID로 조회 | 대상을 찾을 수 없어 거부 |
-| 존재하는 ID와 존재하지 않는 ID를 함께 조회한다 | 프리셋 둘, 아무 권한도 없음 | 세 ID를 한 번에 조회 | 요청한 순서대로 반환되며, 존재하지 않는 ID는 빈 항목으로 반환됨 |
+| public 에서 읽는 사용자가 ID로 조회한다 | 프리셋 하나, public 조회 권한만 있음 | ID로 조회 | 해당 프리셋 전체 |
+| 존재하지 않는 ID로 조회한다 | 다른 프리셋만 있음 | ID로 조회 | 권한 부족으로 거부 |
+| 존재하는 ID와 존재하지 않는 ID를 함께 조회한다 | 프리셋 둘, public 조회 권한만 있음 | 세 ID를 한 번에 조회 | 요청한 순서대로 반환되며, 존재하지 않는 ID 자리에는 거부가 담긴다 |
 | 빈 목록으로 조회한다 | 프리셋 하나 | 빈 ID 목록으로 조회 | 빈 응답을 반환하고 하위 계층을 호출하지 않음 |
 
-조회에는 권한 검사가 없다. 아무 권한도 없는 사용자의 조회가 성공하는 시나리오로 이를 검증한다.
-반면 생성 요청은 슈퍼관리자가 아니면 거부된다.
+조회는 public 에서 READ 를 검사한다. public 조회 권한만 받은 사용자의 조회가 성공하는 시나리오로
+이를 검증한다. 반면 생성 요청은 슈퍼관리자가 아니면 거부된다. 존재하지 않는 ID와 닿을 수 없는 ID는
+같은 이유로 거부된다.
 
 여러 ID를 한 번에 조회할 때는 ID 조건을 지정한 검색으로 실행한다. ID마다 개별 조회하는 방식이
 아니므로 존재하지 않는 ID가 있어도 요청 전체를 거부하지 않고 해당 위치에 빈 항목을 반환한다.
@@ -103,7 +108,17 @@ status: draft
 `default_value` 값이 새 `value_type` 값과 어긋난 상태로 수정된다. 이를 거부할지 정한 뒤 시나리오를
 작성한다.
 
-## 삭제
+## 여럿 수정하기
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 슈퍼관리자가 여럿의 설명을 한 번에 바꾼다 | 한 변형의 프리셋 둘, 슈퍼관리자 | 둘의 설명 수정 | 둘 다 새 설명으로 오고 실패한 것은 없음 |
+| 아무 권한도 없는 사용자가 여럿을 수정한다 | 같은 프리셋 둘, 아무 권한도 없음 | 둘의 설명 수정 | 수정된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
+여럿 수정도 단건 수정과 같은 검사를 프리셋마다 한다. 검사에 걸린 프리셋은 그 이유로 실패 목록에
+오고 나머지는 수정된다.
+
+## purge
 
 | 시나리오 | 상황 | 요청 | 결과 |
 |---|---|---|---|
@@ -111,13 +126,18 @@ status: draft
 | 존재하지 않는 ID를 삭제한다 | 다른 프리셋만 있음, 슈퍼관리자 | 삭제 | 대상을 찾을 수 없어 거부 |
 | 아무 권한도 없는 사용자가 삭제한다 | 해당 프리셋에 아무 권한도 없음 | 삭제 | 권한 부족으로 거부 |
 | 권한 검사를 끄면 권한 없이도 삭제된다 | 권한 검사 비활성화, 아무 권한도 없음 | 삭제 | 삭제한 프리셋의 ID를 담은 응답 |
+| 여럿과 없는 ID 하나를 한 번에 purge 한다 | 한 변형의 프리셋 둘, 슈퍼관리자 | 세 ID를 한 번에 | 둘은 purge 되기 전 노드로 처리된 목록에 오고, 없는 ID는 실패 목록에 옴 |
+| 아무 권한도 없는 사용자가 여럿을 purge 한다 | 같은 프리셋 둘, 아무 권한도 없음 | 두 ID를 한 번에 | purge 된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
+
+여럿 연산은 호출 전체를 거부하지 않는다. 처리한 프리셋은 처리된 목록에, 처리하지 못한 것은 ID와
+이유를 실패 목록에 싣는다.
 
 이 어댑터는 soft delete를 지원하지 않는다.
 
 ## 아직 적지 않은 것
 
-없다. 어댑터가 제공하는 `create`, `get`, `search`, `batch_load_by_ids`, `update`, `delete`가 모두 위에
-있다.
+없다. 어댑터가 제공하는 `create`, `get`, `search`, `batch_load_by_ids`, `update`,
+`partial_bulk_update`, `purge`, `partial_bulk_purge`가 모두 위에 있다.
 
 `batch_load_fields`는 모든 어댑터가 상속받는 공용 메서드이며 이 엔티티 고유의 호출이 아니다.
 보고서의 호출 목록에는 포함되지만 별도로 작성할 시나리오는 없다.

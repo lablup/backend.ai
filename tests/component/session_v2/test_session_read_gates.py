@@ -16,7 +16,7 @@ import sqlalchemy as sa
 
 from ai.backend.client.v2.exceptions import PermissionDeniedError
 from ai.backend.client.v2.v2_registry import V2ClientRegistry
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
 from ai.backend.common.data.entity.types import EntityType
@@ -30,6 +30,12 @@ from ai.backend.manager.actions.registry.types import ProcessorDependencies
 from ai.backend.manager.actions.v2.bulk.validator.rbac import (
     VirtualEntityAtomicBulkActionRBACValidator,
     VirtualEntityPartialBulkActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.global_scope.validator.rbac import (
+    VirtualEntityGlobalActionRBACValidator,
+)
+from ai.backend.manager.actions.v2.membership.validator.rbac import (
+    VirtualEntityMembershipActionRBACValidator,
 )
 from ai.backend.manager.actions.v2.relation.validator.rbac import (
     VirtualEntityRelationActionRBACValidator,
@@ -46,10 +52,11 @@ from ai.backend.manager.errors.auth import InsufficientPrivilege
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.session.searchers import SessionSearcher
 from ai.backend.manager.models.specs.pagination import NoPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
@@ -94,6 +101,8 @@ def processor_registry(
         partial_bulk=VirtualEntityPartialBulkActionRBACValidator(permission_repo),
         atomic_bulk=VirtualEntityAtomicBulkActionRBACValidator(permission_repo),
         relation=VirtualEntityRelationActionRBACValidator(permission_repo, config_provider),
+        membership=VirtualEntityMembershipActionRBACValidator(permission_repo, config_provider),
+        global_scope=VirtualEntityGlobalActionRBACValidator(permission_repo, config_provider),
     )
     return ProcessorRegistry(
         ProcessorDependencies(
@@ -232,7 +241,7 @@ def regular_user_context(
     regular_user_fixture: UserFixtureData,
     domain_fixture: DomainFixtureData,
 ) -> Iterator[None]:
-    with with_user(
+    with with_user_context(
         UserData(
             user_id=regular_user_fixture.user_uuid,
             is_authorized=True,
@@ -251,7 +260,7 @@ def superadmin_context(
     admin_user_fixture: UserFixtureData,
     domain_fixture: DomainFixtureData,
 ) -> Iterator[None]:
-    with with_user(
+    with with_user_context(
         UserData(
             user_id=admin_user_fixture.user_uuid,
             is_authorized=True,
@@ -335,7 +344,11 @@ class TestAgentChildSearchGate:
     ) -> None:
         with pytest.raises(InsufficientPrivilege):
             await session_processors.global_search.run(
-                GlobalSearchSessionsAction(searcher=SessionSearcher(pagination=NoPagination()))
+                GlobalSearchSessionsAction(
+                    searcher=GlobalSearcher(
+                        used_by=(), searcher=SessionSearcher(pagination=NoPagination())
+                    )
+                )
             )
 
     @pytest.mark.usefixtures("regular_user_context")
@@ -346,7 +359,11 @@ class TestAgentChildSearchGate:
     ) -> None:
         with pytest.raises(InsufficientPrivilege):
             await session_processors.global_search_kernels.run(
-                GlobalSearchKernelsAction(searcher=KernelSearcher(pagination=NoPagination()))
+                GlobalSearchKernelsAction(
+                    searcher=GlobalSearcher(
+                        used_by=(), searcher=KernelSearcher(pagination=NoPagination())
+                    )
+                )
             )
 
     @pytest.mark.usefixtures("superadmin_context")
@@ -356,10 +373,18 @@ class TestAgentChildSearchGate:
         user_session_seed: SessionSeedData,
     ) -> None:
         sessions = await session_processors.global_search.run(
-            GlobalSearchSessionsAction(searcher=SessionSearcher(pagination=NoPagination()))
+            GlobalSearchSessionsAction(
+                searcher=GlobalSearcher(
+                    used_by=(), searcher=SessionSearcher(pagination=NoPagination())
+                )
+            )
         )
         kernels = await session_processors.global_search_kernels.run(
-            GlobalSearchKernelsAction(searcher=KernelSearcher(pagination=NoPagination()))
+            GlobalSearchKernelsAction(
+                searcher=GlobalSearcher(
+                    used_by=(), searcher=KernelSearcher(pagination=NoPagination())
+                )
+            )
         )
         assert user_session_seed.session_id in {item.id for item in sessions.items}
         assert user_session_seed.kernel_id in {item.id for item in kernels.items}

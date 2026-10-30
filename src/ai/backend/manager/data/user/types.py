@@ -54,6 +54,28 @@ class UserStatus(enum.StrEnum):
         """Statuses a purge is working through. Writes are refused while in one."""
         return frozenset({cls.PURGING, cls.PURGE_ERROR})
 
+    @classmethod
+    def auth_denied(cls) -> frozenset[UserStatus]:
+        """Statuses whose owner may not authenticate, by password login or by an API request."""
+        return frozenset({
+            cls.INACTIVE,
+            cls.DELETED,
+            cls.BEFORE_VERIFICATION,
+            *cls.purge_in_progress(),
+        })
+
+    def deletes_from(self, current: UserStatus) -> bool:
+        """Whether an update asking for this status soft-deletes a user in ``current``."""
+        return self is UserStatus.DELETED and current is not UserStatus.DELETED
+
+    def restores_from(self, current: UserStatus) -> bool:
+        """Whether an update asking for this status restores a user in ``current``."""
+        return self is UserStatus.ACTIVE and current is UserStatus.DELETED
+
+    def is_updater_value_from(self, current: UserStatus) -> bool:
+        """Whether an update asking for this status hands it to ``UserUpdater``."""
+        return self is not UserStatus.DELETED and not self.restores_from(current)
+
 
 @dataclass
 class UserInfoContext:
@@ -104,7 +126,8 @@ class UserData(EntityData):
     @classmethod
     def from_row(cls, row: Any) -> Self:
         """
-        Deprecated: Use `UserRow.to_data()` method instead.
+        Deprecated: use `UserSearchableFields.own.to_data()`. Kept for the alembic
+        migrations, which read rows the ORM mapper is not available for.
         """
         return cls(
             id=row.uuid,

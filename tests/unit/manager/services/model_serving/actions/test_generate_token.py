@@ -7,10 +7,9 @@ from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from aioresponses import aioresponses
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.endpoint.types import EndpointStatus
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
@@ -29,7 +28,9 @@ from ai.backend.manager.services.model_serving.actions.generate_token import (
 )
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.testutils.scenario import ScenarioBase
 
 
@@ -48,7 +49,7 @@ class TestGenerateToken:
 
     @pytest.fixture(autouse=True)
     def set_user_context(self, user_data: UserData) -> Iterator[None]:
-        with with_user(user_data):
+        with with_user_context(user_data):
             yield
 
     @pytest.fixture
@@ -333,17 +334,24 @@ class TestGenerateToken:
         mock_create_endpoint_token.return_value = mock_token_data
         mock_get_scaling_group_info_token.return_value = mock_scaling_group
 
-        # TODO: Change using aioresponses to mocking client layer after refactoring service layer
-        with aioresponses() as mock_http:
-            # HTTP response mock setup
-            expected_url = (
-                f"{mock_scaling_group.wsproxy_addr}/v2/endpoints/{action.deployment_id}/token"
-            )
-            mock_http.post(expected_url, payload={"token": expected.data.token}, status=200)
-
+        # TODO: Mock the wsproxy client layer once the service stops creating its own session.
+        wsproxy_resp = MagicMock(status=200)
+        wsproxy_resp.json = AsyncMock(return_value={"token": expected.data.token})
+        wsproxy_resp.__aenter__ = AsyncMock(return_value=wsproxy_resp)
+        wsproxy_session = MagicMock()
+        wsproxy_session.post = MagicMock(return_value=wsproxy_resp)
+        wsproxy_session.__aenter__ = AsyncMock(return_value=wsproxy_session)
+        with patch(
+            "ai.backend.manager.services.model_serving.services.model_serving.aiohttp.ClientSession",
+            MagicMock(return_value=wsproxy_session),
+        ):
             with patch("uuid.uuid4", return_value=expected.data.id):
 
                 async def generate_token(action: GenerateTokenAction) -> GenerateTokenActionResult:
                     return await model_serving_service.generate_token(action)
 
                 await scenario.test(generate_token)
+
+        assert wsproxy_session.post.call_args.args == (
+            f"{mock_scaling_group.wsproxy_addr}/v2/endpoints/{action.deployment_id}/token",
+        )

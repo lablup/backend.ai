@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+from typing import Annotated
 from uuid import UUID
 
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.contexts.user import current_user
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.vfolder.request import (
     ScopedSearchVFoldersInput,
     SearchVFoldersInput,
 )
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.gql.base import encode_cursor
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
@@ -19,15 +23,14 @@ from ai.backend.manager.api.gql.decorators import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-from ai.backend.manager.api.gql.vfolder_v2.types import (
-    VFolderConnection,
-    VFolderFilterGQL,
-    VFolderGQL,
-    VFolderOrderByGQL,
-)
+from ai.backend.manager.api.gql.vfolder_v2.types.filters import VFolderFilterGQL, VFolderOrderByGQL
 from ai.backend.manager.api.gql.vfolder_v2.types.mount_policy import VFolderMountPoliciesPayloadGQL
-from ai.backend.manager.api.gql.vfolder_v2.types.node import VFolderEdge
-from ai.backend.manager.api.gql.vfolder_v2.types.scopes import VFolderScopeGQL
+from ai.backend.manager.api.gql.vfolder_v2.types.node import (
+    VFolderConnection,
+    VFolderEdge,
+    VFolderGQL,
+)
+from ai.backend.manager.api.gql.vfolder_v2.types.scopes import VFolderScopeGQL, VFolderUsageGQL
 
 
 @gql_root_field(
@@ -38,6 +41,16 @@ from ai.backend.manager.api.gql.vfolder_v2.types.scopes import VFolderScopeGQL
 )  # type: ignore[misc]
 async def admin_vfolders_v2(
     info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        VFolderUsageGQL | None,
+        strawberry.argument(
+            description=(
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; vfolders the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: VFolderFilterGQL | None = None,
     order_by: list[VFolderOrderByGQL] | None = None,
     before: str | None = None,
@@ -51,6 +64,7 @@ async def admin_vfolders_v2(
     check_admin_only()
     result = await info.context.adapters.vfolder.admin_search(
         SearchVFoldersInput(
+            usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
@@ -92,7 +106,7 @@ async def vfolder_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Page through the virtual folders the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."
@@ -103,6 +117,16 @@ async def vfolder_v2(
 async def scoped_vfolders_v2(
     info: Info[StrawberryGQLContext],
     scope: VFolderScopeGQL,
+    usage: Annotated[
+        VFolderUsageGQL | None,
+        strawberry.argument(
+            description=(
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; vfolders the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: VFolderFilterGQL | None = None,
     order_by: list[VFolderOrderByGQL] | None = None,
     before: str | None = None,
@@ -116,6 +140,7 @@ async def scoped_vfolders_v2(
     result = await info.context.adapters.vfolder.scoped_search(
         ScopedSearchVFoldersInput(
             scope=scope.to_pydantic(),
+            usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
@@ -149,6 +174,16 @@ async def scoped_vfolders_v2(
 async def project_vfolders(
     info: Info[StrawberryGQLContext],
     project_id: UUID,
+    usage: Annotated[
+        VFolderUsageGQL | None,
+        strawberry.argument(
+            description=(
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; vfolders the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: VFolderFilterGQL | None = None,
     order_by: list[VFolderOrderByGQL] | None = None,
     before: str | None = None,
@@ -162,6 +197,7 @@ async def project_vfolders(
     result = await info.context.adapters.vfolder.project_search(
         project_id,
         SearchVFoldersInput(
+            usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
@@ -194,6 +230,16 @@ async def project_vfolders(
 )  # type: ignore[misc]
 async def my_vfolders(
     info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        VFolderUsageGQL | None,
+        strawberry.argument(
+            description=(
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; vfolders the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: VFolderFilterGQL | None = None,
     order_by: list[VFolderOrderByGQL] | None = None,
     before: str | None = None,
@@ -204,8 +250,13 @@ async def my_vfolders(
     offset: int | None = None,
 ) -> VFolderConnection | None:
     """Search virtual folders accessible to the current user."""
-    result = await info.context.adapters.vfolder.my_search(
-        SearchVFoldersInput(
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available")
+    result = await info.context.adapters.vfolder.scoped_search(
+        ScopedSearchVFoldersInput(
+            scope=VFolderScope(user=[UUIDScope(value=me.user_id)]),
+            usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
@@ -232,7 +283,7 @@ async def my_vfolders(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="The mount levels set on a virtual folder, one row per user.",
     )
 )  # type: ignore[misc]

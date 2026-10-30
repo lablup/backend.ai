@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.resource_allocation.types import PresetAvailabilityData
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
@@ -38,12 +38,20 @@ from ai.backend.manager.services.session.resource_allocation.actions.get_resourc
     GetResourceGroupUsageAction,
     GetResourceGroupUsageActionResult,
 )
+from ai.backend.manager.services.session.resource_allocation.actions.get_user_concurrency import (
+    GetUserConcurrencyAction,
+    GetUserConcurrencyActionResult,
+)
+from ai.backend.manager.services.session.resource_allocation.actions.get_user_usage import (
+    GetUserUsageAction,
+    GetUserUsageActionResult,
+)
 from ai.backend.manager.services.session.resource_allocation.actions.resolve_keypair_context import (
     ResolveKeypairContextAction,
     ResolveKeypairContextActionResult,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ResourceAllocationService:
@@ -72,13 +80,24 @@ class ResourceAllocationService:
             resource_policy=ctx.resource_policy,
         )
 
+    async def get_user_concurrency(
+        self, action: GetUserConcurrencyAction
+    ) -> GetUserConcurrencyActionResult:
+        """Get the user's active regular and private session counts."""
+        concurrency = await self._resource_allocation_repository.get_user_concurrency(
+            action.user_id
+        )
+        return GetUserConcurrencyActionResult(concurrency=concurrency)
+
     async def get_keypair_usage(self, action: GetKeypairUsageAction) -> GetKeypairUsageActionResult:
         """Get keypair resource usage."""
-        usage = await self._resource_allocation_repository.get_keypair_usage(
-            access_key=action.access_key,
-            resource_policy=action.resource_policy,
-        )
+        usage = await self._resource_allocation_repository.get_keypair_usage(action.user_id)
         return GetKeypairUsageActionResult(usage=usage)
+
+    async def get_user_usage(self, action: GetUserUsageAction) -> GetUserUsageActionResult:
+        """Get a user's resource usage across all their keypairs."""
+        usage = await self._resource_allocation_repository.get_user_usage(action.user_id)
+        return GetUserUsageActionResult(usage=usage)
 
     async def get_project_usage(self, action: GetProjectUsageAction) -> GetProjectUsageActionResult:
         """Get project resource usage."""

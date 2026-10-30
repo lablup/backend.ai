@@ -8,7 +8,6 @@ from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.manager.data.model_card.types import ModelCardData
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
@@ -73,32 +72,3 @@ class ModelCardRow(LifecycleTimestampsMixin, Base):
     access_level: Mapped[str] = mapped_column(
         "access_level", sa.String(length=32), nullable=False, default="internal"
     )
-
-    def to_data(self) -> ModelCardData:
-        """Project this row.
-
-        The minimum resource requirements live in their own table and are not read
-        here: reaching into a child table would force an eager load on every read.
-        """
-        return ModelCardData(
-            id=self.id,
-            name=self.name,
-            vfolder_id=self.vfolder,
-            domain=self.domain,
-            project_id=self.project,
-            creator_id=self.creator,
-            author=self.author,
-            title=self.title,
-            model_version=self.model_version,
-            description=self.description,
-            task=self.task,
-            category=self.category,
-            architecture=self.architecture,
-            framework=self.framework or [],
-            label=self.label or [],
-            license=self.license,
-            readme=self.readme,
-            access_level=self.access_level,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )

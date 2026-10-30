@@ -10,12 +10,14 @@ from uuid import UUID
 
 import yarl
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_dependency import SessionDependencyID
+from ai.backend.common.data.entity.session_designated_agent import SessionDesignatedAgentID
 from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.types import EntityData, FieldData
 from ai.backend.common.data.entity.user import UserID
@@ -195,7 +197,7 @@ class SessionData(EntityData):
     cluster_size: int
     domain_name: str
     group_id: UUID
-    user_uuid: UUID
+    user_uuid: UUID | None
     use_host_network: bool
     created_at: datetime = field(compare=False)
     status: SessionStatus
@@ -232,6 +234,8 @@ class SessionData(EntityData):
 
     # The routing replica (RoutingRow.id) this session serves, if any.
     replica_id: UUID | None = None
+    requested_starts_at: datetime | None = field(default=None, compare=False)
+    session_group_id: SessionGroupID | None = None
 
     @override
     def entity_id(self) -> SessionID:
@@ -271,7 +275,6 @@ class SessionEntityData(EntityData):
     cluster_size: int
     options: SessionStoredOptions
     agent_ids: list[str] | None
-    designated_agent_ids: list[str] | None
     session_group_id: SessionGroupID | None
     resource_group_id: ResourceGroupID
     resource_group_name: str
@@ -279,7 +282,7 @@ class SessionEntityData(EntityData):
     domain_name: str
     domain_id: DomainID
     group_id: ProjectID
-    user_uuid: UserID
+    user_uuid: UserID | None
     access_key: AccessKey | None
     images: list[str] | None
     image_ids: list[UUID] | None
@@ -337,6 +340,7 @@ class SessionEntityData(EntityData):
             name=self.name,
             access_key=self.access_key,
             agent_ids=self.agent_ids,
+            session_group_id=self.session_group_id,
             images=self.images,
             image_ids=self.image_ids,
             tag=self.tag,
@@ -351,6 +355,7 @@ class SessionEntityData(EntityData):
             terminated_at=self.terminated_at,
             resource_group_name=self.resource_group_name,
             starts_at=self.starts_at,
+            requested_starts_at=self.requested_starts_at,
             status_info=self.status_info,
             status_data=self.status_data,
             status_history=self.status_history,
@@ -372,6 +377,15 @@ class SessionDependencyData(FieldData):
     id: SessionDependencyID
     session_id: SessionID
     depends_on: SessionID
+
+
+@dataclass(frozen=True)
+class SessionDesignatedAgentData(FieldData):
+    """One agent a session designates for its placement."""
+
+    id: SessionDesignatedAgentID
+    session_id: SessionID
+    agent_uuid: AgentUUID
 
 
 @dataclass(frozen=True)
@@ -404,7 +418,7 @@ class SessionMetadata:
     name: str
     domain_name: str
     group_id: UUID
-    user_uuid: UUID
+    user_uuid: UUID | None
     access_key: str
     session_type: SessionTypes
     priority: int

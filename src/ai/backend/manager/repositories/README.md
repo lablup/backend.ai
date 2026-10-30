@@ -650,7 +650,7 @@ before query execution.
 
 ```python
 @dataclass(frozen=True)
-class UserFairShareOperationScope:
+class UserFairShareTarget:
     """Required scope for user fair share search.
 
     These parameters are validated before query execution.
@@ -665,7 +665,7 @@ class FairShareRepository:
     # User API - scope first, then querier
     async def search_user_fair_shares(
         self,
-        scope: UserFairShareOperationScope,  # Required, validated
+        scope: UserFairShareTarget,  # Required, validated
         querier: BatchQuerier,            # Optional filters, pagination
     ) -> UserFairShareSearchResult:
         """Search user fair shares within the specified scope."""
@@ -679,7 +679,7 @@ class FairShareRepository:
     async def _validate_user_search_scope(
         self,
         db_sess: SASession,
-        scope: UserFairShareOperationScope,
+        scope: UserFairShareTarget,
     ) -> None:
         """Validate scope entities exist. Raise error if not found."""
         # Validate resource_group exists
@@ -874,9 +874,9 @@ class SessionDBSource:
 
 class SessionCacheSource:
     """Cache data access - only handles cache operations"""
-    _redis: RedisConnectionInfo
+    _redis: ValkeyLiveClient
 
-    def __init__(self, redis: RedisConnectionInfo) -> None:
+    def __init__(self, redis: ValkeyLiveClient) -> None:
         self._redis = redis
 
     async def get_session(self, session_id: SessionId) -> Optional[SessionInfo]:
@@ -896,7 +896,7 @@ class SessionRepository:
     def __init__(
         self,
         ops_provider: V2DBOpsProvider,
-        redis: RedisConnectionInfo,
+        redis: ValkeyLiveClient,
     ) -> None:
         self._db_source = SessionDBSource(ops_provider)
         self._cache_source = SessionCacheSource(redis)

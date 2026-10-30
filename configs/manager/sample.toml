@@ -19,11 +19,10 @@
   # management.
   # Added in 25.8.0
   type = "postgresql"
-  # Network address and port of the PostgreSQL database server. Default is the
-  # standard PostgreSQL port (5432) on localhost. In production, point this to
-  # your database server or cluster endpoint.
-  # Added in 25.8.0
-  addr = { host = "db.example.com", port = 5432 }
+  # Timeout in seconds for connecting to one member of addrs. When it expires,
+  # the next member is tried.
+  # Added in 26.9.0
+  connect-timeout = 5.0
   # Name of the PostgreSQL database to use for Backend.AI. This database must
   # exist and be accessible by the configured user. The database should be
   # created before starting the manager. Length must be between 2 and 64
@@ -72,6 +71,21 @@
   # Added in 25.8.0
   lock-conn-timeout = 30.0
 
+  # Addresses of the PostgreSQL cluster members. List every member of an HA
+  # cluster, or a single address of a standalone server or a proxy in front of
+  # the cluster.
+  # Added in 26.9.0
+  [[db.addrs]]
+  # Add multiple [[db.addrs]] sections as needed
+    # Host address of the service. Can be a hostname, IP address, or special
+    # addresses like 0.0.0.0 to bind to all interfaces.
+    # Added in 22.03.0
+    host = "db1.example.com"
+    # Port number of the service. Must be between 1 and 65535. Ports below 1024
+    # require root/admin privileges.
+    # Added in 22.03.0
+    port = 5432
+
 # Etcd distributed key-value store configuration. Etcd is used for cluster
 # coordination, service discovery, and shared configuration between manager
 # instances. In multi-manager deployments, etcd ensures consistent state across
@@ -83,11 +97,6 @@
   # keys will be stored under this namespace.
   # Added in 22.03.0
   namespace = "backend"
-  # Network address of the etcd server. Default is the standard etcd port on
-  # localhost. In production, should point to one or more etcd instance
-  # endpoint(s).
-  # Added in 22.03.0
-  addr = { host = "etcd-cluster", port = 2379 }
   # Username for authenticating with etcd. Optional if etcd doesn't require
   # authentication. Should be set along with password for secure deployments.
   # Added in 22.03.0
@@ -96,6 +105,29 @@
   # environments. Set together with the user field for authentication.
   # Added in 22.03.0
   ## password = "ETCD_PASSWORD"
+  # Seconds without a frame from an etcd member before a keep-alive ping is sent
+  # on a connection with requests in flight. Must not be below the server's
+  # --grpc-keepalive-min-time (5 seconds by default).
+  # Added in 26.10.0
+  keep-alive-interval = 5.0
+  # Seconds to wait for a keep-alive ping reply before the connection to that
+  # etcd member is closed and its requests go to the other members.
+  # Added in 26.10.0
+  keep-alive-timeout = 3.0
+
+  # Addresses of the etcd cluster members. List every member of an etcd cluster,
+  # or a single address of a standalone server.
+  # Added in 26.10.0
+  [[etcd.addrs]]
+  # Add multiple [[etcd.addrs]] sections as needed
+    # Host address of the service. Can be a hostname, IP address, or special
+    # addresses like 0.0.0.0 to bind to all interfaces.
+    # Added in 22.03.0
+    host = "etcd1.example.com"
+    # Port number of the service. Must be between 1 and 65535. Ports below 1024
+    # require root/admin privileges.
+    # Added in 22.03.0
+    port = 2379
 
 # Core manager service configuration. Controls fundamental manager behavior
 # including network binding, process management, scaling parameters, and
@@ -103,6 +135,11 @@
 # the manager component itself.
 # Added in 25.8.0
 [manager]
+  # Seconds to keep accepting and serving requests after announcing the drain,
+  # before closing the listeners. Set it to about three times the health check
+  # interval of the clients' endpoint pool.
+  # Added in 26.10.0
+  shutdown-grace-period = 30.0
   # Base directory path for inter-process communication files. Used for Unix
   # domain sockets and other IPC mechanisms. This directory must be writable by
   # the manager process. In production, consider using /var/run/backend.ai/ipc

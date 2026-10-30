@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from contextlib import AbstractContextManager
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.data.domain.types import UserInfo
 from ai.backend.manager.data.user.types import UserData as SeededUser
@@ -26,7 +26,7 @@ class ActingAs:
         self._entered = None
 
     def context(self) -> UserData:
-        """What ``with_user`` needs: the request-context view of the user."""
+        """What ``with_user_context`` needs: the request-context view of the user."""
         return UserData(
             user_id=self._user.id,
             is_authorized=True,
@@ -42,7 +42,7 @@ class ActingAs:
         return UserInfo(id=self._user.id, role=self._user.role, domain_name=self._user.domain_name)
 
     def __enter__(self) -> UserInfo:
-        entered = with_user(self.context())
+        entered = with_user_context(self.context())
         entered.__enter__()
         self._entered = entered
         return self.info()

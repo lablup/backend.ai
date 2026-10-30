@@ -13,8 +13,8 @@ from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.types import AgentId
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.errors.agent import AgentAlreadyExited
-from ai.backend.manager.models.agent.conditions import AgentConditions
 from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState
@@ -98,7 +98,7 @@ class AgentExitStatusUpdater(GuardedDataUpdater[AgentRow, AgentId]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=AgentConditions.by_status_not_in(TERMINAL_AGENT_STATUSES),
+                condition=AgentSearchableFields.own.status.filter.not_in(TERMINAL_AGENT_STATUSES),
                 error=AgentAlreadyExited(self.agent_uuid),
             ),
         )

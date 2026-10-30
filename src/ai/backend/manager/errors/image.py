@@ -33,17 +33,6 @@ class ImageNotFound(EntityError, ObjectNotFound):
         return EntityErrorCode(ImageEntityType(), ActionOperationType.GET, ErrorDetail.NOT_FOUND)
 
 
-class ImagePurgeInProgress(EntityError, web.HTTPConflict):
-    """Raised when a write names an image a purge is working through."""
-
-    error_type = "https://api.backend.ai/probs/image-purge-in-progress"
-    error_title = "Image is being purged."
-
-    @override
-    def entity_error_code(self) -> EntityErrorCode:
-        return EntityErrorCode(ImageEntityType(), ActionOperationType.UPDATE, ErrorDetail.CONFLICT)
-
-
 class ImageAliasNotFound(FieldError, ObjectNotFound):
     object_name = "image alias"
 
@@ -71,6 +60,19 @@ class ContainerRegistryGroupsAssociationNotFound(ObjectNotFound):
             domain=ErrorDomain.CONTAINER_REGISTRY,
             operation=ErrorOperation.READ,
             error_detail=ErrorDetail.NOT_FOUND,
+        )
+
+
+class ProjectDefaultContainerRegistryConflict(EntityError, web.HTTPConflict):
+    """Raised when a project would take a second default registry."""
+
+    error_type = "https://api.backend.ai/probs/project-default-container-registry-conflict"
+    error_title = "The project already has a default container registry."
+
+    @override
+    def entity_error_code(self) -> EntityErrorCode:
+        return EntityErrorCode(
+            ContainerRegistryEntityType(), ActionOperationType.CREATE, ErrorDetail.CONFLICT
         )
 
 

@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 import strawberry
 from strawberry import Info
 
+from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
 from ai.backend.common.dto.manager.v2.resource_slot.request import (
     AdminSearchResourceSlotTypesInput,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -21,6 +24,8 @@ from ai.backend.manager.api.gql.utils import check_admin_only
 from .types import (
     CreateResourceSlotTypeInputGQL,
     CreateResourceSlotTypePayloadGQL,
+    PartialBulkPurgeResourceSlotTypesInputGQL,
+    PartialBulkResourceSlotTypesPayloadGQL,
     PurgeResourceSlotTypeInputGQL,
     PurgeResourceSlotTypePayloadGQL,
     ResourceSlotTypeConnectionGQL,
@@ -95,7 +100,7 @@ async def resource_slot_types(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Register a new resource slot type (super admin only).",
     )
 )
@@ -112,7 +117,7 @@ async def admin_create_resource_slot_type(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description="Update a resource slot type by slot name (super admin only).",
     )
 )
@@ -130,13 +135,53 @@ async def admin_update_resource_slot_type(
 @gql_mutation(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
-        description="Remove a resource slot type by slot name (super admin only).",
+        description="Remove a resource slot type, refusing while anything still references it.",
     )
+)
+async def purge_resource_slot_type(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> PurgeResourceSlotTypePayloadGQL:
+    payload = await info.context.adapters.resource_slot.purge_slot_type(ResourceSlotTypeUUID(id))
+    return PurgeResourceSlotTypePayloadGQL(
+        slot_name=payload.slot_name,
+        purged_id=strawberry.ID(to_global_id(ResourceSlotTypeGQL, payload.slot_name)),
+        entity_id=payload.entity_id,
+    )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Remove several resource slot types, answering for each one.",
+    )
+)
+async def partial_bulk_purge_resource_slot_types(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeResourceSlotTypesInputGQL,
+) -> PartialBulkResourceSlotTypesPayloadGQL:
+    payload = await info.context.adapters.resource_slot.partial_bulk_purge_slot_types(
+        input.to_pydantic()
+    )
+    return PartialBulkResourceSlotTypesPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version="26.9.0",
+        description="Remove a resource slot type by slot name (super admin only).",
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeResourceSlotType`.",
 )
 async def admin_purge_resource_slot_type(
     info: Info[StrawberryGQLContext],
     input: PurgeResourceSlotTypeInputGQL,
 ) -> PurgeResourceSlotTypePayloadGQL | None:
     check_admin_only()
-    payload = await info.context.adapters.resource_slot.admin_purge_slot_type(input.to_pydantic())
-    return PurgeResourceSlotTypePayloadGQL(slot_name=payload.slot_name)
+    adapter = info.context.adapters.resource_slot
+    payload = await adapter.purge_slot_type(await adapter.lookup_slot_type(input.slot_name))
+    return PurgeResourceSlotTypePayloadGQL(
+        slot_name=payload.slot_name,
+        purged_id=strawberry.ID(to_global_id(ResourceSlotTypeGQL, payload.slot_name)),
+        entity_id=payload.entity_id,
+    )

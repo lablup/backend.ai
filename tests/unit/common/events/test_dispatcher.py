@@ -1,21 +1,33 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator
-from typing import override
+import logging
+from collections.abc import AsyncGenerator, Callable, Coroutine
+from typing import cast, override
 
 import pytest
+from opentelemetry import trace
+from opentelemetry.sdk.trace import ReadableSpan
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import SpanContext, SpanKind, StatusCode
 
-from ai.backend.common.events.dispatcher import EventDispatcher
+from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.events.reporter import (
+    AbstractEventReporter,
+    CompleteEventReportArgs,
+    PrepareEventReportArgs,
+)
 from ai.backend.common.events.types import (
     AbstractAnycastEvent,
     AbstractBroadcastEvent,
+    AbstractEvent,
     EventDomain,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.message_queue.message import MQMessage
 from ai.backend.common.message_queue.payload import AnycastMessagePayload, BroadcastMessagePayload
-from ai.backend.common.message_queue.types import MessageName
+from ai.backend.common.message_queue.queue import AbstractMessageQueue
+from ai.backend.common.message_queue.types import MessageMetadata, MessageName
 from ai.backend.common.types import AgentId
 
 
@@ -276,3 +288,177 @@ class TestUndecodablePayload:
 
         assert received == []
         assert mq.done_calls == [b"test-msg-id"]
+
+
+class TestHandlerFailureLog:
+    """A failing handler is logged once, inside the handler scope and the restored metadata."""
+
+    @pytest.fixture
+    def mq(self) -> StubMessageQueue:
+        message = DummyAnycastEvent(value=1).to_message()
+        return StubMessageQueue(
+            anycast_messages=[
+                MQMessage(
+                    msg_id=b"test-msg-id",
+                    payload=AnycastMessagePayload(
+                        name=message.name,
+                        source="i-test",
+                        payload=message.payload,
+                        metadata=MessageMetadata(request_id="req-from-producer"),
+                    ),
+                )
+            ],
+        )
+
+    @pytest.fixture
+    async def dispatcher(self, mq: StubMessageQueue) -> EventDispatcher:
+        dispatcher = EventDispatcher(cast(AbstractMessageQueue, mq))
+
+        async def handler(ctx: object, source: AgentId, ev: DummyAnycastEvent) -> None:
+            raise RuntimeError("handler failed")
+
+        dispatcher.consume(DummyAnycastEvent, object(), handler, name="failing-handler")
+        return dispatcher
+
+    async def test_one_error_line_carries_the_scope(
+        self, dispatcher: EventDispatcher, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.ERROR, logger="ai.backend.common.events.dispatcher"):
+            await dispatcher.start()
+            await asyncio.sleep(0.1)
+            await dispatcher.close()
+
+        errors = [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert len(errors) == 1
+        record = errors[0]
+        assert record.getMessage() == "event handler failed"
+        assert record.__dict__["log_tag_event_name"] == "test_anycast"
+        assert record.__dict__["log_tag_handler_name"] == "failing-handler"
+        assert record.__dict__["log_tag_request_id"] == "req-from-producer"
+
+
+class FailingStartReporter(AbstractEventReporter):
+    @override
+    async def prepare_event_report(self, event: AbstractEvent, arg: PrepareEventReportArgs) -> None:
+        raise RuntimeError("reporter failed")
+
+    @override
+    async def complete_event_report(
+        self, event: AbstractEvent, arg: CompleteEventReportArgs
+    ) -> None:
+        pass
+
+
+class TestFailureOutsideHandler:
+    """A failure outside the handler call is logged by the dispatcher, since no one awaits it."""
+
+    @pytest.fixture
+    def mq(self) -> StubMessageQueue:
+        return StubMessageQueue(
+            anycast_messages=[_make_anycast_mq_message(DummyAnycastEvent(value=1))],
+        )
+
+    @pytest.fixture
+    async def dispatcher(self, mq: StubMessageQueue) -> EventDispatcher:
+        dispatcher = EventDispatcher(cast(AbstractMessageQueue, mq))
+
+        async def handler(ctx: object, source: AgentId, ev: DummyAnycastEvent) -> None:
+            pass
+
+        dispatcher.consume(
+            DummyAnycastEvent,
+            object(),
+            handler,
+            name="reported-handler",
+            start_reporters=[FailingStartReporter()],
+        )
+        return dispatcher
+
+    async def test_reporter_failure_is_logged_once_with_the_scope(
+        self, dispatcher: EventDispatcher, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        with caplog.at_level(logging.ERROR, logger="ai.backend.common.events.dispatcher"):
+            await dispatcher.start()
+            await asyncio.sleep(0.1)
+            await dispatcher.close()
+
+        errors = [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert len(errors) == 1
+        assert errors[0].getMessage() == "event handling failed"
+        assert errors[0].exc_info is not None
+        assert errors[0].__dict__["log_tag_handler_name"] == "reported-handler"
+
+
+class CapturingMessageQueue:
+    """Keeps what the producer sends so it can be handed to a dispatcher."""
+
+    sent: list[AnycastMessagePayload]
+
+    def __init__(self) -> None:
+        self.sent = []
+
+    async def send(self, payload: AnycastMessagePayload) -> None:
+        self.sent.append(payload)
+
+
+async def _wait_for_span(exporter: InMemorySpanExporter, name: str) -> ReadableSpan:
+    async def _poll() -> ReadableSpan:
+        while True:
+            for span in exporter.get_finished_spans():
+                if span.name == name:
+                    return span
+            await asyncio.sleep(0.01)
+
+    return await asyncio.wait_for(_poll(), timeout=5.0)
+
+
+async def _dispatch_from_span(
+    handler: Callable[[object, AgentId, DummyAnycastEvent], Coroutine[None, None, None]],
+    exporter: InMemorySpanExporter,
+) -> tuple[SpanContext, ReadableSpan]:
+    """Produce the event inside a span, then dispatch it and return both sides' spans."""
+    sent = CapturingMessageQueue()
+    producer = EventProducer(cast(AbstractMessageQueue, sent), source=AgentId("i-test"))
+    with trace.get_tracer(__name__).start_as_current_span("producer") as producer_span:
+        await producer.anycast_event(DummyAnycastEvent(value=1))
+
+    mq = StubMessageQueue(anycast_messages=[MQMessage(msg_id=b"test-msg-id", payload=sent.sent[0])])
+    dispatcher = EventDispatcher(cast(AbstractMessageQueue, mq))
+    dispatcher.consume(DummyAnycastEvent, object(), handler)
+    await dispatcher.start()
+    try:
+        handler_span = await _wait_for_span(exporter, "test_anycast")
+    finally:
+        await dispatcher.close()
+    return producer_span.get_span_context(), handler_span
+
+
+class TestEventTraceContext:
+    """The handler span joins the trace of the span that produced the event."""
+
+    async def test_handler_span_is_child_of_producer_span(
+        self, span_exporter: InMemorySpanExporter
+    ) -> None:
+        handler_trace_ids: list[int] = []
+
+        async def handler(ctx: object, source: AgentId, ev: DummyAnycastEvent) -> None:
+            handler_trace_ids.append(trace.get_current_span().get_span_context().trace_id)
+
+        producer_context, handler_span = await _dispatch_from_span(handler, span_exporter)
+
+        assert handler_trace_ids == [producer_context.trace_id]
+        assert handler_span.kind == SpanKind.CONSUMER
+        assert handler_span.parent is not None
+        assert handler_span.parent.span_id == producer_context.span_id
+        assert handler_span.status.status_code == StatusCode.UNSET
+
+    async def test_failed_handler_marks_its_span_error(
+        self, span_exporter: InMemorySpanExporter
+    ) -> None:
+        async def handler(ctx: object, source: AgentId, ev: DummyAnycastEvent) -> None:
+            raise RuntimeError("handler failed")
+
+        _, handler_span = await _dispatch_from_span(handler, span_exporter)
+
+        assert handler_span.status.status_code == StatusCode.ERROR
+        assert [event.name for event in handler_span.events] == ["exception"]

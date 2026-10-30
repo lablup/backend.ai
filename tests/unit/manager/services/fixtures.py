@@ -5,9 +5,16 @@ from datetime import UTC, datetime
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.image import ImageID
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.image import ImageAliasRow, ImageRow, ImageStatus, ImageType
-from ai.backend.testutils.mock import mock_aioresponses_sequential_payloads
+from ai.backend.manager.data.image.types import ImageStatus, ImageType
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.searchable_fields import (
+    ContainerRegistrySearchableFields,
+)
+from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
+from ai.backend.manager.models.image.searchable_fields import (
+    ImageAliasSearchableFields,
+    ImageSearchableFields,
+)
 
 RESOURCE_LIMITS = {"cuda.device": {"min": "1", "max": None}}
 
@@ -24,9 +31,11 @@ CONTAINER_REGISTRY_ROW_FIXTURE = ContainerRegistryRow(
     extra=None,
 )
 
-CONTAINER_REGISTRY_FIXTURE_DATA = CONTAINER_REGISTRY_ROW_FIXTURE.to_dataclass()
+CONTAINER_REGISTRY_FIXTURE_DATA = ContainerRegistrySearchableFields.own.to_data(
+    CONTAINER_REGISTRY_ROW_FIXTURE
+)
 CONTAINER_REGISTRY_FIXTURE_DICT = dataclasses.asdict(
-    dataclasses.replace(CONTAINER_REGISTRY_FIXTURE_DATA, type=ContainerRegistryType.DOCKER.value)  # type: ignore
+    dataclasses.replace(CONTAINER_REGISTRY_FIXTURE_DATA, type=ContainerRegistryType.DOCKER)
 )
 
 
@@ -51,7 +60,7 @@ IMAGE_ROW_FIXTURE = ImageRow(
 IMAGE_ROW_FIXTURE.id = ImageID(uuid.uuid4())
 IMAGE_ROW_FIXTURE.created_at = datetime(2023, 9, 30, 15, 0, 0, tzinfo=UTC)
 
-IMAGE_FIXTURE_DATA = IMAGE_ROW_FIXTURE.to_dataclass()
+IMAGE_FIXTURE_DATA = ImageSearchableFields.own.to_data(IMAGE_ROW_FIXTURE)
 
 IMAGE_FIXTURE_DICT = dataclasses.asdict(
     dataclasses.replace(
@@ -68,36 +77,6 @@ IMAGE_ALIAS_ROW_FIXTURE = ImageAliasRow(
     image_id=IMAGE_ROW_FIXTURE.id,
 )
 
-IMAGE_ALIAS_DATA = IMAGE_ALIAS_ROW_FIXTURE.to_dataclass()
+IMAGE_ALIAS_DATA = ImageAliasSearchableFields.own.to_data(IMAGE_ALIAS_ROW_FIXTURE)
 IMAGE_ALIAS_DICT = dataclasses.asdict(IMAGE_ALIAS_DATA)
 IMAGE_ALIAS_DICT["image"] = IMAGE_ALIAS_ROW_FIXTURE.image_id
-
-
-DOCKERHUB_RESPONSE_MOCK = {
-    "get_token": {"token": "fake-token"},
-    "get_catalog": {
-        "repositories": [
-            "test_project/python",
-            "other/dangling-image1",
-            "other/dangling-image2",
-            "other/python",
-        ],
-    },
-    "get_tags": mock_aioresponses_sequential_payloads([
-        {"tags": ["latest"]},
-        {"tags": []},
-        {"tags": None},
-        {"tags": ["latest"]},
-    ]),
-    "get_manifest": {
-        "schemaVersion": 2,
-        "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
-        "config": {
-            "mediaType": "application/vnd.docker.container.image.v1+json",
-            "size": 100,
-            "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
-        },
-        "layers": [],
-    },
-    "get_config": {"architecture": "amd64", "os": "linux"},
-}

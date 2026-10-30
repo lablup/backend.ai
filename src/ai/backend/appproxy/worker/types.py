@@ -8,6 +8,7 @@ from collections.abc import Callable, Mapping
 from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from decimal import Decimal
+from ipaddress import ip_network
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -24,12 +25,36 @@ import prometheus_client
 from ai.backend.appproxy.common.types import (
     AppMode,
     FrontendMode,
+    ProxyProtocol,
     SerializableCircuit,
 )
 from ai.backend.common.clients.http_client.client_pool import ClientPool
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.dto.appproxy.v2.ingress.types import (
+    Ingress,
+    IngressAccess,
+    IngressAccessMode,
+    IngressAuthority,
+    IngressBackend,
+    IngressBackendID,
+    IngressFrontend,
+    IngressFrontendKind,
+    IngressID,
+    IngressKey,
+    IngressProtocol,
+    IngressTarget,
+    IngressTargetGroup,
+    IngressTargetGroupID,
+    IngressTargetID,
+    IngressTokenAccess,
+    IngressUserAccess,
+    PortFrontend,
+    WildcardFrontend,
+)
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.health_checker.probe import HealthProbe
 from ai.backend.common.metrics.metric import (
     APIMetricObserver,
@@ -52,6 +77,8 @@ from ai.backend.common.types import (
 from .errors import InvalidCircuitDataError, InvalidFrontendTypeError
 
 if TYPE_CHECKING:
+    from ai.backend.appproxy.worker.ingress.factory import IngressState
+
     from .config import ServerConfig
     from .proxy.frontend.base import BaseFrontend
 
@@ -295,7 +322,6 @@ class WorkerMetricRegistry:
         return cls._instance
 
     def to_prometheus(self) -> str:
-        self.system.observe()
         return generate_latest_multiprocess().decode("utf-8")
 
 
@@ -315,6 +341,7 @@ class RootContext:
     proxy_frontend: BaseFrontend[Any, Any]
     event_dispatcher: EventDispatcher
     event_producer: EventProducer
+    sentinel_monitors: SentinelMonitorSet
     valkey_live: ValkeyLiveClient
     valkey_stat: ValkeyStatClient
     http_client_pool: ClientPool
@@ -325,6 +352,7 @@ class RootContext:
     cors_options: dict[str, aiohttp_cors.ResourceOptions]
     metrics: WorkerMetricRegistry
     health_probe: HealthProbe
+    ingress_state: IngressState
 
 
 type CleanupContext = Callable[["RootContext"], AbstractAsyncContextManager[None]]
@@ -416,6 +444,90 @@ class Circuit(SerializableCircuit):
     @property
     def prometheus_metric_label(self) -> dict[str, str]:
         return {"protocol": self.protocol.name}
+
+    def to_ingress(self, authority: IngressAuthority) -> Ingress:
+        frontend = self.to_ingress_frontend()
+        allowed_client_ips = [ip_network(cidr) for cidr in self.ip_validator.ranges]
+        # The worker authenticates http only, so other protocols stay public as they are today.
+        if self.open_to_public or frontend.protocol != IngressProtocol.HTTP:
+            access = IngressAccess(
+                mode=IngressAccessMode.PUBLIC, allowed_client_ips=allowed_client_ips
+            )
+        else:
+            match self.app_info:
+                case InteractiveAppInfo(user_id=user_id):
+                    access = IngressAccess(
+                        mode=IngressAccessMode.USER,
+                        allowed_client_ips=allowed_client_ips,
+                        users=IngressUserAccess(allowed_user_ids=[user_id]),
+                    )
+                case InferenceAppInfo():
+                    access = IngressAccess(
+                        mode=IngressAccessMode.TOKEN,
+                        allowed_client_ips=allowed_client_ips,
+                        token=IngressTokenAccess(),
+                    )
+                case _:
+                    raise UnreachableError("a circuit holds only interactive or inference app info")
+        # Circuits have no target groups, so every route is a target of a single group.
+        target_group = IngressTargetGroup(
+            # TODO: Use the target group id once target groups are stored as their own entity.
+            id=IngressTargetGroupID(str(UUID(int=0))),
+            # TODO: Use the target group weight once target groups are stored as their own entity.
+            weight=1,
+            targets=[
+                IngressTarget(
+                    # TODO: Use the target id once targets are stored as their own entity.
+                    id=IngressTargetID(str(UUID(int=0))),
+                    host=route.current_kernel_host,
+                    port=route.kernel_port,
+                )
+                for route in self.route_info
+            ],
+        )
+        return Ingress(
+            # TODO: Use the ingress id once ingresses are stored as their own entity.
+            id=IngressID(str(UUID(int=0))),
+            authority=authority,
+            # TODO: Use the manager's revision once ingresses are stored as their own entity.
+            revision=0,
+            frontend=frontend,
+            access=access,
+            backend=IngressBackend(
+                # TODO: Use the backend id once ingresses are stored as their own entity.
+                id=IngressBackendID(str(UUID(int=0))),
+                target_groups=[target_group],
+            ),
+        )
+
+    def to_ingress_key(self, authority: IngressAuthority) -> IngressKey:
+        return IngressKey(authority=authority, frontend_key=self.to_ingress_frontend().key())
+
+    def to_ingress_frontend(self) -> IngressFrontend:
+        match self.protocol:
+            case ProxyProtocol.HTTP:
+                protocol = IngressProtocol.HTTP
+            case ProxyProtocol.HTTP2:
+                protocol = IngressProtocol.HTTP2
+            case ProxyProtocol.TCP:
+                protocol = IngressProtocol.TCP
+            case _:
+                raise InvalidCircuitDataError(
+                    f"A worker circuit cannot carry the {self.protocol} protocol"
+                )
+        match self.frontend:
+            case PortFrontendInfo(port=port):
+                return IngressFrontend(
+                    kind=IngressFrontendKind.PORT, protocol=protocol, port=PortFrontend(number=port)
+                )
+            case SubdomainFrontendInfo(subdomain=subdomain):
+                return IngressFrontend(
+                    kind=IngressFrontendKind.WILDCARD,
+                    protocol=protocol,
+                    wildcard=WildcardFrontend(subdomain=subdomain),
+                )
+            case _:
+                raise UnreachableError("a circuit holds only a port or subdomain frontend")
 
 
 class MetricTypes(enum.Enum):

@@ -1,4 +1,7 @@
 [general]
+# Set apiEndpoint only to a Backend.AI Webserver address (the webserver fills it
+# with its own origin). A non-empty value disables API sign-in, which needs a
+# Manager endpoint; leave it blank to let users type a Manager address for API mode.
 apiEndpoint = "[Default API Endpoint. If blank, user input field will be shown.]"
 apiEndpointText = "[Placeholder text instead of API endpoint input field.]"
 defaultSessionEnvironment = "[Default session kernel. If blank, alphabetically first kernel will be default.]"

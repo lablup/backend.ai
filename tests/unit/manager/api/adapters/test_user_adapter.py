@@ -11,10 +11,23 @@ import pytest
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole as DataUserRole
+from ai.backend.common.dto.manager.query import (
+    DateTimeFilter,
+    NullableDateTimeFilter,
+    UUIDFilter,
+)
+from ai.backend.common.dto.manager.v2.keypair.request import KeypairFilter
+from ai.backend.common.dto.manager.v2.user.request import (
+    KeypairNestedFilter,
+    UserFilter,
+    UserOrder,
+)
+from ai.backend.common.dto.manager.v2.user.types import OrderDirection, UserOrderField
 from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
+from ai.backend.manager.actions.v2.ops.result import BulkLookupOpsResult
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.errors.common import GenericForbidden
+from ai.backend.manager.errors.common import GenericBadRequest, GenericForbidden
 
 
 def _create_user_data(
@@ -128,3 +141,167 @@ class TestBatchLoadByIds:
     async def test_no_ids_read_nothing(self, adapter: UserAdapter, processors: MagicMock) -> None:
         assert await adapter.batch_load_by_ids([]) == []
         processors.bulk_get.run.assert_not_awaited()
+
+
+class TestBatchLookupByEmails:
+    @pytest.fixture
+    def found_id(self) -> UserID:
+        return UserID(uuid4())
+
+    @pytest.fixture
+    def unresolvable(self) -> GenericBadRequest:
+        return GenericBadRequest("Cannot resolve the given user key")
+
+    @pytest.fixture
+    def processors(self, found_id: UserID, unresolvable: GenericBadRequest) -> MagicMock:
+        processors = MagicMock()
+        processors.bulk_lookup.run = AsyncMock(
+            return_value=BulkLookupOpsResult(
+                resolved={"found@example.com": found_id},
+                failures={"other@example.com": unresolvable},
+                key_results=[],
+            )
+        )
+        return processors
+
+    @pytest.fixture
+    def adapter(self, processors: MagicMock) -> UserAdapter:
+        return UserAdapter(processors, MagicMock(), MagicMock(), MagicMock())
+
+    async def test_answers_per_email_in_one_lookup(
+        self,
+        adapter: UserAdapter,
+        processors: MagicMock,
+        found_id: UserID,
+        unresolvable: GenericBadRequest,
+    ) -> None:
+        resolved, refused = await adapter.batch_lookup_by_emails([
+            "found@example.com",
+            "other@example.com",
+        ])
+
+        assert resolved == found_id
+        assert refused is unresolvable
+        processors.bulk_lookup.run.assert_awaited_once()
+        action = processors.bulk_lookup.run.await_args.args[0]
+        assert list(action.emails) == ["found@example.com", "other@example.com"]
+
+    async def test_no_emails_look_up_nothing(
+        self, adapter: UserAdapter, processors: MagicMock
+    ) -> None:
+        assert await adapter.batch_lookup_by_emails([]) == []
+        processors.bulk_lookup.run.assert_not_awaited()
+
+
+class TestUserOrderConversion:
+    """Every order field the DTO publishes converts to a query order."""
+
+    @pytest.fixture
+    def adapter(self) -> UserAdapter:
+        return UserAdapter(MagicMock(), MagicMock(), MagicMock(), MagicMock())
+
+    @pytest.mark.parametrize("field", list(UserOrderField))
+    def test_every_published_field_converts(
+        self, adapter: UserAdapter, field: UserOrderField
+    ) -> None:
+        order = adapter._convert_user_order(UserOrder(field=field, direction=OrderDirection.ASC))
+
+        assert order is not None
+
+    @pytest.mark.parametrize("direction", list(OrderDirection))
+    def test_direction_reaches_the_sql(
+        self, adapter: UserAdapter, direction: OrderDirection
+    ) -> None:
+        order = adapter._convert_user_order(
+            UserOrder(field=UserOrderField.TOTP_ACTIVATED_AT, direction=direction)
+        )
+
+        assert direction.value.upper() in str(order).upper()
+
+
+class TestUserTimestampFilterConversion:
+    """The timestamp filters opened alongside the declarations."""
+
+    @pytest.fixture
+    def adapter(self) -> UserAdapter:
+        return UserAdapter(MagicMock(), MagicMock(), MagicMock(), MagicMock())
+
+    def test_modified_at_reaches_the_updated_at_column(self, adapter: UserAdapter) -> None:
+        conditions = adapter._convert_user_filter(
+            UserFilter(modified_at=DateTimeFilter(after=datetime(2026, 1, 1, tzinfo=UTC)))
+        )
+
+        assert len(conditions) == 1
+        assert "updated_at" in str(conditions[0]().compile())
+
+    def test_totp_activated_at_asks_for_null(self, adapter: UserAdapter) -> None:
+        conditions = adapter._convert_user_filter(
+            UserFilter(totp_activated_at=NullableDateTimeFilter(is_null=True))
+        )
+
+        assert len(conditions) == 1
+        assert "IS NULL" in str(conditions[0]().compile()).upper()
+
+    def test_totp_activated_at_asks_for_not_null(self, adapter: UserAdapter) -> None:
+        conditions = adapter._convert_user_filter(
+            UserFilter(totp_activated_at=NullableDateTimeFilter(is_null=False))
+        )
+
+        assert len(conditions) == 1
+        assert "IS NOT NULL" in str(conditions[0]().compile()).upper()
+
+    def test_totp_activated_at_compares_when_no_null_check_is_asked(
+        self, adapter: UserAdapter
+    ) -> None:
+        conditions = adapter._convert_user_filter(
+            UserFilter(
+                totp_activated_at=NullableDateTimeFilter(before=datetime(2026, 1, 1, tzinfo=UTC))
+            )
+        )
+
+        assert len(conditions) == 1
+        assert "totp_activated_at" in str(conditions[0]().compile())
+
+
+class TestUserKeypairNestedFilterConversion:
+    """A user search narrowed by conditions on the keypairs the user owns."""
+
+    @pytest.fixture
+    def adapter(self) -> UserAdapter:
+        return UserAdapter(MagicMock(), MagicMock(), MagicMock(), MagicMock())
+
+    def test_some_reaches_the_keypairs_table(self, adapter: UserAdapter) -> None:
+        conditions = adapter._convert_user_filter(
+            UserFilter(keypairs=KeypairNestedFilter(some=KeypairFilter(is_active=True)))
+        )
+
+        assert len(conditions) == 1
+        sql = str(conditions[0]().compile())
+        assert "EXISTS" in sql
+        assert "keypairs" in sql
+
+    def test_every_quantifier_negates_the_failing_row(self, adapter: UserAdapter) -> None:
+        conditions = adapter._convert_user_filter(
+            UserFilter(keypairs=KeypairNestedFilter(every=KeypairFilter(is_active=True)))
+        )
+
+        assert len(conditions) == 1
+        assert "NOT (EXISTS" in str(conditions[0]().compile())
+
+    def test_each_quantifier_applies_on_its_own(self, adapter: UserAdapter) -> None:
+        conditions = adapter._convert_user_filter(
+            UserFilter(
+                keypairs=KeypairNestedFilter(
+                    some=KeypairFilter(is_active=True),
+                    none=KeypairFilter(is_admin=True),
+                )
+            )
+        )
+
+        assert len(conditions) == 2
+
+    def test_domain_id_filters_the_domain_id_column(self, adapter: UserAdapter) -> None:
+        conditions = adapter._convert_user_filter(UserFilter(domain_id=UUIDFilter(equals=uuid4())))
+
+        assert len(conditions) == 1
+        assert "domain_id" in str(conditions[0]().compile())

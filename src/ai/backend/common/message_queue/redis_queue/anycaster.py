@@ -3,15 +3,16 @@ from __future__ import annotations
 import logging
 from typing import Self, override
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.message_queue.abc import AbstractAnycaster
 from ai.backend.common.message_queue.payload import AnycastMessagePayload
 from ai.backend.common.types import RedisTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .exceptions import MessageQueueClosedError
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class RedisAnycaster(AbstractAnycaster):
@@ -40,7 +41,13 @@ class RedisAnycaster(AbstractAnycaster):
         self._closed = False
 
     @classmethod
-    async def create(cls, redis_target: RedisTarget, stream_key: str, db: int = 0) -> Self:
+    async def create(
+        cls,
+        redis_target: RedisTarget,
+        stream_key: str,
+        db: int = 0,
+        sentinel_monitor: AbstractSentinelMonitor | None = None,
+    ) -> Self:
         """
         Create a new RedisAnycaster instance.
 
@@ -56,6 +63,7 @@ class RedisAnycaster(AbstractAnycaster):
             redis_target.to_valkey_target(),
             human_readable_name="redis_anycaster",
             db_id=db,
+            sentinel_monitor=sentinel_monitor,
         )
         return cls(client, stream_key)
 
@@ -78,7 +86,7 @@ class RedisAnycaster(AbstractAnycaster):
             raise MessageQueueClosedError("Anycaster is closed")
 
         await self._client.enqueue_stream_message(self._stream_key, payload)
-        log.debug("Message sent to stream {}", self._stream_key)
+        log.trace("message sent to stream", stream_key=self._stream_key)
 
     @override
     async def close(self) -> None:
@@ -92,4 +100,4 @@ class RedisAnycaster(AbstractAnycaster):
 
         self._closed = True
         await self._client.close()
-        log.debug("RedisAnycaster closed")
+        log.debug("redis anycaster closed")

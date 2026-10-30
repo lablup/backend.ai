@@ -11,7 +11,7 @@
 # Maintained by `.github/scripts/update-maintained-versions.sh`, run when a
 # release branch is cut. Edit by hand only to correct a date.
 versions:
-  - version: "26.8"
+  - version: "26.9"
   - version: "26.4"
     lts: true
     retire_after: "2027-04-30"

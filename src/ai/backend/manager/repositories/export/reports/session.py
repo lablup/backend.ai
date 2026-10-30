@@ -5,16 +5,16 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_policy import ProjectResourcePolicyRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import ProjectResourcePolicyRow
 from ai.backend.manager.models.resource_slot.aggregates import (
     session_allocated_slots_expr,
     session_requested_slots_expr,
 )
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.repositories.base.export import (
     ExportFieldDef,
     ExportFieldType,

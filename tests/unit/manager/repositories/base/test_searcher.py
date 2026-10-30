@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import AsyncGenerator, Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, override
 from uuid import uuid4
 
@@ -22,6 +23,9 @@ from ai.backend.manager.errors.repository import EmptyOperationScopeError
 from ai.backend.manager.models.base import Base
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
+from ai.backend.manager.models.rbac_models.role_preset.searchable_fields import (
+    RolePresetSearchableFields,
+)
 from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
 from ai.backend.manager.models.specs.pagination import OffsetPagination
 from ai.backend.manager.models.specs.searcher import Searcher
@@ -259,7 +263,7 @@ class RolePresetSearcher(Searcher[RolePresetRow, RolePresetData]):
 
     @override
     def to_data(self, row: RolePresetRow) -> RolePresetData:
-        return row.to_data()
+        return RolePresetSearchableFields.own.to_data(row)
 
 
 class TestPassThroughDomainWiring:
@@ -288,21 +292,21 @@ class TestPassThroughDomainWiring:
                         "name": "domain-admin",
                         "scope_type": DomainEntityType(),
                         "auto_assign": False,
-                        "deleted": False,
+                        "deleted_at": None,
                     },
                     {
                         "id": preset_ids[1],
                         "name": "project-member",
                         "scope_type": ProjectEntityType(),
                         "auto_assign": True,
-                        "deleted": False,
+                        "deleted_at": None,
                     },
                     {
                         "id": preset_ids[2],
                         "name": "retired",
                         "scope_type": ProjectEntityType(),
                         "auto_assign": False,
-                        "deleted": True,
+                        "deleted_at": datetime.now(UTC),
                     },
                 ],
             )
@@ -318,7 +322,7 @@ class TestPassThroughDomainWiring:
         ops = V2DBOpsProvider(database)
         searcher = RolePresetSearcher(
             pagination=OffsetPagination(offset=0, limit=10),
-            conditions=[lambda: RolePresetRow.deleted.is_(False)],
+            conditions=[lambda: RolePresetRow.deleted_at.is_(None)],
             orders=[RolePresetRow.name.asc()],
         )
 

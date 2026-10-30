@@ -5,8 +5,9 @@ from collections.abc import Sequence
 from typing import override
 
 from ai.backend.common.events.dispatcher import EventProducer
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.deployment.types import (
+    RouteData,
     RouteHandlerCategory,
     RouteHealthStatus,
     RouteStatus,
@@ -15,13 +16,12 @@ from ai.backend.manager.data.deployment.types import (
     RouteTransitionTarget,
 )
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.repositories.deployment.types import RouteData
 from ai.backend.manager.sokovan.deployment.route.executor import RouteExecutor
 from ai.backend.manager.sokovan.deployment.route.types import RouteExecutionResult
 
 from .base import RouteHandler
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__name__))
 
 
 class HealthCheckRouteHandler(RouteHandler):
@@ -78,8 +78,6 @@ class HealthCheckRouteHandler(RouteHandler):
     @override
     async def execute(self, routes: Sequence[RouteData]) -> RouteExecutionResult:
         """Execute health check for routes."""
-        log.debug("Checking health for {} routes", len(routes))
-
         # Execute route health check logic via executor
         return await self._route_executor.check_route_health(routes)
 
@@ -93,8 +91,8 @@ class HealthCheckRouteHandler(RouteHandler):
         of work whose failure must be tolerated.
         """
         log.debug(
-            "Health check: {} healthy, {} unhealthy, {} degraded",
-            len(result.successes),
-            len(result.errors),
-            len(result.stale),
+            "route health checked",
+            healthy_count=len(result.successes),
+            unhealthy_count=len(result.errors),
+            degraded_count=len(result.stale),
         )

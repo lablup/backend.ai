@@ -10,6 +10,9 @@ from ai.backend.common.data.entity.object_storage import ObjectStorageID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.object_storage.types import ObjectStorageData
 from ai.backend.manager.models.object_storage.row import ObjectStorageRow
+from ai.backend.manager.models.object_storage.searchable_fields import (
+    ObjectStorageSearchableFields,
+)
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
@@ -38,4 +41,4 @@ class ObjectStoragePurger(EntityPurger[ObjectStorageRow, ObjectStorageData]):
 
     @override
     def to_data(self, row: ObjectStorageRow) -> ObjectStorageData:
-        return row.to_dataclass()
+        return ObjectStorageSearchableFields.own.to_data(row)

@@ -6,10 +6,9 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.manager.data.session.types import StatusTransitions
+from ai.backend.manager.data.kernel.types import KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus, StatusTransitions
 from ai.backend.manager.defs import LockID
-from ai.backend.manager.models.kernel import KernelStatus
-from ai.backend.manager.models.session import SessionStatus
 from ai.backend.manager.sokovan.scheduler.results import SessionExecutionResult
 from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 
@@ -33,6 +32,12 @@ class SessionLifecycleHandler(ABC):
     def name(cls) -> str:
         """Get the name of the handler for logging and metrics."""
         raise NotImplementedError("Subclasses must implement name()")
+
+    @classmethod
+    @abstractmethod
+    def description(cls) -> str:
+        """Get a one-line description of what the handler does, shown in the handler listing."""
+        raise NotImplementedError("Subclasses must implement description()")
 
     @classmethod
     @abstractmethod

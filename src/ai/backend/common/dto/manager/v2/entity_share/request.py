@@ -16,6 +16,7 @@ from ai.backend.common.dto.manager.v2.entity_share.types import (
     EntityShareStatusDTO,
 )
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO, UUIDScope
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "CreateEntityShareInput",
@@ -81,6 +82,10 @@ class EntityShareFilter(BaseRequestModel):
     target_entity_id: UUIDFilter | None = None
     recipient_entity_id: UUIDFilter | None = None
     recipient_email: StringFilter | None = None
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by entity share ID.",
+    )
 
 
 EntityShareFilter.model_rebuild()

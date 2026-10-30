@@ -5,8 +5,6 @@ Converts request DTOs to repository query conditions and orders.
 
 from __future__ import annotations
 
-from decimal import Decimal
-
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.common.dto.manager.image import (
     ImageFilter,
@@ -22,21 +20,14 @@ from ai.backend.common.dto.manager.image.response import (
 from ai.backend.common.dto.manager.image.types import ImageOrderField, OrderDirection
 from ai.backend.manager.data.image.types import ImageData, ImageDataWithDetails
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.image.conditions import ImageConditions
-from ai.backend.manager.models.image.orders import ImageOrders
+from ai.backend.manager.models.image.searchable_fields import ImageSearchableFields
+from ai.backend.manager.models.image.searchers import ImageSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.filter_adapter import BaseFilterAdapter
 
 
 class ImageAdapter(BaseFilterAdapter):
     """Adapter for converting image request DTOs to repository queries and response DTOs."""
-
-    @staticmethod
-    def _convert_max(value: Decimal | str) -> Decimal | None:
-        if isinstance(value, str):
-            value = Decimal(value)
-        return None if value.is_infinite() else value
 
     def convert_to_dto(self, data: ImageData) -> ImageDTO:
         """Convert internal ImageData to response ImageDTO."""
@@ -54,8 +45,8 @@ class ImageAdapter(BaseFilterAdapter):
             labels=[ImageLabelEntryDTO(key=k, value=v) for k, v in data.labels.label_data.items()],
             tags=[ImageTagEntryDTO(key=t.key, value=t.value) for t in data.tags],
             resource_limits=[
-                ImageResourceLimitDTO(key=rl.key, min=rl.min, max=self._convert_max(rl.max))
-                for rl in data.resource_limits
+                ImageResourceLimitDTO.model_validate(resource_limit.to_dict())
+                for resource_limit in data.resource_limits
             ],
             accelerators=data.accelerators if data.accelerators else "*",
             config_digest=data.config_digest,
@@ -79,8 +70,8 @@ class ImageAdapter(BaseFilterAdapter):
             labels=[ImageLabelEntryDTO(key=kv.key, value=kv.value) for kv in data.labels],
             tags=[ImageTagEntryDTO(key=kv.key, value=kv.value) for kv in data.tags],
             resource_limits=[
-                ImageResourceLimitDTO(key=rl.key, min=rl.min, max=self._convert_max(rl.max))
-                for rl in data.resource_limits
+                ImageResourceLimitDTO.model_validate(resource_limit.to_dict())
+                for resource_limit in data.resource_limits
             ],
             accelerators=",".join(data.supported_accelerators)
             if data.supported_accelerators
@@ -90,63 +81,37 @@ class ImageAdapter(BaseFilterAdapter):
             created_at=data.created_at,
         )
 
-    def build_querier(self, request: SearchImagesRequest) -> BatchQuerier:
-        """Convert search request to a BatchQuerier for the repository."""
-        conditions = self._convert_filter(request.filter)
-        orders = self._convert_order(request.order)
-        pagination = self._build_pagination(request.offset, request.limit)
-        return BatchQuerier(
-            conditions=conditions,
-            orders=orders,
-            pagination=pagination,
+    def build_searcher(self, request: SearchImagesRequest) -> ImageSearcher:
+        """Convert a search request to the searcher the read runs."""
+        return ImageSearcher(
+            pagination=self._build_pagination(request.offset, request.limit),
+            conditions=self._convert_filter(request.filter),
+            orders=self._convert_order(request.order),
         )
 
     def _convert_filter(self, filter_: ImageFilter | None) -> list[QueryCondition]:
         if filter_ is None:
             return []
-
-        conditions: list[QueryCondition] = []
-
-        if filter_.name is not None:
-            condition = self.convert_string_filter(
-                filter_.name,
-                contains_factory=ImageConditions.by_name_contains,
-                equals_factory=ImageConditions.by_name_equals,
-                starts_with_factory=ImageConditions.by_name_starts_with,
-                ends_with_factory=ImageConditions.by_name_ends_with,
-                in_factory=ImageConditions.by_name_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter_.architecture is not None:
-            condition = self.convert_string_filter(
-                filter_.architecture,
-                contains_factory=ImageConditions.by_architecture_contains,
-                equals_factory=ImageConditions.by_architecture_equals,
-                starts_with_factory=ImageConditions.by_architecture_starts_with,
-                ends_with_factory=ImageConditions.by_architecture_ends_with,
-                in_factory=ImageConditions.by_architecture_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-
-        return conditions
+        fields = ImageSearchableFields.own
+        return [
+            *self.apply_string_filter(filter_.name, fields.name.filter),
+            *self.apply_string_filter(filter_.architecture, fields.architecture.filter),
+        ]
 
     def _convert_order(self, orders: list[ImageOrder] | None) -> list[QueryOrder]:
         if not orders:
             return []
-
+        fields = ImageSearchableFields.own
         result: list[QueryOrder] = []
         for order in orders:
             ascending = order.direction == OrderDirection.ASC
             match order.field:
                 case ImageOrderField.NAME:
-                    result.append(ImageOrders.name(ascending))
+                    result.append(fields.name.order.apply(ascending))
                 case ImageOrderField.CREATED_AT:
-                    result.append(ImageOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
                 case ImageOrderField.LAST_USED:
-                    result.append(ImageOrders.last_used(ascending))
+                    result.append(fields.last_used_at.order.apply(ascending))
         return result
 
     @staticmethod

@@ -19,56 +19,59 @@ from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeySta
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.types import ResourceSlot, SessionId, SlotName, VFolderID
 from ai.backend.common.utils import nmget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.model_serving.types import EndpointLifecycle
 from ai.backend.manager.data.project.types import ProjectData, ProjectType
+from ai.backend.manager.data.vfolder.types import (
+    VFolderStatusSet,
+    VFolderStorageTarget,
+    vfolder_status_map,
+)
 from ai.backend.manager.errors.resource import (
     PersonalProjectDeletionError,
     ProjectHasActiveEndpointsError,
     ProjectHasVFoldersMountedError,
     ProjectNotFound,
 )
-from ai.backend.manager.models.endpoint import EndpointLifecycle, EndpointRow
-from ai.backend.manager.models.kernel import (
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.kernel.row import (
     AGENT_RESOURCE_OCCUPYING_KERNEL_STATUSES,
     LIVE_STATUS,
     RESOURCE_USAGE_KERNEL_STATUSES,
     KernelRow,
     kernels,
 )
-from ai.backend.manager.models.project import groups
 from ai.backend.manager.models.project.purgers import (
     ProjectEndpointPurger,
     ProjectKernelPurger,
     ProjectPurger,
     ProjectSessionPurger,
+    ProjectVFolderAutoMountPurger,
     SessionsByIdsPurger,
 )
 from ai.backend.manager.models.project.row import (
     ProjectRow,
+    groups,
 )
 from ai.backend.manager.models.project.scopes import (
-    DomainProjectOperationScope,
-    UserProjectOperationScope,
+    DomainProjectTarget,
+    UserProjectTarget,
 )
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
+from ai.backend.manager.models.project.searchers import ProjectSearcher
 from ai.backend.manager.models.resource_slot.aggregates import kernel_allocated_slots_expr
 from ai.backend.manager.models.resource_usage import fetch_resource_usage
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.user.row import users
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import (
-    VFolderDeletionInfo,
-    VFolderRow,
-    VFolderStatusSet,
-    vfolder_status_map,
-)
-from ai.backend.manager.repositories.base.querier import BatchQuerier, execute_batch_querier
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.project.types import ProjectSearchResult
 from ai.backend.manager.repositories.vfolder.deletion import initiate_vfolder_deletion
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ProjectDBSource:
@@ -165,7 +168,7 @@ class ProjectDBSource:
             last_stat = row.last_stat
             if not last_stat:
                 if raw_stat is None:
-                    log.warning("stat object for {} not found on redis, skipping", str(row.id))
+                    log.debug("kernel stat not found, kernel skipped", kernel_id=row.id)
                     continue
                 last_stat = msgpack.unpackb(raw_stat)
             nfs = None
@@ -319,6 +322,9 @@ class ProjectDBSource:
                 project_id, ProjectKernelPurger(project_id=project_id)
             )
             await w.batch_purge_entities_in_global(ProjectSessionPurger(project_id=project_id))
+            await w.batch_purge_entities_in_global(
+                ProjectVFolderAutoMountPurger(project_id=project_id)
+            )
             if await w.purge_entity(ProjectPurger(project_id=project_id)) is None:
                 raise ProjectNotFound("project not found")
 
@@ -346,7 +352,12 @@ class ProjectDBSource:
                     if uuid.UUID(_mount[2]) in group_vfolder_ids:
                         return True
                 except Exception:
-                    log.warning("Malformed mount entry in group {}, skipping: {}", group_id, _mount)
+                    log.warning(
+                        "malformed kernel mount entry skipped",
+                        project_id=group_id,
+                        mount_entry=str(_mount),
+                        exc_info=True,
+                    )
         return False
 
     async def _routed_session_ids(self, sess: SASession, group_id: uuid.UUID) -> list[SessionId]:
@@ -380,7 +391,7 @@ class ProjectDBSource:
 
     async def _purgable_project_vfolders(
         self, sess: SASession, group_id: uuid.UUID
-    ) -> list[VFolderDeletionInfo]:
+    ) -> list[VFolderStorageTarget]:
         """The project's vfolders whose status allows the owner to purge them."""
         rows = (
             await sess.scalars(
@@ -391,13 +402,13 @@ class ProjectDBSource:
             )
         ).all()
         return [
-            VFolderDeletionInfo(VFolderID.from_row(row), row.host, row.unmanaged_path)
+            VFolderStorageTarget(VFolderID.from_row(row), row.host, row.unmanaged_path)
             for row in rows
         ]
 
     async def _delete_project_vfolders(
         self,
-        target_vfs: list[VFolderDeletionInfo],
+        target_vfs: list[VFolderStorageTarget],
         storage_manager: StorageSessionManager,
     ) -> None:
         """Hand the project's purgable vfolders to the storage-side deletion."""
@@ -428,7 +439,7 @@ class ProjectDBSource:
             row = result.scalar_one_or_none()
             if row is None:
                 raise ProjectNotFound(f"Project {project_id} not found")
-            return row.to_data()
+            return ProjectSearchableFields.own.to_data(row)
 
     async def project_id_by_name_in_domain(
         self, domain_name: str, project_name: str
@@ -458,82 +469,48 @@ class ProjectDBSource:
 
     async def search_projects(
         self,
-        querier: BatchQuerier,
+        searcher: ProjectSearcher,
     ) -> ProjectSearchResult:
-        """Search all projects (admin only).
-
-        Args:
-            querier: Contains conditions, orders, and pagination.
-
-        Returns:
-            ProjectSearchResult with items, total_count, and pagination flags.
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ProjectRow)
-            result = await execute_batch_querier(db_sess, query, querier)
-
-            items = [row.ProjectRow.to_data() for row in result.rows]
-
-            return ProjectSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        """Search all projects (admin only)."""
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return ProjectSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def search_projects_by_domain(
         self,
-        scope: DomainProjectOperationScope,
-        querier: BatchQuerier,
+        scope: DomainProjectTarget,
+        searcher: ProjectSearcher,
     ) -> ProjectSearchResult:
-        """Search projects within a domain.
-
-        Args:
-            scope: DomainProjectOperationScope defining the domain to search within.
-            querier: Contains conditions, orders, and pagination.
-
-        Returns:
-            ProjectSearchResult with items, total_count, and pagination flags.
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ProjectRow)
-            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
-
-            items = [row.ProjectRow.to_data() for row in result.rows]
-
-            return ProjectSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        """Search projects within a domain."""
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_with_scopes([scope], searcher)
+        return ProjectSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )
 
     async def search_projects_by_user(
         self,
-        scope: UserProjectOperationScope,
-        querier: BatchQuerier,
+        scope: UserProjectTarget,
+        searcher: ProjectSearcher,
     ) -> ProjectSearchResult:
         """Search projects a user is member of.
 
         Membership comes from the projects' virtual entities; the scope supplies
         the membership predicate.
-
-        Args:
-            scope: UserProjectOperationScope defining the user to search for.
-            querier: Contains conditions, orders, and pagination.
-
-        Returns:
-            ProjectSearchResult with items, total_count, and pagination flags.
         """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ProjectRow).select_from(ProjectRow)
-            result = await execute_batch_querier(db_sess, query, querier, scopes=[scope])
-
-            items = [row.ProjectRow.to_data() for row in result.rows]
-
-            return ProjectSearchResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
+        async with self._v2_ops.read_ops() as r:
+            result = await r.search_with_scopes([scope], searcher)
+        return ProjectSearchResult(
+            items=result.items,
+            total_count=result.total_count,
+            has_next_page=result.has_next_page,
+            has_previous_page=result.has_previous_page,
+        )

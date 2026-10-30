@@ -23,7 +23,7 @@ Requirements
 
 ### Python & Build Tools
 
-- **Python**: 3.13.x (main branch requires CPython 3.13.7)
+- **Python**: 3.13.x (main branch requires CPython 3.13.18)
 - **Pantsbuild**: 2.27.x
 - See [full version compatibility table](src/ai/backend/README.md#development-setup)
 
@@ -35,6 +35,20 @@ Requirements
 |---|---|---|
 | Docker | 20.10+ | The nvidia runtime registered with the daemon (`nvidia-ctk runtime configure --runtime=docker`) |
 | Podman | 5.4.0+ | A CDI spec for the accelerator under `/etc/cdi` or `/var/run/cdi` (`nvidia-ctk cdi generate` for NVIDIA GPUs) |
+
+**Distributions packaging Podman 5.4.0+**:
+
+| OS | Minimum version | Packaged Podman |
+|---|---|---|
+| RHEL | 9.x | 5.4.0+ (older minors, e.g. under EUS, may ship older Podman; check the version the OS repo offers) |
+| Rocky Linux | 9.6 | 5.4.0 |
+| AlmaLinux | 9.6 | 5.4.0 |
+| Oracle Linux | 9.6 | 5.4.0 |
+| CentOS Stream | 9 | 5.8.5 |
+| Ubuntu | 26.04 LTS | 5.7.0 |
+| Debian | 13 | 5.4.2 |
+
+- Ubuntu 24.04 LTS packages Podman 4.9.3 and Debian 12 packages 4.3.1, both below the floor; use Docker there.
 
 **Required**:
 - Docker Compose v2
@@ -218,6 +232,7 @@ as a reference implementation of API clients.
 * `fixtures/`
   - `manager/`, ...: Per-component fixtures for development setup and tests
 * `plugins/`: A directory to place plugins such as accelerators, monitors, etc.
+* `third-party-plugins/`: Backend.AI plugins for third-party software (e.g. AppProxy Traefik Go plugin)
 * `scripts/`: Scripts to assist development workflows
   - `install-dev.sh`: The single-node development setup script from the working copy
 * `stubs/`: Type annotation stub packages written by us

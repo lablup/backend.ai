@@ -10,7 +10,10 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
+from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
@@ -226,6 +229,7 @@ def _create_session(
             ),
             metrics=KernelMetrics(num_queries=0, last_stat=None, container_log=None),
             metadata=KernelMetadata(callback_url=None, internal_data=None),
+            kernel_group_id=None,
         )
         kernel_infos.append(kernel_info)
 
@@ -325,6 +329,7 @@ def _create_kernel(
         ),
         metrics=KernelMetrics(num_queries=0, last_stat=None, container_log=None),
         metadata=KernelMetadata(callback_url=None, internal_data=None),
+        kernel_group_id=None,
     )
 
 
@@ -588,6 +593,7 @@ def kernel_without_agent() -> KernelInfo:
         lifecycle=kernel.lifecycle,
         metrics=kernel.metrics,
         metadata=kernel.metadata,
+        kernel_group_id=None,
     )
 
 
@@ -684,9 +690,11 @@ def sessions_for_start_factory() -> Callable[..., SessionsForStartWithImages]:
                     )
                     for k in s.kernel_infos
                 ],
-                user_uuid=s.session_info.metadata.user_uuid,
+                user_uuid=s.session_info.metadata.user_uuid or uuid4(),
                 user_email="test@example.com",
                 user_name="test-user",
+                domain_id=DomainID(uuid4()),
+                project_id=ProjectID(uuid4()),
                 environ={},
             )
             for s in sessions
@@ -725,7 +733,7 @@ def terminating_session_data_factory() -> Callable[..., list[TerminatingSessionD
                 access_key=AccessKey(s.session_info.metadata.access_key),
                 creation_id=s.session_info.identity.creation_id,
                 status=s.session_info.lifecycle.status,
-                status_info="user-requested",
+                status_info=KernelLifecycleEventReason.USER_REQUESTED,
                 session_type=s.session_info.identity.session_type,
                 kernels=[
                     TerminatingKernelData(

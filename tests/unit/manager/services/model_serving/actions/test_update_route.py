@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
@@ -26,7 +26,9 @@ from ai.backend.manager.services.model_serving.actions.update_route import (
 )
 from ai.backend.manager.services.model_serving.services.model_serving import ModelServingService
 from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 from ai.backend.testutils.scenario import ScenarioBase
 
 
@@ -45,7 +47,7 @@ class TestUpdateRoute:
 
     @pytest.fixture(autouse=True)
     def set_user_context(self, user_data: UserData) -> Iterator[None]:
-        with with_user(user_data):
+        with with_user_context(user_data):
             yield
 
     @pytest.fixture
@@ -194,19 +196,6 @@ class TestUpdateRoute:
         )
 
     @pytest.fixture
-    def mock_get_endpoint_for_appproxy_update(
-        self, mocker: Any, mock_repositories: Any
-    ) -> AsyncMock:
-        return cast(
-            AsyncMock,
-            mocker.patch.object(
-                mock_repositories.repository,
-                "get_endpoint_for_appproxy_update",
-                new_callable=AsyncMock,
-            ),
-        )
-
-    @pytest.fixture
     def mock_mark_appproxy_resync_needed(self, mock_route_controller: MagicMock) -> AsyncMock:
         # The service no longer touches AppProxy from the API path; the
         # route controller's lifecycle hint is the only side effect
@@ -235,7 +224,6 @@ class TestUpdateRoute:
         mock_check_user_access_update_route: AsyncMock,
         mock_get_endpoint_access_validation_data_update_route: AsyncMock,
         mock_update_route_traffic: AsyncMock,
-        mock_get_endpoint_for_appproxy_update: AsyncMock,
         mock_mark_appproxy_resync_needed: AsyncMock,
     ) -> None:
         action = scenario.input
@@ -254,23 +242,9 @@ class TestUpdateRoute:
             traffic_ratio=action.traffic_ratio,
         )
 
-        # Mock endpoint row for AppProxy update
-        mock_endpoint_row = MagicMock(
-            id=action.deployment_id,
-            url="https://api.example.com/v1/models/test-model",
-            routings=[
-                MagicMock(
-                    id=action.route_id,
-                    traffic_ratio=action.traffic_ratio,
-                    session=uuid.UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
-                )
-            ],
-        )
-
         # Setup mocks - now uses single repository for all roles
         mock_get_endpoint_access_validation_data_update_route.return_value = mock_validation_data
         mock_update_route_traffic.return_value = mock_route_data
-        mock_get_endpoint_for_appproxy_update.return_value = mock_endpoint_row
 
         async def update_route(action: UpdateRouteAction) -> UpdateRouteActionResult:
             return await model_serving_service.update_route(action)
@@ -323,7 +297,6 @@ class TestUpdateRoute:
         mock_check_user_access_update_route: AsyncMock,
         mock_get_endpoint_access_validation_data_update_route: AsyncMock,
         mock_update_route_traffic: AsyncMock,
-        mock_get_endpoint_for_appproxy_update: AsyncMock,
         mock_mark_appproxy_resync_needed: AsyncMock,
     ) -> None:
         # The previous "AppProxy communication failure propagates" check
@@ -343,7 +316,6 @@ class TestUpdateRoute:
         )
         mock_get_endpoint_access_validation_data_update_route.return_value = mock_validation_data
         mock_update_route_traffic.return_value = MagicMock(id=action.deployment_id)
-        mock_get_endpoint_for_appproxy_update.return_value = MagicMock(id=action.deployment_id)
 
         await model_serving_service.update_route(action)
 

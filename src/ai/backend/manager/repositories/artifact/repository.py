@@ -2,6 +2,7 @@ import uuid
 
 from ai.backend.common.data.artifact.types import ArtifactRegistryType, VerificationStepResult
 from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.data.storage.registries.types import ModelData
 from ai.backend.common.data.storage.types import ArtifactStorageType
 from ai.backend.common.exception import BackendAIError
@@ -22,8 +23,8 @@ from ai.backend.manager.data.artifact.types import (
 )
 from ai.backend.manager.data.association.types import AssociationArtifactsStoragesData
 from ai.backend.manager.errors.artifact import ArtifactNotFoundError
-from ai.backend.manager.models.artifact.conditions import ArtifactConditions
 from ai.backend.manager.models.artifact.creators import ArtifactCreator
+from ai.backend.manager.models.artifact.searchable_fields import ArtifactSearchableFields
 from ai.backend.manager.models.artifact.searchers import (
     ArtifactSearcher,
     ArtifactWithRevisionsSearcher,
@@ -33,8 +34,10 @@ from ai.backend.manager.models.artifact.updaters import (
     ArtifactTouchUpdater,
     ArtifactUpdater,
 )
-from ai.backend.manager.models.artifact_revision.conditions import ArtifactRevisionConditions
 from ai.backend.manager.models.artifact_revision.creators import ArtifactRevisionCreator
+from ai.backend.manager.models.artifact_revision.searchable_fields import (
+    ArtifactRevisionSearchableFields,
+)
 from ai.backend.manager.models.artifact_revision.searchers import ArtifactRevisionSearcher
 from ai.backend.manager.models.artifact_revision.updaters import ArtifactRevisionScanUpdater
 from ai.backend.manager.models.specs.pagination import OffsetPagination
@@ -283,7 +286,14 @@ class ArtifactRepository:
         result = await ops.search_in_global(
             ArtifactSearcher(
                 pagination=OffsetPagination(limit=1),
-                conditions=[ArtifactConditions.by_name_and_registry(name, registry_id)],
+                conditions=[
+                    ArtifactSearchableFields.own.name.filter.equals(
+                        StringMatchSpec(name, case_insensitive=False, negated=False)
+                    ),
+                    ArtifactSearchableFields.own.registry_id.filter.equals(
+                        UUIDEqualMatchSpec(value=registry_id, negated=False)
+                    ),
+                ],
             )
         )
         return result.items[0] if result.items else None
@@ -295,7 +305,12 @@ class ArtifactRepository:
             ArtifactRevisionSearcher(
                 pagination=OffsetPagination(limit=1),
                 conditions=[
-                    ArtifactRevisionConditions.by_artifact_and_version(artifact_id, version)
+                    ArtifactRevisionSearchableFields.own.artifact_id.filter.equals(
+                        UUIDEqualMatchSpec(value=artifact_id, negated=False)
+                    ),
+                    ArtifactRevisionSearchableFields.own.version.filter.equals(
+                        StringMatchSpec(version, case_insensitive=False, negated=False)
+                    ),
                 ],
             )
         )

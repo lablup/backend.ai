@@ -73,7 +73,7 @@ would be:
    hide-agents = true
    # event-loop = "asyncio"
    # importer-image = "lablup/importer:manylinux2010"
-   distributed-lock = "filelock"
+   distributed-lock = "pg_advisory"
 
    [docker-registry]
    ssl-verify = false
@@ -147,19 +147,6 @@ nodes.
    $ backend.ai mgr etcd put config/redis/addr "bai-m1:8110"
    $ backend.ai mgr etcd put config/redis/password "develove"
 
-Set the container registry. The following is the Lablup's open registry
-(cr.backend.ai). You can set your own registry with username and password if
-needed.  This can be configured via GUI as well.
-
-.. code-block:: console
-
-   $ backend.ai mgr etcd put config/docker/image/auto_pull "tag"
-   $ backend.ai mgr etcd put config/docker/registry/cr.backend.ai "https://cr.backend.ai"
-   $ backend.ai mgr etcd put config/docker/registry/cr.backend.ai/type "harbor2"
-   $ backend.ai mgr etcd put config/docker/registry/cr.backend.ai/project "stable"
-   $ # backend.ai mgr etcd put config/docker/registry/cr.backend.ai/username "bai"
-   $ # backend.ai mgr etcd put config/docker/registry/cr.backend.ai/password "secure-password"
-
 Also, populate the Storage Proxy configuration to the Etcd:
 
 .. code-block:: console
@@ -200,7 +187,7 @@ issuing SQL statement directly inside the PostgreSQL container:
 .. code-block:: console
 
    $ vfolder_host_val='{"bai-m1:local": ["create-vfolder", "modify-vfolder", "delete-vfolder", "mount-in-session", "upload-file", "download-file", "invite-others", "set-user-specific-permission"]}'
-   $ docker compose -f "$HOME/halfstack/postgres-cluster-default" exec -it backendai-half-db psql -U postgres -d backend \
+   $ docker compose -f "$HOME/halfstack/postgres-cluster-default/docker-compose.yaml" exec -it backendai-half-db psql -U postgres -d backend \
          -c "UPDATE domains SET allowed_vfolder_hosts = '${vfolder_host_val}' WHERE name = 'default';"
 
 
@@ -214,20 +201,23 @@ and save it as ``${HOME}/manager/alembic.ini``. Adjust the ``sqlalchemy.url``
 field if database connection information is different from the default one. You
 may need to change ``localhost`` to ``bai-m1``.
 
-Populate the database schema and initial fixtures. Copy the example JSON files
-(`example-keypairs.json <https://github.com/lablup/backend.ai/blob/main/fixtures/manager/example-keypairs.json>`_
-and
-`example-resource-presets.json <https://github.com/lablup/backend.ai/blob/main/fixtures/manager/example-resource-presets.json>`_)
-as ``keypairs.json`` and ``resource-presets.json``, save them under
-``${HOME}/manager/``. Customize them to have unique keypairs and passwords for
-your initial superadmin and sample user accounts for security.
+Populate the database schema and the initial rows. The initial rows are YAML
+seed files under the
+`seeds <https://github.com/lablup/backend.ai/tree/main/seeds>`_ directory of the
+repository. Copy ``seeds/manager`` and ``seeds/examples/manager`` of the release
+you install under ``${HOME}/manager/seeds/``. ``seeds/manager`` holds the
+default domain, resource groups, resource policies, roles and the
+``cr.backend.ai`` container registries. ``seeds/examples/manager`` holds the
+sample accounts; customize their passwords and keypairs for security.
 
 .. code-block:: console
 
    $ backend.ai mgr schema oneshot
-   $ backend.ai mgr fixture populate ./users.json
-   $ backend.ai mgr fixture populate ./keypairs.json
-   $ backend.ai mgr fixture populate ./resource-presets.json
+   $ backend.ai mgr seed apply ./seeds/manager ./seeds/examples/manager
+   $ backend.ai mgr permissions provision --seeds ./seeds/manager
+
+Container registries are stored in the database. Add your own registry with
+username and password through the GUI if needed.
 
 
 Sync the information of container registry
@@ -326,7 +316,7 @@ Then, create a systemd service file at
    KillMode=process
    KillSignal=SIGTERM
    PrivateTmp=false
-   Restart=on-failure
+   Restart=always
    RestartSec=10
    LimitNOFILE=5242880
    LimitNPROC=131072

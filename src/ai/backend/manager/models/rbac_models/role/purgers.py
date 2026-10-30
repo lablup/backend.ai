@@ -11,8 +11,8 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.errors.role_preset import SystemRoleNotEditable
-from ai.backend.manager.models.rbac_models.role.conditions import RoleConditions
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.role.searchable_fields import RoleSearchableFields
 from ai.backend.manager.models.specs.purger import GuardedEntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck, GuardCheck
 
@@ -42,7 +42,7 @@ class RolePurger(GuardedEntityPurger[RoleRow, RoleData]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=RoleConditions.by_source_equals(RoleSource.CUSTOM),
+                condition=RoleSearchableFields.own.source.filter.equals(RoleSource.CUSTOM),
                 error=SystemRoleNotEditable(f"Role {self.role_id} is a SYSTEM role."),
             ),
         )
@@ -53,4 +53,4 @@ class RolePurger(GuardedEntityPurger[RoleRow, RoleData]):
 
     @override
     def to_data(self, row: RoleRow) -> RoleData:
-        return row.to_data()
+        return RoleSearchableFields.own.to_data(row)

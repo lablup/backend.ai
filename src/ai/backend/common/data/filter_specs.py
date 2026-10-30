@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 
@@ -17,7 +18,7 @@ class StringMatchSpec:
 class StringInMatchSpec:
     """Specification for string IN operations (IN, NOT IN)."""
 
-    values: list[str]
+    values: Sequence[str]
     case_insensitive: bool
     negated: bool
 
@@ -34,5 +35,5 @@ class UUIDEqualMatchSpec:
 class UUIDInMatchSpec:
     """Specification for UUID IN operations (IN, NOT IN)."""
 
-    values: list[uuid.UUID]
+    values: Sequence[uuid.UUID]
     negated: bool

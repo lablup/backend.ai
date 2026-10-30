@@ -7,6 +7,9 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.client_ip.types import ClientIPMaskingPolicyData
 from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
+from ai.backend.manager.models.client_ip_masking.searchable_fields import (
+    ClientIPMaskingPolicySearchableFields,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 
 __all__ = ("ClientIPMaskingPolicySearcher",)
@@ -20,4 +23,4 @@ class ClientIPMaskingPolicySearcher(Searcher[ClientIPMaskingPolicyRow, ClientIPM
 
     @override
     def to_data(self, row: ClientIPMaskingPolicyRow) -> ClientIPMaskingPolicyData:
-        return row.to_data()
+        return ClientIPMaskingPolicySearchableFields.own.to_data(row)

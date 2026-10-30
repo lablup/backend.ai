@@ -8,13 +8,13 @@ per-deployment path and the per-resource-group default path.
 
 from __future__ import annotations
 
-from ai.backend.common.dto.manager.v2.deployment_options import (
-    DeploymentHandlerOptionsInfo,
+from ai.backend.common.dto.manager.v2.deployment_options.request import (
     DeploymentHandlerOptionsInput,
-    DeploymentOptionsInfo,
     DeploymentOptionsInput,
 )
-from ai.backend.common.dto.manager.v2.session_options import (
+from ai.backend.common.dto.manager.v2.deployment_options.response import (
+    DeploymentHandlerOptionsInfo,
+    DeploymentOptionsInfo,
     HandlerOptionsEntryInfo,
     HandlerOptionsInfo,
 )

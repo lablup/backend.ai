@@ -20,12 +20,14 @@ from ai.backend.manager.api.gql.decorators import (
     gql_mutation,
     gql_root_field,
 )
-from ai.backend.manager.api.gql.login_session.types import (
-    LoginSessionFilterGQL,
-    LoginSessionOrderByGQL,
+from ai.backend.manager.api.gql.login_session.types.filter import LoginSessionFilterGQL
+from ai.backend.manager.api.gql.login_session.types.node import (
     LoginSessionV2ConnectionGQL,
     LoginSessionV2EdgeGQL,
     LoginSessionV2GQL,
+)
+from ai.backend.manager.api.gql.login_session.types.order import LoginSessionOrderByGQL
+from ai.backend.manager.api.gql.login_session.types.payloads import (
     RevokeLoginSessionPayloadGQL,
     UnblockUserPayloadGQL,
 )

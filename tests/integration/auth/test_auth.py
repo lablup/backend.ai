@@ -16,8 +16,8 @@ from ai.backend.common.dto.manager.auth.request import (
 )
 from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.manager.data.user.types import UserStatus
-from ai.backend.manager.models.keypair import keypairs
-from ai.backend.manager.models.user import users
+from ai.backend.manager.models.keypair.row import keypairs
+from ai.backend.manager.models.user.row import users
 
 from .conftest import AuthUserFixtureData
 

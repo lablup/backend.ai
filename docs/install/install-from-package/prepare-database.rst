@@ -5,7 +5,7 @@ Backend.AI makes use of PostgreSQL as the main database to store user informatio
 Launch the service using docker compose by generating the file ``$HOME/halfstack/postgres-cluster-default/docker-compose.yaml`` and populating it with the following YAML.
 Feel free to adjust the volume paths and port settings.
 Please refer `the latest configuration <https://github.com/lablup/backend.ai/blob/main/docker-compose.halfstack-main.yml>`_
-(it's a symbolic link so follow the filename in it) if needed.
+if needed.
 
 .. code-block:: yaml
 

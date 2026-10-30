@@ -76,8 +76,17 @@ result = await metric_service.batch_get_kernel_live_stats(action)
 - Endpoint configuration: `config.metric.address`
 - Default timewindow for rate calculations: `config.metric.timewindow` (default: 1m)
 
+### Value Types
+`value_type` selects what a container metric query returns:
+
+| `value_type` | Source | Result |
+|---|---|---|
+| `current` | Stored `current` series | Raw value, or its `rate()` for counter metrics (see below) |
+| `capacity` | Stored `capacity` series | Raw value |
+| `pct` | Computed in PromQL | `Σcurrent / Σcapacity × 100` over the scope's kernels; metrics without a capacity series return no data. For the `millicores` unit hint (`cpu_util`, capacity = one core) it is `Σ(rate(current) / capacity) × 100`, the share of one core, so kernels add up and the value may exceed 100 |
+
 ### Metric Types and Automatic Detection
-The service automatically determines metric types based on metric names:
+For `current` and `capacity` queries the service determines metric types based on metric names:
 - **GAUGE**: Default for most metrics (instant values)
 - **RATE**: Applied to network metrics (net_rx, net_tx) for bytes/second calculation
 - **DIFF**: Applied to CPU utilization when value_type="current" for percentage change
@@ -85,7 +94,7 @@ The service automatically determines metric types based on metric names:
 ### Label System
 All metrics use consistent labeling:
 - `container_metric_name`: The metric being queried
-- `value_type`: "usage" or "capacity"
+- `value_type`: "current", "capacity" or "pct"
 - `agent_id`: Agent identifier
 - `kernel_id`: Kernel identifier (Backend.AI's container wrapper, not the actual container ID)
 - `session_id`: Session identifier

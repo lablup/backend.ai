@@ -23,7 +23,7 @@ from ai.backend.manager.data.deployment.types import (
     DeploymentTargetStatuses,
     ReplicaData,
 )
-from ai.backend.manager.repositories.deployment import DeploymentRepository
+from ai.backend.manager.repositories.deployment.repository import DeploymentRepository
 from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
 from ai.backend.manager.sokovan.deployment.handlers.base import DeploymentHandler
 from ai.backend.manager.sokovan.deployment.types import (

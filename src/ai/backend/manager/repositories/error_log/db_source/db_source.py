@@ -5,18 +5,16 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
-from ai.backend.manager.data.error_log.types import ErrorLogData, ErrorLogListResult
+from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.models.error_log.row import ErrorLogRow
-from ai.backend.manager.models.project.row import AssocGroupUserRow, ProjectRow
-from ai.backend.manager.repositories.base import (
-    BatchQuerier,
-    execute_batch_querier,
-)
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.virtual_entity.queries import user_scope_membership_query
 
 if TYPE_CHECKING:
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
@@ -43,37 +41,6 @@ class ErrorLogDBSource:
 
     def __init__(self, db: ExtendedAsyncSAEngine) -> None:
         self._db = db
-
-    @error_log_db_source_resilience.apply()
-    async def search(
-        self,
-        querier: BatchQuerier,
-    ) -> ErrorLogListResult:
-        """Search error logs with querier pattern.
-
-        Args:
-            querier: BatchQuerier for filtering, ordering, and pagination
-
-        Returns:
-            ErrorLogListResult with items, total count, and pagination info
-        """
-        async with self._db.begin_readonly_session() as db_sess:
-            query = sa.select(ErrorLogRow)
-
-            result = await execute_batch_querier(
-                db_sess,
-                query,
-                querier,
-            )
-
-            items = [row.ErrorLogRow.to_dataclass() for row in result.rows]
-
-            return ErrorLogListResult(
-                items=items,
-                total_count=result.total_count,
-                has_next_page=result.has_next_page,
-                has_previous_page=result.has_previous_page,
-            )
 
     @error_log_db_source_resilience.apply()
     async def list_logs(
@@ -103,14 +70,12 @@ class ErrorLogDBSource:
             if is_superadmin:
                 pass
             elif is_admin:
-                j = sa.join(
-                    ProjectRow.__table__,
-                    AssocGroupUserRow.__table__,
-                    ProjectRow.id == AssocGroupUserRow.group_id,
-                )
+                membership = user_scope_membership_query(ProjectEntityType()).subquery()
                 usr_query = (
-                    sa.select(AssocGroupUserRow.user_id)
-                    .select_from(j)
+                    sa.select(membership.c.user_id)
+                    .select_from(
+                        sa.join(membership, ProjectRow, membership.c.scope_id == ProjectRow.id)
+                    )
                     .where(ProjectRow.domain_name == user_domain)
                 )
                 usr_result = await db_sess.execute(usr_query)

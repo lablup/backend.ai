@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.audit_log import AuditLogFieldType
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectEntityType
@@ -27,12 +27,18 @@ from ai.backend.manager.actions.registry.types import (
     ProcessorDependencies,
 )
 from ai.backend.manager.actions.types import ActionOperationType, OperationStatus
+from ai.backend.manager.actions.v2.global_scope.validator.refusing import (
+    RefusingGlobalActionValidator,
+)
 from ai.backend.manager.actions.v2.scope.monitor.audit_log import ScopeActionAuditLogMonitor
 from ai.backend.manager.actions.v2.scope.validator.rbac import VirtualEntityScopeActionRBACValidator
 from ai.backend.manager.actions.v2.validators import ActionValidators
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.audit_log.types import AuditLogData
-from ai.backend.manager.data.permission.virtual_entity import GovernCheckKey
+from ai.backend.manager.data.permission.virtual_entity import (
+    GovernCheckKey,
+    PermissionCheckResult,
+)
 from ai.backend.manager.errors.permission import NotEnoughPermission
 from ai.backend.manager.repositories.base.export import StreamingExportQuery
 from ai.backend.manager.repositories.client_ip_masking.repository import ClientIPMaskingRepository
@@ -77,7 +83,7 @@ def actor() -> UserData:
 @pytest.fixture
 def permission_repository() -> MagicMock:
     repository = MagicMock(spec=RbacPermissionCheckRepository)
-    repository.governed_permissions.return_value = {}
+    repository.checked_permissions.return_value = PermissionCheckResult(governed={}, owned={})
     return repository
 
 
@@ -108,7 +114,8 @@ def registry(
                 scope=[ScopeActionAuditLogMonitor(audit_repository, policy, masking)],
             ),
             validators=ActionValidators(
-                scope=[VirtualEntityScopeActionRBACValidator(permission_repository, config)]
+                scope=[VirtualEntityScopeActionRBACValidator(permission_repository, config)],
+                global_scope=[RefusingGlobalActionValidator()],
             ),
         )
     )
@@ -136,7 +143,7 @@ class TestReportRead:
     ) -> None:
         report = MagicMock()
         export_repository.get_report.return_value = report
-        with with_user(actor):
+        with with_user_context(actor):
             result = await processors.public_get_report.run(
                 PublicGetReportAction(report_key="sessions")
             )
@@ -153,12 +160,15 @@ class TestScopedExportPermissions:
         audit_repository: MagicMock,
     ) -> None:
         scope = UserID(actor.user_id)
-        permission_repository.governed_permissions.return_value = {
-            GovernCheckKey(
-                user_id=UserID(actor.user_id), scope=scope, entity_type=UserEntityType()
-            ): Permission.READ,
-        }
-        with with_user(actor):
+        permission_repository.checked_permissions.return_value = PermissionCheckResult(
+            governed={
+                GovernCheckKey(
+                    user_id=UserID(actor.user_id), scope=scope, entity_type=UserEntityType()
+                ): Permission.READ,
+            },
+            owned={},
+        )
+        with with_user_context(actor):
             await processors.export_my_keypairs_csv.run(
                 ExportMyKeypairsCSVAction(user_uuid=UserID(actor.user_id), query=query)
             )
@@ -178,7 +188,7 @@ class TestScopedExportPermissions:
         export_repository: MagicMock,
         audit_repository: MagicMock,
     ) -> None:
-        with with_user(actor), pytest.raises(NotEnoughPermission):
+        with with_user_context(actor), pytest.raises(NotEnoughPermission):
             await processors.export_my_keypairs_csv.run(
                 ExportMyKeypairsCSVAction(user_uuid=UserID(actor.user_id), query=query)
             )

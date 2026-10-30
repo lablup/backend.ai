@@ -10,6 +10,7 @@ from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.role.searchable_fields import RoleSearchableFields
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -58,4 +59,4 @@ class RoleCreator(EntityCreator[RoleRow, RoleData]):
 
     @override
     def to_data(self, row: RoleRow) -> RoleData:
-        return row.to_data()
+        return RoleSearchableFields.own.to_data(row)

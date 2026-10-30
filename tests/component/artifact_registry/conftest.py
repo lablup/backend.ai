@@ -87,8 +87,10 @@ def artifact_processors(
     artifact_registry_repository = ArtifactRegistryRepository(
         database_engine, V2DBOpsProvider(database_engine)
     )
-    object_storage_repository = ObjectStorageRepository(database_engine)
-    vfs_storage_repository = VFSStorageRepository(database_engine)
+    object_storage_repository = ObjectStorageRepository(
+        database_engine, V2DBOpsProvider(database_engine)
+    )
+    vfs_storage_repository = VFSStorageRepository(database_engine, V2DBOpsProvider(database_engine))
     huggingface_repository = HuggingFaceRepository(
         database_engine, ArtifactRegistryOpsProvider(database_engine)
     )
@@ -136,8 +138,10 @@ def artifact_revision_processors(
     artifact_registry_repository = ArtifactRegistryRepository(
         database_engine, V2DBOpsProvider(database_engine)
     )
-    object_storage_repository = ObjectStorageRepository(database_engine)
-    vfs_storage_repository = VFSStorageRepository(database_engine)
+    object_storage_repository = ObjectStorageRepository(
+        database_engine, V2DBOpsProvider(database_engine)
+    )
+    vfs_storage_repository = VFSStorageRepository(database_engine, V2DBOpsProvider(database_engine))
     storage_namespace_repository = StorageNamespaceRepository(database_engine)
     huggingface_repository = HuggingFaceRepository(
         database_engine, ArtifactRegistryOpsProvider(database_engine)

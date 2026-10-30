@@ -10,6 +10,9 @@ from sqlalchemy.orm import selectinload
 
 from ai.backend.manager.data.huggingface_registry.types import HuggingFaceRegistryData
 from ai.backend.manager.models.huggingface_registry.row import HuggingFaceRegistryRow
+from ai.backend.manager.models.huggingface_registry.searchable_fields import (
+    HuggingFaceRegistrySearchableFields,
+)
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -23,4 +26,4 @@ class HuggingFaceRegistrySearcher(Searcher[HuggingFaceRegistryRow, HuggingFaceRe
 
     @override
     def to_data(self, row: HuggingFaceRegistryRow) -> HuggingFaceRegistryData:
-        return row.to_dataclass()
+        return HuggingFaceRegistrySearchableFields.own.to_data(row)

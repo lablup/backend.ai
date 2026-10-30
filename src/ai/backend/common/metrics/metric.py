@@ -116,7 +116,6 @@ class GraphQLMetricObserver:
                 "operation_type",
                 "field_name",
                 "parent_type",
-                "operation_name",
                 "domain",
                 "operation",
                 "error_detail",
@@ -130,7 +129,6 @@ class GraphQLMetricObserver:
                 "operation_type",
                 "field_name",
                 "parent_type",
-                "operation_name",
                 "domain",
                 "operation",
                 "error_detail",
@@ -151,7 +149,6 @@ class GraphQLMetricObserver:
         operation_type: str,
         field_name: str,
         parent_type: str,
-        operation_name: str,
         error_code: ErrorCode | None,
         success: bool,
     ) -> None:
@@ -159,7 +156,6 @@ class GraphQLMetricObserver:
             operation_type=operation_type,
             field_name=field_name,
             parent_type=parent_type,
-            operation_name=operation_name,
             domain=error_code.domain if error_code else "",
             operation=error_code.operation if error_code else "",
             error_detail=error_code.error_detail if error_code else "",
@@ -172,7 +168,6 @@ class GraphQLMetricObserver:
         operation_type: str,
         field_name: str,
         parent_type: str,
-        operation_name: str,
         error_code: ErrorCode | None,
         success: bool,
         duration: float,
@@ -181,7 +176,6 @@ class GraphQLMetricObserver:
             operation_type=operation_type,
             field_name=field_name,
             parent_type=parent_type,
-            operation_name=operation_name,
             domain=error_code.domain if error_code else "",
             operation=error_code.operation if error_code else "",
             error_detail=error_code.error_detail if error_code else "",
@@ -194,7 +188,6 @@ class GraphQLMetricObserver:
         operation_type: str,
         field_name: str,
         parent_type: str,
-        operation_name: str,
         error_code: ErrorCode | None,
         success: bool,
         duration: float,
@@ -203,7 +196,6 @@ class GraphQLMetricObserver:
             operation_type=operation_type,
             field_name=field_name,
             parent_type=parent_type,
-            operation_name=operation_name,
             error_code=error_code,
             success=success,
         )
@@ -211,7 +203,6 @@ class GraphQLMetricObserver:
             operation_type=operation_type,
             field_name=field_name,
             parent_type=parent_type,
-            operation_name=operation_name,
             error_code=error_code,
             success=success,
             duration=duration,
@@ -527,7 +518,6 @@ class LayerType(enum.StrEnum):
 
     # Cache Source layers
     AGENT_CACHE_SOURCE = "agent_cache_source"
-    RESOURCE_PRESET_CACHE_SOURCE = "resource_preset_cache_source"
     SCHEDULE_CACHE_SOURCE = "schedule_cache_source"
     SCHEDULER_CACHE_SOURCE = "scheduler_cache_source"
 
@@ -545,6 +535,7 @@ class LayerType(enum.StrEnum):
     VALKEY_BGTASK = "valkey_bgtask"
     VALKEY_VOLUME_STATS = "valkey_volume_stats"
     VALKEY_TUS = "valkey_tus"
+    VALKEY_LOCK = "valkey_lock"
 
     # Client layers
     AGENT_CLIENT = "agent_client"
@@ -678,22 +669,22 @@ class SystemMetricObserver:
         self._async_task_count = Gauge(
             name="backendai_async_task_count",
             documentation="Number of active async tasks",
-            multiprocess_mode="livesum",
+            multiprocess_mode="liveall",
         )
         self._cpu_usage_percent = Gauge(
             name="backendai_cpu_usage_percent",
             documentation="CPU usage of the process",
-            multiprocess_mode="livesum",
+            multiprocess_mode="liveall",
         )
         self._memory_used_rss = Gauge(
             name="backendai_memory_used_rss",
             documentation="Memory used by the process in RSS",
-            multiprocess_mode="livesum",
+            multiprocess_mode="liveall",
         )
         self._memory_used_vms = Gauge(
             name="backendai_memory_used_vms",
             documentation="Memory used by the process in VMS",
-            multiprocess_mode="livesum",
+            multiprocess_mode="liveall",
         )
 
     @classmethod
@@ -783,7 +774,6 @@ class CommonMetricRegistry:
         return cls._instance
 
     def to_prometheus(self) -> str:
-        self.system.observe()
         return generate_latest_multiprocess().decode("utf-8")
 
     def to_prometheus_singleprocess(self) -> str:

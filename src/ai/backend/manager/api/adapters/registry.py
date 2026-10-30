@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, Any
 
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -69,10 +70,19 @@ from ai.backend.manager.api.adapters.scheduling_history.adapter import Schedulin
 from ai.backend.manager.api.adapters.secret.adapter import SecretAdapter
 from ai.backend.manager.api.adapters.service_catalog.adapter import ServiceCatalogAdapter
 from ai.backend.manager.api.adapters.session.adapter import SessionAdapter
+from ai.backend.manager.api.adapters.session_group.adapter import SessionGroupAdapter
+from ai.backend.manager.api.adapters.session_lifecycle_handler.adapter import (
+    SessionLifecycleHandlerAdapter,
+)
 from ai.backend.manager.api.adapters.storage_host.adapter import StorageHostAdapter
 from ai.backend.manager.api.adapters.storage_namespace.adapter import StorageNamespaceAdapter
+from ai.backend.manager.api.adapters.system_session_environ.adapter import (
+    SystemSessionEnvironAdapter,
+)
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
+from ai.backend.manager.api.adapters.user.config import UserConfigAdapter
 from ai.backend.manager.api.adapters.vfolder.adapter import VFolderAdapter
+from ai.backend.manager.api.adapters.vfolder_auto_mount.adapter import VFolderAutoMountAdapter
 from ai.backend.manager.api.adapters.vfs_storage.adapter import VFSStorageAdapter
 from ai.backend.manager.secret.pool import KeyProviderPool
 
@@ -82,6 +92,7 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.processors import Processors
     from ai.backend.manager.sokovan.deployment.coordinator import DeploymentCoordinator
     from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
+    from ai.backend.manager.sokovan.scheduler.handlers.base import SessionLifecycleHandler
 
 
 class Adapters:
@@ -141,10 +152,15 @@ class Adapters:
         scheduling_history: SchedulingHistoryAdapter,
         service_catalog: ServiceCatalogAdapter,
         session: SessionAdapter,
+        session_group: SessionGroupAdapter,
+        session_lifecycle_handler: SessionLifecycleHandlerAdapter,
         storage_host: StorageHostAdapter,
         storage_namespace: StorageNamespaceAdapter,
+        system_session_environ: SystemSessionEnvironAdapter,
         user: UserAdapter,
+        user_config: UserConfigAdapter,
         vfolder: VFolderAdapter,
+        vfolder_auto_mount: VFolderAutoMountAdapter,
         vfs_storage: VFSStorageAdapter,
     ) -> None:
         self.agent = agent
@@ -194,10 +210,15 @@ class Adapters:
         self.scheduling_history = scheduling_history
         self.service_catalog = service_catalog
         self.session = session
+        self.session_group = session_group
+        self.session_lifecycle_handler = session_lifecycle_handler
         self.storage_host = storage_host
         self.storage_namespace = storage_namespace
+        self.system_session_environ = system_session_environ
         self.user = user
+        self.user_config = user_config
         self.vfolder = vfolder
+        self.vfolder_auto_mount = vfolder_auto_mount
         self.vfs_storage = vfs_storage
 
     @classmethod
@@ -209,6 +230,7 @@ class Adapters:
         key_provider_pool: KeyProviderPool,
         deployment_coordinator: DeploymentCoordinator,
         schedule_coordinator: ScheduleCoordinator,
+        session_lifecycle_handlers: Sequence[SessionLifecycleHandler],
         config_provider: ManagerConfigProvider | None = None,
     ) -> Adapters:
         """Factory that hands each adapter the processors it uses.
@@ -221,6 +243,10 @@ class Adapters:
         registrations.
         """
         entity_types = WiredEntityTypes(action_registry)
+        # The model card adapter reads presets through this one, so it is built first.
+        deployment_revision_preset = DeploymentRevisionPresetAdapter(
+            processors.deployment_revision_preset
+        )
         return cls(
             agent=AgentAdapter(processors.agent),
             app_config=AppConfigAdapter(processors.app_config),
@@ -236,7 +262,7 @@ class Adapters:
                 processors.container_registry, processors.rbac
             ),
             deployment=DeploymentAdapter(processors.deployment, deployment_coordinator),
-            domain=DomainAdapter(processors.domain, processors.resource_group),
+            domain=DomainAdapter(processors.domain),
             fair_share=FairShareAdapter(processors.fair_share, processors.resource_group),
             huggingface_registry=HuggingFaceRegistryAdapter(processors.artifact_registry),
             idle_checker=IdleCheckerAdapter(processors.idle_checker),
@@ -263,7 +289,7 @@ class Adapters:
             rbac=RBACAdapter(processors.rbac, processors.permission_controller),
             reservoir_registry=ReservoirRegistryAdapter(processors.artifact_registry),
             resource_allocation=ResourceAllocationAdapter(
-                processors.session, processors.domain, processors.user, config_provider
+                processors.session, processors.domain, config_provider
             ),
             resource_group=ResourceGroupAdapter(
                 processors.resource_group,
@@ -277,7 +303,9 @@ class Adapters:
                 processors.user_resource_policy,
                 processors.project_resource_policy,
             ),
-            resource_preset=ResourcePresetAdapter(processors.resource_preset),
+            resource_preset=ResourcePresetAdapter(
+                processors.resource_preset, processors.resource_group
+            ),
             resource_slot=ResourceSlotAdapter(
                 processors.resource_slot, processors.agent, processors.domain
             ),
@@ -285,10 +313,10 @@ class Adapters:
             retention_policy=RetentionPolicyAdapter(processors.retention_policy),
             runtime_variant=RuntimeVariantAdapter(processors.runtime_variant),
             runtime_variant_preset=RuntimeVariantPresetAdapter(processors.runtime_variant_preset),
-            deployment_revision_preset=DeploymentRevisionPresetAdapter(
-                processors.deployment_revision_preset
+            deployment_revision_preset=deployment_revision_preset,
+            model_card=ModelCardAdapter(
+                processors.model_card, processors.deployment, deployment_revision_preset
             ),
-            model_card=ModelCardAdapter(processors.model_card, processors.deployment),
             resource_usage=ResourceUsageAdapter(
                 processors.resource_usage, processors.resource_group
             ),
@@ -299,9 +327,15 @@ class Adapters:
             ),
             service_catalog=ServiceCatalogAdapter(processors.service_catalog),
             session=SessionAdapter(processors.session, processors.idle_checker),
+            session_group=SessionGroupAdapter(processors.session_group),
+            session_lifecycle_handler=SessionLifecycleHandlerAdapter(
+                sorted(session_lifecycle_handlers, key=lambda handler: handler.name())
+            ),
             storage_host=StorageHostAdapter(processors.vfolder),
             storage_namespace=StorageNamespaceAdapter(processors.storage_namespace),
+            system_session_environ=SystemSessionEnvironAdapter(processors.system_session_environ),
             user=UserAdapter(processors.user, processors.domain, auth_config, key_provider_pool),
+            user_config=UserConfigAdapter(processors.user, processors.dotfile),
             vfolder=VFolderAdapter(
                 processors.vfolder,
                 processors.vfolder_file,
@@ -309,5 +343,6 @@ class Adapters:
                 processors.deployment,
                 processors.vfolder_mount_policy,
             ),
+            vfolder_auto_mount=VFolderAutoMountAdapter(processors.vfolder_auto_mount),
             vfs_storage=VFSStorageAdapter(processors.vfs_storage),
         )

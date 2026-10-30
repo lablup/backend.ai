@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any, Final
 
 from ai.backend.common.data.permission.types import Permission
-from ai.backend.manager.data.permission.seed.role import RoleSeed
+from ai.backend.manager.seed.role_preset.seed import RolePresetSeed
 
 # A derived id is a uuid7 whose timestamp is fixed and whose remaining bits come from
 # what it identifies, so the same declaration writes the same file. The timestamp is
@@ -38,9 +38,9 @@ class RoleFixture:
     """Writes the preset fixture from the role files. The roles instantiated from the
     presets are not written: `mgr permissions provision` creates them in each scope."""
 
-    _seeds: Mapping[str, RoleSeed]
+    _seeds: Mapping[str, RolePresetSeed]
 
-    def __init__(self, seeds: Sequence[RoleSeed]) -> None:
+    def __init__(self, seeds: Sequence[RolePresetSeed]) -> None:
         self._seeds = {seed.name: seed for seed in seeds}
 
     def render_presets(self) -> dict[str, Any]:
@@ -58,7 +58,7 @@ class RoleFixture:
                 "role_name_template": None,
                 "scope_type": str(seed.scope_type),
                 "auto_assign": seed.auto_assign,
-                "deleted": False,
+                "deleted_at": None,
                 "created_at": _TIMESTAMP,
                 "updated_at": _TIMESTAMP,
             }

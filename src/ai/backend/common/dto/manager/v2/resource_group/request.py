@@ -12,15 +12,19 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.resource_group import ResourceGroupName
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.resource_group.types import (
     ResourceGroupOrderDirection,
     ResourceGroupOrderField,
     ResourceGroupScope,
+    ResourceGroupUsage,
     SchedulerTypeDTO,
 )
 from ai.backend.common.dto.manager.v2.session_options import DefaultSessionOptionsInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import PreemptionVictimScope
 
@@ -28,6 +32,9 @@ __all__ = (
     "AdminSearchResourceGroupsInput",
     "CreateResourceGroupInput",
     "DeleteResourceGroupInput",
+    "PartialBulkPurgeResourceGroupsInput",
+    "PartialBulkUpdateResourceGroupItemInput",
+    "PartialBulkUpdateResourceGroupsInput",
     "PreemptionConfigInputDTO",
     "ReplaceResourceGroupDefaultDeploymentOptionsGQLInput",
     "ReplaceResourceGroupDefaultDeploymentOptionsInput",
@@ -96,6 +103,41 @@ class CreateResourceGroupInput(BaseRequestModel):
         return stripped
 
 
+class PreemptionConfigInputDTO(BaseRequestModel):
+    """Input for preemption configuration."""
+
+    enabled: bool = Field(
+        default=False,
+        description="Whether preemption is enabled for this resource group (opt-in).",
+    )
+    preemptible_priority: int = Field(
+        default=5,
+        description="Sessions with priority <= this value are eligible for preemption.",
+    )
+    order: str = Field(
+        default="oldest",
+        description="Tie-breaking order for same-priority sessions (oldest/newest).",
+    )
+    mode: str = Field(
+        default="terminate",
+        description="How to preempt sessions (terminate/reschedule).",
+    )
+    preemption_min_runtime: float = Field(
+        default=0.0,
+        ge=0.0,
+        description=(
+            "Minimum session runtime in seconds before it becomes preemptible (0 = disabled)."
+        ),
+    )
+    victim_scope: PreemptionVictimScope = Field(
+        default=PreemptionVictimScope.USER,
+        description=(
+            "Scope preemption victims are drawn from (user/project/domain/resource-group). "
+            "Default is user."
+        ),
+    )
+
+
 class UpdateResourceGroupInput(BaseRequestModel):
     """Input for updating a resource group. All fields optional for partial update."""
 
@@ -137,6 +179,51 @@ class UpdateResourceGroupInput(BaseRequestModel):
         default=UNSET,
         description="Updated resource policy name. Omit to leave unchanged; null clears.",
     )
+    is_public: bool | None | Unset = Field(
+        default=UNSET,
+        description="Whether the resource group is public. Omit to leave unchanged.",
+    )
+    app_proxy_addr: str | None | Unset = Field(
+        default=UNSET,
+        description="App proxy address. Omit to leave unchanged; null clears.",
+    )
+    appproxy_api_token: str | None | Unset = Field(
+        default=UNSET,
+        description="App proxy API token. Omit to leave unchanged; null clears.",
+    )
+    use_host_network: bool | None | Unset = Field(
+        default=UNSET,
+        description="Whether to use host network mode. Omit to leave unchanged.",
+    )
+    scheduler_type: SchedulerTypeDTO | None | Unset = Field(
+        default=UNSET,
+        description="Scheduler type value (fifo/lifo/drf/fair-share). Omit to leave unchanged.",
+    )
+    preemption: PreemptionConfigInputDTO | None | Unset = Field(
+        default=UNSET,
+        description="Preemption configuration. Omit to leave unchanged.",
+    )
+
+
+class PartialBulkUpdateResourceGroupItemInput(BaseRequestModel):
+    """One resource group of a partial bulk update and the fields to update on it."""
+
+    id: UUID = Field(description="ID of the resource group to update.")
+    input: UpdateResourceGroupInput = Field(description="Fields to update on the resource group.")
+
+
+class PartialBulkUpdateResourceGroupsInput(BaseRequestModel):
+    """Input for updating several resource groups, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateResourceGroupItemInput] = Field(
+        description="The resource groups to update, each with its fields."
+    )
+
+
+class PartialBulkPurgeResourceGroupsInput(BaseRequestModel):
+    """Input for purging several resource groups, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the resource groups to purge.")
 
 
 class DeleteResourceGroupInput(BaseRequestModel):
@@ -156,6 +243,13 @@ class ResourceGroupFilter(BaseRequestModel):
     is_public: bool | None = Field(default=None, description="Filter by public status.")
     is_default: bool | None = Field(
         default=None, description="Filter by whether the resource group is the default one."
+    )
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None, description="Filter by the labels on the entity"
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by resource group ID.",
     )
     AND: list[ResourceGroupFilter] | None = Field(default=None, description="AND conjunction.")
     OR: list[ResourceGroupFilter] | None = Field(default=None, description="OR conjunction.")
@@ -177,6 +271,13 @@ class ResourceGroupOrder(BaseRequestModel):
 class AdminSearchResourceGroupsInput(BaseRequestModel):
     """Input for admin search of resource groups with cursor and offset pagination."""
 
+    usage: ResourceGroupUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "resource groups the caller cannot read are left out."
+        ),
+    )
     filter: ResourceGroupFilter | None = Field(default=None, description="Filter conditions.")
     order: list[ResourceGroupOrder] | None = Field(
         default=None, description="Order specifications."
@@ -193,6 +294,13 @@ class ScopedSearchResourceGroupsInput(BaseRequestModel):
     """Input for searching the resource groups the named scopes reach."""
 
     scope: ResourceGroupScope = Field(description="Scope (OR across all items).")
+    usage: ResourceGroupUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "resource groups the caller cannot read are left out."
+        ),
+    )
     filter: ResourceGroupFilter | None = Field(default=None, description="Filter conditions.")
     order: list[ResourceGroupOrder] | None = Field(
         default=None, description="Order specifications."
@@ -212,41 +320,6 @@ class ResourceWeightEntryInput(BaseRequestModel):
     weight: Decimal | None = Field(
         default=None,
         description="Weight multiplier. Set null to revert to default weight.",
-    )
-
-
-class PreemptionConfigInputDTO(BaseRequestModel):
-    """Input for preemption configuration."""
-
-    enabled: bool = Field(
-        default=False,
-        description="Whether preemption is enabled for this resource group (opt-in).",
-    )
-    preemptible_priority: int = Field(
-        default=5,
-        description="Sessions with priority <= this value are eligible for preemption.",
-    )
-    order: str = Field(
-        default="oldest",
-        description="Tie-breaking order for same-priority sessions (oldest/newest).",
-    )
-    mode: str = Field(
-        default="terminate",
-        description="How to preempt sessions (terminate/reschedule).",
-    )
-    preemption_min_runtime: float = Field(
-        default=0.0,
-        ge=0.0,
-        description=(
-            "Minimum session runtime in seconds before it becomes preemptible (0 = disabled)."
-        ),
-    )
-    victim_scope: PreemptionVictimScope = Field(
-        default=PreemptionVictimScope.USER,
-        description=(
-            "Scope preemption victims are drawn from (user/project/domain/resource-group). "
-            "Default is user."
-        ),
     )
 
 

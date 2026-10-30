@@ -87,5 +87,6 @@ resources(
         "configs/**/*.ini",
         "configs/**/*.ts",
         "fixtures/**/*.json",
+        "seeds/**/*.yaml",
     ],
 )

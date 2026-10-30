@@ -9,20 +9,26 @@ from ai.backend.common.data.image.types import ScannedImage
 from ai.backend.common.events.types import (
     AbstractAnycastEvent,
     EventDomain,
+    LogScopedEvent,
 )
 from ai.backend.common.events.user_event.user_event import UserEvent
 from ai.backend.common.types import (
     AgentId,
     ImageCanonical,
 )
+from ai.backend.logging.structured import LogValue
 from ai.backend.logging.types import LogLevel
 
 
-class BaseAgentEvent(AbstractAnycastEvent):
+class BaseAgentEvent(AbstractAnycastEvent, LogScopedEvent):
     @classmethod
     @override
     def event_domain(cls) -> EventDomain:
         return EventDomain.AGENT
+
+    @override
+    def log_fields(self, source: AgentId) -> Mapping[str, LogValue]:
+        return {"agent_id": source}
 
 
 class BaseAgentLifecycleEvent(BaseAgentEvent):

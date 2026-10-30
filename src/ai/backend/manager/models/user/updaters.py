@@ -8,21 +8,27 @@ from typing import Any, override
 
 from sqlalchemy.orm import InstrumentedAttribute
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.data.user.types import UserData
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-from ai.backend.manager.models.specs.updater import DataUpdater
+from ai.backend.manager.errors.user import (
+    UserDeleted,
+    UserModificationBadRequest,
+    UserPurgeInProgress,
+)
+from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
+from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.types import OptionalState, TriState
 
 
 @dataclass
-class UserUpdater(DataUpdater[UserRow, UserData]):
-    """Edits a user account.
+class UserUpdater(GuardedDataUpdater[UserRow, UserData]):
+    """Edits a user account; refuses a deleted user and one a purge is working through.
 
-    ``group_ids`` names the projects the user ends up enrolled in; it is not a
-    column, so the write path syncs it separately from ``build_values()``.
+    ``status`` takes ACTIVE or INACTIVE only. ``group_ids`` is not a column; the write
+    path syncs it separately from ``build_values()``.
     """
 
     user_id: UserID
@@ -45,6 +51,13 @@ class UserUpdater(DataUpdater[UserRow, UserData]):
     integration_name: TriState[str] = field(default_factory=TriState[str].nop)
     group_ids: OptionalState[list[str]] = field(default_factory=OptionalState[list[str]].nop)
 
+    def __post_init__(self) -> None:
+        status = self.status.optional_value()
+        if status is not None and status not in (UserStatus.ACTIVE, UserStatus.INACTIVE):
+            raise UserModificationBadRequest(
+                f"Status '{status}' cannot be set by an update; use delete or restore."
+            )
+
     @property
     @override
     def row_class(self) -> type[UserRow]:
@@ -57,6 +70,21 @@ class UserUpdater(DataUpdater[UserRow, UserData]):
     @override
     def target_id_value(self) -> UserID:
         return self.user_id
+
+    @override
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=UserSearchableFields.own.status.filter.not_in(
+                    UserStatus.purge_in_progress()
+                ),
+                error=UserPurgeInProgress(f"User is being purged: {self.user_id}"),
+            ),
+            GuardCheck(
+                condition=UserSearchableFields.own.status.filter.not_equals(UserStatus.DELETED),
+                error=UserDeleted(f"User is deleted: {self.user_id}"),
+            ),
+        )
 
     @override
     def build_values(self) -> dict[str, Any]:
@@ -98,7 +126,7 @@ class UserUpdater(DataUpdater[UserRow, UserData]):
 
     @override
     def to_data(self, row: UserRow) -> UserData:
-        return row.to_data()
+        return UserSearchableFields.own.to_data(row)
 
     @property
     def group_ids_value(self) -> list[str] | None:

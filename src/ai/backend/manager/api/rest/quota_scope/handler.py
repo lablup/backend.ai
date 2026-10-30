@@ -18,7 +18,7 @@ from ai.backend.common.dto.manager.quota_scope import (
     UnsetQuotaRequest,
     UnsetQuotaResponse,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.dto.quota_scope_request import GetQuotaScopePathParam
 from ai.backend.manager.services.vfs_storage.actions.get_quota_scope import GetQuotaScopeAction
@@ -31,7 +31,7 @@ from ai.backend.manager.services.vfs_storage.actions.unset_quota_scope import Un
 if TYPE_CHECKING:
     from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class QuotaScopeHandler:

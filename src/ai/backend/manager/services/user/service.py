@@ -4,26 +4,18 @@ from typing import Any
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
-from ai.backend.common.data.entity.keypair import KeyPairID
-from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
-from ai.backend.common.exception import InvalidAPIParameters
-from ai.backend.common.types import AccessKey
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.common.exception import BackendAIError
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
-from ai.backend.manager.data.dotfile.types import DotfileEntries, normalize_newlines
+from ai.backend.manager.data.dotfile.types import MAXIMUM_DOTFILE_COUNT
 from ai.backend.manager.data.user.types import (
     BulkPurgeError,
     BulkUserPurgeResultData,
     UserInfoContext,
 )
-from ai.backend.manager.errors.storage import DotfileCreationFailed
 from ai.backend.manager.errors.user import UserPurgeFailure
-from ai.backend.manager.models.domain.row import verify_dotfile_name
-from ai.backend.manager.models.keypair.updaters import (
-    KeypairBootstrapScriptUpdater,
-    KeypairDotfilesUpdater,
-)
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.repositories.user.repository import UserRepository
 from ai.backend.manager.services.user.actions.admin_month_stats import (
@@ -31,24 +23,20 @@ from ai.backend.manager.services.user.actions.admin_month_stats import (
     AdminMonthStatsActionResult,
 )
 from ai.backend.manager.services.user.actions.bootstrap_script import (
-    GetBootstrapScriptAction,
-    GetBootstrapScriptActionResult,
-    UpdateBootstrapScriptAction,
-    UpdateBootstrapScriptActionResult,
+    GetDefaultBootstrapScriptAction,
+    GetDefaultBootstrapScriptActionResult,
+    UpdateDefaultBootstrapScriptAction,
+    UpdateDefaultBootstrapScriptActionResult,
 )
-from ai.backend.manager.services.user.actions.create_keypair_dotfile import (
-    CreateKeypairDotfileAction,
-    CreateKeypairDotfileActionResult,
+from ai.backend.manager.services.user.actions.create_dotfile import (
+    CreateDotfileAction,
+    CreateDotfileActionResult,
 )
 from ai.backend.manager.services.user.actions.create_user import (
     BulkCreateUserAction,
     BulkCreateUserActionResult,
     CreateUserAction,
     CreateUserActionResult,
-)
-from ai.backend.manager.services.user.actions.delete_keypair_dotfile import (
-    DeleteKeypairDotfileAction,
-    DeleteKeypairDotfileActionResult,
 )
 from ai.backend.manager.services.user.actions.delete_user import (
     DeleteUserAction,
@@ -67,16 +55,12 @@ from ai.backend.manager.services.user.actions.keypair_ops import (
     AdminGetSSHKeypairActionResult,
     AdminRegisterSSHKeypairAction,
     AdminRegisterSSHKeypairActionResult,
-    AdminSearchKeypairsAction,
-    AdminSearchKeypairsActionResult,
     GetKeypairAction,
     GetKeypairActionResult,
     IssueMyKeypairAction,
     IssueMyKeypairActionResult,
     PurgeKeypairAction,
     PurgeKeypairActionResult,
-    SearchMyKeypairsAction,
-    SearchMyKeypairsActionResult,
     SwitchDefaultAccessKeyAction,
     SwitchDefaultAccessKeyActionResult,
     UpdateKeypairAction,
@@ -92,9 +76,9 @@ from ai.backend.manager.services.user.actions.restore_user import (
     RestoreUserAction,
     RestoreUserActionResult,
 )
-from ai.backend.manager.services.user.actions.update_keypair_dotfile import (
-    UpdateKeypairDotfileAction,
-    UpdateKeypairDotfileActionResult,
+from ai.backend.manager.services.user.actions.switch_default_dotfile import (
+    SwitchDefaultDotfileAction,
+    SwitchDefaultDotfileActionResult,
 )
 from ai.backend.manager.services.user.actions.update_user import (
     BulkUpdateUserAction,
@@ -106,9 +90,27 @@ from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
 )
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.services.user.bootstrap_script.actions.add_revision import (
+    AddBootstrapScriptRevisionAction,
+    AddBootstrapScriptRevisionActionResult,
+)
+from ai.backend.manager.services.user.bootstrap_script.actions.create import (
+    CreateBootstrapScriptAction,
+    CreateBootstrapScriptActionResult,
+)
+from ai.backend.manager.services.user.bootstrap_script.actions.switch_default import (
+    SwitchDefaultBootstrapScriptAction,
+    SwitchDefaultBootstrapScriptActionResult,
+)
+from ai.backend.manager.services.user.bootstrap_script.actions.unset_default import (
+    UnsetDefaultBootstrapScriptAction,
+    UnsetDefaultBootstrapScriptActionResult,
+)
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @dataclass
@@ -160,8 +162,8 @@ class UserService:
         return BulkUpdateUserActionResult(data=result)
 
     async def delete_user(self, action: DeleteUserAction) -> DeleteUserActionResult:
-        await self._user_repository.delete_user_by_uuid_validated(user_uuid=action.user_id)
-        return DeleteUserActionResult()
+        user = await self._user_repository.delete_user_by_uuid_validated(user_uuid=action.user_id)
+        return DeleteUserActionResult(user=user)
 
     async def restore_user(self, action: RestoreUserAction) -> RestoreUserActionResult:
         await self._user_repository.restore_user_by_uuid_validated(user_uuid=action.user_id)
@@ -245,7 +247,7 @@ class UserService:
         if active_sessions := await self._user_repository.retrieve_active_sessions(user_uuid):
             await self._scheduling_controller.mark_sessions_for_termination(
                 [session.id for session in active_sessions],
-                reason=KernelLifecycleEventReason.USER_PURGED.value,
+                reason=KernelLifecycleEventReason.USER_PURGED,
                 forced=True,
             )
 
@@ -276,7 +278,10 @@ class UserService:
                 await self._purge_single_user(user_uuid, action, user_info_ctx)
                 purged_user_ids.append(user_uuid)
             except Exception as e:
-                log.error("Failed to purge user {}: {}", user_uuid, e)
+                if isinstance(e, BackendAIError) and e.is_client_error():
+                    log.trace("user purge rejected: {}", e, target_user_id=user_uuid)
+                else:
+                    log.exception("user purge failed", target_user_id=user_uuid)
                 failures.append(BulkPurgeError(user_id=user_uuid, exception=e))
 
         return BulkPurgeUserActionResult(
@@ -325,15 +330,6 @@ class UserService:
         )
         return SwitchDefaultAccessKeyActionResult(success=True)
 
-    async def search_my_keypairs(
-        self, action: SearchMyKeypairsAction
-    ) -> SearchMyKeypairsActionResult:
-        """Search keypairs owned by the current user."""
-        result = await self._user_repository.search_my_keypairs(
-            scope=action.scope(), querier=action.querier
-        )
-        return SearchMyKeypairsActionResult(result=result)
-
     async def admin_create_keypair(
         self, action: AdminCreateKeypairAction
     ) -> AdminCreateKeypairActionResult:
@@ -342,13 +338,6 @@ class UserService:
             user_id=action.user_id, creator=action.creator
         )
         return AdminCreateKeypairActionResult(generated_data=generated)
-
-    async def admin_search_keypairs(
-        self, action: AdminSearchKeypairsAction
-    ) -> AdminSearchKeypairsActionResult:
-        """Admin search all keypairs."""
-        result = await self._user_repository.admin_search_keypairs(querier=action.querier)
-        return AdminSearchKeypairsActionResult(result=result)
 
     # ------------------------------------------------------------------ admin SSH keypair operations
 
@@ -382,56 +371,57 @@ class UserService:
             ssh_public_key=ssh_public_key,
         )
 
-    async def create_dotfile(
-        self, action: CreateKeypairDotfileAction
-    ) -> CreateKeypairDotfileActionResult:
-        if not verify_dotfile_name(action.entry.path):
-            raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
-        keypair_id, current = await self._read_dotfiles(action.access_key)
-        entries = current.added(action.entry)
-        await self._write_dotfiles(keypair_id, entries)
-        return CreateKeypairDotfileActionResult(entries=entries.entries)
+    async def create_dotfile(self, action: CreateDotfileAction) -> CreateDotfileActionResult:
+        # Variants count too, so creation cannot grow a user's storage without bound.
+        data = await self._user_repository.create_dotfile(action.creator, MAXIMUM_DOTFILE_COUNT)
+        return CreateDotfileActionResult(data=data)
 
-    async def update_dotfile(
-        self, action: UpdateKeypairDotfileAction
-    ) -> UpdateKeypairDotfileActionResult:
-        keypair_id, current = await self._read_dotfiles(action.access_key)
-        entries = current.replaced(action.entry)
-        await self._write_dotfiles(keypair_id, entries)
-        return UpdateKeypairDotfileActionResult(entries=entries.entries)
+    async def switch_default_dotfile(
+        self, action: SwitchDefaultDotfileAction
+    ) -> SwitchDefaultDotfileActionResult:
+        data = await self._user_repository.switch_default_dotfile(action.user_id, action.dotfile_id)
+        return SwitchDefaultDotfileActionResult(data=data)
 
-    async def delete_dotfile(
-        self, action: DeleteKeypairDotfileAction
-    ) -> DeleteKeypairDotfileActionResult:
-        keypair_id, current = await self._read_dotfiles(action.access_key)
-        entries = current.removed(action.path)
-        await self._write_dotfiles(keypair_id, entries)
-        return DeleteKeypairDotfileActionResult(entries=entries.entries)
-
-    async def get_bootstrap_script(
-        self, action: GetBootstrapScriptAction
-    ) -> GetBootstrapScriptActionResult:
-        keypair = await self._user_repository.admin_get_keypair(action.access_key)
-        return GetBootstrapScriptActionResult(script=keypair.bootstrap_script)
-
-    async def update_bootstrap_script(
-        self, action: UpdateBootstrapScriptAction
-    ) -> UpdateBootstrapScriptActionResult:
-        script = normalize_newlines(action.script).strip()
-        if len(script) > MAXIMUM_DOTFILE_SIZE:
-            raise DotfileCreationFailed("Maximum bootstrap script length reached")
-        keypair = await self._user_repository.admin_get_keypair(action.access_key)
-        await self._user_repository.update_keypair_column(
-            KeypairBootstrapScriptUpdater(keypair_id=keypair.id, script=script)
+    async def get_default_bootstrap_script(
+        self, action: GetDefaultBootstrapScriptAction
+    ) -> GetDefaultBootstrapScriptActionResult:
+        revision = await self._user_repository.default_bootstrap_script(action.user_id)
+        return GetDefaultBootstrapScriptActionResult(
+            script=revision.script if revision is not None else BootstrapScript.empty()
         )
-        return UpdateBootstrapScriptActionResult()
 
-    async def _read_dotfiles(self, access_key: AccessKey) -> tuple[KeyPairID, DotfileEntries]:
-        """The keypair's id alongside its entries, so the write keys on the row it read."""
-        keypair = await self._user_repository.admin_get_keypair(access_key)
-        return keypair.id, DotfileEntries.unpack(keypair.dotfiles)
-
-    async def _write_dotfiles(self, keypair_id: KeyPairID, entries: DotfileEntries) -> None:
-        await self._user_repository.update_keypair_column(
-            KeypairDotfilesUpdater(keypair_id=keypair_id, dotfiles=entries.pack())
+    async def update_default_bootstrap_script(
+        self, action: UpdateDefaultBootstrapScriptAction
+    ) -> UpdateDefaultBootstrapScriptActionResult:
+        await self._user_repository.add_default_bootstrap_script_revision(
+            action.user_id, action.script, action.creator_id
         )
+        return UpdateDefaultBootstrapScriptActionResult()
+
+    async def create_bootstrap_script(
+        self, action: CreateBootstrapScriptAction
+    ) -> CreateBootstrapScriptActionResult:
+        revision = await self._user_repository.create_bootstrap_script(
+            action.user_id, action.script, action.creator_id
+        )
+        return CreateBootstrapScriptActionResult(revision=revision)
+
+    async def add_bootstrap_script_revision(
+        self, action: AddBootstrapScriptRevisionAction
+    ) -> AddBootstrapScriptRevisionActionResult:
+        revision = await self._user_repository.add_bootstrap_script_revision(action.creator)
+        return AddBootstrapScriptRevisionActionResult(revision=revision)
+
+    async def switch_default_bootstrap_script(
+        self, action: SwitchDefaultBootstrapScriptAction
+    ) -> SwitchDefaultBootstrapScriptActionResult:
+        script = await self._user_repository.switch_default_bootstrap_script(
+            action.user_id, action.script_id
+        )
+        return SwitchDefaultBootstrapScriptActionResult(script=script)
+
+    async def unset_default_bootstrap_script(
+        self, action: UnsetDefaultBootstrapScriptAction
+    ) -> UnsetDefaultBootstrapScriptActionResult:
+        await self._user_repository.unset_default_bootstrap_script(action.user_id)
+        return UnsetDefaultBootstrapScriptActionResult()

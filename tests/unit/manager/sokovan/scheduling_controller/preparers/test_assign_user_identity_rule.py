@@ -6,7 +6,7 @@ import uuid
 
 import pytest
 
-from ai.backend.common.contexts.user import with_user
+from ai.backend.common.contexts.user import with_user_context
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.user.types import UserData, UserRole
 from ai.backend.manager.data.dotfile.types import DotfileBundle
@@ -46,6 +46,7 @@ def context() -> SessionSpecContext:
             policy=None,
             container_user=ContainerUserInfo(),
             dotfiles=DotfileBundle(),
+            default_bootstrap_script=None,
             pending_session_count=0,
             pending_session_resource_slots={},
             vfolder_mounts_by_role={},
@@ -76,7 +77,7 @@ class TestAssignUserIdentityRule:
         context: SessionSpecContext,
     ) -> None:
         creator = uuid.uuid4()
-        with with_user(_user(creator)):
+        with with_user_context(_user(creator)):
             result = await rule.prepare(SessionResourceSpecDraft(), context)
         assert result.identity.user_uuid == creator
 
@@ -90,7 +91,7 @@ class TestAssignUserIdentityRule:
         draft = SessionResourceSpecDraft(
             identity=SessionIdentityDraft(user_uuid=prefilled),
         )
-        with with_user(_user(uuid.uuid4())):
+        with with_user_context(_user(uuid.uuid4())):
             result = await rule.prepare(draft, context)
         assert result.identity.user_uuid == prefilled
 
@@ -99,6 +100,6 @@ class TestAssignUserIdentityRule:
         rule: AssignUserIdentityRule,
         context: SessionSpecContext,
     ) -> None:
-        # No with_user block — ambient ctx is empty.
+        # No with_user_context block — ambient ctx is empty.
         result = await rule.prepare(SessionResourceSpecDraft(), context)
         assert result.identity.user_uuid is None

@@ -16,6 +16,7 @@ from typing import (
     override,
 )
 
+import asyncpg
 import sqlalchemy as sa
 import sqlalchemy.sql.functions
 from sqlalchemy.dialects import postgresql as psql
@@ -33,17 +34,18 @@ from tenacity import (
     stop_after_attempt,
     wait_exponential,
 )
-from yarl import URL
 
 from ai.backend.appproxy.common.errors import DatabaseError
 from ai.backend.appproxy.coordinator.config import DBConfig
 from ai.backend.appproxy.coordinator.defs import LockID
 from ai.backend.appproxy.coordinator.errors import TransactionResultError
+from ai.backend.common.db.connector import PrimaryMemberConnector
+from ai.backend.common.db.invalidator import FailedBeginInvalidator
 from ai.backend.common.json import ExtendedJSONEncoder
 from ai.backend.common.types import Sentinel
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 column_constraints = ["nullable", "index", "unique", "primary_key"]
 
 # TODO: Implement begin(), begin_readonly() for AsyncSession also
@@ -71,11 +73,9 @@ class ExtendedAsyncSAEngine(SAEngine):
             and self._generic_txn_count >= self._txn_concurrency_threshold
         ):
             log.warning(
-                "The number of concurrent generic transactions ({}) "
-                "looks too high (warning threshold: {}).",
-                self._generic_txn_count,
-                self._txn_concurrency_threshold,
-                stack_info=False,
+                "concurrent generic transactions reached the threshold",
+                transaction_count=self._generic_txn_count,
+                threshold_count=self._txn_concurrency_threshold,
             )
 
     def _check_readonly_txn_cnt(self) -> None:
@@ -84,11 +84,9 @@ class ExtendedAsyncSAEngine(SAEngine):
             and self._readonly_txn_count >= self._txn_concurrency_threshold
         ):
             log.warning(
-                "The number of concurrent read-only transactions ({}) "
-                "looks too high (warning threshold: {}).",
-                self._readonly_txn_count,
-                self._txn_concurrency_threshold,
-                stack_info=False,
+                "concurrent read-only transactions reached the threshold",
+                transaction_count=self._readonly_txn_count,
+                threshold_count=self._txn_concurrency_threshold,
             )
 
     @actxmgr
@@ -237,7 +235,8 @@ class ExtendedAsyncSAEngine(SAEngine):
                         )
                     except sa.exc.InterfaceError:
                         log.warning(
-                            f"DB Connnection for lock(id: {lock_id:d}) has already been closed. Skip unlock"
+                            "advisory lock connection already closed; skipping unlock",
+                            lock_id=lock_id,
                         )
 
 
@@ -312,9 +311,16 @@ async def execute_with_txn_retry(
 def create_async_engine(
     *args: Any,
     _txn_concurrency_threshold: int = 0,
+    async_creator: Callable[[], Awaitable[asyncpg.Connection]] | None = None,
     **kwargs: Any,
 ) -> ExtendedAsyncSAEngine:
     kwargs["future"] = True
+    sync_engine: sa.engine.Engine
+    if async_creator is not None:
+        # Same adaptation as sqlalchemy.ext.asyncio.create_async_engine(async_creator=...)
+        kwargs["creator"] = lambda: sync_engine.dialect.loaded_dbapi.connect(
+            async_creator_fn=async_creator
+        )
     sync_engine = _create_engine(*args, **kwargs)
     return ExtendedAsyncSAEngine(
         sync_engine,
@@ -329,15 +335,25 @@ async def connect_database(
 ) -> AsyncIterator[ExtendedAsyncSAEngine]:
     from .base import pgsql_connect_opts
 
-    db_url = (
-        URL(f"postgresql+asyncpg://{db_config.addr.host}/{db_config.name}")
-        .with_port(db_config.addr.port)
-        .with_user(db_config.user)
+    db_url = sa.engine.URL.create(
+        "postgresql+asyncpg",
+        username=db_config.user,
+        password=db_config.password,
+        database=db_config.name,
     )
-    if db_config.password is not None:
-        db_url = db_url.with_password(db_config.password)
+    members = [(addr.host, addr.port) for addr in db_config.addrs]
 
-    version_check_db = create_async_engine(str(db_url))
+    version_check_db = create_async_engine(
+        db_url,
+        async_creator=PrimaryMemberConnector(
+            members,
+            user=db_config.user,
+            password=db_config.password,
+            database=db_config.name,
+            connect_timeout=db_config.connect_timeout,
+            connect_kwargs={},
+        ).connect,
+    )
     async with version_check_db.begin() as conn:
         result = await conn.execute(sa.text("show server_version"))
         version_str: str | None = result.scalar()
@@ -349,8 +365,15 @@ async def connect_database(
     await version_check_db.dispose()
 
     db = create_async_engine(
-        str(db_url),
-        connect_args=pgsql_connect_opts,
+        db_url,
+        async_creator=PrimaryMemberConnector(
+            members,
+            user=db_config.user,
+            password=db_config.password,
+            database=db_config.name,
+            connect_timeout=db_config.connect_timeout,
+            connect_kwargs=pgsql_connect_opts,
+        ).connect,
         pool_size=db_config.pool_size,
         pool_recycle=db_config.pool_recycle,
         pool_pre_ping=db_config.pool_pre_ping,
@@ -363,6 +386,7 @@ async def connect_database(
             2,
         ),
     )
+    FailedBeginInvalidator().listen(db.sync_engine)
     yield db
     await db.dispose()
 

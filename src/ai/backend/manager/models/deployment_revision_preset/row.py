@@ -9,12 +9,6 @@ from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
-from ai.backend.manager.data.deployment_revision_preset.types import (
-    DeploymentRevisionPresetData,
-    EnvironEntryData,
-    ResourceOptsEntryData,
-)
-from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetValueData
 from ai.backend.manager.models.base import (
     GUID,
     Base,
@@ -106,34 +100,3 @@ class DeploymentRevisionPresetRow(LifecycleTimestampsMixin, Base):
         nullable=False,
         server_default=sa.text("'{}'::jsonb"),
     )
-
-    def to_data(self) -> DeploymentRevisionPresetData:
-        return DeploymentRevisionPresetData(
-            id=self.id,
-            runtime_variant_id=self.runtime_variant,
-            name=self.name,
-            description=self.description,
-            rank=self.rank,
-            image_id=self.image_id,
-            model_definition=self.model_definition,
-            resource_opts=[
-                ResourceOptsEntryData(name=e.name, value=e.value)
-                for e in (self.resource_opts or [])
-            ],
-            cluster_mode=self.cluster_mode,
-            cluster_size=self.cluster_size,
-            startup_command=self.startup_command,
-            bootstrap_script=self.bootstrap_script,
-            environ=[EnvironEntryData(key=k, value=v) for k, v in (self.environ or {}).items()],
-            runtime_variant_preset_values=[
-                RuntimeVariantPresetValueData(preset_id=pv.preset_id, value=pv.value)
-                for pv in (self.preset_values or [])
-            ],
-            open_to_public=self.open_to_public,
-            replica_count=self.replica_count,
-            revision_history_limit=self.revision_history_limit,
-            deployment_strategy=self.deployment_strategy,
-            deployment_strategy_spec=dict(self.deployment_strategy_spec),
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )

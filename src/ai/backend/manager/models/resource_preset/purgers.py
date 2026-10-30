@@ -12,6 +12,9 @@ from ai.backend.common.data.entity.resource_preset import ResourcePresetID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.data.resource_preset.types import ResourcePresetData
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.resource_preset.searchable_fields import (
+    ResourcePresetSearchableFields,
+)
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
@@ -40,4 +43,4 @@ class ResourcePresetPurger(EntityPurger[ResourcePresetRow, ResourcePresetData]):
 
     @override
     def to_data(self, row: ResourcePresetRow) -> ResourcePresetData:
-        return row.to_dataclass()
+        return ResourcePresetSearchableFields.own.to_data(row)

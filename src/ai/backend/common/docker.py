@@ -27,7 +27,7 @@ import trafaret as t
 import yarl
 from packaging import version
 
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from . import validators as tx
 from .arch import arch_name_aliases
@@ -67,7 +67,7 @@ docker_api_arch_aliases: Final[Mapping[str, str]] = {
     "386": "386",
 }
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 default_registry = "index.docker.io"
 default_repository = "lablup"
@@ -311,7 +311,7 @@ async def login(
             if match:
                 service = match.group(1)
     if ping_status == 200:
-        log.debug("docker-registry: {0} -> basic-auth", registry_url)
+        log.debug("docker registry uses basic auth", registry_url=str(registry_url))
         return {"auth": basic_auth, "headers": {}}
     if ping_status == 404:
         raise RuntimeError(f"Unsupported docker registry: {registry_url}! (API v2 not implemented)")
@@ -325,7 +325,9 @@ async def login(
             "service": service,
         }
         async with sess.get(realm, params=params, auth=basic_auth) as resp:
-            log.debug("docker-registry: {0} -> {1}", registry_url, realm)
+            log.debug(
+                "docker registry uses token auth", registry_url=str(registry_url), realm=str(realm)
+            )
             if resp.status == 200:
                 data = json.loads(await resp.read())
                 token = data.get("token", None)

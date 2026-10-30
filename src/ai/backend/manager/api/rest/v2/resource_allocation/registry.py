@@ -28,6 +28,12 @@ def register_v2_resource_allocation_routes(
     )
     registry.add(
         "GET",
+        "/my/usage",
+        handler.my_user_usage,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "GET",
         "/projects/{project_id}",
         handler.project_usage,
         middlewares=[auth_required],
@@ -60,6 +66,12 @@ def register_v2_resource_allocation_routes(
         "POST",
         "/check-preset-availability",
         handler.check_preset_availability,
+        middlewares=[auth_required],
+    )
+    registry.add(
+        "GET",
+        "/my/concurrency",
+        handler.my_concurrency,
         middlewares=[auth_required],
     )
 

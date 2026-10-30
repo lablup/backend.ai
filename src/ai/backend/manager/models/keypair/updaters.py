@@ -13,79 +13,11 @@ from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.errors.keypair import KeypairResourcePolicyNotFound
 from ai.backend.manager.errors.repository import ForeignKeyViolationError
 from ai.backend.manager.errors.user import KeyPairForbidden
-from ai.backend.manager.models.keypair.conditions import KeypairConditions
 from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
-from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
+from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.types import OptionalState
-
-
-@dataclass
-class KeypairDotfilesUpdater(DataUpdater[KeyPairRow, KeyPairData]):
-    """Replaces the packed dotfile entries a keypair hands to its sessions."""
-
-    keypair_id: KeyPairID
-    dotfiles: bytes
-
-    @property
-    @override
-    def row_class(self) -> type[KeyPairRow]:
-        return KeyPairRow
-
-    @override
-    def target_id_column(self) -> InstrumentedAttribute[Any]:
-        return KeyPairRow.id
-
-    @override
-    def target_id_value(self) -> KeyPairID:
-        return self.keypair_id
-
-    @override
-    def build_values(self) -> dict[str, Any]:
-        return {"dotfiles": self.dotfiles}
-
-    @property
-    @override
-    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
-
-    @override
-    def to_data(self, row: KeyPairRow) -> KeyPairData:
-        return row.to_data()
-
-
-@dataclass
-class KeypairBootstrapScriptUpdater(DataUpdater[KeyPairRow, KeyPairData]):
-    """Replaces the bootstrap script a keypair carries."""
-
-    keypair_id: KeyPairID
-    script: str
-
-    @property
-    @override
-    def row_class(self) -> type[KeyPairRow]:
-        return KeyPairRow
-
-    @override
-    def target_id_column(self) -> InstrumentedAttribute[Any]:
-        return KeyPairRow.id
-
-    @override
-    def target_id_value(self) -> KeyPairID:
-        return self.keypair_id
-
-    @override
-    def build_values(self) -> dict[str, Any]:
-        return {"bootstrap_script": self.script}
-
-    @property
-    @override
-    def integrity_error_checks(self) -> Sequence[IntegrityErrorCheck]:
-        return ()
-
-    @override
-    def to_data(self, row: KeyPairRow) -> KeyPairData:
-        return row.to_data()
 
 
 @dataclass
@@ -123,7 +55,7 @@ class KeypairUpdater(GuardedDataUpdater[KeyPairRow, KeyPairData]):
             return ()
         return (
             GuardCheck(
-                condition=KeypairConditions.by_is_default(False),
+                condition=KeyPairSearchableFields.own.is_default.filter.equals(False),
                 error=KeyPairForbidden(
                     "Cannot deactivate the default access key. Switch the default access key first."
                 ),
@@ -155,4 +87,4 @@ class KeypairUpdater(GuardedDataUpdater[KeyPairRow, KeyPairData]):
 
     @override
     def to_data(self, row: KeyPairRow) -> KeyPairData:
-        return row.to_data()
+        return KeyPairSearchableFields.own.to_data(row)

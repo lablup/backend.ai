@@ -11,19 +11,19 @@ from typing import Any
 
 import pytest
 
-from ai.backend.common.data.entity.audit_log import AuditLogFieldType
+from ai.backend.common.data.entity.audit_log import AuditLogFieldType, AuditLogScopeFieldType
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
 from ai.backend.manager.actions.registry.types import FieldGroupMeta, ProcessorDependencies
 from ai.backend.manager.actions.v2.validators import ActionValidators as V2ActionValidators
 from ai.backend.manager.api.adapters.audit_log.adapter import AuditLogAdapter
-from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
+from ai.backend.manager.models.audit_log.owner_candidates import (
+    AuditLogOwnerCandidates,
+    AuditLogScopeOwnerCandidates,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
-from ai.backend.manager.services.audit_log.actions.lookup_owner import (
-    LookupAuditLogOwnerAction,
-    LookupBulkAuditLogOwnerAction,
-)
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 
 
@@ -43,11 +43,13 @@ async def adapter(
     )
     return AuditLogAdapter(
         AuditLogProcessors(
-            registry.dangling_lookup_field_group(
-                FieldGroupMeta(AuditLogFieldType()),
-                AuditLogData,
-                LookupAuditLogOwnerAction,
-                LookupBulkAuditLogOwnerAction,
-            )
+            registry.dangling_owner_candidates_field_group(
+                FieldGroupMeta(AuditLogFieldType()), AuditLogData, AuditLogOwnerCandidates()
+            ),
+            registry.dangling_owner_candidates_field_group(
+                FieldGroupMeta(AuditLogScopeFieldType()),
+                AuditLogScopeData,
+                AuditLogScopeOwnerCandidates(),
+            ),
         )
     )

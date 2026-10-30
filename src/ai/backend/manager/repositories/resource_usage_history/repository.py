@@ -25,13 +25,21 @@ from ai.backend.manager.data.resource_usage_history.types import (
 )
 from ai.backend.manager.models.resource_usage_history.creators import KernelUsageRecordCreator
 from ai.backend.manager.models.resource_usage_history.scopes import (
-    DomainUsageBucketOperationScope,
-    ProjectUsageBucketOperationScope,
-    UserUsageBucketOperationScope,
+    DomainUsageBucketTarget,
+    ProjectUsageBucketTarget,
+    UserUsageBucketTarget,
+)
+from ai.backend.manager.models.resource_usage_history.searchers import (
+    DomainUsageBucketSearcher,
+    KernelUsageRecordSearcher,
+    ProjectUsageBucketSearcher,
+    UserUsageBucketSearcher,
 )
 from ai.backend.manager.models.specs.creator import NestedFieldToCreate
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.resource_usage_history.db_source.db_source import (
+    ResourceUsageHistoryDBSource,
+)
 from ai.backend.manager.repositories.resource_usage_history.types import (
     DomainUsageBucketSearchResult,
     KernelUsageRecordSearchResult,
@@ -39,11 +47,9 @@ from ai.backend.manager.repositories.resource_usage_history.types import (
     UserUsageBucketSearchResult,
 )
 
-from .db_source import ResourceUsageHistoryDBSource
-
 if TYPE_CHECKING:
-    from ai.backend.manager.data.fair_share import UsageBucketAggregationResult
-    from ai.backend.manager.models.resource_usage_history import KernelUsageRecordRow
+    from ai.backend.manager.data.fair_share.types import UsageBucketAggregationResult
+    from ai.backend.manager.models.resource_usage_history.row import KernelUsageRecordRow
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 
 
@@ -166,43 +172,43 @@ class ResourceUsageHistoryRepository:
     @resource_usage_history_repository_resilience.apply()
     async def search_kernel_usage_records(
         self,
-        querier: BatchQuerier,
+        searcher: KernelUsageRecordSearcher,
     ) -> KernelUsageRecordSearchResult:
         """Search kernel usage records with pagination."""
-        return await self._db_source.search_kernel_usage_records(querier)
+        return await self._db_source.search_kernel_usage_records(searcher)
 
     # ==================== Domain Usage Buckets ====================
 
     @resource_usage_history_repository_resilience.apply()
     async def search_domain_usage_buckets(
         self,
-        querier: BatchQuerier,
-        scope: DomainUsageBucketOperationScope | None = None,
+        searcher: DomainUsageBucketSearcher,
+        scope: DomainUsageBucketTarget | None = None,
     ) -> DomainUsageBucketSearchResult:
         """Search domain usage buckets with pagination."""
-        return await self._db_source.search_domain_usage_buckets(querier, scope)
+        return await self._db_source.search_domain_usage_buckets(searcher, scope)
 
     # ==================== Project Usage Buckets ====================
 
     @resource_usage_history_repository_resilience.apply()
     async def search_project_usage_buckets(
         self,
-        querier: BatchQuerier,
-        scope: ProjectUsageBucketOperationScope | None = None,
+        searcher: ProjectUsageBucketSearcher,
+        scope: ProjectUsageBucketTarget | None = None,
     ) -> ProjectUsageBucketSearchResult:
         """Search project usage buckets with pagination."""
-        return await self._db_source.search_project_usage_buckets(querier, scope)
+        return await self._db_source.search_project_usage_buckets(searcher, scope)
 
     # ==================== User Usage Buckets ====================
 
     @resource_usage_history_repository_resilience.apply()
     async def search_user_usage_buckets(
         self,
-        querier: BatchQuerier,
-        scope: UserUsageBucketOperationScope | None = None,
+        searcher: UserUsageBucketSearcher,
+        scope: UserUsageBucketTarget | None = None,
     ) -> UserUsageBucketSearchResult:
         """Search user usage buckets with pagination."""
-        return await self._db_source.search_user_usage_buckets(querier, scope)
+        return await self._db_source.search_user_usage_buckets(searcher, scope)
 
     # ==================== Aggregation Queries ====================
 

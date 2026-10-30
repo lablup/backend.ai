@@ -33,18 +33,18 @@ if TYPE_CHECKING:
     from ai.backend.common.plugin.monitor import ErrorPluginContext
     from ai.backend.manager.agent_cache import AgentRPCCache
     from ai.backend.manager.clients.appproxy.client import AppProxyClientPool
+    from ai.backend.manager.clients.container_registry.pool import (
+        ContainerRegistryQuotaClientPool,
+    )
     from ai.backend.manager.clients.prometheus.client import PrometheusClient
     from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.idle import IdleCheckerHost
     from ai.backend.manager.models.keypair.ssh_key_validator import SSHKeyValidator
     from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-    from ai.backend.manager.notification import NotificationCenter
+    from ai.backend.manager.notification.notification_center import NotificationCenter
     from ai.backend.manager.registry import AgentRegistry
     from ai.backend.manager.repositories.repositories import Repositories
-    from ai.backend.manager.service.container_registry.harbor import (
-        AbstractPerProjectContainerRegistryQuotaService,
-    )
     from ai.backend.manager.services.agent.processors import AgentProcessors
     from ai.backend.manager.services.agent.service import AgentService
     from ai.backend.manager.services.app_config.processors import (
@@ -96,6 +96,7 @@ if TYPE_CHECKING:
         DomainProcessors,
     )
     from ai.backend.manager.services.domain.service import DomainService
+    from ai.backend.manager.services.dotfile.processors import DotfileProcessors
     from ai.backend.manager.services.entity_label.processors import (
         EntityLabelProcessors,
     )
@@ -257,6 +258,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.service_catalog.processors import (
         ServiceCatalogProcessors,
     )
+    from ai.backend.manager.services.service_catalog.service import (
+        ServiceCatalogService,
+    )
     from ai.backend.manager.services.session.processors import (
         SessionProcessors,
     )
@@ -264,6 +268,8 @@ if TYPE_CHECKING:
         ResourceAllocationService,
     )
     from ai.backend.manager.services.session.service import SessionService
+    from ai.backend.manager.services.session_group.processors import SessionGroupProcessors
+    from ai.backend.manager.services.session_group.service import SessionGroupService
     from ai.backend.manager.services.storage_namespace.processors import (
         StorageNamespaceProcessors,
     )
@@ -271,22 +277,31 @@ if TYPE_CHECKING:
         StreamProcessors,
     )
     from ai.backend.manager.services.stream.service import StreamService
+    from ai.backend.manager.services.system_session_environ.processors import (
+        SystemSessionEnvironProcessors,
+    )
+    from ai.backend.manager.services.system_session_environ.service import (
+        SystemSessionEnvironService,
+    )
     from ai.backend.manager.services.template.processors import (
         TemplateProcessors,
     )
     from ai.backend.manager.services.template.service import TemplateService
+    from ai.backend.manager.services.user.bootstrap_script.processors import (
+        BootstrapScriptProcessors,
+    )
     from ai.backend.manager.services.user.processors import UserProcessors
     from ai.backend.manager.services.user.service import UserService
     from ai.backend.manager.services.user_resource_policy.processors import (
         UserResourcePolicyProcessors,
     )
-    from ai.backend.manager.services.vfolder.processors import (
-        VFolderFileProcessors,
-        VFolderInviteProcessors,
+    from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
+    from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
+    from ai.backend.manager.services.vfolder.processors.mount_policy import (
         VFolderMountPolicyProcessors,
-        VFolderProcessors,
-        VFolderSharingProcessors,
     )
+    from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
+    from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
     from ai.backend.manager.services.vfolder.processors.vfolder_admin import (
         VFolderAdminProcessors,
     )
@@ -305,8 +320,11 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.vfolder.services.vfolder import (
         VFolderService,
     )
-    from ai.backend.manager.services.vfolder.services.vfolder_admin import (
-        VFolderAdminService,
+    from ai.backend.manager.services.vfolder_auto_mount.processors import (
+        VFolderAutoMountProcessors,
+    )
+    from ai.backend.manager.services.vfolder_auto_mount.service import (
+        VFolderAutoMountService,
     )
     from ai.backend.manager.services.vfs_storage.processors import (
         VFSStorageProcessors,
@@ -314,11 +332,11 @@ if TYPE_CHECKING:
     from ai.backend.manager.services.vfs_storage.service import (
         VFSStorageService,
     )
-    from ai.backend.manager.sokovan.deployment import DeploymentController
+    from ai.backend.manager.sokovan.deployment.deployment_controller import DeploymentController
     from ai.backend.manager.sokovan.deployment.route.route_controller import (
         RouteController,
     )
-    from ai.backend.manager.sokovan.scheduling_controller import (
+    from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
         SchedulingController,
     )
 # fmt: on
@@ -350,10 +368,10 @@ class ServiceArgs:
     agent_cache: AgentRPCCache
     notification_center: NotificationCenter
     appproxy_client_pool: AppProxyClientPool
+    registry_quota_client_pool: ContainerRegistryQuotaClientPool
     prometheus_client: PrometheusClient
     ssh_key_validator: SSHKeyValidator
     key_provider_pool: KeyProviderPool
-    registry_quota_service: AbstractPerProjectContainerRegistryQuotaService | None = None
 
 
 @dataclass
@@ -370,12 +388,13 @@ class Services:
     image: ImageService
     container_registry: ContainerRegistryService
     vfolder: VFolderService
-    vfolder_admin: VFolderAdminService
     vfolder_file: VFolderFileService
     vfolder_invite: VFolderInviteService
     vfolder_sharing: VFolderSharingService
     vfolder_mount_policy: VFolderMountPolicyService
+    vfolder_auto_mount: VFolderAutoMountService
     session: SessionService
+    session_group: SessionGroupService
     manager_admin: ManagerAdminService
     secret: SecretService
     prometheus_query_preset: PrometheusQueryPresetService
@@ -390,6 +409,7 @@ class Services:
     runtime_variant_preset: RuntimeVariantPresetService
     deployment_revision_preset: DeploymentPresetService
     model_card: ModelCardService
+    service_catalog: ServiceCatalogService
     resource_group: ResourceGroupService
     metric: MetricService
     model_serving: ModelServingService
@@ -408,6 +428,7 @@ class Services:
     template: TemplateService
     resource_allocation: ResourceAllocationService
     stream: StreamService
+    system_session_environ: SystemSessionEnvironService
     events: EventsService
 
 
@@ -440,11 +461,14 @@ class Processors:
     vfolder_sharing: VFolderSharingProcessors
     vfolder_mount_policy: VFolderMountPolicyProcessors
     vfolder_file: VFolderFileProcessors
+    vfolder_auto_mount: VFolderAutoMountProcessors
     session: SessionProcessors
+    session_group: SessionGroupProcessors
     container_registry: ContainerRegistryProcessors
     keypair_resource_policy: KeypairResourcePolicyProcessors
     manager_admin: ManagerAdminProcessors
     secret: SecretProcessors
+    system_session_environ: SystemSessionEnvironProcessors
     user_resource_policy: UserResourcePolicyProcessors
     project_resource_policy: ProjectResourcePolicyProcessors
     prometheus_query_preset: PrometheusQueryPresetProcessors
@@ -476,6 +500,8 @@ class Processors:
     storage_namespace: StorageNamespaceProcessors
     audit_log: AuditLogProcessors
     entity_label: EntityLabelProcessors
+    dotfile: DotfileProcessors
+    bootstrap_script: BootstrapScriptProcessors
     idle_checker_assignment: IdleCheckerAssignmentProcessors
     scheduling_history: SchedulingHistoryProcessors
     service_catalog: ServiceCatalogProcessors

@@ -14,22 +14,12 @@ from ai.backend.common.data.entity.replica import ReplicaID
 from ai.backend.common.data.entity.route_history import RouteHistoryID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_scheduling_history import SessionSchedulingHistoryID
-from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
-from ai.backend.common.types import KernelId, SessionId
 from ai.backend.manager.data.deployment.types import (
     DeploymentHandlerCategory,
-    DeploymentHistoryData,
     RouteHandlerCategory,
-    RouteHistoryData,
-)
-from ai.backend.manager.data.kernel.types import (
-    KernelSchedulingHistoryData,
-    KernelSchedulingPhase,
 )
 from ai.backend.manager.data.session.types import (
     SchedulingResult,
-    SessionSchedulingHistoryData,
-    SessionStatus,
     SubStepResult,
 )
 from ai.backend.manager.models.base import GUID, Base, PydanticListColumn, StrEnumType
@@ -82,22 +72,6 @@ class SessionSchedulingHistoryRow(ReconcileHistoryMixin, Base):
             and self.error_code == other.error_code
             and self.to_status == other.to_status
             and self.records_an_attempt() == other.records_an_attempt()
-        )
-
-    def to_data(self) -> SessionSchedulingHistoryData:
-        return SessionSchedulingHistoryData(
-            id=self.id,
-            session_id=SessionId(self.session_id),
-            phase=self.phase,
-            from_status=SessionStatus(self.from_status) if self.from_status else None,
-            to_status=SessionStatus(self.to_status) if self.to_status else None,
-            result=SchedulingResult(self.result),
-            error_code=self.error_code,
-            message=self.message,
-            sub_steps=self.sub_steps,  # PydanticListColumn handles conversion
-            attempts=self.attempts,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
         )
 
 
@@ -157,22 +131,6 @@ class KernelSchedulingHistoryRow(Base):
             and self.to_status == new_row.to_status
         )
 
-    def to_data(self) -> KernelSchedulingHistoryData:
-        return KernelSchedulingHistoryData(
-            id=self.id,
-            kernel_id=KernelId(self.kernel_id),
-            session_id=SessionId(self.session_id),
-            phase=self.phase,
-            from_status=KernelSchedulingPhase(self.from_status) if self.from_status else None,
-            to_status=KernelSchedulingPhase(self.to_status) if self.to_status else None,
-            result=SchedulingResult(self.result),
-            error_code=self.error_code,
-            message=self.message,
-            attempts=self.attempts,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )
-
 
 class DeploymentHistoryRow(Base):
     __tablename__ = "deployment_history"
@@ -228,23 +186,6 @@ class DeploymentHistoryRow(Base):
         default=sa.func.now(),
         onupdate=sa.func.now(),
     )
-
-    def to_data(self) -> DeploymentHistoryData:
-        return DeploymentHistoryData(
-            id=self.id,
-            deployment_id=self.deployment_id,
-            handler_category=self.handler_category,
-            phase=self.phase,
-            from_status=ModelDeploymentStatus(self.from_status) if self.from_status else None,
-            to_status=ModelDeploymentStatus(self.to_status) if self.to_status else None,
-            result=SchedulingResult(self.result),
-            error_code=self.error_code,
-            message=self.message,
-            sub_steps=self.sub_steps,
-            attempts=self.attempts,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )
 
 
 class RouteHistoryRow(Base):
@@ -314,24 +255,4 @@ class RouteHistoryRow(Base):
             self.category == new_row.category
             and self.phase == new_row.phase
             and self.error_code == new_row.error_code
-        )
-
-    def to_data(self) -> RouteHistoryData:
-        return RouteHistoryData(
-            id=self.id,
-            route_id=self.route_id,
-            deployment_id=self.deployment_id,
-            category=self.category,
-            phase=self.phase,
-            from_status=self.from_status,
-            to_status=self.to_status,
-            from_sub_status=self.from_sub_status,
-            to_sub_status=self.to_sub_status,
-            result=SchedulingResult(self.result),
-            error_code=self.error_code,
-            message=self.message,
-            sub_steps=self.sub_steps,
-            attempts=self.attempts,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
         )

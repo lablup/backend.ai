@@ -20,6 +20,7 @@ from ai.backend.agent.runtime import AgentRuntime
 from ai.backend.common import config
 from ai.backend.common import validators as tx
 from ai.backend.common.arch import DEFAULT_IMAGE_ARCH
+from ai.backend.common.configs.etcd import EtcdConfig
 from ai.backend.common.types import AgentId, HostPortPair
 from ai.backend.logging import LocalLogger
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
@@ -30,6 +31,10 @@ from ai.backend.testutils.bootstrap import (  # noqa: F401
     sync_file_lock,
 )
 from ai.backend.testutils.pants import get_parallel_slot
+
+pytest_plugins = [
+    "ai.backend.testutils.otel",
+]
 
 
 @pytest.fixture(scope="session")
@@ -82,12 +87,6 @@ def local_config(
     etcd_addr = etcd_container[1]
     redis_addr = redis_container[1]
     mount_path = Path.cwd() / "vfroot"
-
-    registry_state_path = var_base_path / f"last_registry.{test_id}.dat"
-    try:
-        os.unlink(registry_state_path)
-    except FileNotFoundError:
-        pass
 
     raw_server_config = {
         "agent": {
@@ -150,17 +149,13 @@ def local_config(
     try:
         # Override external database config with the current environment's config.
         fs_local_config, cfg_src_path = config.read_from_file(None, "agent")
-        server_config.etcd.addr = fs_local_config["etcd"]["addr"]
+        server_config.etcd.addrs = EtcdConfig.model_validate(fs_local_config["etcd"]).addrs
         _override_if_exists(fs_local_config["etcd"], server_config.etcd.model_dump(), "user")
         _override_if_exists(fs_local_config["etcd"], server_config.etcd.model_dump(), "password")
     except config.ConfigurationError:
         pass
     yield server_config
     shutil.rmtree(ipc_base_path)
-    try:
-        os.unlink(registry_state_path)
-    except FileNotFoundError:
-        pass
 
 
 @pytest.fixture(scope="session", autouse=True)

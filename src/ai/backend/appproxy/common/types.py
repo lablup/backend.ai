@@ -19,7 +19,19 @@ from aiohttp import web
 from pydantic import AliasChoices, AnyUrl, BaseModel, ConfigDict, Field
 
 from ai.backend.appproxy.common.client_ip import ClientIPValidator
-from ai.backend.common.types import BackendAISchema, ModelServiceStatus, RuntimeVariant
+from ai.backend.appproxy.common.defs import (
+    WORKER_HOSTNAME_LABEL,
+    WORKER_TLS_LISTEN_LABEL,
+    WORKER_WILDCARD_DOMAIN_LABEL,
+)
+from ai.backend.appproxy.common.errors.service import WorkerFrontendLabelsInvalid
+from ai.backend.common.exception import BackendAIError
+from ai.backend.common.types import (
+    BackendAISchema,
+    ModelServiceStatus,
+    RuntimeVariant,
+    SchemaValidationFailureInfo,
+)
 
 # FIXME: merge majority of common definitions to ai.backend.common when ready
 
@@ -33,6 +45,11 @@ class FrontendServerMode(enum.StrEnum):
     WILDCARD_DOMAIN = "wildcard"
     PORT = "port"
     TRAEFIK = "traefik"
+
+
+class IngressDeliveryMode(enum.StrEnum):
+    API = "api"
+    REDIS = "redis"
 
 
 class ProxyProtocol(enum.StrEnum):
@@ -85,6 +102,23 @@ type AppCreator = Callable[
     [CORSOptions],
     tuple[web.Application, Iterable[WebMiddleware]],
 ]
+
+
+class WorkerFrontend(BackendAISchema):
+    """Parsed from the labels a worker registers to service discovery."""
+
+    model_config = ConfigDict(frozen=True, validate_by_name=True)
+
+    hostname: str = Field(alias=WORKER_HOSTNAME_LABEL)
+    wildcard_domain: str | None = Field(default=None, alias=WORKER_WILDCARD_DOMAIN_LABEL)
+    tls_listen: bool = Field(alias=WORKER_TLS_LISTEN_LABEL)
+
+    @override
+    @classmethod
+    def build_validation_error(cls, info: SchemaValidationFailureInfo) -> BackendAIError:
+        return WorkerFrontendLabelsInvalid(
+            extra_msg=info.summary, extra_data={"errors": info.errors}
+        )
 
 
 class RouteInfo(BackendAISchema):

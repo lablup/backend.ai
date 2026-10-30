@@ -44,9 +44,9 @@ from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import vfolders
+from ai.backend.manager.models.vfolder.row import vfolders
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
@@ -54,6 +54,9 @@ from ai.backend.manager.repositories.model_card.repository import ModelCardRepos
 from ai.backend.manager.repositories.ops.v2.permission.provider import PermissionOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.relation.provider import RelationOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.roster.provider import RosterOpsProvider
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.permission_controller.repository import (
@@ -116,6 +119,7 @@ def group_processors(
     repo = ProjectRepository(
         database_engine,
         V2DBOpsProvider(database_engine),
+        ResourcePolicyOpsProvider(database_engine),
         config_provider,
         valkey_clients.stat,
         storage_manager,
@@ -168,6 +172,7 @@ def user_processors(
             database_engine,
             V2DBOpsProvider(database_engine),
             ShareOpsProvider(database_engine),
+            ResourcePolicyOpsProvider(database_engine),
             KeyProviderPool(providers=[], write_provider_type=KeyProviderType.PLAIN),
         ),
         scheduling_controller=AsyncMock(),
@@ -211,7 +216,9 @@ def server_module_registries(
     processors.rbac = rbac_processors
     processors.user = user_processors
 
-    mc_handler = V2ModelCardHandler(adapter=ModelCardAdapter(processors.model_card, MagicMock()))
+    mc_handler = V2ModelCardHandler(
+        adapter=ModelCardAdapter(processors.model_card, MagicMock(), MagicMock())
+    )
     proj_handler = V2ProjectHandler(
         adapter=ProjectAdapter(processors.project, processors.rbac, MagicMock(), processors.user)
     )

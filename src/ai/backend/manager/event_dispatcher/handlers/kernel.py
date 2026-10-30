@@ -21,8 +21,8 @@ from ai.backend.common.events.event_types.kernel.anycast import (
 from ai.backend.common.types import (
     AgentId,
 )
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.models.kernel import kernels
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.models.kernel.row import kernels
 from ai.backend.manager.models.utils import (
     ExtendedAsyncSAEngine,
     execute_with_retry,
@@ -30,7 +30,7 @@ from ai.backend.manager.models.utils import (
 from ai.backend.manager.registry import AgentRegistry
 from ai.backend.manager.sokovan.scheduler.coordinator import ScheduleCoordinator
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class KernelEventHandler:
@@ -109,11 +109,7 @@ class KernelEventHandler:
         _source: AgentId,
         event: KernelPreparingAnycastEvent,
     ) -> None:
-        log.info(
-            "handle_kernel_preparing: ev:{} k:{}",
-            event.event_name(),
-            event.kernel_id,
-        )
+        log.trace("kernel preparing")
 
         await self._schedule_coordinator.handle_kernel_preparing(event)
 
@@ -123,11 +119,7 @@ class KernelEventHandler:
         _source: AgentId,
         event: KernelPullingAnycastEvent,
     ) -> None:
-        log.info(
-            "handle_kernel_pulling: ev:{} k:{}",
-            event.event_name(),
-            event.kernel_id,
-        )
+        log.trace("kernel pulling")
 
         await self._schedule_coordinator.handle_kernel_pulling(event)
 
@@ -137,11 +129,7 @@ class KernelEventHandler:
         _source: AgentId,
         event: KernelCreatingAnycastEvent,
     ) -> None:
-        log.info(
-            "handle_kernel_creating: ev:{} k:{}",
-            event.event_name(),
-            event.kernel_id,
-        )
+        log.trace("kernel creating")
 
         await self._schedule_coordinator.handle_kernel_creating(event)
 
@@ -151,11 +139,7 @@ class KernelEventHandler:
         _source: AgentId,
         event: KernelStartedAnycastEvent,
     ) -> None:
-        log.info(
-            "handle_kernel_started: ev:{} k:{}",
-            event.event_name(),
-            event.kernel_id,
-        )
+        log.trace("kernel started")
 
         await self._schedule_coordinator.handle_kernel_running(event)
 
@@ -165,11 +149,7 @@ class KernelEventHandler:
         _source: AgentId,
         event: KernelCancelledAnycastEvent,
     ) -> None:
-        log.info(
-            "handle_kernel_cancelled: ev:{} k:{}",
-            event.event_name(),
-            event.kernel_id,
-        )
+        log.trace("kernel cancelled")
 
         await self._schedule_coordinator.handle_kernel_cancelled(event)
 

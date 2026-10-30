@@ -14,6 +14,7 @@ from ai.backend.client.cli.v2.helpers import (
     load_v2_config,
     print_result,
 )
+from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
 
 
 @click.group()
@@ -32,6 +33,7 @@ def deployment() -> None:
 @entity_label_filter_options
 @click.option(
     "--status",
+    type=click.Choice([status.value for status in ModelDeploymentStatus], case_sensitive=False),
     multiple=True,
     help="Filter by status (repeatable, e.g., --status DEPLOYING --status READY).",
 )

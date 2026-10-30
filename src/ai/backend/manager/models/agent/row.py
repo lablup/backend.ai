@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql as pgsql
-from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import (
     Mapped,
     mapped_column,
@@ -17,12 +16,8 @@ from sqlalchemy.sql.expression import false, true
 from ai.backend.common.auth import PublicKey
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.types import AgentId, ResourceSlot, SlotName, SlotTypes
-from ai.backend.manager.data.agent.types import (
-    AgentData,
-    AgentDataForHeartbeatUpdate,
-    AgentStatus,
-)
+from ai.backend.common.types import AgentId
+from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.resource_slot.types import AgentResourceData
 from ai.backend.manager.models.base import (
     GUID,
@@ -30,13 +25,14 @@ from ai.backend.manager.models.base import (
     CurvePublicKeyColumn,
     EnumType,
 )
-from ai.backend.manager.models.resource_slot import AgentResourceRow
-from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.models.resource_slot.row import AgentResourceRow
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    AgentResourceSearchableFields,
+)
 
 __all__: Sequence[str] = (
     "AgentRow",
     "agents",
-    "list_schedulable_agents_by_sgroup",
 )
 
 
@@ -102,91 +98,20 @@ class AgentRow(Base):
         default=False,
     )
 
+    # The relationship and the two readers below are used only by gql_legacy
+    # (api/gql_legacy/agent.py and the list_data it calls). v2 reads AgentResourceRow
+    # on its own. Delete them together with gql_legacy.
     agent_resource_rows: Mapped[list[AgentResourceRow]] = relationship("AgentResourceRow")
 
     def _resource_rows_by_rank(self) -> list[AgentResourceRow]:
         return sorted(self.agent_resource_rows, key=lambda r: r.slot_type_row.rank)
 
     def resources_by_rank(self) -> list[AgentResourceData]:
-        return [resource_row.to_data() for resource_row in self._resource_rows_by_rank()]
-
-    def actual_available_slots(self) -> ResourceSlot:
-        available = ResourceSlot()
-        for resource_row in self._resource_rows_by_rank():
-            available[resource_row.slot_name] = resource_row.capacity
-        return available
-
-    def actual_occupied_slots(self) -> ResourceSlot:
-        occupied = ResourceSlot()
-        for resource_row in self._resource_rows_by_rank():
-            occupied[resource_row.slot_name] = resource_row.used
-        return occupied
-
-    def to_data(self) -> AgentData:
-        return AgentData(
-            uuid=self.uuid,
-            id=AgentId(self.id),
-            status=self.status,
-            status_changed=self.status_changed,
-            region=self.region,
-            resource_group=self.scaling_group,
-            schedulable=self.schedulable,
-            addr=self.addr,
-            public_host=self.public_host,
-            first_contact=self.first_contact,
-            lost_at=self.lost_at,
-            version=self.version,
-            architecture=self.architecture,
-            compute_plugins=self.compute_plugins,
-            public_key=self.public_key,
-            auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
-        )
-
-    def to_heartbeat_update_data(self) -> AgentDataForHeartbeatUpdate:
-        return AgentDataForHeartbeatUpdate(
-            status=self.status,
-            status_changed=self.status_changed,
-            available_slots=self.actual_available_slots(),
-            addr=self.addr,
-            public_host=self.public_host,
-            version=self.version,
-            architecture=self.architecture,
-            compute_plugins=self.compute_plugins,
-            public_key=self.public_key,
-            auto_terminate_abusing_kernel=self.auto_terminate_abusing_kernel,
-        )
-
-    @classmethod
-    async def get_occupied_slots(
-        cls,
-        db: ExtendedAsyncSAEngine,
-        agent_id: AgentId,
-        known_slot_types: Mapping[SlotName, SlotTypes],
-    ) -> ResourceSlot:
-        async with db.begin_readonly_session() as db_session:
-            query = sa.select(AgentResourceRow.slot_name, AgentResourceRow.used).where(
-                AgentResourceRow.agent_id == agent_id,
-            )
-            result = await db_session.execute(query)
-            occupied_slots = ResourceSlot.from_known_slots(known_slot_types)
-            for row in result:
-                occupied_slots[row.slot_name] = row.used
-            return occupied_slots
+        return [
+            AgentResourceSearchableFields.own.to_data(resource_row)
+            for resource_row in self._resource_rows_by_rank()
+        ]
 
 
 # For compatibility
 agents = AgentRow.__table__
-
-
-async def list_schedulable_agents_by_sgroup(
-    db_sess: SASession,
-    sgroup_name: str,
-) -> Sequence[AgentRow]:
-    query = sa.select(AgentRow).where(
-        (AgentRow.status == AgentStatus.ALIVE)
-        & (AgentRow.scaling_group == sgroup_name)
-        & (AgentRow.schedulable == true()),
-    )
-
-    result = await db_sess.execute(query)
-    return result.scalars().all()

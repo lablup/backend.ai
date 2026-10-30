@@ -5,6 +5,7 @@ Common types for resource group DTO v2.
 from __future__ import annotations
 
 from enum import StrEnum
+from uuid import UUID
 
 from pydantic import Field, model_validator
 
@@ -18,6 +19,8 @@ __all__ = (
     "ResourceGroupOrderDirection",
     "ResourceGroupOrderField",
     "ResourceGroupScope",
+    "ResourceGroupUsage",
+    "ResourceGroupUsedBy",
     "SchedulerTypeDTO",
 )
 
@@ -77,3 +80,24 @@ class ResourceGroupScope(BaseRequestModel):
                 "ResourceGroupScope requires a non-empty value for 'domain', 'project' or 'user'"
             )
         return self
+
+
+class ResourceGroupUsedBy(BaseRequestModel):
+    """Entities whose use of the resource group narrows the result."""
+
+    session: list[UUID] | None = Field(default=None, description="Sessions the resource group runs")
+    deployment: list[UUID] | None = Field(
+        default=None, description="Deployments the resource group runs"
+    )
+
+
+class ResourceGroupUsage(BaseRequestModel):
+    """Uses narrowing the resource groups read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request. Resource groups the caller
+    cannot read are left out even when a listed entity is tied to them.
+    """
+
+    used_by: ResourceGroupUsedBy | None = Field(
+        default=None, description="Entities whose use of the resource group narrows the result"
+    )

@@ -30,20 +30,20 @@ from ai.backend.manager.data.idle_checker.types import IdleJudgmentData
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.idle_checker import IdleCheckerNotFound
 from ai.backend.manager.errors.kernel import SessionNotFound
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.idle_checker.row import (
     IdleCheckerBindingRow,
     IdleCheckerRow,
     SessionIdleCheckRow,
 )
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import EntityMembershipCapRow
@@ -81,6 +81,7 @@ class ScopeFixture:
     project_id: uuid.UUID
     resource_group_name: str
     resource_group_id: ResourceGroupID
+    user_id: uuid.UUID
 
 
 @dataclass(frozen=True)
@@ -106,9 +107,27 @@ class JudgmentRows:
     checker_id: IdleCheckerID
 
 
+def _expired_check_user_row(scope: ScopeFixture, user_id: uuid.UUID) -> UserRow:
+    return UserRow(
+        uuid=user_id,
+        username=f"user-{user_id}",
+        email=f"{user_id}@example.com",
+        domain_name=scope.domain_name,
+        domain_id=scope.domain_id,
+        resource_policy=f"{scope.domain_name}-owner-policy",
+    )
+
+
 def _expired_check_scope_rows(
     scope: ScopeFixture,
-) -> tuple[ProjectResourcePolicyRow, DomainRow, ProjectRow, ResourceGroupRow]:
+) -> tuple[
+    ProjectResourcePolicyRow,
+    DomainRow,
+    ProjectRow,
+    ResourceGroupRow,
+    UserResourcePolicyRow,
+    UserRow,
+]:
     return (
         ProjectResourcePolicyRow(
             name=f"{scope.domain_name}-policy",
@@ -141,6 +160,14 @@ def _expired_check_scope_rows(
             scheduler="fifo",
             use_host_network=False,
         ),
+        UserResourcePolicyRow(
+            name=f"{scope.domain_name}-owner-policy",
+            max_vfolder_count=10,
+            max_quota_scope_size=1024,
+            max_session_count_per_model_session=5,
+            max_customized_image_count=3,
+        ),
+        _expired_check_user_row(scope, scope.user_id),
     )
 
 
@@ -162,7 +189,7 @@ def _expired_check_session_row(
         domain_id=scope.domain_id,
         resource_group_id=scope.resource_group_id,
         group_id=scope.project_id,
-        user_uuid=user_uuid if user_uuid is not None else uuid.uuid4(),
+        user_uuid=user_uuid if user_uuid is not None else scope.user_id,
         access_key=None,
         tag=None,
         status=status,
@@ -204,6 +231,7 @@ def _expired_check_scope_fixture(prefix: str) -> ScopeFixture:
         project_id=uuid.uuid4(),
         resource_group_name=f"{prefix}-sgroup",
         resource_group_id=ResourceGroupID(uuid.uuid4()),
+        user_id=uuid.uuid4(),
     )
 
 
@@ -1564,7 +1592,7 @@ class TestUserScopeAssignments:
         database: ExtendedAsyncSAEngine,
     ) -> UserScopeRows:
         scope = _expired_check_scope_fixture("user-scope")
-        bound_user_id = uuid.uuid4()
+        bound_user_id = scope.user_id
         other_user_id = uuid.uuid4()
         bound_user_session_id = SessionId(uuid.uuid4())
         other_user_session_id = SessionId(uuid.uuid4())
@@ -1575,6 +1603,7 @@ class TestUserScopeAssignments:
         async with database.begin_session() as db_sess:
             for scope_row in _expired_check_scope_rows(scope):
                 db_sess.add(scope_row)
+            db_sess.add(_expired_check_user_row(scope, other_user_id))
             db_sess.add(
                 _expired_check_session_row(
                     scope,

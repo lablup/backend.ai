@@ -11,14 +11,16 @@ from pydantic import Field
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.dto.manager.defs import DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT
-from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.query import StringFilter, UUIDFilter
 from ai.backend.common.dto.manager.v2.agent.types import (
     AgentOrderField,
     AgentStatusFilter,
+    AgentUsage,
     ConflictingSessionCleanupPolicyEnum,
     OrderDirection,
 )
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import AgentId
 
 __all__ = (
@@ -54,6 +56,10 @@ class AgentFilter(BaseRequestModel):
     id: StringFilter | None = Field(
         default=None,
         description="Filter by agent ID. Supports string match operations.",
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by agent entity ID.",
     )
     status: AgentStatusFilter | None = Field(
         default=None,
@@ -151,6 +157,13 @@ class UpdateAgentResourceGroupInput(UpdateAgentResourceGroupBody):
 class AdminSearchAgentsInput(BaseRequestModel):
     """Input for admin-scoped paginated agent search with cursor and offset pagination."""
 
+    usage: AgentUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "agents the caller cannot read are left out."
+        ),
+    )
     filter: AgentFilter | None = None
     order: list[AgentOrder] | None = None
     # Cursor pagination

@@ -17,8 +17,7 @@ from sqlalchemy.sql.expression import SQLColumnExpression
 
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
-from ai.backend.common.exception import UnknownImageRegistry
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
 from ai.backend.manager.errors.container_registry import (
     InvalidContainerRegistryProject,
@@ -31,11 +30,11 @@ from ai.backend.manager.models.base import (
 )
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.association_container_registries_groups import (
+    from ai.backend.manager.models.association_container_registries_groups.row import (
         AssociationContainerRegistriesGroupsRow,
     )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__: Sequence[str] = (
     "ContainerRegistryRow",
@@ -99,7 +98,7 @@ class ContainerRegistryValidator:
 
 
 def _get_association_join_condition() -> sa.ColumnElement[bool]:
-    from ai.backend.manager.models.association_container_registries_groups import (
+    from ai.backend.manager.models.association_container_registries_groups.row import (
         AssociationContainerRegistriesGroupsRow,
     )
 
@@ -135,8 +134,8 @@ class ContainerRegistryRow(Base):
     ssl_verify: Mapped[bool | None] = mapped_column(
         "ssl_verify", sa.Boolean, nullable=True, server_default=sa.text("true"), index=True
     )
-    is_global: Mapped[bool | None] = mapped_column(
-        "is_global", sa.Boolean, nullable=True, server_default=sa.text("true"), index=True
+    is_global: Mapped[bool] = mapped_column(
+        "is_global", sa.Boolean, nullable=False, server_default=sa.text("true"), index=True
     )
     extra: Mapped[dict[str, Any] | None] = mapped_column(
         "extra", sa.JSON, nullable=True, default=None
@@ -159,7 +158,7 @@ class ContainerRegistryRow(Base):
         username: str | None = None,
         password: str | None = None,
         ssl_verify: bool | None = None,
-        is_global: bool | None = None,
+        is_global: bool = True,
         extra: dict[str, Any] | None = None,
     ) -> None:
         self.id = id
@@ -200,31 +199,6 @@ class ContainerRegistryRow(Base):
         if not rows:
             raise NoResultFound
         return rows
-
-    @classmethod
-    async def get_container_registry_info(
-        cls, session: AsyncSession, registry_id: uuid.UUID
-    ) -> tuple[yarl.URL, dict[str, Any]]:
-        query_stmt = (
-            sa.select(ContainerRegistryRow)
-            .where(ContainerRegistryRow.id == registry_id)
-            .options(
-                load_only(
-                    ContainerRegistryRow.url,
-                    ContainerRegistryRow.username,
-                    ContainerRegistryRow.password,
-                )
-            )
-        )
-        registry_row = cast(ContainerRegistryRow | None, await session.scalar(query_stmt))
-        if registry_row is None:
-            raise UnknownImageRegistry(registry_id)
-        url = registry_row.url
-        username = registry_row.username
-        password = registry_row.password
-        creds = {"username": username, "password": password}
-
-        return yarl.URL(url), creds
 
     @classmethod
     async def get_known_container_registries(
@@ -275,17 +249,3 @@ class ContainerRegistryRow(Base):
         )
         instance.id = data.id
         return instance
-
-    def to_dataclass(self) -> ContainerRegistryData:
-        return ContainerRegistryData(
-            id=self.id,
-            url=self.url,
-            registry_name=self.registry_name,
-            type=self.type,
-            project=self.project,
-            username=self.username,
-            password=self.password,
-            ssl_verify=self.ssl_verify,
-            is_global=self.is_global,
-            extra=self.extra,
-        )

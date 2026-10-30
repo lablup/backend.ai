@@ -369,6 +369,24 @@ class TestSliceGeneration:
         assert specs[2].period_start == make_datetime(7, 55, 0)
         assert specs[2].period_end == make_datetime(8, 0, 0)
 
+    def test_purged_owner_yields_no_slices(
+        self,
+        aggregator: FairShareAggregator,
+        mock_kernel_info: MagicMock,
+        mock_allocated_slots: ResourceSlot,
+    ) -> None:
+        mock_kernel_info.user_permission.user_uuid = None
+        specs = aggregator._generate_slice_specs(
+            mock_kernel_info,
+            mock_allocated_slots,
+            ResourceGroupID(uuid4()),
+            "default",
+            start_time=make_datetime(7, 45, 0),
+            end_time=make_datetime(8, 0, 0),
+        )
+
+        assert specs == []
+
     def test_resource_seconds_calculation(
         self,
         aggregator: FairShareAggregator,

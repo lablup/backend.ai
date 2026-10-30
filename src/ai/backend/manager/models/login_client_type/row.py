@@ -1,16 +1,11 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
 import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
 from ai.backend.manager.models.base import GUID, Base
 from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
-
-if TYPE_CHECKING:
-    from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
 
 __all__ = ("LoginClientTypeRow",)
 
@@ -26,14 +21,3 @@ class LoginClientTypeRow(LifecycleTimestampsMixin, Base):
     )
     name: Mapped[str] = mapped_column("name", sa.String(length=64), nullable=False, unique=True)
     description: Mapped[str | None] = mapped_column("description", sa.Text, nullable=True)
-
-    def to_dataclass(self) -> LoginClientTypeData:
-        from ai.backend.manager.data.login_client_type.types import LoginClientTypeData
-
-        return LoginClientTypeData(
-            id=self.id,
-            name=self.name,
-            description=self.description,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )

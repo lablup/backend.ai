@@ -28,6 +28,7 @@ class ActionKind(enum.StrEnum):
     BULK = "bulk"
     SCOPE = "scope"
     RELATION = "relation"
+    MEMBERSHIP = "membership"
     GLOBAL = "global"
     LOOKUP = "lookup"
 
@@ -42,6 +43,8 @@ class ActionKind(enum.StrEnum):
                 return "an action reaching every entity under a scope at once"
             case ActionKind.RELATION:
                 return "an action linking two entities, or unlinking them"
+            case ActionKind.MEMBERSHIP:
+                return "an action moving one entity into scopes, or out of them"
             case ActionKind.GLOBAL:
                 return "an action operating over everything, divided by no scope"
             case ActionKind.LOOKUP:

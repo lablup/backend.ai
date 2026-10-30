@@ -6,6 +6,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.manager.data.session.types import SessionEntityData
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier
 
 
@@ -22,4 +23,4 @@ class BulkSessionQuerier(BulkEntityQuerier[SessionRow, SessionEntityData]):
 
     @override
     def to_data(self, row: SessionRow) -> SessionEntityData:
-        return row.to_entity_data()
+        return SessionSearchableFields.own.to_data(row)

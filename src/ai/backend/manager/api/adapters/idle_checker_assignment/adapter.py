@@ -4,17 +4,25 @@ from __future__ import annotations
 
 import uuid
 from functools import lru_cache
+from typing import assert_never
 
 from ai.backend.common.data.entity.idle_checker import (
     IdleCheckerAssignmentID,
     IdleCheckerID,
 )
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType, RuntimeEntityID
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.data.filter_specs import StringInMatchSpec, StringMatchSpec
+from ai.backend.common.dto.manager.v2.common import (
+    OrderDirection,
+    PartialBulkFailure,
+    PartialBulkPayload,
+)
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     CreateIdleCheckerAssignmentInput,
     IdleCheckerAssignmentFilter,
     IdleCheckerAssignmentOrder,
+    PartialBulkPurgeIdleCheckerAssignmentsInput,
+    PartialBulkUpdateIdleCheckerAssignmentsInput,
     PurgeIdleCheckerAssignmentInput,
     ScopedSearchIdleCheckerAssignmentsInput,
     SearchIdleCheckerAssignmentsInput,
@@ -31,6 +39,7 @@ from ai.backend.common.dto.manager.v2.idle_checker_assignment.types import (
     IdleCheckerAssignmentOrderField,
     IdleCheckerScopeTypeDTO,
 )
+from ai.backend.common.exception import BackendAIError
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.idle_checker.types import IdleCheckerAssignmentData
@@ -39,12 +48,17 @@ from ai.backend.manager.errors.idle_checker import (
     IdleCheckerAssignmentNotFound,
 )
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.idle_checker.conditions import IdleCheckerAssignmentConditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
 from ai.backend.manager.models.idle_checker.creators import IdleCheckerAssignmentCreator
-from ai.backend.manager.models.idle_checker.orders import IdleCheckerAssignmentOrders
 from ai.backend.manager.models.idle_checker.purgers import IdleCheckerAssignmentPurger
 from ai.backend.manager.models.idle_checker.row import IdleCheckerBindingRow
+from ai.backend.manager.models.idle_checker.searchable_fields import (
+    IdleCheckerAssignmentSearchableFields,
+)
 from ai.backend.manager.models.idle_checker.searchers import IdleCheckerAssignmentSearcher
 from ai.backend.manager.models.idle_checker.updaters import (
     IdleCheckerAssignmentDisabler,
@@ -76,7 +90,9 @@ from ai.backend.manager.services.rbac.processors import RbacProcessors
 @lru_cache(maxsize=1)
 def _get_idle_checker_assignment_pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=IdleCheckerAssignmentOrders.created_at(ascending=False),
+        forward_order=IdleCheckerAssignmentSearchableFields.own.created_at.order.apply(
+            ascending=False
+        ),
         cursor_column=IdleCheckerBindingRow.id,
     )
 
@@ -138,7 +154,48 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
     async def purge(
         self, input: PurgeIdleCheckerAssignmentInput
     ) -> PurgeIdleCheckerAssignmentPayload:
-        current = await self._resolve(input.id)
+        purged = await self._purge(input.id)
+        return PurgeIdleCheckerAssignmentPayload(id=IdleCheckerAssignmentID(purged.id))
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateIdleCheckerAssignmentsInput
+    ) -> PartialBulkPayload[IdleCheckerAssignmentNode]:
+        """Switch several bindings on or off, answering for each one.
+
+        Each item is its own relation write, so a refused item leaves the others done.
+        """
+        successes: list[IdleCheckerAssignmentNode] = []
+        failed: list[PartialBulkFailure] = []
+        for item in input.items:
+            try:
+                payload = await self.update(item)
+            except BackendAIError as e:
+                failed.append(PartialBulkFailure(id=item.id, message=str(e)))
+                continue
+            successes.append(payload.idle_checker_assignment)
+        return PartialBulkPayload[IdleCheckerAssignmentNode](successes=successes, failed=failed)
+
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeIdleCheckerAssignmentsInput
+    ) -> PartialBulkPayload[IdleCheckerAssignmentNode]:
+        """Remove several bindings for good, answering for each one with the binding as it
+        stood before removal.
+
+        Each item is its own relation write, so a refused item leaves the others done.
+        """
+        successes: list[IdleCheckerAssignmentNode] = []
+        failed: list[PartialBulkFailure] = []
+        for assignment_id in input.ids:
+            try:
+                purged = await self._purge(assignment_id)
+            except BackendAIError as e:
+                failed.append(PartialBulkFailure(id=assignment_id, message=str(e)))
+                continue
+            successes.append(self._data_to_node(purged))
+        return PartialBulkPayload[IdleCheckerAssignmentNode](successes=successes, failed=failed)
+
+    async def _purge(self, assignment_id: IdleCheckerAssignmentID) -> IdleCheckerAssignmentData:
+        current = await self._resolve(assignment_id)
         result = await self._rbac.purge_relation.run(
             PurgeRelationAction(
                 pairs=[RelationPair(scope=current.scope_entity(), target=current.idle_checker_id)],
@@ -147,7 +204,7 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
         )
         if not any(unlink.unlinked for unlink in result.results):
             raise IdleCheckerAssignmentNotFound(str(current.id))
-        return PurgeIdleCheckerAssignmentPayload(id=current.id)
+        return current
 
     async def _read_by_pair(
         self, scope: EntityIdentifier, idle_checker_id: IdleCheckerID
@@ -216,84 +273,73 @@ class IdleCheckerAssignmentAdapter(BaseAdapter):
         )
 
     def _convert_filter(self, f: IdleCheckerAssignmentFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
+        fields = IdleCheckerAssignmentSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_uuid_filter(f.scope_id, fields.scope_id.filter),
+            *self.apply_uuid_filter(f.idle_checker_id, fields.idle_checker_id.filter),
+            *self.apply_bool_filter(f.enabled, fields.enabled.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(f.updated_at, fields.updated_at.filter),
+        ]
         if f.scope_type is not None:
             if f.scope_type.equals is not None:
                 conditions.append(
-                    IdleCheckerAssignmentConditions.by_scope_type_equals(
-                        EntityType.from_name(f.scope_type.equals.value)
+                    fields.scope_type.filter.equals(
+                        StringMatchSpec(
+                            EntityType.from_name(f.scope_type.equals.value),
+                            case_insensitive=False,
+                            negated=False,
+                        )
                     )
                 )
             if f.scope_type.in_ is not None:
-                scope_types: list[EntityType] = []
-                for scope_type_dto in f.scope_type.in_:
-                    scope_types.append(EntityType.from_name(scope_type_dto.value))
-                conditions.append(IdleCheckerAssignmentConditions.by_scope_type_in(scope_types))
-        if f.scope_id is not None:
-            condition = self.convert_uuid_filter(
-                f.scope_id,
-                equals_factory=IdleCheckerAssignmentConditions.by_scope_id_equals,
-                in_factory=IdleCheckerAssignmentConditions.by_scope_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.idle_checker_id is not None:
-            condition = self.convert_uuid_filter(
-                f.idle_checker_id,
-                equals_factory=IdleCheckerAssignmentConditions.by_idle_checker_id_equals,
-                in_factory=IdleCheckerAssignmentConditions.by_idle_checker_id_in,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.enabled is not None:
-            conditions.append(IdleCheckerAssignmentConditions.by_enabled_equals(f.enabled))
-        if f.created_at is not None:
-            condition = f.created_at.build_query_condition(
-                before_factory=IdleCheckerAssignmentConditions.by_created_at_before,
-                after_factory=IdleCheckerAssignmentConditions.by_created_at_after,
-                equals_factory=IdleCheckerAssignmentConditions.by_created_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
-        if f.updated_at is not None:
-            condition = f.updated_at.build_query_condition(
-                before_factory=IdleCheckerAssignmentConditions.by_updated_at_before,
-                after_factory=IdleCheckerAssignmentConditions.by_updated_at_after,
-                equals_factory=IdleCheckerAssignmentConditions.by_updated_at_equals,
-            )
-            if condition is not None:
-                conditions.append(condition)
+                conditions.append(
+                    fields.scope_type.filter.in_(
+                        StringInMatchSpec(
+                            values=[
+                                EntityType.from_name(scope_type_dto.value)
+                                for scope_type_dto in f.scope_type.in_
+                            ],
+                            case_insensitive=False,
+                            negated=False,
+                        )
+                    )
+                )
         if f.AND:
             for sub_filter in f.AND:
                 conditions.extend(self._convert_filter(sub_filter))
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub_filter in f.OR:
-                or_conditions.extend(self._convert_filter(sub_filter))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub_filter in f.NOT:
-                not_conditions.extend(self._convert_filter(sub_filter))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
     @staticmethod
     def _convert_orders(orders: list[IdleCheckerAssignmentOrder]) -> list[QueryOrder]:
+        fields = IdleCheckerAssignmentSearchableFields.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirection.ASC
             match o.field:
                 case IdleCheckerAssignmentOrderField.SCOPE_TYPE:
-                    result.append(IdleCheckerAssignmentOrders.scope_type(ascending))
+                    result.append(fields.scope_type.order.apply(ascending))
                 case IdleCheckerAssignmentOrderField.ENABLED:
-                    result.append(IdleCheckerAssignmentOrders.enabled(ascending))
+                    result.append(fields.enabled.order.apply(ascending))
                 case IdleCheckerAssignmentOrderField.CREATED_AT:
-                    result.append(IdleCheckerAssignmentOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
                 case IdleCheckerAssignmentOrderField.UPDATED_AT:
-                    result.append(IdleCheckerAssignmentOrders.updated_at(ascending))
+                    result.append(fields.updated_at.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
         return result
 
     async def _resolve(self, assignment_id: IdleCheckerAssignmentID) -> IdleCheckerAssignmentData:

@@ -12,7 +12,7 @@ from typing import override
 
 import jinja2
 
-from ai.backend.manager.data.notification import NotificationChannelData
+from ai.backend.manager.data.notification.types import NotificationChannelData
 from ai.backend.manager.notification.channels.base import AbstractNotificationChannel
 from ai.backend.manager.notification.notification_center import NotificationCenter
 from ai.backend.manager.notification.types import NotificationMessage, SendResult

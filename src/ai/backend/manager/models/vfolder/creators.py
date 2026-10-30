@@ -30,7 +30,7 @@ from ai.backend.manager.errors.storage import (
 )
 from ai.backend.manager.models.base import StrEnumType
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
@@ -38,11 +38,13 @@ from ai.backend.manager.models.specs.creator import (
     GuardedEntityCreator,
 )
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck, PreconditionCheck
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.vfolder.row import (
-    HARD_DELETED_VFOLDER_STATUSES,
     VFOLDER_NAME_IN_PROJECT_INDEX,
     VFolderRow,
+)
+from ai.backend.manager.models.vfolder.searchable_fields import (
+    VFolderSearchableFields,
 )
 
 
@@ -135,7 +137,7 @@ class VFolderBaseCreator(GuardedEntityCreator[VFolderRow, VFolderData]):
             .select_from(VFolderRow)
             .where(
                 self._owned_folders_condition(),
-                VFolderRow.status.not_in(HARD_DELETED_VFOLDER_STATUSES),
+                VFolderRow.status.not_in(VFolderOperationStatus.hard_deleted()),
             )
             .scalar_subquery()
         )
@@ -189,7 +191,7 @@ class VFolderBaseCreator(GuardedEntityCreator[VFolderRow, VFolderData]):
 
     @override
     def to_data(self, row: VFolderRow) -> VFolderData:
-        return row.to_data()
+        return VFolderSearchableFields.own.to_data(row)
 
 
 @dataclass(kw_only=True)
@@ -255,20 +257,9 @@ class ProjectVFolderCreator(VFolderBaseCreator):
     def precondition_checks(self) -> Sequence[PreconditionCheck]:
         """What the allowance says, plus what the named project may not be.
 
-        A personal project is never addressed by a request: a folder under somebody's
-        own name is theirs to create, and sharing is what puts one into anyone else's.
         A model store holds model folders only.
         """
-        checks = [
-            *super().precondition_checks(),
-            PreconditionCheck(
-                finder=self._project_of_type(ProjectType.PERSONAL),
-                error=VFolderInvalidParameter(
-                    "A personal project cannot be named as the target of a vfolder. "
-                    "Omit the project to create your own folder."
-                ),
-            ),
-        ]
+        checks = [*super().precondition_checks()]
         if self.usage_mode != VFolderUsageMode.MODEL:
             checks.append(
                 PreconditionCheck(

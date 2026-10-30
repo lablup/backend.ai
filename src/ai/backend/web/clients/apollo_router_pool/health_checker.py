@@ -19,6 +19,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import override
 
+from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
 from ai.backend.common.health_checker.abc import ServiceHealthChecker
 from ai.backend.common.health_checker.types import (
     ComponentHealthStatus,
@@ -26,7 +27,6 @@ from ai.backend.common.health_checker.types import (
     ServiceGroup,
     ServiceHealth,
 )
-from ai.backend.web.clients.endpoint_pool import HealthyEndpointPool
 
 APOLLO_ROUTER: ServiceGroup = ServiceGroup("apollo-router")
 APOLLO_ROUTER_ENDPOINTS: ServiceGroup = ServiceGroup("apollo-router-endpoints")

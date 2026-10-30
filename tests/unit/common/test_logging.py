@@ -11,8 +11,9 @@ import pytest
 import trafaret as t
 
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
-from ai.backend.logging import BraceStyleAdapter, LocalLogger, Logger
+from ai.backend.logging import LocalLogger, Logger
 from ai.backend.logging.config import ConsoleConfig, LogDriver, LoggingConfig
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.logging.types import LogFormat, LogLevel, MsgpackOptions
 
 test_log_config = LoggingConfig(
@@ -38,7 +39,9 @@ msgpack_opts: MsgpackOptions = {
     "unpack_opts": DEFAULT_UNPACK_OPTS,
 }
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.common.testing"))
+log = StructuredLogger(logging.getLogger("ai.backend.common.testing"))
+# Keeps the arguments on the record so the relay has to pickle them.
+unformatted_log = logging.getLogger("ai.backend.common.testing")
 
 
 class NotPicklableClass:
@@ -79,22 +82,22 @@ def test_logger(unused_tcp_port: int, capsys: pytest.CaptureFixture[str]) -> Non
     )
     with logger:
         assert test_log_path.exists()
-        log.warning("blizzard warning {}", 123)
+        log.warning("blizzard warning", code=123)
         assert get_logger_thread() is not None
     assert not test_log_path.exists()
     assert get_logger_thread() is None
     captured = capsys.readouterr()
-    assert "blizzard warning 123" in captured.err
+    assert "blizzard warning" in captured.err
 
 
 def test_local_logger(capsys: pytest.CaptureFixture[str]) -> None:
     logger = LocalLogger(test_log_config)
     with logger:
-        log.warning("blizzard warning {}", 456)
+        log.warning("blizzard warning", code=456)
         assert get_logger_thread() is None
     assert get_logger_thread() is None
     captured = capsys.readouterr()
-    assert "blizzard warning 456" in captured.err
+    assert "blizzard warning" in captured.err
 
 
 def test_logger_not_picklable(capsys: pytest.CaptureFixture[str]) -> None:
@@ -107,7 +110,7 @@ def test_logger_not_picklable(capsys: pytest.CaptureFixture[str]) -> None:
         msgpack_options=msgpack_opts,
     )
     with logger:
-        log.warning("blizzard warning {}", NotPicklableClass())
+        unformatted_log.warning("blizzard warning %s", NotPicklableClass())
     assert not test_log_path.exists()
     assert get_logger_thread() is None
     captured = capsys.readouterr()
@@ -148,7 +151,7 @@ def test_logger_not_unpicklable(capsys: pytest.CaptureFixture[str]) -> None:
         msgpack_options=msgpack_opts,
     )
     with logger:
-        log.warning("blizzard warning {}", NotUnpicklableClass(0))
+        unformatted_log.warning("blizzard warning %s", NotUnpicklableClass(0))
         time.sleep(1.0)
         assert get_logger_thread() is not None, "logger thread must be alive"
     assert not test_log_path.exists()

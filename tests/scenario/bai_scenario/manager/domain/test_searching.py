@@ -1,4 +1,4 @@
-"""도메인 훑기 — 필터가 무엇을 좁히고, 누가 물을 수 있는가."""
+"""도메인 search — 필터가 무엇을 좁히고, 누가 물을 수 있는가."""
 
 from __future__ import annotations
 
@@ -33,20 +33,20 @@ from bai_scenario.components.domain import (
     TheCallIsRefused,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchDomainsPayload
-type DomainStep = Scenario[SeedingSession, ManyDomainsAndACaller, DomainAdapter, Searched]
+type DomainStep = Scenario[TestSeedingSession, ManyDomainsAndACaller, DomainAdapter, Searched]
 
 
 @dataclass(frozen=True)
 class SearchingEveryDomain(When[ManyDomainsAndACaller, DomainAdapter, Searched]):
-    """필터 없이 전체를 훑는다."""
+    """필터 없이 전체를 search 한다."""
 
     @override
     def operation(self) -> str:
-        return "admin_search"
+        return "global_search"
 
     @override
     def describe(self, laid: ManyDomainsAndACaller) -> str:
@@ -55,16 +55,16 @@ class SearchingEveryDomain(When[ManyDomainsAndACaller, DomainAdapter, Searched])
     @override
     async def call(self, adapter: DomainAdapter, laid: ManyDomainsAndACaller) -> Searched:
         with ActingAs(laid.caller):
-            return await adapter.admin_search(AdminSearchDomainsInput())
+            return await adapter.global_search(AdminSearchDomainsInput())
 
 
 @dataclass(frozen=True)
 class SearchingByName(When[ManyDomainsAndACaller, DomainAdapter, Searched]):
-    """심은 것 중 하나의 이름으로 걸러 훑는다."""
+    """미리 만든 것 중 하나의 이름으로 걸러 search 한다."""
 
     @override
     def operation(self) -> str:
-        return "admin_search"
+        return "global_search"
 
     @override
     def describe(self, laid: ManyDomainsAndACaller) -> str:
@@ -73,7 +73,7 @@ class SearchingByName(When[ManyDomainsAndACaller, DomainAdapter, Searched]):
     @override
     async def call(self, adapter: DomainAdapter, laid: ManyDomainsAndACaller) -> Searched:
         with ActingAs(laid.caller):
-            return await adapter.admin_search(
+            return await adapter.global_search(
                 AdminSearchDomainsInput(
                     filter=DomainFilter(name=StringFilter(equals=laid.named.name))
                 )
@@ -81,12 +81,31 @@ class SearchingByName(When[ManyDomainsAndACaller, DomainAdapter, Searched]):
 
 
 @dataclass(frozen=True)
+class SoftDeletingOneThenSearching(When[ManyDomainsAndACaller, DomainAdapter, Searched]):
+    """미리 만든 것 중 하나를 soft delete 한 뒤 필터 없이 전체를 search 한다."""
+
+    @override
+    def operation(self) -> str:
+        return "global_search"
+
+    @override
+    def describe(self, laid: ManyDomainsAndACaller) -> str:
+        return f"{laid.caller.username}이 {laid.named.name}을 soft delete 한 뒤 필터 없이 전체 조회"
+
+    @override
+    async def call(self, adapter: DomainAdapter, laid: ManyDomainsAndACaller) -> Searched:
+        with ActingAs(laid.caller):
+            await adapter.delete(await adapter.lookup_name(laid.named.name))
+            return await adapter.global_search(AdminSearchDomainsInput())
+
+
+@dataclass(frozen=True)
 class EveryLaidDomainIsCounted(Then[ManyDomainsAndACaller, Searched]):
-    """심은 것이 모두 세어진다."""
+    """미리 만든 것이 모두 나온다."""
 
     @override
     def says(self) -> str:
-        return "심은 도메인이 모두 세어진다"
+        return "미리 만든 도메인이 모두 나온다"
 
     @override
     def look(self, laid: ManyDomainsAndACaller, answered: Answered[Searched]) -> list[Verdict]:
@@ -128,7 +147,7 @@ class OnlyTheNamedOneIsLeft(Then[ManyDomainsAndACaller, Searched]):
 
 @dataclass(frozen=True)
 class TheAnswerCountsEveryDomainLaid(
-    Scenario[SeedingSession, ManyDomainsAndACaller, DomainAdapter, Searched]
+    Scenario[TestSeedingSession, ManyDomainsAndACaller, DomainAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -136,10 +155,10 @@ class TheAnswerCountsEveryDomainLaid(
 
     @override
     def describe(self) -> str:
-        return "이 시나리오가 심은 도메인이 넷일 때, 필터 없는 조회는 그 넷을 모두 센다"
+        return "이 시나리오가 미리 만든 도메인이 넷일 때, 필터 없는 조회는 그 넷이 모두 나온다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyDomainsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyDomainsAndACaller]:
         return ManyDomainsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -152,7 +171,9 @@ class TheAnswerCountsEveryDomainLaid(
 
 
 @dataclass(frozen=True)
-class ANameFilterNarrows(Scenario[SeedingSession, ManyDomainsAndACaller, DomainAdapter, Searched]):
+class ANameFilterNarrows(
+    Scenario[TestSeedingSession, ManyDomainsAndACaller, DomainAdapter, Searched]
+):
     @override
     def summary(self) -> str:
         return "a-name-filter-narrows-the-answer-to-the-domain-it-names"
@@ -162,7 +183,7 @@ class ANameFilterNarrows(Scenario[SeedingSession, ManyDomainsAndACaller, DomainA
         return "도메인 여럿 중 하나의 이름으로 걸러 조회하면, 답에는 그 이름의 도메인만 남는다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyDomainsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyDomainsAndACaller]:
         return ManyDomainsAndSomeone(role=UserRole.SUPERADMIN)
 
     @override
@@ -176,7 +197,7 @@ class ANameFilterNarrows(Scenario[SeedingSession, ManyDomainsAndACaller, DomainA
 
 @dataclass(frozen=True)
 class AUserWhoIsNotTheSuperadminMayNotSearch(
-    Scenario[SeedingSession, ManyDomainsAndACaller, DomainAdapter, Searched]
+    Scenario[TestSeedingSession, ManyDomainsAndACaller, DomainAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -187,7 +208,7 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
         return "슈퍼관리자가 아닌 사용자가 전체 도메인 조회를 요청하면 역할로 막힌다"
 
     @override
-    def given(self) -> Given[SeedingSession, ManyDomainsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, ManyDomainsAndACaller]:
         return ManyDomainsAndSomeone()
 
     @override
@@ -199,10 +220,36 @@ class AUserWhoIsNotTheSuperadminMayNotSearch(
         return TheCallIsRefused(InsufficientPrivilege)
 
 
+@dataclass(frozen=True)
+class SoftDeletedDomainsAreCountedToo(
+    Scenario[TestSeedingSession, ManyDomainsAndACaller, DomainAdapter, Searched]
+):
+    @override
+    def summary(self) -> str:
+        return "the-answer-includes-soft-deleted-domains-too"
+
+    @override
+    def describe(self) -> str:
+        return "미리 만든 도메인 중 하나를 soft delete 한 뒤 필터 없이 search 하면, 그것까지 모두 나온다"
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ManyDomainsAndACaller]:
+        return ManyDomainsAndSomeone(role=UserRole.SUPERADMIN)
+
+    @override
+    def when(self) -> When[ManyDomainsAndACaller, DomainAdapter, Searched]:
+        return SoftDeletingOneThenSearching()
+
+    @override
+    def then(self) -> Then[ManyDomainsAndACaller, Searched]:
+        return EveryLaidDomainIsCounted()
+
+
 SCENARIOS: list[DomainStep] = [
     TheAnswerCountsEveryDomainLaid(),
     ANameFilterNarrows(),
     AUserWhoIsNotTheSuperadminMayNotSearch(),
+    SoftDeletedDomainsAreCountedToo(),
 ]
 
 

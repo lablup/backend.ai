@@ -5,6 +5,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from ai.backend.client.v2.base_domain import BaseDomainClient
+from ai.backend.common.dto.manager.v2.common import PartialBulkPayload
 from ai.backend.common.dto.manager.v2.rbac.request import (
     AdminSearchPermissionsGQLInput,
     AssignRoleInput,
@@ -15,8 +16,10 @@ from ai.backend.common.dto.manager.v2.rbac.request import (
     CreatePermissionInput,
     CreateRoleInput,
     DeletePermissionInput,
-    DeleteRoleInput,
-    PurgeRoleInput,
+    PartialBulkDeleteRolesInput,
+    PartialBulkPurgeRolesInput,
+    PartialBulkRestoreRolesInput,
+    PartialBulkUpdateRolesInput,
     ReplaceRolePermissionsInput,
     RevokeRoleInput,
     SearchRoleAssignmentsInput,
@@ -37,6 +40,7 @@ from ai.backend.common.dto.manager.v2.rbac.response import (
     PermissionNode,
     PurgeRolePayload,
     ReplaceRolePermissionsPayload,
+    RestoreRolePayload,
     RoleAssignmentNode,
     RoleNode,
     SearchRoleAssignmentsPayload,
@@ -106,22 +110,72 @@ class V2RBACClient(BaseDomainClient):
             response_model=UpdateRolePayload,
         )
 
-    async def delete_role(self, request: DeleteRoleInput) -> DeleteRolePayload:
+    async def delete_role(self, role_id: UUID) -> DeleteRolePayload:
         """Soft-delete a role (marks status as DELETED)."""
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/roles/delete",
-            request=request,
+            f"{_PATH}/roles/{role_id}/delete",
             response_model=DeleteRolePayload,
         )
 
-    async def purge_role(self, request: PurgeRoleInput) -> PurgeRolePayload:
-        """Hard-delete a role from the database."""
+    async def restore_role(self, role_id: UUID) -> RestoreRolePayload:
+        """Restore a soft-deleted role (marks status as ACTIVE)."""
         return await self._client.typed_request(
             "POST",
-            f"{_PATH}/roles/purge",
-            request=request,
+            f"{_PATH}/roles/{role_id}/restore",
+            response_model=RestoreRolePayload,
+        )
+
+    async def purge_role(self, role_id: UUID) -> PurgeRolePayload:
+        """Hard-delete a role from the database."""
+        return await self._client.typed_request(
+            "DELETE",
+            f"{_PATH}/roles/{role_id}",
             response_model=PurgeRolePayload,
+        )
+
+    async def partial_bulk_update_roles(
+        self, request: PartialBulkUpdateRolesInput
+    ) -> PartialBulkPayload[RoleNode]:
+        """Update several roles, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/roles/partial-bulk-update",
+            request=request,
+            response_model=PartialBulkPayload[RoleNode],
+        )
+
+    async def partial_bulk_delete_roles(
+        self, request: PartialBulkDeleteRolesInput
+    ) -> PartialBulkPayload[RoleNode]:
+        """Soft-delete several roles, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/roles/partial-bulk-delete",
+            request=request,
+            response_model=PartialBulkPayload[RoleNode],
+        )
+
+    async def partial_bulk_restore_roles(
+        self, request: PartialBulkRestoreRolesInput
+    ) -> PartialBulkPayload[RoleNode]:
+        """Restore several soft-deleted roles, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/roles/partial-bulk-restore",
+            request=request,
+            response_model=PartialBulkPayload[RoleNode],
+        )
+
+    async def partial_bulk_purge_roles(
+        self, request: PartialBulkPurgeRolesInput
+    ) -> PartialBulkPayload[RoleNode]:
+        """Permanently remove several roles, answering for each one."""
+        return await self._client.typed_request(
+            "POST",
+            f"{_PATH}/roles/partial-bulk-purge",
+            request=request,
+            response_model=PartialBulkPayload[RoleNode],
         )
 
     # ------------------------------------------------------------------ Permissions

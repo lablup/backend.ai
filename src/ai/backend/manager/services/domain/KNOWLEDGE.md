@@ -9,7 +9,6 @@ keywords:
   - DomainUpdater
   - DomainDotfilesUpdater
   - dotfile
-  - create_domain_node
   - RoleManagedEntityCreator
 sources:
   - src/ai/backend/manager/services/domain/processors.py

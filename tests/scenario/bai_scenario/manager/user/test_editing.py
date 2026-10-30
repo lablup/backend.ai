@@ -11,14 +11,18 @@ import pytest
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
-from ai.backend.common.dto.manager.v2.user.request import SearchUsersRequest, UpdateUserInput
+from ai.backend.common.dto.manager.v2.user.request import (
+    BulkUpdateUserItemInput,
+    BulkUpdateUsersInput,
+    SearchUsersRequest,
+    UpdateUserInput,
+)
 from ai.backend.common.dto.manager.v2.user.response import (
     BulkUpdateUsersPayload,
     SearchUsersPayload,
     UpdateMyAllowedClientIPPayload,
     UserNode,
 )
-from ai.backend.common.types import AccessKey
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.permission.types import Permission
@@ -30,10 +34,9 @@ from ai.backend.manager.errors.user import UserModificationBadRequest
 from ai.backend.manager.models.user.updaters import UserUpdater
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.services.user.actions.update_user import (
-    BulkUpdateUserAction,
     UpdateUserAction,
 )
-from ai.backend.manager.types import OptionalState, TriState
+from ai.backend.manager.types import TriState
 from ai.backend.testutils.scenario_steps import (
     Answered,
     Given,
@@ -51,13 +54,13 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.domain import WAS_HERE, SomeoneOf
 from bai_scenario.components.user import AGrant, UserNodeLook
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
-from bai_scenario.seeds.domain.domain import SeedDomain
-from bai_scenario.seeds.project.project import SeedProject
-from bai_scenario.seeds.resource_policy.keypair import SeedKeypairPolicy
-from bai_scenario.seeds.resource_policy.project import SeedProjectPolicy
-from bai_scenario.seeds.user.fields import SeedKeypairOf
+from bai_scenario.seeds.domain.domain import TestSeedDomain
+from bai_scenario.seeds.project.project import TestSeedProject
+from bai_scenario.seeds.resource_policy.keypair import TestSeedKeypairPolicy
+from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
+from bai_scenario.seeds.user.fields import TestSeedKeypairOf
 
 RENAMED = "renamed"
 """바꿔 넣는 전체 이름. 시나리오가 정한 값이다."""
@@ -67,6 +70,9 @@ ALLOWED_IP = ["10.0.0.1"]
 
 STORED_IP = ["10.0.0.1/32"]
 """같은 허용 IP를 다시 읽으면 오는 모양. 저장할 때 네트워크 표기로 바뀐다."""
+
+NEW_PASSWORD = "scenario-new-password"
+"""바꿔 넣는 비밀번호. 시나리오가 정한 값이다."""
 
 
 @dataclass(frozen=True)
@@ -122,10 +128,10 @@ class AProjectMemberAndAnEditor(Given[Any, AMemberEdit]):
 
     @override
     async def lay(self, seeding: Any) -> AMemberEdit:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
         target = await seeding.within(SomeoneOf(domain))
-        policy = await seeding.once(SeedProjectPolicy())
-        project = await seeding.creating_from_two(SeedProject(name_hint="team"), domain, policy)
+        policy = await seeding.once(TestSeedProjectPolicy())
+        project = await seeding.creating_from_two(TestSeedProject(name_hint="team"), domain, policy)
         await seeding.joining(
             project,
             target,
@@ -198,7 +204,9 @@ class TheMembershipStays(Then[AMemberEdit, Answer]):
 
 
 @dataclass(frozen=True)
-class NullProjectsLeaveTheMembership(Scenario[SeedingSession, AMemberEdit, UserAdapter, Answer]):
+class NullProjectsLeaveTheMembership(
+    Scenario[TestSeedingSession, AMemberEdit, UserAdapter, Answer]
+):
     started: datetime
 
     @override
@@ -213,7 +221,7 @@ class NullProjectsLeaveTheMembership(Scenario[SeedingSession, AMemberEdit, UserA
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AMemberEdit]:
+    def given(self) -> Given[TestSeedingSession, AMemberEdit]:
         return AProjectMemberAndAnEditor()
 
     @override
@@ -231,7 +239,7 @@ class SomeoneEditingAnother(Given[Any, AnEdit]):
 
     `on_target`은 대상 사용자 스코프에서, `on_domain`은 도메인 스코프에서 부르는 사람이 받는
     사용자 권한이다. `others`만큼 사용자를 더 두고, `key_on`이 가리키는 사람에게 기본이 아닌
-    키를 하나 더 준다.
+    키를 하나 더 준다. `target_needs_password_change`면 대상 사용자가 비밀번호 변경을 요구받는다.
     """
 
     role: UserRole = UserRole.USER
@@ -239,6 +247,7 @@ class SomeoneEditingAnother(Given[Any, AnEdit]):
     on_domain: tuple[Permission, ...] = ()
     others: int = 0
     key_on: str | None = None
+    target_needs_password_change: bool = False
 
     @override
     def describe(self) -> str:
@@ -255,12 +264,16 @@ class SomeoneEditingAnother(Given[Any, AnEdit]):
             )
         if self.key_on is not None:
             parts.append("한 사람에게 기본이 아닌 키가 하나 더 있다")
+        if self.target_needs_password_change:
+            parts.append("대상 사용자는 비밀번호 변경을 요구받는다")
         return ", ".join(parts)
 
     @override
     async def lay(self, seeding: Any) -> AnEdit:
-        domain = await seeding.creating(SeedDomain(name_hint="home", description=WAS_HERE))
-        target = await seeding.within(SomeoneOf(domain))
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        target = await seeding.within(
+            SomeoneOf(domain, need_password_change=self.target_needs_password_change)
+        )
         others = [await seeding.within(SomeoneOf(domain)) for _ in range(self.others)]
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         observer = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
@@ -270,10 +283,10 @@ class SomeoneEditingAnother(Given[Any, AnEdit]):
             await seeding.within(AGrant.on_domain(domain, caller, *self.on_domain))
         extra_key = None
         if self.key_on is not None:
-            policy = await seeding.creating(SeedKeypairPolicy())
+            policy = await seeding.creating(TestSeedKeypairPolicy())
             owner = target if self.key_on == "target" else others[0]
             extra_key = await seeding.adding(
-                SeedKeypairOf(resource_policy=seeding.made(policy).name), owner
+                TestSeedKeypairOf(resource_policy=seeding.made(policy).name), owner
             )
         return AnEdit(
             caller=seeding.made(caller),
@@ -281,6 +294,32 @@ class SomeoneEditingAnother(Given[Any, AnEdit]):
             observer=seeding.made(observer),
             others=tuple(seeding.made(one) for one in others),
             extra_key=seeding.made(extra_key) if extra_key is not None else None,
+        )
+
+
+@dataclass(frozen=True)
+class SomeoneEditingThemselves(Given[Any, AnEdit]):
+    """비밀번호 변경을 요구받는 사용자 한 명. 자기 사용자 스코프에서 UPDATE와 READ를 받았다."""
+
+    @override
+    def describe(self) -> str:
+        return (
+            "도메인 하나와 비밀번호 변경을 요구받는 사용자 한 명, "
+            "그 사용자는 자기 사용자 스코프에서 UPDATE, READ를 받았다"
+        )
+
+    @override
+    async def lay(self, seeding: Any) -> AnEdit:
+        domain = await seeding.creating(TestSeedDomain(name_hint="home", description=WAS_HERE))
+        me = await seeding.within(SomeoneOf(domain, need_password_change=True))
+        observer = await seeding.within(SomeoneOf(domain, role=UserRole.SUPERADMIN))
+        await seeding.within(AGrant.on_user(me, me, Permission.UPDATE, Permission.READ))
+        return AnEdit(
+            caller=seeding.made(me),
+            target=seeding.made(me),
+            observer=seeding.made(observer),
+            others=(),
+            extra_key=None,
         )
 
 
@@ -301,6 +340,49 @@ class ChangingTheFullName(When[AnEdit, UserAdapter, Answer]):
         with ActingAs(laid.caller):
             payload = await adapter.update_user_by_id(
                 laid.target.id, UpdateUserInput(full_name=RENAMED)
+            )
+        return payload.user
+
+
+@dataclass(frozen=True)
+class ChangingAnotherUsersPasswordOnly(When[AnEdit, UserAdapter, Answer]):
+    """다른 사용자의 비밀번호만 바꾼다."""
+
+    @override
+    def operation(self) -> str:
+        return "update_user_by_id"
+
+    @override
+    def describe(self, laid: AnEdit) -> str:
+        return f"{laid.caller.username}이 {laid.target.username}의 비밀번호만 바꿈"
+
+    @override
+    async def call(self, adapter: UserAdapter, laid: AnEdit) -> Answer:
+        with ActingAs(laid.caller):
+            payload = await adapter.update_user_by_id(
+                laid.target.id, UpdateUserInput(password=NEW_PASSWORD)
+            )
+        return payload.user
+
+
+@dataclass(frozen=True)
+class SettingOwnPasswordLiftingTheRequirement(When[AnEdit, UserAdapter, Answer]):
+    """본인이 새 비밀번호와 요구 해제를 함께 준다. GQL resolver가 본인 요청에 싣는 입력이다."""
+
+    @override
+    def operation(self) -> str:
+        return "update_user_by_id"
+
+    @override
+    def describe(self, laid: AnEdit) -> str:
+        return f"{laid.caller.username}이 자기 비밀번호를 바꾸며 비밀번호 변경 요구를 풂"
+
+    @override
+    async def call(self, adapter: UserAdapter, laid: AnEdit) -> Answer:
+        with ActingAs(laid.caller):
+            payload = await adapter.update_user_by_id(
+                laid.target.id,
+                UpdateUserInput(password=NEW_PASSWORD, need_password_change=False),
             )
         return payload.user
 
@@ -388,7 +470,7 @@ class BulkRenamingOneAndCollidingAnother(When[AnEdit, UserAdapter, Answer]):
 
     @override
     def operation(self) -> str:
-        return "bulk_modify_users"
+        return "bulk_update_users"
 
     @override
     def describe(self, laid: AnEdit) -> str:
@@ -399,17 +481,19 @@ class BulkRenamingOneAndCollidingAnother(When[AnEdit, UserAdapter, Answer]):
 
     @override
     async def call(self, adapter: UserAdapter, laid: AnEdit) -> Answer:
-        action = BulkUpdateUserAction(
-            items=[
-                UserUpdater(user_id=UserID(laid.target.id), full_name=TriState.update(RENAMED)),
-                UserUpdater(
-                    user_id=UserID(laid.others[1].id),
-                    username=OptionalState.update(laid.others[0].username),
+        input = BulkUpdateUsersInput(
+            users=[
+                BulkUpdateUserItemInput(
+                    user_id=laid.target.id, input=UpdateUserInput(full_name=RENAMED)
+                ),
+                BulkUpdateUserItemInput(
+                    user_id=laid.others[1].id,
+                    input=UpdateUserInput(username=laid.others[0].username),
                 ),
             ]
         )
         with ActingAs(laid.caller):
-            return await adapter.bulk_modify_users(action, {})
+            return await adapter.bulk_update_users(input)
 
 
 @dataclass(frozen=True)
@@ -418,7 +502,7 @@ class BulkRenamingWithSomeoneElsesKey(When[AnEdit, UserAdapter, Answer]):
 
     @override
     def operation(self) -> str:
-        return "bulk_modify_users"
+        return "bulk_update_users"
 
     @override
     def describe(self, laid: AnEdit) -> str:
@@ -430,13 +514,18 @@ class BulkRenamingWithSomeoneElsesKey(When[AnEdit, UserAdapter, Answer]):
     @override
     async def call(self, adapter: UserAdapter, laid: AnEdit) -> Answer:
         assert laid.extra_key is not None
-        action = BulkUpdateUserAction(
-            items=[UserUpdater(user_id=UserID(laid.target.id), full_name=TriState.update(RENAMED))]
+        input = BulkUpdateUsersInput(
+            users=[
+                BulkUpdateUserItemInput(
+                    user_id=laid.target.id,
+                    input=UpdateUserInput(
+                        full_name=RENAMED, main_access_key=str(laid.extra_key.access_key)
+                    ),
+                )
+            ]
         )
         with ActingAs(laid.caller):
-            return await adapter.bulk_modify_users(
-                action, {UserID(laid.target.id): AccessKey(str(laid.extra_key.access_key))}
-            )
+            return await adapter.bulk_update_users(input)
 
 
 @dataclass(frozen=True)
@@ -455,6 +544,29 @@ class TheRenamedNode(Then[AnEdit, Answer]):
         if not isinstance(node, UserNode):
             return [Refused(NotEnoughPermission, answered.raised)]
         return UserNodeLook(self.started).verdicts(node, replace(laid.target, full_name=RENAMED))
+
+
+@dataclass(frozen=True)
+class ThePasswordChangeRequirement(Then[AnEdit, Answer]):
+    """비밀번호 변경 요구가 `required`인 노드가 통째로 온다."""
+
+    started: datetime
+    required: bool
+
+    @override
+    def says(self) -> str:
+        if self.required:
+            return "비밀번호 변경 요구가 남은 사용자 전체가 온다"
+        return "비밀번호 변경 요구가 풀린 사용자 전체가 온다"
+
+    @override
+    def look(self, laid: AnEdit, answered: Answered[Answer]) -> list[Verdict]:
+        node = answered.response
+        if not isinstance(node, UserNode):
+            return [Refused(NotEnoughPermission, answered.raised)]
+        return UserNodeLook(self.started).verdicts(
+            node, replace(laid.target, need_password_change=self.required)
+        )
 
 
 @dataclass(frozen=True)
@@ -573,7 +685,7 @@ class TheSwitchFailureIsAFailure(Then[AnEdit, Answer]):
 
 
 @dataclass(frozen=True)
-class AGrantedUserChangesOnlyTheFullName(Scenario[SeedingSession, AnEdit, UserAdapter, Answer]):
+class AGrantedUserChangesOnlyTheFullName(Scenario[TestSeedingSession, AnEdit, UserAdapter, Answer]):
     started: datetime
 
     @override
@@ -588,7 +700,7 @@ class AGrantedUserChangesOnlyTheFullName(Scenario[SeedingSession, AnEdit, UserAd
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEdit]:
+    def given(self) -> Given[TestSeedingSession, AnEdit]:
         return SomeoneEditingAnother(on_target=(Permission.UPDATE, Permission.READ))
 
     @override
@@ -601,7 +713,69 @@ class AGrantedUserChangesOnlyTheFullName(Scenario[SeedingSession, AnEdit, UserAd
 
 
 @dataclass(frozen=True)
-class AUserGrantedNothingMayNotEditAnother(Scenario[SeedingSession, AnEdit, UserAdapter, Answer]):
+class AnotherUsersNewPasswordLeavesTheRequirement(
+    Scenario[TestSeedingSession, AnEdit, UserAdapter, Answer]
+):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "another-users-new-password-leaves-the-password-change-requirement"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "대상 사용자 스코프에서 UPDATE와 READ를 받은 다른 사용자가 비밀번호 변경을 요구받는 "
+            "사용자에게 새 비밀번호만 주면, 요구가 남은 노드가 온다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AnEdit]:
+        return SomeoneEditingAnother(
+            on_target=(Permission.UPDATE, Permission.READ), target_needs_password_change=True
+        )
+
+    @override
+    def when(self) -> When[AnEdit, UserAdapter, Answer]:
+        return ChangingAnotherUsersPasswordOnly()
+
+    @override
+    def then(self) -> Then[AnEdit, Answer]:
+        return ThePasswordChangeRequirement(started=self.started, required=True)
+
+
+@dataclass(frozen=True)
+class OwnNewPasswordLiftsTheRequirement(Scenario[TestSeedingSession, AnEdit, UserAdapter, Answer]):
+    started: datetime
+
+    @override
+    def summary(self) -> str:
+        return "setting-ones-own-new-password-lifts-the-password-change-requirement"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "비밀번호 변경을 요구받는 사용자가 자기 사용자 스코프에서 UPDATE와 READ를 받고, "
+            "새 비밀번호와 요구 해제를 함께 주면, 요구가 풀린 노드가 온다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, AnEdit]:
+        return SomeoneEditingThemselves()
+
+    @override
+    def when(self) -> When[AnEdit, UserAdapter, Answer]:
+        return SettingOwnPasswordLiftingTheRequirement()
+
+    @override
+    def then(self) -> Then[AnEdit, Answer]:
+        return ThePasswordChangeRequirement(started=self.started, required=False)
+
+
+@dataclass(frozen=True)
+class AUserGrantedNothingMayNotEditAnother(
+    Scenario[TestSeedingSession, AnEdit, UserAdapter, Answer]
+):
     @override
     def summary(self) -> str:
         return "a-user-granted-nothing-may-not-edit-another-user"
@@ -611,7 +785,7 @@ class AUserGrantedNothingMayNotEditAnother(Scenario[SeedingSession, AnEdit, User
         return "역할을 받지 않은 사용자가 수정하려 하면, 엔티티 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnEdit]:
+    def given(self) -> Given[TestSeedingSession, AnEdit]:
         return SomeoneEditingAnother()
 
     @override
@@ -624,7 +798,7 @@ class AUserGrantedNothingMayNotEditAnother(Scenario[SeedingSession, AnEdit, User
 
 
 @dataclass(frozen=True)
-class ANameAnotherUserHoldsMayNotBeTaken(Scenario[SeedingSession, AnEdit, UserAdapter, Answer]):
+class ANameAnotherUserHoldsMayNotBeTaken(Scenario[TestSeedingSession, AnEdit, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "a-username-another-user-holds-may-not-be-taken"
@@ -634,7 +808,7 @@ class ANameAnotherUserHoldsMayNotBeTaken(Scenario[SeedingSession, AnEdit, UserAd
         return "권한 받은 사용자가 이미 쓰이는 사용자 이름을 주면, 입력 검증이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnEdit]:
+    def given(self) -> Given[TestSeedingSession, AnEdit]:
         return SomeoneEditingAnother(on_target=(Permission.UPDATE,), others=1)
 
     @override
@@ -647,7 +821,9 @@ class ANameAnotherUserHoldsMayNotBeTaken(Scenario[SeedingSession, AnEdit, UserAd
 
 
 @dataclass(frozen=True)
-class NamingADefaultKeyMovesItAfterTheEdit(Scenario[SeedingSession, AnEdit, UserAdapter, Answer]):
+class NamingADefaultKeyMovesItAfterTheEdit(
+    Scenario[TestSeedingSession, AnEdit, UserAdapter, Answer]
+):
     started: datetime
 
     @override
@@ -662,7 +838,7 @@ class NamingADefaultKeyMovesItAfterTheEdit(Scenario[SeedingSession, AnEdit, User
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEdit]:
+    def given(self) -> Given[TestSeedingSession, AnEdit]:
         return SomeoneEditingAnother(
             on_target=(Permission.UPDATE, Permission.READ), key_on="target"
         )
@@ -677,7 +853,7 @@ class NamingADefaultKeyMovesItAfterTheEdit(Scenario[SeedingSession, AnEdit, User
 
 
 @dataclass(frozen=True)
-class AGrantedUserChangesTheAllowedIp(Scenario[SeedingSession, AnEdit, UserAdapter, Answer]):
+class AGrantedUserChangesTheAllowedIp(Scenario[TestSeedingSession, AnEdit, UserAdapter, Answer]):
     started: datetime
 
     @override
@@ -692,7 +868,7 @@ class AGrantedUserChangesTheAllowedIp(Scenario[SeedingSession, AnEdit, UserAdapt
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEdit]:
+    def given(self) -> Given[TestSeedingSession, AnEdit]:
         return SomeoneEditingAnother(on_target=(Permission.UPDATE,))
 
     @override
@@ -706,7 +882,7 @@ class AGrantedUserChangesTheAllowedIp(Scenario[SeedingSession, AnEdit, UserAdapt
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotChangeTheAllowedIp(
-    Scenario[SeedingSession, AnEdit, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AnEdit, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -717,7 +893,7 @@ class AUserGrantedNothingMayNotChangeTheAllowedIp(
         return "역할 없이 허용 IP 수정을 보내면, 엔티티 권한 문이 막는다"
 
     @override
-    def given(self) -> Given[SeedingSession, AnEdit]:
+    def given(self) -> Given[TestSeedingSession, AnEdit]:
         return SomeoneEditingAnother()
 
     @override
@@ -731,7 +907,7 @@ class AUserGrantedNothingMayNotChangeTheAllowedIp(
 
 @dataclass(frozen=True)
 class TheSuperadminBulkEditSplitsUpdatedAndFailed(
-    Scenario[SeedingSession, AnEdit, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AnEdit, UserAdapter, Answer]
 ):
     started: datetime
 
@@ -747,7 +923,7 @@ class TheSuperadminBulkEditSplitsUpdatedAndFailed(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEdit]:
+    def given(self) -> Given[TestSeedingSession, AnEdit]:
         return SomeoneEditingAnother(role=UserRole.SUPERADMIN, others=2)
 
     @override
@@ -761,7 +937,7 @@ class TheSuperadminBulkEditSplitsUpdatedAndFailed(
 
 @dataclass(frozen=True)
 class AFailedKeySwitchTurnsTheUserIntoAFailure(
-    Scenario[SeedingSession, AnEdit, UserAdapter, Answer]
+    Scenario[TestSeedingSession, AnEdit, UserAdapter, Answer]
 ):
     @override
     def summary(self) -> str:
@@ -775,7 +951,7 @@ class AFailedKeySwitchTurnsTheUserIntoAFailure(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEdit]:
+    def given(self) -> Given[TestSeedingSession, AnEdit]:
         return SomeoneEditingAnother(role=UserRole.SUPERADMIN, others=1, key_on="other")
 
     @override
@@ -788,7 +964,7 @@ class AFailedKeySwitchTurnsTheUserIntoAFailure(
 
 
 @dataclass(frozen=True)
-class OnlyTheSuperadminMayBulkEdit(Scenario[SeedingSession, AnEdit, UserAdapter, Answer]):
+class OnlyTheSuperadminMayBulkEdit(Scenario[TestSeedingSession, AnEdit, UserAdapter, Answer]):
     @override
     def summary(self) -> str:
         return "a-user-who-is-not-the-superadmin-may-not-bulk-edit-users"
@@ -801,7 +977,7 @@ class OnlyTheSuperadminMayBulkEdit(Scenario[SeedingSession, AnEdit, UserAdapter,
         )
 
     @override
-    def given(self) -> Given[SeedingSession, AnEdit]:
+    def given(self) -> Given[TestSeedingSession, AnEdit]:
         return SomeoneEditingAnother(on_domain=(Permission.UPDATE,), others=2)
 
     @override
@@ -813,9 +989,11 @@ class OnlyTheSuperadminMayBulkEdit(Scenario[SeedingSession, AnEdit, UserAdapter,
         return TheCallIsRefused(InsufficientPrivilege)
 
 
-SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Answer]] = [
+SCENARIOS: list[Scenario[TestSeedingSession, Any, UserAdapter, Answer]] = [
     AGrantedUserChangesOnlyTheFullName(started=datetime.now(UTC)),
     AUserGrantedNothingMayNotEditAnother(),
+    AnotherUsersNewPasswordLeavesTheRequirement(started=datetime.now(UTC)),
+    OwnNewPasswordLiftsTheRequirement(started=datetime.now(UTC)),
     ANameAnotherUserHoldsMayNotBeTaken(),
     NullProjectsLeaveTheMembership(started=datetime.now(UTC)),
     NamingADefaultKeyMovesItAfterTheEdit(started=datetime.now(UTC)),
@@ -829,7 +1007,7 @@ SCENARIOS: list[Scenario[SeedingSession, Any, UserAdapter, Answer]] = [
 
 @pytest.mark.parametrize("scenario", SCENARIOS, ids=lambda s: s.summary())
 async def test_editing(
-    scenario: Scenario[SeedingSession, Any, UserAdapter, Answer],
+    scenario: Scenario[TestSeedingSession, Any, UserAdapter, Answer],
     adapter: UserAdapter,
     engine: ExtendedAsyncSAEngine,
 ) -> None:

@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
+from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.types import PreemptionMode
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.preempt_sessions import (
@@ -16,7 +17,7 @@ from ai.backend.manager.sokovan.scheduler.handlers.lifecycle.preempt_sessions im
 from ai.backend.manager.sokovan.scheduler.types import ScheduleType
 from ai.backend.manager.views.sokovan.lifecycle import SessionWithKernels
 
-_REASON = "PREEMPTED_BY_SCHEDULER"
+_REASON = KernelLifecycleEventReason.PREEMPTED_BY_SCHEDULER
 
 
 class TestPreemptSessionsLifecycleHandler:

@@ -19,31 +19,32 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.types import BinarySize, ResourceSlot
+from ai.backend.manager.data.image.types import ImageStatus, ImageType
 from ai.backend.manager.data.project.types import ProjectType
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.image import ImageRow, ImageStatus, ImageType
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.image.scopes import (
-    ContainerRegistryImageOperationScope,
-    GlobalImageOperationScope,
-    ProjectImageOperationScope,
+    ContainerRegistryImageTarget,
+    ProjectImageTarget,
+    PublicImageTarget,
 )
-from ai.backend.manager.models.keypair import KeyPairRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.scopes import OperationScope
 from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.scope_binding import ScopeBindingRow
 from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
-from ai.backend.manager.repositories.base import BatchQuerier
 from ai.backend.manager.repositories.base.querier import (
+    BatchQuerier,
     BatchQuerierResult,
     execute_batch_querier,
 )
@@ -110,7 +111,7 @@ class TestImageScopedSearch:
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
     ) -> dict[str, uuid.UUID]:
-        """One image created in a project, one in a registry marked global."""
+        """One image created in a project, one in a registry registered in public."""
         project_id = uuid.uuid4()
         owned_registry_id = uuid.uuid4()
         global_registry_id = uuid.uuid4()
@@ -198,7 +199,7 @@ class TestImageScopedSearch:
     ) -> None:
         result = await _search(
             db_with_cleanup,
-            [ProjectImageOperationScope(project_id=ProjectID(test_data["project_id"]))],
+            [ProjectImageTarget(project_id=ProjectID(test_data["project_id"]))],
         )
         assert [row.ImageRow.id for row in result.rows] == [test_data["owned_image_id"]]
 
@@ -210,7 +211,7 @@ class TestImageScopedSearch:
         result = await _search(
             db_with_cleanup,
             [
-                ContainerRegistryImageOperationScope(
+                ContainerRegistryImageTarget(
                     registry_id=ContainerRegistryID(test_data["owned_registry_id"])
                 )
             ],
@@ -223,7 +224,7 @@ class TestImageScopedSearch:
         test_data: dict[str, uuid.UUID],
     ) -> None:
         """The global image is in no scope's graph, and is read all the same."""
-        result = await _search(db_with_cleanup, [GlobalImageOperationScope()])
+        result = await _search(db_with_cleanup, [PublicImageTarget()])
         assert [row.ImageRow.id for row in result.rows] == [test_data["shared_image_id"]]
 
     async def test_scopes_are_combined_with_or(
@@ -234,8 +235,8 @@ class TestImageScopedSearch:
         result = await _search(
             db_with_cleanup,
             [
-                ProjectImageOperationScope(project_id=ProjectID(test_data["project_id"])),
-                GlobalImageOperationScope(),
+                ProjectImageTarget(project_id=ProjectID(test_data["project_id"])),
+                PublicImageTarget(),
             ],
         )
         assert {row.ImageRow.id for row in result.rows} == {

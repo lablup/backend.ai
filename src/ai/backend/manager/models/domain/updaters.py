@@ -12,8 +12,8 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.domain.types import DomainData, DomainStatus
 from ai.backend.manager.errors.resource import DomainPurgeInProgress
-from ai.backend.manager.models.domain.conditions import DomainConditions
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater, GuardedDataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -26,7 +26,6 @@ class DomainUpdater(GuardedDataUpdater[DomainRow, DomainData]):
     domain_id: DomainID
     new_name: OptionalState[str] = field(default_factory=OptionalState[str].nop)
     description: TriState[str] = field(default_factory=TriState[str].nop)
-    is_active: OptionalState[bool] = field(default_factory=OptionalState[bool].nop)
     total_resource_slots: TriState[ResourceSlot] = field(default_factory=TriState[ResourceSlot].nop)
     allowed_vfolder_hosts: OptionalState[dict[str, list[str]]] = field(
         default_factory=OptionalState[dict[str, list[str]]].nop
@@ -54,7 +53,9 @@ class DomainUpdater(GuardedDataUpdater[DomainRow, DomainData]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=DomainConditions.not_being_purged(),
+                condition=DomainSearchableFields.own.status.filter.not_in(
+                    DomainStatus.purge_in_progress()
+                ),
                 error=DomainPurgeInProgress(f"Domain is being purged: {self.domain_id}"),
             ),
         )
@@ -65,7 +66,6 @@ class DomainUpdater(GuardedDataUpdater[DomainRow, DomainData]):
         self.new_name.update_dict(to_update, "name")
         self.dotfiles.update_dict(to_update, "dotfiles")
         self.description.update_dict(to_update, "description")
-        self.is_active.update_dict(to_update, "is_active")
         self.total_resource_slots.update_dict(to_update, "total_resource_slots")
         self.allowed_vfolder_hosts.update_dict(to_update, "allowed_vfolder_hosts")
         self.allowed_docker_registries.update_dict(to_update, "allowed_docker_registries")
@@ -80,7 +80,7 @@ class DomainUpdater(GuardedDataUpdater[DomainRow, DomainData]):
 
     @override
     def to_data(self, row: DomainRow) -> DomainData:
-        return row.to_data()
+        return DomainSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -114,7 +114,7 @@ class DomainDotfilesUpdater(DataUpdater[DomainRow, DomainData]):
 
     @override
     def to_data(self, row: DomainRow) -> DomainData:
-        return row.to_data()
+        return DomainSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -140,7 +140,9 @@ class DomainSoftDeleteUpdater(GuardedDataUpdater[DomainRow, DomainData]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=DomainConditions.not_being_purged(),
+                condition=DomainSearchableFields.own.status.filter.not_in(
+                    DomainStatus.purge_in_progress()
+                ),
                 error=DomainPurgeInProgress(f"Domain is being purged: {self.domain_id}"),
             ),
         )
@@ -156,7 +158,7 @@ class DomainSoftDeleteUpdater(GuardedDataUpdater[DomainRow, DomainData]):
 
     @override
     def to_data(self, row: DomainRow) -> DomainData:
-        return row.to_data()
+        return DomainSearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -183,7 +185,9 @@ class DomainRestoreUpdater(GuardedDataUpdater[DomainRow, DomainData]):
     def guard_checks(self) -> Sequence[GuardCheck]:
         return (
             GuardCheck(
-                condition=DomainConditions.not_being_purged(),
+                condition=DomainSearchableFields.own.status.filter.not_in(
+                    DomainStatus.purge_in_progress()
+                ),
                 error=DomainPurgeInProgress(f"Domain is being purged: {self.domain_id}"),
             ),
         )
@@ -199,4 +203,4 @@ class DomainRestoreUpdater(GuardedDataUpdater[DomainRow, DomainData]):
 
     @override
     def to_data(self, row: DomainRow) -> DomainData:
-        return row.to_data()
+        return DomainSearchableFields.own.to_data(row)

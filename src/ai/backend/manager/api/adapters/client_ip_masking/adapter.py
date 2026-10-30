@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from typing import assert_never
+
 from ai.backend.common.data.entity.client_ip_masking import ClientIPMaskingPolicyID
 from ai.backend.common.dto.manager.v2.client_ip_masking.request import (
     AdminSearchClientIPMaskingPoliciesInput,
     AdminUpsertClientIPMaskingPolicyInput,
     ClientIPMaskingPolicyFilter,
     ClientIPMaskingPolicyOrder,
+    PartialBulkPurgeClientIPMaskingPoliciesInput,
 )
 from ai.backend.common.dto.manager.v2.client_ip_masking.response import (
     AdminSearchClientIPMaskingPoliciesPayload,
@@ -23,16 +27,29 @@ from ai.backend.common.dto.manager.v2.client_ip_masking.types import (
 from ai.backend.common.dto.manager.v2.client_ip_masking.types import (
     ClientIPMaskingTarget as ClientIPMaskingTargetDTO,
 )
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import (
+    OrderDirection,
+    PartialBulkFailure,
+    PartialBulkPayload,
+)
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.client_ip.masking import ClientIPMaskingMode, ClientIPMaskingTarget
 from ai.backend.manager.data.client_ip.types import ClientIPMaskingPolicyData
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.client_ip_masking.conditions import ClientIPMaskingPolicyConditions
-from ai.backend.manager.models.client_ip_masking.orders import ClientIPMaskingPolicyOrders
 from ai.backend.manager.models.client_ip_masking.row import ClientIPMaskingPolicyRow
+from ai.backend.manager.models.client_ip_masking.searchable_fields import (
+    ClientIPMaskingPolicySearchableFields,
+)
 from ai.backend.manager.models.client_ip_masking.searchers import ClientIPMaskingPolicySearcher
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
+from ai.backend.manager.services.client_ip_masking.actions.bulk_get import (
+    BulkGetClientIPMaskingPoliciesAction,
+)
+from ai.backend.manager.services.client_ip_masking.actions.partial_bulk_purge import (
+    PartialBulkPurgeClientIPMaskingPoliciesAction,
+)
 from ai.backend.manager.services.client_ip_masking.actions.purge import (
     PurgeClientIPMaskingPolicyAction,
 )
@@ -47,7 +64,9 @@ from ai.backend.manager.services.client_ip_masking.processors import ClientIPMas
 
 def _pagination_spec() -> PaginationSpec:
     return PaginationSpec(
-        forward_order=ClientIPMaskingPolicyOrders.target_type(ascending=True),
+        forward_order=ClientIPMaskingPolicySearchableFields.own.target_type.order.apply(
+            ascending=True
+        ),
         cursor_column=ClientIPMaskingPolicyRow.id,
     )
 
@@ -59,6 +78,22 @@ class ClientIPMaskingAdapter(BaseAdapter):
 
     def __init__(self, client_ip_masking: ClientIPMaskingProcessors) -> None:
         self._client_ip_masking = client_ip_masking
+
+    async def batch_load_by_ids(
+        self, ids: Sequence[ClientIPMaskingPolicyID]
+    ) -> list[ClientIPMaskingPolicyNode | Exception | None]:
+        """Batch load client IP masking policies by id for DataLoader use, one answer per id."""
+        if not ids:
+            return []
+        result = await self._client_ip_masking.bulk_get.run(
+            BulkGetClientIPMaskingPoliciesAction(ids=ids)
+        )
+        return [
+            self._data_to_node(item.value)
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def admin_search(
         self, input: AdminSearchClientIPMaskingPoliciesInput
@@ -78,7 +113,9 @@ class ClientIPMaskingAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._client_ip_masking.global_search.run(
-            SearchClientIPMaskingPoliciesAction(searcher=searcher)
+            SearchClientIPMaskingPoliciesAction(
+                searcher=GlobalSearcher(used_by=(), searcher=searcher)
+            )
         )
         return AdminSearchClientIPMaskingPoliciesPayload(
             items=[self._data_to_node(item) for item in result.items],
@@ -87,9 +124,10 @@ class ClientIPMaskingAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
-    async def admin_upsert(
+    async def upsert(
         self, input: AdminUpsertClientIPMaskingPolicyInput
     ) -> ClientIPMaskingPolicyPayload:
+        """Set the masking one target gets."""
         result = await self._client_ip_masking.global_upsert.run(
             UpsertClientIPMaskingPolicyAction(
                 target_type=ClientIPMaskingTarget(input.target_type.value),
@@ -100,41 +138,66 @@ class ClientIPMaskingAdapter(BaseAdapter):
         )
         return ClientIPMaskingPolicyPayload(policy=self._data_to_node(result.data))
 
-    async def admin_purge(self, policy_id: ClientIPMaskingPolicyID) -> ClientIPMaskingPolicyPayload:
+    async def purge(self, policy_id: ClientIPMaskingPolicyID) -> ClientIPMaskingPolicyPayload:
+        """Drop one target's policy so it falls back to the default."""
         result = await self._client_ip_masking.purge.run(
             PurgeClientIPMaskingPolicyAction(id=policy_id)
         )
         return ClientIPMaskingPolicyPayload(policy=self._data_to_node(result.data))
 
-    @staticmethod
-    def _convert_filter(f: ClientIPMaskingPolicyFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
+    async def partial_bulk_purge(
+        self, input: PartialBulkPurgeClientIPMaskingPoliciesInput
+    ) -> PartialBulkPayload[ClientIPMaskingPolicyNode]:
+        """Drop several policies, answering for each one."""
+        result = await self._client_ip_masking.partial_bulk_purge.run(
+            PartialBulkPurgeClientIPMaskingPoliciesAction(
+                ids=[ClientIPMaskingPolicyID(policy_id) for policy_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[ClientIPMaskingPolicyData]
+    ) -> PartialBulkPayload[ClientIPMaskingPolicyNode]:
+        return PartialBulkPayload[ClientIPMaskingPolicyNode](
+            successes=[
+                self._data_to_node(item.value) for item in result.items if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
+
+    def _convert_filter(self, f: ClientIPMaskingPolicyFilter) -> list[QueryCondition]:
+        fields = ClientIPMaskingPolicySearchableFields.own
+        conditions: list[QueryCondition] = [*self.apply_uuid_filter(f.entity_id, fields.id.filter)]
         if f.target_type is not None:
             conditions.append(
-                ClientIPMaskingPolicyConditions.by_target_type(
-                    ClientIPMaskingTarget(f.target_type.value)
-                )
+                fields.target_type.filter.equals(ClientIPMaskingTarget(f.target_type.value))
             )
         if f.mode is not None:
-            conditions.append(
-                ClientIPMaskingPolicyConditions.by_mode(ClientIPMaskingMode(f.mode.value))
-            )
+            conditions.append(fields.mode.filter.equals(ClientIPMaskingMode(f.mode.value)))
         return conditions
 
     @staticmethod
     def _convert_orders(orders: list[ClientIPMaskingPolicyOrder]) -> list[QueryOrder]:
+        fields = ClientIPMaskingPolicySearchableFields.own
         result: list[QueryOrder] = []
         for o in orders:
             ascending = o.direction == OrderDirection.ASC
             match o.field:
                 case ClientIPMaskingPolicyOrderField.TARGET_TYPE:
-                    result.append(ClientIPMaskingPolicyOrders.target_type(ascending))
+                    result.append(fields.target_type.order.apply(ascending))
                 case ClientIPMaskingPolicyOrderField.MODE:
-                    result.append(ClientIPMaskingPolicyOrders.mode(ascending))
+                    result.append(fields.mode.order.apply(ascending))
                 case ClientIPMaskingPolicyOrderField.CREATED_AT:
-                    result.append(ClientIPMaskingPolicyOrders.created_at(ascending))
+                    result.append(fields.created_at.order.apply(ascending))
                 case ClientIPMaskingPolicyOrderField.UPDATED_AT:
-                    result.append(ClientIPMaskingPolicyOrders.updated_at(ascending))
+                    result.append(fields.updated_at.order.apply(ascending))
+                case _:
+                    assert_never(o.field)
         return result
 
     @staticmethod

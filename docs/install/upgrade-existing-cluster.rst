@@ -39,7 +39,7 @@ Upgrading Backend.AI Manager
 
 1. Stop the manager process running at server.
 2. Upgrade the Python package by executing ``pip install -U backend.ai-manager==<target version>``.
-3. Match databse schema with latest by executing ``alembic upgrade head``.
+3. Match database schema with latest by executing ``alembic upgrade head``.
 4. Restart the process.
 
 
@@ -77,7 +77,7 @@ To plan the upgrade, first check following facts:
 
 
 Example of allowed upgrade paths
-~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * **23.09.10 (latest in the previous major)** -> 24.03.0
 * **23.09.10 (latest in the previous major)** -> 24.03.5
 * 23.09.9 -> **23.09.10 (latest in the previous major)** -> 24.03.0
@@ -85,7 +85,7 @@ Example of allowed upgrade paths
 * ...
 
 Example of forbidden upgrade paths
-~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 * 23.09.9 (a non-latest minor version of the prior release) -> 24.03.0
 * 23.03.0 (not a direct prior release) -> 24.03.0
 * ...
@@ -96,8 +96,8 @@ Upgrading Backend.AI Manager
 
 1. Stop the manager process running at server.
 2. Upgrade the Python package by executing ``pip install -U backend.ai-manager==<target version>``.
-3. Match databse schema with latest by executing ``alembic upgrade head``.
-4. Fill out any missing DB revisions by executing ``backend.ai mgr schema apply-mission-revisions <version number of previous Backend.AI software>``.
+3. Match database schema with latest by executing ``alembic upgrade head``.
+4. Fill out any missing DB revisions by executing ``backend.ai mgr schema apply-missing-revisions <version number of previous Backend.AI software>``.
 5. Start the process again.
 
 

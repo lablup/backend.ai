@@ -1,4 +1,3 @@
-import asyncio
 import glob
 import logging
 from collections.abc import Mapping, MutableMapping, Sequence
@@ -10,6 +9,7 @@ from typing import Any
 import aiodocker
 
 from ai.backend.accelerator.furiosa import __version__
+from ai.backend.common.asyncio import run_in_executor_with_context
 
 from .warboy_api import WarboyAPI
 
@@ -41,12 +41,12 @@ from ai.backend.common.types import (
     SlotName,
     SlotTypes,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 PREFIX = "warboy"
 
 
-log = BraceStyleAdapter(logging.getLogger("ai.backend.accelerator.warboy"))
+log = StructuredLogger(logging.getLogger("ai.backend.accelerator.warboy"))
 
 
 class WarboyDevice(AbstractComputeDevice):
@@ -90,10 +90,12 @@ class WarboyPlugin(AbstractComputePlugin):
 
         try:
             detected_devices = await self.list_devices()
-            log.info("detected devices:\n" + pformat(detected_devices))
-            log.info("Warboy acceleration is enabled.")
+            log.debug("detected devices:\n{}", pformat(detected_devices))
+            log.info(
+                "accelerator enabled", plugin_name=self.key, device_count=len(detected_devices)
+            )
         except ImportError:
-            log.warning("could not find Furiosa devices.")
+            log.warning("accelerator disabled: no devices found", plugin_name=self.key)
             self.enabled = False
 
     async def list_devices(self) -> list[WarboyDevice]:
@@ -173,7 +175,7 @@ class WarboyPlugin(AbstractComputePlugin):
         ]
         devices: dict[str, str] = {}
         for alloc_idx, device_id in enumerate(device_ids):
-            source_paths = await asyncio.get_running_loop().run_in_executor(
+            source_paths = await run_in_executor_with_context(
                 None, glob.glob, f"/dev/npu{device_id}"
             )
             for source_path in source_paths:

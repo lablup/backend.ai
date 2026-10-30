@@ -23,6 +23,7 @@ import pytest
 from aiohttp import web
 
 from ai.backend.common.api_handlers import BodyParam, QueryParam
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.dto.manager.resource.request import (
     CheckPresetsRequest,
     UsagePerPeriodQuery,
@@ -30,10 +31,11 @@ from ai.backend.common.dto.manager.resource.request import (
 )
 from ai.backend.common.types import LegacyResourceSlotState as ResourceSlotState
 from ai.backend.common.types import SlotQuantity
+from ai.backend.manager.actions.v2.ops.result import LookupOpsResult
 from ai.backend.manager.api.rest.resource.handler import ResourceHandler
 from ai.backend.manager.data.manager_status.types import ManagerStatus
-from ai.backend.manager.dto.context import RequestCtx, UserContext
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.dto.context import UserContext
+from ai.backend.manager.models.user.row import UserRole
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -53,7 +55,11 @@ def mock_root_ctx() -> MagicMock:
 @pytest.fixture
 def mock_processors() -> MagicMock:
     """Mock Processors for ResourceHandler constructor injection."""
-    return MagicMock()
+    processors = MagicMock()
+    processors.resource_group.lookup.run = AsyncMock(
+        return_value=LookupOpsResult(resolved_entity_id=ResourceGroupID(uuid.uuid4()))
+    )
+    return processors
 
 
 @pytest.fixture
@@ -61,6 +67,7 @@ def handler(mock_processors: MagicMock) -> ResourceHandler:
     """ResourceHandler instance with mock processors."""
     return ResourceHandler(
         resource_preset=mock_processors.resource_preset,
+        resource_group=mock_processors.resource_group,
         agent=mock_processors.agent,
         project=mock_processors.project,
         user=mock_processors.user,
@@ -275,7 +282,7 @@ class TestCheckPresets:
         handler: ResourceHandler,
         mock_processors: MagicMock,
     ) -> None:
-        """Verify group, scaling_group, access_key etc. are passed to Action and response is returned."""
+        """Verify group, scaling_group, user etc. are passed to Action and response is returned."""
         user_uuid = uuid.uuid4()
         body: BodyParam[CheckPresetsRequest] = BodyParam(CheckPresetsRequest)
         body.from_body({"scaling_group": "sg-test", "group": "test-group"})
@@ -288,21 +295,13 @@ class TestCheckPresets:
             is_admin=False,
             is_superadmin=False,
         )
-        mock_req = MagicMock(spec=web.Request)
-        storage: dict[str, Any] = {
-            "keypair": {"access_key": "AKTEST", "resource_policy": "default"},
-        }
-        mock_req.__getitem__ = lambda _, key: storage[key]
-        req_ctx = RequestCtx(request=mock_req)
         mock_result, _ = self._create_mock_result()
         mock_processors.resource_preset.check_presets.run = AsyncMock(return_value=mock_result)
 
-        response = await handler.check_presets(body, user_context, req_ctx)
+        response = await handler.check_presets(body, user_context)
 
         call_args = mock_processors.resource_preset.check_presets.run.call_args
         action = call_args[0][0]
-        assert action.access_key == "AKTEST"
-        assert action.resource_policy == "default"
         assert action.domain_name == "default"
         assert action.user_id == user_uuid
         assert action.group == "test-group"
@@ -339,16 +338,10 @@ class TestCheckPresets:
             is_admin=False,
             is_superadmin=False,
         )
-        mock_req = MagicMock(spec=web.Request)
-        storage: dict[str, Any] = {
-            "keypair": {"access_key": "AKTEST", "resource_policy": "default"},
-        }
-        mock_req.__getitem__ = lambda _, key: storage[key]
-        req_ctx = RequestCtx(request=mock_req)
         mock_result, _ = self._create_mock_result()
         mock_processors.resource_preset.check_presets.run = AsyncMock(return_value=mock_result)
 
-        response = await handler.check_presets(body, user_context, req_ctx)
+        response = await handler.check_presets(body, user_context)
 
         response_body = response.to_json
         assert response_body is not None

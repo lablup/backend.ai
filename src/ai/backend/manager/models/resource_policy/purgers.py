@@ -1,4 +1,4 @@
-"""Delete specs of the three resource policies, keyed by the policy name."""
+"""Delete specs of the three resource policies, keyed by the policy id."""
 
 from __future__ import annotations
 
@@ -24,6 +24,11 @@ from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
+from ai.backend.manager.models.resource_policy.searchable_fields import (
+    KeyPairResourcePolicySearchableFields,
+    ProjectResourcePolicySearchableFields,
+    UserResourcePolicySearchableFields,
+)
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
@@ -32,7 +37,6 @@ from ai.backend.manager.models.specs.types import ConflictCheck
 class KeyPairResourcePolicyPurger(
     EntityPurger[KeyPairResourcePolicyRow, KeyPairResourcePolicyData]
 ):
-    name: str
     policy_id: KeyPairResourcePolicyUUID
 
     @override
@@ -53,12 +57,11 @@ class KeyPairResourcePolicyPurger(
 
     @override
     def to_data(self, row: KeyPairResourcePolicyRow) -> KeyPairResourcePolicyData:
-        return row.to_dataclass()
+        return KeyPairResourcePolicySearchableFields.own.to_data(row)
 
 
 @dataclass
 class UserResourcePolicyPurger(EntityPurger[UserResourcePolicyRow, UserResourcePolicyData]):
-    name: str
     policy_id: UserResourcePolicyUUID
 
     @override
@@ -79,14 +82,13 @@ class UserResourcePolicyPurger(EntityPurger[UserResourcePolicyRow, UserResourceP
 
     @override
     def to_data(self, row: UserResourcePolicyRow) -> UserResourcePolicyData:
-        return row.to_dataclass()
+        return UserResourcePolicySearchableFields.own.to_data(row)
 
 
 @dataclass
 class ProjectResourcePolicyPurger(
     EntityPurger[ProjectResourcePolicyRow, ProjectResourcePolicyData]
 ):
-    name: str
     policy_id: ProjectResourcePolicyUUID
 
     @override
@@ -107,4 +109,4 @@ class ProjectResourcePolicyPurger(
 
     @override
     def to_data(self, row: ProjectResourcePolicyRow) -> ProjectResourcePolicyData:
-        return row.to_dataclass()
+        return ProjectResourcePolicySearchableFields.own.to_data(row)

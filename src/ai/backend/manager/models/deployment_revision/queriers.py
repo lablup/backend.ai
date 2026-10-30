@@ -10,6 +10,9 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.deployment_revision import DeploymentRevisionID
 from ai.backend.manager.data.deployment.types import ModelRevisionData
 from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision.searchable_fields import (
+    ModelRevisionSearchableFields,
+)
 from ai.backend.manager.models.specs.querier import BulkFieldQuerier, FieldQuerier
 
 
@@ -31,7 +34,7 @@ class ModelRevisionQuerier(FieldQuerier[DeploymentRevisionRow, ModelRevisionData
 
     @override
     def to_data(self, row: DeploymentRevisionRow) -> ModelRevisionData:
-        return row.to_data()
+        return ModelRevisionSearchableFields.own.to_data(row)
 
 
 class BulkModelRevisionQuerier(BulkFieldQuerier[DeploymentRevisionRow, ModelRevisionData]):
@@ -47,4 +50,4 @@ class BulkModelRevisionQuerier(BulkFieldQuerier[DeploymentRevisionRow, ModelRevi
 
     @override
     def to_data(self, row: DeploymentRevisionRow) -> ModelRevisionData:
-        return row.to_data()
+        return ModelRevisionSearchableFields.own.to_data(row)

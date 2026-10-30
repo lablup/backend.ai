@@ -184,7 +184,7 @@ Then, create a systemd service file at
    [Service]
    Type=simple
    ExecStart=/home/bai/bin/run-storage-proxy.sh
-   PIDFile=/home/bai/storage-proxy/storage-proxy.pid
+   PIDFile=/home/bai/storage-proxy/storage_proxy.pid
    WorkingDirectory=/home/bai/storage-proxy
    User=1100
    Group=1100
@@ -192,7 +192,7 @@ Then, create a systemd service file at
    KillMode=process
    KillSignal=SIGTERM
    PrivateTmp=false
-   Restart=on-failure
+   Restart=always
    RestartSec=10
    LimitNOFILE=5242880
    LimitNPROC=131072

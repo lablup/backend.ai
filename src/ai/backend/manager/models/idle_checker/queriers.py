@@ -8,6 +8,9 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.manager.data.idle_checker.types import IdleCheckerData
 from ai.backend.manager.models.idle_checker.row import IdleCheckerRow
+from ai.backend.manager.models.idle_checker.searchable_fields import (
+    IdleCheckerSearchableFields,
+)
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier
 
 
@@ -24,4 +27,4 @@ class BulkIdleCheckerQuerier(BulkEntityQuerier[IdleCheckerRow, IdleCheckerData])
 
     @override
     def to_data(self, row: IdleCheckerRow) -> IdleCheckerData:
-        return row.to_data()
+        return IdleCheckerSearchableFields.own.to_data(row)

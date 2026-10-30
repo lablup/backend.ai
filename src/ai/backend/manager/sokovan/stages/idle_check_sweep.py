@@ -25,7 +25,9 @@ from ai.backend.manager.sokovan.reconciler.base import (
     ReconcilerStageRegistration,
     ReconcilerTaskSpec,
 )
-from ai.backend.manager.sokovan.scheduling_controller import SchedulingController
+from ai.backend.manager.sokovan.scheduling_controller.scheduling_controller import (
+    SchedulingController,
+)
 
 
 def build_idle_check_sweep_stage(

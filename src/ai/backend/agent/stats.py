@@ -44,7 +44,7 @@ from ai.backend.common.types import (
     SessionId,
     SlotName,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .errors import InvalidContainerMeasurementError
 from .metrics.metric import UtilizationMetricObserver
@@ -74,7 +74,7 @@ __all__ = (
     "StatModes",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 # Valkey expiration (TTL) of stored utilization values is derived from the configured
 # collection interval by this multiplier, so the TTL scales when the interval changes.
@@ -446,11 +446,11 @@ class StatContext:
         kernel_id: KernelId,
         container_id: ContainerId | None,
     ) -> None:
-        log.info("Removing metrics for kernel {} (container: {})", kernel_id, container_id)
+        log.debug("kernel metrics removing", kernel_id=kernel_id, container_id=container_id)
         known_metrics = self.kernel_metrics.get(kernel_id)
-        log.debug("Known metrics for kernel {}: {}", kernel_id, known_metrics)
+        log.debug("kernel known metrics", kernel_id=kernel_id, known_metrics=str(known_metrics))
         if known_metrics is None:
-            log.warning("No known metrics for kernel {}", kernel_id)
+            log.debug("kernel metrics removal skipped, no known metrics", kernel_id=kernel_id)
             return
         metric_keys = list(known_metrics.keys())
         agent_id = self.agent.id
@@ -476,20 +476,18 @@ class StatContext:
         # - On macOS: code after return appears unreachable (needs type: ignore[unreachable])
         # - On Linux: type: ignore is unused (needs type: ignore[unused-ignore])
         if container_id is None:  # type: ignore[unreachable,unused-ignore]
-            log.warning(
-                "Skipping process metric removal for kernel {}: container_id is None", kernel_id
-            )
+            log.debug("process metrics removal skipped, no container", kernel_id=kernel_id)
             return
 
         process_metrics_for_container = self.process_metrics.get(container_id, {})
         if not process_metrics_for_container:
-            log.warning("No process metrics to remove for container {}", container_id)
+            log.debug("process metrics removal skipped, no metrics", container_id=container_id)
             return
 
-        log.info(
-            "Removing process metrics for container {}: {} PIDs",
-            container_id,
-            len(process_metrics_for_container),
+        log.debug(
+            "process metrics removing",
+            container_id=container_id,
+            pid_count=len(process_metrics_for_container),
         )
         for pid, metrics in process_metrics_for_container.items():
             metric_keys = list(metrics.keys())
@@ -532,7 +530,7 @@ class StatContext:
             results = await asyncio.gather(*_tasks, return_exceptions=True)
         for res in results:
             if isinstance(res, BaseException):
-                log.error("collect_node_stat(): gather_node_measures() error", exc_info=res)
+                log.error("node measure gather failed", exc_info=res)
                 continue
             slot_names, result = res
             for node_measure in result:
@@ -589,7 +587,10 @@ class StatContext:
                     metric_value = obj.to_serializable_dict()
                 except ValueError:
                     log.warning(
-                        "Failed to serialize metric (Device Id: {}, {})", device_id, str(obj.stats)
+                        "device metric serialize failed",
+                        device_id=device_id,
+                        metric_key=metric_key,
+                        metric_stats=str(obj.stats),
                     )
                     continue
                 device_metrics[metric_key][device_id] = metric_value
@@ -615,7 +616,7 @@ class StatContext:
                 node_metrics[key] = obj.to_serializable_dict()
             except ValueError:
                 log.warning(
-                    "Failed to serialize node metric (Metric key: {}, {})", key, str(obj.stats)
+                    "node metric serialize failed", metric_key=key, metric_stats=str(obj.stats)
                 )
                 continue
 
@@ -625,9 +626,9 @@ class StatContext:
         }
         if self.agent.local_config.debug.log_stats:
             log.debug(
-                "stats: node_updates: {0}: {1}",
-                self.agent.id,
-                redis_agent_updates["node"],
+                "node stats updated",
+                agent_id=self.agent.id,
+                node_metrics=str(redis_agent_updates["node"]),
             )
         with self._stage_observer.measure_stage(
             stage=CollectionStage.SERIALIZE, upper_layer=CollectionLayer.NODE
@@ -659,8 +660,8 @@ class StatContext:
             case [slot_name]:
                 return resource_scaling_factors[slot_name]
             case _:
-                log.warning(
-                    "Plugin defines more than 1 device slot info. Attempting best-effort match with metric key..."
+                log.debug(
+                    "multiple device slots defined, matching by metric key", metric_key=metric_key
                 )
                 slot_names_with_same_prefix_as_metric_key = [
                     slot_name
@@ -669,7 +670,11 @@ class StatContext:
                 ]
                 if len(slot_names_with_same_prefix_as_metric_key) == 1:
                     slot_name = slot_names_with_same_prefix_as_metric_key[0]
-                    log.info("Found slot name {} with same prefix as {}", slot_name, metric_key)
+                    log.debug(
+                        "device slot matched by metric key",
+                        slot_name=str(slot_name),
+                        metric_key=metric_key,
+                    )
                     return resource_scaling_factors[slot_name]
                 raise ValueError(
                     f"Plugin defines more than 1 device slots {slot_names}, "
@@ -745,7 +750,7 @@ class StatContext:
             try:
                 cid = info["container_id"]
             except KeyError:
-                log.warning("collect_container_stat(): no container for kernel {}", kid)
+                log.debug("container stat skipped, no container", kernel_id=kid)
             else:
                 kernel_id_map[ContainerId(cid)] = kid
                 kernel_obj_map[kid] = info
@@ -773,10 +778,7 @@ class StatContext:
         updated_kernel_ids: set[KernelId] = set()
         for result in results:
             if isinstance(result, BaseException):
-                log.error(
-                    "collect_container_stat(): gather_container_measures() error",
-                    exc_info=result,
-                )
+                log.error("container measure gather failed", exc_info=result)
                 continue
             for ctnr_measure in result:
                 if not isinstance(ctnr_measure, ContainerMeasurement):
@@ -824,7 +826,10 @@ class StatContext:
                     metric_value = obj.to_serializable_dict()
                 except ValueError:
                     log.warning(
-                        "Failed to serialize metric (Metric key: {}, {})", key, str(obj.stats)
+                        "kernel metric serialize failed",
+                        kernel_id=kernel_id,
+                        metric_key=key,
+                        metric_stats=str(obj.stats),
                     )
                     continue
                 serializable_metrics[key] = metric_value
@@ -846,7 +851,11 @@ class StatContext:
                     )
                 )
             if self.agent.local_config.debug.log_stats:
-                log.debug("kernel_updates: {0}: {1}", kernel_id, serializable_metrics)
+                log.debug(
+                    "kernel stats updated",
+                    kernel_id=kernel_id,
+                    kernel_metrics=str(serializable_metrics),
+                )
 
             serializable_by_kernel[str(kernel_id)] = serializable_metrics
 
@@ -875,9 +884,7 @@ class StatContext:
             result = await docker._query_json(f"containers/{container_id}/top", method="GET")
             procs = result["Processes"]
         except (KeyError, aiodocker.exceptions.DockerError):
-            log.debug(
-                "collect_per_container_process_stat(): cannot find container {}", container_id
-            )
+            log.debug("container process list not found", container_id=container_id)
             return return_val
 
         for proc in procs:
@@ -885,8 +892,9 @@ class StatContext:
                 return_val.append(PID(int(proc[1])))
             except (ValueError, KeyError):
                 log.debug(
-                    "collect_per_container_process_stat(): cannot parse PID from {}",
-                    proc,
+                    "container process pid parse failed",
+                    container_id=container_id,
+                    process_entry=str(proc),
                 )
                 continue
         return return_val
@@ -912,7 +920,7 @@ class StatContext:
             try:
                 cid = info["container_id"]
             except KeyError:
-                log.warning("collect_per_container_process_stat(): no container for kernel {}", kid)
+                log.debug("process stat skipped, no container", kernel_id=kid)
             else:
                 kernel_id_map[ContainerId(cid)] = kid
 
@@ -944,10 +952,7 @@ class StatContext:
         updated_cids: set[ContainerId] = set()
         for result in results:
             if isinstance(result, BaseException):
-                log.error(
-                    "collect_per_container_process_stat(): gather_process_measures() error",
-                    exc_info=result,
-                )
+                log.error("process measure gather failed", exc_info=result)
                 continue
             for proc_measure in result:
                 metric_key = proc_measure.key
@@ -1024,14 +1029,20 @@ class StatContext:
                     try:
                         serializable_metrics[str(key)] = obj.to_serializable_dict()
                     except ValueError:
-                        log.warning("Failed to serialize metric {}: {}", key, str(obj.stats))
+                        log.warning(
+                            "process metric serialize failed",
+                            container_id=cid,
+                            pid=pid,
+                            metric_key=str(key),
+                            metric_stats=str(obj.stats),
+                        )
                         continue
                 serializable_table[pid] = serializable_metrics
             if self.agent.local_config.debug.log_stats:
                 log.debug(
-                    "stats: process_updates: \ncontainer_id: {}\n{}",
-                    cid,
-                    serializable_table,
+                    "process stats updated",
+                    container_id=cid,
+                    process_metrics=str(serializable_table),
                 )
             serializable_by_cid[str(cid)] = serializable_table
 

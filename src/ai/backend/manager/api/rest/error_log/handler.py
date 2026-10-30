@@ -24,13 +24,14 @@ from ai.backend.common.dto.manager.error_log.response import (
     ListErrorLogsResponse,
     MarkClearedResponse,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.error_log.types import ErrorLogSeverity
 from ai.backend.manager.dto.context import UserContext
 from ai.backend.manager.models.error_log.creators import ErrorLogCreator
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.error_log.searchers import ErrorLogSearcher
 from ai.backend.manager.models.specs.pagination import OffsetPagination
+from ai.backend.manager.models.specs.searcher import GlobalSearcher
 from ai.backend.manager.services.user.error_log.actions.create import CreateErrorLogAction
 from ai.backend.manager.services.user.error_log.actions.delete import DeleteErrorLogAction
 from ai.backend.manager.services.user.error_log.actions.global_search import (
@@ -39,7 +40,7 @@ from ai.backend.manager.services.user.error_log.actions.global_search import (
 from ai.backend.manager.services.user.error_log.actions.search import SearchErrorLogsAction
 from ai.backend.manager.services.user.error_log.processors import ErrorLogProcessors
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ErrorLogHandler:
@@ -90,11 +91,11 @@ class ErrorLogHandler:
         # separate actions with separate gates, not one action that widens itself.
         if ctx.is_superadmin:
             result = await self._error_log.global_search.run(
-                GlobalSearchErrorLogsAction(searcher=searcher)
+                GlobalSearchErrorLogsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
             )
         else:
             result = await self._error_log.scoped_search.run(
-                SearchErrorLogsAction(user_id=UserID(ctx.user_uuid), searcher=searcher)
+                SearchErrorLogsAction(user_ids=[UserID(ctx.user_uuid)], searcher=searcher)
             )
 
         is_admin = ctx.is_superadmin or ctx.is_admin

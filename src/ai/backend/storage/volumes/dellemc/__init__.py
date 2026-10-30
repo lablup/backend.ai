@@ -3,34 +3,47 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, cast, override
+from typing import Any, ClassVar, cast, override
 
 import aiofiles.os
 
+from ai.backend.common.clients.storage_backends.dellemc.client import OneFSClient, OneFSClientArgs
+from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
+from ai.backend.common.data.entity.storage_volume import StorageVolumeName
+from ai.backend.common.data.storage.types import (
+    StorageBackendCapability,
+    StorageBackendType,
+)
+from ai.backend.common.dto.clients.storage_backends.dellemc.request import (
+    OneFSCreateQuotaRequest,
+    OneFSUpdateQuotaRequest,
+)
+from ai.backend.common.dto.clients.storage_backends.dellemc.response import OneFSQuotaThresholds
+from ai.backend.common.dto.clients.storage_backends.dellemc.types import (
+    OneFSQuotaID,
+    OneFSQuotaType,
+)
 from ai.backend.common.etcd import AsyncEtcd
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.types import HardwareMetadata, QuotaScopeID
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.storage.errors import QuotaDirectoryNotEmptyError
 from ai.backend.storage.types import CapacityUsage, FSPerfMetric, QuotaConfig, QuotaUsage
 from ai.backend.storage.volumes.abc import (
-    CAP_FAST_FS_SIZE,
-    CAP_METRIC,
-    CAP_QUOTA,
-    CAP_VFOLDER,
     AbstractQuotaModel,
 )
 from ai.backend.storage.volumes.vfs import BaseQuotaModel, BaseVolume
 from ai.backend.storage.watcher import WatcherClient
 
 from .config import config_iv
-from .exceptions import DellNoMetricError
-from .onefs_client import OneFSClient, QuotaThresholds, QuotaTypes
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class DellEMCOneFSQuotaModel(BaseQuotaModel):
+    ifs_path: Path
+    api_client: OneFSClient
+
     def __init__(
         self,
         mount_path: Path,
@@ -42,12 +55,12 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
         self.ifs_path = ifs_path
         self.api_client = api_client
 
-    async def _set_quota_id(self, qspath: Path, quota_id: str) -> None:
+    async def _set_quota_id(self, qspath: Path, quota_id: OneFSQuotaID) -> None:
         quota_id_path = qspath / ".quota_id"
         async with aiofiles.open(quota_id_path, "w") as file:
             await file.write(quota_id.rstrip())
 
-    async def _get_quota_id(self, qspath: Path) -> str | None:
+    async def _get_quota_id(self, qspath: Path) -> OneFSQuotaID | None:
         """
         Read OneFS quota id of the given path.
         Return `None` if no quota is set to the path.
@@ -56,7 +69,7 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
         if quota_id_path.exists():
             async with aiofiles.open(quota_id_path) as file:
                 quota_id = await file.read()
-            return quota_id.rstrip()
+            return OneFSQuotaID(quota_id.rstrip())
         return None
 
     async def _unset_quota_id(self, qspath: Path) -> None:
@@ -83,23 +96,22 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
     ) -> QuotaUsage | None:
         qspath = self.mangle_qspath(quota_scope_id)
         quota_id = await self._get_quota_id(qspath)
-        if quota_id is not None:
-            data = await self.api_client.get_quota(quota_id)
-            used_bytes = data["usage"]["fslogical"]
-            limit_bytes = data["thresholds"]["hard"]
-            if used_bytes < 0 or limit_bytes < 0:
-                log.warning(
-                    "Data from OneFS API negative values in used_bytes({}) or limit_bytes({}) for quota scope {}: response from OneFS API = {}",
-                    used_bytes,
-                    limit_bytes,
-                    quota_scope_id,
-                    data,
-                )
-            return QuotaUsage(
+        if quota_id is None:
+            return None
+        quota = await self.api_client.get_quota(quota_id)
+        used_bytes = quota.usage.fslogical if quota.usage.fslogical is not None else -1
+        limit_bytes = quota.thresholds.hard if quota.thresholds.hard is not None else -1
+        if used_bytes < 0 or limit_bytes < 0:
+            log.warning(
+                "negative quota usage reported",
                 used_bytes=used_bytes,
                 limit_bytes=limit_bytes,
+                response_body=quota.model_dump_json(),
             )
-        return None
+        return QuotaUsage(
+            used_bytes=used_bytes,
+            limit_bytes=limit_bytes,
+        )
 
     @override
     async def update_quota_scope(
@@ -109,23 +121,22 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
     ) -> None:
         qspath = self.mangle_qspath(quota_scope_id)
         quota_id = await self._get_quota_id(qspath)
+        thresholds = OneFSQuotaThresholds(hard=config.limit_bytes)
         if quota_id is not None:
             await self.api_client.update_quota(
                 quota_id,
-                QuotaThresholds(
-                    hard=config.limit_bytes,
-                ),
+                OneFSUpdateQuotaRequest(thresholds=thresholds),
             )
         else:
             quota_target_path = self.ifs_path / quota_scope_id.pathname
             result = await self.api_client.create_quota(
-                quota_target_path,
-                QuotaTypes.DIRECTORY,
-                QuotaThresholds(
-                    hard=config.limit_bytes,
-                ),
+                OneFSCreateQuotaRequest(
+                    path=str(quota_target_path),
+                    type=OneFSQuotaType.DIRECTORY,
+                    thresholds=thresholds,
+                )
             )
-            await self._set_quota_id(qspath, result["id"])
+            await self._set_quota_id(qspath, result.id)
 
     @override
     async def unset_quota(
@@ -135,7 +146,6 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
         qspath = self.mangle_qspath(quota_scope_id)
         quota_id = await self._get_quota_id(qspath)
         if len([p for p in qspath.iterdir() if p.is_dir()]) > 0:
-            # Check if any directory exists in the quota scope path
             raise QuotaDirectoryNotEmptyError(
                 f"Cannot delete quota scope '{quota_scope_id}': directory not empty"
             )
@@ -154,10 +164,8 @@ class DellEMCOneFSQuotaModel(BaseQuotaModel):
 
 
 class DellEMCOneFSVolume(BaseVolume):
-    name = "dellemc-onefs"
-    endpoint: str
-    dell_admin: str
-    dell_password: str
+    name: ClassVar[StorageBackendType] = StorageBackendType("dellemc-onefs")
+    api_client: OneFSClient
 
     def __init__(
         self,
@@ -169,28 +177,29 @@ class DellEMCOneFSVolume(BaseVolume):
         event_producer: EventProducer,
         watcher: WatcherClient | None = None,
         options: Mapping[str, Any] | None = None,
+        volume_name: StorageVolumeName,
+        status_check_config: VolumeStatusCheckConfig | None,
     ) -> None:
         super().__init__(
             local_config,
             mount_path,
             etcd=etcd,
             options=options,
+            volume_name=volume_name,
+            status_check_config=status_check_config,
             event_dispatcher=event_dispatcher,
             event_producer=event_producer,
             watcher=watcher,
         )
         self.config = cast(Mapping[str, Any], config_iv.check(self.config))
-        self.endpoint = self.config["dell_endpoint"]
-        self.dell_admin = self.config["dell_username"]
-        self.dell_password = str(self.config["dell_password"])
-        self.dell_api_version = self.config["dell_api_version"]
-        self.dell_system_name = self.config["dell_system_name"]
         self.api_client = OneFSClient(
-            str(self.endpoint),
-            self.dell_admin,
-            self.dell_password,
-            api_version=self.dell_api_version,
-            system_name=self.dell_system_name,
+            OneFSClientArgs(
+                endpoint=str(self.config["dell_endpoint"]),
+                user=self.config["dell_username"],
+                password=str(self.config["dell_password"]),
+                api_version=self.config["dell_api_version"],
+                system_name=self.config["dell_system_name"],
+            )
         )
 
     @override
@@ -205,73 +214,45 @@ class DellEMCOneFSVolume(BaseVolume):
         )
 
     @override
-    async def get_capabilities(self) -> frozenset[str]:
-        return frozenset([CAP_FAST_FS_SIZE, CAP_VFOLDER, CAP_QUOTA, CAP_METRIC])
+    async def get_capabilities(self) -> frozenset[StorageBackendCapability]:
+        return frozenset([
+            StorageBackendCapability.FAST_FS_SIZE,
+            StorageBackendCapability.VFOLDER,
+            StorageBackendCapability.QUOTA,
+            StorageBackendCapability.METRIC,
+        ])
 
     @override
     async def get_hwinfo(self) -> HardwareMetadata:
-        raw_metadata = await self.api_client.get_metadata()
+        metadata = await self.api_client.get_metadata()
         return {
             "status": "healthy",
             "status_info": None,
-            "metadata": {**raw_metadata},
+            "metadata": {"cluster": metadata.cluster, "nodes": metadata.nodes},
         }
 
     @override
     async def get_fs_usage(self) -> CapacityUsage:
         usage = await self.api_client.get_usage()
         return CapacityUsage(
-            capacity_bytes=int(usage["capacity_bytes"]),
-            used_bytes=int(usage["used_bytes"]),
+            capacity_bytes=usage.capacity_bytes,
+            used_bytes=usage.used_bytes,
         )
 
     @override
     async def get_performance_metric(self) -> FSPerfMetric:
-        protocol_stats = await self.get_protocol_stats()
-        workload = await self.get_workload_stats()
+        protocol_stats = await self.api_client.get_protocol_stats()
+        workload = await self.api_client.get_workload_stats()
+        disk_iops = protocol_stats.disk.iops if protocol_stats.disk is not None else None
+        onefs_out = protocol_stats.onefs.out if protocol_stats.onefs is not None else None
+        onefs_in = protocol_stats.onefs.in_ if protocol_stats.onefs is not None else None
+        latency_write = workload.latency_write if workload is not None else None
+        latency_read = workload.latency_read if workload is not None else None
         return FSPerfMetric(
-            iops_read=protocol_stats["disk"]["iops"] or 0,
-            # Dell does not support IOPS Read/Write, They support only IOPS.
+            iops_read=int(disk_iops or 0),
             iops_write=0,
-            io_bytes_read=protocol_stats["onefs"]["out"] or 0,
-            io_bytes_write=protocol_stats["onefs"]["in"] or 0,
-            io_usec_read=workload["latency_write"] or 0,
-            io_usec_write=workload["latency_read"] or 0,
+            io_bytes_read=int(onefs_out or 0),
+            io_bytes_write=int(onefs_in or 0),
+            io_usec_read=latency_write or 0,
+            io_usec_write=latency_read or 0,
         )
-
-    # -- Custom Methods --
-
-    async def get_drive_stats(self) -> Mapping[str, Any]:
-        try:
-            return await self.api_client.get_drive_stats()
-        except (IndexError, KeyError) as e:
-            raise DellNoMetricError from e
-
-    async def get_protocol_stats(self) -> Mapping[str, Any]:
-        try:
-            return await self.api_client.get_protocol_stats()
-        except (IndexError, KeyError):
-            return {
-                "disk": {
-                    "iops": 0,
-                },
-                "onefs": {
-                    "out": 0,
-                    "in": 0,
-                },
-            }
-
-    async def get_system_stats(self) -> Mapping[str, Any]:
-        try:
-            return await self.api_client.get_system_stats()
-        except (IndexError, KeyError) as e:
-            raise DellNoMetricError from e
-
-    async def get_workload_stats(self) -> Mapping[str, Any]:
-        try:
-            return await self.api_client.get_workload_stats()
-        except (IndexError, KeyError):
-            return {
-                "latency_write": 0,
-                "latency_read": 0,
-            }

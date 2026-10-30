@@ -32,7 +32,11 @@ from ai.backend.manager.repositories.client_ip_masking.repository import (
 )
 from ai.backend.manager.repositories.domain.repository import DomainRepository
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.domain.provider import DomainOpsProvider
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
+    ResourcePolicyOpsProvider,
+)
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.project.repository import ProjectRepository
 from ai.backend.manager.repositories.user.repository import UserRepository
@@ -86,13 +90,19 @@ async def adapter(
             unwired(StorageSessionManager, "only purging a user with folders reaches it"),
             valkey.stat,
             unwired(AgentRegistry, "no user operation reaches the agents"),
-            UserRepository(engine, provider, ShareOpsProvider(engine), key_pool),
+            UserRepository(
+                engine,
+                provider,
+                ShareOpsProvider(engine),
+                ResourcePolicyOpsProvider(engine),
+                key_pool,
+            ),
             unwired(SchedulingController, "only purging a user with sessions reaches it"),
         ),
     )
     domain = DomainProcessors(
         registry.group(GroupMeta(DomainEntityType())),
-        DomainService(DomainRepository(engine, provider)),
+        DomainService(DomainRepository(engine, DomainOpsProvider(engine))),
     )
     return UserAdapter(user, domain, config.config.auth, key_pool)
 

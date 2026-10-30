@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import dataclass
 from typing import Final, NewType, Self, cast
 
 from glide import Batch, ConditionalChange, ExpirySet, ExpiryType, Script
@@ -12,6 +13,7 @@ from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
     create_valkey_client,
 )
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.exception import BackendAIError, UnreachableError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience import (
@@ -23,11 +25,11 @@ from ai.backend.common.resilience import (
     RetryPolicy,
 )
 from ai.backend.common.types import ValkeyTarget
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .exceptions import TusLeaseHeldError, TusLeaseLostError, TusSessionNotFoundError
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 valkey_tus_resilience = Resilience(
     policies=[
@@ -44,6 +46,12 @@ valkey_tus_resilience = Resilience(
 )
 
 TusSessionId = NewType("TusSessionId", str)
+
+
+@dataclass(frozen=True)
+class TusUploadState:
+    offset: int
+    ttl_seconds: int
 
 
 _OFFSET_KEY_PREFIX: Final = "tus.upload.offset"
@@ -103,11 +111,13 @@ class ValkeyTusClient:
         *,
         db_id: int,
         human_readable_name: str,
+        sentinel_monitor: AbstractSentinelMonitor | None = None,
     ) -> Self:
         client = create_valkey_client(
             valkey_target=valkey_target,
             db_id=db_id,
             human_readable_name=human_readable_name,
+            sentinel_monitor=sentinel_monitor,
         )
         await client.connect()
         return cls(client=client)
@@ -143,13 +153,24 @@ class ValkeyTusClient:
             )
 
     @valkey_tus_resilience.apply()
-    async def get_offset(self, session_id: TusSessionId) -> int | None:
+    async def get_upload_state(self, session_id: TusSessionId) -> TusUploadState | None:
+        """Read the committed offset and its remaining TTL in one MULTI/EXEC round-trip."""
+        offset_key = self._offset_key(session_id)
+        tx = self._create_batch(is_atomic=True)
+        tx.get(offset_key)
+        tx.ttl(offset_key)
         async with self._client.client() as conn:
-            raw = await conn.get(self._offset_key(session_id))
-        if raw is None:
+            results = await conn.exec(tx, raise_on_error=True)
+        if results is None:
+            raise UnreachableError(
+                "get_upload_state: MULTI/EXEC returned no results — no WATCH in use, "
+                "so this path should be unreachable."
+            )
+        offset_raw, ttl = results
+        if offset_raw is None:
             return None
-        decoded = raw.decode() if isinstance(raw, bytes) else raw
-        return int(decoded)
+        decoded = offset_raw.decode() if isinstance(offset_raw, bytes) else cast(str, offset_raw)
+        return TusUploadState(offset=int(decoded), ttl_seconds=cast(int, ttl))
 
     @valkey_tus_resilience.apply()
     async def try_load_offset(
@@ -260,12 +281,12 @@ class ValkeyTusClient:
         length: int,
         *,
         offset_ttl_seconds: int = _DEFAULT_TTL_SECONDS,
-    ) -> int:
+    ) -> TusUploadState:
         """Advance the committed offset and release the lease atomically.
 
         Runs ``ADVANCE_OFFSET_SCRIPT`` so the ownership check, ``INCRBY``,
         TTL refresh, and lease ``DEL`` all happen in a single Redis step.
-        Returns the new committed offset. Raises :class:`TusLeaseLostError`
+        Returns the new committed offset and its refreshed TTL. Raises :class:`TusLeaseLostError`
         if the lease is no longer owned by ``holder_token`` (expired and
         reclaimed by another storage-proxy while we were writing).
         """
@@ -282,4 +303,4 @@ class ValkeyTusClient:
             raise TusLeaseLostError(
                 f"TUS session {session_id} lease was reclaimed by another storage-proxy"
             )
-        return new_offset
+        return TusUploadState(offset=new_offset, ttl_seconds=offset_ttl_seconds)

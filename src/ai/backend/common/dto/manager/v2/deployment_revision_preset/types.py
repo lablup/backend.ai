@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from uuid import UUID
 
 from pydantic import Field
 
-from ai.backend.common.api_handlers import BaseResponseModel
+from ai.backend.common.api_handlers import BaseRequestModel, BaseResponseModel
 from ai.backend.common.dto.manager.v2.deployment.types import (
     ModelHealthCheckInfoDTO,
     ModelMetadataInfoDTO,
@@ -16,6 +17,25 @@ class DeploymentRevisionPresetOrderField(StrEnum):
     NAME = "name"
     RANK = "rank"
     CREATED_AT = "created_at"
+
+
+class DeploymentRevisionPresetUsedBy(BaseRequestModel):
+    """Entities whose use of the preset narrows the result."""
+
+    deployment: list[UUID] | None = Field(
+        default=None, description="Deployments whose revisions name the preset"
+    )
+
+
+class DeploymentRevisionPresetUsage(BaseRequestModel):
+    """Uses narrowing the presets read; every id is AND-ed.
+
+    An entity the caller cannot read refuses the request.
+    """
+
+    used_by: DeploymentRevisionPresetUsedBy | None = Field(
+        default=None, description="Entities whose use of the preset narrows the result"
+    )
 
 
 class PresetModelServiceConfigInfoDTO(BaseResponseModel):

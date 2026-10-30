@@ -11,34 +11,33 @@ from uuid import uuid4
 import pytest
 from dateutil.tz import tzutc
 
-from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.resource_group import ResourceGroupOpts, ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_slot import (
-    AgentResourceRow,
+from ai.backend.manager.models.resource_slot.row import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
-from ai.backend.manager.models.session import SessionRow
-from ai.backend.manager.models.specs.pagination import OffsetPagination
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.repositories.base import BatchQuerier
-from ai.backend.manager.repositories.resource_slot.db_source import ResourceSlotDBSource
+from ai.backend.manager.repositories.resource_slot.db_source.db_source import ResourceSlotDBSource
 from ai.backend.testutils.db import with_tables
+
+_USER_ID = uuid4()
 
 
 class TestSlotTypes:
@@ -54,155 +53,6 @@ class TestSlotTypes:
         names = [t.slot_name for t in types]
         assert "cpu" in names
         assert "mem" in names
-
-
-class TestAgentResources:
-    """Tests for agent_resources read operations."""
-
-    @pytest.fixture
-    async def db_with_agent_tables(
-        self,
-        database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        async with with_tables(
-            database_connection,
-            [ResourceGroupRow, AgentRow, ResourceSlotTypeRow, AgentResourceRow],
-        ):
-            async with database_connection.begin_session() as db_sess:
-                for name, stype in [("cpu", "count"), ("mem", "bytes")]:
-                    db_sess.add(ResourceSlotTypeRow(slot_name=name, slot_type=stype, rank=0))
-            yield database_connection
-
-    async def _seed_agent(
-        self, db: ExtendedAsyncSAEngine
-    ) -> tuple[str, Decimal, Decimal, Decimal, Decimal]:
-        cpu_capacity = Decimal("8")
-        cpu_used = Decimal("2")
-        mem_capacity = Decimal("32768")
-        mem_used = Decimal("4096")
-        sg_name = str(uuid4())
-        sg_id = ResourceGroupID(uuid4())
-        agent_id = str(uuid4())
-        async with db.begin_session() as db_sess:
-            db_sess.add(
-                ResourceGroupRow(
-                    id=sg_id,
-                    name=sg_name,
-                    driver="static",
-                    driver_opts={},
-                    scheduler="fifo",
-                    scheduler_opts=ResourceGroupOpts(),
-                )
-            )
-        agent_uuid = AgentUUID(uuid.uuid4())
-        async with db.begin_session() as db_sess:
-            db_sess.add(
-                AgentRow(
-                    uuid=agent_uuid,
-                    id=agent_id,
-                    status=AgentStatus.ALIVE,
-                    status_changed=datetime.now(tzutc()),
-                    region="test-region",
-                    scaling_group=sg_name,
-                    resource_group_id=sg_id,
-                    addr="tcp://127.0.0.1:6001",
-                    version="24.12.0",
-                    architecture="x86_64",
-                    compute_plugins={},
-                )
-            )
-        async with db.begin_session() as db_sess:
-            db_sess.add(
-                AgentResourceRow(
-                    agent_id=agent_id,
-                    agent_uuid=agent_uuid,
-                    slot_name="cpu",
-                    capacity=cpu_capacity,
-                    used=cpu_used,
-                )
-            )
-            db_sess.add(
-                AgentResourceRow(
-                    agent_id=agent_id,
-                    agent_uuid=agent_uuid,
-                    slot_name="mem",
-                    capacity=mem_capacity,
-                    used=mem_used,
-                )
-            )
-        return agent_id, cpu_capacity, cpu_used, mem_capacity, mem_used
-
-    async def test_search_agent_resources(
-        self,
-        db_with_agent_tables: ExtendedAsyncSAEngine,
-    ) -> None:
-        agent_id, cpu_capacity, cpu_used, _, _ = await self._seed_agent(db_with_agent_tables)
-        db_source = ResourceSlotDBSource(db_with_agent_tables)
-        querier = BatchQuerier(pagination=OffsetPagination(offset=0, limit=10))
-
-        result = await db_source.search_agent_resources(querier)
-
-        expected_count = 2
-        assert result.total_count == expected_count
-        assert len(result.items) == expected_count
-        assert not result.has_next_page
-        cpu_item = next(item for item in result.items if item.slot_name == "cpu")
-        assert cpu_item.agent_id == agent_id
-        assert cpu_item.capacity == cpu_capacity
-        assert cpu_item.used == cpu_used
-
-    async def test_search_agent_resources_empty(
-        self,
-        db_with_agent_tables: ExtendedAsyncSAEngine,
-    ) -> None:
-        db_source = ResourceSlotDBSource(db_with_agent_tables)
-        querier = BatchQuerier(pagination=OffsetPagination(offset=0, limit=10))
-
-        result = await db_source.search_agent_resources(querier)
-
-        assert result.total_count == 0
-        assert result.items == []
-
-
-class TestResourceAllocations:
-    """Tests for resource_allocations read operations."""
-
-    @pytest.fixture
-    async def db_with_allocation_tables(
-        self,
-        database_connection: ExtendedAsyncSAEngine,
-    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
-        # Full FK chain: DomainRow, ProjectResourcePolicyRow, ResourceGroupRow, ProjectRow,
-        # AgentRow, SessionRow, KernelRow, ResourceSlotTypeRow → ResourceAllocationRow
-        async with with_tables(
-            database_connection,
-            [
-                DomainRow,
-                ProjectResourcePolicyRow,
-                ResourceGroupRow,
-                UserResourcePolicyRow,
-                UserRow,
-                ProjectRow,
-                AgentRow,
-                ContainerRegistryRow,
-                ImageRow,
-                SessionRow,
-                KernelRow,
-                ResourceSlotTypeRow,
-                ResourceAllocationRow,
-            ],
-        ):
-            yield database_connection
-
-    async def test_search_resource_allocations_empty(
-        self,
-        db_with_allocation_tables: ExtendedAsyncSAEngine,
-    ) -> None:
-        db_source = ResourceSlotDBSource(db_with_allocation_tables)
-        querier = BatchQuerier(pagination=OffsetPagination(offset=0, limit=10))
-        result = await db_source.search_resource_allocations(querier)
-        assert result.total_count == 0
-        assert result.items == []
 
 
 class TestAggregation:
@@ -290,6 +140,27 @@ class TestAggregation:
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
+                UserResourcePolicyRow(
+                    name="default",
+                    max_vfolder_count=10,
+                    max_quota_scope_size=0,
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                UserRow(
+                    uuid=_USER_ID,
+                    username="test-user",
+                    email="test-user@example.com",
+                    domain_name=domain_name,
+                    domain_id=domain_id,
+                    resource_policy="default",
+                )
+            )
+        async with db.begin_session() as db_sess:
+            db_sess.add(
                 AgentRow(
                     id=agent_id,
                     status=AgentStatus.ALIVE,
@@ -334,7 +205,7 @@ class TestAggregation:
                     group_id=project_id,
                     resource_group_id=resource_group_id,
                     scaling_group_name="test-sg",
-                    user_uuid=uuid4(),
+                    user_uuid=_USER_ID,
                 )
             )
             await db_sess.flush()
@@ -344,7 +215,7 @@ class TestAggregation:
                     session_id=session_id,
                     domain_name=domain_name,
                     group_id=project_id,
-                    user_uuid=uuid4(),
+                    user_uuid=_USER_ID,
                     status=status,
                     repl_in_port=0,
                     repl_out_port=0,
@@ -673,6 +544,27 @@ class TestComputeActualAgentResourceUsage:
             )
         async with db.begin_session() as db_sess:
             db_sess.add(
+                UserResourcePolicyRow(
+                    name="default",
+                    max_vfolder_count=10,
+                    max_quota_scope_size=0,
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                UserRow(
+                    uuid=_USER_ID,
+                    username="test-user",
+                    email="test-user@example.com",
+                    domain_name=domain_name,
+                    domain_id=domain_id,
+                    resource_policy="default",
+                )
+            )
+        async with db.begin_session() as db_sess:
+            db_sess.add(
                 AgentRow(
                     id=agent_id,
                     status=AgentStatus.ALIVE,
@@ -712,7 +604,7 @@ class TestComputeActualAgentResourceUsage:
                     group_id=project_id,
                     resource_group_id=resource_group_id,
                     scaling_group_name="test-sg",
-                    user_uuid=uuid4(),
+                    user_uuid=_USER_ID,
                 )
             )
             await db_sess.flush()
@@ -722,7 +614,7 @@ class TestComputeActualAgentResourceUsage:
                     session_id=session_id,
                     domain_name=domain_name,
                     group_id=project_id,
-                    user_uuid=uuid4(),
+                    user_uuid=_USER_ID,
                     status=status,
                     repl_in_port=0,
                     repl_out_port=0,

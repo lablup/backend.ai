@@ -2,11 +2,7 @@
 
 from __future__ import annotations
 
-import json
-import uuid
-
 from ai.backend.common.dto.manager.v2.service_catalog.types import (
-    EndpointInfo,
     OrderDirection,
     ServiceCatalogOrderField,
 )
@@ -87,91 +83,3 @@ class TestReExportedEnums:
 
     def test_service_catalog_status_deregistered_value(self) -> None:
         assert ExportedServiceCatalogStatus.DEREGISTERED.value == "deregistered"
-
-
-class TestEndpointInfo:
-    """Tests for EndpointInfo model creation and serialization."""
-
-    def test_creation_with_all_fields(self) -> None:
-        endpoint_id = uuid.uuid4()
-        info = EndpointInfo(
-            id=endpoint_id,
-            role="primary",
-            scope="internal",
-            address="192.168.1.100",
-            port=8080,
-            protocol="http",
-            metadata={"region": "us-east"},
-        )
-        assert info.id == endpoint_id
-        assert info.role == "primary"
-        assert info.scope == "internal"
-        assert info.address == "192.168.1.100"
-        assert info.port == 8080
-        assert info.protocol == "http"
-        assert info.metadata == {"region": "us-east"}
-
-    def test_creation_without_metadata(self) -> None:
-        info = EndpointInfo(
-            id=uuid.uuid4(),
-            role="secondary",
-            scope="external",
-            address="10.0.0.1",
-            port=443,
-            protocol="https",
-            metadata=None,
-        )
-        assert info.metadata is None
-
-    def test_model_dump_json(self) -> None:
-        endpoint_id = uuid.uuid4()
-        info = EndpointInfo(
-            id=endpoint_id,
-            role="primary",
-            scope="internal",
-            address="127.0.0.1",
-            port=9000,
-            protocol="grpc",
-            metadata=None,
-        )
-        data = json.loads(info.model_dump_json())
-        assert data["role"] == "primary"
-        assert data["port"] == 9000
-        assert data["metadata"] is None
-
-    def test_serialization_round_trip(self) -> None:
-        endpoint_id = uuid.uuid4()
-        info = EndpointInfo(
-            id=endpoint_id,
-            role="primary",
-            scope="internal",
-            address="192.168.1.100",
-            port=8080,
-            protocol="http",
-            metadata={"key": "value"},
-        )
-        json_str = info.model_dump_json()
-        restored = EndpointInfo.model_validate_json(json_str)
-        assert restored.id == endpoint_id
-        assert restored.role == "primary"
-        assert restored.scope == "internal"
-        assert restored.address == "192.168.1.100"
-        assert restored.port == 8080
-        assert restored.protocol == "http"
-        assert restored.metadata == {"key": "value"}
-
-    def test_serialization_round_trip_no_metadata(self) -> None:
-        endpoint_id = uuid.uuid4()
-        info = EndpointInfo(
-            id=endpoint_id,
-            role="secondary",
-            scope="external",
-            address="10.0.0.2",
-            port=443,
-            protocol="https",
-            metadata=None,
-        )
-        json_str = info.model_dump_json()
-        restored = EndpointInfo.model_validate_json(json_str)
-        assert restored.id == endpoint_id
-        assert restored.metadata is None

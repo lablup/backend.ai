@@ -12,6 +12,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.filter_specs import StringMatchSpec
 from ai.backend.common.data.notification import (
@@ -25,60 +26,53 @@ from ai.backend.manager.data.notification.types import (
     NotificationChannelData,
     NotificationRuleData,
 )
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.container_registry import ContainerRegistryRow
-from ai.backend.manager.models.deployment_auto_scaling_policy import DeploymentAutoScalingPolicyRow
-from ai.backend.manager.models.deployment_policy import DeploymentPolicyRow
-from ai.backend.manager.models.deployment_revision import DeploymentRevisionRow
-from ai.backend.manager.models.deployment_revision_preset import DeploymentRevisionPresetRow
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.endpoint import EndpointRow
-from ai.backend.manager.models.image import ImageRow
-from ai.backend.manager.models.kernel import KernelRow
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.notification import (
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.deployment_auto_scaling_policy.row import (
+    DeploymentAutoScalingPolicyRow,
+)
+from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
+from ai.backend.manager.models.deployment_revision.row import DeploymentRevisionRow
+from ai.backend.manager.models.deployment_revision_preset.row import DeploymentRevisionPresetRow
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
+from ai.backend.manager.models.image.row import ImageRow
+from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.notification.row import (
     NotificationChannelRow,
     NotificationRuleRow,
 )
-from ai.backend.manager.models.notification.conditions import (
-    NotificationChannelConditions,
-    NotificationRuleConditions,
-)
-from ai.backend.manager.models.notification.orders import (
-    NotificationChannelOrders,
-    NotificationRuleOrders,
+from ai.backend.manager.models.notification.searchable_fields import (
+    NotificationChannelSearchableFields,
+    NotificationRuleSearchableFields,
 )
 from ai.backend.manager.models.notification.searchers import (
     NotificationChannelSearcher,
     NotificationRuleSearcher,
 )
-from ai.backend.manager.models.project import ProjectRow
-from ai.backend.manager.models.rbac_models import RoleRow, UserRoleRow
-from ai.backend.manager.models.replica_group import ReplicaGroupRow
-from ai.backend.manager.models.resource_group import ResourceGroupRow
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
+from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.resource_preset import ResourcePresetRow
-from ai.backend.manager.models.routing import RoutingRow
-from ai.backend.manager.models.runtime_variant import RuntimeVariantRow
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.routing.row import RoutingRow
+from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.specs.pagination import (
     CursorBackwardPagination,
     CursorForwardPagination,
     OffsetPagination,
 )
-from ai.backend.manager.models.user import (
-    PasswordHashAlgorithm,
-    PasswordInfo,
-    UserRole,
-    UserRow,
-    UserStatus,
-)
+from ai.backend.manager.models.user.row import PasswordHashAlgorithm, UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.vfolder import VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.testutils.db import with_tables
@@ -404,7 +398,7 @@ class TestNotificationOptions:
 
         return rule_ids
 
-    # NotificationChannelConditions Tests
+    # Notification channel filter tests
 
     async def test_channel_by_name_contains_case_sensitive(
         self,
@@ -416,7 +410,7 @@ class TestNotificationOptions:
         searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_contains(
+                NotificationChannelSearchableFields.own.name.filter.contains(
                     StringMatchSpec("Test", case_insensitive=False, negated=False)
                 )
             ],
@@ -438,7 +432,7 @@ class TestNotificationOptions:
         searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_contains(
+                NotificationChannelSearchableFields.own.name.filter.contains(
                     StringMatchSpec("test", case_insensitive=True, negated=False)
                 )
             ],
@@ -461,7 +455,7 @@ class TestNotificationOptions:
         searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_equals(
+                NotificationChannelSearchableFields.own.name.filter.equals(
                     StringMatchSpec("Test Channel", case_insensitive=False, negated=False)
                 )
             ],
@@ -483,7 +477,7 @@ class TestNotificationOptions:
         searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_equals(
+                NotificationChannelSearchableFields.own.name.filter.equals(
                     StringMatchSpec("test channel", case_insensitive=True, negated=False)
                 )
             ],
@@ -506,7 +500,9 @@ class TestNotificationOptions:
         searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_channel_types([NotificationChannelType.WEBHOOK])
+                NotificationChannelSearchableFields.own.channel_type.filter.in_([
+                    NotificationChannelType.WEBHOOK
+                ])
             ],
             orders=[],
         )
@@ -525,7 +521,7 @@ class TestNotificationOptions:
         # sample_channels_for_filter creates 4 enabled and 1 disabled
         searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[NotificationChannelConditions.by_enabled(True)],
+            conditions=[NotificationChannelSearchableFields.own.enabled.filter.equals(True)],
             orders=[],
         )
         channels = await channel_ops.search_in_global(searcher)
@@ -542,7 +538,7 @@ class TestNotificationOptions:
         # sample_channels_for_filter creates 4 enabled and 1 disabled
         searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[NotificationChannelConditions.by_enabled(False)],
+            conditions=[NotificationChannelSearchableFields.own.enabled.filter.equals(False)],
             orders=[],
         )
         channels = await channel_ops.search_in_global(searcher)
@@ -551,7 +547,7 @@ class TestNotificationOptions:
         assert not channels.items[0].enabled
         assert channels.items[0].name == "Dev Notification"
 
-    # NotificationChannelOrders Tests
+    # Notification channel order tests
 
     async def test_channel_order_by_name_ascending(
         self,
@@ -563,7 +559,7 @@ class TestNotificationOptions:
         searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationChannelOrders.name(ascending=True)],
+            orders=[NotificationChannelSearchableFields.own.name.order.apply(ascending=True)],
         )
         channels = await channel_ops.search_in_global(searcher)
 
@@ -582,7 +578,7 @@ class TestNotificationOptions:
         searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationChannelOrders.name(ascending=False)],
+            orders=[NotificationChannelSearchableFields.own.name.order.apply(ascending=False)],
         )
         channels = await channel_ops.search_in_global(searcher)
 
@@ -601,7 +597,7 @@ class TestNotificationOptions:
         searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationChannelOrders.created_at(ascending=True)],
+            orders=[NotificationChannelSearchableFields.own.created_at.order.apply(ascending=True)],
         )
         channels = await channel_ops.search_in_global(searcher)
 
@@ -621,7 +617,9 @@ class TestNotificationOptions:
         searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationChannelOrders.created_at(ascending=False)],
+            orders=[
+                NotificationChannelSearchableFields.own.created_at.order.apply(ascending=False)
+            ],
         )
         channels = await channel_ops.search_in_global(searcher)
 
@@ -641,7 +639,7 @@ class TestNotificationOptions:
         searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationChannelOrders.updated_at(ascending=True)],
+            orders=[NotificationChannelSearchableFields.own.updated_at.order.apply(ascending=True)],
         )
         channels = await channel_ops.search_in_global(searcher)
 
@@ -661,7 +659,9 @@ class TestNotificationOptions:
         searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationChannelOrders.updated_at(ascending=False)],
+            orders=[
+                NotificationChannelSearchableFields.own.updated_at.order.apply(ascending=False)
+            ],
         )
         channels = await channel_ops.search_in_global(searcher)
 
@@ -671,7 +671,7 @@ class TestNotificationOptions:
         assert channels.items[1].name == "Alpha Channel"
         assert channels.items[2].name == "Beta Channel"
 
-    # NotificationRuleConditions Tests
+    # Notification rule filter tests
 
     async def test_rule_by_name_contains_case_sensitive(
         self,
@@ -683,7 +683,7 @@ class TestNotificationOptions:
         searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_name_contains(
+                NotificationRuleSearchableFields.own.name.filter.contains(
                     StringMatchSpec("Test", case_insensitive=False, negated=False)
                 )
             ],
@@ -705,7 +705,7 @@ class TestNotificationOptions:
         searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_name_contains(
+                NotificationRuleSearchableFields.own.name.filter.contains(
                     StringMatchSpec("test", case_insensitive=True, negated=False)
                 )
             ],
@@ -728,7 +728,7 @@ class TestNotificationOptions:
         searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_name_equals(
+                NotificationRuleSearchableFields.own.name.filter.equals(
                     StringMatchSpec("Test Rule", case_insensitive=False, negated=False)
                 )
             ],
@@ -750,7 +750,7 @@ class TestNotificationOptions:
         searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_name_equals(
+                NotificationRuleSearchableFields.own.name.filter.equals(
                     StringMatchSpec("test rule", case_insensitive=True, negated=False)
                 )
             ],
@@ -773,7 +773,9 @@ class TestNotificationOptions:
         searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_rule_types([NotificationRuleType.SESSION_STARTED])
+                NotificationRuleSearchableFields.own.rule_type.filter.in_([
+                    NotificationRuleType.SESSION_STARTED
+                ])
             ],
             orders=[],
         )
@@ -792,7 +794,7 @@ class TestNotificationOptions:
         # sample_rules_for_filter creates 4 enabled and 1 disabled
         searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[NotificationRuleConditions.by_enabled(True)],
+            conditions=[NotificationRuleSearchableFields.own.enabled.filter.equals(True)],
             orders=[],
         )
         rules = await rule_ops.search_in_global(searcher)
@@ -809,7 +811,7 @@ class TestNotificationOptions:
         # sample_rules_for_filter creates 4 enabled and 1 disabled
         searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
-            conditions=[NotificationRuleConditions.by_enabled(False)],
+            conditions=[NotificationRuleSearchableFields.own.enabled.filter.equals(False)],
             orders=[],
         )
         rules = await rule_ops.search_in_global(searcher)
@@ -818,7 +820,7 @@ class TestNotificationOptions:
         assert not rules.items[0].enabled
         assert rules.items[0].name == "Dev Notification"
 
-    # NotificationRuleOrders Tests
+    # Notification rule order tests
 
     async def test_rule_order_by_name_ascending(
         self,
@@ -830,7 +832,7 @@ class TestNotificationOptions:
         searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationRuleOrders.name(ascending=True)],
+            orders=[NotificationRuleSearchableFields.own.name.order.apply(ascending=True)],
         )
         rules = await rule_ops.search_in_global(searcher)
 
@@ -849,7 +851,7 @@ class TestNotificationOptions:
         searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationRuleOrders.name(ascending=False)],
+            orders=[NotificationRuleSearchableFields.own.name.order.apply(ascending=False)],
         )
         rules = await rule_ops.search_in_global(searcher)
 
@@ -868,7 +870,7 @@ class TestNotificationOptions:
         searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationRuleOrders.created_at(ascending=True)],
+            orders=[NotificationRuleSearchableFields.own.created_at.order.apply(ascending=True)],
         )
         rules = await rule_ops.search_in_global(searcher)
 
@@ -888,7 +890,7 @@ class TestNotificationOptions:
         searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationRuleOrders.created_at(ascending=False)],
+            orders=[NotificationRuleSearchableFields.own.created_at.order.apply(ascending=False)],
         )
         rules = await rule_ops.search_in_global(searcher)
 
@@ -908,7 +910,7 @@ class TestNotificationOptions:
         searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationRuleOrders.updated_at(ascending=True)],
+            orders=[NotificationRuleSearchableFields.own.updated_at.order.apply(ascending=True)],
         )
         rules = await rule_ops.search_in_global(searcher)
 
@@ -928,7 +930,7 @@ class TestNotificationOptions:
         searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[],
-            orders=[NotificationRuleOrders.updated_at(ascending=False)],
+            orders=[NotificationRuleSearchableFields.own.updated_at.order.apply(ascending=False)],
         )
         rules = await rule_ops.search_in_global(searcher)
 
@@ -947,7 +949,7 @@ class TestNotificationOptions:
         searcher = NotificationChannelSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationChannelConditions.by_name_equals(
+                NotificationChannelSearchableFields.own.name.filter.equals(
                     StringMatchSpec("NonexistentChannelName", case_insensitive=False, negated=False)
                 )
             ],
@@ -968,7 +970,7 @@ class TestNotificationOptions:
         searcher = NotificationRuleSearcher(
             pagination=OffsetPagination(limit=1000, offset=0),
             conditions=[
-                NotificationRuleConditions.by_name_equals(
+                NotificationRuleSearchableFields.own.name.filter.equals(
                     StringMatchSpec("NonexistentRuleName", case_insensitive=False, negated=False)
                 )
             ],
@@ -1130,7 +1132,9 @@ class TestNotificationCursorPagination:
     @pytest.fixture
     def channel_pagination_spec(self) -> PaginationSpec:
         return PaginationSpec(
-            forward_order=NotificationChannelOrders.created_at(ascending=False),
+            forward_order=NotificationChannelSearchableFields.own.created_at.order.apply(
+                ascending=False
+            ),
             cursor_column=NotificationChannelRow.id,
         )
 
@@ -1182,7 +1186,9 @@ class TestNotificationCursorPagination:
         searcher = NotificationChannelSearcher(
             pagination=CursorForwardPagination(
                 first=3,
-                cursor_order=NotificationChannelOrders.created_at(ascending=False),  # DESC
+                cursor_order=NotificationChannelSearchableFields.own.created_at.order.apply(
+                    ascending=False
+                ),  # DESC
                 cursor_condition=None,  # No cursor = first page
             ),
         )
@@ -1222,7 +1228,9 @@ class TestNotificationCursorPagination:
         searcher = NotificationChannelSearcher(
             pagination=CursorForwardPagination(
                 first=3,
-                cursor_order=NotificationChannelOrders.created_at(ascending=False),  # DESC
+                cursor_order=NotificationChannelSearchableFields.own.created_at.order.apply(
+                    ascending=False
+                ),  # DESC
                 cursor_condition=cursor_condition,
             ),
         )
@@ -1248,7 +1256,9 @@ class TestNotificationCursorPagination:
         searcher = NotificationChannelSearcher(
             pagination=CursorBackwardPagination(
                 last=3,
-                cursor_order=NotificationChannelOrders.created_at(ascending=True),  # ASC
+                cursor_order=NotificationChannelSearchableFields.own.created_at.order.apply(
+                    ascending=True
+                ),  # ASC
                 cursor_condition=None,  # No cursor = last page
             ),
         )
@@ -1289,7 +1299,9 @@ class TestNotificationCursorPagination:
         searcher = NotificationChannelSearcher(
             pagination=CursorBackwardPagination(
                 last=3,
-                cursor_order=NotificationChannelOrders.created_at(ascending=True),  # ASC
+                cursor_order=NotificationChannelSearchableFields.own.created_at.order.apply(
+                    ascending=True
+                ),  # ASC
                 cursor_condition=cursor_condition,
             ),
         )

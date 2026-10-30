@@ -7,14 +7,13 @@ import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.object_storage import ObjectStorageID
-from ai.backend.logging import BraceStyleAdapter
-from ai.backend.manager.data.object_storage.types import ObjectStorageData
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.models.base import (
     GUID,
     Base,
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 __all__ = ("ObjectStorageRow",)
 
@@ -70,14 +69,3 @@ class ObjectStorageRow(Base):
     @override
     def __repr__(self) -> str:
         return self.__str__()
-
-    def to_dataclass(self) -> ObjectStorageData:
-        return ObjectStorageData(
-            id=self.id,
-            name=self.name,
-            host=self.host,
-            access_key=self.access_key,
-            secret_key=self.secret_key,
-            endpoint=self.endpoint,
-            region=self.region,
-        )

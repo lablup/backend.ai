@@ -12,7 +12,7 @@ import jwt as pyjwt
 import pytest
 
 from ai.backend.common.plugin.hook import Reject
-from ai.backend.manager.models.user import UserStatus
+from ai.backend.manager.models.user.row import UserStatus
 from ai.backend.manager.plugin.openid.hook import OIDCHookPlugin
 
 # ===========================================================================

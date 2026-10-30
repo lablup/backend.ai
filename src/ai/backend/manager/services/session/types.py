@@ -45,7 +45,7 @@ class LegacySessionInfo:
     age_ms: int = field(compare=False)
     domain_name: str
     group_id: UUID
-    user_id: UUID
+    user_id: UUID | None
     lang: str
     image: str
     architecture: str
@@ -75,7 +75,7 @@ class LegacySessionInfo:
             "age": self.age_ms,
             "domainName": self.domain_name,
             "groupId": str(self.group_id),
-            "userId": str(self.user_id),
+            "userId": str(self.user_id) if self.user_id is not None else None,
             "lang": self.lang,
             "image": self.image,
             "architecture": self.architecture,

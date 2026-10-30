@@ -12,12 +12,9 @@ import sqlalchemy as sa
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
-from ai.backend.common.dto.manager.v2.deployment_revision_preset.request import (
-    SearchDeploymentRevisionPresetsInput,
-)
 from ai.backend.common.dto.manager.v2.model_card.request import DeleteModelCardOptions
 from ai.backend.common.types import VFolderID, VFolderUsageMode
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.data.model_card.types import (
     BulkModelCardDeleteFailure,
     BulkModelCardDeleteResultData,
@@ -27,18 +24,13 @@ from ai.backend.manager.data.model_card.types import (
     VFolderScanData,
 )
 from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.errors.resource import (
     InvalidProjectTypeForModelCard,
     ModelCardNotFound,
     ProjectNotFound,
 )
 from ai.backend.manager.errors.storage import VFolderDeletionNotAllowed
-from ai.backend.manager.models.deployment_revision_preset.conditions import (
-    DeploymentRevisionPresetConditions,
-)
-from ai.backend.manager.models.deployment_revision_preset.searchers import (
-    DeploymentPresetSearcher,
-)
 from ai.backend.manager.models.model_card.creators import ModelCardResourceRequirementCreator
 from ai.backend.manager.models.model_card.purgers import (
     ModelCardPurger,
@@ -53,19 +45,16 @@ from ai.backend.manager.models.project.queriers import ProjectQuerier
 from ai.backend.manager.models.resource_slot.row import ModelCardResourceRequirementRow
 from ai.backend.manager.models.session.searchers import LiveSessionsMountingVFolderSearcher
 from ai.backend.manager.models.specs.creator import FieldToCreate
-from ai.backend.manager.models.specs.pagination import NoPagination, OffsetPagination
+from ai.backend.manager.models.specs.pagination import NoPagination
 from ai.backend.manager.models.vfolder.queriers import VFolderQuerier
-from ai.backend.manager.models.vfolder.row import DEAD_VFOLDER_STATUSES, VFolderRow
+from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.manager.models.vfolder.searchers import VFolderScanTargetSearcher
 from ai.backend.manager.models.vfolder.updaters import VFolderSoftDeleteUpdater
-from ai.backend.manager.repositories.model_card.types import (
-    AvailablePresetsSearchResult,
-)
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.write import V2WriteOps
 from ai.backend.manager.types import TriState
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class ModelCardDBSource:
@@ -131,10 +120,10 @@ class ModelCardDBSource:
                 Decimal(entry.min_quantity)
             except (InvalidOperation, ValueError):
                 log.warning(
-                    "model card update: skipping invalid min_quantity {!r} for card {} slot {}",
-                    entry.min_quantity,
-                    card_id,
-                    entry.slot_name,
+                    "model card resource requirement with invalid min quantity skipped",
+                    model_card_id=card_id,
+                    slot_name=entry.slot_name,
+                    min_quantity=str(entry.min_quantity),
                 )
                 continue
             creations.append(
@@ -152,7 +141,8 @@ class ModelCardDBSource:
         options: DeleteModelCardOptions,
     ) -> UUID:
         async with self._v2_ops.write_ops() as w:
-            return await self._delete_card(w, purger, options)
+            deleted = await self._delete_card(w, purger, options)
+            return deleted.id
 
     async def bulk_delete(
         self,
@@ -165,7 +155,7 @@ class ModelCardDBSource:
         card, mounted VFolder, ...) does not abort the rest of the batch. The
         outer transaction commits the union of every successful savepoint.
         """
-        successes: list[UUID] = []
+        successes: list[ModelCardData] = []
         failures: list[BulkModelCardDeleteFailure] = []
         if not purgers:
             return BulkModelCardDeleteResultData(successes=successes, failures=failures)
@@ -173,8 +163,8 @@ class ModelCardDBSource:
             for purger in purgers:
                 try:
                     async with w.savepoint() as sp:
-                        deleted_id = await self._delete_card(sp, purger, options)
-                    successes.append(deleted_id)
+                        deleted = await self._delete_card(sp, purger, options)
+                    successes.append(deleted)
                 except Exception as exc:
                     failures.append(BulkModelCardDeleteFailure(card_id=purger.card_id, error=exc))
         return BulkModelCardDeleteResultData(successes=successes, failures=failures)
@@ -184,7 +174,7 @@ class ModelCardDBSource:
         w: V2WriteOps,
         purger: ModelCardPurger,
         options: DeleteModelCardOptions,
-    ) -> UUID:
+    ) -> ModelCardData:
         deleted = await w.purge_entity(purger)
         if deleted is None:
             raise ModelCardNotFound()
@@ -205,14 +195,13 @@ class ModelCardDBSource:
                 # -- surface that for ops/debugging since the caller only asked
                 # for a single id.
                 log.debug(
-                    "model card delete: cascaded {} sibling card(s) on vfolder {} "
-                    "alongside target {}",
-                    len(siblings),
-                    vfolder_id,
-                    deleted.id,
+                    "model card delete cascaded to sibling cards",
+                    model_card_id=deleted.id,
+                    vfolder_id=vfolder_id,
+                    sibling_count=len(siblings),
                 )
             await w.update_data(VFolderSoftDeleteUpdater(vfolder_id=vfolder_id))
-        return deleted.id
+        return deleted
 
     async def _reject_if_vfolder_mounted(self, w: V2WriteOps, vfolder_id: VFolderUUID) -> None:
         """Raise :class:`VFolderDeletionNotAllowed` if the VFolder is mounted on a live session.
@@ -235,37 +224,6 @@ class ModelCardDBSource:
                 f"The vfolder(id: {vfolder_id}) is mounted on sessions(ids: {session_ids})."
             )
 
-    async def search_available_presets(
-        self,
-        model_card_id: UUID,
-        search_input: SearchDeploymentRevisionPresetsInput,
-    ) -> AvailablePresetsSearchResult:
-        """Find presets whose resource_slots satisfy the model card's min_resource requirements.
-
-        Uses relational division: a preset is "available" iff for every required slot_name
-        in model_card_resource_requirements, there exists a matching row in
-        preset_resource_slots with quantity >= min_quantity.
-        """
-        async with self._v2_ops.read_ops() as r:
-            result = await r.search_in_global(
-                DeploymentPresetSearcher(
-                    pagination=OffsetPagination(
-                        limit=search_input.limit or 20, offset=search_input.offset or 0
-                    ),
-                    conditions=[
-                        DeploymentRevisionPresetConditions.satisfying_model_card(
-                            ModelCardID(model_card_id)
-                        )
-                    ],
-                )
-            )
-        return AvailablePresetsSearchResult(
-            items=result.items,
-            total_count=result.total_count,
-            has_next_page=result.has_next_page,
-            has_previous_page=result.has_previous_page,
-        )
-
     async def get_scan_target_vfolders(self, project_id: UUID) -> list[VFolderScanData]:
         async with self._v2_ops.read_ops() as r:
             project = await r.query_data(ProjectQuerier(project_id=ProjectID(project_id)))
@@ -282,7 +240,7 @@ class ModelCardDBSource:
                         lambda: sa.and_(
                             VFolderRow.group == project_id,
                             VFolderRow.usage_mode == VFolderUsageMode.MODEL,
-                            VFolderRow.status.not_in(DEAD_VFOLDER_STATUSES),
+                            VFolderRow.status.not_in(VFolderOperationStatus.dead()),
                         )
                     ],
                     project_id=ProjectID(project_id),

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from ai.backend.common.data.entity.types import EntityIdentifier, EntityType
 from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.permission.types import Permission
 
 
 @dataclass(frozen=True)
@@ -24,3 +26,11 @@ class GovernCheckKey:
     user_id: UserID
     scope: EntityIdentifier
     entity_type: EntityType
+
+
+@dataclass(frozen=True)
+class PermissionCheckResult:
+    """The bits answered for one run's checks: govern per scope key, own per entity key."""
+
+    governed: Mapping[GovernCheckKey, Permission]
+    owned: Mapping[OwnCheckKey, Permission]

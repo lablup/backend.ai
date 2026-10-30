@@ -28,7 +28,7 @@ from ai.backend.manager.clients.prometheus.preset import (
     MetricPreset,
     PromQLTemplateRenderer,
 )
-from ai.backend.manager.data.prometheus_query_preset import (
+from ai.backend.manager.data.prometheus_query_preset.types import (
     ExecutePresetOptions,
     PrometheusQueryPresetData,
 )
@@ -39,15 +39,17 @@ from ai.backend.manager.models.prometheus_query_preset.updaters import (
     PrometheusQueryPresetUpdater,
 )
 from ai.backend.manager.repositories.ops.repository import OpsRepository
-from ai.backend.manager.repositories.prometheus_query_preset import (
+from ai.backend.manager.repositories.prometheus_query_preset.repository import (
     PrometheusQueryPresetRepository,
 )
-from ai.backend.manager.services.prometheus_query_preset.actions import (
-    CreatePresetAction,
+from ai.backend.manager.services.prometheus_query_preset.actions.create import CreatePresetAction
+from ai.backend.manager.services.prometheus_query_preset.actions.execute_preset import (
     ExecutePresetAction,
-    PreviewPresetAction,
-    UpdatePresetAction,
 )
+from ai.backend.manager.services.prometheus_query_preset.actions.preview import (
+    PreviewPresetAction,
+)
+from ai.backend.manager.services.prometheus_query_preset.actions.update import UpdatePresetAction
 from ai.backend.manager.services.prometheus_query_preset.service import (
     PrometheusQueryPresetService,
 )

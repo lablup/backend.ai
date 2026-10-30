@@ -9,8 +9,9 @@ from ai.backend.manager.data.resource.types import SlotTypeInfo
 from ai.backend.manager.data.session.creation import ContainerUserInfo
 from ai.backend.manager.data.session.draft import (
     KernelExecutionSpecDraft,
-    KernelSpecDraft,
+    KernelGroupDraft,
     ResourceSpecDraft,
+    SessionOptionsDraft,
     SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import (
@@ -45,6 +46,7 @@ def _context() -> SessionSpecContext:
             policy=None,
             container_user=ContainerUserInfo(),
             dotfiles=DotfileBundle(),
+            default_bootstrap_script=None,
             pending_session_count=0,
             pending_session_resource_slots={},
             vfolder_mounts_by_role={},
@@ -57,10 +59,10 @@ def _context() -> SessionSpecContext:
 
 
 def _draft_with_sudo(
-    *, sudo: bool, kernel_specs: tuple[KernelSpecDraft, ...]
+    *, sudo: bool, kernel_groups: tuple[KernelGroupDraft, ...]
 ) -> SessionResourceSpecDraft:
     return SessionResourceSpecDraft(
-        resource=ResourceSpecDraft(kernel_specs=kernel_specs),
+        resource=ResourceSpecDraft(options=SessionOptionsDraft(kernel_groups=kernel_groups)),
         internal_data_extras=InternalDataExtras(sudo_session_enabled=sudo),
     )
 
@@ -68,37 +70,48 @@ def _draft_with_sudo(
 class TestInjectSessionEnvironRule:
     async def test_noop_when_sudo_disabled(self, rule: InjectSessionEnvironRule) -> None:
         """Without sudo, the draft is returned unchanged."""
-        draft = _draft_with_sudo(sudo=False, kernel_specs=(KernelSpecDraft(cluster_role="main"),))
+        draft = _draft_with_sudo(
+            sudo=False, kernel_groups=(KernelGroupDraft(role="main", replica_count=1),)
+        )
         result = await rule.prepare(draft, _context())
         assert result is draft
 
-    async def test_injects_sudo_env_on_every_kernel(self, rule: InjectSessionEnvironRule) -> None:
-        """With sudo enabled, every kernel's environ carries the flag."""
+    async def test_noop_when_no_groups(self, rule: InjectSessionEnvironRule) -> None:
+        """With no groups to overlay, the draft is returned unchanged."""
+        draft = _draft_with_sudo(sudo=True, kernel_groups=())
+        result = await rule.prepare(draft, _context())
+        assert result is draft
+
+    async def test_injects_sudo_env_on_every_group(self, rule: InjectSessionEnvironRule) -> None:
+        """With sudo enabled, every group's environ carries the flag."""
         draft = _draft_with_sudo(
             sudo=True,
-            kernel_specs=(
-                KernelSpecDraft(cluster_role="main"),
-                KernelSpecDraft(cluster_role="worker"),
+            kernel_groups=(
+                KernelGroupDraft(role="main", replica_count=1),
+                KernelGroupDraft(role="worker", replica_count=2),
             ),
         )
         result = await rule.prepare(draft, _context())
-        for kernel in result.resource.kernel_specs:
-            assert kernel.execution_spec.environ["SUDO_SESSION_ENABLED"] == "1"
+        groups = result.resource.options.kernel_groups
+        assert groups is not None
+        for group in groups:
+            assert group.execution_spec.environ["SUDO_SESSION_ENABLED"] == "1"
 
     async def test_preserves_caller_environ_keys(self, rule: InjectSessionEnvironRule) -> None:
         """Caller-set environ entries survive under the overlay."""
         draft = _draft_with_sudo(
             sudo=True,
-            kernel_specs=(
-                KernelSpecDraft(
-                    cluster_role="main",
-                    execution_spec=KernelExecutionSpecDraft(
-                        environ={"PATH": "/custom/bin"},
-                    ),
+            kernel_groups=(
+                KernelGroupDraft(
+                    role="main",
+                    replica_count=1,
+                    execution_spec=KernelExecutionSpecDraft(environ={"PATH": "/custom/bin"}),
                 ),
             ),
         )
         result = await rule.prepare(draft, _context())
-        env = result.resource.kernel_specs[0].execution_spec.environ
+        groups = result.resource.options.kernel_groups
+        assert groups is not None
+        env = groups[0].execution_spec.environ
         assert env["PATH"] == "/custom/bin"
         assert env["SUDO_SESSION_ENABLED"] == "1"

@@ -1,0 +1,41 @@
+"""Route registry for REST v2 system session environ endpoints."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from ai.backend.manager.api.rest.middleware.auth import auth_required, superadmin_required
+from ai.backend.manager.api.rest.routing import RouteRegistry
+
+from .handler import V2SystemSessionEnvironHandler
+
+if TYPE_CHECKING:
+    from ai.backend.manager.api.rest.types import RouteDeps
+
+
+def register_v2_system_session_environ_routes(
+    handler: V2SystemSessionEnvironHandler,
+    route_deps: RouteDeps,
+) -> RouteRegistry:
+    """Register all REST v2 system session environ routes and return the sub-registry."""
+    registry = RouteRegistry.create("system-session-environs", route_deps.cors_options)
+
+    registry.add(
+        "POST",
+        "/search",
+        handler.admin_search,
+        middlewares=[superadmin_required],
+    )
+    registry.add(
+        "GET",
+        "/value-sources",
+        handler.list_value_sources,
+        middlewares=[auth_required],
+    )
+    registry.add("POST", "", handler.create, middlewares=[auth_required])
+    registry.add("PATCH", "/{environ_id}", handler.update, middlewares=[auth_required])
+    registry.add("POST", "/{environ_id}/delete", handler.delete, middlewares=[auth_required])
+    registry.add("POST", "/{environ_id}/restore", handler.restore, middlewares=[auth_required])
+    registry.add("POST", "/{environ_id}/purge", handler.purge, middlewares=[auth_required])
+
+    return registry

@@ -42,6 +42,16 @@
 - both admin and user, with different behavior (e.g. admin sets more fields): split `admin_` and non-admin into different DTOs.
 - both admin and user, differing only in permission checks: a single endpoint — admins already have entity access, so no separate `admin_` is needed.
 
+## Write responses (DTO, REST)
+
+- When the target still exists (create, update, soft delete, restore), return the target DTO.
+- A purge finishing within the request returns 200 with the removed target's UUID: `entity_id` for an entity,
+  `field_id` for a field row, the end UUIDs for a relation.
+- A purge of an entity with `purge_status` starts the cleanup and returns 202 Accepted with the target DTO
+  (`purge_status = purging`). A force purge finishes within the request.
+- A request naming a relation takes the end UUIDs in the body. Do NOT put an id in the path.
+- DTOs carry UUIDs only. The GQL layer builds global IDs (`gql/AGENTS.md`).
+
 ## Routing
 
 - Register routes only in `create_app()`.

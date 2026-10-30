@@ -222,15 +222,15 @@ class TestDeleteDomainPayload:
     """Tests for DeleteDomainPayload model."""
 
     def test_deleted_true(self) -> None:
-        payload = DeleteDomainPayload(deleted=True)
+        payload = DeleteDomainPayload(deleted=True, domain=make_domain_node())
         assert payload.deleted is True
 
     def test_deleted_false(self) -> None:
-        payload = DeleteDomainPayload(deleted=False)
+        payload = DeleteDomainPayload(deleted=False, domain=make_domain_node())
         assert payload.deleted is False
 
     def test_round_trip(self) -> None:
-        payload = DeleteDomainPayload(deleted=True)
+        payload = DeleteDomainPayload(deleted=True, domain=make_domain_node())
         json_str = payload.model_dump_json()
         restored = DeleteDomainPayload.model_validate_json(json_str)
         assert restored.deleted is True

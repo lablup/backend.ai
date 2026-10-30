@@ -10,6 +10,7 @@ from pydantic import Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.dto.manager.query import StringFilter
+from ai.backend.common.dto.manager.v2.common import NonEmptyList
 from ai.backend.common.dto.manager.v2.object_storage.types import (
     ObjectStorageOrderField,
     OrderDirection,
@@ -24,6 +25,8 @@ __all__ = (
     "GetPresignedUploadURLInput",
     "ObjectStorageFilter",
     "ObjectStorageOrder",
+    "PartialBulkPurgeObjectStoragesInput",
+    "PartialBulkUpdateObjectStoragesInput",
     "UpdateObjectStorageInput",
 )
 
@@ -78,6 +81,20 @@ class DeleteObjectStorageInput(BaseRequestModel):
     id: UUID = Field(description="Object storage ID to delete")
 
 
+class PartialBulkUpdateObjectStoragesInput(BaseRequestModel):
+    """Input for updating several object storages, each answered for separately."""
+
+    items: NonEmptyList[UpdateObjectStorageInput] = Field(
+        description="The object storages to update, each with its ID and fields."
+    )
+
+
+class PartialBulkPurgeObjectStoragesInput(BaseRequestModel):
+    """Input for permanently purging several object storages, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the object storages to purge.")
+
+
 class GetPresignedUploadURLInput(BaseRequestModel):
     """Input for getting a presigned upload URL."""
 
@@ -99,7 +116,12 @@ class ObjectStorageFilter(BaseRequestModel):
 class ObjectStorageOrder(BaseRequestModel):
     """Single ordering criterion for object storage search."""
 
-    field: ObjectStorageOrderField = Field(description="Field to order by.")
+    field: ObjectStorageOrderField = Field(
+        description=(
+            "Field to order by. `CREATED_AT` is deprecated since 26.9.0: it is not used"
+            " for ordering and is removed in the next release."
+        )
+    )
     direction: OrderDirection = Field(default=OrderDirection.ASC, description="Sort direction.")
 
 

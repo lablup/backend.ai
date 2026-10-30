@@ -23,12 +23,12 @@ class TestEtcdDependency:
         container_id, etcd_addr = etcd_container
 
         # Create minimal etcd config for testing
-        etcd_config = EtcdConfig(
-            addr=HostPortPair(host=etcd_addr.host, port=etcd_addr.port),
-            namespace=test_ns,
-            user=None,
-            password=None,
-        )
+        etcd_config = EtcdConfig.model_validate({
+            "addrs": [HostPortPair(host=etcd_addr.host, port=etcd_addr.port)],
+            "namespace": test_ns,
+            "user": None,
+            "password": None,
+        })
 
         # Create a minimal BootstrapConfig with just etcd settings
         return BootstrapConfig(etcd=etcd_config)

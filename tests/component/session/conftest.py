@@ -17,6 +17,7 @@ from ai.backend.common.bgtask.bgtask import BackgroundTaskManager
 from ai.backend.common.data.entity.agent import AgentEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.kernel import KernelFieldType
+from ai.backend.common.data.entity.kernel_group import KernelGroupFieldType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import (
     ResourceGroupEntityType,
@@ -46,21 +47,29 @@ from ai.backend.manager.api.rest.session.registry import register_session_routes
 from ai.backend.manager.api.rest.types import RouteDeps
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
+from ai.backend.manager.data.kernel_group.types import KernelGroupData
 from ai.backend.manager.data.session.types import SessionStatus
-from ai.backend.manager.models.agent import AgentRow
-from ai.backend.manager.models.kernel import kernels
-from ai.backend.manager.models.session import SessionRow
+from ai.backend.manager.models.agent.row import AgentRow
+from ai.backend.manager.models.kernel.row import kernels
+from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
+from ai.backend.manager.repositories.container_registry.db_source import ContainerRegistryDBSource
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.session.repository import SessionRepository
 from ai.backend.manager.services.agent.processors import AgentProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.project.processors import ProjectProcessors
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_group_owner import (
+    LookupBulkKernelGroupOwnerAction,
+)
 from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
     LookupBulkKernelOwnerAction,
 )
 from ai.backend.manager.services.session.actions.lookup_kernel_field_owner import (
     LookupKernelFieldOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_group_field_owner import (
+    LookupKernelGroupFieldOwnerAction,
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
@@ -107,7 +116,11 @@ def session_repository(
     """Real ``SessionRepository`` exposed as a fixture so individual tests can
     override or stub specific methods (e.g., ``resolve_image``) without
     monkey-patching the class globally."""
-    return SessionRepository(database_engine, V2DBOpsProvider(database_engine))
+    return SessionRepository(
+        database_engine,
+        V2DBOpsProvider(database_engine),
+        registry_db_source=ContainerRegistryDBSource(V2DBOpsProvider(database_engine)),
+    )
 
 
 @pytest.fixture()
@@ -144,6 +157,12 @@ async def session_processors(
             KernelInfo,
             LookupKernelFieldOwnerAction,
             LookupBulkKernelOwnerAction,
+        ),
+        processor_registry.group(GroupMeta(SessionEntityType())).field_group(
+            FieldGroupMeta(KernelGroupFieldType()),
+            KernelGroupData,
+            LookupKernelGroupFieldOwnerAction,
+            LookupBulkKernelGroupOwnerAction,
         ),
         ResourceAllocationProcessors(
             groups.group(GroupMeta(UserEntityType())),

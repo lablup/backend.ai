@@ -24,7 +24,6 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from ai.backend.common import validators as tx
 from ai.backend.common.data.entity.session import SessionID
-from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.defs.session import SESSION_PRIORITY_MAX, SESSION_PRIORITY_MIN
 from ai.backend.common.exception import SessionWithInvalidStateError
 from ai.backend.common.types import (
@@ -33,10 +32,11 @@ from ai.backend.common.types import (
     ResourceSlot,
     SessionId,
     SessionResult,
+    SessionTypes,
     VFolderID,
     VFolderMount,
 )
-from ai.backend.manager.api.gql.base import resolve_global_id
+from ai.backend.manager.api.gql.base import resolve_entity_id, resolve_global_id
 from ai.backend.manager.clients.valkey_client.statistics import KernelStatistics
 from ai.backend.manager.data.permission.permission_defs import ComputeSessionPermission
 from ai.backend.manager.data.permission.permission_defs import (
@@ -45,10 +45,10 @@ from ai.backend.manager.data.permission.permission_defs import (
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.types import SessionData, SessionStatus
 from ai.backend.manager.defs import DEFAULT_ROLE
-from ai.backend.manager.errors.api import NotImplementedAPI
+from ai.backend.manager.errors.api import InvalidAPIParameters, NotImplementedAPI
 from ai.backend.manager.errors.resource import DataTransformationFailed
 from ai.backend.manager.idle import ReportInfo
-from ai.backend.manager.models.kernel import KernelRow
+from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.minilang import ArrayFieldItem, JSONFieldItem, ORMFieldItem
 from ai.backend.manager.models.minilang.ordering import ColumnMapType, QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import FieldSpecType, QueryFilterParser
@@ -58,11 +58,10 @@ from ai.backend.manager.models.rbac.context import ClientContext
 from ai.backend.manager.models.resource_slot.aggregates import (
     batch_load_session_allocations,
 )
-from ai.backend.manager.models.session import (
+from ai.backend.manager.models.session.row import (
     DEFAULT_SESSION_ORDERING,
     SessionDependencyRow,
     SessionRow,
-    SessionTypes,
     by_domain_name,
     by_raw_filter,
     by_resource_group_name,
@@ -76,10 +75,10 @@ from ai.backend.manager.models.types import (
     join_by_related_field,
     load_related_field,
 )
-from ai.backend.manager.models.user import UserRole, UserRow
+from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.utils import agg_to_array
-from ai.backend.manager.models.vfolder import VFolderRow
-from ai.backend.manager.models.vfolder import get_permission_ctx as get_vfolder_permission_ctx
+from ai.backend.manager.models.vfolder.row import VFolderRow
+from ai.backend.manager.models.vfolder.row import get_permission_ctx as get_vfolder_permission_ctx
 from ai.backend.manager.services.session.actions.update_session import UpdateSessionAction
 from ai.backend.manager.types import OptionalState
 
@@ -326,11 +325,11 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         id: str,
     ) -> Self | None:
         graphene_ctx: GraphQueryContext = info.context
-        _, raw_session_id = AsyncNode.resolve_global_id(info, id)
+        session_id = resolve_entity_id(id, SessionID)
         async with graphene_ctx.db.begin_readonly_session() as db_session:
             stmt = (
                 sa.select(SessionRow)
-                .where(SessionRow.id == uuid.UUID(raw_session_id))
+                .where(SessionRow.id == session_id)
                 .options(selectinload(SessionRow.kernels), joinedload(SessionRow.user))
             )
             query_result = await db_session.scalar(stmt)
@@ -395,9 +394,9 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             # ownership
             domain_name=row.domain_name,
             project_id=row.group_id,
-            user_id=UserID(row.user_uuid),
+            user_id=row.user_uuid,
             access_key=row.access_key,
-            owner=UserNode.from_row(ctx, row.user),
+            owner=UserNode.from_row(ctx, row.user) if row.user is not None else None,
             # status
             status=row.status.name,
             # status_changed=row.status_changed,  # FIXME: generated attribute
@@ -454,7 +453,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
             # ownership
             domain_name=session_data.domain_name,
             project_id=session_data.group_id,
-            user_id=UserID(session_data.user_uuid),
+            user_id=session_data.user_uuid,
             access_key=session_data.access_key,
             owner=UserNode.from_dataclass(ctx, session_data.owner),
             # status
@@ -595,7 +594,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         self,
         info: graphene.ResolveInfo,
     ) -> ConnectionResolverResult[Self]:
-        from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+        from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
 
         ctx: GraphQueryContext = info.context
 
@@ -651,7 +650,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         Used by resolve_dependents(): given dependee IDs (sessions being depended on),
         return the dependent sessions (sessions that depend on them).
         """
-        from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+        from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
 
         async with ctx.db.begin_readonly_session() as db_sess:
             # Step 1: Find dependency rows where depends_on matches the input IDs
@@ -695,7 +694,7 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         Used by resolve_dependees(): given dependent IDs (sessions that depend on others),
         return the dependee sessions (sessions they depend on).
         """
-        from ai.backend.manager.models.session import SessionDependencyRow, SessionRow
+        from ai.backend.manager.models.session.row import SessionDependencyRow, SessionRow
 
         async with ctx.db.begin_readonly_session() as db_sess:
             # Step 1: Find dependency rows where session_id matches the input IDs
@@ -741,13 +740,17 @@ class ComputeSessionNode(graphene.ObjectType):  # type: ignore[misc]
         graph_ctx: GraphQueryContext = info.context
         user = graph_ctx.user
         client_ctx = ClientContext(graph_ctx.db, user["domain_name"], user["uuid"], user["role"])
-        _, session_id = id
+        _, raw_session_id = id
         async with graph_ctx.db.connect() as db_conn:
             permission_ctx = await get_permission_ctx(db_conn, client_ctx, scope_id, permission)
             cond = permission_ctx.query_condition
             if cond is None:
                 return None
-            query = sa.select(SessionRow).where(cond & (SessionRow.id == uuid.UUID(session_id)))
+            try:
+                session_id = uuid.UUID(raw_session_id)
+            except ValueError as e:
+                raise InvalidAPIParameters(f"Invalid id: {raw_session_id}") from e
+            query = sa.select(SessionRow).where(cond & (SessionRow.id == session_id))
             query = cls._add_basic_options_to_query(query)
             async with graph_ctx.db.begin_readonly_session(db_conn) as db_session:
                 session_row = await db_session.scalar(query)
@@ -1285,6 +1288,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: str | None = None,
+        user_id: uuid.UUID | None = None,
         status: str | SessionStatus | None = None,
         filter: str | None = None,
     ) -> int:
@@ -1306,6 +1310,8 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
             query = query.where(SessionRow.group_id == group_id)
         if access_key is not None:
             query = query.where(SessionRow.access_key == access_key)
+        if user_id is not None:
+            query = query.where(SessionRow.user_uuid == user_id)
         if status_list is not None:
             query = query.where(SessionRow.status.in_(status_list))
         if filter is not None:
@@ -1325,6 +1331,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         domain_name: str | None = None,
         group_id: uuid.UUID | None = None,
         access_key: str | None = None,
+        user_id: uuid.UUID | None = None,
         status: str | SessionStatus | None = None,
         filter: str | None = None,
         order: str | None = None,
@@ -1359,6 +1366,8 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
             query = query.where(SessionRow.group_id == group_id)
         if access_key is not None:
             query = query.where(SessionRow.access_key == access_key)
+        if user_id is not None:
+            query = query.where(SessionRow.user_uuid == user_id)
         if status_list is not None:
             query = query.where(SessionRow.status.in_(status_list))
         if filter is not None:
@@ -1381,6 +1390,7 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
         *,
         domain_name: str | None = None,
         access_key: str | None = None,
+        user_id: uuid.UUID | None = None,
     ) -> Sequence[ComputeSession | None]:
         j = sa.join(SessionRow, ProjectRow, SessionRow.group_id == ProjectRow.id).join(
             UserRow, SessionRow.user_uuid == UserRow.uuid
@@ -1400,6 +1410,8 @@ class ComputeSession(graphene.ObjectType):  # type: ignore[misc]
             query = query.where(SessionRow.domain_name == domain_name)
         if access_key is not None:
             query = query.where(SessionRow.access_key == access_key)
+        if user_id is not None:
+            query = query.where(SessionRow.user_uuid == user_id)
         async with ctx.db.begin_readonly_session() as db_sess:
             rows = (await db_sess.execute(query)).all()
             objs_per_key: dict[SessionId, ComputeSession | None] = dict.fromkeys(session_ids)

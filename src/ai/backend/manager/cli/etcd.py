@@ -15,7 +15,7 @@ from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.etcd import quote as etcd_quote
 from ai.backend.common.etcd import unquote as etcd_unquote
 from ai.backend.common.json import pretty_json_str
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
 from .context import etcd_ctx
 from .image_impl import alias as alias_impl
@@ -29,7 +29,7 @@ from .image_impl import set_image_resource_limit as set_image_resource_limit_imp
 if TYPE_CHECKING:
     from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @click.group()
@@ -56,7 +56,7 @@ def put(cli_ctx: CLIContext, key: str, value: str, scope: ConfigScopes) -> None:
             try:
                 await etcd.put(key, value, scope=scope)
             except Exception:
-                log.exception("An error occurred.")
+                log.exception("etcd command failed")
 
     asyncio.run(_impl())
 
@@ -84,7 +84,7 @@ def put_json(cli_ctx: CLIContext, key: str, file: BinaryIO, scope: ConfigScopes)
                 value = json.load(file)
                 await etcd.put_prefix(key, value, scope=scope)
             except Exception:
-                log.exception("An error occurred.")
+                log.exception("etcd command failed")
 
     asyncio.run(_impl())
 
@@ -118,7 +118,7 @@ def move_subtree(
                 await etcd.put_prefix(dst_prefix, subtree, scope=scope)  # type: ignore[arg-type]
                 await etcd.delete_prefix(src_prefix, scope=scope)
             except Exception:
-                log.exception("An error occurred.")
+                log.exception("etcd command failed")
 
     asyncio.run(_impl())
 
@@ -155,7 +155,7 @@ def get(cli_ctx: CLIContext, key: str, prefix: bool, scope: ConfigScopes) -> Non
                         sys.exit(ExitCode.FAILURE)
                     print(val)
             except Exception:
-                log.exception("An error occurred.")
+                log.exception("etcd command failed")
 
     asyncio.run(_impl())
 
@@ -180,19 +180,19 @@ def delete(cli_ctx: CLIContext, key: str, prefix: bool, scope: ConfigScopes) -> 
                 if prefix:
                     prefix_data = await etcd.get_prefix(key, scope=scope)
                     if not prefix_data:
-                        log.info(f"No keys found to delete with prefix: {key}")
+                        log.info("no keys found to delete with the prefix", etcd_key=key)
                         return
                     await etcd.delete_prefix(key, scope=scope)
-                    log.info(f"All keys starting with '{key}' successfully deleted.")
+                    log.info("deleted all keys with the prefix", etcd_key=key)
                 else:
                     single_data = await etcd.get(key, scope=scope)
                     if single_data is None:
-                        log.info(f"No key found to delete: {key}")
+                        log.info("no key found to delete", etcd_key=key)
                         return
                     await etcd.delete(key, scope=scope)
-                    log.info(f"Key '{key}' successfully deleted.")
+                    log.info("deleted the key", etcd_key=key)
             except Exception:
-                log.exception("An error occurred.")
+                log.exception("etcd command failed")
 
     asyncio.run(_impl())
 
@@ -335,7 +335,7 @@ def set_storage_sftp_resource_group(
         async with etcd_ctx(cli_ctx) as etcd:
             data = await etcd.get_prefix(f"volumes/proxies/{proxy}", scope=scope)
             if len(data) == 0:
-                log.error("proxy {} does not exist", proxy)
+                log.error("storage proxy does not exist", proxy_name=proxy)
                 sys.exit(ExitCode.FAILURE)
             await etcd.put(
                 f"volumes/proxies/{proxy}/sftp_scaling_groups",
@@ -368,7 +368,7 @@ def remove_storage_sftp_resource_group(
         async with etcd_ctx(cli_ctx) as etcd:
             data = await etcd.get_prefix(f"volumes/proxies/{proxy}", scope=scope)
             if len(data) == 0:
-                log.error("proxy {} does not exist", proxy)
+                log.error("storage proxy does not exist", proxy_name=proxy)
                 sys.exit(ExitCode.FAILURE)
             await etcd.delete(f"volumes/proxies/{proxy}/sftp_scaling_groups")
 

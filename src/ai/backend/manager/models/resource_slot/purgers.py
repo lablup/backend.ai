@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
 
+import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.resource_slot import ResourceSlotTypeUUID
@@ -18,20 +19,22 @@ from ai.backend.manager.models.resource_slot.row import (
     ResourceAllocationRow,
     ResourceSlotTypeRow,
 )
+from ai.backend.manager.models.resource_slot.searchable_fields import (
+    ResourceSlotTypeSearchableFields,
+)
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
 
 
 @dataclass
 class ResourceSlotTypePurger(EntityPurger[ResourceSlotTypeRow, ResourceSlotTypeData]):
-    """Purger for a resource slot type, keyed by its ``slot_name`` primary key.
+    """Purger for a resource slot type, keyed by its id.
 
     Every table that keeps the name as an FK is declared as a conflict check, so a
     slot type still spoken of anywhere is refused instead of failing on the
     constraint.
     """
 
-    slot_name: str
     slot_type_id: ResourceSlotTypeUUID
 
     @override
@@ -48,40 +51,48 @@ class ResourceSlotTypePurger(EntityPurger[ResourceSlotTypeRow, ResourceSlotTypeD
 
     @override
     def conflict_checks(self) -> Sequence[ConflictCheck]:
-        slot_name = self.slot_name
+        slot_type_id = self.slot_type_id
+
+        def slot_name() -> sa.ScalarSelect[str]:
+            return (
+                sa.select(ResourceSlotTypeRow.slot_name)
+                .where(ResourceSlotTypeRow.uuid == slot_type_id)
+                .scalar_subquery()
+            )
+
         return (
             ConflictCheck(
-                condition=lambda: AgentResourceRow.slot_name == slot_name,
+                condition=lambda: AgentResourceRow.slot_name == slot_name(),
                 error=ResourceSlotTypeInUse(
-                    f"Resource slot type '{slot_name}' is still reported by an agent."
+                    f"Resource slot type {slot_type_id} is still reported by an agent."
                 ),
             ),
             ConflictCheck(
-                condition=lambda: ResourceAllocationRow.slot_name == slot_name,
+                condition=lambda: ResourceAllocationRow.slot_name == slot_name(),
                 error=ResourceSlotTypeInUse(
-                    f"Resource slot type '{slot_name}' is still allocated to a kernel."
+                    f"Resource slot type {slot_type_id} is still allocated to a kernel."
                 ),
             ),
             ConflictCheck(
-                condition=lambda: ModelCardResourceRequirementRow.slot_name == slot_name,
+                condition=lambda: ModelCardResourceRequirementRow.slot_name == slot_name(),
                 error=ResourceSlotTypeInUse(
-                    f"Resource slot type '{slot_name}' is still required by a model card."
+                    f"Resource slot type {slot_type_id} is still required by a model card."
                 ),
             ),
             ConflictCheck(
-                condition=lambda: PresetResourceSlotRow.slot_name == slot_name,
+                condition=lambda: PresetResourceSlotRow.slot_name == slot_name(),
                 error=ResourceSlotTypeInUse(
-                    f"Resource slot type '{slot_name}' is still used by a deployment preset."
+                    f"Resource slot type {slot_type_id} is still used by a deployment preset."
                 ),
             ),
             ConflictCheck(
-                condition=lambda: DeploymentRevisionResourceSlotRow.slot_name == slot_name,
+                condition=lambda: DeploymentRevisionResourceSlotRow.slot_name == slot_name(),
                 error=ResourceSlotTypeInUse(
-                    f"Resource slot type '{slot_name}' is still used by a deployment revision."
+                    f"Resource slot type {slot_type_id} is still used by a deployment revision."
                 ),
             ),
         )
 
     @override
     def to_data(self, row: ResourceSlotTypeRow) -> ResourceSlotTypeData:
-        return row.to_data()
+        return ResourceSlotTypeSearchableFields.own.to_data(row)

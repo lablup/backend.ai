@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from ai.backend.manager.data.fair_share import (
+from ai.backend.manager.data.fair_share.types import (
     FairShareSpec,
 )
 from ai.backend.manager.data.resource_group.types import FairShareResourceGroupSpec
@@ -13,10 +13,10 @@ from ai.backend.manager.models.fair_share.upserters import (
     ProjectFairShareUpserter,
     UserFairShareUpserter,
 )
-from ai.backend.manager.repositories.base import (
+from ai.backend.manager.repositories.base.querier import (
     BatchQuerier,
 )
-from ai.backend.manager.repositories.fair_share import FairShareRepository
+from ai.backend.manager.repositories.fair_share.repository import FairShareRepository
 from ai.backend.manager.types import TriState
 
 from .actions import (

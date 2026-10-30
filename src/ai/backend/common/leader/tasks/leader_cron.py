@@ -8,9 +8,9 @@ from typing import Final, override
 
 from ai.backend.common.cron.base import PeriodicTask
 from ai.backend.common.leader.base import LeadershipChecker, LeaderTask
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger, with_log_context
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class LeaderCron(LeaderTask):
@@ -40,7 +40,7 @@ class LeaderCron(LeaderTask):
         self._task_runners = []
         self._stopped = False
 
-        log.info("Initialized LeaderCron with {} tasks", len(tasks))
+        log.debug("leader cron initialized", task_count=len(tasks))
 
     async def _run_task(self, task: PeriodicTask) -> None:
         """
@@ -48,6 +48,10 @@ class LeaderCron(LeaderTask):
 
         This task only executes when the instance is the leader.
         """
+        with with_log_context(task_name=task.name):
+            await self._run_task_in_scope(task)
+
+    async def _run_task_in_scope(self, task: PeriodicTask) -> None:
         try:
             await asyncio.sleep(task.initial_delay)
             while not self._stopped:
@@ -55,13 +59,13 @@ class LeaderCron(LeaderTask):
                     try:
                         await task.run()
                     except Exception:
-                        log.exception("Error running task {}", task.name)
+                        log.exception("periodic task failed")
                 await asyncio.sleep(task.interval)
         except asyncio.CancelledError:
-            log.debug("Task {} cancelled", task.name)
+            log.debug("periodic task cancelled")
             raise
         except Exception:
-            log.exception("Unexpected error in task {}", task.name)
+            log.exception("periodic task loop failed")
             raise
 
     @override
@@ -72,7 +76,7 @@ class LeaderCron(LeaderTask):
         Args:
             leadership_checker: Object that provides leadership status
         """
-        log.info("Starting leader cron")
+        log.debug("leader cron starting")
 
         self._stopped = False
         self._leadership_checker = leadership_checker
@@ -83,7 +87,7 @@ class LeaderCron(LeaderTask):
             runner.set_name(f"leader-cron-task-{task.name}")
             self._task_runners.append(runner)
 
-        log.info("Leader cron started with {} tasks", len(self._tasks))
+        log.info("leader cron started", task_count=len(self._tasks))
 
     @override
     async def stop(self) -> None:
@@ -92,7 +96,7 @@ class LeaderCron(LeaderTask):
 
         This stops all tasks and cleans up resources.
         """
-        log.info("Stopping leader cron")
+        log.debug("leader cron stopping")
         self._stopped = True
         for runner in self._task_runners:
             if not runner.done():
@@ -102,4 +106,4 @@ class LeaderCron(LeaderTask):
                 except asyncio.CancelledError:
                     pass
         self._task_runners.clear()
-        log.info("Leader cron stopped")
+        log.info("leader cron stopped")

@@ -16,11 +16,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from cryptography.hazmat.backends import default_backend as crypto_default_backend
-from cryptography.hazmat.primitives import serialization as crypto_serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 from pydantic import BaseModel, Field
 
+from ai.backend.common.auth.ssh import generate_ssh_keypair
 from ai.backend.common.docker import ImageRef, LabelName
 from ai.backend.common.types import (
     AutoPullBehavior,
@@ -87,32 +85,11 @@ class KernelCreateSpec(BaseModel):
 def generate_cluster_ssh_keypair() -> ClusterSSHKeyPair:
     """Generate an ephemeral RSA keypair for the cluster SSH slot.
 
-    Mirrors ``manager/models/keypair/row.py:generate_ssh_keypair`` (which lives
-    in a manager-only layer the agent cannot import). Single-node kernels do not
-    use it, but the manager always sends one, so we do too to keep parity.
+    Single-node kernels do not use it, but the manager always sends one, so we do
+    too to keep parity.
     """
-    key = rsa.generate_private_key(
-        backend=crypto_default_backend(),
-        public_exponent=65537,
-        key_size=2048,
-    )
-    private_key = key.private_bytes(
-        crypto_serialization.Encoding.PEM,
-        crypto_serialization.PrivateFormat.TraditionalOpenSSL,
-        crypto_serialization.NoEncryption(),
-    ).decode("utf-8")
-    public_key = (
-        key.public_key()
-        .public_bytes(
-            crypto_serialization.Encoding.OpenSSH,
-            crypto_serialization.PublicFormat.OpenSSH,
-        )
-        .decode("utf-8")
-    )
-    return ClusterSSHKeyPair(
-        public_key=f"{public_key.rstrip()}\n",
-        private_key=f"{private_key.rstrip()}\n",
-    )
+    public_key, private_key = generate_ssh_keypair()
+    return ClusterSSHKeyPair(public_key=public_key, private_key=private_key)
 
 
 def build_cluster_info(

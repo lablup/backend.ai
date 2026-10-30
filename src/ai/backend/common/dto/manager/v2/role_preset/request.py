@@ -2,25 +2,43 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.role_preset import RolePresetID
 from ai.backend.common.data.entity.types import DeclaredEntityType
-from ai.backend.common.dto.manager.query import StringFilter
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.query import (
+    NullableDateTimeFilter,
+    StringFilter,
+    ToManyFilter,
+    UUIDFilter,
+)
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, OrderDirection
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
+from ai.backend.common.dto.manager.v2.role_permission_preset.request import (
+    RolePermissionPresetFilter,
+)
 from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
     RolePermissionPresetEntry,
 )
-from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetOrderField
+from ai.backend.common.dto.manager.v2.role_preset.types import RolePresetOrderField, RolePresetUsage
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "BulkDeleteRolePresetsInput",
     "BulkPurgeRolePresetsInput",
     "BulkRestoreRolePresetsInput",
     "CreateRolePresetInput",
+    "PartialBulkDeleteRolePresetsInput",
+    "PartialBulkPurgeRolePresetsInput",
+    "PartialBulkRestoreRolePresetsInput",
+    "PartialBulkUpdateRolePresetItemInput",
+    "PartialBulkUpdateRolePresetsInput",
     "RolePresetFilter",
     "RolePresetOrder",
+    "RolePresetPermissionNestedFilter",
     "SearchRolePresetsInput",
     "UpdateRolePresetBody",
     "UpdateRolePresetInput",
@@ -54,8 +72,8 @@ class UpdateRolePresetBody(BaseRequestModel):
     Used directly as the REST request body, where the preset ID is supplied as a
     URL path segment instead of a body field. ``UpdateRolePresetInput`` extends
     this with the ID for the GQL/adapter call path. Permission entries are
-    managed via the dedicated Add/Remove endpoints, and the ``deleted`` flag
-    through the dedicated Delete/Restore endpoints.
+    managed via the dedicated Add/Remove endpoints, and ``deleted_at`` through the
+    dedicated Delete/Restore endpoints.
     """
 
     name: str | None = Field(default=None, min_length=1, max_length=64, description="Updated name.")
@@ -76,7 +94,7 @@ class UpdateRolePresetInput(UpdateRolePresetBody):
 
 
 class BulkDeleteRolePresetsInput(BaseRequestModel):
-    """Input for bulk-soft-deleting role presets (sets ``deleted = true``)."""
+    """Input for bulk-soft-deleting role presets (sets ``deleted_at``)."""
 
     role_preset_ids: list[RolePresetID] = Field(
         description="Role preset UUIDs to soft-delete.",
@@ -84,7 +102,7 @@ class BulkDeleteRolePresetsInput(BaseRequestModel):
 
 
 class BulkRestoreRolePresetsInput(BaseRequestModel):
-    """Input for bulk-restoring soft-deleted role presets (sets ``deleted = false``)."""
+    """Input for bulk-restoring soft-deleted role presets (clears ``deleted_at``)."""
 
     role_preset_ids: list[RolePresetID] = Field(
         description="Role preset UUIDs to restore.",
@@ -99,18 +117,85 @@ class BulkPurgeRolePresetsInput(BaseRequestModel):
     )
 
 
-class RolePresetFilter(BaseRequestModel):
-    """Filter criteria for searching role presets."""
+class PartialBulkUpdateRolePresetItemInput(BaseRequestModel):
+    """One role preset of a partial bulk update and the fields to update on it."""
 
+    id: UUID = Field(description="ID of the role preset to update.")
+    input: UpdateRolePresetBody = Field(description="Fields to update on the role preset.")
+
+
+class PartialBulkUpdateRolePresetsInput(BaseRequestModel):
+    """Input for updating several role presets, each answered for separately."""
+
+    items: NonEmptyList[PartialBulkUpdateRolePresetItemInput] = Field(
+        description="The role presets to update, each with its fields."
+    )
+
+
+class PartialBulkDeleteRolePresetsInput(BaseRequestModel):
+    """Input for soft-deleting several role presets, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the role presets to soft-delete.")
+
+
+class PartialBulkRestoreRolePresetsInput(BaseRequestModel):
+    """Input for restoring several soft-deleted role presets, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the role presets to restore.")
+
+
+class PartialBulkPurgeRolePresetsInput(BaseRequestModel):
+    """Input for purging several role presets, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the role presets to purge.")
+
+
+class RolePresetPermissionNestedFilter(ToManyFilter[RolePermissionPresetFilter]):
+    """The `permissions` field of a role preset filter.
+
+    Each quantifier matches one permission entry at a time. To require two different
+    entries, combine two of these with the preset filter's own `AND`.
+    """
+
+
+class RolePresetFilter(BaseRequestModel):
+    """Filter criteria for searching role presets.
+
+    Soft-deleted presets are left out unless the top-level filter gives ``deleted_at`` or
+    ``deleted``. Either inside ``AND``/``OR``/``NOT`` does not lift that default.
+    """
+
+    id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `entity_id`.",
+        deprecated=True,
+    )
+    entity_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by role preset ID.",
+    )
     name: StringFilter | None = Field(default=None, description="Filter by name.")
     scope_type: StringFilter | None = Field(default=None, description="Filter by scope type.")
     auto_assign: bool | None = Field(default=None, description="Filter by auto-assign flag.")
     deleted: bool | None = Field(
         default=None,
+        description=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `deleted_at`.",
+        deprecated=True,
+    )
+    deleted_at: NullableDateTimeFilter | None = Field(
+        default=None,
         description=(
-            "Filter by soft-delete flag. Searches exclude soft-deleted rows by default; "
-            "set this explicitly to ``true`` to inspect archived presets."
+            f"Added in {NEXT_RELEASE_VERSION}. Filter by soft-delete time. Setting it on the "
+            "top-level filter includes soft-deleted presets; inside AND, OR or NOT it does not."
         ),
+    )
+    permissions: RolePresetPermissionNestedFilter | None = Field(
+        default=None,
+        description="Filter by conditions on the permission entries the preset carries.",
+    )
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by the labels on the entity.",
     )
     AND: list[RolePresetFilter] | None = Field(default=None, description="AND conjunction.")
     OR: list[RolePresetFilter] | None = Field(default=None, description="OR conjunction.")
@@ -130,6 +215,12 @@ class RolePresetOrder(BaseRequestModel):
 class SearchRolePresetsInput(BaseRequestModel):
     """Input for paginated search of role presets."""
 
+    usage: RolePresetUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller."
+        ),
+    )
     filter: RolePresetFilter | None = Field(default=None, description="Filter conditions.")
     order: list[RolePresetOrder] | None = Field(default=None, description="Order specifications.")
     first: int | None = Field(default=None, description="Cursor pagination: number of items.")

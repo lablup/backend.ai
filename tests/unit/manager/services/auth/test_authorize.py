@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 import pytest
 from aiohttp import web
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm
 from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.data.entity.resource_policy import (
     UserResourcePolicyUUID,
@@ -13,12 +14,11 @@ from ai.backend.common.dto.manager.auth.types import AuthTokenType
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.plugin.hook import HookPluginContext, HookResult, HookResults
 from ai.backend.manager.config.unified import AuthConfig
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.auth.login_session_types import LoginAttemptResult
 from ai.backend.manager.data.resource.types import UserResourcePolicyData
 from ai.backend.manager.data.secret.types import KeyProviderType
 from ai.backend.manager.errors.auth import AuthorizationFailed, PasswordExpired
-from ai.backend.manager.models.user import UserRole, UserStatus
+from ai.backend.manager.models.user.row import UserRole, UserStatus
 from ai.backend.manager.repositories.auth.db_source.db_source import (
     ActiveSessionInfo,
     CredentialVerificationResult,
@@ -122,6 +122,7 @@ def _make_mock_keypair(
 ) -> MagicMock:
     """The keypair data the repository answers a default-keypair read with."""
     mock_keypair = MagicMock()
+    mock_keypair.user_id = _DEFAULT_USER_UUID
     mock_keypair.access_key = access_key
     mock_keypair.secret_key = SecretValue(secret_key)
     return mock_keypair
@@ -235,6 +236,35 @@ async def test_authorize_invalid_credentials(
     )
 
     with pytest.raises(AuthorizationFailed):
+        await auth_service.authorize(action)
+
+
+@pytest.mark.parametrize(
+    "status",
+    [UserStatus.INACTIVE, UserStatus.DELETED, UserStatus.PURGING, UserStatus.PURGE_ERROR],
+)
+async def test_authorize_rejects_user_by_status(
+    auth_service: AuthService,
+    setup_successful_auth: None,
+    mock_auth_repository: AsyncMock,
+    status: UserStatus,
+) -> None:
+    mock_auth_repository.verify_credential.return_value = CredentialVerificationResult(
+        user=_make_mock_user(status=status),
+        active_sessions=[],
+    )
+    action = AuthorizeAction(
+        type=AuthTokenType.KEYPAIR,
+        domain_name="default",
+        email="test@example.com",
+        password="correct_password",
+        request=MagicMock(),
+        stoken=None,
+        client_type_id=uuid4(),
+        otp=None,
+    )
+
+    with pytest.raises(AuthorizationFailed, match="User credential mismatch"):
         await auth_service.authorize(action)
 
 
@@ -416,7 +446,7 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
     )
 
     # Valkey cross-check: stale session is NOT in Valkey
-    mock_valkey_session_client.get_login_session.return_value = None
+    mock_valkey_session_client.get_login_sessions.return_value = [None]
 
     # create_login_session succeeds (after stale session cleaned up, count < max)
     mock_auth_repository.create_login_session.return_value = LoginSessionCreationResult(
@@ -426,8 +456,8 @@ async def test_authorize_with_valkey_cross_check_cleans_stale_sessions(
     result = await auth_service.authorize(action)
 
     # Stale session should have been invalidated in DB
-    mock_auth_repository.delete_login_session_by_token.assert_awaited_once_with(
-        "stale_token", LoginAttemptResult.EXPIRED, None
+    mock_auth_repository.delete_login_sessions_by_tokens.assert_awaited_once_with(
+        ["stale_token"], LoginAttemptResult.EXPIRED, None
     )
     assert result.authorization_result is not None
     assert result.authorization_result.session_token == "new_session_token"
@@ -485,7 +515,7 @@ async def test_authorize_force_invalidates_existing_sessions(
     )
 
     # Valkey cross-check: session IS live
-    mock_valkey_session_client.get_login_session.return_value = b"session_data"
+    mock_valkey_session_client.get_login_sessions.return_value = [b"session_data"]
 
     # create_login_session succeeds
     mock_auth_repository.create_login_session.return_value = LoginSessionCreationResult(
@@ -503,7 +533,9 @@ async def test_authorize_force_invalidates_existing_sessions(
     assert "tokens_to_invalidate" not in create_kwargs
 
     # Old session should be deleted from Valkey
-    mock_valkey_session_client.delete_login_session.assert_awaited_once_with("existing_live_token")
+    mock_valkey_session_client.delete_login_sessions.assert_awaited_once_with([
+        "existing_live_token"
+    ])
 
     assert result.authorization_result is not None
     assert result.authorization_result.session_token == "forced_new_token"

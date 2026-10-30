@@ -46,6 +46,7 @@ Check options with `--help`.
 - **image**: user(empty group) · admin(search, forget, purge, update · sub alias: create, remove, search)
 - **entity-label**: user(upsert, purge, search)
 - **session**: user(compute-schedule, enqueue, exclude-idle-checks, include-idle-checks, get, logs, project-search, start-service, shutdown-service, terminate, update) · admin(search · sub kernel: search) · my(search)
+- **system-session-environ**: user(create, delete, purge, restore, update, value-sources) · admin(search)
 
 ### Compute & Serving
 
@@ -58,6 +59,7 @@ Check options with `--help`.
 - **runtime-variant-preset**: user(get, search) · admin(get, search, create, update, delete)
 - **scheduling-history**: sub session / kernel / deployment / route / replica-group — each (search, search-scoped)
 - **scheduling-handler**: admin(list)
+- **session-lifecycle-handler**: admin(list)
 
 ### Storage
 
@@ -92,7 +94,7 @@ Check options with `--help`.
 ### Resource Management
 
 - **resource-group**: user(empty group) · admin(search, get, create, update, delete, resource-info, default-options, default-session-options, allow-domains, allowed-domains, allow-projects, allowed-projects, allow-for-domain, allowed-for-domain, allow-for-project, allowed-for-project)
-- **resource-allocation**: user(project-usage, resource-group-usage) · admin(domain-usage, effective) · my(effective, keypair-usage)
+- **resource-allocation**: user(project-usage, resource-group-usage) · admin(domain-usage, effective) · my(concurrency, effective, keypair-usage, user-usage)
 - **resource-preset**: admin(search, get, create, update, delete, check-availability)
 - **resource-policy**: admin(sub keypair / project / user — each create, get, search, update, delete) · my(keypair, user)
 - **resource-slot**: sub slot-type(search, create, update, delete), agent-resource(search), allocation(search)

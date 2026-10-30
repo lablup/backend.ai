@@ -25,7 +25,7 @@ from ai.backend.manager.data.session.draft import (
     SessionResourceSpecDraft,
 )
 from ai.backend.manager.data.session.options import DefaultSessionOptions
-from ai.backend.manager.models.network import NetworkType
+from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.sokovan.scheduling_controller.preparers.specs.assign_network_config_rule import (
     AssignNetworkConfigRule,
 )
@@ -58,6 +58,7 @@ def _context(*, use_host_network: bool = False, resource_group: bool = True) -> 
             policy=None,
             container_user=ContainerUserInfo(),
             dotfiles=DotfileBundle(),
+            default_bootstrap_script=None,
             pending_session_count=0,
             pending_session_resource_slots={},
             vfolder_mounts_by_role={},

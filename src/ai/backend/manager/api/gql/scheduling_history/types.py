@@ -15,6 +15,7 @@ from strawberry.relay import NodeID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_history import DeploymentHistoryID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
+from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
 from ai.backend.common.data.entity.route_history import RouteHistoryID
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.session_scheduling_history import (
@@ -260,7 +261,7 @@ class SessionSchedulingHistory(PydanticNodeMixin[SessionHistoryNode]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the session scheduling history record.",
         ),
     )
@@ -320,7 +321,7 @@ class KernelSchedulingHistoryGQL(PydanticNodeMixin[KernelHistoryNode]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the kernel scheduling history record.",
         ),
     )
@@ -357,7 +358,7 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the deployment history record.",
         ),
     )
@@ -427,11 +428,10 @@ class DeploymentHistory(PydanticNodeMixin[DeploymentHistoryNode]):
     name="ReplicaGroupHistory",
 )
 class ReplicaGroupHistoryGQL(PydanticNodeMixin[ReplicaGroupHistoryNode]):
-    # No resolve_nodes: these rows are reached through the owning deployment.
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the replica group history record.",
         ),
     )
@@ -465,13 +465,27 @@ class ReplicaGroupHistoryGQL(PydanticNodeMixin[ReplicaGroupHistoryNode]):
             DeploymentID(UUID(str(self.deployment_id)))
         )
 
+    @classmethod
+    @override
+    async def resolve_nodes(  # type: ignore[override]  # Strawberry Node uses AwaitableOrValue overloads incompatible with async def
+        cls,
+        *,
+        info: Info[StrawberryGQLContext],
+        node_ids: Iterable[str],
+        required: bool = False,
+    ) -> Iterable[Self | None]:
+        results = await info.context.data_loaders.replica_group_history_loader.load_many([
+            ReplicaGroupHistoryID(UUID(nid)) for nid in node_ids
+        ])
+        return cast(list[Self | None], results)
+
 
 @gql_node_type(BackendAIGQLMeta(added_version="26.3.0", description="Route history record."))
 class RouteHistory(PydanticNodeMixin[RouteHistoryNode]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the route history record.",
         ),
     )
@@ -660,7 +674,17 @@ class SchedulingResultFilterGQL(PydanticInputMixin[SchedulingResultFilterDTO]):
     name="SessionSchedulingHistoryFilter",
 )
 class SessionSchedulingHistoryFilter(PydanticInputMixin[SessionHistoryFilterDTO]):
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = gql_field(
+        description="Filter by history record ID.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `fieldId`.",
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by history record ID."
+        ),
+        default=None,
+    )
     session_id: UUIDFilter | None = None
     phase: StringFilter | None = None
     from_status: list[str] | None = None
@@ -691,7 +715,17 @@ class SessionSchedulingHistoryOrderBy(PydanticInputMixin[SessionHistoryOrderDTO]
     name="KernelSchedulingHistoryFilter",
 )
 class KernelSchedulingHistoryFilterGQL(PydanticInputMixin[KernelHistoryFilterDTO]):
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = gql_field(
+        description="Filter by history record ID.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `fieldId`.",
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by history record ID."
+        ),
+        default=None,
+    )
     kernel_id: UUIDFilter | None = None
     session_id: UUIDFilter | None = None
     phase: StringFilter | None = None
@@ -724,7 +758,17 @@ class KernelSchedulingHistoryOrderByGQL(PydanticInputMixin[KernelHistoryOrderDTO
     name="DeploymentHistoryFilter",
 )
 class DeploymentHistoryFilter(PydanticInputMixin[DeploymentHistoryFilterDTO]):
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = gql_field(
+        description="Filter by history record ID.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `fieldId`.",
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by history record ID."
+        ),
+        default=None,
+    )
     deployment_id: UUIDFilter | None = None
     phase: StringFilter | None = None
     from_status: list[str] | None = None
@@ -758,7 +802,17 @@ class DeploymentHistoryOrderBy(PydanticInputMixin[DeploymentHistoryOrderDTO]):
     name="ReplicaGroupHistoryFilter",
 )
 class ReplicaGroupHistoryFilterGQL(PydanticInputMixin[ReplicaGroupHistoryFilterDTO]):
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = gql_field(
+        description="Filter by history record ID.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `fieldId`.",
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by history record ID."
+        ),
+        default=None,
+    )
     deployment_id: UUIDFilter | None = None
     category: list[ReplicaGroupHistoryCategoryGQL] | None = None
     phase: StringFilter | None = None
@@ -791,7 +845,17 @@ class ReplicaGroupHistoryOrderByGQL(PydanticInputMixin[ReplicaGroupHistoryOrderD
     name="RouteHistoryFilter",
 )
 class RouteHistoryFilter(PydanticInputMixin[RouteHistoryFilterDTO]):
-    id: UUIDFilter | None = None
+    id: UUIDFilter | None = gql_field(
+        description="Filter by history record ID.",
+        default=None,
+        deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `fieldId`.",
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by history record ID."
+        ),
+        default=None,
+    )
     route_id: UUIDFilter | None = None
     deployment_id: UUIDFilter | None = None
     phase: StringFilter | None = None

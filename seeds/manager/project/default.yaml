@@ -1,0 +1,21 @@
+kind: project
+version: 1
+items:
+- id: 2de2b969-1d04-48a6-af16-0bc8adb3c831
+  domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9  # default
+  name: default
+  description: The default user group
+  is_active: true
+  resource_policy_id: 2f0e7303-bb2b-40a7-9fcf-c1acf34ec6f5  # default
+  total_resource_slots: {}
+  allowed_vfolder_hosts: {}
+  type: general
+- id: 8e32dd28-d319-4e3b-8851-ea37837699a5
+  domain_id: b9e676dc-e23e-54c6-b350-e83fba4127e9  # default
+  name: model-store
+  description: model store project
+  is_active: true
+  resource_policy_id: 2f0e7303-bb2b-40a7-9fcf-c1acf34ec6f5  # default
+  total_resource_slots: {}
+  allowed_vfolder_hosts: {}
+  type: model-store

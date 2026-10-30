@@ -9,7 +9,7 @@ from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.actions.v2.ops.base import BulkScopedSearchOpsAction
 from ai.backend.manager.data.permission.permission import PermissionData
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.permission.scopes import PermissionOperationScope
+from ai.backend.manager.models.rbac_models.permission.scopes import RolePermissionTarget
 from ai.backend.manager.models.rbac_models.permission.searchers import RolePermissionSearcher
 from ai.backend.manager.models.scopes import OperationScope
 
@@ -32,7 +32,7 @@ class SearchRolePermissionsAction(BulkScopedSearchOpsAction[PermissionRow, Permi
 
     @override
     def operation_scopes(self) -> Sequence[OperationScope]:
-        return [PermissionOperationScope(role_id=role_id) for role_id in self.role_ids]
+        return [RolePermissionTarget(role_id=role_id) for role_id in self.role_ids]
 
     @override
     def to_searcher(self) -> RolePermissionSearcher:

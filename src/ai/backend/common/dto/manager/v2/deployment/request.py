@@ -17,6 +17,7 @@ from ai.backend.common.config import (
     ModelDefinitionDraft,
     PreStartAction,
 )
+from ai.backend.common.data.endpoint.types import ScalingState
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetID
 from ai.backend.common.data.entity.image import ImageID
@@ -25,23 +26,28 @@ from ai.backend.common.data.entity.runtime_variant import RuntimeVariantID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import (
     DeploymentStrategy,
+    ModelDeploymentStatus,
     RouteHealthStatus,
     RouteStatus,
     RouteTrafficStatus,
 )
 from ai.backend.common.dto.manager.query import (
     DateTimeFilter,
+    DecimalFilter,
+    EnumFilter,
     IntFilter,
     NullableDateTimeFilter,
     StringFilter,
+    ToManyFilter,
     UUIDFilter,
 )
-from ai.backend.common.dto.manager.v2.common import ResourceSlotEntryInput
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, ResourceSlotEntryInput
 from ai.backend.common.dto.manager.v2.deployment.types import (
     AccessTokenOrderField,
     AutoScalingRuleOrderField,
     DeploymentOrderField,
     DeploymentScope,
+    DeploymentUsage,
     OrderDirection,
     ReplicaOrderField,
     RevisionOrderField,
@@ -50,6 +56,7 @@ from ai.backend.common.dto.manager.v2.deployment.types import (
 from ai.backend.common.dto.manager.v2.deployment_options import DeploymentOptionsInput
 from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.resource_slot.types import ResourceOptsDTOInput
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.schema.deployment import IntOrPercent
 from ai.backend.common.tristate.unset import UNSET, Unset
 from ai.backend.common.types import (
@@ -95,6 +102,7 @@ __all__ = (
     "ModelMountConfigInput",
     "ModelRuntimeConfigInput",
     "ModelServiceConfigInput",
+    "PartialBulkPurgeAccessTokensInput",
     "PresetValueInput",
     "ReplicaFilter",
     "ReplicaHealthStatusFilter",
@@ -112,8 +120,6 @@ __all__ = (
     "RollingUpdateConfigInput",
     "RouteFilter",
     "RouteOrder",
-    "RouteStatusFilter",
-    "RouteTrafficStatusFilter",
     "ScaleDeploymentInput",
     "SearchAccessTokensInput",
     "SearchAutoScalingRulesInput",
@@ -580,78 +586,28 @@ class ScaleDeploymentInput(BaseRequestModel):
 # ---------------------------------------------------------------------------
 
 
-class DeploymentStatusFilter(BaseRequestModel):
+class DeploymentStatusFilter(EnumFilter[ModelDeploymentStatus]):
     """Filter for deployment status."""
 
-    equals: str | None = Field(default=None, description="Exact status match")
-    in_: list[str] | None = Field(default=None, alias="in", description="Status is in list")
-    not_equals: str | None = Field(default=None, description="Excludes exact status match")
-    not_in: list[str] | None = Field(default=None, description="Status is not in list")
+
+class DeploymentScalingStateFilter(EnumFilter[ScalingState]):
+    """Filter for the deployment scaling state."""
 
 
-class RouteStatusFilter(BaseRequestModel):
-    """Filter for route status."""
-
-    equals: RouteStatus | None = Field(default=None, description="Exact status match")
-    in_: list[RouteStatus] | None = Field(default=None, alias="in", description="Status is in list")
-    not_equals: RouteStatus | None = Field(default=None, description="Excludes exact status match")
-    not_in: list[RouteStatus] | None = Field(default=None, description="Status is not in list")
+class AutoScalingMetricSourceFilter(EnumFilter[AutoScalingMetricSource]):
+    """Filter for the auto-scaling metric source."""
 
 
-class RouteTrafficStatusFilter(BaseRequestModel):
-    """Filter for route traffic status."""
-
-    equals: RouteTrafficStatus | None = Field(default=None, description="Exact status match")
-    in_: list[RouteTrafficStatus] | None = Field(
-        default=None, alias="in", description="Status is in list"
-    )
-    not_equals: RouteTrafficStatus | None = Field(
-        default=None, description="Excludes exact status match"
-    )
-    not_in: list[RouteTrafficStatus] | None = Field(
-        default=None, description="Status is not in list"
-    )
-
-
-class ReplicaStatusFilter(BaseRequestModel):
+class ReplicaStatusFilter(EnumFilter[RouteStatus]):
     """Filter for replica (route) status."""
 
-    equals: RouteStatus | None = Field(default=None, description="Exact status match")
-    in_: list[RouteStatus] | None = Field(default=None, alias="in", description="Status is in list")
-    not_equals: RouteStatus | None = Field(default=None, description="Excludes exact status match")
-    not_in: list[RouteStatus] | None = Field(default=None, description="Status is not in list")
 
-
-class ReplicaTrafficStatusFilter(BaseRequestModel):
+class ReplicaTrafficStatusFilter(EnumFilter[RouteTrafficStatus]):
     """Filter for replica traffic status."""
 
-    equals: RouteTrafficStatus | None = Field(
-        default=None, description="Exact traffic status match"
-    )
-    in_: list[RouteTrafficStatus] | None = Field(
-        default=None, alias="in", description="Traffic status is in list"
-    )
-    not_equals: RouteTrafficStatus | None = Field(
-        default=None, description="Excludes exact traffic status match"
-    )
-    not_in: list[RouteTrafficStatus] | None = Field(
-        default=None, description="Traffic status is not in list"
-    )
 
-
-class ReplicaHealthStatusFilter(BaseRequestModel):
+class ReplicaHealthStatusFilter(EnumFilter[RouteHealthStatus]):
     """Filter for replica health status."""
-
-    equals: RouteHealthStatus | None = Field(default=None, description="Exact health status match")
-    in_: list[RouteHealthStatus] | None = Field(
-        default=None, alias="in", description="Health status is in list"
-    )
-    not_equals: RouteHealthStatus | None = Field(
-        default=None, description="Excludes exact health status match"
-    )
-    not_in: list[RouteHealthStatus] | None = Field(
-        default=None, description="Health status is not in list"
-    )
 
 
 class ReplicaFilter(BaseRequestModel):
@@ -665,6 +621,10 @@ class ReplicaFilter(BaseRequestModel):
     traffic_status: ReplicaTrafficStatusFilter | None = Field(
         default=None, description="Replica traffic status filter"
     )
+    created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
+    field_id: UUIDFilter | None = Field(default=None, description="Filter by replica ID")
+    session_id: UUIDFilter | None = Field(default=None, description="Filter by session ID")
+    revision_id: UUIDFilter | None = Field(default=None, description="Filter by revision ID")
     AND: list[ReplicaFilter] | None = Field(default=None, description="AND conjunction")
     OR: list[ReplicaFilter] | None = Field(default=None, description="OR conjunction")
     NOT: list[ReplicaFilter] | None = Field(default=None, description="NOT negation")
@@ -673,24 +633,12 @@ class ReplicaFilter(BaseRequestModel):
 ReplicaFilter.model_rebuild()
 
 
-class ReplicaNestedFilter(BaseRequestModel):
-    """Filter deployments by conditions on their replicas."""
+class ReplicaNestedFilter(ToManyFilter[ReplicaFilter]):
+    """The `replicas` field of a deployment filter.
 
-    some: ReplicaFilter | None = Field(
-        default=None,
-        description="Matches parents with at least one replica satisfying all conditions.",
-    )
-    every: ReplicaFilter | None = Field(
-        default=None,
-        description=(
-            "Matches parents where every replica satisfies all conditions "
-            "(also true when the parent has no replica)."
-        ),
-    )
-    none: ReplicaFilter | None = Field(
-        default=None,
-        description="Matches parents with no replica satisfying all conditions.",
-    )
+    Each quantifier matches one replica at a time. To require two different replicas,
+    combine two of these with the deployment filter's own `AND`.
+    """
 
 
 class DeploymentFilter(BaseRequestModel):
@@ -719,6 +667,14 @@ class DeploymentFilter(BaseRequestModel):
     labels: EntityLabelNestedFilter | None = Field(
         default=None, description="Filter by the labels on the entity"
     )
+    entity_id: UUIDFilter | None = Field(default=None, description="Filter by deployment ID")
+    desired_replicas: IntFilter | None = Field(
+        default=None,
+        description="Filter by the desired replica count, or the user-set replica count until autoscaling sets one",
+    )
+    scaling_state: DeploymentScalingStateFilter | None = Field(
+        default=None, description="Filter by scaling state"
+    )
     AND: list[DeploymentFilter] | None = Field(default=None, description="AND conjunction")
     OR: list[DeploymentFilter] | None = Field(default=None, description="OR conjunction")
     NOT: list[DeploymentFilter] | None = Field(default=None, description="NOT negation")
@@ -740,6 +696,23 @@ class RevisionFilter(BaseRequestModel):
         default=None, description="Resource group name filter"
     )
     cluster_mode: StringFilter | None = Field(default=None, description="Cluster mode filter")
+    runtime_variant_id: UUIDFilter | None = Field(
+        default=None, description="Filter by runtime variant ID"
+    )
+    field_id: UUIDFilter | None = Field(default=None, description="Filter by revision ID")
+    model_mount_destination: StringFilter | None = Field(
+        default=None, description="Filter by the model mount destination"
+    )
+    vfolder_subpath: StringFilter | None = Field(
+        default=None, description="Filter by the subpath within the model vfolder"
+    )
+    model_definition_path: StringFilter | None = Field(
+        default=None, description="Filter by the model definition path"
+    )
+    cluster_size: IntFilter | None = Field(default=None, description="Filter by cluster size")
+    revision_preset_id: UUIDFilter | None = Field(
+        default=None, description="Filter by the preset that produced the revision"
+    )
     created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
     AND: list[RevisionFilter] | None = Field(default=None, description="AND conjunction")
     OR: list[RevisionFilter] | None = Field(default=None, description="OR conjunction")
@@ -750,7 +723,12 @@ RevisionFilter.model_rebuild()
 
 
 class RouteFilter(BaseRequestModel):
-    """Filter for deployment routes."""
+    """Filter for deployment routes.
+
+    Each status takes a bare list, so only membership is expressible. Read the same rows
+    through a deployment's replicas with :class:`ReplicaFilter`, which also offers
+    equals / not_equals / not_in.
+    """
 
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
     status: list[RouteStatus] | None = Field(
@@ -761,6 +739,9 @@ class RouteFilter(BaseRequestModel):
     )
     traffic_status: list[RouteTrafficStatus] | None = Field(
         default=None, description="Traffic status filter"
+    )
+    field_id: UUIDFilter | None = Field(
+        default=None, description=f"Added in {NEXT_RELEASE_VERSION}. Filter by route ID."
     )
     AND: list[RouteFilter] | None = Field(default=None, description="AND conjunction")
     OR: list[RouteFilter] | None = Field(default=None, description="OR conjunction")
@@ -774,11 +755,11 @@ class AccessTokenFilter(BaseRequestModel):
     """Filter for access tokens."""
 
     deployment_id: UUID | None = Field(default=None, description="Filter by deployment ID")
-    token: StringFilter | None = Field(default=None, description="Token value filter")
     expires_at: DateTimeFilter | None = Field(
         default=None, description="Expiration datetime filter"
     )
     created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
+    field_id: UUIDFilter | None = Field(default=None, description="Filter by access token ID")
     AND: list[AccessTokenFilter] | None = Field(default=None, description="AND conjunction")
     OR: list[AccessTokenFilter] | None = Field(default=None, description="OR conjunction")
     NOT: list[AccessTokenFilter] | None = Field(default=None, description="NOT negation")
@@ -794,6 +775,28 @@ class AutoScalingRuleFilter(BaseRequestModel):
     created_at: DateTimeFilter | None = Field(default=None, description="Creation datetime filter")
     last_triggered_at: NullableDateTimeFilter | None = Field(
         default=None, description="Last triggered datetime filter"
+    )
+    field_id: UUIDFilter | None = Field(default=None, description="Filter by rule ID")
+    metric_source: AutoScalingMetricSourceFilter | None = Field(
+        default=None, description="Filter by metric source"
+    )
+    metric_name: StringFilter | None = Field(default=None, description="Filter by metric name")
+    min_threshold: DecimalFilter | None = Field(
+        default=None, description="Filter by the scale-down threshold"
+    )
+    max_threshold: DecimalFilter | None = Field(
+        default=None, description="Filter by the scale-up threshold"
+    )
+    step_size: IntFilter | None = Field(default=None, description="Filter by step size")
+    time_window: IntFilter | None = Field(
+        default=None, description="Filter by the cooldown window in seconds"
+    )
+    min_replicas: IntFilter | None = Field(default=None, description="Filter by the replica floor")
+    max_replicas: IntFilter | None = Field(
+        default=None, description="Filter by the replica ceiling"
+    )
+    prometheus_query_preset_id: UUIDFilter | None = Field(
+        default=None, description="Filter by the Prometheus query preset"
     )
     AND: list[AutoScalingRuleFilter] | None = Field(default=None, description="AND conjunction")
     OR: list[AutoScalingRuleFilter] | None = Field(default=None, description="OR conjunction")
@@ -865,6 +868,13 @@ class ScopedSearchDeploymentsInput(BaseRequestModel):
     """Input for searching the deployments the named scopes reach."""
 
     scope: DeploymentScope = Field(description="Scope (OR across all items).")
+    usage: DeploymentUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "deployments the caller cannot read are left out."
+        ),
+    )
     filter: DeploymentFilter | None = Field(default=None, description="Filter criteria")
     order: list[DeploymentOrder] | None = Field(default=None, description="Sort order")
     first: int | None = Field(default=None, ge=1, description="Cursor-forward page size")
@@ -878,6 +888,13 @@ class ScopedSearchDeploymentsInput(BaseRequestModel):
 class AdminSearchDeploymentsInput(BaseRequestModel):
     """Input for searching deployments (admin, no scope)."""
 
+    usage: DeploymentUsage | None = Field(
+        default=None,
+        description=(
+            "Uses narrowing the result. Each listed entity must be readable by the caller; "
+            "deployments the caller cannot read are left out."
+        ),
+    )
     filter: DeploymentFilter | None = Field(default=None, description="Filter criteria")
     order: list[DeploymentOrder] | None = Field(default=None, description="Sort order")
     first: int | None = Field(default=None, ge=1, description="Cursor-forward page size")
@@ -988,6 +1005,12 @@ class BulkDeleteAccessTokensInput(BaseRequestModel):
     """Input for bulk deleting access tokens."""
 
     ids: list[UUID] = Field(description="List of access token UUIDs to delete.")
+
+
+class PartialBulkPurgeAccessTokensInput(BaseRequestModel):
+    """Input for permanently removing several access tokens, each answered for separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the access tokens to purge.")
 
 
 class CreateAutoScalingRuleInput(BaseRequestModel):

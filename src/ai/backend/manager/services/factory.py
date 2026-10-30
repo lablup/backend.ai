@@ -8,12 +8,14 @@ from ai.backend.common.data.entity.app_config_fragment import AppConfigFragmentE
 from ai.backend.common.data.entity.artifact import ArtifactEntityType
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryEntityType
 from ai.backend.common.data.entity.artifact_revision import ArtifactRevisionFieldType
-from ai.backend.common.data.entity.audit_log import AuditLogFieldType
+from ai.backend.common.data.entity.audit_log import AuditLogFieldType, AuditLogScopeFieldType
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptFieldType
 from ai.backend.common.data.entity.client_ip_masking import ClientIPMaskingPolicyEntityType
 from ai.backend.common.data.entity.container_registry import ContainerRegistryEntityType
 from ai.backend.common.data.entity.deployment import DeploymentEntityType
 from ai.backend.common.data.entity.deployment_preset import DeploymentPresetEntityType
 from ai.backend.common.data.entity.domain import DomainEntityType
+from ai.backend.common.data.entity.dotfile import DotfileFieldType
 from ai.backend.common.data.entity.entity_label import EntityLabelFieldType
 from ai.backend.common.data.entity.entity_share import EntityShareEntityType
 from ai.backend.common.data.entity.fair_share import (
@@ -25,6 +27,7 @@ from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType
 from ai.backend.common.data.entity.image import ImageEntityType
 from ai.backend.common.data.entity.image_alias import ImageAliasFieldType
 from ai.backend.common.data.entity.kernel import KernelFieldType
+from ai.backend.common.data.entity.kernel_group import KernelGroupFieldType
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeEntityType
 from ai.backend.common.data.entity.model_card import ModelCardEntityType
 from ai.backend.common.data.entity.notification import (
@@ -55,8 +58,10 @@ from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantP
 from ai.backend.common.data.entity.secret import SecretFieldType
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogEntityType
 from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.session_group import SessionGroupEntityType
 from ai.backend.common.data.entity.session_template import SessionTemplateEntityType
 from ai.backend.common.data.entity.storage_namespace import StorageNamespaceEntityType
+from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironEntityType
 from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.common.data.entity.usage_bucket import (
     DomainUsageBucketFieldType,
@@ -65,6 +70,7 @@ from ai.backend.common.data.entity.usage_bucket import (
 )
 from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
+from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountEntityType
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType
 from ai.backend.manager.actions.monitors import ActionMonitors
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
@@ -78,7 +84,9 @@ from ai.backend.manager.actions.registry.types import (
 from ai.backend.manager.actions.v2.bulk.validator.rbac import BulkOwnCheck
 from ai.backend.manager.clients.prometheus.preset import PromQLTemplateRenderer
 from ai.backend.manager.data.artifact.types import ArtifactRevisionData
-from ai.backend.manager.data.audit_log.types import AuditLogData
+from ai.backend.manager.data.audit_log.types import AuditLogData, AuditLogScopeData
+from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
+from ai.backend.manager.data.dotfile.types import DotfileData
 from ai.backend.manager.data.entity_label.types import EntityLabelData
 from ai.backend.manager.data.fair_share.types import (
     DomainFairShareData,
@@ -87,13 +95,21 @@ from ai.backend.manager.data.fair_share.types import (
 )
 from ai.backend.manager.data.image.types import ImageAliasData
 from ai.backend.manager.data.kernel.types import KernelInfo
+from ai.backend.manager.data.kernel_group.types import KernelGroupData
 from ai.backend.manager.data.resource_usage_history.types import (
     DomainUsageBucketData,
     ProjectUsageBucketData,
     UserUsageBucketData,
 )
 from ai.backend.manager.data.secret.types import SecretFieldData
+from ai.backend.manager.models.audit_log.owner_candidates import (
+    AuditLogOwnerCandidates,
+    AuditLogScopeOwnerCandidates,
+)
 from ai.backend.manager.repositories.ops.repository import OpsRepository
+from ai.backend.manager.repositories.ops.v2.resource_allocation.provider import (
+    ResourceAllocationOpsProvider,
+)
 from ai.backend.manager.repositories.resource_allocation.repository import (
     ResourceAllocationRepository,
 )
@@ -115,10 +131,6 @@ from ai.backend.manager.services.artifact.revision.service import ArtifactRevisi
 from ai.backend.manager.services.artifact.service import ArtifactService
 from ai.backend.manager.services.artifact_registry.processors import ArtifactRegistryProcessors
 from ai.backend.manager.services.artifact_registry.service import ArtifactRegistryService
-from ai.backend.manager.services.audit_log.actions.lookup_owner import (
-    LookupAuditLogOwnerAction,
-    LookupBulkAuditLogOwnerAction,
-)
 from ai.backend.manager.services.audit_log.processors import AuditLogProcessors
 from ai.backend.manager.services.auth.processors import AuthProcessors
 from ai.backend.manager.services.auth.service import AuthService
@@ -135,6 +147,11 @@ from ai.backend.manager.services.deployment_revision_preset.service import (
 )
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.domain.service import DomainService
+from ai.backend.manager.services.dotfile.actions.lookup_owner import (
+    LookupBulkDotfileOwnerAction,
+    LookupDotfileOwnerAction,
+)
+from ai.backend.manager.services.dotfile.processors import DotfileProcessors
 from ai.backend.manager.services.entity_label.actions.lookup_owner import (
     LookupBulkEntityLabelOwnerAction,
     LookupEntityLabelOwnerAction,
@@ -241,11 +258,18 @@ from ai.backend.manager.services.scheduling_history.service import SchedulingHis
 from ai.backend.manager.services.secret.processors import SecretProcessors
 from ai.backend.manager.services.secret.service import SecretService
 from ai.backend.manager.services.service_catalog.processors import ServiceCatalogProcessors
+from ai.backend.manager.services.service_catalog.service import ServiceCatalogService
+from ai.backend.manager.services.session.actions.lookup_bulk_kernel_group_owner import (
+    LookupBulkKernelGroupOwnerAction,
+)
 from ai.backend.manager.services.session.actions.lookup_bulk_kernel_owner import (
     LookupBulkKernelOwnerAction,
 )
 from ai.backend.manager.services.session.actions.lookup_kernel_field_owner import (
     LookupKernelFieldOwnerAction,
+)
+from ai.backend.manager.services.session.actions.lookup_kernel_group_field_owner import (
+    LookupKernelGroupFieldOwnerAction,
 )
 from ai.backend.manager.services.session.processors import SessionProcessors
 from ai.backend.manager.services.session.resource_allocation.processors import (
@@ -255,28 +279,38 @@ from ai.backend.manager.services.session.resource_allocation.service import (
     ResourceAllocationService,
 )
 from ai.backend.manager.services.session.service import SessionService, SessionServiceArgs
+from ai.backend.manager.services.session_group.processors import SessionGroupProcessors
+from ai.backend.manager.services.session_group.service import SessionGroupService
 from ai.backend.manager.services.storage_namespace.processors import StorageNamespaceProcessors
 from ai.backend.manager.services.stream.processors import StreamProcessors
 from ai.backend.manager.services.stream.service import StreamService
+from ai.backend.manager.services.system_session_environ.processors import (
+    SystemSessionEnvironProcessors,
+)
+from ai.backend.manager.services.system_session_environ.service import SystemSessionEnvironService
 from ai.backend.manager.services.template.processors import TemplateProcessors
 from ai.backend.manager.services.template.service import TemplateService
+from ai.backend.manager.services.user.bootstrap_script.actions.lookup_owner import (
+    LookupBootstrapScriptOwnerAction,
+    LookupBulkBootstrapScriptOwnerAction,
+)
+from ai.backend.manager.services.user.bootstrap_script.processors import BootstrapScriptProcessors
 from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.services.user.service import UserService
 from ai.backend.manager.services.user_resource_policy.processors import UserResourcePolicyProcessors
-from ai.backend.manager.services.vfolder.processors import (
-    VFolderFileProcessors,
-    VFolderInviteProcessors,
-    VFolderMountPolicyProcessors,
-    VFolderProcessors,
-    VFolderSharingProcessors,
-)
+from ai.backend.manager.services.vfolder.processors.file import VFolderFileProcessors
+from ai.backend.manager.services.vfolder.processors.invite import VFolderInviteProcessors
+from ai.backend.manager.services.vfolder.processors.mount_policy import VFolderMountPolicyProcessors
+from ai.backend.manager.services.vfolder.processors.sharing import VFolderSharingProcessors
+from ai.backend.manager.services.vfolder.processors.vfolder import VFolderProcessors
 from ai.backend.manager.services.vfolder.processors.vfolder_admin import VFolderAdminProcessors
 from ai.backend.manager.services.vfolder.services.file import VFolderFileService
 from ai.backend.manager.services.vfolder.services.invite import VFolderInviteService
 from ai.backend.manager.services.vfolder.services.mount_policy import VFolderMountPolicyService
 from ai.backend.manager.services.vfolder.services.sharing import VFolderSharingService
 from ai.backend.manager.services.vfolder.services.vfolder import VFolderService
-from ai.backend.manager.services.vfolder.services.vfolder_admin import VFolderAdminService
+from ai.backend.manager.services.vfolder_auto_mount.processors import VFolderAutoMountProcessors
+from ai.backend.manager.services.vfolder_auto_mount.service import VFolderAutoMountService
 from ai.backend.manager.services.vfs_storage.processors import VFSStorageProcessors
 from ai.backend.manager.services.vfs_storage.service import VFSStorageService
 
@@ -333,7 +367,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
         container_registry=ContainerRegistryService(
             args.db,
             repositories.container_registry.repository,
-            quota_service=args.registry_quota_service,
+            args.registry_quota_client_pool,
         ),
         vfolder=VFolderService(
             args.config_provider,
@@ -344,9 +378,6 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             repositories.user.repository,
             args.valkey_stat_client,
             BulkOwnCheck(repositories.rbac.permission_check),
-        ),
-        vfolder_admin=VFolderAdminService(
-            vfolder_admin_repository=repositories.vfolder.admin_repository,
         ),
         vfolder_file=VFolderFileService(
             args.config_provider,
@@ -368,6 +399,8 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             repositories.vfolder.repository,
             repositories.rbac.permission_check,
         ),
+        vfolder_auto_mount=VFolderAutoMountService(repositories.vfolder_auto_mount.repository),
+        session_group=SessionGroupService(OpsRepository(repositories.v2_ops_provider)),
         session=SessionService(
             SessionServiceArgs(
                 agent_registry=args.agent_registry,
@@ -387,7 +420,6 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
         manager_admin=ManagerAdminService(
             repository=repositories.manager_admin.repository,
             config_provider=args.config_provider,
-            etcd=args.etcd,
             db=args.db,
             valkey_stat=args.valkey_stat_client,
         ),
@@ -426,6 +458,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
         deployment_revision_preset=DeploymentPresetService(
             repositories.deployment_revision_preset.repository,
         ),
+        service_catalog=ServiceCatalogService(repositories.service_catalog.repository),
         model_card=ModelCardService(
             repositories.model_card.repository,
             args.storage_manager,
@@ -534,6 +567,7 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
         resource_allocation=ResourceAllocationService(
             resource_allocation_repository=ResourceAllocationRepository(
                 db=args.db,
+                ops_provider=ResourceAllocationOpsProvider(args.db),
                 config_provider=args.config_provider,
             ),
             resource_preset_repository=repositories.resource_preset.repository,
@@ -545,6 +579,9 @@ def create_services(args: ServiceArgs, action_registry: ProcessorRegistry[Any]) 
             etcd=args.etcd,
         ),
         events=EventsService(args.db),
+        system_session_environ=SystemSessionEnvironService(
+            repositories.system_session_environ.repository
+        ),
     )
 
 
@@ -659,9 +696,7 @@ def create_processors(
         vfolder=VFolderProcessors(
             vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder
         ),
-        vfolder_admin=VFolderAdminProcessors(
-            vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_admin
-        ),
+        vfolder_admin=VFolderAdminProcessors(vfolder_groups.group(GroupMeta(VFolderEntityType()))),
         vfolder_file=VFolderFileProcessors(
             vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_file
         ),
@@ -675,6 +710,14 @@ def create_processors(
         vfolder_mount_policy=VFolderMountPolicyProcessors(
             vfolder_groups.group(GroupMeta(VFolderEntityType())), services.vfolder_mount_policy
         ),
+        vfolder_auto_mount=VFolderAutoMountProcessors(
+            vfolder_groups.group(GroupMeta(VFolderAutoMountEntityType())),
+            services.vfolder_auto_mount,
+        ),
+        session_group=SessionGroupProcessors(
+            session_groups.group(GroupMeta(SessionGroupEntityType())),
+            services.session_group,
+        ),
         session=SessionProcessors(
             session_groups.group(GroupMeta(SessionEntityType())),
             resource_group_groups.group(GroupMeta(ResourceGroupEntityType())),
@@ -683,6 +726,12 @@ def create_processors(
                 KernelInfo,
                 LookupKernelFieldOwnerAction,
                 LookupBulkKernelOwnerAction,
+            ),
+            session_groups.group(GroupMeta(SessionEntityType())).field_group(
+                FieldGroupMeta(KernelGroupFieldType()),
+                KernelGroupData,
+                LookupKernelGroupFieldOwnerAction,
+                LookupBulkKernelGroupOwnerAction,
             ),
             ResourceAllocationProcessors(
                 resource_group_groups.group(GroupMeta(UserEntityType())),
@@ -704,6 +753,10 @@ def create_processors(
         secret=SecretProcessors(
             system_groups.dangling_field_group(FieldGroupMeta(SecretFieldType()), SecretFieldData),
             services.secret,
+        ),
+        system_session_environ=SystemSessionEnvironProcessors(
+            session_groups.group(GroupMeta(SystemSessionEnvironEntityType())),
+            services.system_session_environ,
         ),
         user_resource_policy=UserResourcePolicyProcessors(
             resource_policy_groups.group(GroupMeta(UserResourcePolicyEntityType()))
@@ -839,12 +892,14 @@ def create_processors(
             artifact_groups.group(GroupMeta(StorageNamespaceEntityType()))
         ),
         audit_log=AuditLogProcessors(
-            visibility_groups.dangling_lookup_field_group(
-                FieldGroupMeta(AuditLogFieldType()),
-                AuditLogData,
-                LookupAuditLogOwnerAction,
-                LookupBulkAuditLogOwnerAction,
-            )
+            visibility_groups.dangling_owner_candidates_field_group(
+                FieldGroupMeta(AuditLogFieldType()), AuditLogData, AuditLogOwnerCandidates()
+            ),
+            visibility_groups.dangling_owner_candidates_field_group(
+                FieldGroupMeta(AuditLogScopeFieldType()),
+                AuditLogScopeData,
+                AuditLogScopeOwnerCandidates(),
+            ),
         ),
         entity_label=EntityLabelProcessors(
             registry.dangling_lookup_field_group(
@@ -853,6 +908,24 @@ def create_processors(
                 LookupEntityLabelOwnerAction,
                 LookupBulkEntityLabelOwnerAction,
             )
+        ),
+        dotfile=DotfileProcessors(
+            registry.dangling_lookup_field_group(
+                FieldGroupMeta(DotfileFieldType()),
+                DotfileData,
+                LookupDotfileOwnerAction,
+                LookupBulkDotfileOwnerAction,
+            )
+        ),
+        bootstrap_script=BootstrapScriptProcessors(
+            organization_groups.group(GroupMeta(UserEntityType())),
+            registry.dangling_lookup_field_group(
+                FieldGroupMeta(BootstrapScriptFieldType()),
+                BootstrapScriptData,
+                LookupBootstrapScriptOwnerAction,
+                LookupBulkBootstrapScriptOwnerAction,
+            ),
+            services.user,
         ),
         idle_checker_assignment=IdleCheckerAssignmentProcessors(
             session_groups.group(GroupMeta(IdleCheckerEntityType())),
@@ -865,7 +938,7 @@ def create_processors(
             services.scheduling_history,
         ),
         service_catalog=ServiceCatalogProcessors(
-            system_groups.group(GroupMeta(ServiceCatalogEntityType()))
+            system_groups.group(GroupMeta(ServiceCatalogEntityType())), services.service_catalog
         ),
         template=TemplateProcessors(
             session_groups.group(GroupMeta(SessionTemplateEntityType())), services.template

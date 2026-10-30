@@ -11,11 +11,14 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.data.container_registry.types import ContainerRegistryData
-from ai.backend.manager.models.association_container_registries_groups import (
+from ai.backend.manager.models.association_container_registries_groups.row import (
     AssociationContainerRegistriesGroupsRow,
 )
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
+from ai.backend.manager.models.container_registry.searchable_fields import (
+    ContainerRegistrySearchableFields,
+)
 from ai.backend.manager.models.specs.purger import EntityPurger
 from ai.backend.manager.models.specs.relation import RelationPurger
 from ai.backend.manager.models.specs.types import ConflictCheck
@@ -45,7 +48,7 @@ class ContainerRegistryPurger(EntityPurger[ContainerRegistryRow, ContainerRegist
 
     @override
     def to_data(self, row: ContainerRegistryRow) -> ContainerRegistryData:
-        return row.to_dataclass()
+        return ContainerRegistrySearchableFields.own.to_data(row)
 
 
 @dataclass
@@ -62,7 +65,7 @@ class ContainerRegistryProjectPurger(
     def conditions(self, scope: ProjectID, target: ContainerRegistryID) -> Sequence[QueryCondition]:
         return (
             lambda: AssociationContainerRegistriesGroupsRow.registry_id == target,
-            lambda: AssociationContainerRegistriesGroupsRow.group_id == scope,
+            lambda: AssociationContainerRegistriesGroupsRow.project_id == scope,
         )
 
     @override

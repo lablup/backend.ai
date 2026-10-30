@@ -11,6 +11,7 @@ whole page.
 
 from __future__ import annotations
 
+from abc import ABC
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, override
@@ -19,6 +20,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -28,20 +30,32 @@ from ai.backend.manager.models.resource_group.row import (
     ResourceGroupForProjectRow,
     ResourceGroupRow,
 )
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 
 __all__ = (
-    "DomainResourceGroupOperationScope",
-    "ProjectResourceGroupOperationScope",
-    "UserResourceGroupOperationScope",
+    "DomainResourceGroupTarget",
+    "ProjectResourceGroupTarget",
+    "ResourceGroupTarget",
+    "UserResourceGroupTarget",
 )
 
 
+class ResourceGroupTarget(ScopeTarget, ABC):
+    """One side a resource group is reachable from.
+
+    A resource group is associated with domains, projects and keypairs independently,
+    so which side a read comes in through is a value rather than a separate action."""
+
+
 @dataclass(frozen=True)
-class DomainResourceGroupOperationScope(OperationScope):
+class DomainResourceGroupTarget(ResourceGroupTarget):
     """The resource groups a domain may schedule on."""
 
     domain_id: DomainID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.domain_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -63,10 +77,14 @@ class DomainResourceGroupOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class ProjectResourceGroupOperationScope(OperationScope):
+class ProjectResourceGroupTarget(ResourceGroupTarget):
     """The resource groups a project may schedule on."""
 
     project_id: ProjectID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.project_id
 
     @override
     def to_condition(self) -> QueryCondition:
@@ -88,7 +106,7 @@ class ProjectResourceGroupOperationScope(OperationScope):
 
 
 @dataclass(frozen=True)
-class UserResourceGroupOperationScope(OperationScope):
+class UserResourceGroupTarget(ResourceGroupTarget):
     """The resource groups a user's keypairs may schedule on.
 
     Keyed on the user rather than one access key: a keypair carries no permission of
@@ -96,6 +114,10 @@ class UserResourceGroupOperationScope(OperationScope):
     """
 
     user_id: UserID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.user_id
 
     @override
     def to_condition(self) -> QueryCondition:

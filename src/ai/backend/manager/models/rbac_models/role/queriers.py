@@ -10,6 +10,7 @@ from sqlalchemy.orm import InstrumentedAttribute
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.manager.data.permission.role import RoleData
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.role.searchable_fields import RoleSearchableFields
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier, DataQuerier
 
 
@@ -31,7 +32,7 @@ class RoleQuerier(DataQuerier[RoleRow, RoleData]):
 
     @override
     def to_data(self, row: RoleRow) -> RoleData:
-        return row.to_data()
+        return RoleSearchableFields.own.to_data(row)
 
 
 class BulkRoleQuerier(BulkEntityQuerier[RoleRow, RoleData]):
@@ -47,4 +48,4 @@ class BulkRoleQuerier(BulkEntityQuerier[RoleRow, RoleData]):
 
     @override
     def to_data(self, row: RoleRow) -> RoleData:
-        return row.to_data()
+        return RoleSearchableFields.own.to_data(row)

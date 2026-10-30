@@ -233,16 +233,6 @@ class UpsertResult:
 
 
 @dataclass
-class AgentListResult:
-    """Search result with total count for agents."""
-
-    items: list[AgentDetailData]
-    total_count: int
-    has_next_page: bool
-    has_previous_page: bool
-
-
-@dataclass
 class AgentDetailData:
     """An agent with its slot rows and the caller's permissions on it.
 

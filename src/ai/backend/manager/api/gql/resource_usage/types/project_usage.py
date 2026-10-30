@@ -10,7 +10,7 @@ from strawberry import Info
 from strawberry.relay import Connection, Edge, NodeID
 
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.filter_specs import UUIDEqualMatchSpec
+from ai.backend.common.data.filter_specs import StringMatchSpec, UUIDEqualMatchSpec
 from ai.backend.common.dto.manager.v2.resource_usage.request import (
     ProjectUsageBucketFilter as ProjectUsageBucketFilterDTO,
 )
@@ -27,6 +27,7 @@ from ai.backend.manager.api.gql.base import (
     StringFilter,
     UUIDFilter,
 )
+from ai.backend.manager.api.gql.common_types import ResourceSlotGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_added_field,
@@ -35,11 +36,10 @@ from ai.backend.manager.api.gql.decorators import (
     gql_node_type,
     gql_pydantic_input,
 )
-from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticInputMixin, PydanticNodeMixin
 from ai.backend.manager.api.gql.types import GQLFilter, GQLOrderBy, StrawberryGQLContext
-from ai.backend.manager.repositories.resource_usage_history.options import (
-    UserUsageBucketConditions,
+from ai.backend.manager.models.resource_usage_history.searchable_fields import (
+    UserUsageBucketSearchableFields,
 )
 
 from .common import UsageBucketMetadataGQL, UsageBucketOrderField
@@ -78,7 +78,7 @@ class ProjectUsageBucketGQL(PydanticNodeMixin[ProjectUsageBucketNode]):
     id: NodeID[str]
     field_id: UUID = gql_added_field(
         BackendAIGQLMeta(
-            added_version=NEXT_RELEASE_VERSION,
+            added_version="26.9.0",
             description="UUID of the usage bucket.",
         ),
     )
@@ -156,7 +156,10 @@ class ProjectUsageBucketGQL(PydanticNodeMixin[ProjectUsageBucketNode]):
         ]
         | None
     ):
-        return await info.context.data_loaders.domain_loader.load(self.domain_name)
+        domain_id = await info.context.data_loaders.domain_id_by_name_loader.load(self.domain_name)
+        if domain_id is None:
+            return None
+        return await info.context.data_loaders.domain_by_id_loader.load(domain_id)
 
     @gql_added_field(
         BackendAIGQLMeta(
@@ -200,11 +203,15 @@ class ProjectUsageBucketGQL(PydanticNodeMixin[ProjectUsageBucketNode]):
 
         payload = await info.context.adapters.resource_usage.gql_search_user_unscoped(
             base_conditions=[
-                UserUsageBucketConditions.by_project_id(
+                UserUsageBucketSearchableFields.own.project_id.filter.equals(
                     UUIDEqualMatchSpec(value=self.project_id, negated=False)
                 ),
-                UserUsageBucketConditions.by_resource_group(self.resource_group_name),
-                UserUsageBucketConditions.by_period_start(self.metadata.period_start),
+                UserUsageBucketSearchableFields.own.resource_group.filter.equals(
+                    StringMatchSpec(self.resource_group_name, case_insensitive=False, negated=False)
+                ),
+                UserUsageBucketSearchableFields.own.period_start.filter.equals(
+                    self.metadata.period_start
+                ),
             ],
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
@@ -281,6 +288,12 @@ class ProjectUsageBucketFilter(PydanticInputMixin[ProjectUsageBucketFilterDTO], 
     )
     period_end: DateFilter | None = gql_field(
         description="Filter by usage measurement period end date.", default=None
+    )
+    field_id: UUIDFilter | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION, description="Filter by project usage bucket ID."
+        ),
+        default=None,
     )
 
     AND: list[Self] | None = gql_field(

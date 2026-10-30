@@ -1,22 +1,21 @@
 import logging
-import uuid
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import UTC, datetime
 
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.actions.run_status import ActionRunStatus
 from ai.backend.manager.actions.types import ActionOperationType
 from ai.backend.manager.actions.v2.global_scope.base import BaseGlobalAction
-from ai.backend.manager.actions.v2.global_scope.monitor import GlobalActionMonitor
+from ai.backend.manager.actions.v2.global_scope.log_context import with_global_action_context
+from ai.backend.manager.actions.v2.global_scope.monitor.base import GlobalActionMonitor
 from ai.backend.manager.actions.v2.global_scope.result import (
     GlobalActionProcessResult,
     GlobalActionResultMeta,
 )
-from ai.backend.manager.actions.v2.global_scope.validator import (
+from ai.backend.manager.actions.v2.global_scope.validator.authenticated import (
     AuthenticatedActionValidator,
-    GlobalActionValidator,
-    SuperAdminActionValidator,
 )
+from ai.backend.manager.actions.v2.global_scope.validator.base import GlobalActionValidator
 from ai.backend.manager.actions.v2.trigger import ActionTriggerMeta
 from ai.backend.manager.errors.common import ServerMisconfiguredError
 
@@ -26,14 +25,19 @@ __all__ = (
     "PublicActionProcessor",
 )
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class GlobalActionProcessor[TAction: BaseGlobalAction, TResult]:
     """Validate, run monitors around, then execute a global action.
 
-    The SUPERADMIN gate always runs first — it is the invariant of this layer — then
-    any extra validators, then the action within the monitor lifecycle.
+    Each registered validator runs first, then the action within the monitor lifecycle.
+    The gate is the one the wiring supplies, as it is for a scope action: the `global`
+    singleton answers for the action's entity type.
+
+    The constructor refuses an empty validator list, so a wiring that states no gate
+    fails where it is made rather than running ungated at request time. A tool that only
+    reads the wiring states :class:`RefusingGlobalActionValidator`.
     """
 
     _func: Callable[[TAction], Awaitable[TResult]]
@@ -46,16 +50,20 @@ class GlobalActionProcessor[TAction: BaseGlobalAction, TResult]:
         monitors: Sequence[GlobalActionMonitor] | None = None,
         validators: Sequence[GlobalActionValidator] | None = None,
     ) -> None:
+        if not validators:
+            raise ServerMisconfiguredError(
+                "A global processor states at least one validator; this one states none."
+            )
         self._func = func
         self._monitors = monitors or []
-        self._validators = [SuperAdminActionValidator(), *(validators or [])]
+        self._validators = validators
 
     async def _prepare_monitors(self, action: TAction, trigger_meta: ActionTriggerMeta) -> None:
         for monitor in self._monitors:
             try:
                 await monitor.prepare(action, trigger_meta)
             except Exception as e:
-                log.warning("Error in monitor prepare method: {}", e)
+                log.warning("action monitor prepare failed", exc_info=e)
 
     async def _finalize_monitors(self, action: TAction, meta: GlobalActionResultMeta) -> None:
         process_result = GlobalActionProcessResult(meta=meta)
@@ -63,52 +71,52 @@ class GlobalActionProcessor[TAction: BaseGlobalAction, TResult]:
             try:
                 await monitor.done(action, process_result)
             except Exception as e:
-                log.warning("Error in monitor done method: {}", e)
+                log.warning("action monitor done failed", exc_info=e)
 
     async def run(self, action: TAction) -> TResult:
-        started_at = datetime.now(UTC)
-        action_id = uuid.uuid4()
-        trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
+        with with_global_action_context(action) as action_id:
+            started_at = datetime.now(UTC)
+            trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
 
-        run_status = ActionRunStatus.unknown()
+            run_status = ActionRunStatus.unknown()
 
-        # Validation runs inside the monitor lifecycle so a rejected action is
-        # recorded too; monitors that only wrapped execution missed every denial.
-        await self._prepare_monitors(action, trigger_meta)
-        try:
+            # Validation runs inside the monitor lifecycle so a rejected action is
+            # recorded too; monitors that only wrapped execution missed every denial.
+            await self._prepare_monitors(action, trigger_meta)
             try:
-                for validator in self._validators:
-                    await validator.validate(action, trigger_meta)
-            except BaseException as e:
-                run_status = ActionRunStatus.of_failure(e, during_validation=True)
-                raise
-            try:
-                result = await self._func(action)
-            except BaseException as e:
-                run_status = ActionRunStatus.of_failure(e, during_validation=False)
-                raise
-            else:
-                run_status = ActionRunStatus.success()
-                return result
-        finally:
-            ended_at = datetime.now(UTC)
-            meta = GlobalActionResultMeta(
-                action_id=action_id,
-                status=run_status.status,
-                description=run_status.description,
-                started_at=started_at,
-                ended_at=ended_at,
-                duration=ended_at - started_at,
-                error_code=run_status.error_code,
-            )
-            await self._finalize_monitors(action, meta)
+                try:
+                    for validator in self._validators:
+                        await validator.validate(action, trigger_meta)
+                except BaseException as e:
+                    run_status = ActionRunStatus.of_failure(e, during_validation=True)
+                    raise
+                try:
+                    result = await self._func(action)
+                except BaseException as e:
+                    run_status = ActionRunStatus.of_failure(e, during_validation=False)
+                    raise
+                else:
+                    run_status = ActionRunStatus.success()
+                    return result
+            finally:
+                ended_at = datetime.now(UTC)
+                meta = GlobalActionResultMeta(
+                    action_id=action_id,
+                    status=run_status.status,
+                    description=run_status.description,
+                    started_at=started_at,
+                    ended_at=ended_at,
+                    duration=ended_at - started_at,
+                    error_code=run_status.error_code,
+                )
+                await self._finalize_monitors(action, meta)
 
 
 class PublicActionProcessor[TAction: BaseGlobalAction, TResult]:
     """Validate authentication only, run monitors around, then execute a global read.
 
     The counterpart of :class:`GlobalActionProcessor` for global state everyone may
-    read — the SUPERADMIN gate is replaced by an authentication check, and nothing
+    read — the global gate is replaced by an authentication check, and nothing
     else. The action shape stays ``BaseGlobalAction``, so the global monitor set
     (audit, reporter, prometheus) applies unchanged.
 
@@ -147,7 +155,7 @@ class PublicActionProcessor[TAction: BaseGlobalAction, TResult]:
             try:
                 await monitor.prepare(action, trigger_meta)
             except Exception as e:
-                log.warning("Error in monitor prepare method: {}", e)
+                log.warning("action monitor prepare failed", exc_info=e)
 
     async def _finalize_monitors(self, action: TAction, meta: GlobalActionResultMeta) -> None:
         process_result = GlobalActionProcessResult(meta=meta)
@@ -155,45 +163,45 @@ class PublicActionProcessor[TAction: BaseGlobalAction, TResult]:
             try:
                 await monitor.done(action, process_result)
             except Exception as e:
-                log.warning("Error in monitor done method: {}", e)
+                log.warning("action monitor done failed", exc_info=e)
 
     async def run(self, action: TAction) -> TResult:
-        started_at = datetime.now(UTC)
-        action_id = uuid.uuid4()
-        trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
+        with with_global_action_context(action) as action_id:
+            started_at = datetime.now(UTC)
+            trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
 
-        run_status = ActionRunStatus.unknown()
+            run_status = ActionRunStatus.unknown()
 
-        # Same lifecycle as the global processor: validation runs inside the monitor
-        # lifecycle so a rejected action is recorded too.
-        await self._prepare_monitors(action, trigger_meta)
-        try:
+            # Same lifecycle as the global processor: validation runs inside the monitor
+            # lifecycle so a rejected action is recorded too.
+            await self._prepare_monitors(action, trigger_meta)
             try:
-                for validator in self._validators:
-                    await validator.validate(action, trigger_meta)
-            except BaseException as e:
-                run_status = ActionRunStatus.of_failure(e, during_validation=True)
-                raise
-            try:
-                result = await self._func(action)
-            except BaseException as e:
-                run_status = ActionRunStatus.of_failure(e, during_validation=False)
-                raise
-            else:
-                run_status = ActionRunStatus.success()
-                return result
-        finally:
-            ended_at = datetime.now(UTC)
-            meta = GlobalActionResultMeta(
-                action_id=action_id,
-                status=run_status.status,
-                description=run_status.description,
-                started_at=started_at,
-                ended_at=ended_at,
-                duration=ended_at - started_at,
-                error_code=run_status.error_code,
-            )
-            await self._finalize_monitors(action, meta)
+                try:
+                    for validator in self._validators:
+                        await validator.validate(action, trigger_meta)
+                except BaseException as e:
+                    run_status = ActionRunStatus.of_failure(e, during_validation=True)
+                    raise
+                try:
+                    result = await self._func(action)
+                except BaseException as e:
+                    run_status = ActionRunStatus.of_failure(e, during_validation=False)
+                    raise
+                else:
+                    run_status = ActionRunStatus.success()
+                    return result
+            finally:
+                ended_at = datetime.now(UTC)
+                meta = GlobalActionResultMeta(
+                    action_id=action_id,
+                    status=run_status.status,
+                    description=run_status.description,
+                    started_at=started_at,
+                    ended_at=ended_at,
+                    duration=ended_at - started_at,
+                    error_code=run_status.error_code,
+                )
+                await self._finalize_monitors(action, meta)
 
 
 class AnonymousGlobalActionProcessor[TAction: BaseGlobalAction, TResult]:
@@ -225,7 +233,7 @@ class AnonymousGlobalActionProcessor[TAction: BaseGlobalAction, TResult]:
             try:
                 await monitor.prepare(action, trigger_meta)
             except Exception as e:
-                log.warning("Error in monitor prepare method: {}", e)
+                log.warning("action monitor prepare failed", exc_info=e)
 
     async def _finalize_monitors(self, action: TAction, meta: GlobalActionResultMeta) -> None:
         process_result = GlobalActionProcessResult(meta=meta)
@@ -233,34 +241,34 @@ class AnonymousGlobalActionProcessor[TAction: BaseGlobalAction, TResult]:
             try:
                 await monitor.done(action, process_result)
             except Exception as e:
-                log.warning("Error in monitor done method: {}", e)
+                log.warning("action monitor done failed", exc_info=e)
 
     async def run(self, action: TAction) -> TResult:
-        started_at = datetime.now(UTC)
-        action_id = uuid.uuid4()
-        trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
+        with with_global_action_context(action) as action_id:
+            started_at = datetime.now(UTC)
+            trigger_meta = ActionTriggerMeta(action_id=action_id, started_at=started_at)
 
-        run_status = ActionRunStatus.unknown()
+            run_status = ActionRunStatus.unknown()
 
-        await self._prepare_monitors(action, trigger_meta)
-        try:
+            await self._prepare_monitors(action, trigger_meta)
             try:
-                result = await self._func(action)
-            except BaseException as e:
-                run_status = ActionRunStatus.of_failure(e, during_validation=False)
-                raise
-            else:
-                run_status = ActionRunStatus.success()
-                return result
-        finally:
-            ended_at = datetime.now(UTC)
-            meta = GlobalActionResultMeta(
-                action_id=action_id,
-                status=run_status.status,
-                description=run_status.description,
-                started_at=started_at,
-                ended_at=ended_at,
-                duration=ended_at - started_at,
-                error_code=run_status.error_code,
-            )
-            await self._finalize_monitors(action, meta)
+                try:
+                    result = await self._func(action)
+                except BaseException as e:
+                    run_status = ActionRunStatus.of_failure(e, during_validation=False)
+                    raise
+                else:
+                    run_status = ActionRunStatus.success()
+                    return result
+            finally:
+                ended_at = datetime.now(UTC)
+                meta = GlobalActionResultMeta(
+                    action_id=action_id,
+                    status=run_status.status,
+                    description=run_status.description,
+                    started_at=started_at,
+                    ended_at=ended_at,
+                    duration=ended_at - started_at,
+                    error_code=run_status.error_code,
+                )
+                await self._finalize_monitors(action, meta)

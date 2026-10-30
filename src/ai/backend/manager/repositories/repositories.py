@@ -43,7 +43,7 @@ from ai.backend.manager.repositories.permission_controller.repositories import (
     PermissionControllerRepositories,
 )
 from ai.backend.manager.repositories.project.repositories import ProjectRepositories
-from ai.backend.manager.repositories.prometheus_query_preset import (
+from ai.backend.manager.repositories.prometheus_query_preset.repositories import (
     PrometheusQueryPresetRepositories,
 )
 from ai.backend.manager.repositories.rbac.repositories import RbacRepositories
@@ -76,6 +76,9 @@ from ai.backend.manager.repositories.storage_namespace.repositories import (
     StorageNamespaceRepositories,
 )
 from ai.backend.manager.repositories.stream.repositories import StreamRepositories
+from ai.backend.manager.repositories.system_session_environ.repositories import (
+    SystemSessionEnvironRepositories,
+)
 from ai.backend.manager.repositories.template.repositories import TemplateRepositories
 from ai.backend.manager.repositories.types import RepositoryArgs
 from ai.backend.manager.repositories.user.repositories import UserRepositories
@@ -83,6 +86,9 @@ from ai.backend.manager.repositories.user_resource_policy.repositories import (
     UserResourcePolicyRepositories,
 )
 from ai.backend.manager.repositories.vfolder.repositories import VfolderRepositories
+from ai.backend.manager.repositories.vfolder_auto_mount.repositories import (
+    VFolderAutoMountRepositories,
+)
 from ai.backend.manager.repositories.vfs_storage.repositories import VFSStorageRepositories
 
 
@@ -128,6 +134,7 @@ class Repositories:
     user: UserRepositories
     user_resource_policy: UserResourcePolicyRepositories
     vfolder: VfolderRepositories
+    vfolder_auto_mount: VFolderAutoMountRepositories
     object_storage: ObjectStorageRepositories
     vfs_storage: VFSStorageRepositories
     huggingface_registry: HuggingFaceRegistryRepositories
@@ -140,6 +147,7 @@ class Repositories:
     role_preset: RolePresetRepositories
     secret: SecretRepositories
     service_catalog: ServiceCatalogRepositories
+    system_session_environ: SystemSessionEnvironRepositories
 
     @classmethod
     def create(cls, args: RepositoryArgs) -> Self:
@@ -182,6 +190,7 @@ class Repositories:
         user_repositories = UserRepositories.create(args)
         user_resource_policy_repositories = UserResourcePolicyRepositories.create(args)
         vfolder_repositories = VfolderRepositories.create(args)
+        vfolder_auto_mount_repositories = VFolderAutoMountRepositories.create(args)
         object_storage_repositories = ObjectStorageRepositories.create(args)
         vfs_storage_repositories = VFSStorageRepositories.create(args)
         artifact_repositories = ArtifactRepositories.create(args)
@@ -194,6 +203,7 @@ class Repositories:
         role_preset_repositories = RolePresetRepositories.create(args)
         secret_repositories = SecretRepositories.create(args)
         service_catalog_repositories = ServiceCatalogRepositories.create(args)
+        system_session_environ_repositories = SystemSessionEnvironRepositories.create(args)
 
         return cls(
             agent=agent_repositories,
@@ -236,6 +246,7 @@ class Repositories:
             user=user_repositories,
             user_resource_policy=user_resource_policy_repositories,
             vfolder=vfolder_repositories,
+            vfolder_auto_mount=vfolder_auto_mount_repositories,
             object_storage=object_storage_repositories,
             vfs_storage=vfs_storage_repositories,
             huggingface_registry=huggingface_registry_repositories,
@@ -248,4 +259,5 @@ class Repositories:
             role_preset=role_preset_repositories,
             secret=secret_repositories,
             service_catalog=service_catalog_repositories,
+            system_session_environ=system_session_environ_repositories,
         )

@@ -1,0 +1,14 @@
+import{i as u,r as p,br as m,ak as c,az as f,j as y,F as g}from"./index-4XAoWQdC.js";const d=(function(){var l=[{defaultValue:null,kind:"LocalArgument",name:"filter"}],e=[{kind:"Variable",name:"filter",variableName:"filter"},{kind:"Literal",name:"limit",value:100},{kind:"Literal",name:"orderBy",value:[{direction:"ASC",field:"NAME"}]}],r={alias:null,args:null,kind:"ScalarField",name:"name",storageKey:null};return{fragment:{argumentDefinitions:l,kind:"Fragment",metadata:null,name:"BAIResourceGroupSelectQuery",selections:[{alias:null,args:e,concreteType:"ResourceGroupConnection",kind:"LinkedField",name:"adminResourceGroups",plural:!1,selections:[{alias:null,args:null,concreteType:"ResourceGroupEdge",kind:"LinkedField",name:"edges",plural:!0,selections:[{alias:null,args:null,concreteType:"ResourceGroup",kind:"LinkedField",name:"node",plural:!1,selections:[r],storageKey:null}],storageKey:null}],storageKey:null}],type:"Query",abstractKey:null},kind:"Request",operation:{argumentDefinitions:l,kind:"Operation",name:"BAIResourceGroupSelectQuery",selections:[{alias:null,args:e,concreteType:"ResourceGroupConnection",kind:"LinkedField",name:"adminResourceGroups",plural:!1,selections:[{alias:null,args:null,concreteType:"ResourceGroupEdge",kind:"LinkedField",name:"edges",plural:!0,selections:[{alias:null,args:null,concreteType:"ResourceGroup",kind:"LinkedField",name:"node",plural:!1,selections:[r,{alias:null,args:null,kind:"ScalarField",name:"id",storageKey:null}],storageKey:null}],storageKey:null}],storageKey:null}]},params:{cacheID:"ccbeb1e0d742d5ecb1d403bebf4046be",id:null,metadata:{},name:"BAIResourceGroupSelectQuery",operationKind:"query",text:`query BAIResourceGroupSelectQuery(
+  $filter: ResourceGroupFilter
+) {
+  adminResourceGroups(filter: $filter, orderBy: [{field: NAME, direction: ASC}], limit: 100) {
+    edges {
+      node {
+        name
+        id
+      }
+    }
+  }
+}
+`}}})();d.hash="401e1429387d38b178219ebb0a678556";const k=l=>{"use memo";const e=u.c(5);let r;e[0]===Symbol.for("react.memo_cache_sentinel")?(r=d,e[0]=r):r=e[0];const t=l??null;let s;e[1]!==t?(s={filter:t},e[1]=t,e[2]=s):s=e[2];const{adminResourceGroups:n}=p.useLazyLoadQuery(r,s);let a;return e[3]!==(n==null?void 0:n.edges)?(a=m(c(n==null?void 0:n.edges,R)),e[3]=n==null?void 0:n.edges,e[4]=a):a=e[4],a},S=l=>{"use memo";const e=u.c(11);let r,t;e[0]!==l?({filter:r,...t}=l,e[0]=l,e[1]=r,e[2]=t):(r=e[1],t=e[2]);const{t:s}=f(),n=k(r);let a;e[3]!==n?(a=c(n,b),e[3]=n,e[4]=a):a=e[4];let o;e[5]!==s?(o=s("comp:BAIResourceGroupSelect.SelectResourceGroup"),e[5]=s,e[6]=o):o=e[6];let i;return e[7]!==t||e[8]!==a||e[9]!==o?(i=y.jsx(g,{options:a,showSearch:!0,placeholder:o,...t}),e[7]=t,e[8]=a,e[9]=o,e[10]=i):i=e[10],i};function R(l){var e;return(e=l==null?void 0:l.node)==null?void 0:e.name}function b(l){return{label:l,value:l,resourceGroup:l}}export{S as B,k as u};
+//# sourceMappingURL=BAIResourceGroupSelect-jox4l-pQ.js.map

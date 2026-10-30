@@ -28,8 +28,8 @@ from ai.backend.common.dto.manager.vfolder import (
 from ai.backend.manager.data.entity_share.types import EntityShareStatus
 from ai.backend.manager.data.vfolder.types import VFolderOperationStatus
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.vfolder import VFolderUserMountPolicyRow, vfolders
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.vfolder.row import VFolderUserMountPolicyRow, vfolders
 
 VFolderFixtureData = dict[str, Any]
 VFolderFactory = Callable[..., Coroutine[Any, Any, VFolderFixtureData]]
@@ -550,6 +550,29 @@ class TestVFolderInviteList:
 
         result = await user_registry.vfolder.list_invitations()
         assert isinstance(result, ListInvitationsResponse)
+        inv_ids = [i.id for i in result.invitations]
+        assert str(inv["id"]) in inv_ids
+
+    async def test_superadmin_acting_as_invitee_sees_invitee_invitations(
+        self,
+        admin_registry: BackendAIClientRegistry,
+        vfolder_factory: VFolderFactory,
+        regular_user_fixture: Any,
+        invitation_factory: InvitationFactory,
+    ) -> None:
+        """Superadmin listing with ``X-BackendAI-Act-As: <invitee>`` gets the invitee's invitations."""
+        vf = await vfolder_factory()
+        inv = await invitation_factory(
+            vfolder_id=vf["id"],
+            invitee_email=regular_user_fixture.email,
+        )
+
+        raw = await admin_registry._client._request(
+            "GET",
+            "/folders/invitations/list",
+            extra_headers={"X-BackendAI-Act-As": str(regular_user_fixture.user_uuid)},
+        )
+        result = ListInvitationsResponse.model_validate(raw)
         inv_ids = [i.id for i in result.invitations]
         assert str(inv["id"]) in inv_ids
 

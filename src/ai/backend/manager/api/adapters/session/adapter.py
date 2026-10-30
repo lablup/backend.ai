@@ -7,16 +7,24 @@ from collections import defaultdict
 from collections.abc import Sequence
 from datetime import datetime, timedelta
 from decimal import Decimal
+from typing import assert_never
 from uuid import UUID
 
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.kernel_group import KernelGroupID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
+from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.deployment.types import (
     EnvironmentVariableEntryInfoDTO,
     EnvironmentVariablesInfoDTO,
@@ -41,7 +49,17 @@ from ai.backend.common.dto.manager.v2.kernel.response import (
     KernelUserInfoGQLDTO,
     ResourceAllocationGQLDTO,
 )
-from ai.backend.common.dto.manager.v2.kernel.types import KernelStatusFilter
+from ai.backend.common.dto.manager.v2.kernel.types import KernelOrderField, KernelStatusFilter
+from ai.backend.common.dto.manager.v2.kernel_group.request import (
+    KernelGroupFilter,
+    KernelGroupOrder,
+    ScopedSearchKernelGroupsInput,
+)
+from ai.backend.common.dto.manager.v2.kernel_group.response import (
+    KernelGroupNode,
+    ScopedSearchKernelGroupsPayload,
+)
+from ai.backend.common.dto.manager.v2.kernel_group.types import KernelGroupOrderField
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceOptsEntryInfoDTO,
     ResourceOptsInfoDTO,
@@ -57,6 +75,7 @@ from ai.backend.common.dto.manager.v2.session.request import (
     EnqueueSessionInput,
     ExcludeSessionIdleChecksInput,
     IncludeSessionIdleChecksInput,
+    PartialBulkTerminateSessionsInput,
     ScopedSearchSessionsInput,
     SessionFilter,
     SessionOrder,
@@ -80,18 +99,23 @@ from ai.backend.common.dto.manager.v2.session.response import (
     SessionNode,
     SessionResourceInfoGQLDTO,
     SessionRuntimeInfoGQLDTO,
+    SessionTerminationInfo,
     StartSessionServicePayload,
     TerminateSessionsPayload,
     UpdateSessionPayload,
 )
 from ai.backend.common.dto.manager.v2.session.types import (
     ClusterModeEnum,
+    OrderDirection,
+    SessionOrderField,
     SessionScope,
-    SessionStatusFilter,
+    SessionTerminationStatusEnum,
+    SessionUsage,
 )
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    BinarySize,
     ClusterMode,
     KernelId,
     MountInfoEntry,
@@ -103,7 +127,8 @@ from ai.backend.common.types import (
 from ai.backend.common.types import ResourceSlotEntry as DataResourceSlotEntry
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
-from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus, KernelStatusInMatchSpec
+from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
+from ai.backend.manager.data.kernel_group.types import KernelGroupData
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.compute_schedule import ComputeScheduleKernelResult
 from ai.backend.manager.data.session.draft import KernelResourceInput
@@ -115,26 +140,29 @@ from ai.backend.manager.data.session.types import (
 )
 from ai.backend.manager.errors.base.not_found import NotFoundError
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.kernel.conditions import KernelConditions
-from ai.backend.manager.models.kernel.orders import (
-    DEFAULT_FORWARD_ORDER as KERNEL_DEFAULT_FORWARD_ORDER,
-)
-from ai.backend.manager.models.kernel.orders import (
-    resolve_order as resolve_kernel_order,
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
 )
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
-from ai.backend.manager.models.session.conditions import SessionConditions
-from ai.backend.manager.models.session.orders import (
-    DEFAULT_FORWARD_ORDER as SESSION_DEFAULT_FORWARD_ORDER,
-)
-from ai.backend.manager.models.session.orders import (
-    resolve_order as resolve_session_order,
-)
+from ai.backend.manager.models.kernel_group.row import KernelGroupRow
+from ai.backend.manager.models.kernel_group.searchable_fields import KernelGroupSearchableFields
+from ai.backend.manager.models.kernel_group.searchers import KernelGroupSearcher
 from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session.scopes import (
+    DomainSessionTarget,
+    ProjectSessionTarget,
+    SessionTarget,
+    UserSessionTarget,
+)
+from ai.backend.manager.models.session.searchable_fields import SessionSearchableFields
 from ai.backend.manager.models.session.searchers import SessionSearcher
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.specs.search.usage import UsedBy
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.repositories.idle_checker.types import SessionIdleCheckPair
 from ai.backend.manager.services.idle_checker.actions.exclude_sessions import (
     ExcludeSessionIdleChecksAction,
@@ -150,7 +178,16 @@ from ai.backend.manager.services.session.actions.batch_get_session_resource_allo
     BatchGetSessionResourceAllocationAction,
 )
 from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
+from ai.backend.manager.services.session.actions.bulk_get_kernel_groups import (
+    BulkGetKernelGroupsAction,
+)
 from ai.backend.manager.services.session.actions.bulk_get_kernels import BulkGetKernelsAction
+from ai.backend.manager.services.session.actions.bulk_get_main_kernel_groups import (
+    BulkGetMainKernelGroupsAction,
+)
+from ai.backend.manager.services.session.actions.bulk_get_session_designated_agent_ids import (
+    BulkGetSessionDesignatedAgentIdsAction,
+)
 from ai.backend.manager.services.session.actions.compute_schedule import (
     ComputeScheduleAction,
 )
@@ -172,11 +209,10 @@ from ai.backend.manager.services.session.actions.global_search_kernels import (
 )
 from ai.backend.manager.services.session.actions.rename_session import RenameSessionAction
 from ai.backend.manager.services.session.actions.scoped_search import (
-    DomainSessionScopeItem,
-    ProjectSessionScopeItem,
     ScopedSearchSessionsAction,
-    SessionScopeItem,
-    UserSessionScopeItem,
+)
+from ai.backend.manager.services.session.actions.scoped_search_kernel_groups import (
+    ScopedSearchKernelGroupsAction,
 )
 from ai.backend.manager.services.session.actions.scoped_search_kernels import (
     ScopedSearchKernelsAction,
@@ -219,13 +255,18 @@ def _fold_session_status(status: SessionStatus) -> str:
 
 
 _SESSION_PAGINATION_SPEC = PaginationSpec(
-    forward_order=SESSION_DEFAULT_FORWARD_ORDER,
+    forward_order=SessionSearchableFields.own.created_at.order.apply(ascending=False),
     cursor_column=SessionRow.id,
 )
 
 _KERNEL_PAGINATION_SPEC = PaginationSpec(
-    forward_order=KERNEL_DEFAULT_FORWARD_ORDER,
+    forward_order=KernelSearchableFields.own.created_at.order.apply(ascending=False),
     cursor_column=KernelRow.id,
+)
+
+_KERNEL_GROUP_PAGINATION_SPEC = PaginationSpec(
+    forward_order=KernelGroupSearchableFields.own.created_at.order.apply(ascending=True),
+    cursor_column=KernelGroupRow.id,
 )
 
 
@@ -348,7 +389,7 @@ class SessionAdapter(BaseAdapter):
             mounts=mounts,
             execution=execution_spec,
             scheduling=SessionSchedulingSpec(
-                priority=input.priority,
+                tier=input.effective_tier(),
                 job_priority=input.job_priority,
                 is_preemptible=input.is_preemptible,
                 dependencies=input.dependencies,
@@ -482,7 +523,7 @@ class SessionAdapter(BaseAdapter):
             return []
         result = await self._session.bulk_get.run(BulkGetSessionsAction(ids=list(session_ids)))
         nodes = iter(
-            await self._session_data_to_nodes([
+            await self._session_data_to_node_results([
                 item.value.to_session_data() for item in result.items if item.value is not None
             ])
         )
@@ -584,17 +625,158 @@ class SessionAdapter(BaseAdapter):
             for kid in kernel_ids
         ]
 
+    async def _batch_main_kernel_group(
+        self, session_ids: Sequence[SessionID]
+    ) -> list[KernelGroupData | None]:
+        """The main kernel group of each session, in the order of the ids."""
+        if not session_ids:
+            return []
+        action_result = await self._session.bulk_get_main_kernel_groups.run(
+            BulkGetMainKernelGroupsAction(session_ids=list(session_ids))
+        )
+        return [action_result.designated.get(session_id) for session_id in session_ids]
+
+    async def _batch_kernel_groups(
+        self, kernel_group_ids: Sequence[KernelGroupID]
+    ) -> list[KernelGroupData | Exception | None]:
+        """The kernel groups the ids name, checked per owning session."""
+        if not kernel_group_ids:
+            return []
+        return await self.batch_load_fields(
+            self._session.bulk_get_kernel_groups,
+            BulkGetKernelGroupsAction(ids=list(kernel_group_ids)),
+            kernel_group_ids,
+            lambda group: group,
+        )
+
+    async def batch_load_main_kernel_groups(
+        self, session_ids: Sequence[SessionID]
+    ) -> list[KernelGroupNode | None]:
+        """The main kernel group of each session for a DataLoader, in the order of the ids."""
+        return [
+            self._kernel_group_data_to_node(group) if group is not None else None
+            for group in await self._batch_main_kernel_group(session_ids)
+        ]
+
+    async def batch_load_kernel_groups_by_ids(
+        self, kernel_group_ids: Sequence[KernelGroupID]
+    ) -> list[KernelGroupNode | Exception | None]:
+        """The kernel groups the ids name for a DataLoader, in the order of the ids."""
+        return [
+            self._kernel_group_data_to_node(group) if isinstance(group, KernelGroupData) else group
+            for group in await self._batch_kernel_groups(kernel_group_ids)
+        ]
+
+    async def scoped_search_kernel_groups(
+        self, input: ScopedSearchKernelGroupsInput
+    ) -> ScopedSearchKernelGroupsPayload:
+        """Search the kernel groups of the sessions in the scope, authorized on each session."""
+        conditions = self._convert_kernel_group_filter(input.filter) if input.filter else []
+        orders = self._convert_kernel_group_orders(input.order) if input.order else []
+        action_result = await self._session.scoped_search_kernel_groups.run(
+            ScopedSearchKernelGroupsAction(
+                session_ids=[SessionID(item.value) for item in input.scope.session],
+                searcher=self._build_searcher(
+                    KernelGroupSearcher,
+                    conditions=conditions,
+                    orders=orders,
+                    pagination_spec=_KERNEL_GROUP_PAGINATION_SPEC,
+                    first=input.first,
+                    after=input.after,
+                    last=input.last,
+                    before=input.before,
+                    limit=input.limit,
+                    offset=input.offset,
+                ),
+            )
+        )
+        return ScopedSearchKernelGroupsPayload(
+            items=[self._kernel_group_data_to_node(group) for group in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _convert_kernel_group_filter(self, f: KernelGroupFilter) -> list[QueryCondition]:
+        fields = KernelGroupSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
+            *self.apply_string_filter(f.role, fields.role.filter),
+            *self.apply_uuid_filter(f.image_id, fields.image_id.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+        ]
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_kernel_group_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                sub_conditions = self._convert_kernel_group_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            for sub in f.NOT:
+                sub_conditions = self._convert_kernel_group_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+        return conditions
+
+    def _convert_kernel_group_orders(self, orders: list[KernelGroupOrder]) -> list[QueryOrder]:
+        fields = KernelGroupSearchableFields.own
+        result: list[QueryOrder] = []
+        for order in orders:
+            ascending = order.direction == OrderDirection.ASC
+            match order.field:
+                case KernelGroupOrderField.ROLE:
+                    result.append(fields.role.order.apply(ascending))
+                case KernelGroupOrderField.REQUESTED_STARTS_AT:
+                    result.append(fields.requested_starts_at.order.apply(ascending))
+                case KernelGroupOrderField.CREATED_AT:
+                    result.append(fields.created_at.order.apply(ascending))
+                case _:
+                    assert_never(order.field)
+        return result
+
     async def _session_data_to_nodes(self, data: Sequence[SessionData]) -> list[SessionNode]:
-        """Convert session data to nodes, batch-loading their slot allocations."""
-        allocations = await self.batch_resource_allocation_by_session([
-            SessionID(item.id) for item in data
-        ])
+        """Convert session data to nodes for a payload, which carries nodes only; the first
+        session that failed to load fails the request."""
         nodes: list[SessionNode] = []
-        for item, allocation in zip(data, allocations, strict=True):
-            if isinstance(allocation, Exception):
-                raise allocation
-            nodes.append(self._session_data_to_node(item, allocation))
+        for node in await self._session_data_to_node_results(data):
+            if isinstance(node, Exception):
+                raise node
+            nodes.append(node)
         return nodes
+
+    async def _session_data_to_node_results(
+        self, data: Sequence[SessionData]
+    ) -> list[SessionNode | Exception]:
+        """Convert session data to nodes, batch-loading their slot allocations and
+        designated agents. A session whose allocation or agents fail to load answers
+        with that error instead of a node."""
+        session_ids = [SessionID(item.id) for item in data]
+        allocations = await self.batch_resource_allocation_by_session(session_ids)
+        designated = (
+            (
+                await self._session.bulk_get_session_designated_agent_ids.run(
+                    BulkGetSessionDesignatedAgentIdsAction(session_ids=session_ids)
+                )
+            ).items
+            if session_ids
+            else []
+        )
+        results: list[SessionNode | Exception] = []
+        for item, allocation, agents in zip(data, allocations, designated, strict=True):
+            if isinstance(allocation, Exception):
+                results.append(allocation)
+                continue
+            error = self.batch_load_failure(agents.error)
+            if error is not None:
+                results.append(error)
+                continue
+            results.append(self._session_data_to_node(item, allocation, agents.value or []))
+        return results
 
     async def _kernel_infos_to_nodes(self, data: Sequence[KernelInfo]) -> list[KernelNode]:
         """Convert kernel infos to nodes, batch-loading their slot allocations."""
@@ -610,13 +792,64 @@ class SessionAdapter(BaseAdapter):
     # Session search
     # -------------------------------------------------------------------------
 
+    def _on_agent(self, agent_id: AgentId) -> QueryCondition:
+        """The sessions with a kernel on the agent."""
+        kernels = SessionSearchableFields.nested.kernels
+        return kernels.correlation.some([
+            kernels.fields.agent.filter.equals(
+                StringMatchSpec(str(agent_id), case_insensitive=False, negated=False)
+            )
+        ])
+
+    def _usage(self, usage: SessionUsage | None) -> list[UsedBy]:
+        """The uses the request named, the using side before the used side."""
+        if usage is None:
+            return []
+        linked = SessionSearchableFields.linked.usage
+        used_by = usage.used_by
+        uses = usage.uses
+        return [
+            *(
+                linked.deployments.used_by(DeploymentID(entity_id))
+                for entity_id in (used_by.deployment or () if used_by else ())
+            ),
+            *(
+                linked.images.uses(ImageID(entity_id))
+                for entity_id in (uses.image or () if uses else ())
+            ),
+            *(
+                linked.agents.uses(AgentUUID(entity_id))
+                for entity_id in (uses.agent or () if uses else ())
+            ),
+            *(
+                linked.resource_groups.uses(ResourceGroupID(entity_id))
+                for entity_id in (uses.resource_group or () if uses else ())
+            ),
+        ]
+
+    def _scoped_search_action(
+        self, scopes: Sequence[SessionTarget], input: AdminSearchSessionsInput
+    ) -> ScopedSearchSessionsAction:
+        return ScopedSearchSessionsAction(
+            searcher=ScopedSearcher(
+                scopes=scopes,
+                used_by=self._usage(input.usage),
+                searcher=self._build_session_searcher(input),
+            )
+        )
+
     async def admin_search(
         self,
         input: AdminSearchSessionsInput,
     ) -> AdminSearchSessionsPayload:
         """Search sessions (admin, no scope) with filters, orders, and pagination."""
         action_result = await self._session.global_search.run(
-            GlobalSearchSessionsAction(searcher=self._build_session_searcher(input))
+            GlobalSearchSessionsAction(
+                searcher=GlobalSearcher(
+                    used_by=self._usage(input.usage),
+                    searcher=self._build_session_searcher(input),
+                )
+            )
         )
 
         return AdminSearchSessionsPayload(
@@ -637,7 +870,7 @@ class SessionAdapter(BaseAdapter):
         searcher = self._build_searcher(
             SessionSearcher,
             conditions=[
-                SessionConditions.by_agent_id(agent_id),
+                self._on_agent(agent_id),
                 *(self._convert_session_filter(input.filter) if input.filter else []),
             ],
             orders=self._convert_session_orders(input.order) if input.order else [],
@@ -650,26 +883,11 @@ class SessionAdapter(BaseAdapter):
             offset=input.offset,
         )
         action_result = await self._session.global_search.run(
-            GlobalSearchSessionsAction(searcher=searcher)
-        )
-
-        return AdminSearchSessionsPayload(
-            items=await self._session_data_to_nodes([
-                item.to_session_data() for item in action_result.items
-            ]),
-            total_count=action_result.total_count,
-            has_next_page=action_result.has_next_page,
-            has_previous_page=action_result.has_previous_page,
-        )
-
-    async def my_search(self, input: AdminSearchSessionsInput) -> AdminSearchSessionsPayload:
-        """Search sessions owned by the current user."""
-        action_result = await self._session.scoped_search.run(
-            ScopedSearchSessionsAction(
-                items=[UserSessionScopeItem(user_id=UserID(self._require_user_id()))],
-                searcher=self._build_session_searcher(input),
+            GlobalSearchSessionsAction(
+                searcher=GlobalSearcher(used_by=self._usage(input.usage), searcher=searcher)
             )
         )
+
         return AdminSearchSessionsPayload(
             items=await self._session_data_to_nodes([
                 item.to_session_data() for item in action_result.items
@@ -686,10 +904,7 @@ class SessionAdapter(BaseAdapter):
     ) -> AdminSearchSessionsPayload:
         """Search sessions within a project, cursor-based pagination."""
         action_result = await self._session.scoped_search.run(
-            ScopedSearchSessionsAction(
-                items=[ProjectSessionScopeItem(project_id=project_id)],
-                searcher=self._build_session_searcher(input),
-            )
+            self._scoped_search_action([ProjectSessionTarget(project_id=project_id)], input)
         )
         return AdminSearchSessionsPayload(
             items=await self._session_data_to_nodes([
@@ -700,19 +915,16 @@ class SessionAdapter(BaseAdapter):
             has_previous_page=action_result.has_previous_page,
         )
 
-    def _scope_items(self, scope: SessionScope) -> list[SessionScopeItem]:
-        """The scope items the request named, in the order the input lists them."""
-        items: list[SessionScopeItem] = [
-            DomainSessionScopeItem(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+    def _scope_targets(self, scope: SessionScope) -> list[SessionTarget]:
+        """The scope targets the request named, in the order the input lists them."""
+        targets: list[SessionTarget] = [
+            DomainSessionTarget(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
         ]
-        items.extend(
-            ProjectSessionScopeItem(project_id=ProjectID(entry.value))
-            for entry in scope.project or ()
+        targets.extend(
+            ProjectSessionTarget(project_id=ProjectID(entry.value)) for entry in scope.project or ()
         )
-        items.extend(
-            UserSessionScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
-        )
-        return items
+        targets.extend(UserSessionTarget(user_id=UserID(entry.value)) for entry in scope.user or ())
+        return targets
 
     async def scoped_search(
         self,
@@ -721,8 +933,11 @@ class SessionAdapter(BaseAdapter):
         """Search the sessions the named scopes reach, combined with OR."""
         action_result = await self._session.scoped_search.run(
             ScopedSearchSessionsAction(
-                items=self._scope_items(input.scope),
-                searcher=self._build_scoped_session_searcher(input),
+                searcher=ScopedSearcher(
+                    scopes=self._scope_targets(input.scope),
+                    used_by=self._usage(input.usage),
+                    searcher=self._build_scoped_session_searcher(input),
+                )
             )
         )
         return AdminSearchSessionsPayload(
@@ -769,106 +984,121 @@ class SessionAdapter(BaseAdapter):
         return await self.gql_search_by_project(ProjectID(project_id), input)
 
     def _convert_session_filter(self, f: SessionFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if f.id is not None:
-            c = self.convert_uuid_filter(
-                f.id,
-                equals_factory=SessionConditions.by_id_filter_equals,
-                in_factory=SessionConditions.by_id_filter_in,
-            )
-            if c is not None:
-                conditions.append(c)
-        if f.name is not None:
-            c = self.convert_string_filter(
-                f.name,
-                contains_factory=SessionConditions.by_name_contains,
-                equals_factory=SessionConditions.by_name_equals,
-                starts_with_factory=SessionConditions.by_name_starts_with,
-                ends_with_factory=SessionConditions.by_name_ends_with,
-                in_factory=SessionConditions.by_name_in,
-            )
-            if c is not None:
-                conditions.append(c)
-        if f.domain_name is not None:
-            c = self.convert_string_filter(
-                f.domain_name,
-                contains_factory=SessionConditions.by_domain_name_contains,
-                equals_factory=SessionConditions.by_domain_name_equals,
-                starts_with_factory=SessionConditions.by_domain_name_starts_with,
-                ends_with_factory=SessionConditions.by_domain_name_ends_with,
-                in_factory=SessionConditions.by_domain_name_in,
-            )
-            if c is not None:
-                conditions.append(c)
-        if f.project_id is not None:
-            c = self.convert_uuid_filter(
-                f.project_id,
-                equals_factory=SessionConditions.by_group_id_filter_equals,
-                in_factory=SessionConditions.by_group_id_filter_in,
-            )
-            if c is not None:
-                conditions.append(c)
-        if f.user_uuid is not None:
-            c = self.convert_uuid_filter(
-                f.user_uuid,
-                equals_factory=SessionConditions.by_user_uuid_filter_equals,
-                in_factory=SessionConditions.by_user_uuid_filter_in,
-            )
-            if c is not None:
-                conditions.append(c)
-        if f.status is not None:
-            conditions.extend(self._convert_session_status_filter(f.status))
-        if f.created_at is not None:
-            c = f.created_at.build_query_condition(
-                before_factory=SessionConditions.by_created_at_before,
-                after_factory=SessionConditions.by_created_at_after,
-                equals_factory=SessionConditions.by_created_at_equals,
-            )
-            if c is not None:
-                conditions.append(c)
-        if f.labels is not None:
-            conditions.extend(
-                self._convert_entity_label_nested_filter(f.labels, SessionConditions.labels)
-            )
+        fields = SessionSearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(f.id, fields.id.filter),
+            *self.apply_uuid_filter(f.entity_id, fields.id.filter),
+            *self.apply_string_filter(f.name, fields.name.filter),
+            *self.apply_string_filter(f.domain_name, fields.domain_name.filter),
+            *self.apply_uuid_filter(f.project_id, fields.group_id.filter),
+            *self.apply_uuid_filter(f.user_uuid, fields.user_uuid.filter),
+            *self.apply_enum_filter(f.status, fields.status.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+            *self.apply_to_many_filter(
+                f.labels,
+                SessionSearchableFields.nested.labels.correlation,
+                self._convert_entity_label_filter,
+            ),
+            *self.apply_string_filter(f.creation_id, fields.creation_id.filter),
+            *self.apply_enum_filter(f.session_type, fields.session_type.filter),
+            *self.apply_int_filter(f.tier, fields.priority.filter),
+            *self.apply_int_filter(f.priority, fields.priority.filter),
+            *self.apply_int_filter(f.job_priority, fields.job_priority.filter),
+            *self.apply_bool_filter(f.is_preemptible, fields.is_preemptible.filter),
+            *self.apply_int_filter(f.cluster_size, fields.cluster_size.filter),
+            *self.apply_string_filter(f.resource_group_name, fields.resource_group_name.filter),
+            *self.apply_string_filter(f.access_key, fields.access_key.filter),
+            *self.apply_string_filter(f.tag, fields.tag.filter),
+            *self.apply_bool_filter(f.use_host_network, fields.use_host_network.filter),
+            *self.apply_int_filter(f.batch_timeout, fields.batch_timeout.filter),
+            *self.apply_datetime_filter(f.starts_at, fields.starts_at.filter),
+            *self.apply_datetime_filter(f.terminated_at, fields.terminated_at.filter),
+            *self.apply_enum_filter(f.result, fields.result.filter),
+            *self.apply_enum_filter(f.network_type, fields.network_type.filter),
+            *self.apply_string_filter(f.network_id, fields.network_id.filter),
+            *self.apply_uuid_filter(f.replica_id, fields.replica_id.filter),
+            *self.apply_uuid_filter(f.session_group_id, fields.session_group_id.filter),
+            *self.apply_datetime_filter(f.requested_starts_at, fields.requested_starts_at.filter),
+        ]
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_session_filter(sub))
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_session_filter(sub))
+                sub_conditions = self._convert_session_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_session_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_session_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
-    @staticmethod
-    def _convert_session_status_filter(f: SessionStatusFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if f.equals is not None:
-            conditions.append(SessionConditions.by_status_equals(SessionStatus(f.equals.value)))
-        if f.in_:
-            conditions.append(
-                SessionConditions.by_status_in([SessionStatus(s.value) for s in f.in_])
-            )
-        if f.not_equals is not None:
-            conditions.append(
-                SessionConditions.by_status_not_equals(SessionStatus(f.not_equals.value))
-            )
-        if f.not_in:
-            conditions.append(
-                SessionConditions.by_status_not_in([SessionStatus(s.value) for s in f.not_in])
-            )
-        return conditions
+    def _convert_session_orders(self, orders: list[SessionOrder]) -> list[QueryOrder]:
+        return [self._convert_session_order(order) for order in orders]
 
-    @staticmethod
-    def _convert_session_orders(orders: list[SessionOrder]) -> list[QueryOrder]:
-        return [resolve_session_order(o.field, o.direction) for o in orders]
+    def _convert_session_order(self, order: SessionOrder) -> QueryOrder:
+        fields = SessionSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case SessionOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case SessionOrderField.TERMINATED_AT:
+                return fields.terminated_at.order.apply(ascending)
+            case SessionOrderField.STATUS:
+                return fields.status.order.apply(ascending)
+            case SessionOrderField.ID:
+                return fields.id.order.apply(ascending)
+            case SessionOrderField.NAME:
+                return fields.name.order.apply(ascending)
+            case SessionOrderField.CREATION_ID:
+                return fields.creation_id.order.apply(ascending)
+            case SessionOrderField.SESSION_TYPE:
+                return fields.session_type.order.apply(ascending)
+            case SessionOrderField.TIER | SessionOrderField.PRIORITY:
+                return fields.priority.order.apply(ascending)
+            case SessionOrderField.JOB_PRIORITY:
+                return fields.job_priority.order.apply(ascending)
+            case SessionOrderField.IS_PREEMPTIBLE:
+                return fields.is_preemptible.order.apply(ascending)
+            case SessionOrderField.CLUSTER_SIZE:
+                return fields.cluster_size.order.apply(ascending)
+            case SessionOrderField.RESOURCE_GROUP_NAME:
+                return fields.resource_group_name.order.apply(ascending)
+            case SessionOrderField.DOMAIN_NAME:
+                return fields.domain_name.order.apply(ascending)
+            case SessionOrderField.PROJECT_ID:
+                return fields.group_id.order.apply(ascending)
+            case SessionOrderField.USER_ID:
+                return fields.user_uuid.order.apply(ascending)
+            case SessionOrderField.ACCESS_KEY:
+                return fields.access_key.order.apply(ascending)
+            case SessionOrderField.TAG:
+                return fields.tag.order.apply(ascending)
+            case SessionOrderField.USE_HOST_NETWORK:
+                return fields.use_host_network.order.apply(ascending)
+            case SessionOrderField.BATCH_TIMEOUT:
+                return fields.batch_timeout.order.apply(ascending)
+            case SessionOrderField.STARTS_AT:
+                return fields.starts_at.order.apply(ascending)
+            case SessionOrderField.RESULT:
+                return fields.result.order.apply(ascending)
+            case SessionOrderField.NETWORK_TYPE:
+                return fields.network_type.order.apply(ascending)
+            case SessionOrderField.NETWORK_ID:
+                return fields.network_id.order.apply(ascending)
+            case SessionOrderField.REPLICA_ID:
+                return fields.replica_id.order.apply(ascending)
+            case SessionOrderField.SESSION_GROUP_ID:
+                return fields.session_group_id.order.apply(ascending)
+            case SessionOrderField.REQUESTED_STARTS_AT:
+                return fields.requested_starts_at.order.apply(ascending)
+            case _:
+                assert_never(order.field)
 
     # -------------------------------------------------------------------------
     # Kernel search
@@ -880,7 +1110,9 @@ class SessionAdapter(BaseAdapter):
     ) -> AdminSearchKernelsPayload:
         """Search kernels (admin, no scope) with filters, orders, and pagination."""
         action_result = await self._session.global_search_kernels.run(
-            GlobalSearchKernelsAction(searcher=self._build_kernel_searcher(input))
+            GlobalSearchKernelsAction(
+                searcher=GlobalSearcher(used_by=(), searcher=self._build_kernel_searcher(input))
+            )
         )
 
         return AdminSearchKernelsPayload(
@@ -888,6 +1120,12 @@ class SessionAdapter(BaseAdapter):
             total_count=action_result.total_count,
             has_next_page=action_result.has_next_page,
             has_previous_page=action_result.has_previous_page,
+        )
+
+    def _kernel_on_agent(self, agent_id: AgentId) -> QueryCondition:
+        """The kernels running on the agent."""
+        return KernelSearchableFields.own.agent.filter.equals(
+            StringMatchSpec(str(agent_id), case_insensitive=False, negated=False)
         )
 
     async def search_kernels_by_agent(
@@ -898,8 +1136,11 @@ class SessionAdapter(BaseAdapter):
         """Search the kernels on a specific agent (superadmin)."""
         action_result = await self._session.global_search_kernels.run(
             GlobalSearchKernelsAction(
-                searcher=self._build_kernel_searcher(
-                    input, base_condition=KernelConditions.by_agent_id(agent_id)
+                searcher=GlobalSearcher(
+                    used_by=(),
+                    searcher=self._build_kernel_searcher(
+                        input, base_condition=self._kernel_on_agent(agent_id)
+                    ),
                 )
             )
         )
@@ -953,80 +1194,98 @@ class SessionAdapter(BaseAdapter):
         )
 
     def _convert_kernel_filter(self, f: KernelFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-        if f.id is not None:
-            c = self.convert_uuid_filter(
-                f.id,
-                equals_factory=KernelConditions.by_id_filter_equals,
-                in_factory=KernelConditions.by_id_filter_in,
-            )
-            if c is not None:
-                conditions.append(c)
-        if f.session_id is not None:
-            c = self.convert_uuid_filter(
-                f.session_id,
-                equals_factory=KernelConditions.by_session_id_filter_equals,
-                in_factory=KernelConditions.by_session_id_filter_in,
-            )
-            if c is not None:
-                conditions.append(c)
-        if f.status is not None:
-            conditions.extend(self._convert_kernel_status_filter(f.status))
+        fields = KernelSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_uuid_filter(f.id, fields.id.filter),
+            *self.apply_uuid_filter(f.field_id, fields.id.filter),
+            *self.apply_uuid_filter(f.session_id, fields.session_id.filter),
+            *self._convert_kernel_status_filter(f.status),
+        ]
         if f.AND:
             for sub in f.AND:
                 conditions.extend(self._convert_kernel_filter(sub))
         if f.OR:
             or_conditions: list[QueryCondition] = []
             for sub in f.OR:
-                or_conditions.extend(self._convert_kernel_filter(sub))
+                sub_conditions = self._convert_kernel_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
             if or_conditions:
                 conditions.append(combine_conditions_or(or_conditions))
         if f.NOT:
-            not_conditions: list[QueryCondition] = []
             for sub in f.NOT:
-                not_conditions.extend(self._convert_kernel_filter(sub))
-            if not_conditions:
-                conditions.append(negate_conditions(not_conditions))
+                sub_conditions = self._convert_kernel_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
         return conditions
 
-    @staticmethod
-    def _convert_kernel_status_filter(f: KernelStatusFilter) -> list[QueryCondition]:
+    def _convert_kernel_status_filter(self, f: KernelStatusFilter | None) -> list[QueryCondition]:
+        if f is None:
+            return []
+        status = KernelSearchableFields.own.status.filter
         conditions: list[QueryCondition] = []
         if f.equals is not None:
-            conditions.append(
-                KernelConditions.by_status_filter_in(
-                    KernelStatusInMatchSpec(values=[KernelStatus(f.equals)], negated=False)
-                )
-            )
+            conditions.append(status.equals(KernelStatus(f.equals)))
         if f.in_:
-            conditions.append(
-                KernelConditions.by_status_filter_in(
-                    KernelStatusInMatchSpec(values=[KernelStatus(s) for s in f.in_], negated=False)
-                )
-            )
+            conditions.append(status.in_([KernelStatus(s) for s in f.in_]))
         if f.not_equals is not None:
-            conditions.append(
-                KernelConditions.by_status_filter_in(
-                    KernelStatusInMatchSpec(values=[KernelStatus(f.not_equals)], negated=True)
-                )
-            )
+            conditions.append(status.not_equals(KernelStatus(f.not_equals)))
         if f.not_in:
-            conditions.append(
-                KernelConditions.by_status_filter_in(
-                    KernelStatusInMatchSpec(
-                        values=[KernelStatus(s) for s in f.not_in], negated=True
-                    )
-                )
-            )
+            conditions.append(status.not_in([KernelStatus(s) for s in f.not_in]))
         return conditions
 
-    @staticmethod
-    def _convert_kernel_orders(orders: list[KernelOrder]) -> list[QueryOrder]:
-        return [resolve_kernel_order(o.field, o.direction) for o in orders]
+    def _convert_kernel_orders(self, orders: list[KernelOrder]) -> list[QueryOrder]:
+        return [self._convert_kernel_order(o) for o in orders]
+
+    def _convert_kernel_order(self, order: KernelOrder) -> QueryOrder:
+        """The query order one requested kernel order field names."""
+        fields = KernelSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case KernelOrderField.CLUSTER_IDX:
+                return fields.cluster_idx.order.apply(ascending)
+            case KernelOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case KernelOrderField.TERMINATED_AT:
+                return fields.terminated_at.order.apply(ascending)
+            case KernelOrderField.STATUS:
+                return fields.status.order.apply(ascending)
+            case KernelOrderField.CLUSTER_MODE:
+                return fields.cluster_mode.order.apply(ascending)
+            case KernelOrderField.CLUSTER_HOSTNAME:
+                return fields.cluster_hostname.order.apply(ascending)
+            case _:
+                assert_never(order.field)
 
     # -------------------------------------------------------------------------
     # Terminate
     # -------------------------------------------------------------------------
+
+    async def partial_bulk_terminate(
+        self, input: PartialBulkTerminateSessionsInput
+    ) -> PartialBulkPayload[SessionTerminationInfo]:
+        """Terminate several sessions, answering for each one."""
+        result = await self._session.terminate_sessions.run(
+            TerminateSessionsAction(
+                session_ids=[SessionId(session_id) for session_id in input.ids],
+                forced=input.forced,
+            )
+        )
+        return PartialBulkPayload[SessionTerminationInfo](
+            successes=[
+                SessionTerminationInfo(
+                    id=SessionID(item.entity_id),
+                    status=SessionTerminationStatusEnum(item.value.value),
+                )
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
+        )
 
     async def terminate(self, input: TerminateSessionsInput) -> TerminateSessionsPayload:
         """Terminate one or more sessions.
@@ -1214,7 +1473,7 @@ class SessionAdapter(BaseAdapter):
 
     @staticmethod
     def _session_data_to_node(
-        data: SessionData, allocation: ResourceAllocationGQLDTO
+        data: SessionData, allocation: ResourceAllocationGQLDTO, designated_agent_ids: list[AgentId]
     ) -> SessionNode:
         environ = (
             EnvironmentVariablesInfoDTO(
@@ -1231,7 +1490,7 @@ class SessionAdapter(BaseAdapter):
             entity_id=data.entity_id(),
             image_ids=data.image_ids,
             domain_name=data.domain_name,
-            user_id=UserID(data.user_uuid),
+            user_id=data.user_uuid,
             project_id=data.group_id,
             metadata=SessionMetadataInfoGQLDTO(
                 creation_id=data.creation_id or "",
@@ -1240,6 +1499,7 @@ class SessionAdapter(BaseAdapter):
                 access_key=str(data.access_key) if data.access_key else "",
                 cluster_mode=data.cluster_mode.name,
                 cluster_size=data.cluster_size,
+                tier=data.priority,
                 priority=data.priority,
                 job_priority=data.job_priority,
                 is_preemptible=data.is_preemptible,
@@ -1248,6 +1508,8 @@ class SessionAdapter(BaseAdapter):
             resource=SessionResourceInfoGQLDTO(
                 allocation=allocation,
                 resource_group_name=data.resource_group_name,
+                session_group_id=data.session_group_id,
+                designated_agent_ids=[str(agent_id) for agent_id in designated_agent_ids] or None,
             ),
             lifecycle=SessionLifecycleInfoGQLDTO(
                 status=_fold_session_status(data.status),
@@ -1255,6 +1517,7 @@ class SessionAdapter(BaseAdapter):
                 created_at=data.created_at,
                 terminated_at=data.terminated_at,
                 starts_at=data.starts_at,
+                requested_starts_at=data.requested_starts_at,
                 batch_timeout=data.batch_timeout,
             ),
             runtime=SessionRuntimeInfoGQLDTO(
@@ -1293,6 +1556,7 @@ class SessionAdapter(BaseAdapter):
             id=info.id,
             field_id=info.id,
             image_id=info.image.image_id,
+            kernel_group_id=info.kernel_group_id,
             startup_command=info.runtime.startup_command,
             session_info=KernelSessionInfoGQLDTO(
                 session_id=UUID(info.session.session_id),
@@ -1301,7 +1565,7 @@ class SessionAdapter(BaseAdapter):
                 session_type=info.session.session_type.value,
             ),
             user_info=KernelUserInfoGQLDTO(
-                user_id=UserID(info.user_permission.user_uuid),
+                user_id=info.user_permission.user_uuid,
                 access_key=info.user_permission.access_key,
                 domain_name=info.user_permission.domain_name,
                 group_id=info.user_permission.group_id,
@@ -1331,4 +1595,19 @@ class SessionAdapter(BaseAdapter):
                 terminated_at=info.lifecycle.terminated_at,
                 starts_at=info.lifecycle.starts_at,
             ),
+        )
+
+    @staticmethod
+    def _kernel_group_data_to_node(data: KernelGroupData) -> KernelGroupNode:
+        return KernelGroupNode(
+            id=data.id,
+            field_id=data.id,
+            session_id=data.session_id,
+            role=data.role,
+            image_id=data.image_id,
+            shmem=BinarySize.to_size_info(data.shmem) if data.shmem is not None else None,
+            startup_command=data.startup_command,
+            preopen_ports=data.preopen_ports,
+            requested_starts_at=data.requested_starts_at,
+            batch_timeout=data.batch_timeout_sec,
         )

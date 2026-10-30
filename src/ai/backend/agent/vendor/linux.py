@@ -14,9 +14,9 @@ from ai.backend.common.cgroup import (
     get_cgroup_mount_point,
 )
 from ai.backend.common.docker import get_docker_connector
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 _numa_supported = False
 
 if sys.platform == "linux":
@@ -91,8 +91,8 @@ class libnuma:
                     cgroup_parent = "system.slice"
                 case _:
                     log.warning(
-                        "unsupported cgroup driver: {}, falling back to the next cpuset source",
-                        driver,
+                        "unsupported cgroup driver, falling back to next cpuset source",
+                        cgroup_driver=driver,
                     )
                     return None
             match version:
@@ -102,12 +102,12 @@ class libnuma:
                     cpuset_source_name = "cpuset.cpus.effective"
                 case _:
                     log.warning(
-                        "unsupported cgroup version: {}, falling back to the next cpuset source",
-                        driver,
+                        "unsupported cgroup version, falling back to next cpuset source",
+                        cgroup_version=version,
                     )
                     return None
             docker_cpuset_path = mount_point / cgroup_parent / cpuset_source_name
-            log.debug("docker_cpuset_path: {}", docker_cpuset_path)
+            log.debug("docker cgroup cpuset path resolved", cpuset_path=docker_cpuset_path)
             cpuset_source = f"the docker cgroup (v{version})"
             try:
                 docker_cpuset = docker_cpuset_path.read_text()
@@ -115,8 +115,8 @@ class libnuma:
                 return cpuset, cpuset_source
             except (OSError, ValueError):
                 log.warning(
-                    "failed to parse cgroup cpuset from {}, falling back to the next cpuset source",
-                    docker_cpuset_path,
+                    "cgroup cpuset parse failed, falling back to next cpuset source",
+                    cpuset_path=docker_cpuset_path,
                 )
                 return None
 
@@ -164,7 +164,7 @@ class libnuma:
                 case _:
                     return get_cpus()
         finally:
-            log.debug("read the available cpuset from {}", cpuset_source)
+            log.debug("available cpuset read", cpuset_source=cpuset_source)
 
     @staticmethod
     async def get_core_topology(limit_cpus: set[int] | None = None) -> tuple[list[int], ...]:

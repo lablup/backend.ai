@@ -10,12 +10,14 @@ from ai.backend.common.api_handlers import APIResponse, BodyParam, PathParam
 from ai.backend.common.data.entity.idle_checker import IdleCheckerAssignmentID
 from ai.backend.common.dto.manager.v2.idle_checker_assignment.request import (
     CreateIdleCheckerAssignmentInput,
+    PartialBulkPurgeIdleCheckerAssignmentsInput,
+    PartialBulkUpdateIdleCheckerAssignmentsInput,
     PurgeIdleCheckerAssignmentInput,
     ScopedSearchIdleCheckerAssignmentsInput,
     SearchIdleCheckerAssignmentsInput,
     UpdateIdleCheckerAssignmentInput,
 )
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.api.rest.v2.path_params import IdleCheckerAssignmentIdPathParam
 
 if TYPE_CHECKING:
@@ -23,7 +25,7 @@ if TYPE_CHECKING:
         IdleCheckerAssignmentAdapter,
     )
 
-log: Final = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log: Final = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 class V2IdleCheckerAssignmentHandler:
@@ -76,4 +78,20 @@ class V2IdleCheckerAssignmentHandler:
                 id=IdleCheckerAssignmentID(path.parsed.idle_checker_assignment_id)
             )
         )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_update(
+        self,
+        body: BodyParam[PartialBulkUpdateIdleCheckerAssignmentsInput],
+    ) -> APIResponse:
+        """Update several idle checker assignments' enabled state, answering for each one."""
+        result = await self._adapter.partial_bulk_update(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
+
+    async def partial_bulk_purge(
+        self,
+        body: BodyParam[PartialBulkPurgeIdleCheckerAssignmentsInput],
+    ) -> APIResponse:
+        """Permanently remove several idle checker assignments, answering for each one."""
+        result = await self._adapter.partial_bulk_purge(body.parsed)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)

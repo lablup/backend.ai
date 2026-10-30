@@ -8,6 +8,9 @@ from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.manager.data.resource_group.types import ResourceGroupData
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
+from ai.backend.manager.models.resource_group.searchable_fields import (
+    ResourceGroupSearchableFields,
+)
 from ai.backend.manager.models.specs.querier import BulkEntityQuerier
 
 
@@ -24,4 +27,4 @@ class BulkResourceGroupQuerier(BulkEntityQuerier[ResourceGroupRow, ResourceGroup
 
     @override
     def to_data(self, row: ResourceGroupRow) -> ResourceGroupData:
-        return row.to_dataclass()
+        return ResourceGroupSearchableFields.own.to_data(row)

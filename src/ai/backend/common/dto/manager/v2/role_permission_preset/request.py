@@ -2,21 +2,25 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseRequestModel
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
-from ai.backend.common.dto.manager.v2.common import OrderDirection
+from ai.backend.common.dto.manager.v2.common import NonEmptyList, OrderDirection
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitFilter
 from ai.backend.common.dto.manager.v2.role_permission_preset.types import (
     RolePermissionPresetEntry,
     RolePermissionPresetOrderField,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "BulkAddRolePermissionPresetsInput",
     "BulkRemoveRolePermissionPresetsInput",
+    "PartialBulkRemoveRolePresetPermissionsInput",
     "RolePermissionPresetFilter",
     "RolePermissionPresetOrder",
     "SearchRolePermissionPresetsInput",
@@ -39,6 +43,13 @@ class BulkRemoveRolePermissionPresetsInput(BaseRequestModel):
     )
 
 
+class PartialBulkRemoveRolePresetPermissionsInput(BaseRequestModel):
+    """Input for removing several role preset permission entries, each answered for
+    separately."""
+
+    ids: NonEmptyList[UUID] = Field(description="IDs of the permission entries to remove.")
+
+
 class RolePermissionPresetFilter(BaseRequestModel):
     """Filter criteria for role_permission_presets rows.
 
@@ -58,6 +69,10 @@ class RolePermissionPresetFilter(BaseRequestModel):
     )
     created_at: DateTimeFilter | None = Field(
         default=None, description="Filter by creation timestamp."
+    )
+    field_id: UUIDFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by role permission preset ID.",
     )
     AND: list[RolePermissionPresetFilter] | None = Field(
         default=None, description="AND conjunction."

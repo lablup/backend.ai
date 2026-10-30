@@ -9,16 +9,21 @@ from typing import Any, override
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.artifact import ArtifactID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.manager.models.artifact_revision.row import ArtifactRevisionRow
 from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.scopes import ExistenceCheck, OperationScope
+from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
 
 
 @dataclass(frozen=True)
-class ArtifactRevisionOperationScope(OperationScope):
+class ArtifactRevisionTarget(ScopeTarget):
     """The revisions one artifact holds."""
 
     artifact_id: ArtifactID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.artifact_id
 
     @override
     def to_condition(self) -> QueryCondition:

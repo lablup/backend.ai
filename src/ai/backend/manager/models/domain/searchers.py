@@ -9,6 +9,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.data.domain.types import DomainData
 from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.specs.searcher import Searcher
 
 
@@ -20,4 +21,4 @@ class DomainSearcher(Searcher[DomainRow, DomainData]):
 
     @override
     def to_data(self, row: DomainRow) -> DomainData:
-        return row.to_data()
+        return DomainSearchableFields.own.to_data(row)

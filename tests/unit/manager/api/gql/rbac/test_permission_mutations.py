@@ -16,11 +16,8 @@ from ai.backend.common.dto.manager.v2.rbac.response import PermissionNode
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.tristate.unset import UNSET
 from ai.backend.manager.api.gql.rbac.resolver import permission as permission_resolver
-from ai.backend.manager.api.gql.rbac.types import (
-    PermissionBitGQL,
-    PermissionGQL,
-    UpdatePermissionInput,
-)
+from ai.backend.manager.api.gql.rbac.types.permission import PermissionGQL, UpdatePermissionInput
+from ai.backend.manager.api.gql.rbac.types.scope import PermissionBitGQL
 
 _SCOPE_ID = uuid.UUID("11111111-1111-1111-1111-111111111111")
 

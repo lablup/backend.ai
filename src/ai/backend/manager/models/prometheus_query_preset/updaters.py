@@ -15,6 +15,9 @@ from ai.backend.manager.models.prometheus_query_preset.row import (
     PresetOptions,
     PrometheusQueryPresetRow,
 )
+from ai.backend.manager.models.prometheus_query_preset.searchable_fields import (
+    PrometheusQueryPresetSearchableFields,
+)
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 from ai.backend.manager.models.specs.updater import DataUpdater
 from ai.backend.manager.types import OptionalState, TriState
@@ -76,7 +79,7 @@ class PrometheusQueryPresetUpdater(
 
     @override
     def to_data(self, row: PrometheusQueryPresetRow) -> PrometheusQueryPresetData:
-        return row.to_data()
+        return PrometheusQueryPresetSearchableFields.own.to_data(row)
 
     def _build_options(self) -> Any:
         filter_value = self.filter_labels.optional_value()

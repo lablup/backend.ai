@@ -12,7 +12,7 @@ from ai.backend.common.dto.manager.v2.fair_share.types import (
     ResourceSlotInfo,
 )
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.api.gql.fair_share.types import ResourceSlotGQL
+from ai.backend.manager.api.gql.common_types import ResourceSlotGQL
 from ai.backend.manager.api.gql.resource_usage.types.common_calculations import (
     calculate_average_daily_usage,
     calculate_usage_capacity_ratio,

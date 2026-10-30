@@ -8,6 +8,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.data.entity.runtime_variant import RuntimeVariantEntityType, RuntimeVariantID
 from ai.backend.common.data.entity.runtime_variant_preset import RuntimeVariantPresetEntityType
 from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
@@ -16,17 +17,17 @@ from ai.backend.common.dto.manager.v2.runtime_variant_preset.types import (
 )
 from ai.backend.manager.data.runtime_variant_preset.types import RuntimeVariantPresetData
 from ai.backend.manager.errors.base.entity import EntityNotFoundError
-from ai.backend.manager.models.domain import DomainRow
+from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.rbac_models.permission.permission import PermissionRow
-from ai.backend.manager.models.rbac_models.role import RoleRow
-from ai.backend.manager.models.resource_policy import UserResourcePolicyRow
+from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
 from ai.backend.manager.models.runtime_variant.purgers import RuntimeVariantPurger
 from ai.backend.manager.models.runtime_variant.row import RuntimeVariantRow
 from ai.backend.manager.models.runtime_variant_preset.creators import RuntimeVariantPresetCreator
 from ai.backend.manager.models.runtime_variant_preset.row import RuntimeVariantPresetRow
-from ai.backend.manager.models.user import UserRow
+from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.virtual_entity.entity_membership import EntityMembershipRow
 from ai.backend.manager.models.virtual_entity.entity_membership_cap import (
@@ -79,7 +80,12 @@ async def _add_variant(database: ExtendedAsyncSAEngine) -> RuntimeVariantID:
     variant_id = RuntimeVariantID(uuid.uuid4())
     async with database.begin_session() as sess:
         sess.add(
-            RuntimeVariantRow(id=variant_id, name=f"variant-{variant_id.hex[:8]}", description=None)
+            RuntimeVariantRow(
+                id=variant_id,
+                name=f"variant-{variant_id.hex[:8]}",
+                description=None,
+                default_model_definition=DefaultModelDefinition(),
+            )
         )
         await sess.flush()
         await VirtualEntitySeeder().provision(sess, RuntimeVariantEntityType(), variant_id)

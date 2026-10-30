@@ -3,22 +3,25 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import assert_never
 from uuid import UUID
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter, UUIDFilter
+from ai.backend.common.dto.manager.v2.common import PartialBulkFailure, PartialBulkPayload
 from ai.backend.common.dto.manager.v2.group.request import (
     AdminSearchProjectsInput,
     AssignUsersToProjectInput,
     CreateProjectInput,
-    DeleteProjectInput,
+    PartialBulkDeleteProjectsInput,
+    PartialBulkRestoreProjectsInput,
+    PartialBulkUpdateProjectsInput,
     ProjectFilter,
     ProjectOrder,
     PurgeProjectInput,
-    RestoreProjectInput,
     ScopedSearchProjectsInput,
     UnassignUsersFromProjectInput,
     UpdateProjectInput,
@@ -41,6 +44,7 @@ from ai.backend.common.dto.manager.v2.group.response import (
 )
 from ai.backend.common.dto.manager.v2.group.types import (
     OrderDirection,
+    ProjectDomainFilter,
     ProjectOrderField,
     ProjectScope,
     ProjectType,
@@ -49,38 +53,61 @@ from ai.backend.common.dto.manager.v2.group.types import (
 )
 from ai.backend.common.dto.manager.v2.user.response import UserNode
 from ai.backend.common.exception import UnreachableError
+from ai.backend.common.tristate.unset import Unset
 from ai.backend.common.types import AccessKey
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.api.adapters.user.adapter import UserAdapter
+from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
 from ai.backend.manager.data.project.types import ProjectData
 from ai.backend.manager.data.project.types import ProjectType as DataProjectType
-from ai.backend.manager.data.user.types import UserData
+from ai.backend.manager.data.user.types import UserData, UserStatus
 from ai.backend.manager.models.clauses import QueryCondition, QueryOrder
-from ai.backend.manager.models.condition_utils import combine_conditions_or, negate_conditions
-from ai.backend.manager.models.domain.conditions import DomainConditions
-from ai.backend.manager.models.project.conditions import ProjectConditions
+from ai.backend.manager.models.condition_utils import (
+    combine_conditions_and,
+    combine_conditions_or,
+    negate_conditions,
+)
+from ai.backend.manager.models.domain.searchable_fields import DomainSearchableFields
 from ai.backend.manager.models.project.creators import ProjectCreator
-from ai.backend.manager.models.project.orders import ProjectOrders
+from ai.backend.manager.models.project.deprecated_search import (
+    DeprecatedProjectConditions,
+    DeprecatedProjectOrders,
+)
 from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.project.scopes import (
+    DomainProjectTarget,
+    ProjectTarget,
+    UserProjectTarget,
+)
+from ai.backend.manager.models.project.searchable_fields import ProjectSearchableFields
 from ai.backend.manager.models.project.searchers import ProjectSearcher
 from ai.backend.manager.models.project.updaters import (
     ProjectRestoreUpdater,
     ProjectSoftDeleteUpdater,
     ProjectUpdater,
 )
+from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
+from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 from ai.backend.manager.services.domain.actions.lookup import LookupDomainAction
 from ai.backend.manager.services.domain.processors import DomainProcessors
 from ai.backend.manager.services.project.actions.bulk_get import BulkGetProjectsAction
 from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
 from ai.backend.manager.services.project.actions.delete_project import DeleteProjectAction
+from ai.backend.manager.services.project.actions.partial_bulk_delete_projects import (
+    PartialBulkDeleteProjectsAction,
+)
+from ai.backend.manager.services.project.actions.partial_bulk_restore_projects import (
+    PartialBulkRestoreProjectsAction,
+)
+from ai.backend.manager.services.project.actions.partial_bulk_update_projects import (
+    PartialBulkUpdateProjectsAction,
+)
 from ai.backend.manager.services.project.actions.purge_project import PurgeProjectAction
 from ai.backend.manager.services.project.actions.restore_project import RestoreProjectAction
 from ai.backend.manager.services.project.actions.scoped_search import (
-    DomainProjectScopeItem,
-    ProjectScopeItem,
     ScopedSearchProjectsAction,
-    UserProjectScopeItem,
 )
 from ai.backend.manager.services.project.actions.search_projects import (
     GetProjectAction,
@@ -100,7 +127,7 @@ from ai.backend.manager.services.user.processors import UserProcessors
 from ai.backend.manager.types import OptionalState, TriState
 
 _PROJECT_PAGINATION_SPEC = PaginationSpec(
-    forward_order=ProjectOrders.created_at(ascending=False),
+    forward_order=ProjectSearchableFields.own.created_at.order.apply(ascending=False),
     cursor_column=ProjectRow.id,
 )
 
@@ -126,10 +153,25 @@ class ProjectAdapter(BaseAdapter):
         self._user = user
 
     async def _resolve_domain_id(self, domain_name: str) -> DomainID:
-        result = await self._domain.lookup.run(LookupDomainAction(name=DomainName(domain_name)))
+        result = await self._domain.lookup_name.run(
+            LookupDomainAction(name=DomainName(domain_name))
+        )
         return result.entity_id()
 
     # ------------------------------------------------------------------ batch load (DataLoader)
+
+    async def batch_load_image_commit_registries(
+        self, project_ids: Sequence[ProjectID]
+    ) -> Sequence[ImageCommitRegistry | Exception | None]:
+        if not project_ids:
+            return []
+        result = await self._project.bulk_get.run(BulkGetProjectsAction(ids=list(project_ids)))
+        return [
+            item.value.container_registry
+            if item.value is not None
+            else self.batch_load_failure(item.error)
+            for item in result.items
+        ]
 
     async def batch_load_by_ids(
         self, group_ids: Sequence[ProjectID]
@@ -175,7 +217,7 @@ class ProjectAdapter(BaseAdapter):
         )
 
         result = await self._project.global_search.run(
-            GlobalSearchProjectsAction(searcher=searcher)
+            GlobalSearchProjectsAction(searcher=GlobalSearcher(used_by=(), searcher=searcher))
         )
 
         return AdminSearchGroupsPayload(
@@ -204,36 +246,129 @@ class ProjectAdapter(BaseAdapter):
         )
         return ProjectPayload(project=self._group_data_to_node(result.data))
 
-    async def admin_update(self, project_id: UUID, input: UpdateProjectInput) -> ProjectPayload:
-        """Update an existing project (superadmin only)."""
-        updater = ProjectUpdater(
-            project_id=ProjectID(project_id),
+    async def update(self, project_id: ProjectID, input: UpdateProjectInput) -> ProjectPayload:
+        """Update an existing project."""
+        result = await self._project.update_project.run(
+            UpdateProjectAction(updater=self._to_updater(project_id, input))
+        )
+        if result.data is None:
+            raise UnreachableError("modify_group must return data")
+        data = await self._apply_deprecated_is_active(result.data, input.is_active)
+        return ProjectPayload(project=self._group_data_to_node(data))
+
+    async def delete(self, project_id: ProjectID) -> DeleteProjectPayload:
+        """Soft-delete a project."""
+        result = await self._project.delete_project.run(
+            DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=project_id))
+        )
+        return DeleteProjectPayload(deleted=True, project=self._group_data_to_node(result.data))
+
+    async def restore(self, project_id: ProjectID) -> RestoreProjectPayload:
+        """Restore a soft-deleted project."""
+        result = await self._project.restore_project.run(
+            RestoreProjectAction(updater=ProjectRestoreUpdater(project_id=project_id))
+        )
+        return RestoreProjectPayload(restored=True, project=self._group_data_to_node(result.data))
+
+    async def partial_bulk_update(
+        self, input: PartialBulkUpdateProjectsInput
+    ) -> PartialBulkPayload[ProjectNode]:
+        """Update several projects, answering for each one."""
+        result = await self._project.partial_bulk_update.run(
+            PartialBulkUpdateProjectsAction(
+                updaters=[self._to_updater(ProjectID(item.id), item.input) for item in input.items]
+            )
+        )
+        requested = {ProjectID(item.id): item.input.is_active for item in input.items}
+        to_delete: list[ProjectID] = []
+        to_restore: list[ProjectID] = []
+        for item in result.items:
+            if item.value is None:
+                continue
+            project_id = item.value.entity_id()
+            match requested.get(project_id):
+                case False if item.value.is_active is not False:
+                    to_delete.append(project_id)
+                case True if item.value.is_active is not True:
+                    to_restore.append(project_id)
+        transitioned: dict[EntityIdentifier, PartialBulkEntityResult[ProjectData]] = {}
+        if to_delete:
+            deleted = await self._project.partial_bulk_delete.run(
+                PartialBulkDeleteProjectsAction(ids=to_delete)
+            )
+            transitioned.update({item.entity_id: item for item in deleted.items})
+        if to_restore:
+            restored = await self._project.partial_bulk_restore.run(
+                PartialBulkRestoreProjectsAction(ids=to_restore)
+            )
+            transitioned.update({item.entity_id: item for item in restored.items})
+        return self._to_partial_bulk_payload(
+            PartialBulkResult(
+                items=[transitioned.get(item.entity_id, item) for item in result.items]
+            )
+        )
+
+    async def partial_bulk_delete(
+        self, input: PartialBulkDeleteProjectsInput
+    ) -> PartialBulkPayload[ProjectNode]:
+        """Soft-delete several projects, answering for each one."""
+        result = await self._project.partial_bulk_delete.run(
+            PartialBulkDeleteProjectsAction(ids=[ProjectID(project_id) for project_id in input.ids])
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def partial_bulk_restore(
+        self, input: PartialBulkRestoreProjectsInput
+    ) -> PartialBulkPayload[ProjectNode]:
+        """Restore several soft-deleted projects, answering for each one."""
+        result = await self._project.partial_bulk_restore.run(
+            PartialBulkRestoreProjectsAction(
+                ids=[ProjectID(project_id) for project_id in input.ids]
+            )
+        )
+        return self._to_partial_bulk_payload(result)
+
+    async def _apply_deprecated_is_active(
+        self, data: ProjectData, is_active: bool | None | Unset
+    ) -> ProjectData:
+        """Soft-delete (``False``) or restore (``True``) the project; nothing when it is
+        already there."""
+        if not isinstance(is_active, bool) or data.is_active is is_active:
+            return data
+        if is_active:
+            restored = await self._project.restore_project.run(
+                RestoreProjectAction(updater=ProjectRestoreUpdater(project_id=data.entity_id()))
+            )
+            return restored.data
+        deleted = await self._project.delete_project.run(
+            DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=data.entity_id()))
+        )
+        return deleted.data
+
+    def _to_updater(self, project_id: ProjectID, input: UpdateProjectInput) -> ProjectUpdater:
+        return ProjectUpdater(
+            project_id=project_id,
             name=OptionalState.from_unset(input.name),
             description=TriState.from_unset(input.description),
-            is_active=OptionalState.from_unset(input.is_active),
             integration_name=TriState.from_unset(input.integration_name),
             resource_policy=OptionalState.from_unset(input.resource_policy),
         )
-        result = await self._project.update_project.run(UpdateProjectAction(updater=updater))
-        if result.data is None:
-            raise UnreachableError("modify_group must return data")
-        return ProjectPayload(project=self._group_data_to_node(result.data))
 
-    async def admin_delete(self, input: DeleteProjectInput) -> DeleteProjectPayload:
-        """Soft-delete a project (superadmin only)."""
-        project_id = ProjectID(input.group_id)
-        await self._project.delete_project.run(
-            DeleteProjectAction(updater=ProjectSoftDeleteUpdater(project_id=project_id))
+    def _to_partial_bulk_payload(
+        self, result: PartialBulkResult[ProjectData]
+    ) -> PartialBulkPayload[ProjectNode]:
+        return PartialBulkPayload[ProjectNode](
+            successes=[
+                self._group_data_to_node(item.value)
+                for item in result.items
+                if item.value is not None
+            ],
+            failed=[
+                PartialBulkFailure(id=item.entity_id, message=str(item.error))
+                for item in result.items
+                if item.error is not None
+            ],
         )
-        return DeleteProjectPayload(deleted=True)
-
-    async def admin_restore(self, input: RestoreProjectInput) -> RestoreProjectPayload:
-        """Restore a soft-deleted project (superadmin only)."""
-        project_id = ProjectID(input.group_id)
-        await self._project.restore_project.run(
-            RestoreProjectAction(updater=ProjectRestoreUpdater(project_id=project_id))
-        )
-        return RestoreProjectPayload(restored=True)
 
     async def admin_purge(self, input: PurgeProjectInput) -> PurgeProjectPayload:
         """Permanently purge a project (superadmin only)."""
@@ -283,7 +418,11 @@ class ProjectAdapter(BaseAdapter):
 
         result = await self._project.scoped_search.run(
             ScopedSearchProjectsAction(
-                items=[DomainProjectScopeItem(domain_id=domain_id)], searcher=searcher
+                searcher=ScopedSearcher(
+                    scopes=[DomainProjectTarget(domain_id=domain_id)],
+                    used_by=(),
+                    searcher=searcher,
+                )
             )
         )
 
@@ -294,15 +433,13 @@ class ProjectAdapter(BaseAdapter):
             has_previous_page=result.has_previous_page,
         )
 
-    def _scope_items(self, scope: ProjectScope) -> list[ProjectScopeItem]:
-        """The scope items the request named, in the order the input lists them."""
-        items: list[ProjectScopeItem] = [
-            DomainProjectScopeItem(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
+    def _scope_targets(self, scope: ProjectScope) -> list[ProjectTarget]:
+        """The scope targets the request named, in the order the input lists them."""
+        targets: list[ProjectTarget] = [
+            DomainProjectTarget(domain_id=DomainID(entry.value)) for entry in scope.domain or ()
         ]
-        items.extend(
-            UserProjectScopeItem(user_id=UserID(entry.value)) for entry in scope.user or ()
-        )
-        return items
+        targets.extend(UserProjectTarget(user_id=UserID(entry.value)) for entry in scope.user or ())
+        return targets
 
     async def scoped_search(
         self,
@@ -324,7 +461,11 @@ class ProjectAdapter(BaseAdapter):
             offset=input.offset,
         )
         result = await self._project.scoped_search.run(
-            ScopedSearchProjectsAction(items=self._scope_items(input.scope), searcher=searcher)
+            ScopedSearchProjectsAction(
+                searcher=ScopedSearcher(
+                    scopes=self._scope_targets(input.scope), used_by=(), searcher=searcher
+                )
+            )
         )
         return AdminSearchGroupsPayload(
             items=[self._group_data_to_node(item) for item in result.items],
@@ -356,7 +497,9 @@ class ProjectAdapter(BaseAdapter):
 
         result = await self._project.scoped_search.run(
             ScopedSearchProjectsAction(
-                items=[UserProjectScopeItem(user_id=user_id)], searcher=searcher
+                searcher=ScopedSearcher(
+                    scopes=[UserProjectTarget(user_id=user_id)], used_by=(), searcher=searcher
+                )
             )
         )
 
@@ -395,46 +538,21 @@ class ProjectAdapter(BaseAdapter):
         return [UserAdapter._user_data_to_node(user, keys.get(UserID(user.id))) for user in users]
 
     def _convert_group_filter(self, filter: ProjectFilter) -> list[QueryCondition]:
-        conditions: list[QueryCondition] = []
-
-        if filter.id is not None:
-            condition = self._convert_id_filter(filter.id)
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.name is not None:
-            condition = self._convert_name_filter(filter.name)
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.domain_name is not None:
-            condition = self._convert_domain_name_filter(filter.domain_name)
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.type is not None:
-            conditions.extend(self._convert_type_filter(filter.type))
-
-        if filter.is_active is not None:
-            conditions.append(ProjectConditions.by_is_active(filter.is_active))
-
-        if filter.created_at is not None:
-            condition = self._convert_created_at_filter(filter.created_at)
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.modified_at is not None:
-            condition = self._convert_modified_at_filter(filter.modified_at)
-            if condition is not None:
-                conditions.append(condition)
-
-        if filter.domain is not None:
-            conditions.extend(
-                self._convert_domain_nested_filter(filter.domain.name, filter.domain.is_active)
-            )
-
-        if filter.user is not None:
-            conditions.extend(self._convert_user_nested_filter(filter.user))
+        fields = ProjectSearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(filter.id, fields.id.filter),
+            *self.apply_uuid_filter(filter.entity_id, fields.id.filter),
+            *self.apply_string_filter(filter.name, fields.name.filter),
+            *self.apply_string_filter(filter.domain_name, fields.domain_name.filter),
+            *self.apply_string_filter(filter.description, fields.description.filter),
+            *self.apply_string_filter(filter.integration_name, fields.integration_name.filter),
+            *self._convert_type_filter(filter.type),
+            *self.apply_bool_filter(filter.is_active, fields.is_active.filter),
+            *self.apply_datetime_filter(filter.created_at, fields.created_at.filter),
+            *self.apply_datetime_filter(filter.modified_at, fields.modified_at.filter),
+            *self._convert_domain_nested_filter(filter.domain),
+            *self._convert_user_nested_filter(filter.user),
+        ]
 
         if filter.AND:
             for sub_filter in filter.AND:
@@ -443,150 +561,114 @@ class ProjectAdapter(BaseAdapter):
         if filter.OR:
             or_sub_conditions: list[QueryCondition] = []
             for sub_filter in filter.OR:
-                or_sub_conditions.extend(self._convert_group_filter(sub_filter))
+                sub_conditions = self._convert_group_filter(sub_filter)
+                if sub_conditions:
+                    or_sub_conditions.append(combine_conditions_and(sub_conditions))
             if or_sub_conditions:
                 conditions.append(combine_conditions_or(or_sub_conditions))
 
         if filter.NOT:
-            not_sub_conditions: list[QueryCondition] = []
             for sub_filter in filter.NOT:
-                not_sub_conditions.extend(self._convert_group_filter(sub_filter))
-            if not_sub_conditions:
-                conditions.append(negate_conditions(not_sub_conditions))
+                sub_conditions = self._convert_group_filter(sub_filter)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
 
         return conditions
 
-    def _convert_id_filter(self, uuid_filter: UUIDFilter) -> QueryCondition | None:
-        return self.convert_uuid_filter(
-            uuid_filter,
-            equals_factory=ProjectConditions.by_id_equals,
-            in_factory=ProjectConditions.by_id_in,
-        )
-
-    def _convert_name_filter(self, sf: StringFilter) -> QueryCondition | None:
-        return self.convert_string_filter(
-            sf,
-            contains_factory=ProjectConditions.by_name_contains,
-            equals_factory=ProjectConditions.by_name_equals,
-            starts_with_factory=ProjectConditions.by_name_starts_with,
-            ends_with_factory=ProjectConditions.by_name_ends_with,
-            in_factory=ProjectConditions.by_name_in,
-        )
-
-    def _convert_domain_name_filter(self, sf: StringFilter) -> QueryCondition | None:
-        return self.convert_string_filter(
-            sf,
-            contains_factory=ProjectConditions.by_domain_name_contains,
-            equals_factory=ProjectConditions.by_domain_name_equals,
-            starts_with_factory=ProjectConditions.by_domain_name_starts_with,
-            ends_with_factory=ProjectConditions.by_domain_name_ends_with,
-            in_factory=ProjectConditions.by_domain_name_in,
-        )
-
-    @staticmethod
-    def _convert_type_filter(type_filter: ProjectTypeFilter) -> list[QueryCondition]:
+    def _convert_type_filter(self, type_filter: ProjectTypeFilter | None) -> list[QueryCondition]:
+        if type_filter is None:
+            return []
         conditions: list[QueryCondition] = []
+        type_conditions = ProjectSearchableFields.own.type.filter
         if type_filter.equals is not None:
-            conditions.append(
-                ProjectConditions.by_type_equals(DataProjectType(type_filter.equals.value))
-            )
+            conditions.append(type_conditions.equals(DataProjectType(type_filter.equals.value)))
         if type_filter.in_ is not None:
             conditions.append(
-                ProjectConditions.by_type_in([DataProjectType(t.value) for t in type_filter.in_])
+                type_conditions.in_([DataProjectType(t.value) for t in type_filter.in_])
             )
         if type_filter.not_equals is not None:
             conditions.append(
-                negate_conditions([
-                    ProjectConditions.by_type_equals(DataProjectType(type_filter.not_equals.value))
-                ])
+                type_conditions.not_equals(DataProjectType(type_filter.not_equals.value))
             )
         if type_filter.not_in is not None:
             conditions.append(
-                negate_conditions([
-                    ProjectConditions.by_type_in([
-                        DataProjectType(t.value) for t in type_filter.not_in
-                    ])
-                ])
+                type_conditions.not_in([DataProjectType(t.value) for t in type_filter.not_in])
             )
         return conditions
 
-    @staticmethod
-    def _convert_created_at_filter(dt_filter: DateTimeFilter) -> QueryCondition | None:
-        return dt_filter.build_query_condition(
-            before_factory=ProjectConditions.by_created_at_before,
-            after_factory=ProjectConditions.by_created_at_after,
-            equals_factory=ProjectConditions.by_created_at_equals,
-        )
-
-    @staticmethod
-    def _convert_modified_at_filter(dt_filter: DateTimeFilter) -> QueryCondition | None:
-        return dt_filter.build_query_condition(
-            before_factory=ProjectConditions.by_modified_at_before,
-            after_factory=ProjectConditions.by_modified_at_after,
-            equals_factory=ProjectConditions.by_modified_at_equals,
-        )
-
-    @staticmethod
     def _convert_domain_nested_filter(
-        name_filter: StringFilter | None,
-        is_active: bool | None,
+        self, domain_filter: ProjectDomainFilter | None
     ) -> list[QueryCondition]:
-        raw_conditions: list[QueryCondition] = []
-        if name_filter is not None:
-            condition = name_filter.build_query_condition(
-                contains_factory=DomainConditions.by_name_contains,
-                equals_factory=DomainConditions.by_name_equals,
-                starts_with_factory=DomainConditions.by_name_starts_with,
-                ends_with_factory=DomainConditions.by_name_ends_with,
-                in_factory=DomainConditions.by_name_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if is_active is not None:
-            raw_conditions.append(DomainConditions.by_is_active(is_active))
+        """The domain conditions, gathered into one EXISTS on the holding domain row."""
+        if domain_filter is None:
+            return []
+        fields = DomainSearchableFields.own
+        raw_conditions = [
+            *self.apply_string_filter(domain_filter.name, fields.name.filter),
+            *self.apply_bool_filter(domain_filter.is_active, fields.is_active.filter),
+        ]
         if not raw_conditions:
             return []
-        return [ProjectConditions.exists_domain_combined(raw_conditions)]
+        return [DeprecatedProjectConditions.exists_domain_combined(raw_conditions)]
 
-    @staticmethod
-    def _convert_user_nested_filter(user_filter: ProjectUserFilter) -> list[QueryCondition]:
-        raw_conditions: list[QueryCondition] = []
-        if user_filter.id is not None:
-            condition = user_filter.id.build_query_condition(
-                equals_factory=ProjectConditions.by_user_id_equals,
-                in_factory=ProjectConditions.by_user_id_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if user_filter.username is not None:
-            condition = user_filter.username.build_query_condition(
-                contains_factory=ProjectConditions.by_user_username_contains,
-                equals_factory=ProjectConditions.by_user_username_equals,
-                starts_with_factory=ProjectConditions.by_user_username_starts_with,
-                ends_with_factory=ProjectConditions.by_user_username_ends_with,
-                in_factory=ProjectConditions.by_user_username_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if user_filter.email is not None:
-            condition = user_filter.email.build_query_condition(
-                contains_factory=ProjectConditions.by_user_email_contains,
-                equals_factory=ProjectConditions.by_user_email_equals,
-                starts_with_factory=ProjectConditions.by_user_email_starts_with,
-                ends_with_factory=ProjectConditions.by_user_email_ends_with,
-                in_factory=ProjectConditions.by_user_email_in,
-            )
-            if condition is not None:
-                raw_conditions.append(condition)
-        if user_filter.is_active is not None:
-            raw_conditions.append(ProjectConditions.by_user_is_active(user_filter.is_active))
-        if not raw_conditions:
+    def _convert_user_nested_filter(
+        self, user_filter: ProjectUserFilter | None
+    ) -> list[QueryCondition]:
+        """Deprecated. Every condition lands in one EXISTS over one enrolled member."""
+        if user_filter is None:
             return []
-        return [ProjectConditions.exists_user_combined(raw_conditions)]
+        fields = UserSearchableFields.own
+        conditions = [
+            *self.apply_uuid_filter(user_filter.id, fields.uuid.filter),
+            *self.apply_string_filter(user_filter.username, fields.username.filter),
+            *self.apply_string_filter(user_filter.email, fields.email.filter),
+            *self._convert_member_active_filter(user_filter.is_active),
+        ]
+        if not conditions:
+            return []
+        return [DeprecatedProjectConditions.exists_user_combined(conditions)]
 
-    @staticmethod
-    def _convert_orders(order: list[ProjectOrder]) -> list[QueryOrder]:
-        return [_resolve_order(o.field, o.direction) for o in order]
+    def _convert_member_active_filter(self, is_active: bool | None) -> list[QueryCondition]:
+        """Active means the member's account status is ACTIVE."""
+        if is_active is None:
+            return []
+        status = UserSearchableFields.own.status.filter
+        if is_active:
+            return [status.equals(UserStatus.ACTIVE)]
+        return [status.not_equals(UserStatus.ACTIVE)]
+
+    def _convert_orders(self, order: list[ProjectOrder]) -> list[QueryOrder]:
+        return [self._convert_order(o) for o in order]
+
+    def _convert_order(self, order: ProjectOrder) -> QueryOrder:
+        """The query order one requested order field names."""
+        fields = ProjectSearchableFields.own
+        ascending = order.direction == OrderDirection.ASC
+        match order.field:
+            case ProjectOrderField.NAME:
+                return fields.name.order.apply(ascending)
+            case ProjectOrderField.CREATED_AT:
+                return fields.created_at.order.apply(ascending)
+            case ProjectOrderField.MODIFIED_AT:
+                return fields.modified_at.order.apply(ascending)
+            case ProjectOrderField.IS_ACTIVE:
+                return fields.is_active.order.apply(ascending)
+            case ProjectOrderField.TYPE:
+                return fields.type.order.apply(ascending)
+            case ProjectOrderField.DOMAIN_NAME:
+                return fields.domain_name.order.apply(ascending)
+            case ProjectOrderField.ID:
+                return fields.id.order.apply(ascending)
+            case ProjectOrderField.DESCRIPTION:
+                return fields.description.order.apply(ascending)
+            case ProjectOrderField.INTEGRATION_NAME:
+                return fields.integration_name.order.apply(ascending)
+            case ProjectOrderField.USER_USERNAME:
+                return DeprecatedProjectOrders.by_user_username(ascending)
+            case ProjectOrderField.USER_EMAIL:
+                return DeprecatedProjectOrders.by_user_email(ascending)
+            case _:
+                assert_never(order.field)
 
     @staticmethod
     def _group_data_to_node(data: ProjectData) -> ProjectNode:
@@ -621,25 +703,3 @@ class ProjectAdapter(BaseAdapter):
                 modified_at=data.modified_at,
             ),
         )
-
-
-def _resolve_order(field: ProjectOrderField, direction: OrderDirection) -> QueryOrder:
-    """Resolve a ProjectOrderField + OrderDirection pair to a QueryOrder."""
-    ascending = direction == OrderDirection.ASC
-    match field:
-        case ProjectOrderField.NAME:
-            return ProjectOrders.name(ascending)
-        case ProjectOrderField.CREATED_AT:
-            return ProjectOrders.created_at(ascending)
-        case ProjectOrderField.MODIFIED_AT:
-            return ProjectOrders.modified_at(ascending)
-        case ProjectOrderField.IS_ACTIVE:
-            return ProjectOrders.is_active(ascending)
-        case ProjectOrderField.TYPE:
-            return ProjectOrders.type(ascending)
-        case ProjectOrderField.DOMAIN_NAME:
-            return ProjectOrders.by_domain_name(ascending)
-        case ProjectOrderField.USER_USERNAME:
-            return ProjectOrders.by_user_username(ascending)
-        case ProjectOrderField.USER_EMAIL:
-            return ProjectOrders.by_user_email(ascending)

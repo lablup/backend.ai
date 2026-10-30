@@ -8,12 +8,12 @@ from pathlib import Path
 import click
 
 from ai.backend.common.dependencies.stacks.visualizing import VisualizingDependencyStack
-from ai.backend.logging import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 from ai.backend.web.dependencies.composer import DependencyInput, WebDependencyComposer
 
 from .context import CLIContext
 
-log = BraceStyleAdapter(logging.getLogger(__name__))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 
 @click.group()

@@ -9,6 +9,9 @@ from typing import override
 from ai.backend.common.data.entity.artifact_registry import ArtifactRegistryID
 from ai.backend.manager.data.reservoir_registry.types import ReservoirRegistryData
 from ai.backend.manager.models.reservoir_registry.row import ReservoirRegistryRow
+from ai.backend.manager.models.reservoir_registry.searchable_fields import (
+    ReservoirRegistrySearchableFields,
+)
 from ai.backend.manager.models.specs.created_in import CreatedInGlobal
 from ai.backend.manager.models.specs.creator import EntityCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
@@ -49,4 +52,4 @@ class ReservoirRegistryCreator(
 
     @override
     def to_data(self, row: ReservoirRegistryRow) -> ReservoirRegistryData:
-        return row.to_dataclass()
+        return ReservoirRegistrySearchableFields.own.to_data(row)

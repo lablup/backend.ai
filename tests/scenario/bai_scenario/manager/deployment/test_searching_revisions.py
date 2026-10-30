@@ -40,13 +40,13 @@ from bai_scenario.components.deployment_revision import (
     RevisionsInTwoProjects,
 )
 from bai_scenario.runner.acting import ActingAs
-from bai_scenario.runner.planting import SeedingSession
+from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Searched = AdminSearchRevisionsPayload
 type Slots = SearchAllocatedResourceSlotsPayload
-type SearchingStep = Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
-type SlotStep = Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
+type SearchingStep = Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+type SlotStep = Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
 
 
 @dataclass(frozen=True)
@@ -119,7 +119,7 @@ class SearchingTheSlots(When[RevisionsAndACaller, DeploymentAdapter, Slots]):
 
 @dataclass(frozen=True)
 class TheGrantedUserCountsTheDeploymentsRevisions(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -133,7 +133,7 @@ class TheGrantedUserCountsTheDeploymentsRevisions(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=3)
 
     @override
@@ -147,7 +147,7 @@ class TheGrantedUserCountsTheDeploymentsRevisions(
 
 @dataclass(frozen=True)
 class FilteringByNumberLeavesThatOne(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -158,7 +158,7 @@ class FilteringByNumberLeavesThatOne(
         return "리비전 셋이 딸린 배포의 리비전을 번호로 걸러 훑으면, 그 번호의 것만 남는다"
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=3)
 
     @override
@@ -172,7 +172,7 @@ class FilteringByNumberLeavesThatOne(
 
 @dataclass(frozen=True)
 class AnotherDeploymentsRevisionsStayOut(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -186,7 +186,7 @@ class AnotherDeploymentsRevisionsStayOut(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return RevisionsInTwoProjects(granted=(Permission.READ,), named=2, elsewhere=1)
 
     @override
@@ -200,7 +200,7 @@ class AnotherDeploymentsRevisionsStayOut(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearchIt(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -211,7 +211,7 @@ class AUserGrantedNothingMayNotSearchIt(
         return "아무 배포 권한도 받지 않은 사용자가 배포의 리비전을 훑으면, 권한 부족으로 거부된다"
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(revisions=1)
 
     @override
@@ -225,7 +225,7 @@ class AUserGrantedNothingMayNotSearchIt(
 
 @dataclass(frozen=True)
 class TheSuperadminCountsEveryRevision(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -239,7 +239,7 @@ class TheSuperadminCountsEveryRevision(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return RevisionsInTwoProjects(role=UserRole.SUPERADMIN, named=2, elsewhere=1)
 
     @override
@@ -253,7 +253,7 @@ class TheSuperadminCountsEveryRevision(
 
 @dataclass(frozen=True)
 class AReadGrantDoesNotOpenTheGlobalDoor(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Searched]
 ):
     @override
     def summary(self) -> str:
@@ -267,7 +267,7 @@ class AReadGrantDoesNotOpenTheGlobalDoor(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=1)
 
     @override
@@ -281,7 +281,7 @@ class AReadGrantDoesNotOpenTheGlobalDoor(
 
 @dataclass(frozen=True)
 class TheGrantedUserCountsARevisionsSlots(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
 ):
     @override
     def summary(self) -> str:
@@ -295,7 +295,7 @@ class TheGrantedUserCountsARevisionsSlots(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(granted=(Permission.READ,), revisions=1)
 
     @override
@@ -309,7 +309,7 @@ class TheGrantedUserCountsARevisionsSlots(
 
 @dataclass(frozen=True)
 class AUserGrantedNothingMayNotSearchTheSlots(
-    Scenario[SeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
+    Scenario[TestSeedingSession, RevisionsAndACaller, DeploymentAdapter, Slots]
 ):
     @override
     def summary(self) -> str:
@@ -323,7 +323,7 @@ class AUserGrantedNothingMayNotSearchTheSlots(
         )
 
     @override
-    def given(self) -> Given[SeedingSession, RevisionsAndACaller]:
+    def given(self) -> Given[TestSeedingSession, RevisionsAndACaller]:
         return ADeploymentToRevise(revisions=1)
 
     @override

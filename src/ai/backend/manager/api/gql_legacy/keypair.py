@@ -16,11 +16,11 @@ from ai.backend.common.defs import REDIS_RATE_LIMIT_DB, RedisRole
 from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.keypair.types import KeyPairCreator, KeyPairData
-from ai.backend.manager.models.keypair import (
+from ai.backend.manager.models.keypair.row import (
+    KEYPAIR_SECRET_KEY_CONTEXT,
     KeyPairRow,
     keypairs,
 )
-from ai.backend.manager.models.keypair.row import KEYPAIR_SECRET_KEY_CONTEXT
 
 from .session import ComputeSession
 
@@ -40,11 +40,10 @@ __all__ = (
 )
 
 from ai.backend.common.data.entity.user import UserID
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
-from ai.backend.manager.models.user import UserRole
+from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.utils import agg_to_array
 from ai.backend.manager.services.user.actions.keypair_ops import AdminCreateKeypairAction
 from ai.backend.manager.services.user.actions.lookup import LookupUserAction
@@ -108,7 +107,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     is_active = graphene.Boolean()
     is_admin = graphene.Boolean()
     is_default = graphene.Boolean(
-        description=f"Added in {NEXT_RELEASE_VERSION}. Whether this is the owner's default keypair."
+        description="Added in 26.9.0. Whether this is the owner's default keypair."
     )
     resource_policy = graphene.String()
     created_at = GQLDateTime()
@@ -204,6 +203,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             valkey_target=valkey_target,
             db_id=REDIS_RATE_LIMIT_DB,
             human_readable_name="ratelimit",
+            sentinel_monitor=ctx.sentinel_monitors.monitor_for(valkey_target),
         )
         try:
             rlim_window = await valkey_client.get_user_rlim_window(UserID(self.user))
@@ -229,14 +229,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
 
     async def resolve_concurrency_used(self, info: graphene.ResolveInfo) -> int:
         ctx: GraphQueryContext = info.context
-
-        # Get repository from context
-        repository = ctx.scheduler_repository
-
-        # Get concurrency through repository (cache-through pattern)
-        # Convert graphene.String to str, then to AccessKey type
-        access_key = AccessKey(str(self.access_key))
-        return await repository.get_keypair_concurrency(access_key, is_sftp=False)
+        return await ctx.scheduler_repository.get_user_concurrency(UserID(self.user))
 
     async def resolve_last_used(self, info: graphene.ResolveInfo) -> datetime | None:
         ctx: GraphQueryContext = info.context
@@ -261,7 +254,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
             users,
             keypairs.c.user == users.c.uuid,
         )
-        query = sa.select(keypairs).select_from(j)
+        query = sa.select(keypairs, users.c.email, users.c.full_name).select_from(j)
         if domain_name is not None:
             query = query.where(users.c.domain_name == domain_name)
         if is_active is not None:
@@ -401,7 +394,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
     async def batch_load_by_email(
         cls,
         graph_ctx: GraphQueryContext,
-        user_ids: Sequence[uuid.UUID],
+        emails: Sequence[str],
         *,
         domain_name: str | None = None,
         is_active: bool | None = None,
@@ -425,7 +418,7 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
                 agg_to_array(groups.c.name).label("groups_name"),
             )
             .select_from(j)
-            .where(keypairs.c.user.in_(user_ids))
+            .where(users.c.email.in_(emails))
             .group_by(*keypairs.c, users.c.email, users.c.full_name)
         )
         if domain_name is not None:
@@ -438,8 +431,8 @@ class KeyPair(graphene.ObjectType):  # type: ignore[misc]
                 conn,
                 query,
                 cls,
-                user_ids,
-                lambda row: row.user,
+                emails,
+                lambda row: row.email,
             )
 
     @classmethod

@@ -15,21 +15,28 @@ from ai.backend.manager.actions.registry.types import (
     ProcessorDependencies,
 )
 from ai.backend.manager.actions.v2.validators import ActionValidators
+from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.repository import OpsRepository
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
+from ai.backend.testutils.action_validators import build_global_gate
 
 
-def ops_processor_group(db: ExtendedAsyncSAEngine, meta: GroupMeta) -> ProcessorGroup[Any]:
-    """A processor group backed by the given engine, with no extra monitors or validators.
+def ops_processor_group(
+    db: ExtendedAsyncSAEngine,
+    meta: GroupMeta,
+    config_provider: ManagerConfigProvider,
+) -> ProcessorGroup[Any]:
+    """A processor group backed by the given engine, with no extra monitors.
 
-    The gates a processor imposes on itself still apply — the global processor prepends
-    its SUPERADMIN check regardless of what this bundle carries.
+    Callers run global actions through these groups, so the global gate is the
+    production one over the same engine: a super admin passes without a read, and
+    everyone else is answered by that database's graph.
     """
     return ProcessorRegistry(
         ProcessorDependencies(
             monitors=ActionMonitors(),
-            validators=ActionValidators(),
+            validators=ActionValidators(global_scope=[build_global_gate(db, config_provider)]),
             repository=OpsRepository(V2DBOpsProvider(db)),
         )
     ).group(meta)

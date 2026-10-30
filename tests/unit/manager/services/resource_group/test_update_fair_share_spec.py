@@ -31,7 +31,7 @@ from ai.backend.manager.data.resource_group.types import (
 from ai.backend.manager.data.session.options import DefaultSessionOptions
 from ai.backend.manager.errors.fair_share import InvalidResourceWeightError
 from ai.backend.manager.errors.resource import ResourceGroupNotFound
-from ai.backend.manager.repositories.resource_group import ResourceGroupRepository
+from ai.backend.manager.repositories.resource_group.repository import ResourceGroupRepository
 from ai.backend.manager.services.resource_group.actions.update_fair_share_spec import (
     ResourceWeightInput,
     UpdateFairShareSpecAction,

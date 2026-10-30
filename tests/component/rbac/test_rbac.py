@@ -9,6 +9,8 @@ import pytest
 
 from ai.backend.client.v2.exceptions import NotFoundError, PermissionDeniedError
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dto.manager.query import StringFilter
 from ai.backend.common.dto.manager.rbac.request import (
     AssignRoleRequest,
@@ -18,7 +20,6 @@ from ai.backend.common.dto.manager.rbac.request import (
     RoleFilter,
     RoleOrder,
     SearchRolesRequest,
-    SearchScopesRequest,
     SearchUsersAssignedToRoleRequest,
     UpdateRoleRequest,
 )
@@ -31,7 +32,6 @@ from ai.backend.common.dto.manager.rbac.response import (
     GetScopeTypesResponse,
     RevokeRoleResponse,
     SearchRolesResponse,
-    SearchScopesResponse,
     SearchUsersAssignedToRoleResponse,
     UpdateRoleResponse,
 )
@@ -387,8 +387,8 @@ class TestRoleAssignment:
     ) -> None:
         result = await admin_registry.rbac.assign_role(
             AssignRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
         assert isinstance(result, AssignRoleResponse)
@@ -398,8 +398,8 @@ class TestRoleAssignment:
         # Clean up: revoke the assignment
         await admin_registry.rbac.revoke_role(
             RevokeRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
 
@@ -412,15 +412,15 @@ class TestRoleAssignment:
         # Assign first
         await admin_registry.rbac.assign_role(
             AssignRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
         # Revoke
         revoke_result = await admin_registry.rbac.revoke_role(
             RevokeRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
         assert isinstance(revoke_result, RevokeRoleResponse)
@@ -436,8 +436,8 @@ class TestRoleAssignment:
         # Assign role
         await admin_registry.rbac.assign_role(
             AssignRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
         # Search assigned users
@@ -452,8 +452,8 @@ class TestRoleAssignment:
         # Clean up
         await admin_registry.rbac.revoke_role(
             RevokeRoleRequest(
-                user_id=admin_user_fixture.user_uuid,
-                role_id=target_role.role.id,
+                user_id=UserID(admin_user_fixture.user_uuid),
+                role_id=RoleID(target_role.role.id),
             )
         )
 
@@ -466,37 +466,6 @@ class TestScopeManagement:
         result = await admin_registry.rbac.get_scope_types()
         assert isinstance(result, GetScopeTypesResponse)
         assert len(result.items) > 0
-
-    async def test_admin_searches_scopes(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        result = await admin_registry.rbac.search_scopes("domain", SearchScopesRequest())
-        assert isinstance(result, SearchScopesResponse)
-        assert result.pagination.total >= 1
-        assert len(result.items) >= 1
-
-    async def test_search_scopes_with_pagination(
-        self,
-        admin_registry: BackendAIClientRegistry,
-    ) -> None:
-        """Search scopes with pagination returns correct page."""
-        result = await admin_registry.rbac.search_scopes(
-            "domain",
-            SearchScopesRequest(limit=1, offset=0),
-        )
-
-        assert isinstance(result, SearchScopesResponse)
-        assert result.pagination.limit == 1
-        assert len(result.items) <= 1
-
-    async def test_regular_user_cannot_search_scopes(
-        self,
-        user_registry: BackendAIClientRegistry,
-    ) -> None:
-        """Regular user cannot search scopes (admin-only operation)."""
-        with pytest.raises(PermissionDeniedError):
-            await user_registry.rbac.search_scopes("domain", SearchScopesRequest())
 
 
 class TestEntityManagement:

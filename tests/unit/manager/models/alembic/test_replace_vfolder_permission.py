@@ -15,6 +15,7 @@ import sqlalchemy as sa
 from sqlalchemy import Table
 from sqlalchemy.dialects import postgresql
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.types import (
     QuotaScopeID,
@@ -22,7 +23,6 @@ from ai.backend.common.types import (
     VFolderHostPermissionMap,
     VFolderMountPolicy,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.vfolder.types import (
     VFolderOperationStatus,
     VFolderOwnershipType,
@@ -32,16 +32,15 @@ from ai.backend.manager.models.alembic.versions.d4a7c2e9f018_replace_vfolder_per
     RESTORE_PERMISSION,
 )
 from ai.backend.manager.models.base import GUID
-from ai.backend.manager.models.domain import DomainRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
-from ai.backend.manager.models.keypair import KeyPairRow
-from ai.backend.manager.models.project import ProjectRow, ProjectType
-from ai.backend.manager.models.resource_policy import (
+from ai.backend.manager.models.domain.row import DomainRow
+from ai.backend.manager.models.keypair.row import KeyPairRow
+from ai.backend.manager.models.project.row import ProjectRow, ProjectType
+from ai.backend.manager.models.resource_policy.row import (
     KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
-from ai.backend.manager.models.user import UserRole, UserRow, UserStatus
+from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
 from ai.backend.testutils.db import HasTable, with_tables

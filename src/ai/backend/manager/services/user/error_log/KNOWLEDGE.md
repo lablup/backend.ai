@@ -3,7 +3,7 @@ name: error-log-service-shapes
 type: decision-table
 description: error log knowledge: why recording is user-scoped rather than global, why clearing is a soft delete addressed by id
 scope: src/ai/backend/manager/services/user/error_log
-keywords: [CreateErrorLogAction, DeleteErrorLogAction, SearchErrorLogsAction, AdminSearchErrorLogsAction, ErrorLogSoftDeleteUpdater, UserErrorLogOperationScope, entity_create_ops, scope_search_ops, single_delete_ops, is_cleared]
+keywords: [CreateErrorLogAction, DeleteErrorLogAction, SearchErrorLogsAction, AdminSearchErrorLogsAction, ErrorLogSoftDeleteUpdater, UserErrorLogTarget, entity_create_ops, scope_search_ops, single_delete_ops, is_cleared]
 sources:
   - src/ai/backend/manager/services/user/error_log
   - src/ai/backend/manager/models/error_log

@@ -12,6 +12,9 @@ from ai.backend.common.data.entity.service_catalog import (
 )
 from ai.backend.manager.data.service_catalog.types import ServiceCatalogEndpointData
 from ai.backend.manager.models.service_catalog.row import ServiceCatalogEndpointRow
+from ai.backend.manager.models.service_catalog.searchable_fields import (
+    ServiceCatalogEndpointSearchableFields,
+)
 from ai.backend.manager.models.specs.creator import FieldCreator
 from ai.backend.manager.models.specs.types import IntegrityErrorCheck
 
@@ -51,13 +54,4 @@ class ServiceCatalogEndpointCreator(
 
     @override
     def to_data(self, row: ServiceCatalogEndpointRow) -> ServiceCatalogEndpointData:
-        return ServiceCatalogEndpointData(
-            id=row.id,
-            service_id=row.service_id,
-            role=row.role,
-            scope=row.scope,
-            address=row.address,
-            port=row.port,
-            protocol=row.protocol,
-            metadata=row.metadata_,
-        )
+        return ServiceCatalogEndpointSearchableFields.own.to_data(row)

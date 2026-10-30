@@ -13,9 +13,10 @@ group — this rule flattens that list, assigning:
   * ``local_rank``     — 0-based across the whole session
 
 The group's ``execution_spec`` (a :class:`KernelExecutionSpecDraft`
-with possibly-unset fields) is copied onto each replica unchanged; an
-earlier rule is expected to have filled RG-default fields on the
-group's execution_spec before expansion runs.
+with possibly-unset fields) and ``preopen_ports`` are copied onto each
+replica unchanged; earlier rules are expected to have filled the RG
+defaults, the session environ overlay and the resolved mounts on the
+group before expansion runs.
 """
 
 from __future__ import annotations
@@ -56,9 +57,11 @@ class ExpandKernelGroupsRule(ResourceSpecDraftRule):
         if groups is None:
             return draft
 
+        resolved_mounts = context.user.vfolder_mounts_by_role
         expanded: list[KernelSpecDraft] = []
         local_rank = 0
         for group in groups:
+            group_mounts = resolved_mounts.get(group.role, ())
             for replica_idx in range(group.replica_count):
                 cluster_idx = replica_idx + 1  # 1-based within role
                 expanded.append(
@@ -68,6 +71,7 @@ class ExpandKernelGroupsRule(ResourceSpecDraftRule):
                         cluster_hostname=f"{group.role}{cluster_idx}",
                         local_rank=local_rank,
                         preopen_ports=group.preopen_ports,
+                        vfolder_mounts=group_mounts,
                         execution_spec=group.execution_spec,
                     )
                 )

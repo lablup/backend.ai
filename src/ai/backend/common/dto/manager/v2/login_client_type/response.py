@@ -8,13 +8,13 @@ from uuid import UUID
 from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
-from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
     "SearchLoginClientTypesPayload",
     "CreateLoginClientTypePayload",
     "DeleteLoginClientTypePayload",
     "LoginClientTypeNode",
+    "PurgeLoginClientTypePayload",
     "UpdateLoginClientTypePayload",
 )
 
@@ -24,7 +24,7 @@ class LoginClientTypeNode(BaseResponseModel):
 
     id: UUID = Field(description="Login client type UUID.")
     entity_id: UUID = Field(
-        description=f"UUID of the login client type. Added in {NEXT_RELEASE_VERSION}.",
+        description="UUID of the login client type. Added in 26.9.0.",
     )
     name: str = Field(description="Unique login client type name.")
     description: str | None = Field(description="Optional description.")
@@ -48,6 +48,14 @@ class DeleteLoginClientTypePayload(BaseResponseModel):
     """Payload for login client type deletion."""
 
     id: UUID = Field(description="UUID of the deleted login client type.")
+    entity_id: UUID = Field(description="UUID of the deleted login client type. Added in 26.10.0.")
+
+
+class PurgeLoginClientTypePayload(BaseResponseModel):
+    """Payload for login client type purge."""
+
+    id: UUID = Field(description="UUID of the purged login client type.")
+    entity_id: UUID = Field(description="UUID of the purged login client type. Added in 26.10.0.")
 
 
 class SearchLoginClientTypesPayload(BaseResponseModel):

@@ -11,8 +11,9 @@ from strawberry.relay import PageInfo
 from ai.backend.common.dto.manager.v2.resource_preset.request import (
     AdminSearchResourcePresetsInput,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.api.gql.base import encode_cursor
+from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
     gql_mutation,
@@ -25,6 +26,10 @@ from .types import (
     CreateResourcePresetInputGQL,
     CreateResourcePresetPayloadGQL,
     DeleteResourcePresetPayloadGQL,
+    PartialBulkPurgeResourcePresetsInputGQL,
+    PartialBulkResourcePresetsPayloadGQL,
+    PartialBulkUpdateResourcePresetsInputGQL,
+    PurgeResourcePresetPayloadGQL,
     ResourcePresetConnection,
     ResourcePresetEdge,
     ResourcePresetFilterGQL,
@@ -132,9 +137,67 @@ async def admin_create_resource_preset_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update a resource preset. Only provided fields will be updated.",
+    )
+)
+async def update_resource_preset_v2(
+    info: Info[StrawberryGQLContext],
+    input: UpdateResourcePresetInputGQL,
+) -> UpdateResourcePresetPayloadGQL:
+    payload = await info.context.adapters.resource_preset.update(input.to_pydantic())
+    return UpdateResourcePresetPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION, description="Permanently delete a resource preset."
+    )
+)
+async def purge_resource_preset_v2(
+    info: Info[StrawberryGQLContext],
+    id: UUID,
+) -> PurgeResourcePresetPayloadGQL:
+    payload = await info.context.adapters.resource_preset.purge(id)
+    return PurgeResourcePresetPayloadGQL.from_pydantic(
+        payload, extra={"purged_id": to_global_id(ResourcePresetGQL, payload.entity_id)}
+    )
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Update several resource presets, answering for each one.",
+    )
+)
+async def partial_bulk_update_resource_presets_v2(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkUpdateResourcePresetsInputGQL,
+) -> PartialBulkResourcePresetsPayloadGQL:
+    payload = await info.context.adapters.resource_preset.partial_bulk_update(input.to_pydantic())
+    return PartialBulkResourcePresetsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Permanently delete several resource presets, answering for each one.",
+    )
+)
+async def partial_bulk_purge_resource_presets_v2(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkPurgeResourcePresetsInputGQL,
+) -> PartialBulkResourcePresetsPayloadGQL:
+    payload = await info.context.adapters.resource_preset.partial_bulk_purge(input.to_pydantic())
+    return PartialBulkResourcePresetsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
         added_version="26.4.2",
         description="Update a resource preset (admin only).",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `updateResourcePresetV2`.",
 )
 async def admin_update_resource_preset_v2(
     info: Info[StrawberryGQLContext],
@@ -151,12 +214,13 @@ async def admin_update_resource_preset_v2(
     BackendAIGQLMeta(
         added_version="26.4.2",
         description="Delete a resource preset (admin only).",
-    )
+    ),
+    deprecation_reason=f"Deprecated since {NEXT_RELEASE_VERSION}. Use `purgeResourcePresetV2`.",
 )
 async def admin_delete_resource_preset_v2(
     info: Info[StrawberryGQLContext],
     id: UUID,
 ) -> DeleteResourcePresetPayloadGQL | None:
     check_admin_only()
-    payload = await info.context.adapters.resource_preset.delete(id)
+    payload = await info.context.adapters.resource_preset.purge(id)
     return DeleteResourcePresetPayloadGQL.from_pydantic(payload)

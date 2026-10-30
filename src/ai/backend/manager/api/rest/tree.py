@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from ai.backend.common.health_checker.probe import HealthProbe
     from ai.backend.common.plugin.monitor import ErrorPluginContext
     from ai.backend.manager.api.adapters.registry import Adapters
+    from ai.backend.manager.api.rest.shutdown import ServerDrainNotifier
     from ai.backend.manager.config.provider import ManagerConfigProvider
     from ai.backend.manager.event_dispatcher.handlers.stream_cleanup import (
         StreamCleanupEventHandler,
@@ -43,6 +44,7 @@ def build_api_routes(
     root_app: web.Application,
     stream_cleanup_handler: StreamCleanupEventHandler,
     health_probe: HealthProbe,
+    drain_notifier: ServerDrainNotifier,
     pidx: int = 0,
 ) -> list[RouteRegistry]:
     """Build the full API module tree and return all root-level registries.
@@ -54,6 +56,9 @@ def build_api_routes(
     from ai.backend.manager.api.gql.schema import public_schema as public_strawberry_schema
     from ai.backend.manager.api.gql.schema import schema as strawberry_schema
     from ai.backend.manager.api.gql_legacy.schema import graphene_schema
+    from ai.backend.manager.api.rest.prometheus_query_preset.handler import (
+        PrometheusQueryPresetHandler,
+    )
 
     from .acl.handler import AclHandler
     from .acl.registry import register_acl_routes
@@ -106,7 +111,6 @@ def build_api_routes(
     from .notification.registry import register_notification_routes
     from .object_storage.handler import ObjectStorageHandler
     from .object_storage.registry import register_object_storage_routes
-    from .prometheus_query_preset import PrometheusQueryPresetHandler
     from .prometheus_query_preset.registry import register_prometheus_query_preset_routes
     from .quota_scope.handler import QuotaScopeHandler
     from .quota_scope.registry import register_quota_scope_routes
@@ -198,6 +202,7 @@ def build_api_routes(
     )
     resource_handler = ResourceHandler(
         resource_preset=processors.resource_preset,
+        resource_group=processors.resource_group,
         agent=processors.agent,
         project=processors.project,
         user=processors.user,
@@ -230,6 +235,7 @@ def build_api_routes(
     userconfig_handler = UserConfigHandler(
         auth=processors.auth,
         user=processors.user,
+        user_config=adapters.user_config,
     )
     vfolder_handler = VFolderHandler(
         auth=processors.auth,
@@ -242,7 +248,7 @@ def build_api_routes(
     vfs_storage_handler = VFSStorageHandler(vfs_storage=processors.vfs_storage)
 
     # Admin sub-registries
-    domain_handler = DomainHandler(domain=processors.domain, project=processors.project)
+    domain_handler = DomainHandler(domain=processors.domain)
     user_handler = UserHandler(
         user=processors.user, domain=processors.domain, config_provider=config_provider
     )
@@ -263,7 +269,7 @@ def build_api_routes(
     if gql_context_deps is None:
         raise RuntimeError("GQLContextDeps required for admin routes")
 
-    from ai.backend.manager.api.gql.graphql_ws import GraphQLTransportWSHandler
+    from ai.backend.manager.api.gql.graphql_ws.handler import GraphQLTransportWSHandler
 
     gql_ws_handler = GraphQLTransportWSHandler(
         schema=strawberry_schema,
@@ -288,7 +294,7 @@ def build_api_routes(
     session_template_reg = register_session_template_routes(session_template_handler, route_deps)
 
     # Health handler
-    health_handler = HealthHandler(health_probe=health_probe)
+    health_handler = HealthHandler(health_probe=health_probe, drain_notifier=drain_notifier)
 
     # Spec handler
     spec_handler = SpecHandler(config_provider=config_provider, root_app=root_app)

@@ -7,14 +7,19 @@ from typing import Any, Self, override
 
 import glide
 
+from ai.backend.common.clients.valkey_client.sentinel_monitor.base import AbstractSentinelMonitor
 from ai.backend.common.clients.valkey_client.valkey_stream.client import ValkeyStreamClient
 from ai.backend.common.message_queue.abc import AbstractSubscriber
 from ai.backend.common.message_queue.exceptions import InvalidMessagePayloadError
 from ai.backend.common.message_queue.payload import BroadcastMessagePayload
 from ai.backend.common.types import RedisTarget
-from ai.backend.logging.utils import BraceStyleAdapter
+from ai.backend.logging.structured import StructuredLogger
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
+
+_RETRY_DELAY_SEC = 1.0
+# About 30 seconds of consecutive failures at `_RETRY_DELAY_SEC`.
+_ERROR_FAILURE_COUNT = 30
 
 
 class RedisSubscriber(AbstractSubscriber):
@@ -48,7 +53,13 @@ class RedisSubscriber(AbstractSubscriber):
         self._loop_task = asyncio.create_task(self._read_broadcast_messages_loop())
 
     @classmethod
-    async def create(cls, redis_target: RedisTarget, channels: set[str], db: int = 0) -> Self:
+    async def create(
+        cls,
+        redis_target: RedisTarget,
+        channels: set[str],
+        db: int = 0,
+        sentinel_monitor: AbstractSentinelMonitor | None = None,
+    ) -> Self:
         """
         Create a new RedisSubscriber instance.
 
@@ -65,6 +76,7 @@ class RedisSubscriber(AbstractSubscriber):
             human_readable_name="redis_subscriber",
             db_id=db,
             pubsub_channels=channels,
+            sentinel_monitor=sentinel_monitor,
         )
         return cls(client, channels)
 
@@ -107,27 +119,37 @@ class RedisSubscriber(AbstractSubscriber):
             try:
                 await self._loop_task
             except asyncio.CancelledError:
-                log.debug("Subscriber loop task cancelled")
+                log.debug("subscriber loop task cancelled")
 
         await self._client.close()
-        log.debug("RedisSubscriber closed")
+        log.debug("redis subscriber closed")
 
     async def _read_broadcast_messages_loop(self) -> None:
         """
         Background task to read broadcast messages from subscribed channels.
         """
-        log.debug("Starting read broadcast messages loop for channels {}", self._channels)
+        log.debug("broadcast read loop started", channels=str(self._channels))
 
+        failure_count = 0
         while not self._closed:
             try:
                 await self._read_broadcast_messages()
+                failure_count = 0
             except glide.ClosingError:
-                log.info("Client connection closed, stopping read broadcast messages loop")
+                log.debug("broadcast read loop stopped on client close")
                 break
             except Exception as e:
-                log.error("Error while reading broadcast messages: {}", e)
+                failure_count += 1
+                if failure_count == _ERROR_FAILURE_COUNT:
+                    log.error(
+                        "broadcast read keeps failing", exc_info=e, attempt_count=failure_count
+                    )
+                elif failure_count == 1:
+                    log.warning("broadcast read failed", exc_info=e, attempt_count=failure_count)
+                else:
+                    log.debug("broadcast read failed", attempt_count=failure_count)
                 # Add a small delay to avoid tight error loops
-                await asyncio.sleep(1.0)
+                await asyncio.sleep(_RETRY_DELAY_SEC)
 
     async def _read_broadcast_messages(self) -> None:
         """
@@ -139,6 +161,6 @@ class RedisSubscriber(AbstractSubscriber):
         try:
             payload = await self._client.receive_broadcast_message()
         except InvalidMessagePayloadError as e:
-            log.warning("Dropping malformed broadcast message: {}", e)
+            log.warning("malformed broadcast message dropped", exc_info=e)
             return
         await self._subscribe_queue.put(payload)

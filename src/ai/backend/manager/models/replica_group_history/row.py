@@ -4,12 +4,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.replica_group import ReplicaGroupID
-from ai.backend.common.data.entity.replica_group_history import ReplicaGroupHistoryID
-from ai.backend.manager.data.deployment.types import (
-    ReplicaGroupHandlerCategory,
-    ReplicaGroupHistoryData,
-)
-from ai.backend.manager.data.session.types import SchedulingResult
+from ai.backend.manager.data.deployment.types import ReplicaGroupHandlerCategory
 from ai.backend.manager.models.base import GUID, Base, StrEnumType
 from ai.backend.manager.models.mixins.history import ReconcileHistoryMixin
 
@@ -34,21 +29,3 @@ class ReplicaGroupHistoryRow(ReconcileHistoryMixin, Base):
         nullable=False,
         server_default=ReplicaGroupHandlerCategory.LIFECYCLE.value,
     )
-
-    def to_data(self) -> ReplicaGroupHistoryData:
-        return ReplicaGroupHistoryData(
-            id=ReplicaGroupHistoryID(self.id),
-            replica_group_id=self.replica_group_id,
-            deployment_id=self.deployment_id,
-            category=self.category,
-            phase=self.phase,
-            from_status=self.from_status,
-            to_status=self.to_status,
-            result=SchedulingResult(self.result),
-            error_code=self.error_code,
-            message=self.message,
-            sub_steps=self.sub_steps,
-            attempts=self.attempts,
-            created_at=self.created_at,
-            updated_at=self.updated_at,
-        )

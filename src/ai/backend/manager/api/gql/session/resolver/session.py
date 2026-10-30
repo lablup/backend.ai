@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from typing import Annotated
 from uuid import UUID
 
 import strawberry
@@ -7,11 +8,14 @@ from strawberry import ID, Info
 
 from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.session.request import (
     AdminSearchSessionsInput,
     ScopedSearchSessionsInput,
     TerminateSessionsInput,
 )
+from ai.backend.common.dto.manager.v2.session.types import SessionScope
+from ai.backend.common.exception import UnreachableError
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.common.types import SessionId
 from ai.backend.manager.api.gql.base import encode_cursor
@@ -29,9 +33,12 @@ from ai.backend.manager.api.gql.session.types import (
     IncludeSessionIdleChecksFailureInfoGQL,
     IncludeSessionIdleChecksInputGQL,
     IncludeSessionIdleChecksPayloadGQL,
+    PartialBulkTerminateSessionsInputGQL,
+    PartialBulkTerminateSessionsPayloadGQL,
     ProjectSessionScopeGQL,
     SessionIdleCheckTargetInfoGQL,
     SessionScopeGQL,
+    SessionUsageGQL,
     SessionV2ConnectionGQL,
     SessionV2EdgeGQL,
     SessionV2FilterGQL,
@@ -66,6 +73,16 @@ async def session_v2(
 )  # type: ignore[misc]
 async def admin_sessions_v2(
     info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        SessionUsageGQL | None,
+        strawberry.argument(
+            description=(
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; sessions the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: SessionV2FilterGQL | None = None,
     order_by: list[SessionV2OrderByGQL] | None = None,
     before: str | None = None,
@@ -78,6 +95,7 @@ async def admin_sessions_v2(
     check_admin_only()
     payload = await info.context.adapters.session.admin_search(
         AdminSearchSessionsInput(
+            usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
@@ -104,7 +122,7 @@ async def admin_sessions_v2(
 
 @gql_root_field(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Page through the sessions the named scopes reach, combined with OR. "
             "Every scope is authorized before the read runs."
@@ -114,6 +132,16 @@ async def admin_sessions_v2(
 async def scoped_sessions_v2(
     info: Info[StrawberryGQLContext],
     scope: SessionScopeGQL,
+    usage: Annotated[
+        SessionUsageGQL | None,
+        strawberry.argument(
+            description=(
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; sessions the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: SessionV2FilterGQL | None = None,
     order_by: list[SessionV2OrderByGQL] | None = None,
     before: str | None = None,
@@ -127,6 +155,65 @@ async def scoped_sessions_v2(
     payload = await info.context.adapters.session.scoped_search(
         ScopedSearchSessionsInput(
             scope=scope.to_pydantic(),
+            usage=usage.to_pydantic() if usage else None,
+            filter=filter.to_pydantic() if filter else None,
+            order=[o.to_pydantic() for o in order_by] if order_by else None,
+            first=first,
+            after=after,
+            last=last,
+            before=before,
+            limit=limit,
+            offset=offset,
+        ),
+    )
+    nodes = [SessionV2GQL.from_pydantic(node) for node in payload.items]
+    edges = [SessionV2EdgeGQL(node=node, cursor=encode_cursor(node.id)) for node in nodes]
+    return SessionV2ConnectionGQL(
+        edges=edges,
+        page_info=strawberry.relay.PageInfo(
+            has_next_page=payload.has_next_page,
+            has_previous_page=payload.has_previous_page,
+            start_cursor=edges[0].cursor if edges else None,
+            end_cursor=edges[-1].cursor if edges else None,
+        ),
+        count=payload.total_count,
+    )
+
+
+@gql_root_field(
+    BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Page through the sessions the current user owns.",
+    )
+)  # type: ignore[misc]
+async def my_sessions_v2(
+    info: Info[StrawberryGQLContext],
+    usage: Annotated[
+        SessionUsageGQL | None,
+        strawberry.argument(
+            description=(
+                "Uses narrowing the result. Each listed entity must be readable by the "
+                "caller; sessions the caller cannot read are left out."
+            )
+        ),
+    ] = None,
+    filter: SessionV2FilterGQL | None = None,
+    order_by: list[SessionV2OrderByGQL] | None = None,
+    before: str | None = None,
+    after: str | None = None,
+    first: int | None = None,
+    last: int | None = None,
+    limit: int | None = None,
+    offset: int | None = None,
+) -> SessionV2ConnectionGQL | None:
+    """Page through the sessions the current user owns."""
+    me = current_user()
+    if me is None:
+        raise UnreachableError("User context is not available")
+    payload = await info.context.adapters.session.scoped_search(
+        ScopedSearchSessionsInput(
+            scope=SessionScope(user=[UUIDScope(value=me.user_id)]),
+            usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
@@ -160,6 +247,16 @@ async def scoped_sessions_v2(
 async def project_sessions_v2(
     info: Info[StrawberryGQLContext],
     scope: ProjectSessionScopeGQL,
+    usage: Annotated[
+        SessionUsageGQL | None,
+        strawberry.argument(
+            description=(
+                "Added in 26.9.0. Uses narrowing the result. Each listed "
+                "entity must be readable by the caller; sessions the caller cannot read "
+                "are left out."
+            )
+        ),
+    ] = None,
     filter: SessionV2FilterGQL | None = None,
     order_by: list[SessionV2OrderByGQL] | None = None,
     before: str | None = None,
@@ -172,6 +269,7 @@ async def project_sessions_v2(
     payload = await info.context.adapters.session.gql_search_by_project(
         project_id=ProjectID(scope.project_id),
         input=AdminSearchSessionsInput(
+            usage=usage.to_pydantic() if usage else None,
             filter=filter.to_pydantic() if filter else None,
             order=[o.to_pydantic() for o in order_by] if order_by else None,
             first=first,
@@ -226,11 +324,28 @@ async def enqueue_session(
 
 @gql_mutation(
     BackendAIGQLMeta(
+        added_version=NEXT_RELEASE_VERSION,
+        description="Terminate several sessions, answering for each one.",
+    )
+)
+async def partial_bulk_terminate_sessions_v2(
+    info: Info[StrawberryGQLContext],
+    input: PartialBulkTerminateSessionsInputGQL,
+) -> PartialBulkTerminateSessionsPayloadGQL:
+    payload = await info.context.adapters.session.partial_bulk_terminate(input.to_pydantic())
+    return PartialBulkTerminateSessionsPayloadGQL.from_pydantic(payload)
+
+
+@gql_mutation(
+    BackendAIGQLMeta(
         added_version="26.4.4",
         description=(
             "Terminate one or more sessions by ID. Per-session RBAC permission is enforced "
             "by the bulk validator; any denial fails the whole request."
         ),
+    ),
+    deprecation_reason=(
+        f"Deprecated since {NEXT_RELEASE_VERSION}. Use `partialBulkTerminateSessionsV2`."
     ),
 )
 async def terminate_sessions_v2(
@@ -255,7 +370,7 @@ async def terminate_sessions_v2(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Exclude checker-session pairs from idle checks. Per-session RBAC permission "
             "is enforced by the bulk validator; any denial fails the whole request."
@@ -289,7 +404,7 @@ async def exclude_session_idle_checks(
 
 @gql_mutation(
     BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
+        added_version="26.9.0",
         description=(
             "Include checker-session pairs into idle checks, resetting them so checks "
             "start from the initial grace period. Per-session RBAC permission "

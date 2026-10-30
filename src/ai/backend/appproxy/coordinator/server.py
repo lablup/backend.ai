@@ -61,7 +61,6 @@ from ai.backend.appproxy.common.errors import (
     ObjectNotFound,
     URLNotFound,
 )
-from ai.backend.appproxy.common.etcd import TraefikEtcd
 from ai.backend.appproxy.common.events import (
     DoCheckUnusedPortEvent,
     DoCheckWorkerLostEvent,
@@ -80,16 +79,20 @@ from ai.backend.appproxy.common.utils import (
     BackendAIAccessLogger,
     ensure_json_serializable,
     mime_match,
-    ping_redis_connection,
+)
+from ai.backend.appproxy.coordinator.dependencies.composer import (
+    CoordinatorDependencyComposer,
+    DependencyInput,
+    DependencyResources,
 )
 from ai.backend.appproxy.coordinator.models.worker import WorkerStatus
-from ai.backend.common import redis_helper
+from ai.backend.appproxy.coordinator.services.ingress import IngressService
+from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.clients.valkey_client.valkey_leader.client import ValkeyLeaderClient
-from ai.backend.common.clients.valkey_client.valkey_live.client import ValkeyLiveClient
-from ai.backend.common.clients.valkey_client.valkey_schedule import ValkeyScheduleClient
-from ai.backend.common.defs import REDIS_LIVE_DB, REDIS_STREAM_DB, REDIS_STREAM_LOCK, RedisRole
+from ai.backend.common.contexts.request_id import with_request_context
+from ai.backend.common.defs import REDIS_STREAM_DB, REDIS_STREAM_LOCK, RedisRole
+from ai.backend.common.dependencies.stacks.builder import DependencyBuilderStack
 from ai.backend.common.dto.appproxy_coordinator.v2.status.types import AppProxyStatusResponse
-from ai.backend.common.etcd import ConfigScopes
 from ai.backend.common.events.dispatcher import EventDispatcher, EventProducer
 from ai.backend.common.exception import BackendAIError, BackendAISchemaValidationFailed
 from ai.backend.common.health_checker.checkers.valkey import ValkeyHealthChecker
@@ -105,30 +108,27 @@ from ai.backend.common.leader.tasks import (
 from ai.backend.common.lock import FileLock, RedisLock
 from ai.backend.common.message_queue.queue import AbstractMessageQueue
 from ai.backend.common.message_queue.redis_queue import RedisMQArgs, RedisQueue
-from ai.backend.common.metrics.http import build_api_metric_middleware
+from ai.backend.common.metrics.http import SystemMetricUpdater, build_api_metric_middleware
 from ai.backend.common.metrics.multiprocess_setup import cleanup_prometheus_multiprocess_dir
+from ai.backend.common.middlewares.exception import client_closed_response, is_client_disconnect
+from ai.backend.common.middlewares.request_id import REQUEST_ID_HEADER
 from ai.backend.common.msgpack import DEFAULT_PACK_OPTS, DEFAULT_UNPACK_OPTS
 from ai.backend.common.networking import force_threaded_dns_resolver
 from ai.backend.common.service_discovery.event_publisher import ServiceDiscoveryEventPublisher
-from ai.backend.common.service_discovery.redis_discovery.service_discovery import (
-    RedisServiceDiscovery,
-    RedisServiceDiscoveryArgs,
-)
-from ai.backend.common.service_discovery.service_discovery import (
-    ServiceDiscovery,
-    ServiceDiscoveryLoop,
-    ServiceEndpoint,
-    ServiceMetadata,
-)
 from ai.backend.common.types import (
     AgentId,
-    HostPortPair,
     RedisProfileTarget,
-    ServiceDiscoveryType,
 )
 from ai.backend.common.utils import env_info
-from ai.backend.logging import BraceStyleAdapter, Logger, LogLevel
-from ai.backend.logging.otel import OpenTelemetrySpec
+from ai.backend.logging import Logger, LogLevel
+from ai.backend.logging.otel import (
+    LegacyOtelLogging,
+    OpenTelemetrySpec,
+    apply_otel_tracer,
+    build_otel_server_middleware,
+)
+from ai.backend.logging.structured import StructuredLogger, with_log_context
+from ai.backend.logging.structured_otel import StructuredOtelLogging
 
 from . import __version__
 from .config import ServerConfig
@@ -137,11 +137,10 @@ from .defs import EVENT_DISPATCHER_CONSUMER_GROUP
 from .errors import (
     CleanupContextNotInitializedError,
     MissingProfilingConfigError,
-    MissingTraefikConfigError,
 )
 from .health.database import DatabaseHealthChecker
 from .models import Circuit, Worker
-from .models.utils import connect_database, execute_with_txn_retry
+from .models.utils import execute_with_txn_retry
 from .pglock import PgAdvisoryLock
 from .repositories.endpoint import EndpointRepository
 from .services.endpoint import EndpointService
@@ -156,7 +155,7 @@ from .types import (
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
+log = StructuredLogger(logging.getLogger(__spec__.name))
 
 global_subapp_pkgs: Final[list[str]] = [
     ".circuit_v1",
@@ -164,6 +163,7 @@ global_subapp_pkgs: Final[list[str]] = [
     ".conf",
     ".endpoint",
     ".health",
+    ".ingress",
     ".proxy",
     ".slot_v1",
     ".slot_v2",
@@ -176,11 +176,11 @@ global_subapp_pkgs: Final[list[str]] = [
 async def request_context_aware_middleware(
     request: web.Request, handler: WebRequestHandler
 ) -> web.StreamResponse:
-    request_id = request.headers.get("X-BackendAI-RequestID", str(uuid.uuid4()))
+    request_id = request.headers.get(REQUEST_ID_HEADER) or str(uuid.uuid4())
+    # The access log is written after the request scope has closed.
     request["request_id"] = request_id
-    if _current_task := asyncio.current_task():
-        setattr(_current_task, "request_id", request_id)
-    return await handler(request)
+    with with_request_context(request_id):
+        return await handler(request)
 
 
 @web.middleware
@@ -223,6 +223,8 @@ async def exception_middleware(
     request: web.Request, handler: WebRequestHandler
 ) -> web.StreamResponse:
     root_ctx: RootContext = request.app["_root.context"]
+    method = request.method
+    endpoint = getattr(request.match_info.route.resource, "canonical", request.path)
     # The inner block turns every exception into a BackendAIError; the outer one renders
     # it, so no error can escape through aiohttp's default rendering.
     try:
@@ -232,15 +234,29 @@ async def exception_middleware(
             # ``ValidationError`` covers plain ``BaseModel`` subclasses that
             # skip the ``BackendAISchema`` auto-conversion override.
             log.exception(
-                "Failed to create response model: {}",
-                json.dumps(ex.errors(), indent=2, default=str),
+                "failed to create response model",
+                http_method=method,
+                route_path=endpoint,
+                validation_errors=json.dumps(ex.errors(), default=str),
             )
             raise InternalServerError() from ex
         except BackendAIError as ex:
             if ex.status_code >= 500:
-                log.exception("Server error raised inside handlers")
+                log.exception(
+                    "request failed with server error",
+                    http_method=method,
+                    route_path=endpoint,
+                    http_status=ex.status_code,
+                    error_code=str(ex.error_code()),
+                )
             else:
-                log.warning("Client error: {0!r}", ex)
+                log.trace(
+                    "request failed with client error",
+                    http_method=method,
+                    route_path=endpoint,
+                    http_status=ex.status_code,
+                    error_code=str(ex.error_code()),
+                )
             raise
         except web.HTTPException as ex:
             if ex.status_code == 404:
@@ -251,15 +267,29 @@ async def exception_middleware(
                     extra_msg=f"Method {concrete_ex.method} not allowed",
                     extra_data={"allowed_methods": list(concrete_ex.allowed_methods)},
                 ) from ex
-            log.warning("Bad request: {0!r}", ex)
+            log.trace(
+                "request failed with client error",
+                http_method=method,
+                route_path=endpoint,
+                http_status=ex.status_code,
+            )
             raise GenericBadRequest from ex
         except asyncio.CancelledError as e:
             # The server is closing or the client has disconnected in the middle of
             # request.  Atomic requests are still executed to their ends.
-            log.debug("Request cancelled ({0} {1})", request.method, request.rel_url)
+            log.trace("request cancelled", http_method=method, route_path=endpoint)
             raise e
         except Exception as e:
-            log.exception("Uncaught exception in HTTP request handlers {0!r}", e)
+            if is_client_disconnect(request, e):
+                log.trace(
+                    "client disconnected while writing the response",
+                    http_method=method,
+                    route_path=endpoint,
+                )
+                return client_closed_response()
+            log.exception(
+                "request failed with uncaught exception", http_method=method, route_path=endpoint
+            )
             if root_ctx.local_config.debug.enabled:
                 raise InternalServerError(traceback.format_exc()) from e
             raise InternalServerError() from e
@@ -267,52 +297,10 @@ async def exception_middleware(
         return _render_error_response(request, ex)
 
 
-@asynccontextmanager
-async def redis_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    redis_profile_target = RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
-    core_redis_profile_target = RedisProfileTarget.from_dict(
-        (root_ctx.local_config.core_redis or root_ctx.local_config.redis).to_dict()
-    )
-
-    # Create valkey clients for live data access
-    root_ctx.valkey_live = await ValkeyLiveClient.create(
-        valkey_target=redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),
-        db_id=REDIS_LIVE_DB,
-        human_readable_name="appproxy-coordinator-live",
-    )
-    root_ctx.core_valkey_live = await ValkeyLiveClient.create(
-        valkey_target=core_redis_profile_target.profile_target(RedisRole.LIVE).to_valkey_target(),
-        db_id=REDIS_LIVE_DB,
-        human_readable_name="appproxy-coordinator-core-live",
-    )
-
-    # Keep redis_lock for distributed locking (not yet migrated)
-    root_ctx.redis_lock = redis_helper.get_redis_object_for_lock(
-        redis_profile_target.profile_target(RedisRole.STREAM),
-        name="lock",  # distributed locks
-        db=REDIS_STREAM_LOCK,
-    )
-    await ping_redis_connection(root_ctx.redis_lock)
-
-    # Initialize ValkeyScheduleClient for health status updates
-    root_ctx.valkey_schedule = await ValkeyScheduleClient.create(
-        valkey_target=core_redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target(),
-        db_id=REDIS_LIVE_DB,
-        human_readable_name="appproxy-schedule",
-    )
-    log.info("ValkeyScheduleClient initialized for health status updates")
-    try:
-        yield
-    finally:
-        await root_ctx.valkey_live.close()
-        await root_ctx.core_valkey_live.close()
-        await root_ctx.valkey_schedule.close()
-        await root_ctx.redis_lock.close()
-
-
 async def _make_message_queue(
     node_id: str,
     redis_config: RedisConfig,
+    sentinel_monitors: SentinelMonitorSet,
     *,
     anycast_stream_key: str = APPPROXY_ANYCAST_STREAM_KEY,
     broadcast_channel: str = APPPROXY_BROADCAST_CHANNEL,
@@ -337,6 +325,7 @@ async def _make_message_queue(
     return await RedisQueue.create(
         stream_redis_target,
         args,
+        sentinel_monitors.monitor_for(stream_redis_target.to_valkey_target()),
     )
 
 
@@ -345,6 +334,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     mq = await _make_message_queue(
         root_ctx.local_config.proxy_coordinator.id,
         root_ctx.local_config.redis,
+        root_ctx.sentinel_monitors,
     )
     root_ctx.event_producer = EventProducer(
         mq,
@@ -359,6 +349,7 @@ async def event_dispatcher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     core_mq = await _make_message_queue(
         root_ctx.local_config.proxy_coordinator.id,
         root_ctx.local_config.core_redis or root_ctx.local_config.redis,
+        root_ctx.sentinel_monitors,
         anycast_stream_key="events",
         broadcast_channel="events_all",
     )
@@ -393,10 +384,12 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
     # Create ValkeyLeaderClient for leader election
     redis_profile_target = RedisProfileTarget.from_dict(root_ctx.local_config.redis.to_dict())
+    leader_valkey_target = redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target()
     valkey_leader_client = await ValkeyLeaderClient.create(
-        valkey_target=redis_profile_target.profile_target(RedisRole.STREAM).to_valkey_target(),
+        valkey_target=leader_valkey_target,
         db_id=REDIS_STREAM_LOCK,
         human_readable_name="appproxy-leader",
+        sentinel_monitor=root_ctx.sentinel_monitors.monitor_for(leader_valkey_target),
     )
 
     # Create leader election configuration
@@ -462,55 +455,23 @@ async def leader_election_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         await root_ctx.leader_election.stop()
 
 
-@asynccontextmanager
-async def etcd_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    if root_ctx.local_config.proxy_coordinator.enable_traefik:
-        traefik_config = root_ctx.local_config.proxy_coordinator.traefik
-        if not traefik_config:
-            raise MissingTraefikConfigError(
-                "Traefik configuration is required when enable_traefik is True"
-            )
-
-        creds: dict[str, str] | None = None
-        if traefik_config.etcd.password:
-            creds = {"password": traefik_config.etcd.password}
-
-        # Handle addr as either single HostPortPair or list
-        addr = traefik_config.etcd.addr
-        if isinstance(addr, list):
-            # Use first address from the list
-            host_port = addr[0]
-        else:
-            host_port = addr
-
-        root_ctx.traefik_etcd = TraefikEtcd(
-            HostPortPair(host_port.host, host_port.port),
-            traefik_config.etcd.namespace,
-            {ConfigScopes.GLOBAL: ""},
-            credentials=creds,
-        )
-    else:
-        root_ctx.traefik_etcd = None
-    yield
-
-
 async def on_worker_lost_event(
     context: RootContext,
     _worker_id: AgentId,
     event: WorkerLostEvent,
 ) -> None:
-    log.warning("detected termination of proxy worker {}", event.worker_id)
-
     async def _update(sess: SASession) -> None:
         try:
             worker = await Worker.find_by_authority(sess, event.worker_id)
             worker.status = WorkerStatus.LOST
             await sess.flush()
         except ObjectNotFound:
-            log.warning("worker {} not found in database", event.worker_id)
+            log.warning("lost worker not found in database")
 
-    async with context.db.connect() as db_conn:
-        await execute_with_txn_retry(_update, context.db.begin_session, db_conn)
+    with with_log_context(worker_id=event.worker_id):
+        log.warning("proxy worker lost")
+        async with context.db.connect() as db_conn:
+            await execute_with_txn_retry(_update, context.db.begin_session, db_conn)
 
 
 async def _reconcile_worker_occupied_slots(
@@ -546,10 +507,10 @@ async def _reconcile_worker_occupied_slots(
         for worker, expected in drifted:
             fresh = await Worker.get(sess, worker.id)
             log.info(
-                "occupied_slots reconcile: worker={} {} -> {}",
-                fresh.authority,
-                fresh.occupied_slots,
-                expected,
+                "worker occupied slots corrected",
+                worker_id=fresh.authority,
+                previous_slot_count=fresh.occupied_slots,
+                slot_count=expected,
             )
             fresh.occupied_slots = expected
 
@@ -557,7 +518,7 @@ async def _reconcile_worker_occupied_slots(
         async with context.db.connect() as db_conn:
             await execute_with_txn_retry(_fix, context.db.begin_session, db_conn)
     except Exception:
-        log.exception("Failed to reconcile worker occupied_slots")
+        log.exception("failed to reconcile worker occupied slots")
 
 
 async def on_reconcile_traefik_routes(
@@ -591,20 +552,32 @@ async def on_reconcile_traefik_routes(
         circuits = await Circuit.list_circuits(db_sess, load_worker=True, load_endpoint=True)
         workers = await Worker.list_workers(db_sess)
     reconciled = 0
+    failed = 0
+    first_error: Exception | None = None
     for circuit in circuits:
-        try:
-            await context.circuit_manager.update_circuit_routes(
-                circuit, list(circuit.route_info or [])
-            )
-            reconciled += 1
-        except Exception:
-            log.exception("Failed to reconcile traefik routes for circuit {}", circuit.id)
+        with with_log_context(circuit_id=circuit.id):
+            try:
+                await context.circuit_manager.update_circuit_routes(
+                    circuit, list(circuit.route_info or [])
+                )
+                reconciled += 1
+            except Exception as e:
+                failed += 1
+                first_error = first_error or e
+                log.debug("circuit traefik route reconcile failed", reason=repr(e))
+    if failed:
+        log.warning(
+            "traefik route reconcile failed for some circuits",
+            exc_info=first_error,
+            failed_count=failed,
+            circuit_count=len(circuits),
+        )
     try:
         await context.circuit_manager.reconcile_traefik_etcd_state(circuits, workers)
     except Exception:
-        log.exception("Failed to reconcile stale traefik etcd state")
+        log.exception("failed to reconcile stale traefik etcd state")
     await _reconcile_worker_occupied_slots(context, circuits, workers)
-    log.debug("reconcile_traefik_routes cycle completed: {} circuits reconciled", reconciled)
+    log.debug("traefik routes reconciled", circuit_count=reconciled)
 
 
 @asynccontextmanager
@@ -626,13 +599,6 @@ async def event_handler_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 
 
 @asynccontextmanager
-async def database_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    async with connect_database(root_ctx.local_config.db) as db:
-        root_ctx.db = db
-        yield
-
-
-@asynccontextmanager
 async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.distributed_lock_factory = init_lock_factory(root_ctx)
     yield
@@ -641,67 +607,56 @@ async def distributed_lock_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
 @asynccontextmanager
 async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     async def _collect(_context: None, _src: AgentId, _event: DoCheckUnusedPortEvent) -> None:
-        try:
+        async def _update(sess: SASession) -> list[Circuit]:
+            non_inference_http_circuits = [
+                c
+                for c in (await Circuit.list_circuits(sess))
+                if c.app_mode != AppMode.INFERENCE and c.protocol == ProxyProtocol.HTTP
+            ]
+            if len(non_inference_http_circuits) == 0:
+                return []
+            last_access = await root_ctx.valkey_live.get_multiple_live_data([
+                f"circuit.{c.id!s}.last_access" for c in non_inference_http_circuits
+            ])
+            unused_circuits: list[Circuit] = []
 
-            async def _update(sess: SASession) -> list[Circuit]:
-                non_inference_http_circuits = [
-                    c
-                    for c in (await Circuit.list_circuits(sess))
-                    if c.app_mode != AppMode.INFERENCE and c.protocol == ProxyProtocol.HTTP
-                ]
-                if len(non_inference_http_circuits) == 0:
-                    return []
-                last_access = await root_ctx.valkey_live.get_multiple_live_data([
-                    f"circuit.{c.id!s}.last_access" for c in non_inference_http_circuits
-                ])
-                unused_circuits: list[Circuit] = []
+            for idx in range(len(last_access)):
+                access = last_access[idx]
+                last_access_time: float = 0
+                current_time = time.time()
+                if access:
+                    last_access_time = current_time - float(access.decode("utf-8"))
+                else:
+                    circuit_created_at = non_inference_http_circuits[idx].created_at
+                    last_access_time = (
+                        current_time - circuit_created_at.timestamp() if circuit_created_at else 0.0
+                    )
+                if (
+                    last_access_time
+                    > root_ctx.local_config.proxy_coordinator.unused_circuit_collection_timeout
+                ):
+                    unused_circuits.append(non_inference_http_circuits[idx])
+            if len(unused_circuits) == 0:
+                return []
 
-                for idx in range(len(last_access)):
-                    access = last_access[idx]
-                    last_access_time: float = 0
-                    current_time = time.time()
-                    if access:
-                        last_access_time = current_time - float(access.decode("utf-8"))
-                    else:
-                        circuit_created_at = non_inference_http_circuits[idx].created_at
-                        last_access_time = (
-                            current_time - circuit_created_at.timestamp()
-                            if circuit_created_at
-                            else 0.0
-                        )
-                    if (
-                        last_access_time
-                        > root_ctx.local_config.proxy_coordinator.unused_circuit_collection_timeout
-                    ):
-                        unused_circuits.append(non_inference_http_circuits[idx])
-                if len(unused_circuits) == 0:
-                    return []
+            log.info("collecting unused circuits", circuit_count=len(unused_circuits))
+            log.debug("unused circuits: {}", [str(c.id) for c in unused_circuits])
 
-                log.info(
-                    "collecting {} unused circuits: {}",
-                    len(unused_circuits),
-                    [str(c.id) for c in unused_circuits],
-                )
+            worker_map: dict[UUID, Worker] = {}
+            for circuit in unused_circuits:
+                if circuit.worker not in worker_map:
+                    worker_map[circuit.worker] = await Worker.get(sess, circuit.worker)
 
-                worker_map: dict[UUID, Worker] = {}
-                for circuit in unused_circuits:
-                    if circuit.worker not in worker_map:
-                        worker_map[circuit.worker] = await Worker.get(sess, circuit.worker)
+                worker_map[circuit.worker].occupied_slots -= 1
+                await sess.delete(circuit)
 
-                    worker_map[circuit.worker].occupied_slots -= 1
-                    await sess.delete(circuit)
+            return unused_circuits
 
-                return unused_circuits
-
-            async with root_ctx.db.connect() as db_conn:
-                unused_circuits = await execute_with_txn_retry(
-                    _update, root_ctx.db.begin_session, db_conn
-                )
-            await root_ctx.circuit_manager.unload_circuits(unused_circuits)
-
-        except Exception:
-            log.exception("")
-            raise
+        async with root_ctx.db.connect() as db_conn:
+            unused_circuits = await execute_with_txn_retry(
+                _update, root_ctx.db.begin_session, db_conn
+            )
+        await root_ctx.circuit_manager.unload_circuits(unused_circuits)
 
     unused_port_collection_evh = root_ctx.event_dispatcher.consume(
         DoCheckUnusedPortEvent,
@@ -716,76 +671,22 @@ async def unused_port_collection_ctx(root_ctx: RootContext) -> AsyncIterator[Non
 
 
 @asynccontextmanager
-async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
-    sd_type = root_ctx.local_config.service_discovery.type
-    service_discovery: ServiceDiscovery
-    match sd_type:
-        case ServiceDiscoveryType.REDIS:
-            # Use core redis for service discovery if available, otherwise use main redis
-            core_redis_profile_target = RedisProfileTarget.from_dict(
-                (root_ctx.local_config.core_redis or root_ctx.local_config.redis).to_dict()
-            )
-            live_redis_target = core_redis_profile_target.profile_target(RedisRole.LIVE)
-            service_discovery = await RedisServiceDiscovery.create(
-                RedisServiceDiscoveryArgs(valkey_target=live_redis_target.to_valkey_target())
-            )
-        case _:
-            raise RuntimeError(
-                f"Unsupported service discovery type: {sd_type}. "
-                "Please use Redis service discovery for appproxy."
-            )
-
-    # Determine announce addresses
-    announce_addr = root_ctx.local_config.proxy_coordinator.announce_addr
-    sd_loop = ServiceDiscoveryLoop(
-        sd_type,
-        service_discovery,
-        ServiceMetadata(
-            display_name=f"appproxy-coordinator-{root_ctx.local_config.proxy_coordinator.id}",
-            service_group="appproxy-coordinator",
-            version=__version__,
-            endpoint=ServiceEndpoint(
-                address=announce_addr.host,
-                port=announce_addr.port,
-                protocol="http",
-                # It can be separated into an internal-purpose port later.
-                prometheus_address=str(announce_addr),
-            ),
-        ),
-    )
-
-    if root_ctx.local_config.otel.enabled:
-        meta = sd_loop.metadata
-        otel_spec = OpenTelemetrySpec(
-            service_name=meta.service_group,
-            service_version=meta.version,
-            log_level=root_ctx.local_config.otel.log_level,
-            endpoint=root_ctx.local_config.otel.endpoint,
-            service_instance_id=meta.id,
-            service_instance_name=meta.display_name,
-            max_queue_size=root_ctx.local_config.otel.max_queue_size,
-            max_export_batch_size=root_ctx.local_config.otel.max_export_batch_size,
-        )
-        BraceStyleAdapter.apply_otel(otel_spec)
-
-    # Start event-based SD publishing if config has service_group set
+async def service_discovery_event_publisher_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     sd_config = root_ctx.local_config.service_discovery
-    sd_event_publisher: ServiceDiscoveryEventPublisher | None = None
-    if sd_config.service_group and hasattr(root_ctx, "event_producer"):
-        sd_event_publisher = ServiceDiscoveryEventPublisher(
-            event_producer=root_ctx.event_producer,
-            config=sd_config,
-            component_version=__version__,
-            startup_time=datetime.now(tz=UTC),
-        )
-        await sd_event_publisher.start()
-
+    if not sd_config.service_group:
+        yield
+        return
+    sd_event_publisher = ServiceDiscoveryEventPublisher(
+        event_producer=root_ctx.event_producer,
+        config=sd_config,
+        component_version=__version__,
+        startup_time=datetime.now(tz=UTC),
+    )
+    await sd_event_publisher.start()
     try:
         yield
     finally:
-        if sd_event_publisher is not None:
-            await sd_event_publisher.stop()
-        sd_loop.close()
+        await sd_event_publisher.stop()
 
 
 @asynccontextmanager
@@ -799,7 +700,7 @@ async def circuit_manager_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     if root_ctx.local_config.proxy_coordinator.enable_traefik:
         async with root_ctx.db.begin_readonly_session() as session:
             circuits = await Circuit.list_circuits(session, load_worker=True, load_endpoint=True)
-            log.info("Injecting traefik configuration of {} circuits", len(circuits))
+            log.info("injecting traefik configuration", circuit_count=len(circuits))
             await root_ctx.circuit_manager.initialize_traefik_circuits(circuits)
 
     yield
@@ -811,6 +712,16 @@ async def endpoint_service_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     root_ctx.endpoint_service = EndpointService(
         repository=EndpointRepository(root_ctx.db),
         circuit_manager=root_ctx.circuit_manager,
+    )
+    yield
+
+
+@asynccontextmanager
+async def ingress_service_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
+    root_ctx.ingress_service = IngressService(
+        root_ctx.worker_service_discovery,
+        root_ctx.worker_client_pool,
+        root_ctx.local_config.secrets,
     )
     yield
 
@@ -909,10 +820,10 @@ def handle_loop_error(
     msg = context.get("message", "(empty message)")
     if exception is not None:
         if sys.exc_info()[0] is not None:
-            log.exception("Error inside event loop: {0}", msg)
+            log.exception("error inside the event loop", loop_error_message=str(msg))
         else:
             exc_info = (type(exception), exception, exception.__traceback__)
-            log.error("Error inside event loop: {0}", msg, exc_info=exc_info)
+            log.error("error inside the event loop", loop_error_message=str(msg), exc_info=exc_info)
 
 
 def _init_subapp(
@@ -965,7 +876,7 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
 
             return lambda lock_id, lifetime_hint: RedisLock(
                 str(lock_id),
-                root_ctx.redis_lock,
+                root_ctx.valkey_lock,
                 lifetime=min(lifetime_hint * 2, lifetime_hint + 30),
                 lock_retry_interval=redlock_config.lock_retry_interval,
             )
@@ -976,6 +887,7 @@ def init_lock_factory(root_ctx: RootContext) -> DistributedLockFactory:
 def build_root_app(
     pidx: int,
     local_config: ServerConfig,
+    dependency_resources: DependencyResources,
     *,
     cleanup_contexts: Sequence[CleanupContext] | None = None,
     subapp_pkgs: Sequence[str] = (),
@@ -991,12 +903,24 @@ def build_root_app(
             build_api_metric_middleware(root_ctx.metrics.api),
         ]
     )
+    if local_config.otel.enabled:
+        app.middlewares.insert(0, build_otel_server_middleware(parent_required_prefixes=("/api/",)))
     global_exception_handler = functools.partial(handle_loop_error, root_ctx)
     loop = asyncio.get_running_loop()
     loop.set_exception_handler(global_exception_handler)
     app["_root.context"] = root_ctx
     root_ctx.local_config = local_config
     root_ctx.pidx = pidx
+    infrastructure = dependency_resources.infrastructure
+    root_ctx.db = infrastructure.db
+    root_ctx.sentinel_monitors = infrastructure.sentinel_monitors
+    root_ctx.valkey_live = infrastructure.valkey.valkey_live
+    root_ctx.core_valkey_live = infrastructure.valkey.core_valkey_live
+    root_ctx.valkey_lock = infrastructure.valkey.valkey_lock
+    root_ctx.valkey_schedule = infrastructure.valkey.valkey_schedule
+    root_ctx.traefik_etcd = infrastructure.traefik_etcd
+    root_ctx.worker_service_discovery = dependency_resources.system.worker_service_discovery
+    root_ctx.worker_client_pool = dependency_resources.components.worker_client_pool
     root_ctx.cors_options = {
         "*": aiohttp_cors.ResourceOptions(  # type: ignore[no-untyped-call]
             allow_credentials=False, expose_headers="*", allow_headers="*"
@@ -1009,18 +933,16 @@ def build_root_app(
 
     if cleanup_contexts is None:
         cleanup_contexts = [
-            redis_ctx,
             distributed_lock_ctx,
-            database_ctx,
             event_dispatcher_ctx,
             leader_election_ctx,
-            etcd_ctx,
             circuit_manager_ctx,
             endpoint_service_ctx,
             health_probe_ctx,
             unused_port_collection_ctx,
             event_handler_ctx,
-            service_discovery_ctx,
+            service_discovery_event_publisher_ctx,
+            ingress_service_ctx,
         ]
     shutdown_context_instances = []
 
@@ -1042,10 +964,11 @@ def build_root_app(
             try:
                 await cctx_instance.shutdown()
             except Exception:
-                log.exception("error while shutting down a cleanup context")
+                log.exception("failed to shut down a cleanup context")
 
     app.on_shutdown.append(_trigger_shutdown)
     app.cleanup_ctx.append(_cleanup_context_wrapper)
+    app.cleanup_ctx.append(SystemMetricUpdater(root_ctx.metrics.system).cleanup_ctx)
     cors = aiohttp_cors.setup(app, defaults=root_ctx.cors_options)
     # should be done in create_app() in other modules.
     cors.add(app.router.add_route("GET", "/status", status))
@@ -1054,7 +977,7 @@ def build_root_app(
     app.on_response_prepare.append(make_error_cors_fallback(app))
     for pkg_name in subapp_pkgs:
         if pidx == 0:
-            log.info("Loading module: {0}", pkg_name[1:])
+            log.info("loading module", module_name=pkg_name[1:])
         subapp_mod = importlib.import_module(pkg_name, "ai.backend.appproxy.coordinator.api")
         init_subapp(pkg_name, app, subapp_mod.create_app)
     return app
@@ -1067,6 +990,7 @@ async def server_main(
     _args: Sequence[Any],
 ) -> AsyncIterator[None]:
     local_config: ServerConfig = _args[0]
+    config_path: Path | None = _args[2]
     loop.set_debug(local_config.debug.asyncio)
 
     @asynccontextmanager
@@ -1108,7 +1032,10 @@ async def server_main(
             )
 
         runner = web.AppRunner(
-            root_app, keepalive_timeout=30.0, access_log_class=BackendAIAccessLogger
+            root_app,
+            keepalive_timeout=30.0,
+            access_log_class=BackendAIAccessLogger,
+            max_field_size=local_config.proxy_coordinator.max_header_field_size,
         )
         await runner.setup()
         service_addr = local_config.proxy_coordinator.bind_addr
@@ -1129,7 +1056,32 @@ async def server_main(
     proxy_init_stack = AsyncExitStack()
     await proxy_init_stack.__aenter__()
     try:
-        root_app = build_root_app(pidx, local_config, subapp_pkgs=global_subapp_pkgs)
+        dependency_stack = DependencyBuilderStack()
+        await proxy_init_stack.enter_async_context(dependency_stack)
+        dependency_resources = await dependency_stack.enter_composer(
+            CoordinatorDependencyComposer(),
+            DependencyInput(config_path=config_path),
+        )
+
+        if local_config.otel.enabled:
+            meta = dependency_resources.system.sd_loop.metadata
+            otel_spec = OpenTelemetrySpec(
+                service_name=meta.service_group,
+                service_version=meta.version,
+                log_level=local_config.otel.log_level,
+                endpoint=local_config.otel.endpoint,
+                service_instance_id=meta.id,
+                service_instance_name=meta.display_name,
+                max_queue_size=local_config.otel.max_queue_size,
+                max_export_batch_size=local_config.otel.max_export_batch_size,
+            )
+            LegacyOtelLogging(otel_spec).attach()
+            apply_otel_tracer(otel_spec)
+            StructuredOtelLogging(otel_spec).attach(local_config.logging.pkg_ns.keys())
+
+        root_app = build_root_app(
+            pidx, local_config, dependency_resources, subapp_pkgs=global_subapp_pkgs
+        )
         await proxy_init_stack.enter_async_context(aiomonitor_ctx(root_app))
         await proxy_init_stack.enter_async_context(webapp_ctx())
 
@@ -1141,16 +1093,16 @@ async def server_main(
             ])
             os.setgid(gid)
             os.setuid(uid)
-            log.info("changed process uid and gid to {}:{}", uid, gid)
+            log.info("changed the process uid and gid", uid=uid, gid=gid)
 
-        log.info("Started the app-proxy coordinator service.")
+        log.info("started the app-proxy coordinator service")
     except Exception:
-        log.exception("Server initialization failure; triggering shutdown...")
+        log.exception("server initialization failed; triggering shutdown")
         loop.call_later(0.2, os.kill, 0, signal.SIGINT)
     try:
         yield
     finally:
-        log.info("shutting down...")
+        log.info("shutting down")
         await proxy_init_stack.__aexit__(None, None, None)
 
 
@@ -1244,32 +1196,32 @@ def main(ctx: click.Context, config_path: Path | None, debug: bool, log_level: L
             )
             with logger:
                 setproctitle("backend.ai: proxy-coordinator")
-                log.info("Backend.AI AppProxy Coordinator {0}", __version__)
-                log.info("runtime: {0}", env_info())
+                log.info("Backend.AI AppProxy Coordinator starting", version=__version__)
+                log.info("runtime environment", runtime_info=env_info())
                 if server_config.profiling.enable_pyroscope:
-                    log.info("Pyroscope tracing enabled")
+                    log.info("pyroscope tracing enabled")
                 if server_config.profiling.enable_memray:
-                    log.info("Memray tracing enabled")
+                    log.info("memray tracing enabled")
                 log_config = logging.getLogger("ai.backend.appproxy.coordinator.config")
                 log_config.debug("debug mode enabled.")
                 runner: Callable[..., Any]
                 match server_config.proxy_coordinator.event_loop:
                     case EventLoopType.UVLOOP:
                         runner = uvloop.run
-                        log.info("Using uvloop as the event loop backend")
+                        log.info("using uvloop as the event loop backend")
                     case EventLoopType.ASYNCIO:
                         runner = asyncio.run
                 try:
                     aiotools.start_server(
                         server_main_logwrapper,
                         num_workers=1,
-                        args=(server_config, log_endpoint),
+                        args=(server_config, log_endpoint, config_path),
                         wait_timeout=5.0,
                         runner=runner,
                     )
                 finally:
                     cleanup_prometheus_multiprocess_dir()
-                    log.info("terminated.")
+                    log.info("terminated")
         finally:
             if server_config.proxy_coordinator.pid_file.is_file():
                 # check is_file() to prevent deleting /dev/null!

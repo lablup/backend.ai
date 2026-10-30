@@ -102,7 +102,12 @@ class DomainFairShareFilter(BaseRequestModel):
     resource_group: StringFilter | None = Field(default=None, description="Filter by scaling group")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
     domain: DomainFairShareDomainNestedFilter | None = Field(
-        default=None, description="Filter by domain entity properties"
+        default=None,
+        description=(
+            "Filter by the domain this fair share is calculated for. Deprecated: search "
+            "domains first, then narrow by `domain_name`."
+        ),
+        deprecated=True,
     )
     AND: list[DomainFairShareFilter] | None = Field(
         default=None, description="Combine with AND logic"
@@ -120,7 +125,12 @@ class ProjectFairShareFilter(BaseRequestModel):
     project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
     project: ProjectFairShareProjectNestedFilter | None = Field(
-        default=None, description="Filter by project entity properties"
+        default=None,
+        description=(
+            "Filter by the project this fair share is calculated for. Deprecated: search "
+            "projects first, then narrow by `project_id`."
+        ),
+        deprecated=True,
     )
     AND: list[ProjectFairShareFilter] | None = Field(
         default=None, description="Combine with AND logic"
@@ -139,7 +149,12 @@ class UserFairShareFilter(BaseRequestModel):
     project_id: UUIDFilter | None = Field(default=None, description="Filter by project ID")
     domain_name: StringFilter | None = Field(default=None, description="Filter by domain name")
     user: UserFairShareUserNestedFilter | None = Field(
-        default=None, description="Filter by user entity properties"
+        default=None,
+        description=(
+            "Filter by the user this fair share is calculated for. Deprecated: search users "
+            "first, then narrow by `user_uuid`."
+        ),
+        deprecated=True,
     )
     AND: list[UserFairShareFilter] | None = Field(
         default=None, description="Combine with AND logic"
