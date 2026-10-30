@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any
 
 import sqlalchemy as sa
 
+from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.types import AgentId, ImageID, ResourceSlot
@@ -18,6 +19,7 @@ from ai.backend.manager.data.agent.types import (
 )
 from ai.backend.manager.data.image.types import ImageIdentifier
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
+from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.errors.agent import AgentHasConflictingSessions, AgentNotFound
 from ai.backend.manager.errors.resource import ResourceGroupNotFound, UnresolvableResourceGroup
 from ai.backend.manager.models.agent.row import AgentRow, agents
@@ -258,7 +260,10 @@ class AgentDBSource:
                     DeploymentDesignatedAgentRow.endpoint_id.in_(
                         sa.select(EndpointRow.id)
                         .join(ResourceGroupRow, ResourceGroupRow.name == EndpointRow.resource_group)
-                        .where(ResourceGroupRow.id != resource_group_id)
+                        .where(
+                            ResourceGroupRow.id != resource_group_id,
+                            EndpointRow.lifecycle_stage.in_(EndpointLifecycle.active_states()),
+                        )
                     ),
                 )
             )
@@ -267,7 +272,8 @@ class AgentDBSource:
                     SessionDesignatedAgentRow.agent_uuid == agent.uuid,
                     SessionDesignatedAgentRow.session_id.in_(
                         sa.select(SessionRow.id).where(
-                            SessionRow.resource_group_id != resource_group_id
+                            SessionRow.resource_group_id != resource_group_id,
+                            SessionRow.status.not_in(SessionStatus.terminal_statuses()),
                         )
                     ),
                 )
