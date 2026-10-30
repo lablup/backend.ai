@@ -34699,7 +34699,7 @@
               }
             ],
             "default": null,
-            "description": "Shell script executed on container startup. Falls back to keypair setting.",
+            "description": "Shell script executed on container startup. Falls back to the user's default bootstrap script, then the resource group's default.",
             "title": "Bootstrap Script"
           },
           "tier": {
