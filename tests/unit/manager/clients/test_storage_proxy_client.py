@@ -77,7 +77,9 @@ class TestStorageProxyClient:
                     trace.get_tracer(__name__).start_as_current_span("manager")
                 )
                 context = span.get_span_context()
-                expected = f"00-{context.trace_id:032x}-{context.span_id:016x}-01"
+                expected = (
+                    f"00-{context.trace_id:032x}-{context.span_id:016x}-{context.trace_flags:02x}"
+                )
             await client.request(method="GET", url="echo", request_timeout=DEFAULT_TIMEOUT)
 
         assert received == [expected]

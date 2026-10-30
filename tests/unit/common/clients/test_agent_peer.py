@@ -33,7 +33,7 @@ async def test_call_carries_the_caller_span_as_traceparent(
     context = span.get_span_context()
     assert peer.bodies[0]["args"] == ("ping",)
     assert peer.bodies[0]["metadata"]["traceparent"] == (
-        f"00-{context.trace_id:032x}-{context.span_id:016x}-01"
+        f"00-{context.trace_id:032x}-{context.span_id:016x}-{context.trace_flags:02x}"
     )
 
 
