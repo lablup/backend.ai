@@ -1,4 +1,4 @@
-export PS1="%F{green}%n@${BACKENDAI_CLUSTER_HOST:-main}%F{yellow}[${BACKENDAI_SESSION_NAME}]%f:%F{blue}%~%f\$ "
+export PS1="%F{green}%n@${BACKENDAI_CLUSTER_HOST:-main}%F{yellow}[$(cat /home/config/session_name.txt)]%f:%F{blue}%~%f\$ "
 
 # Print the persistent-path notice only in interactive shells; otherwise stdout
 # would corrupt SFTP/SCP/rsync subsystems that use the same channel as data.

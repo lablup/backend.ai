@@ -33,7 +33,6 @@ def shell_env() -> dict[str, str]:
     return {
         "BACKENDAI_PERSISTENT_PATHS": "/home/work/abc",
         "BACKENDAI_CLUSTER_HOST": "main1",
-        "BACKENDAI_SESSION_NAME": "test-session",
         "PATH": "/usr/bin:/bin",
         "TERM": "dumb",
     }

@@ -347,6 +347,7 @@ def create(
     spec = _load_spec(spec_path, image)
     kernel_id = kernel_id or str(uuid.uuid4())
     session_id = session_id or str(uuid.uuid4())
+    session_name = spec.session_name or f"ag-kernel-{session_id}"
     owner_user_id = spec.owner_user_id or str(uuid.uuid4())
 
     async def _run() -> None:
@@ -367,6 +368,7 @@ def create(
                 image_config=image_config,
                 kernel_id=kernel_id,
                 session_id=session_id,
+                session_name=session_name,
                 owner_user_id=owner_user_id,
                 agent_addr=agent_addr,
             )
