@@ -147,11 +147,12 @@ ENV/
 /.tmp/
 /tmp/
 /volumes/
-/vfroot/
-/var/
+/vfroot
+/var
 /ipc/
-/scratches/
+/scratches
 logs/
+/logs
 /*.pid
 /.postgres-volume-backup
 
