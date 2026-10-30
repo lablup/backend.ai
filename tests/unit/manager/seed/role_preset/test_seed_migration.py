@@ -27,6 +27,9 @@ _USER_OWNER_APP_CONFIG_REVISION = "d6e297fca9ae_grant_user_owners_read_on_app_co
 _SYSTEM_SESSION_ENVIRON_GRANTS_REVISION = (
     "bf07cae92d86_grant_role_presets_on_system_session_environ"
 )
+_SYSTEM_SESSION_ENVIRON_MEMBER_REVOKES_REVISION = (
+    "995eabef0eac_revoke_members_read_on_system_session_environ"
+)
 _VFOLDER_AUTO_MOUNT_REVISION = "456a338e7c3a_add_vfolder_auto_mounts"
 _USER_OWNER_VFOLDER_AUTO_MOUNT_REVISION = "8bb02f0415eb_grant_user_owners_on_vfolder_auto_mounts"
 _REPOSITORY = Path(__file__).resolve().parents[5]
@@ -87,6 +90,11 @@ def user_owner_app_config_migration() -> Any:
 @pytest.fixture(scope="module")
 def system_session_environ_grants_migration() -> Any:
     return load_python_file(str(_VERSIONS), f"{_SYSTEM_SESSION_ENVIRON_GRANTS_REVISION}.py")
+
+
+@pytest.fixture(scope="module")
+def system_session_environ_member_revokes_migration() -> Any:
+    return load_python_file(str(_VERSIONS), f"{_SYSTEM_SESSION_ENVIRON_MEMBER_REVOKES_REVISION}.py")
 
 
 @pytest.fixture(scope="module")
@@ -165,6 +173,7 @@ class TestMigrationMatchesFixture:
         own_policy_reads_migration: Any,
         user_owner_app_config_migration: Any,
         system_session_environ_grants_migration: Any,
+        system_session_environ_member_revokes_migration: Any,
         vfolder_auto_mount_migration: Any,
         user_owner_vfolder_auto_mount_migration: Any,
         fixture: dict[str, Any],
@@ -205,6 +214,7 @@ class TestMigrationMatchesFixture:
             (preset_id, entity_type, bit)
             for preset_id, entity_type, bit in system_session_environ_grants_migration._GRANTS
         }
+        written -= set(system_session_environ_member_revokes_migration._REVOKES)
         written |= {
             (preset_id, vfolder_auto_mount_migration._ENTITY_TYPE, bit)
             for preset_id, bits in vfolder_auto_mount_migration._GRANTS

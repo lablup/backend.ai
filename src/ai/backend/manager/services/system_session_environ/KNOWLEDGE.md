@@ -9,12 +9,13 @@ sources:
   - src/ai/backend/manager/models/system_session_environ
   - src/ai/backend/manager/repositories/system_session_environ/repository.py
   - src/ai/backend/manager/models/alembic/versions/bf07cae92d86_grant_role_presets_on_system_session_environ.py
+  - src/ai/backend/manager/models/alembic/versions/995eabef0eac_revoke_members_read_on_system_session_environ.py
 generated:
   by: claude-code/opus-5.5
   at: 2026-10-23
 updated:
   by: claude-code/opus-5.5
-  at: 2026-10-28
+  at: 2026-10-30
 status: draft
 ---
 
@@ -116,4 +117,6 @@ domain repository; this package holds the operations a caller reaches through th
 - It feeds the GQL DataLoader behind `node(id:)`, where one batch mixes ids from several
   resolvers. A row the caller may not read fails alone.
 - Each row is checked on the graph: every user reads the public rows, a domain's or a
-  project's members read its rows.
+  project's admins read its rows, a domain's admins also its projects' rows.
+- The domain member and project member presets hold no READ: the graph binds a project
+  under its domain, so a domain member's READ would pass on every project of the domain.
