@@ -6,17 +6,22 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 from uuid import UUID
 
-from ai.backend.common.api_handlers import APIResponse, BodyParam
+from pydantic import Field
+
+from ai.backend.common.api_handlers import APIResponse, BaseRequestModel, BodyParam, PathParam
 from ai.backend.common.contexts.user import current_user
+from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironID
 from ai.backend.common.dto.manager.query import NullableDateTimeFilter
 from ai.backend.common.dto.manager.v2.group.request import ScopedSearchProjectsInput
 from ai.backend.common.dto.manager.v2.group.types import ProjectScope
 from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     AdminSearchSystemSessionEnvironsInput,
+    CreateSystemSessionEnvironInput,
     MySearchSystemSessionEnvironsInput,
     ScopedSearchSystemSessionEnvironsInput,
     SystemSessionEnvironFilter,
+    UpdateSystemSessionEnvironInput,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironScope,
@@ -30,6 +35,10 @@ if TYPE_CHECKING:
     )
 
 _MY_PROJECTS_PAGE_SIZE: Final[int] = 100
+
+
+class SystemSessionEnvironIdPathParam(BaseRequestModel):
+    environ_id: SystemSessionEnvironID = Field(description="The id of the row.")
 
 
 class V2SystemSessionEnvironHandler:
@@ -96,6 +105,35 @@ class V2SystemSessionEnvironHandler:
                 offset=my_input.offset,
             )
         )
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
+    async def create(self, body: BodyParam[CreateSystemSessionEnvironInput]) -> APIResponse:
+        """Bind a value source to an environment variable name at one scope."""
+        payload = await self._adapter.create(body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.CREATED, response_model=payload)
+
+    async def update(
+        self,
+        path: PathParam[SystemSessionEnvironIdPathParam],
+        body: BodyParam[UpdateSystemSessionEnvironInput],
+    ) -> APIResponse:
+        """Change a system session environ row's key."""
+        payload = await self._adapter.update(path.parsed.environ_id, body.parsed)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
+    async def delete(self, path: PathParam[SystemSessionEnvironIdPathParam]) -> APIResponse:
+        """Soft-delete a system session environ row."""
+        payload = await self._adapter.delete(path.parsed.environ_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
+    async def restore(self, path: PathParam[SystemSessionEnvironIdPathParam]) -> APIResponse:
+        """Restore a soft-deleted system session environ row."""
+        payload = await self._adapter.restore(path.parsed.environ_id)
+        return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
+
+    async def purge(self, path: PathParam[SystemSessionEnvironIdPathParam]) -> APIResponse:
+        """Remove a system session environ row for good, soft-deleted or not."""
+        payload = await self._adapter.purge(path.parsed.environ_id)
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=payload)
 
     async def _project_ids_of(self, user_id: UUID) -> list[UUID]:

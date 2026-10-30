@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import AsyncGenerator
 
@@ -13,7 +14,15 @@ from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.types import ResourceSlot
 from ai.backend.manager.data.secret.types import KeyProviderType
+from ai.backend.manager.errors.bootstrap_script import (
+    BootstrapScriptNotFound,
+    DefaultBootstrapScriptPurgeForbidden,
+)
+from ai.backend.manager.models.bootstrap_script.purgers import NonDefaultBootstrapScriptPurger
 from ai.backend.manager.models.bootstrap_script.row import BootstrapScriptRow
+from ai.backend.manager.models.bootstrap_script_revision.creators import (
+    BootstrapScriptRevisionCreator,
+)
 from ai.backend.manager.models.bootstrap_script_revision.row import BootstrapScriptRevisionRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.resource_policy.row import UserResourcePolicyRow
@@ -192,3 +201,58 @@ class TestBootstrapScriptRevision:
 
         assert current is not None
         assert current.script == "echo replacement"
+
+    async def test_revision_is_refused_on_a_soft_deleted_script(
+        self,
+        db: ExtendedAsyncSAEngine,
+        user_id: UserID,
+        deleted_default_script: BootstrapScriptID,
+    ) -> None:
+        with pytest.raises(BootstrapScriptNotFound):
+            async with V2DBOpsProvider(db).write_ops() as w:
+                await w.create_dangling_field(
+                    BootstrapScriptRevisionCreator(
+                        script_id=deleted_default_script,
+                        script=BootstrapScript("echo 2"),
+                        creator_id=user_id,
+                    )
+                )
+
+        assert await self._revisions(db, deleted_default_script) == [(1, "echo 1", None)]
+
+    async def test_concurrent_switches_leave_one_default(
+        self,
+        db: ExtendedAsyncSAEngine,
+        repository: UserRepository,
+        user_id: UserID,
+        default_script: BootstrapScriptID,
+    ) -> None:
+        async with db.begin_session() as session:
+            rows = [
+                BootstrapScriptRow(entity_type=UserEntityType(), entity_id=user_id)
+                for _ in range(8)
+            ]
+            session.add_all(rows)
+            await session.flush()
+            targets = [row.id for row in rows]
+
+        await asyncio.gather(*(repository.switch_default_bootstrap_script(t) for t in targets))
+
+        async with db.begin_readonly_session() as session:
+            defaults = await session.scalars(
+                sa.select(BootstrapScriptRow.is_default).where(
+                    BootstrapScriptRow.entity_id == user_id
+                )
+            )
+            assert list(defaults).count(True) == 1
+
+    async def test_purge_is_refused_on_the_default_script(
+        self, db: ExtendedAsyncSAEngine, default_script: BootstrapScriptID
+    ) -> None:
+        with pytest.raises(DefaultBootstrapScriptPurgeForbidden):
+            async with V2DBOpsProvider(db).write_ops() as w:
+                await w.purge_field_entity(
+                    NonDefaultBootstrapScriptPurger(script_id=default_script)
+                )
+
+        assert await self._revisions(db, default_script) == [(1, "echo 1", None)]

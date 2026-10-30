@@ -101,9 +101,7 @@ class V2EntityWriteOps(V2GraphWriteOpsBase):
         What the spec refuses runs first, each answering with its own error so a caller
         learns which one stood in the way. A spec with nothing to refuse passes through.
         """
-        for check in creator.precondition_checks():
-            if (await self._sess.execute(check.finder)).first() is not None:
-                raise check.error
+        await self._validate_precondition_checks(creator.precondition_checks())
         row = creator.build_row()
         await self._insert_row(row, creator.integrity_error_checks())
         entity = creator.entity_id(row)

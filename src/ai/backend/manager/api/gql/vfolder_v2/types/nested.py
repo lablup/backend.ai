@@ -80,8 +80,8 @@ class VFolderMetadataInfoGQL:
         added_version="26.4.2",
         description=(
             "Access control information for a virtual folder. "
-            "Includes the mount permission level (read-only, read-write, read-write-delete) "
-            "and ownership type (user or project)."
+            "Includes the folder's default mount permission level "
+            "(read-only, read-write, read-write-delete) and ownership type (user or project)."
         ),
     ),
     model=VFolderAccessControlInfoDTO,
@@ -91,7 +91,12 @@ class VFolderAccessControlInfoGQL:
     """Access control and ownership type information."""
 
     permission: VFolderMountPermissionGQL = gql_field(
-        description="Mount permission level: READ_ONLY (ro), READ_WRITE (rw), or RW_DELETE (wd)."
+        description=(
+            "The folder's default mount permission level: READ_ONLY (ro), READ_WRITE (rw), "
+            "or RW_DELETE (wd). Applies to a shared user without their own "
+            "`vfolderMountPolicies` entry. The level the current user mounts at is "
+            "`VFolder.mountPermission`."
+        )
     )
     ownership_type: VFolderOwnershipTypeGQL = gql_field(
         description="Ownership type: USER (personal folder) or GROUP (project-shared folder)."

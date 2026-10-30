@@ -85,7 +85,6 @@ from ai.backend.manager.models.kernel.row import (
 )
 from ai.backend.manager.models.keypair.row import (
     KeyPairRow,
-    generate_keypair_data,
     keypairs,
 )
 from ai.backend.manager.models.keypair.searchable_fields import KeyPairSearchableFields
@@ -114,6 +113,7 @@ from ai.backend.manager.models.user.purgers import (
     UserKeyPairPurger,
     UserPurger,
     UserSessionGroupPurger,
+    UserVFolderAutoMountPurger,
 )
 from ai.backend.manager.models.user.row import UserRole, UserRow, UserStatus, users
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
@@ -124,6 +124,7 @@ from ai.backend.manager.models.vfolder.row import (
     VFolderRow,
     vfolders,
 )
+from ai.backend.manager.repositories.auth.keypair_secrets import generate_keypair_data
 from ai.backend.manager.repositories.ops.v2.provider import V2DBOpsProvider
 from ai.backend.manager.repositories.ops.v2.read import V2ReadOps
 from ai.backend.manager.repositories.ops.v2.resource_policy.provider import (
@@ -501,6 +502,8 @@ class UserDBSource:
             # delegated (the groups moved with them) or deleted by now.
             # TODO: scope this purge. A user operation must not use in_global.
             await w.batch_purge_entities_in_global(UserSessionGroupPurger(user_id=user_id))
+            # TODO: scope this purge. A user operation must not use in_global.
+            await w.batch_purge_entities_in_global(UserVFolderAutoMountPurger(user_id=user_id))
             # Finally the user itself as a scope: the row and the RBAC graph it left.
             await w.purge_entity(UserPurger(user_id=user_id))
 

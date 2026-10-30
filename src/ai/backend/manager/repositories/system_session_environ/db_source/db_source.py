@@ -3,6 +3,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
+from ai.backend.manager.models.system_session_environ.creators import (
+    SystemSessionEnvironCreator,
+)
 from ai.backend.manager.models.system_session_environ.scopes import (
     SessionSystemSessionEnvironScope,
 )
@@ -28,3 +31,7 @@ class SystemSessionEnvironDBSource:
         async with self._ops_provider.read_ops() as r:
             result = await r.search_with_scopes(scopes, searcher)
         return list(result.items)
+
+    async def create(self, creator: SystemSessionEnvironCreator) -> SystemSessionEnvironData:
+        async with self._ops_provider.write_ops() as w:
+            return await w.create_entity(creator)

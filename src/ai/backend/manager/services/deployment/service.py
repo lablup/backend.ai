@@ -198,6 +198,7 @@ def _convert_deployment_info_to_data(info: DeploymentInfo) -> ModelDeploymentDat
         deploying_revision_id=info.deploying_revision_id,
         scaling_rule_ids=[],  # Not available in DeploymentInfo
         replica_state=ReplicaStateData(
+            replica_count=info.replica.replica_count,
             desired_replica_count=_deployment_desired_replica_count(info),
             replica_ids=[],  # Not available in DeploymentInfo
         ),
@@ -233,6 +234,7 @@ def _convert_deployment_info_to_legacy_data(info: DeploymentInfo) -> LegacyDeplo
         network_access=info.network,
         revision=info.current_revision,
         replica_state=ReplicaStateData(
+            replica_count=info.replica.replica_count,
             desired_replica_count=_deployment_desired_replica_count(info),
             replica_ids=[],  # Not available in DeploymentInfo
         ),

@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import pytest
+import sqlalchemy as sa
 from dateutil.tz import tzutc
 
 from ai.backend.common.data.entity.domain import DomainID, DomainName
@@ -30,6 +31,7 @@ from ai.backend.common.types import (
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.data.user.types import UserStatus
+from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
@@ -183,7 +185,7 @@ def _as_dict(quantities: list[SlotQuantity]) -> dict[str, Decimal]:
     return result
 
 
-class TestGetUserUsage:
+class _UsageFixtures:
     @pytest.fixture
     async def db(
         self,
@@ -335,6 +337,8 @@ class TestGetUserUsage:
     def ops_provider(self, db: ExtendedAsyncSAEngine) -> ResourceAllocationOpsProvider:
         return ResourceAllocationOpsProvider(db)
 
+
+class TestGetUserUsage(_UsageFixtures):
     async def test_sums_sessions_from_every_keypair(
         self,
         ops_provider: ResourceAllocationOpsProvider,
@@ -361,3 +365,39 @@ class TestGetUserUsage:
             usage = await ops.user_usage(owner.user_id)
 
         assert _as_dict(usage.used) == {"cpu": Decimal("5"), "mem": Decimal("3072")}
+
+
+class TestGetKeypairUsage(_UsageFixtures):
+    @pytest.fixture
+    async def no_default_keypair(self, db: ExtendedAsyncSAEngine, owner: _Owner) -> None:
+        async with db.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.update(KeyPairRow)
+                .where(KeyPairRow.access_key == owner.default_access_key)
+                .values(is_default=False)
+            )
+
+    async def test_excludes_sessions_on_other_keypairs(
+        self,
+        ops_provider: ResourceAllocationOpsProvider,
+        owner: _Owner,
+        sessions_on_both_keypairs: None,
+    ) -> None:
+        async with ops_provider.read_ops() as ops:
+            usage = await ops.keypair_usage(owner.user_id)
+
+        assert _as_dict(usage.used) == {"cpu": Decimal("2"), "mem": Decimal("1024")}
+        assert _as_dict(usage.assignable) == {
+            "cpu": _LIMIT_CPU - Decimal("2"),
+            "mem": _LIMIT_MEM - Decimal("1024"),
+        }
+
+    async def test_raises_without_default_keypair(
+        self,
+        ops_provider: ResourceAllocationOpsProvider,
+        owner: _Owner,
+        no_default_keypair: None,
+    ) -> None:
+        async with ops_provider.read_ops() as ops:
+            with pytest.raises(KeyPairNotFound):
+                await ops.keypair_usage(owner.user_id)

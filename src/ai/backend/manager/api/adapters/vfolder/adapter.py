@@ -148,6 +148,9 @@ from ai.backend.manager.services.vfolder.actions.base import (
     UpdateVFolderAttributeAction,
 )
 from ai.backend.manager.services.vfolder.actions.bulk_get import BulkGetVFoldersAction
+from ai.backend.manager.services.vfolder.actions.bulk_load_mount_levels import (
+    BulkLoadVFolderMountLevelsAction,
+)
 from ai.backend.manager.services.vfolder.actions.bulk_load_permissions import (
     BulkLoadVFolderPermissionsAction,
 )
@@ -335,6 +338,32 @@ class VFolderAdapter(BaseAdapter):
             bits = held.get(vfolder_id, Permission.NONE)
             answers.append([dto for dto in PermissionBitDTO if bits & Permission[dto.name]])
         return answers
+
+    async def batch_load_mount_permissions(
+        self, vfolder_ids: Sequence[VFolderUUID]
+    ) -> list[VFolderPermissionField | Exception | None]:
+        """The level the caller mounts each vfolder at, in the given order.
+
+        An id naming no folder answers ``None``.
+        """
+        if not vfolder_ids:
+            return []
+        result = await self._vfolder.bulk_load_mount_levels.run(
+            BulkLoadVFolderMountLevelsAction(vfolder_ids=vfolder_ids)
+        )
+        levels = result.values()
+        errors = result.errors()
+        mount_permissions: list[VFolderPermissionField | Exception | None] = []
+        for vfolder_id in vfolder_ids:
+            error = self.batch_load_failure(errors.get(vfolder_id))
+            if error is not None:
+                mount_permissions.append(error)
+                continue
+            level = levels.get(vfolder_id)
+            mount_permissions.append(
+                VFolderPermissionField(level.value) if level is not None else None
+            )
+        return mount_permissions
 
     # -------------------------------------------------------------------------
     # Search

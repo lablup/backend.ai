@@ -55,22 +55,17 @@ class ResourceAllocationRepository:
 
     async def get_user_concurrency(self, user_id: UserID) -> UserConcurrencyData:
         """Count the user's active regular and private sessions."""
-        return await self._db_source.get_user_concurrency(user_id)
+        async with self._ops_provider.read_ops() as ops:
+            return await ops.user_concurrency(user_id)
 
     async def _get_known_slot_types(self) -> Mapping[SlotName, SlotTypes]:
         """Get known slot types from etcd config."""
         return await self._config_provider.legacy_etcd_config_loader.get_resource_slots()
 
-    async def get_keypair_usage(
-        self,
-        access_key: AccessKey,
-        resource_policy: Mapping[str, Any],
-    ) -> ScopeUsageData:
-        """Get keypair resource usage (limits, used, assignable)."""
-        known_slot_types = await self._get_known_slot_types()
-        return await self._db_source.get_keypair_usage(
-            access_key, resource_policy, known_slot_types
-        )
+    async def get_keypair_usage(self, user_id: UserID) -> ScopeUsageData:
+        """Get the usage of a user's default keypair (limits, used, assignable)."""
+        async with self._ops_provider.read_ops() as ops:
+            return await ops.keypair_usage(user_id)
 
     async def get_user_usage(self, user_id: UserID) -> ScopeUsageData:
         """Get a user's resource usage across all their keypairs (limits, used, assignable)."""
@@ -82,24 +77,24 @@ class ResourceAllocationRepository:
         project_id: UUID,
     ) -> ScopeUsageData:
         """Get project resource usage by project ID (limits, used, assignable)."""
-        known_slot_types = await self._get_known_slot_types()
-        return await self._db_source.get_project_usage(project_id, known_slot_types)
+        async with self._ops_provider.read_ops() as ops:
+            return await ops.project_usage(project_id)
 
     async def get_domain_usage(
         self,
         domain_name: str,
     ) -> ScopeUsageData:
         """Get domain resource usage (limits, used, assignable)."""
-        known_slot_types = await self._get_known_slot_types()
-        return await self._db_source.get_domain_usage(domain_name, known_slot_types)
+        async with self._ops_provider.read_ops() as ops:
+            return await ops.domain_usage(domain_name)
 
     async def get_resource_group_usage(
         self,
         rg_name: str,
     ) -> ResourceGroupUsageData:
         """Get resource group (scaling group) usage with max_per_node."""
-        known_slot_types = await self._get_known_slot_types()
-        return await self._db_source.get_resource_group_usage(rg_name, known_slot_types)
+        async with self._ops_provider.read_ops() as ops:
+            return await ops.resource_group_usage(rg_name)
 
     async def get_effective_allocation(
         self,

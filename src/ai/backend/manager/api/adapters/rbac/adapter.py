@@ -1274,6 +1274,11 @@ class RBACAdapter(BaseAdapter):
                 RoleSearchableFields.nested.permissions.correlation,
                 self._convert_permission_filter,
             ),
+            *self.apply_to_many_filter(
+                f.labels,
+                RoleSearchableFields.nested.labels.correlation,
+                self._convert_entity_label_filter,
+            ),
         ]
         if f.AND:
             for sub in f.AND:

@@ -3939,6 +3939,31 @@ enum CreateSessionType {
   BATCH
 }
 
+"""
+Added in 26.10.0. Input for binding a value source to an environment variable name at one scope.
+"""
+input CreateSystemSessionEnvironInput {
+  """The environment variable name the value is injected under."""
+  key: String!
+
+  """
+  Which value of the starting session is injected, as a value source name systemSessionEnvironValueSources lists.
+  """
+  valueSource: String!
+
+  """Whether the row applies to every session, a domain's or a project's."""
+  scopeType: SystemSessionEnvironScopeType!
+
+  """The id of the domain or the project. Left out for public."""
+  scopeId: UUID = null
+}
+
+"""Added in 26.10.0. Payload for a system session environ row create."""
+type CreateSystemSessionEnvironPayload {
+  """The created row."""
+  systemSessionEnviron: SystemSessionEnviron!
+}
+
 """Added in 26.4.2. Input for creating a file upload session."""
 input CreateUploadSessionV2Input {
   """File path to upload to."""
@@ -4069,11 +4094,11 @@ type CreateVFSStoragePayload {
 }
 
 """
-Added in 26.10.0. Input for auto-mounting a vfolder into every session created in a project. The vfolder must belong to that project.
+Added in 26.10.0. Input for auto-mounting a vfolder into every session created in a project or by a user. The vfolder must belong to that project, or be owned by that user.
 """
 input CreateVFolderAutoMountInput {
-  """ID of the project the vfolder is auto-mounted in."""
-  projectId: UUID!
+  """The project or the user the vfolder is auto-mounted for."""
+  scope: VFolderAutoMountScopeRef!
 
   """ID of the vfolder to auto-mount."""
   vfolderId: UUID!
@@ -4728,6 +4753,14 @@ type DeleteStorageVolumePayload {
   item: StorageVolumeV2!
 }
 
+"""
+Added in 26.10.0. Payload for a system session environ row soft delete.
+"""
+type DeleteSystemSessionEnvironPayload {
+  """The soft-deleted row."""
+  systemSessionEnviron: SystemSessionEnviron!
+}
+
 """Added in 26.4.2. Payload for user resource policy deletion."""
 type DeleteUserResourcePolicyPayload {
   """Name of the deleted policy."""
@@ -4910,7 +4943,9 @@ input DeploymentFilter {
   """Added in 26.9.0. Filter by deployment ID."""
   entityId: UUIDFilter = null
 
-  """Added in 26.9.0. Filter by the requested replica count."""
+  """
+  Added in 26.9.0. Filter by the desired replica count. Falls back to the user-set replica count until autoscaling sets one.
+  """
   desiredReplicas: IntFilter = null
 
   """Added in 26.9.0. Filter by scaling state."""
@@ -5173,6 +5208,9 @@ input DeploymentRevisionPresetFilter {
 
   """Variant ID filter."""
   runtimeVariantId: UUIDFilter = null
+
+  """Added in 26.10.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
 
   """Added in 26.7.0. Match all of the given sub-filters."""
   AND: [DeploymentRevisionPresetFilter!] = null
@@ -7594,6 +7632,110 @@ The `JSON` scalar type represents JSON values as specified by [ECMA-404](https:/
 scalar JSON @specifiedBy(url: "https://ecma-international.org/wp-content/uploads/ECMA-404_2nd_edition_december_2017.pdf")
 
 """
+Added in 26.10.0. One role of a session and the execution spec its kernels share.
+"""
+type KernelGroup implements Node {
+  """The Globally Unique ID of this object"""
+  id: ID!
+
+  """ID of the kernel group."""
+  fieldId: UUID!
+
+  """ID of the session the group belongs to."""
+  sessionId: UUID!
+
+  """Role of the group, unique within its session."""
+  role: String!
+
+  """ID of the image the group's kernels run."""
+  imageId: UUID
+
+  """Shared memory requested for the group. Null means the runtime default."""
+  shmem: BinarySizeInfo
+
+  """Command the group's kernels run at startup."""
+  startupCommand: String
+
+  """Ports pre-opened on the group's kernels."""
+  preopenPorts: [Int!]!
+
+  """
+  Reserved start time requested at creation. Honored only for batch sessions.
+  """
+  requestedStartsAt: DateTime
+
+  """Batch execution timeout in seconds."""
+  batchTimeout: Int
+
+  """The session the group belongs to."""
+  session: SessionV2
+
+  """The image the group's kernels run."""
+  image: ImageV2
+}
+
+"""Added in 26.10.0. Paginated connection for kernel groups."""
+type KernelGroupConnection {
+  """Pagination data for this connection"""
+  pageInfo: PageInfo!
+
+  """Contains the nodes in this connection."""
+  edges: [KernelGroupEdge!]!
+
+  """Total number of kernel groups matching the query."""
+  count: Int!
+}
+
+"""Added in 26.10.0. One kernel group within a connection."""
+type KernelGroupEdge {
+  """A cursor for use in pagination"""
+  cursor: String!
+
+  """The item at the end of the edge"""
+  node: KernelGroup!
+}
+
+"""Added in 26.10.0. Filter for kernel groups."""
+input KernelGroupFilter {
+  """Filter by kernel group ID."""
+  fieldId: UUIDFilter = null
+
+  """Filter by role."""
+  role: StringFilter = null
+
+  """Filter by image ID."""
+  imageId: UUIDFilter = null
+
+  """Filter by creation time."""
+  createdAt: DateTimeFilter = null
+
+  """Match all nested filters."""
+  AND: [KernelGroupFilter!] = null
+
+  """Match any nested filter."""
+  OR: [KernelGroupFilter!] = null
+
+  """Negate nested filters."""
+  NOT: [KernelGroupFilter!] = null
+}
+
+"""Added in 26.10.0. One ordering rule for a kernel group search."""
+input KernelGroupOrderBy {
+  """Field to order by."""
+  field: KernelGroupOrderField!
+
+  """Order direction."""
+  direction: OrderDirection! = ASC
+}
+
+"""Added in 26.10.0. Fields available for ordering kernel groups."""
+enum KernelGroupOrderField {
+  ROLE
+  REQUESTED_STARTS_AT
+  CREATED_AT
+}
+
+"""
 Added in 26.3.0. Per-slot resource allocation entry for a kernel.
 Represents one row from the resource_allocations table.
 """
@@ -7763,6 +7905,9 @@ type KernelV2 implements Node {
   """
   imageId: ID
 
+  """Added in 26.10.0. ID of the kernel group this kernel belongs to."""
+  kernelGroupId: UUID
+
   """Startup command executed when the kernel starts."""
   startupCommand: String
 
@@ -7789,6 +7934,9 @@ type KernelV2 implements Node {
 
   """Added in 26.4.3. The image used by this kernel."""
   image: ImageV2
+
+  """Added in 26.10.0. The kernel group this kernel belongs to."""
+  kernelGroup: KernelGroup
 
   """Added in 26.2.0. The user who owns this kernel."""
   user: UserV2
@@ -10998,6 +11146,27 @@ type Mutation {
   updateRuntimeVariant(input: UpdateRuntimeVariantInput!): UpdateRuntimeVariantPayload!
 
   """
+  Added in 26.10.0. Bind a value source to an environment variable name at the public scope, a domain or a project.
+  """
+  createSystemSessionEnviron(input: CreateSystemSessionEnvironInput!): CreateSystemSessionEnvironPayload
+
+  """
+  Added in 26.10.0. Change a system session environ row's key. Only provided fields are updated.
+  """
+  updateSystemSessionEnviron(id: UUID!, input: UpdateSystemSessionEnvironInput!): UpdateSystemSessionEnvironPayload
+
+  """Added in 26.10.0. Soft-delete a system session environ row."""
+  deleteSystemSessionEnviron(id: UUID!): DeleteSystemSessionEnvironPayload
+
+  """Added in 26.10.0. Restore a soft-deleted system session environ row."""
+  restoreSystemSessionEnviron(id: UUID!): RestoreSystemSessionEnvironPayload
+
+  """
+  Added in 26.10.0. Remove a system session environ row for good, soft-deleted or not.
+  """
+  purgeSystemSessionEnviron(id: UUID!): PurgeSystemSessionEnvironPayload
+
+  """
   Added in 26.10.0. Purge a runtime variant with the presets in its catalog.
   """
   purgeRuntimeVariant(id: UUID!): PurgeRuntimeVariantPayload!
@@ -11297,7 +11466,7 @@ type Mutation {
   purgeSessionGroup(input: PurgeSessionGroupInput!): PurgeSessionGroupPayload
 
   """
-  Added in 26.10.0. Auto-mount a vfolder into every session created in a project. The vfolder must belong to the project, and the caller needs the auto-mount create permission on it.
+  Added in 26.10.0. Auto-mount a vfolder into every session created in a project or by a user. The vfolder must belong to the project, or be owned by the user, and the caller needs the auto-mount create permission on that project or user.
   """
   createVfolderAutoMount(input: CreateVFolderAutoMountInput!): CreateVFolderAutoMountPayload
 
@@ -14772,6 +14941,15 @@ type PurgeStorageVolumePayload {
   entityId: UUID!
 }
 
+"""Added in 26.10.0. Payload for a system session environ row purge."""
+type PurgeSystemSessionEnvironPayload {
+  """Global ID of the purged row."""
+  purgedId: ID!
+
+  """The id of the purged row."""
+  entityId: UUID!
+}
+
 """Added in 26.10.0. Payload for user resource policy purge."""
 type PurgeUserResourcePolicyPayload {
   """Global ID of the purged user resource policy."""
@@ -15381,7 +15559,7 @@ type Query {
   scopedSessionGroups(scope: SessionGroupScope!, filter: SessionGroupFilter = null, orderBy: [SessionGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): SessionGroupConnection
 
   """
-  Added in 26.10.0. Page through the vfolder auto-mounts of the named projects, combined with OR. Every project is authorized before the read runs. Auto-mounts marked deleted are left out unless the filter names `deletedAt`.
+  Added in 26.10.0. Page through the vfolder auto-mounts of the named projects and users, combined with OR. Every project is authorized before the read runs. Auto-mounts marked deleted are left out unless the filter names `deletedAt`.
   """
   scopedVfolderAutoMounts(scope: VFolderAutoMountScope!, filter: VFolderAutoMountFilter = null, orderBy: [VFolderAutoMountOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderAutoMountConnection
 
@@ -16864,6 +17042,10 @@ enum ReplicaOrderField {
 Added in 25.19.0. Represents the current replica state of a deployment, including the desired replica count and access to the list of active replicas.
 """
 type ReplicaState {
+  """
+  Added in 26.10.0. The replica count the user set. Autoscaling changes only desiredReplicaCount, so the two differ when an autoscaling rule set the count.
+  """
+  replicaCount: Int!
   desiredReplicaCount: Int!
 }
 
@@ -17613,6 +17795,12 @@ type RestoreStorageVolumePayload {
   item: StorageVolumeV2!
 }
 
+"""Added in 26.10.0. Payload for a system session environ row restore."""
+type RestoreSystemSessionEnvironPayload {
+  """The restored row."""
+  systemSessionEnviron: SystemSessionEnviron!
+}
+
 """Added in 26.9.0. Payload for single user restore mutation."""
 type RestoreUserV2Payload {
   """Whether the restore was successful."""
@@ -17939,6 +18127,9 @@ input RoleFilter {
 
   """Added in 26.10.0. Filter by role ID."""
   entityId: UUIDFilter = null
+
+  """Added in 26.10.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [RoleFilter!] = null
   OR: [RoleFilter!] = null
   NOT: [RoleFilter!] = null
@@ -18331,6 +18522,9 @@ input RolePresetFilter {
   Added in 26.9.0. Filter by conditions on the permission entries the preset carries.
   """
   permissions: RolePresetPermissionNestedFilter = null
+
+  """Added in 26.10.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
 
   """Combine multiple filters with AND logic. All conditions must match."""
   AND: [RolePresetFilter!] = null
@@ -19471,34 +19665,10 @@ type ServiceCatalog implements Node {
   """Hash of the service configuration."""
   configHash: String!
 
-  """Endpoints exposed by this service instance."""
-  endpoints: [ServiceCatalogEndpoint!]!
-
   """
   Added in 26.10.0. The storage volumes attached to this service, one attachment per volume.
   """
   storageVolumeAttachments(filter: StorageVolumeServiceAttachmentFilter = null, orderBy: [StorageVolumeServiceAttachmentOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): StorageVolumeServiceAttachmentConnection
-}
-
-"""Added in 26.3.0. An endpoint exposed by a service instance."""
-type ServiceCatalogEndpoint {
-  """Role of this endpoint (e.g., 'main', 'health')."""
-  role: String!
-
-  """Network scope (e.g., 'public', 'private', 'internal')."""
-  scope: String!
-
-  """Hostname or IP address."""
-  address: String!
-
-  """Port number."""
-  port: Int!
-
-  """Protocol (e.g., 'grpc', 'http', 'https')."""
-  protocol: String!
-
-  """Additional metadata."""
-  metadata: JSON
 }
 
 """Added in 26.3.0. Filter for service catalog queries."""
@@ -20102,6 +20272,12 @@ type SessionV2 implements Node {
 
   """Added in 26.3.0. The kernels belonging to this session."""
   kernels: KernelV2Connection
+
+  """Added in 26.10.0. The main kernel group of this session."""
+  mainKernelGroup: KernelGroup
+
+  """Added in 26.10.0. The kernel groups of this session, one per role."""
+  kernelGroups(filter: KernelGroupFilter = null, orderBy: [KernelGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): KernelGroupConnection
 
   """
   Added in 26.4.4. The model deployment replica served by this session: a single replica instance of a model deployment that runs in this compute session and serves inference requests. Null for non-inference sessions.
@@ -22517,6 +22693,20 @@ type UpdateStorageVolumePayload {
 }
 
 """
+Added in 26.10.0. Input for changing a system session environ row's key.
+"""
+input UpdateSystemSessionEnvironInput {
+  """New environment variable name."""
+  key: String
+}
+
+"""Added in 26.10.0. Payload for a system session environ row update."""
+type UpdateSystemSessionEnvironPayload {
+  """The updated row."""
+  systemSessionEnviron: SystemSessionEnviron!
+}
+
+"""
 Added in 26.4.2. Input for updating a user resource policy. All fields optional.
 """
 input UpdateUserResourcePolicyInput {
@@ -23413,6 +23603,11 @@ type UserV2 implements Node @key(fields: "id") {
 
   """Added in 26.9.0. Resource groups this user may schedule on."""
   resourceGroups(filter: ResourceGroupFilter = null, orderBy: [ResourceGroupOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): ResourceGroupConnection
+
+  """
+  Added in 26.10.0. VFolders auto-mounted into every session this user creates. Those of the user's personal project are not included.
+  """
+  vfolderAutoMounts(filter: VFolderAutoMountFilter = null, orderBy: [VFolderAutoMountOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): VFolderAutoMountConnection
 }
 
 """
@@ -23548,6 +23743,9 @@ input UserV2Filter {
   Filter by the user's projects. Deprecated since 26.9.0. The condition is evaluated on rows the caller may not be able to read. Use `projectUsersV2`, which reads the users of one project.
   """
   project: UserProjectNestedFilter = null
+
+  """Added in 26.10.0. Select entities by the labels on them."""
+  labels: EntityLabelNestedFilter = null
   AND: [UserV2Filter!] = null
   OR: [UserV2Filter!] = null
   NOT: [UserV2Filter!] = null
@@ -23762,7 +23960,7 @@ type VFolder implements Node {
   entityId: UUID!
 
   """
-  Current operation status. READY, CLONING, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.
+  Current operation status. READY, CREATING, CLONING, DELETE_PENDING, DELETE_ONGOING, DELETE_COMPLETE, or DELETE_ERROR.
   """
   status: VFolderOperationStatus!
 
@@ -23774,7 +23972,9 @@ type VFolder implements Node {
   """
   metadata: VFolderMetadataInfo!
 
-  """Access control including permission level and ownership type."""
+  """
+  Access control including the folder's default mount permission level and ownership type.
+  """
   accessControl: VFolderAccessControlInfo!
 
   """
@@ -23804,17 +24004,22 @@ type VFolder implements Node {
   entityLabels(filter: EntityLabelFilter = null, orderBy: [EntityLabelOrderBy!] = null, before: String = null, after: String = null, first: Int = null, last: Int = null, limit: Int = null, offset: Int = null): EntityLabelConnection
 
   """
-  Added in 26.9.0. The permission bits the current user holds on this vfolder.
+  Added in 26.9.0. The permission bits the current user holds on this vfolder. On a folder shared to them, capped by the share's `EntityShare.permissions`. Separate from the mount level (`mountPermission`).
   """
   permissions: [PermissionBit!]!
+
+  """
+  Added in 26.10.0. The level the current user mounts this vfolder at: NONE without read access, READ_WRITE on a personal folder they own, otherwise their own mount policy or the folder's default (`accessControl.permission`).
+  """
+  mountPermission: VFolderMountPermission
 }
 
 """
-Added in 26.4.2. Access control information for a virtual folder. Includes the mount permission level (read-only, read-write, read-write-delete) and ownership type (user or project).
+Added in 26.4.2. Access control information for a virtual folder. Includes the folder's default mount permission level (read-only, read-write, read-write-delete) and ownership type (user or project).
 """
 type VFolderAccessControlInfo {
   """
-  Mount permission level: READ_ONLY (ro), READ_WRITE (rw), or RW_DELETE (wd).
+  The folder's default mount permission level: READ_ONLY (ro), READ_WRITE (rw), or RW_DELETE (wd). Applies to a shared user without their own `vfolderMountPolicies` entry. The level the current user mounts at is `VFolder.mountPermission`.
   """
   permission: VFolderMountPermission!
 
@@ -23825,7 +24030,7 @@ type VFolderAccessControlInfo {
 }
 
 """
-Added in 26.10.0. A vfolder mounted into every session created in a project, a personal project included.
+Added in 26.10.0. A vfolder mounted into every session created in a project, a personal project included, or by a user.
 """
 type VFolderAutoMount implements Node {
   """The Globally Unique ID of this object"""
@@ -23834,8 +24039,11 @@ type VFolderAutoMount implements Node {
   """ID of the auto-mount."""
   entityId: UUID!
 
-  """ID of the project the vfolder is auto-mounted in."""
-  projectId: UUID!
+  """Kind of the scope the auto-mount is set on."""
+  scopeType: VFolderAutoMountScopeType!
+
+  """ID of the project or the user."""
+  scopeId: UUID!
 
   """ID of the auto-mounted vfolder."""
   vfolderId: UUID!
@@ -23858,8 +24066,11 @@ type VFolderAutoMount implements Node {
   """Deletion timestamp. Null while the auto-mount is in use."""
   deletedAt: DateTime
 
-  """The project the vfolder is auto-mounted in."""
+  """The project the vfolder is auto-mounted in. Null for a user one."""
   project: ProjectV2
+
+  """The user the vfolder is auto-mounted for. Null for a project one."""
+  user: UserV2
 
   """The auto-mounted vfolder."""
   vfolder: VFolder
@@ -23893,8 +24104,11 @@ input VFolderAutoMountFilter {
   """Filter by auto-mount ID."""
   entityId: UUIDFilter = null
 
-  """Filter by project ID."""
-  projectId: UUIDFilter = null
+  """Filter by the kind of scope the auto-mount is set on."""
+  scopeType: VFolderAutoMountScopeTypeFilter = null
+
+  """Filter by the ID of the project or the user."""
+  scopeId: UUIDFilter = null
 
   """Filter by vfolder ID."""
   vfolderId: UUIDFilter = null
@@ -23961,13 +24175,52 @@ input VFolderAutoMountPermissionFilter {
 }
 
 """
-Added in 26.10.0. Scope for the scoped vfolder auto-mount query. The items are OR'd, and every scope named is authorized before the read runs.
+Added in 26.10.0. Scope for the scoped vfolder auto-mount query. The items are OR'd, and every scope named is authorized before the read runs. At least one of `project` and `user` must be non-empty.
 """
 input VFolderAutoMountScope {
   """
   Projects whose auto-mounts are being read. A personal project included.
   """
-  project: [UUIDScope!]!
+  project: [UUIDScope!] = null
+
+  """
+  Users whose own auto-mounts are being read; those of a personal project are not.
+  """
+  user: [UUIDScope!] = null
+}
+
+"""Added in 26.10.0. The one project or user an auto-mount is set on."""
+input VFolderAutoMountScopeRef {
+  """Kind of the scope."""
+  scopeType: VFolderAutoMountScopeType!
+
+  """ID of the project or the user."""
+  scopeId: UUID!
+}
+
+"""
+Added in 26.10.0. Whether an auto-mount is set on a project or on a user.
+"""
+enum VFolderAutoMountScopeType {
+  PROJECT
+  USER
+}
+
+"""
+Added in 26.10.0. Filter for the scope type with equality and membership operators.
+"""
+input VFolderAutoMountScopeTypeFilter {
+  """Exact match."""
+  equals: VFolderAutoMountScopeType = null
+
+  """Match any of the provided values."""
+  in: [VFolderAutoMountScopeType!] = null
+
+  """Exclude an exact match."""
+  notEquals: VFolderAutoMountScopeType = null
+
+  """Exclude any of the provided values."""
+  notIn: [VFolderAutoMountScopeType!] = null
 }
 
 """
@@ -24138,6 +24391,7 @@ type VFolderMountPolicy {
 """Added in 26.4.2. Operation status of a virtual folder."""
 enum VFolderOperationStatus {
   READY
+  CREATING
   CLONING
   DELETE_PENDING
   DELETE_ONGOING

@@ -16,6 +16,7 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.kernel_group import KernelGroupID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
@@ -49,6 +50,16 @@ from ai.backend.common.dto.manager.v2.kernel.response import (
     ResourceAllocationGQLDTO,
 )
 from ai.backend.common.dto.manager.v2.kernel.types import KernelOrderField, KernelStatusFilter
+from ai.backend.common.dto.manager.v2.kernel_group.request import (
+    KernelGroupFilter,
+    KernelGroupOrder,
+    ScopedSearchKernelGroupsInput,
+)
+from ai.backend.common.dto.manager.v2.kernel_group.response import (
+    KernelGroupNode,
+    ScopedSearchKernelGroupsPayload,
+)
+from ai.backend.common.dto.manager.v2.kernel_group.types import KernelGroupOrderField
 from ai.backend.common.dto.manager.v2.resource_slot.types import (
     ResourceOptsEntryInfoDTO,
     ResourceOptsInfoDTO,
@@ -104,6 +115,7 @@ from ai.backend.common.dto.manager.v2.session.types import (
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
+    BinarySize,
     ClusterMode,
     KernelId,
     MountInfoEntry,
@@ -116,6 +128,7 @@ from ai.backend.common.types import ResourceSlotEntry as DataResourceSlotEntry
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
 from ai.backend.manager.data.kernel.types import KernelInfo, KernelStatus
+from ai.backend.manager.data.kernel_group.types import KernelGroupData
 from ai.backend.manager.data.resource_slot.types import ResourceAllocationAggregate
 from ai.backend.manager.data.session.compute_schedule import ComputeScheduleKernelResult
 from ai.backend.manager.data.session.draft import KernelResourceInput
@@ -135,6 +148,9 @@ from ai.backend.manager.models.condition_utils import (
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.kernel.searchable_fields import KernelSearchableFields
 from ai.backend.manager.models.kernel.searchers import KernelSearcher
+from ai.backend.manager.models.kernel_group.row import KernelGroupRow
+from ai.backend.manager.models.kernel_group.searchable_fields import KernelGroupSearchableFields
+from ai.backend.manager.models.kernel_group.searchers import KernelGroupSearcher
 from ai.backend.manager.models.session.row import SessionRow
 from ai.backend.manager.models.session.scopes import (
     DomainSessionTarget,
@@ -162,7 +178,16 @@ from ai.backend.manager.services.session.actions.batch_get_session_resource_allo
     BatchGetSessionResourceAllocationAction,
 )
 from ai.backend.manager.services.session.actions.bulk_get import BulkGetSessionsAction
+from ai.backend.manager.services.session.actions.bulk_get_kernel_groups import (
+    BulkGetKernelGroupsAction,
+)
 from ai.backend.manager.services.session.actions.bulk_get_kernels import BulkGetKernelsAction
+from ai.backend.manager.services.session.actions.bulk_get_main_kernel_groups import (
+    BulkGetMainKernelGroupsAction,
+)
+from ai.backend.manager.services.session.actions.bulk_get_session_designated_agent_ids import (
+    BulkGetSessionDesignatedAgentIdsAction,
+)
 from ai.backend.manager.services.session.actions.compute_schedule import (
     ComputeScheduleAction,
 )
@@ -185,6 +210,9 @@ from ai.backend.manager.services.session.actions.global_search_kernels import (
 from ai.backend.manager.services.session.actions.rename_session import RenameSessionAction
 from ai.backend.manager.services.session.actions.scoped_search import (
     ScopedSearchSessionsAction,
+)
+from ai.backend.manager.services.session.actions.scoped_search_kernel_groups import (
+    ScopedSearchKernelGroupsAction,
 )
 from ai.backend.manager.services.session.actions.scoped_search_kernels import (
     ScopedSearchKernelsAction,
@@ -234,6 +262,11 @@ _SESSION_PAGINATION_SPEC = PaginationSpec(
 _KERNEL_PAGINATION_SPEC = PaginationSpec(
     forward_order=KernelSearchableFields.own.created_at.order.apply(ascending=False),
     cursor_column=KernelRow.id,
+)
+
+_KERNEL_GROUP_PAGINATION_SPEC = PaginationSpec(
+    forward_order=KernelGroupSearchableFields.own.created_at.order.apply(ascending=True),
+    cursor_column=KernelGroupRow.id,
 )
 
 
@@ -490,7 +523,7 @@ class SessionAdapter(BaseAdapter):
             return []
         result = await self._session.bulk_get.run(BulkGetSessionsAction(ids=list(session_ids)))
         nodes = iter(
-            await self._session_data_to_nodes([
+            await self._session_data_to_node_results([
                 item.value.to_session_data() for item in result.items if item.value is not None
             ])
         )
@@ -592,17 +625,158 @@ class SessionAdapter(BaseAdapter):
             for kid in kernel_ids
         ]
 
+    async def _batch_main_kernel_group(
+        self, session_ids: Sequence[SessionID]
+    ) -> list[KernelGroupData | None]:
+        """The main kernel group of each session, in the order of the ids."""
+        if not session_ids:
+            return []
+        action_result = await self._session.bulk_get_main_kernel_groups.run(
+            BulkGetMainKernelGroupsAction(session_ids=list(session_ids))
+        )
+        return [action_result.designated.get(session_id) for session_id in session_ids]
+
+    async def _batch_kernel_groups(
+        self, kernel_group_ids: Sequence[KernelGroupID]
+    ) -> list[KernelGroupData | Exception | None]:
+        """The kernel groups the ids name, checked per owning session."""
+        if not kernel_group_ids:
+            return []
+        return await self.batch_load_fields(
+            self._session.bulk_get_kernel_groups,
+            BulkGetKernelGroupsAction(ids=list(kernel_group_ids)),
+            kernel_group_ids,
+            lambda group: group,
+        )
+
+    async def batch_load_main_kernel_groups(
+        self, session_ids: Sequence[SessionID]
+    ) -> list[KernelGroupNode | None]:
+        """The main kernel group of each session for a DataLoader, in the order of the ids."""
+        return [
+            self._kernel_group_data_to_node(group) if group is not None else None
+            for group in await self._batch_main_kernel_group(session_ids)
+        ]
+
+    async def batch_load_kernel_groups_by_ids(
+        self, kernel_group_ids: Sequence[KernelGroupID]
+    ) -> list[KernelGroupNode | Exception | None]:
+        """The kernel groups the ids name for a DataLoader, in the order of the ids."""
+        return [
+            self._kernel_group_data_to_node(group) if isinstance(group, KernelGroupData) else group
+            for group in await self._batch_kernel_groups(kernel_group_ids)
+        ]
+
+    async def scoped_search_kernel_groups(
+        self, input: ScopedSearchKernelGroupsInput
+    ) -> ScopedSearchKernelGroupsPayload:
+        """Search the kernel groups of the sessions in the scope, authorized on each session."""
+        conditions = self._convert_kernel_group_filter(input.filter) if input.filter else []
+        orders = self._convert_kernel_group_orders(input.order) if input.order else []
+        action_result = await self._session.scoped_search_kernel_groups.run(
+            ScopedSearchKernelGroupsAction(
+                session_ids=[SessionID(item.value) for item in input.scope.session],
+                searcher=self._build_searcher(
+                    KernelGroupSearcher,
+                    conditions=conditions,
+                    orders=orders,
+                    pagination_spec=_KERNEL_GROUP_PAGINATION_SPEC,
+                    first=input.first,
+                    after=input.after,
+                    last=input.last,
+                    before=input.before,
+                    limit=input.limit,
+                    offset=input.offset,
+                ),
+            )
+        )
+        return ScopedSearchKernelGroupsPayload(
+            items=[self._kernel_group_data_to_node(group) for group in action_result.items],
+            total_count=action_result.total_count,
+            has_next_page=action_result.has_next_page,
+            has_previous_page=action_result.has_previous_page,
+        )
+
+    def _convert_kernel_group_filter(self, f: KernelGroupFilter) -> list[QueryCondition]:
+        fields = KernelGroupSearchableFields.own
+        conditions: list[QueryCondition] = [
+            *self.apply_uuid_filter(f.field_id, fields.field_id.filter),
+            *self.apply_string_filter(f.role, fields.role.filter),
+            *self.apply_uuid_filter(f.image_id, fields.image_id.filter),
+            *self.apply_datetime_filter(f.created_at, fields.created_at.filter),
+        ]
+        if f.AND:
+            for sub in f.AND:
+                conditions.extend(self._convert_kernel_group_filter(sub))
+        if f.OR:
+            or_conditions: list[QueryCondition] = []
+            for sub in f.OR:
+                sub_conditions = self._convert_kernel_group_filter(sub)
+                if sub_conditions:
+                    or_conditions.append(combine_conditions_and(sub_conditions))
+            if or_conditions:
+                conditions.append(combine_conditions_or(or_conditions))
+        if f.NOT:
+            for sub in f.NOT:
+                sub_conditions = self._convert_kernel_group_filter(sub)
+                if sub_conditions:
+                    conditions.append(negate_conditions(sub_conditions))
+        return conditions
+
+    def _convert_kernel_group_orders(self, orders: list[KernelGroupOrder]) -> list[QueryOrder]:
+        fields = KernelGroupSearchableFields.own
+        result: list[QueryOrder] = []
+        for order in orders:
+            ascending = order.direction == OrderDirection.ASC
+            match order.field:
+                case KernelGroupOrderField.ROLE:
+                    result.append(fields.role.order.apply(ascending))
+                case KernelGroupOrderField.REQUESTED_STARTS_AT:
+                    result.append(fields.requested_starts_at.order.apply(ascending))
+                case KernelGroupOrderField.CREATED_AT:
+                    result.append(fields.created_at.order.apply(ascending))
+                case _:
+                    assert_never(order.field)
+        return result
+
     async def _session_data_to_nodes(self, data: Sequence[SessionData]) -> list[SessionNode]:
-        """Convert session data to nodes, batch-loading their slot allocations."""
-        allocations = await self.batch_resource_allocation_by_session([
-            SessionID(item.id) for item in data
-        ])
+        """Convert session data to nodes for a payload, which carries nodes only; the first
+        session that failed to load fails the request."""
         nodes: list[SessionNode] = []
-        for item, allocation in zip(data, allocations, strict=True):
-            if isinstance(allocation, Exception):
-                raise allocation
-            nodes.append(self._session_data_to_node(item, allocation))
+        for node in await self._session_data_to_node_results(data):
+            if isinstance(node, Exception):
+                raise node
+            nodes.append(node)
         return nodes
+
+    async def _session_data_to_node_results(
+        self, data: Sequence[SessionData]
+    ) -> list[SessionNode | Exception]:
+        """Convert session data to nodes, batch-loading their slot allocations and
+        designated agents. A session whose allocation or agents fail to load answers
+        with that error instead of a node."""
+        session_ids = [SessionID(item.id) for item in data]
+        allocations = await self.batch_resource_allocation_by_session(session_ids)
+        designated = (
+            (
+                await self._session.bulk_get_session_designated_agent_ids.run(
+                    BulkGetSessionDesignatedAgentIdsAction(session_ids=session_ids)
+                )
+            ).items
+            if session_ids
+            else []
+        )
+        results: list[SessionNode | Exception] = []
+        for item, allocation, agents in zip(data, allocations, designated, strict=True):
+            if isinstance(allocation, Exception):
+                results.append(allocation)
+                continue
+            error = self.batch_load_failure(agents.error)
+            if error is not None:
+                results.append(error)
+                continue
+            results.append(self._session_data_to_node(item, allocation, agents.value or []))
+        return results
 
     async def _kernel_infos_to_nodes(self, data: Sequence[KernelInfo]) -> list[KernelNode]:
         """Convert kernel infos to nodes, batch-loading their slot allocations."""
@@ -1299,7 +1473,7 @@ class SessionAdapter(BaseAdapter):
 
     @staticmethod
     def _session_data_to_node(
-        data: SessionData, allocation: ResourceAllocationGQLDTO
+        data: SessionData, allocation: ResourceAllocationGQLDTO, designated_agent_ids: list[AgentId]
     ) -> SessionNode:
         environ = (
             EnvironmentVariablesInfoDTO(
@@ -1335,7 +1509,7 @@ class SessionAdapter(BaseAdapter):
                 allocation=allocation,
                 resource_group_name=data.resource_group_name,
                 session_group_id=data.session_group_id,
-                designated_agent_ids=data.designated_agent_ids,
+                designated_agent_ids=[str(agent_id) for agent_id in designated_agent_ids] or None,
             ),
             lifecycle=SessionLifecycleInfoGQLDTO(
                 status=_fold_session_status(data.status),
@@ -1382,6 +1556,7 @@ class SessionAdapter(BaseAdapter):
             id=info.id,
             field_id=info.id,
             image_id=info.image.image_id,
+            kernel_group_id=info.kernel_group_id,
             startup_command=info.runtime.startup_command,
             session_info=KernelSessionInfoGQLDTO(
                 session_id=UUID(info.session.session_id),
@@ -1420,4 +1595,19 @@ class SessionAdapter(BaseAdapter):
                 terminated_at=info.lifecycle.terminated_at,
                 starts_at=info.lifecycle.starts_at,
             ),
+        )
+
+    @staticmethod
+    def _kernel_group_data_to_node(data: KernelGroupData) -> KernelGroupNode:
+        return KernelGroupNode(
+            id=data.id,
+            field_id=data.id,
+            session_id=data.session_id,
+            role=data.role,
+            image_id=data.image_id,
+            shmem=BinarySize.to_size_info(data.shmem) if data.shmem is not None else None,
+            startup_command=data.startup_command,
+            preopen_ports=data.preopen_ports,
+            requested_starts_at=data.requested_starts_at,
+            batch_timeout=data.batch_timeout_sec,
         )

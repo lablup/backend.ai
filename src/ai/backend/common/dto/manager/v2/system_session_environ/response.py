@@ -14,9 +14,14 @@ from ai.backend.common.dto.manager.v2.system_session_environ.types import (
 
 __all__ = (
     "AdminSearchSystemSessionEnvironsPayload",
+    "CreateSystemSessionEnvironPayload",
+    "DeleteSystemSessionEnvironPayload",
     "ListSystemSessionEnvironValueSourcesPayload",
+    "PurgeSystemSessionEnvironPayload",
+    "RestoreSystemSessionEnvironPayload",
     "ScopedSearchSystemSessionEnvironsPayload",
     "SystemSessionEnvironNode",
+    "UpdateSystemSessionEnvironPayload",
 )
 
 
@@ -62,3 +67,33 @@ class ListSystemSessionEnvironValueSourcesPayload(BaseResponseModel):
     """Every value source a system session environ row can carry."""
 
     items: list[str] = Field(description="The value source names a row can carry.")
+
+
+class CreateSystemSessionEnvironPayload(BaseResponseModel):
+    """The system session environ row the create made."""
+
+    system_session_environ: SystemSessionEnvironNode = Field(description="The created row.")
+
+
+class UpdateSystemSessionEnvironPayload(BaseResponseModel):
+    """The system session environ row after the update."""
+
+    system_session_environ: SystemSessionEnvironNode = Field(description="The updated row.")
+
+
+class DeleteSystemSessionEnvironPayload(BaseResponseModel):
+    """The system session environ row after the soft delete."""
+
+    system_session_environ: SystemSessionEnvironNode = Field(description="The soft-deleted row.")
+
+
+class RestoreSystemSessionEnvironPayload(BaseResponseModel):
+    """The system session environ row after the restore."""
+
+    system_session_environ: SystemSessionEnvironNode = Field(description="The restored row.")
+
+
+class PurgeSystemSessionEnvironPayload(BaseResponseModel):
+    """The id of the system session environ row the purge removed."""
+
+    entity_id: SystemSessionEnvironID = Field(description="The id of the purged row.")

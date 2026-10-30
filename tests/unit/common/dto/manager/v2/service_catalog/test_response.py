@@ -14,22 +14,7 @@ from ai.backend.common.dto.manager.v2.service_catalog.response import (
     ServiceCatalogNode,
     UpdateServiceCatalogPayload,
 )
-from ai.backend.common.dto.manager.v2.service_catalog.types import EndpointInfo
 from ai.backend.common.types import ServiceCatalogStatus
-
-
-def _make_endpoint_info(**kwargs: object) -> EndpointInfo:
-    defaults: dict[str, Any] = {
-        "id": uuid.uuid4(),
-        "role": "primary",
-        "scope": "internal",
-        "address": "192.168.1.100",
-        "port": 8080,
-        "protocol": "http",
-        "metadata": None,
-    }
-    defaults.update(kwargs)
-    return EndpointInfo(**defaults)
 
 
 def _make_service_catalog_node(**kwargs: object) -> ServiceCatalogNode:
@@ -48,7 +33,6 @@ def _make_service_catalog_node(**kwargs: object) -> ServiceCatalogNode:
         "registered_at": now,
         "last_heartbeat": now,
         "config_hash": "",
-        "endpoints": [],
     }
     defaults.update(kwargs)
     return ServiceCatalogNode(**defaults)
@@ -73,7 +57,6 @@ class TestServiceCatalogNode:
             registered_at=now,
             last_heartbeat=now,
             config_hash="abc123",
-            endpoints=[],
         )
         assert node.id == catalog_id
         assert node.service_group == "my-group"
@@ -84,30 +67,9 @@ class TestServiceCatalogNode:
         assert node.status == ServiceCatalogStatus.HEALTHY
         assert node.config_hash == "abc123"
 
-    def test_endpoints_defaults_to_empty_list(self) -> None:
-        node = _make_service_catalog_node()
-        assert node.endpoints == []
-
     def test_labels_defaults_to_empty_dict(self) -> None:
         node = _make_service_catalog_node()
         assert node.labels == {}
-
-    def test_with_single_endpoint(self) -> None:
-        endpoint = _make_endpoint_info(role="primary", port=8080)
-        node = _make_service_catalog_node(endpoints=[endpoint])
-        assert len(node.endpoints) == 1
-        assert node.endpoints[0].role == "primary"
-        assert node.endpoints[0].port == 8080
-
-    def test_with_multiple_endpoints(self) -> None:
-        endpoints = [
-            _make_endpoint_info(role="primary", port=8080),
-            _make_endpoint_info(role="secondary", port=8081),
-        ]
-        node = _make_service_catalog_node(endpoints=endpoints)
-        assert len(node.endpoints) == 2
-        assert node.endpoints[0].role == "primary"
-        assert node.endpoints[1].role == "secondary"
 
     def test_with_labels(self) -> None:
         node = _make_service_catalog_node(labels={"team": "ml", "env": "staging"})
@@ -130,20 +92,6 @@ class TestServiceCatalogNode:
         assert restored.id == catalog_id
         assert restored.service_group == "my-group"
         assert restored.config_hash == "deadbeef"
-        assert restored.endpoints == []
-
-    def test_round_trip_with_endpoints(self) -> None:
-        catalog_id = uuid.uuid4()
-        endpoint_id = uuid.uuid4()
-        endpoint = _make_endpoint_info(id=endpoint_id, role="primary", port=9090)
-        node = _make_service_catalog_node(id=catalog_id, endpoints=[endpoint])
-        json_str = node.model_dump_json()
-        restored = ServiceCatalogNode.model_validate_json(json_str)
-        assert restored.id == catalog_id
-        assert len(restored.endpoints) == 1
-        assert restored.endpoints[0].id == endpoint_id
-        assert restored.endpoints[0].role == "primary"
-        assert restored.endpoints[0].port == 9090
 
     def test_round_trip_with_labels(self) -> None:
         node = _make_service_catalog_node(labels={"key": "value", "count": "42"})
@@ -178,13 +126,6 @@ class TestCreateServiceCatalogPayload:
         json_str = payload.model_dump_json()
         restored = CreateServiceCatalogPayload.model_validate_json(json_str)
         assert restored.service.id == catalog_id
-
-    def test_nested_endpoints_in_payload(self) -> None:
-        endpoint = _make_endpoint_info(role="primary")
-        node = _make_service_catalog_node(endpoints=[endpoint])
-        payload = CreateServiceCatalogPayload(service=node)
-        assert len(payload.service.endpoints) == 1
-        assert payload.service.endpoints[0].role == "primary"
 
 
 class TestUpdateServiceCatalogPayload:

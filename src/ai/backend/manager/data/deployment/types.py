@@ -1241,6 +1241,7 @@ class ModelDeploymentMetadataInfo:
 
 @dataclass
 class ReplicaStateData:
+    replica_count: int
     desired_replica_count: int
     replica_ids: list[UUID]
 

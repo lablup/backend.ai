@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 import pytest
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
@@ -19,7 +20,6 @@ from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.model_deployment.types import ModelDeploymentStatus
 from ai.backend.common.types import ResourceSlot
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import ModelDeploymentData
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.project.types import ProjectType
@@ -41,7 +41,6 @@ from ai.backend.manager.models.endpoint.scopes import (
 )
 from ai.backend.manager.models.endpoint.searchable_fields import DeploymentSearchableFields
 from ai.backend.manager.models.endpoint.searchers import DeploymentSearcher
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -265,6 +264,8 @@ class TestDeploymentScopedSearch:
                             resource_group=sgroup_name,
                             lifecycle_stage=EndpointLifecycle.CREATED,
                             replicas=1,
+                            # Autoscaling scaled the second deployment in project A to zero.
+                            desired_replicas=0 if ids is endpoint_ids_in_a and i == 1 else None,
                         )
                     )
                     ids.append(eid)
@@ -469,3 +470,26 @@ class TestDeploymentScopedSearch:
         )
 
         assert result.total_count == 0
+
+    async def test_desired_replicas_falls_back_to_replicas(
+        self,
+        repository: OpsRepository[ModelDeploymentData],
+        test_data: TestData,
+    ) -> None:
+        result = await repository.scoped_search(
+            ScopedSearcher(
+                scopes=[ProjectDeploymentTarget(project_id=test_data.project_a_id)],
+                used_by=[],
+                searcher=DeploymentSearcher(
+                    pagination=OffsetPagination(limit=10, offset=0),
+                    conditions=[
+                        DeploymentSearchableFields.own.desired_replicas.filter.equals(1),
+                    ],
+                ),
+            )
+        )
+
+        (item,) = result.items
+        assert item.id == test_data.endpoint_ids_in_a[0]
+        assert item.replica_state.replica_count == 1
+        assert item.replica_state.desired_replica_count == 1

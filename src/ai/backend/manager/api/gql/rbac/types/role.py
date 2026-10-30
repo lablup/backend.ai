@@ -137,6 +137,7 @@ from ai.backend.manager.api.gql.decorators import (
     gql_pydantic_input,
     gql_pydantic_type,
 )
+from ai.backend.manager.api.gql.entity_label.types.filters import EntityLabelNestedFilterGQL
 from ai.backend.manager.api.gql.pydantic_compat import PydanticNodeMixin, PydanticOutputMixin
 from ai.backend.manager.api.gql.rbac.types.scope import (
     ScopeInputGQL,
@@ -773,6 +774,13 @@ class RoleFilter(PydanticInputMixin[RoleFilterDTO], GQLFilter):
     )
     entity_id: UUIDFilter | None = gql_added_field(
         BackendAIGQLMeta(added_version=NEXT_RELEASE_VERSION, description="Filter by role ID."),
+        default=None,
+    )
+    labels: EntityLabelNestedFilterGQL | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Select entities by the labels on them.",
+        ),
         default=None,
     )
 

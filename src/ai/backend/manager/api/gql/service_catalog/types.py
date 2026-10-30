@@ -21,9 +21,6 @@ from ai.backend.common.dto.manager.v2.service_catalog.request import (
 )
 from ai.backend.common.dto.manager.v2.service_catalog.response import ServiceCatalogNode
 from ai.backend.common.dto.manager.v2.service_catalog.types import (
-    EndpointInfo,
-)
-from ai.backend.common.dto.manager.v2.service_catalog.types import (
     ServiceCatalogStatusFilter as ServiceCatalogStatusFilterDTO,
 )
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
@@ -35,12 +32,10 @@ from ai.backend.manager.api.gql.decorators import (
     gql_field,
     gql_node_type,
     gql_pydantic_input,
-    gql_pydantic_type,
 )
 from ai.backend.manager.api.gql.pydantic_compat import (
     PydanticInputMixin,
     PydanticNodeMixin,
-    PydanticOutputMixin,
 )
 from ai.backend.manager.api.gql.storage_volume_service_attachment.types import (
     StorageVolumeServiceAttachmentConnectionGQL,
@@ -50,7 +45,6 @@ from ai.backend.manager.api.gql.storage_volume_service_attachment.types import (
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 
 __all__ = (
-    "ServiceCatalogEndpointGQL",
     "ServiceCatalogFilterGQL",
     "ServiceCatalogGQL",
     "ServiceCatalogOrderByGQL",
@@ -70,23 +64,6 @@ class ServiceCatalogStatusGQL(StrEnum):
     HEALTHY = "healthy"
     UNHEALTHY = "unhealthy"
     DEREGISTERED = "deregistered"
-
-
-@gql_pydantic_type(
-    BackendAIGQLMeta(
-        added_version="26.3.0",
-        description="An endpoint exposed by a service instance.",
-    ),
-    model=EndpointInfo,
-    name="ServiceCatalogEndpoint",
-)
-class ServiceCatalogEndpointGQL(PydanticOutputMixin[EndpointInfo]):
-    role: str = gql_field(description="Role of this endpoint (e.g., 'main', 'health').")
-    scope: str = gql_field(description="Network scope (e.g., 'public', 'private', 'internal').")
-    address: str = gql_field(description="Hostname or IP address.")
-    port: int = gql_field(description="Port number.")
-    protocol: str = gql_field(description="Protocol (e.g., 'grpc', 'http', 'https').")
-    metadata: JSON | None = gql_field(description="Additional metadata.", default=None)
 
 
 @gql_node_type(
@@ -116,9 +93,6 @@ class ServiceCatalogGQL(PydanticNodeMixin[ServiceCatalogNode]):
     registered_at: datetime = gql_field(description="When the service was first registered.")
     last_heartbeat: datetime = gql_field(description="Last heartbeat timestamp.")
     config_hash: str = gql_field(description="Hash of the service configuration.")
-    endpoints: list[ServiceCatalogEndpointGQL] = gql_field(
-        description="Endpoints exposed by this service instance."
-    )
 
     @gql_added_field(
         BackendAIGQLMeta(

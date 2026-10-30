@@ -91,10 +91,7 @@ class ResourceAllocationService:
 
     async def get_keypair_usage(self, action: GetKeypairUsageAction) -> GetKeypairUsageActionResult:
         """Get keypair resource usage."""
-        usage = await self._resource_allocation_repository.get_keypair_usage(
-            access_key=action.access_key,
-            resource_policy=action.resource_policy,
-        )
+        usage = await self._resource_allocation_repository.get_keypair_usage(action.user_id)
         return GetKeypairUsageActionResult(usage=usage)
 
     async def get_user_usage(self, action: GetUserUsageAction) -> GetUserUsageActionResult:

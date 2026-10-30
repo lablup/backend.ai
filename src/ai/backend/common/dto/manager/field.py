@@ -14,6 +14,7 @@ class VFolderPermissionField(enum.StrEnum):
 
 class VFolderOperationStatusField(enum.StrEnum):
     READY = "ready"
+    CREATING = "creating"
     PERFORMING = "performing"
     CLONING = "cloning"
     MOUNTED = "mounted"

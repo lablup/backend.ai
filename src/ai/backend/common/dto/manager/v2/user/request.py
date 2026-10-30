@@ -20,6 +20,7 @@ from ai.backend.common.dto.manager.query import (
     ToManyFilter,
     UUIDFilter,
 )
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
 from ai.backend.common.dto.manager.v2.keypair.request import KeypairFilter
 from ai.backend.common.dto.manager.v2.user.types import (
     OrderDirection,
@@ -386,6 +387,10 @@ class UserFilter(BaseRequestModel):
     )
     project: UserProjectFilter | None = Field(
         default=None, description="Nested filter for projects a user belongs to."
+    )
+    labels: EntityLabelNestedFilter | None = Field(
+        default=None,
+        description=f"Added in {NEXT_RELEASE_VERSION}. Filter by the labels on the entity.",
     )
     AND: list[UserFilter] | None = Field(
         default=None, description="Combine multiple filters with AND logic."

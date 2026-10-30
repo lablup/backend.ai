@@ -44,6 +44,7 @@ from ai.backend.common.data.entity.idle_checker import IdleCheckerEntityType, Id
 from ai.backend.common.data.entity.image import ImageEntityType, ImageID
 from ai.backend.common.data.entity.image_alias import ImageAliasID
 from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.kernel_group import KernelGroupID
 from ai.backend.common.data.entity.kernel_scheduling_history import KernelSchedulingHistoryID
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.login_client_type import LoginClientTypeID
@@ -96,6 +97,7 @@ from ai.backend.common.data.entity.user import UserEntityType, UserID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType, VFolderUUID
 from ai.backend.common.data.entity.vfolder_auto_mount import VFolderAutoMountID
 from ai.backend.common.data.entity.vfs_storage import VFSStorageEntityType, VFSStorageID
+from ai.backend.common.dto.manager.field import VFolderPermissionField
 from ai.backend.common.dto.manager.v2.rbac.types import PermissionBitDTO
 from ai.backend.common.types import AgentId
 
@@ -168,6 +170,9 @@ if TYPE_CHECKING:
     from ai.backend.manager.api.gql.kernel.types import (  # pants: no-infer-dep
         KernelV2GQL,
         ResourceAllocationGQL,
+    )
+    from ai.backend.manager.api.gql.kernel_group.types import (  # pants: no-infer-dep
+        KernelGroupGQL,
     )
     from ai.backend.manager.api.gql.keypair.types.node import KeyPairGQL  # pants: no-infer-dep
     from ai.backend.manager.api.gql.login_client_type.types import (  # pants: no-infer-dep
@@ -466,6 +471,19 @@ class DataLoaders:
 
         async def load_fn(ids: list[VFolderUUID]) -> list[list[PermissionBitDTO] | Exception]:
             return await adapter.batch_load_permissions(ids)
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def vfolder_mount_permission_loader(
+        self,
+    ) -> DataLoader[VFolderUUID, VFolderPermissionField | None]:
+        adapter = self._adapters.vfolder
+
+        async def load_fn(
+            ids: list[VFolderUUID],
+        ) -> list[VFolderPermissionField | Exception | None]:
+            return await adapter.batch_load_mount_permissions(ids)
 
         return DataLoader(load_fn=load_fn)
 
@@ -855,6 +873,41 @@ class DataLoaders:
                 dto if dto is None or isinstance(dto, Exception) else KG.from_pydantic(dto)
                 for dto in dtos
             ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def kernel_group_loader(
+        self,
+    ) -> DataLoader[KernelGroupID, KernelGroupGQL | None]:
+        adapter = self._adapters.session
+
+        async def load_fn(ids: list[KernelGroupID]) -> list[KernelGroupGQL | Exception | None]:
+            from ai.backend.manager.api.gql.kernel_group.types import (  # pants: no-infer-dep
+                KernelGroupGQL as KGG,
+            )
+
+            dtos = await adapter.batch_load_kernel_groups_by_ids(ids)
+            return [
+                dto if dto is None or isinstance(dto, Exception) else KGG.from_pydantic(dto)
+                for dto in dtos
+            ]
+
+        return DataLoader(load_fn=load_fn)
+
+    @cached_property
+    def main_kernel_group_by_session_id_loader(
+        self,
+    ) -> DataLoader[SessionID, KernelGroupGQL | None]:
+        adapter = self._adapters.session
+
+        async def load_fn(session_ids: list[SessionID]) -> list[KernelGroupGQL | None]:
+            from ai.backend.manager.api.gql.kernel_group.types import (  # pants: no-infer-dep
+                KernelGroupGQL as KGG,
+            )
+
+            dtos = await adapter.batch_load_main_kernel_groups(session_ids)
+            return [KGG.from_pydantic(dto) if dto is not None else None for dto in dtos]
 
         return DataLoader(load_fn=load_fn)
 

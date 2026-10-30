@@ -28,6 +28,7 @@ from sqlalchemy.ext.asyncio.engine import AsyncEngine as SAEngine
 from ai.backend.client.v2.auth import HMACAuth
 from ai.backend.client.v2.config import ClientConfig
 from ai.backend.client.v2.registry import BackendAIClientRegistry
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.bgtask.bgtask import BackgroundTaskManager, BackgroundTaskManagerArgs
 from ai.backend.common.clients.valkey_client.valkey_artifact.client import (
     ValkeyArtifactDownloadTrackingClient,
@@ -110,7 +111,6 @@ from ai.backend.manager.config.unified import (
     ManagerConfig,
     ManagerUnifiedConfig,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.manager_status.types import ManagerStatus
 from ai.backend.manager.data.permission.global_entity import GlobalEntityIDCache
 from ai.backend.manager.data.secret.types import KeyProviderType
@@ -119,7 +119,6 @@ from ai.backend.manager.dependencies.infrastructure.redis import ValkeyClients
 from ai.backend.manager.models.base import pgsql_connect_opts
 from ai.backend.manager.models.domain.row import domains
 from ai.backend.manager.models.dotfile.row import DotfileRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageAliasRow, ImageRow
 from ai.backend.manager.models.kernel.row import kernels
 

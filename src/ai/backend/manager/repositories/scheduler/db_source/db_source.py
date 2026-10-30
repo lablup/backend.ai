@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession as SASession
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.kernel import KernelID
@@ -137,6 +138,10 @@ from ai.backend.manager.models.session.row import (
 )
 from ai.backend.manager.models.session.searchers import SessionInfoSearcher, SessionSearcher
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
+from ai.backend.manager.models.session_designated_agent.creators import (
+    SessionDesignatedAgentCreator,
+)
+from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
 from ai.backend.manager.models.specs.creator import FieldToCreate, NestedFieldToCreate
 from ai.backend.manager.models.user.row import UserRow
@@ -461,7 +466,6 @@ class ScheduleDBSource:
                     SessionRow.is_preemptible,
                     SessionRow.session_type,
                     SessionRow.cluster_mode,
-                    SessionRow.designated_agent_ids,
                     SessionRow.requested_starts_at,
                     SessionRow.options,
                     SessionRow.session_group_id,
@@ -514,6 +518,16 @@ class ScheduleDBSource:
                     ra_row.requested
                 )
 
+        # Designated agents by id, the name the selectors match agents on
+        designated_agents: dict[SessionId, list[AgentId]] = defaultdict(list)
+        designation_result = await db_sess.execute(
+            sa.select(SessionDesignatedAgentRow.session_id, AgentRow.id)
+            .join(AgentRow, AgentRow.uuid == SessionDesignatedAgentRow.agent_uuid)
+            .where(SessionDesignatedAgentRow.session_id.in_(session_rows.keys()))
+        )
+        for designated_session_id, agent_id in designation_result:
+            designated_agents[designated_session_id].append(AgentId(agent_id))
+
         group_policies = await self._fetch_session_group_policies(
             db_sess,
             {row.session_group_id for row in session_rows.values() if row.session_group_id},
@@ -556,9 +570,7 @@ class ScheduleDBSource:
                         cluster_mode=ClusterMode(row.cluster_mode),
                         kernels=kernels,
                         agent_selection_policy=row.options.agent_selection_policy,
-                        designated_agent_ids=[AgentId(a) for a in row.designated_agent_ids]
-                        if row.designated_agent_ids is not None
-                        else None,
+                        designated_agent_ids=designated_agents.get(session_id),
                         session_group=group_policies.get(row.session_group_id)
                         if row.session_group_id is not None
                         else None,
@@ -1955,6 +1967,21 @@ class ScheduleDBSource:
                     )
                 matched_dependency_ids.append(SessionID(dependency_id))
 
+            # An agent id missing from ``agents`` designates nothing.
+            designated_agent_uuids: list[AgentUUID] = []
+            if spec.resource_spec.options.scheduling_target.designated_agents:
+                designated_agent_uuids = list(
+                    (
+                        await read_sess.scalars(
+                            sa.select(AgentRow.uuid).where(
+                                AgentRow.id.in_(
+                                    spec.resource_spec.options.scheduling_target.designated_agents
+                                )
+                            )
+                        )
+                    ).all()
+                )
+
         kernel_groups = spec.resource_spec.options.kernel_groups
         group_roles = {group.role for group in kernel_groups}
         for kernel in spec.resource_spec.kernel_specs:
@@ -2039,6 +2066,13 @@ class ScheduleDBSource:
                 [
                     SessionDependencyCreator(depends_on=dependency_id)
                     for dependency_id in matched_dependency_ids
+                ],
+            )
+            await w.atomic_create_field_entities(
+                session_id,
+                [
+                    SessionDesignatedAgentCreator(agent_uuid=agent_uuid)
+                    for agent_uuid in designated_agent_uuids
                 ],
             )
             await w.apply_batch_transition(

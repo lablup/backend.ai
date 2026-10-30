@@ -404,6 +404,21 @@ class TestMountItemInput:
         assert result.mount_path is None
         assert result.permission is None
 
+    def test_paths_inside_root_accepted(self) -> None:
+        result = MountItemInput(vfolder_id=uuid4(), mount_path="/home/work/data", subpath="a/b")
+        assert result.mount_path == "/home/work/data"
+        assert result.subpath == "a/b"
+
+    @pytest.mark.parametrize("subpath", ["..", "../other", "a/../../other", "/etc"])
+    def test_subpath_escaping_root_rejected(self, subpath: str) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            MountItemInput(vfolder_id=uuid4(), subpath=subpath)
+
+    @pytest.mark.parametrize("mount_path", ["/home/work/../../etc", "data/../x", ".."])
+    def test_mount_path_with_parent_segment_rejected(self, mount_path: str) -> None:
+        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
+            MountItemInput(vfolder_id=uuid4(), mount_path=mount_path)
+
 
 class TestResourceOptsInput:
     """Tests for ResourceOptsInput model."""

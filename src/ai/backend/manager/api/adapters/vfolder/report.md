@@ -2,14 +2,15 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/vfolder/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/vfolder/adapter.py)
 
-시나리오: 미완 24 / 29
+시나리오: 미완 25 / 30
 
 - ops 로 구성 (4)
   - admin_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
   - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
   - project_search — 대표 성공 ✓ · 대표 실패 ✓
   - scoped_search — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-- 직접 구현 (25)
+- 직접 구현 (26)
+  - batch_load_mount_permissions — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
   - batch_load_permissions — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
   - bulk_delete — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
   - bulk_purge — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP

@@ -13,8 +13,8 @@ from ai.backend.manager.models.mixins.timestamp import LifecycleTimestampsMixin
 
 
 class VFolderAutoMountRow(SoftDeleteMixin, LifecycleTimestampsMixin, Base):
-    """A vfolder mounted into every session created in a project; a vfolder and a mount
-    destination each appear at most once among the project's live rows."""
+    """A vfolder mounted into every session created in a project or by a user; a vfolder and
+    a mount destination each appear at most once among the scope's live rows."""
 
     __tablename__ = "vfolder_auto_mounts"
     __table_args__ = (

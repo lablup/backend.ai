@@ -127,6 +127,7 @@ def _make_network_access(**kwargs: object) -> DeploymentNetworkAccessInfoDTO:
 
 def _make_replica_state(**kwargs: object) -> ReplicaStateInfo:
     defaults: dict[str, Any] = {
+        "replica_count": 2,
         "desired_replica_count": 2,
         "replica_ids": [],
     }

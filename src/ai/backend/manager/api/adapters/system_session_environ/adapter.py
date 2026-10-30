@@ -9,25 +9,34 @@ from collections.abc import Sequence
 from typing import assert_never
 
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.global_entity import GlobalEntityName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.system_session_environ import (
     SystemSessionEnvironID,
     SystemSessionEnvironScopeID,
 )
+from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.dto.manager.query import EnumFilter
 from ai.backend.common.dto.manager.v2.common import OrderDirection
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     AdminSearchSystemSessionEnvironsInput,
+    CreateSystemSessionEnvironInput,
     ScopedSearchSystemSessionEnvironsInput,
     SystemSessionEnvironFilter,
     SystemSessionEnvironOrder,
     SystemSessionEnvironValueSourceFilter,
+    UpdateSystemSessionEnvironInput,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.response import (
     AdminSearchSystemSessionEnvironsPayload,
+    CreateSystemSessionEnvironPayload,
+    DeleteSystemSessionEnvironPayload,
     ListSystemSessionEnvironValueSourcesPayload,
+    PurgeSystemSessionEnvironPayload,
+    RestoreSystemSessionEnvironPayload,
     ScopedSearchSystemSessionEnvironsPayload,
     SystemSessionEnvironNode,
+    UpdateSystemSessionEnvironPayload,
 )
 from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironOrderField,
@@ -36,8 +45,10 @@ from ai.backend.common.dto.manager.v2.system_session_environ.types import (
     SystemSessionEnvironScopeType,
     SystemSessionEnvironValueSource,
 )
+from ai.backend.common.exception import UnreachableError
 from ai.backend.manager.api.adapter_options.pagination.pagination import PaginationSpec
 from ai.backend.manager.api.adapters.base import BaseAdapter
+from ai.backend.manager.data.permission.global_entity import global_entity_id
 from ai.backend.manager.data.system_session_environ.types import SystemSessionEnvironData
 from ai.backend.manager.errors.system_session_environ import (
     UnknownSystemSessionEnvironValueSource,
@@ -49,6 +60,13 @@ from ai.backend.manager.models.condition_utils import (
     negate_conditions,
 )
 from ai.backend.manager.models.specs.searcher import GlobalSearcher, ScopedSearcher
+from ai.backend.manager.models.specs.soft_delete import RestoreUpdater, SoftDeleteUpdater
+from ai.backend.manager.models.system_session_environ.creators import (
+    SystemSessionEnvironCreator,
+)
+from ai.backend.manager.models.system_session_environ.purgers import (
+    SystemSessionEnvironPurger,
+)
 from ai.backend.manager.models.system_session_environ.row import SystemSessionEnvironRow
 from ai.backend.manager.models.system_session_environ.scopes import (
     DomainSystemSessionEnvironTarget,
@@ -62,8 +80,17 @@ from ai.backend.manager.models.system_session_environ.searchable_fields import (
 from ai.backend.manager.models.system_session_environ.searchers import (
     SystemSessionEnvironSearcher,
 )
+from ai.backend.manager.models.system_session_environ.updaters import (
+    SystemSessionEnvironUpdater,
+)
 from ai.backend.manager.services.system_session_environ.actions.bulk_get import (
     BulkGetSystemSessionEnvironsAction,
+)
+from ai.backend.manager.services.system_session_environ.actions.create import (
+    CreateSystemSessionEnvironAction,
+)
+from ai.backend.manager.services.system_session_environ.actions.delete import (
+    DeleteSystemSessionEnvironAction,
 )
 from ai.backend.manager.services.system_session_environ.actions.global_search import (
     GlobalSearchSystemSessionEnvironsAction,
@@ -71,12 +98,22 @@ from ai.backend.manager.services.system_session_environ.actions.global_search im
 from ai.backend.manager.services.system_session_environ.actions.public_list_value_sources import (
     PublicListSystemSessionEnvironValueSourcesAction,
 )
+from ai.backend.manager.services.system_session_environ.actions.purge import (
+    PurgeSystemSessionEnvironAction,
+)
+from ai.backend.manager.services.system_session_environ.actions.restore import (
+    RestoreSystemSessionEnvironAction,
+)
 from ai.backend.manager.services.system_session_environ.actions.scoped_search import (
     ScopedSearchSystemSessionEnvironsAction,
+)
+from ai.backend.manager.services.system_session_environ.actions.update import (
+    UpdateSystemSessionEnvironAction,
 )
 from ai.backend.manager.services.system_session_environ.processors import (
     SystemSessionEnvironProcessors,
 )
+from ai.backend.manager.types import OptionalState
 
 __all__ = ("SystemSessionEnvironAdapter",)
 
@@ -155,6 +192,82 @@ class SystemSessionEnvironAdapter(BaseAdapter):
         return ListSystemSessionEnvironValueSourcesPayload(
             items=[value_source.value for value_source in result.value_sources]
         )
+
+    async def create(
+        self, input: CreateSystemSessionEnvironInput
+    ) -> CreateSystemSessionEnvironPayload:
+        """Bind a value source to an environment variable name at one scope."""
+        result = await self._system_session_environ.create.run(
+            CreateSystemSessionEnvironAction(
+                creator=SystemSessionEnvironCreator(
+                    owner=self._owner_of(input.scope_type, input.scope_id),
+                    value_source=self._value_source_named(input.value_source),
+                    key=input.key,
+                )
+            )
+        )
+        return CreateSystemSessionEnvironPayload(
+            system_session_environ=self._data_to_node(result.data)
+        )
+
+    async def update(
+        self, environ_id: SystemSessionEnvironID, input: UpdateSystemSessionEnvironInput
+    ) -> UpdateSystemSessionEnvironPayload:
+        """Change a system session environ row's key."""
+        result = await self._system_session_environ.update.run(
+            UpdateSystemSessionEnvironAction(
+                updater=SystemSessionEnvironUpdater(
+                    environ_id=environ_id,
+                    key=OptionalState.from_unset(input.key),
+                )
+            )
+        )
+        return UpdateSystemSessionEnvironPayload(
+            system_session_environ=self._data_to_node(result.data)
+        )
+
+    async def delete(self, environ_id: SystemSessionEnvironID) -> DeleteSystemSessionEnvironPayload:
+        """Soft-delete a system session environ row."""
+        result = await self._system_session_environ.delete.run(
+            DeleteSystemSessionEnvironAction(
+                updater=SoftDeleteUpdater(
+                    target_row=SystemSessionEnvironRow,
+                    target_column=SystemSessionEnvironRow.id,
+                    target_id=environ_id,
+                    converter=SystemSessionEnvironSearchableFields.own,
+                )
+            )
+        )
+        return DeleteSystemSessionEnvironPayload(
+            system_session_environ=self._data_to_node(result.data)
+        )
+
+    async def restore(
+        self, environ_id: SystemSessionEnvironID
+    ) -> RestoreSystemSessionEnvironPayload:
+        """Restore a soft-deleted system session environ row."""
+        result = await self._system_session_environ.restore.run(
+            RestoreSystemSessionEnvironAction(
+                updater=RestoreUpdater(
+                    target_row=SystemSessionEnvironRow,
+                    target_column=SystemSessionEnvironRow.id,
+                    target_id=environ_id,
+                    converter=SystemSessionEnvironSearchableFields.own,
+                )
+            )
+        )
+        return RestoreSystemSessionEnvironPayload(
+            system_session_environ=self._data_to_node(result.data)
+        )
+
+    async def purge(self, environ_id: SystemSessionEnvironID) -> PurgeSystemSessionEnvironPayload:
+        """Remove a system session environ row for good, soft-deleted or not."""
+        result = await self._system_session_environ.purge.run(
+            PurgeSystemSessionEnvironAction(
+                purger=SystemSessionEnvironPurger(environ_id=environ_id)
+            )
+        )
+        return PurgeSystemSessionEnvironPayload(entity_id=result.data.id)
 
     async def bulk_get_ids(
         self, ids: Sequence[SystemSessionEnvironID]
@@ -239,6 +352,19 @@ class SystemSessionEnvironAdapter(BaseAdapter):
             return SystemSessionEnvironValueSource(name)
         except ValueError as e:
             raise UnknownSystemSessionEnvironValueSource(name) from e
+
+    def _owner_of(
+        self,
+        scope_type: SystemSessionEnvironScopeType,
+        scope_id: SystemSessionEnvironScopeID | None,
+    ) -> EntityIdentifier:
+        match scope_type:
+            case SystemSessionEnvironScopeType.PUBLIC:
+                return global_entity_id(GlobalEntityName.PUBLIC)
+            case SystemSessionEnvironScopeType.DOMAIN | SystemSessionEnvironScopeType.PROJECT:
+                if scope_id is None:
+                    raise UnreachableError(f"A {scope_type} system session environ has no scope id")
+                return scope_type.to_owner(scope_id)
 
     def _convert_orders(self, orders: list[SystemSessionEnvironOrder]) -> list[QueryOrder]:
         return [self._convert_order(order) for order in orders]

@@ -13,6 +13,7 @@ import pytest
 import sqlalchemy as sa
 from dateutil.tz import tzutc
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -53,7 +54,6 @@ from ai.backend.common.types import (
     SessionTypes,
 )
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import (
     DeploymentLifecycleSubStep,
     DeploymentOptions,
@@ -92,7 +92,6 @@ from ai.backend.manager.models.endpoint.creators import (
 from ai.backend.manager.models.endpoint.row import EndpointRow, EndpointTokenRow
 from ai.backend.manager.models.endpoint.updaters import DeploymentUpdater
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow

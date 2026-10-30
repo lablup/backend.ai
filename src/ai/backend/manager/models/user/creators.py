@@ -28,7 +28,7 @@ from ai.backend.manager.models.user.row import UserRole, UserRow
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
 
 if TYPE_CHECKING:
-    from ai.backend.manager.models.hasher.types import PasswordInfo
+    from ai.backend.common.auth.password import PasswordInfo
 
 
 @dataclass

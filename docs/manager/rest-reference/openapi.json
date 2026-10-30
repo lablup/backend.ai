@@ -3,7 +3,7 @@
   "info": {
     "title": "Backend.AI Manager API",
     "description": "Backend.AI Manager REST API specification",
-    "version": "26.10.0a3",
+    "version": "26.10.0a4",
     "contact": {
       "name": "Lablup Inc.",
       "url": "https://docs.backend.ai",
@@ -9001,6 +9001,18 @@
               }
             ],
             "default": null
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityLabelNestedFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by the labels on the entity."
           },
           "AND": {
             "anyOf": [
@@ -20830,6 +20842,18 @@
             ],
             "default": null,
             "description": "Filter by conditions on the permission entries the preset carries."
+          },
+          "labels": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityLabelNestedFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Added in 26.10.0. Filter by the labels on the entity."
           },
           "AND": {
             "anyOf": [
@@ -38158,6 +38182,69 @@
         "title": "ScopedSearchSystemSessionEnvironsInput",
         "type": "object"
       },
+      "CreateSystemSessionEnvironInput": {
+        "description": "Input for binding a value source to an environment variable name at one scope.",
+        "properties": {
+          "key": {
+            "description": "The environment variable name the value is injected under.",
+            "maxLength": 256,
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+            "title": "Key",
+            "type": "string"
+          },
+          "value_source": {
+            "description": "Which value of the starting session is injected, as a value source name the value source query lists.",
+            "title": "Value Source",
+            "type": "string"
+          },
+          "scope_type": {
+            "$ref": "#/components/schemas/SystemSessionEnvironScopeType",
+            "description": "Whether the row applies to every session, a domain's or a project's."
+          },
+          "scope_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The id of the domain or the project. Left out for public.",
+            "title": "Scope Id"
+          }
+        },
+        "required": [
+          "key",
+          "value_source",
+          "scope_type"
+        ],
+        "title": "CreateSystemSessionEnvironInput",
+        "type": "object"
+      },
+      "UpdateSystemSessionEnvironInput": {
+        "description": "Input for changing a system session environ row's key.",
+        "properties": {
+          "key": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "New environment variable name. Omit to leave unchanged.",
+            "title": "Key"
+          }
+        },
+        "title": "UpdateSystemSessionEnvironInput",
+        "type": "object"
+      },
       "ArrayFilter_int_": {
         "properties": {
           "contains": {
@@ -39359,6 +39446,7 @@
       "VFolderOperationStatusField": {
         "enum": [
           "ready",
+          "creating",
           "performing",
           "cloning",
           "mounted",
@@ -40551,14 +40639,42 @@
         "title": "BulkDeleteVFoldersInput",
         "type": "object"
       },
-      "CreateVFolderAutoMountInput": {
-        "description": "Input for auto-mounting a vfolder into every session created in a project.\n\nThe vfolder must belong to that project; for a personal project, that is the\nowner's personal vfolders.",
+      "VFolderAutoMountScopeRef": {
+        "description": "The one project or user an auto-mount is set on.",
         "properties": {
-          "project_id": {
-            "description": "ID of the project the vfolder is auto-mounted in.",
+          "scope_type": {
+            "$ref": "#/components/schemas/VFolderAutoMountScopeType",
+            "description": "Kind of the scope."
+          },
+          "scope_id": {
+            "description": "ID of the project or the user.",
             "format": "uuid",
-            "title": "Project Id",
+            "title": "Scope Id",
             "type": "string"
+          }
+        },
+        "required": [
+          "scope_type",
+          "scope_id"
+        ],
+        "title": "VFolderAutoMountScopeRef",
+        "type": "object"
+      },
+      "VFolderAutoMountScopeType": {
+        "description": "Scope whose sessions a vfolder is auto-mounted into; a personal project is a project,\nand a user scope is mapped to the user directly.",
+        "enum": [
+          "project",
+          "user"
+        ],
+        "title": "VFolderAutoMountScopeType",
+        "type": "string"
+      },
+      "CreateVFolderAutoMountInput": {
+        "description": "Input for auto-mounting a vfolder into every session created in a project or by a user.\n\nThe vfolder must belong to that project, or be owned by that user.",
+        "properties": {
+          "scope": {
+            "$ref": "#/components/schemas/VFolderAutoMountScopeRef",
+            "description": "The project or the user the vfolder is auto-mounted for."
           },
           "vfolder_id": {
             "description": "ID of the vfolder to auto-mount.",
@@ -40584,7 +40700,7 @@
           }
         },
         "required": [
-          "project_id",
+          "scope",
           "vfolder_id",
           "mount_destination",
           "mount_permission"
@@ -40607,7 +40723,19 @@
             "default": null,
             "description": "Filter by auto-mount ID."
           },
-          "project_id": {
+          "scope_type": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderAutoMountScopeTypeFilter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Filter by the kind of scope the auto-mount is set on."
+          },
+          "scope_id": {
             "anyOf": [
               {
                 "$ref": "#/components/schemas/UUIDFilter"
@@ -40617,7 +40745,7 @@
               }
             ],
             "default": null,
-            "description": "Filter by project ID."
+            "description": "Filter by the ID of the project or the user."
           },
           "vfolder_id": {
             "anyOf": [
@@ -40840,19 +40968,102 @@
         "description": "Scope for the scoped vfolder auto-mount query; the items are OR'd.",
         "properties": {
           "project": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
             "description": "Projects whose auto-mounts are being read. A personal project included.",
-            "items": {
-              "$ref": "#/components/schemas/UUIDScope"
-            },
-            "minItems": 1,
-            "title": "Project",
-            "type": "array"
+            "title": "Project"
+          },
+          "user": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/UUIDScope"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Users whose own auto-mounts are being read; those of a personal project are not.",
+            "title": "User"
           }
         },
-        "required": [
-          "project"
-        ],
         "title": "VFolderAutoMountScope",
+        "type": "object"
+      },
+      "VFolderAutoMountScopeTypeFilter": {
+        "description": "Filter for the kind of scope an auto-mount is set on.",
+        "properties": {
+          "equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderAutoMountScopeType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exact match."
+          },
+          "in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderAutoMountScopeType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Match any of the provided values.",
+            "title": "In"
+          },
+          "not_equals": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VFolderAutoMountScopeType"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude an exact match."
+          },
+          "not_in": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VFolderAutoMountScopeType"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Exclude any of the provided values.",
+            "title": "Not In"
+          }
+        },
+        "title": "VFolderAutoMountScopeTypeFilter",
         "type": "object"
       },
       "ScopedSearchVFolderAutoMountsInput": {
@@ -66324,6 +66535,160 @@
         "description": "Search the system session environ rows the named scopes reach.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
+    "/v2/system-session-environs": {
+      "post": {
+        "operationId": "v2/system-session-environs.create",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSystemSessionEnvironInput"
+              }
+            }
+          }
+        },
+        "parameters": [],
+        "description": "Bind a value source to an environment variable name at one scope.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/system-session-environs/{environ_id}": {
+      "patch": {
+        "operationId": "v2/system-session-environs.update",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSystemSessionEnvironInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "environ_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Change a system session environ row's key.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/system-session-environs/{environ_id}/delete": {
+      "post": {
+        "operationId": "v2/system-session-environs.delete",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "environ_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Soft-delete a system session environ row.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/system-session-environs/{environ_id}/restore": {
+      "post": {
+        "operationId": "v2/system-session-environs.restore",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "environ_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Restore a soft-deleted system session environ row.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
+    "/v2/system-session-environs/{environ_id}/purge": {
+      "post": {
+        "operationId": "v2/system-session-environs.purge",
+        "tags": [
+          "v2/system-session-environs"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        },
+        "security": [
+          {
+            "TokenAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "environ_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Remove a system session environ row for good, soft-deleted or not.\n\n**Preconditions:**\n* User privilege required.\n"
+      }
+    },
     "/v2/users/search": {
       "post": {
         "operationId": "v2/users.admin_search",
@@ -67605,7 +67970,7 @@
           }
         },
         "parameters": [],
-        "description": "Auto-mount a vfolder of a project into every session created in it.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Auto-mount a vfolder of a project or a user into every session created in that\nproject or by that user.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/vfolder-auto-mounts/scoped/search": {
@@ -67634,7 +67999,7 @@
           }
         },
         "parameters": [],
-        "description": "Search the auto-mounts of the named projects, combined with OR.\n\n**Preconditions:**\n* User privilege required.\n"
+        "description": "Search the auto-mounts of the named projects and users, combined with OR.\n\n**Preconditions:**\n* User privilege required.\n"
       }
     },
     "/v2/vfolder-auto-mounts/{vfolder_auto_mount_id}": {

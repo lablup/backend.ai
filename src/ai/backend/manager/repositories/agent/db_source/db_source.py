@@ -23,11 +23,15 @@ from ai.backend.manager.errors.resource import ResourceGroupNotFound, Unresolvab
 from ai.backend.manager.models.agent.row import AgentRow, agents
 from ai.backend.manager.models.agent.searchable_fields import AgentSearchableFields
 from ai.backend.manager.models.agent.upserters import AgentHeartbeatUpserter
+from ai.backend.manager.models.deployment_designated_agent.row import DeploymentDesignatedAgentRow
+from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.resource_slot.row import AgentResourceRow
 from ai.backend.manager.models.resource_slot.upserters import AgentResourceUpserter
+from ai.backend.manager.models.session.row import SessionRow
+from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 
@@ -198,8 +202,8 @@ class AgentDBSource:
         Finds the active kernels on the agent. If any exist and ``force`` is not
         set, raises without changing anything. Otherwise updates the agent's group
         (name + id columns) and returns those kernels so the caller can transition
-        their sessions. The lookup, the check, and the update run in one transaction; the
-        agent's own and govern edges move to the new group after it.
+        their sessions. The lookup, the check, the update and the designation drop run in one
+        transaction; the agent's own and govern edges move to the new group after it.
         Raises ScalingGroupNotFound when no resource group matches
         ``resource_group_id``, and AgentNotFound when no agent row matches
         ``agent_id``.
@@ -246,6 +250,26 @@ class AgentDBSource:
                 .values(
                     resource_group_id=resource_group_id,
                     scaling_group=resource_group_name,
+                )
+            )
+            await session.execute(
+                sa.delete(DeploymentDesignatedAgentRow).where(
+                    DeploymentDesignatedAgentRow.agent_uuid == agent.uuid,
+                    DeploymentDesignatedAgentRow.endpoint_id.in_(
+                        sa.select(EndpointRow.id)
+                        .join(ResourceGroupRow, ResourceGroupRow.name == EndpointRow.resource_group)
+                        .where(ResourceGroupRow.id != resource_group_id)
+                    ),
+                )
+            )
+            await session.execute(
+                sa.delete(SessionDesignatedAgentRow).where(
+                    SessionDesignatedAgentRow.agent_uuid == agent.uuid,
+                    SessionDesignatedAgentRow.session_id.in_(
+                        sa.select(SessionRow.id).where(
+                            SessionRow.resource_group_id != resource_group_id
+                        )
+                    ),
                 )
             )
         if agent.resource_group_id != resource_group_id:

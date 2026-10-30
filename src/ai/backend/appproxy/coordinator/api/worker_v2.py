@@ -15,7 +15,7 @@ from aiohttp import web
 from dateutil.tz import tzutc
 from pydantic import Field
 
-from ai.backend.appproxy.common.config import get_default_redis_key_ttl
+from ai.backend.appproxy.common.config import ContentEncodingConfig, get_default_redis_key_ttl
 from ai.backend.appproxy.common.errors import ObjectNotFound
 from ai.backend.appproxy.common.events import DoCheckWorkerLostEvent, WorkerLostEvent
 from ai.backend.appproxy.common.types import (
@@ -111,6 +111,10 @@ class WorkerResponseModel(WorkerModel):
     slots: list[SlotModel]
 
 
+class WorkerRegistrationResponseModel(WorkerResponseModel):
+    content_encoding: ContentEncodingConfig
+
+
 class WorkerListResponseModel(BackendAISchema):
     workers: list[WorkerResponseModel]
 
@@ -190,7 +194,7 @@ async def list_worker_circuits(request: web.Request) -> PydanticResponse[Circuit
 @pydantic_api_handler(WorkerRequestModel)
 async def update_worker(
     request: web.Request, params: WorkerRequestModel
-) -> PydanticResponse[WorkerResponseModel]:
+) -> PydanticResponse[WorkerRegistrationResponseModel]:
     """
     Registers worker to coordinator.
     """
@@ -259,7 +263,12 @@ async def update_worker(
 
     async with root_ctx.db.connect() as db_conn:
         result = await execute_with_txn_retry(_update, root_ctx.db.begin_session, db_conn)
-    return PydanticResponse(WorkerResponseModel(**result))
+    return PydanticResponse(
+        WorkerRegistrationResponseModel(
+            content_encoding=root_ctx.local_config.proxy_coordinator.content_encoding,
+            **result,
+        )
+    )
 
 
 @auth_required("worker")

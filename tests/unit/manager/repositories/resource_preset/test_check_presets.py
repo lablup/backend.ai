@@ -18,6 +18,7 @@ import sqlalchemy as sa
 from dateutil.tz import tzutc
 from sqlalchemy.ext.asyncio import AsyncSession as SASession
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
@@ -36,7 +37,6 @@ from ai.backend.common.types import (
     SlotTypes,
 )
 from ai.backend.manager.data.agent.types import AgentStatus
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.session.types import SessionStatus
 from ai.backend.manager.models.agent.row import AgentRow
@@ -50,7 +50,6 @@ from ai.backend.manager.models.deployment_revision_preset.row import DeploymentR
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -611,7 +610,6 @@ class TestCheckPresetsOccupiedSlots:
                 scaling_group_name=test_scaling_group_name,
                 result=SessionResult.UNDEFINED,
                 agent_ids=[],
-                designated_agent_ids=[],
                 target_sgroup_names=[],
                 images=[],
                 vfolder_mounts=[],
@@ -727,7 +725,6 @@ class TestCheckPresetsOccupiedSlots:
                 scaling_group_name=test_scaling_group_name,
                 result=SessionResult.UNDEFINED,
                 agent_ids=[],
-                designated_agent_ids=[],
                 target_sgroup_names=[],
                 images=["test-image:latest"],
                 vfolder_mounts=[],
@@ -840,7 +837,6 @@ class TestCheckPresetsOccupiedSlots:
                 scaling_group_name=test_scaling_group_name,
                 result=SessionResult.UNDEFINED,
                 agent_ids=[],
-                designated_agent_ids=[],
                 target_sgroup_names=[],
                 images=["test-image:latest"],
                 vfolder_mounts=[],
@@ -976,7 +972,6 @@ class TestCheckPresetsOccupiedSlots:
                 scaling_group_name=test_scaling_group_name,
                 result=SessionResult.UNDEFINED,
                 agent_ids=[],
-                designated_agent_ids=[],
                 target_sgroup_names=[],
                 images=[],
                 vfolder_mounts=[],
@@ -1180,7 +1175,6 @@ class TestCheckPresetsOccupiedSlots:
                     scaling_group_name=resource_group_name,
                     result=SessionResult.UNDEFINED,
                     agent_ids=[],
-                    designated_agent_ids=[],
                     target_sgroup_names=[],
                     images=[],
                     vfolder_mounts=[],

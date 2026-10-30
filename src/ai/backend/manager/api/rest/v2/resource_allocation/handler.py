@@ -34,17 +34,9 @@ class V2ResourceAllocationHandler:
     def __init__(self, *, adapter: ResourceAllocationAdapter) -> None:
         self._adapter = adapter
 
-    async def my_keypair_usage(
-        self,
-        ctx: UserContext,
-        req: RequestCtx,
-    ) -> APIResponse:
+    async def my_keypair_usage(self) -> APIResponse:
         """Deprecated. Use `GET /v2/resource-allocation/my/usage`."""
-        resource_policy = req.request["keypair"]["resource_policy"]
-        result = await self._adapter.my_keypair_usage(
-            access_key=ctx.access_key,
-            resource_policy=resource_policy,
-        )
+        result = await self._adapter.my_keypair_usage()
         return APIResponse.build(status_code=HTTPStatus.OK, response_model=result)
 
     async def my_user_usage(self) -> APIResponse:

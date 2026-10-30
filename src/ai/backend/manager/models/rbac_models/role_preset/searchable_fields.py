@@ -5,7 +5,12 @@ from __future__ import annotations
 from typing import override
 
 from ai.backend.common.data.entity.role import RoleID
+from ai.backend.common.data.entity.role_preset import RolePresetEntityType
 from ai.backend.manager.data.role_preset.types import RolePresetData
+from ai.backend.manager.models.entity_label.searchable_fields import (
+    EntityLabelCorrelation,
+    EntityLabelSearchableFields,
+)
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
@@ -99,7 +104,8 @@ class _RolePresetOwnFields(RowDataConverter[RolePresetRow, RolePresetData]):
 
 
 class _RolePresetNestedFields:
-    """The permission entries the preset owns, read under the preset's own permission.
+    """The permission entries and labels the preset owns, read under the preset's own
+    permission.
 
     A permission entry is the preset's field row, so one permission answers for the
     pair. Narrowing a preset search by permission does not replace the permission
@@ -113,6 +119,10 @@ class _RolePresetNestedFields:
             RolePresetRow,
             RolePermissionPresetRow.role_preset_id == RolePresetRow.id,
         ),
+    )
+    labels = NestedSearchableField(
+        EntityLabelSearchableFields.own,
+        EntityLabelCorrelation(RolePresetRow, RolePresetEntityType(), RolePresetRow.id),
     )
 
 

@@ -1,3 +1,4 @@
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptFieldType
 from ai.backend.common.data.entity.error_log import ErrorLogFieldType
 from ai.backend.common.data.entity.keypair import KeyPairFieldType, KeyPairID
 from ai.backend.common.data.entity.ssh_keypair import SSHKeypairFieldType
@@ -28,6 +29,7 @@ from ai.backend.manager.actions.v2.ops.result import (
 )
 from ai.backend.manager.actions.v2.scope.processor import ScopeActionProcessor
 from ai.backend.manager.actions.v2.single_entity.processor import SingleEntityActionProcessor
+from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
 from ai.backend.manager.data.error_log.types import ErrorLogData
 from ai.backend.manager.data.keypair.types import KeyPairData
 from ai.backend.manager.data.ssh_keypair.types import SSHKeypairData
@@ -129,6 +131,11 @@ from ai.backend.manager.services.user.actions.user_month_stats import (
     UserMonthStatsAction,
     UserMonthStatsActionResult,
 )
+from ai.backend.manager.services.user.bootstrap_script.actions.lookup_owner import (
+    LookupBootstrapScriptOwnerAction,
+    LookupBulkBootstrapScriptOwnerAction,
+)
+from ai.backend.manager.services.user.bootstrap_script.processors import BootstrapScriptProcessors
 from ai.backend.manager.services.user.error_log.actions.lookup_owner import (
     LookupBulkErrorLogOwnerAction,
     LookupErrorLogOwnerAction,
@@ -146,6 +153,7 @@ class UserProcessors:
     keypair_group: LookupFieldGroup[KeyPairData]
     ssh_keypair_group: LookupFieldGroup[SSHKeypairData]
     error_log: ErrorLogProcessors
+    bootstrap_script: BootstrapScriptProcessors
     bulk_get: PartialBulkActionProcessor[BulkGetUsersAction, UserData]
     global_search: GlobalActionProcessor[GlobalSearchUsersAction, BatchOpsResult[UserData]]
     scoped_search: ScopeActionProcessor[ScopedSearchUsersAction, ScopedBatchOpsResult[UserData]]
@@ -307,4 +315,14 @@ class UserProcessors:
                 LookupErrorLogOwnerAction,
                 LookupBulkErrorLogOwnerAction,
             )
+        )
+        self.bootstrap_script = BootstrapScriptProcessors(
+            group,
+            group.field_group(
+                FieldGroupMeta(BootstrapScriptFieldType()),
+                BootstrapScriptData,
+                LookupBootstrapScriptOwnerAction,
+                LookupBulkBootstrapScriptOwnerAction,
+            ),
+            user_service,
         )

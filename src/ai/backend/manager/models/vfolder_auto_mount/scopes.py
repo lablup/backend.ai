@@ -6,6 +6,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
+from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.vfolder_auto_mount.types import VFolderAutoMountScopeType
 from ai.backend.manager.models.clauses import QueryCondition
 from ai.backend.manager.models.scopes import ExistenceCheck, ScopeTarget
@@ -30,6 +31,34 @@ class ProjectVFolderAutoMountTarget(ScopeTarget):
             return sa.and_(
                 VFolderAutoMountRow.scope_type == VFolderAutoMountScopeType.PROJECT,
                 VFolderAutoMountRow.scope_id == project_id,
+            )
+
+        return inner
+
+    @property
+    @override
+    def existence_checks(self) -> Sequence[ExistenceCheck[Any]]:
+        return ()
+
+
+@dataclass(frozen=True)
+class UserVFolderAutoMountTarget(ScopeTarget):
+    """The auto-mounts set on one user directly, not those of the user's personal project."""
+
+    user_id: UserID
+
+    @override
+    def scope_id(self) -> EntityIdentifier:
+        return self.user_id
+
+    @override
+    def to_condition(self) -> QueryCondition:
+        user_id = self.user_id
+
+        def inner() -> sa.sql.expression.ColumnElement[bool]:
+            return sa.and_(
+                VFolderAutoMountRow.scope_type == VFolderAutoMountScopeType.USER,
+                VFolderAutoMountRow.scope_id == user_id,
             )
 
         return inner

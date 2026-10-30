@@ -28,6 +28,7 @@ from ai.backend.manager.models.specs.creator import (
     FieldCreator,
     FieldToCreate,
     GlobalEntityCreator,
+    GuardedDanglingFieldCreator,
     NestedFieldCreator,
     RoleManagedEntityCreator,
     RoleManagedGlobalEntityCreator,
@@ -399,7 +400,7 @@ class OpsRepository[TData]:
             return await w.atomic_create_field_entities(owner_id, creators)
 
     async def create_dangling_field[TFieldData: FieldData](
-        self, creator: DanglingFieldCreator[Any, TFieldData]
+        self, creator: GuardedDanglingFieldCreator[Any, TFieldData]
     ) -> TFieldData:
         async with self._ops.write_ops() as w:
             return await w.create_dangling_field(creator)

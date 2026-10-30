@@ -32,6 +32,7 @@ from unittest.mock import MagicMock
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_token import DeploymentTokenID
 from ai.backend.common.data.entity.domain import DomainID
@@ -45,7 +46,6 @@ from ai.backend.common.events.types import EventDomain
 from ai.backend.common.schema.deployment import IntOrPercent, ReplicaGroupRolloutSpec
 from ai.backend.common.types import ResourceSlot, SessionTypes
 from ai.backend.manager.actions.types import OperationStatus
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.types import ReplicaGroupLifecycle, RouteStatus
 from ai.backend.manager.data.error_log.types import ErrorLogSeverity
 from ai.backend.manager.data.kernel.types import KernelStatus
@@ -69,7 +69,6 @@ from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
 from ai.backend.manager.models.error_log.row import ErrorLogRow
 from ai.backend.manager.models.event_log.row import EventLogRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow

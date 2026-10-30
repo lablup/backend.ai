@@ -13,6 +13,7 @@ from pathlib import PurePosixPath
 import pytest
 import sqlalchemy as sa
 
+from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.config import DefaultModelDefinition
 from ai.backend.common.container_registry import ContainerRegistryType
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
@@ -35,7 +36,6 @@ from ai.backend.common.types import (
     VFolderMountPolicy,
     VFolderUsageMode,
 )
-from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.image.types import ImageType
 from ai.backend.manager.data.permission.types import RoleSource
 from ai.backend.manager.data.project.types import ProjectType
@@ -45,6 +45,7 @@ from ai.backend.manager.data.vfolder.types import (
     VFolderOwnershipType,
 )
 from ai.backend.manager.defs import DEFAULT_ROLE
+from ai.backend.manager.errors.resource import ProjectNotFound
 from ai.backend.manager.errors.storage import (
     VFolderAlreadyExists,
     VFolderDeletionNotAllowed,
@@ -66,7 +67,6 @@ from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointRow
 from ai.backend.manager.models.entity_label.row import EntityLabelRow
 from ai.backend.manager.models.entity_share.row import EntityShareRow
-from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
@@ -120,6 +120,7 @@ from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntit
 from ai.backend.manager.repositories.ops.v2.share.provider import ShareOpsProvider
 from ai.backend.manager.repositories.vfolder.repository import VfolderRepository
 from ai.backend.manager.secret.types import SecretValue
+from ai.backend.manager.views.user import UserResourceInfo
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -491,7 +492,7 @@ class TestVfolderRepository:
                 )
             )
 
-    async def test_naming_a_personal_project_is_refused(
+    async def test_naming_a_personal_project_makes_a_project_folder_there(
         self,
         db_with_cleanup: ExtendedAsyncSAEngine,
         vfolder_repository: VfolderRepository,
@@ -499,32 +500,22 @@ class TestVfolderRepository:
         test_user: uuid.UUID,
         test_project_resource_policy_name: str,
     ) -> None:
-        """Nothing is created under another person's name; sharing puts it there."""
-        personal_project = uuid.uuid4()
-        async with db_with_cleanup.begin_session() as session:
-            session.add(
-                ProjectRow(
-                    id=personal_project,
-                    name=f"personal-{personal_project.hex[:8]}",
-                    domain_name=test_domain.domain_name,
-                    is_active=True,
-                    total_resource_slots=ResourceSlot(),
-                    allowed_vfolder_hosts={"local": ["create-vfolder"]},
-                    resource_policy=test_project_resource_policy_name,
-                    type=ProjectType.PERSONAL,
-                    creator_id=test_user,
-                )
-            )
-            await session.flush()
+        """A personal project carries no hosts; the user's keypair policy answers."""
+        personal_project = await _add_project(
+            db_with_cleanup, test_domain, test_project_resource_policy_name, ProjectType.PERSONAL
+        )
+        await _add_default_keypair_allowing_create(db_with_cleanup, test_user)
 
-        with pytest.raises(VFolderInvalidParameter):
-            await vfolder_repository.create_vfolder_with_permission(
-                self._make_project_vfolder_creator(
-                    domain_name=test_domain.domain_name,
-                    group_id=personal_project,
-                    user_id=test_user,
-                )
+        creation = await vfolder_repository.create_vfolder_with_permission(
+            self._make_project_vfolder_creator(
+                domain_name=test_domain.domain_name,
+                group_id=personal_project,
+                user_id=test_user,
             )
+        )
+
+        assert creation.vfolder.ownership_type == VFolderOwnershipType.GROUP
+        assert creation.vfolder.group == personal_project
 
     async def test_the_owners_allowance_refuses_the_folder_over_it(
         self,
@@ -688,6 +679,42 @@ async def _add_project(
             )
         )
     return project_id
+
+
+async def _add_default_keypair_allowing_create(
+    db: ExtendedAsyncSAEngine, user_id: uuid.UUID
+) -> None:
+    """A default keypair whose policy allows creating folders on ``local``."""
+    policy_name = f"test-kp-policy-{uuid.uuid4().hex[:8]}"
+    async with db.begin_session() as session:
+        session.add(
+            KeyPairResourcePolicyRow(
+                name=policy_name,
+                default_for_unspecified=DefaultForUnspecified.LIMITED,
+                total_resource_slots=ResourceSlot(),
+                max_session_lifetime=0,
+                max_concurrent_sessions=10,
+                max_concurrent_sftp_sessions=1,
+                max_containers_per_session=1,
+                idle_timeout=0,
+                allowed_vfolder_hosts=VFolderHostPermissionMap({
+                    "local": {VFolderHostPermission.CREATE},
+                }),
+            )
+        )
+        await session.flush()
+        session.add(
+            KeyPairRow(
+                user=user_id,
+                access_key=f"DK{user_id.hex[:14]}",
+                secret_key=SecretValue("test-secret"),
+                is_active=True,
+                is_admin=False,
+                is_default=True,
+                resource_policy=policy_name,
+                rate_limit=1000,
+            )
+        )
 
 
 async def _set_project_folder_allowance(
@@ -881,6 +908,71 @@ class TestVfolderRepositoryAllowedVfolderHosts:
         )
 
         assert isinstance(result, VFolderHostPermissionMap)
+
+    async def test_get_allowed_vfolder_hosts_answers_a_general_project_with_its_own_hosts(
+        self,
+        vfolder_repository: VfolderRepository,
+        user_with_default_keypair: uuid.UUID,
+        test_group: uuid.UUID,
+    ) -> None:
+        """The user's keypair policy does not answer for a general project."""
+        result = await vfolder_repository.get_allowed_vfolder_hosts(
+            user_uuid=user_with_default_keypair,
+            group_uuid=test_group,
+        )
+
+        assert result == VFolderHostPermissionMap({
+            "local": {
+                VFolderHostPermission.CREATE,
+                VFolderHostPermission.MOUNT_IN_SESSION,
+            },
+        })
+
+    @pytest.fixture
+    async def test_personal_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+        test_project_resource_policy_name: str,
+        test_user: uuid.UUID,
+    ) -> uuid.UUID:
+        """``test_user``'s personal project, which carries no hosts of its own."""
+        project_uuid = uuid.uuid4()
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ProjectRow(
+                    id=project_uuid,
+                    name=f"personal-{project_uuid.hex[:8]}",
+                    domain_name=test_domain.domain_name,
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    resource_policy=test_project_resource_policy_name,
+                    type=ProjectType.PERSONAL,
+                    creator_id=test_user,
+                )
+            )
+            await db_sess.flush()
+        return project_uuid
+
+    async def test_get_allowed_vfolder_hosts_answers_a_personal_project_with_the_keypair_policy(
+        self,
+        vfolder_repository: VfolderRepository,
+        user_with_default_keypair: uuid.UUID,
+        test_personal_project: uuid.UUID,
+    ) -> None:
+        """A personal project carries no hosts; the user's default keypair policy answers."""
+        result = await vfolder_repository.get_allowed_vfolder_hosts(
+            user_uuid=user_with_default_keypair,
+            group_uuid=test_personal_project,
+        )
+
+        assert result == VFolderHostPermissionMap({
+            "local:volume1": {
+                VFolderHostPermission.CREATE,
+                VFolderHostPermission.MODIFY,
+            },
+        })
 
     @pytest.fixture
     async def keypair_policy_with_hosts(
@@ -2517,3 +2609,225 @@ class TestVFolderRepositoryTrashAndRestore:
     ) -> None:
         result = await vfolder_repository.restore_vfolders_from_trash([uuid.uuid4()])
         assert result == []
+
+
+class TestVfolderRepositoryResourcePolicyReads:
+    """The resource policy values the vfolder repository reads for a user or a project."""
+
+    @pytest.fixture
+    async def db_with_cleanup(
+        self,
+        database_connection: ExtendedAsyncSAEngine,
+    ) -> AsyncGenerator[ExtendedAsyncSAEngine, None]:
+        async with with_tables(
+            database_connection,
+            [
+                DomainRow,
+                UserResourcePolicyRow,
+                ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
+                RoleRow,
+                UserRoleRow,
+                UserRow,
+                KeyPairRow,
+                ProjectRow,
+                VirtualEntityRow,
+                EntityMembershipRow,
+            ],
+        ):
+            yield database_connection
+
+    async def _add_domain(self, db: ExtendedAsyncSAEngine) -> DomainFixtureData:
+        domain = DomainFixtureData(
+            domain_name=DomainName(f"test-domain-{uuid.uuid4().hex[:8]}"),
+            domain_id=DomainID(uuid.uuid4()),
+        )
+        async with db.begin_session() as db_sess:
+            db_sess.add(
+                DomainRow(
+                    id=domain.domain_id,
+                    name=domain.domain_name,
+                    is_active=True,
+                    total_resource_slots=ResourceSlot(),
+                    allowed_vfolder_hosts={},
+                    allowed_docker_registries=[],
+                )
+            )
+        return domain
+
+    @pytest.fixture
+    async def test_domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> DomainFixtureData:
+        return await self._add_domain(db_with_cleanup)
+
+    @pytest.fixture
+    async def other_domain(self, db_with_cleanup: ExtendedAsyncSAEngine) -> DomainFixtureData:
+        return await self._add_domain(db_with_cleanup)
+
+    @pytest.fixture
+    async def test_user(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+    ) -> uuid.UUID:
+        """A user under a policy allowing 7 folders and 3 GiB, running as uid 2000."""
+        user_uuid = uuid.uuid4()
+        policy_name = f"test-user-policy-{user_uuid.hex[:8]}"
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                UserResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=7,
+                    max_quota_scope_size=BinarySize.finite_from_str("3GiB"),
+                    max_session_count_per_model_session=5,
+                    max_customized_image_count=3,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(
+                UserRow(
+                    uuid=user_uuid,
+                    username=f"testuser-{user_uuid.hex[:8]}",
+                    email=f"test-{user_uuid.hex[:8]}@example.com",
+                    need_password_change=False,
+                    status=UserStatus.ACTIVE,
+                    domain_name=test_domain.domain_name,
+                    domain_id=test_domain.domain_id,
+                    role=UserRole.USER,
+                    resource_policy=policy_name,
+                    container_uid=2000,
+                )
+            )
+        return user_uuid
+
+    @pytest.fixture
+    async def test_project(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_domain: DomainFixtureData,
+    ) -> ProjectRow:
+        """A project under a policy allowing 4 folders and 2 GiB."""
+        project_id = uuid.uuid4()
+        policy_name = f"test-project-policy-{project_id.hex[:8]}"
+        project = ProjectRow(
+            id=project_id,
+            name=f"test-project-{project_id.hex[:8]}",
+            domain_name=test_domain.domain_name,
+            is_active=True,
+            total_resource_slots=ResourceSlot(),
+            allowed_vfolder_hosts={},
+            resource_policy=policy_name,
+            type=ProjectType.MODEL_STORE,
+        )
+        async with db_with_cleanup.begin_session() as db_sess:
+            db_sess.add(
+                ProjectResourcePolicyRow(
+                    name=policy_name,
+                    max_vfolder_count=4,
+                    max_quota_scope_size=BinarySize.finite_from_str("2GiB"),
+                    max_network_count=3,
+                )
+            )
+            await db_sess.flush()
+            db_sess.add(project)
+        return project
+
+    @pytest.fixture
+    def vfolder_repository(self, db_with_cleanup: ExtendedAsyncSAEngine) -> VfolderRepository:
+        return VfolderRepository(
+            db=db_with_cleanup, v2_ops_provider=ShareOpsProvider(db_with_cleanup)
+        )
+
+    async def test_a_project_reads_its_policy_max_vfolder_count(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_user: uuid.UUID,
+        test_project: ProjectRow,
+    ) -> None:
+        count = await vfolder_repository.get_max_vfolder_count(test_user, test_project.id)
+
+        assert count == 4
+
+    async def test_a_user_reads_its_policy_max_vfolder_count(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_user: uuid.UUID,
+    ) -> None:
+        count = await vfolder_repository.get_max_vfolder_count(test_user, None)
+
+        assert count == 7
+
+    async def test_an_unknown_project_is_refused(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_user: uuid.UUID,
+    ) -> None:
+        with pytest.raises(ProjectNotFound):
+            await vfolder_repository.get_max_vfolder_count(test_user, uuid.uuid4())
+
+    async def test_an_unknown_user_is_refused(
+        self,
+        vfolder_repository: VfolderRepository,
+    ) -> None:
+        with pytest.raises(UserNotFound):
+            await vfolder_repository.get_max_vfolder_count(uuid.uuid4(), None)
+
+    @pytest.mark.parametrize("by_name", [True, False], ids=["by_name", "by_id"])
+    async def test_project_resource_info_carries_its_policy_and_type(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+        test_project: ProjectRow,
+        by_name: bool,
+    ) -> None:
+        reference: str | uuid.UUID = test_project.name if by_name else test_project.id
+
+        info = await vfolder_repository.get_group_resource_info(reference, test_domain.domain_name)
+
+        assert info is not None
+        assert info.project_id == test_project.id
+        assert info.max_vfolder_count == 4
+        assert info.max_quota_scope_size == BinarySize.finite_from_str("2GiB")
+        assert info.project_type == ProjectType.MODEL_STORE
+
+    async def test_an_unknown_project_has_no_resource_info(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_domain: DomainFixtureData,
+    ) -> None:
+        info = await vfolder_repository.get_group_resource_info(
+            uuid.uuid4(), test_domain.domain_name
+        )
+
+        assert info is None
+
+    async def test_a_project_under_another_domain_has_no_resource_info(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_project: ProjectRow,
+        other_domain: DomainFixtureData,
+    ) -> None:
+        info = await vfolder_repository.get_group_resource_info(
+            test_project.id, other_domain.domain_name
+        )
+
+        assert info is None
+
+    async def test_user_resource_info_carries_its_policy_and_container_uid(
+        self,
+        vfolder_repository: VfolderRepository,
+        test_user: uuid.UUID,
+    ) -> None:
+        info = await vfolder_repository.get_user_resource_info(test_user)
+
+        assert info == UserResourceInfo(
+            max_quota_scope_size=BinarySize.finite_from_str("3GiB"),
+            container_uid=2000,
+        )
+
+    async def test_an_unknown_user_has_no_resource_info(
+        self,
+        vfolder_repository: VfolderRepository,
+    ) -> None:
+        info = await vfolder_repository.get_user_resource_info(uuid.uuid4())
+
+        assert info is None
