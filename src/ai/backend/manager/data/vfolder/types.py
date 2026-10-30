@@ -110,6 +110,11 @@ class VFolderOperationStatus(enum.StrEnum):
         """
         return frozenset({cls.DELETE_ONGOING, cls.DELETE_ERROR})
 
+    @classmethod
+    def hard_deleted(cls) -> frozenset[VFolderOperationStatus]:
+        """Statuses of a folder whose storage is gone or failed to go; only its row remains."""
+        return frozenset({cls.DELETE_COMPLETE, cls.DELETE_ERROR})
+
     @override
     @classmethod
     def _missing_(cls, value: Any) -> VFolderOperationStatus | None:
