@@ -793,7 +793,8 @@ class CommonAgentConfig(BaseConfigSchema):
                 "container orchestration infrastructure. Available options: "
                 "'docker' uses Docker daemon for container management (default for most deployments); "
                 "'kubernetes' uses Kubernetes API for container management in K8s clusters; "
-                "'dummy' is a mock backend for testing without actual containers."
+                "'dummy' is a mock backend for testing without actual containers; "
+                "'containerd' uses containerd's native API for container management."
             ),
             added_version="25.12.0",
             example=ConfigExample(local="docker", prod="docker"),
@@ -2372,6 +2373,33 @@ class DockerExtraConfig(BaseConfigSchema):
     ]
 
 
+class ContainerdConfig(BaseConfigSchema):
+    """
+    Settings of the containerd backend, read only when the agent backend is `containerd`.
+    """
+
+    address: Annotated[
+        str,
+        Field(default="/run/containerd/containerd.sock"),
+        BackendAIConfigMeta(
+            description="Path of the containerd gRPC unix socket.",
+            added_version="26.10.0",
+            example=ConfigExample(
+                local="/run/containerd/containerd.sock", prod="/run/containerd/containerd.sock"
+            ),
+        ),
+    ]
+    namespace: Annotated[
+        str,
+        Field(default="backend-ai"),
+        BackendAIConfigMeta(
+            description="containerd namespace holding the kernel containers and the images.",
+            added_version="26.10.0",
+            example=ConfigExample(local="backend-ai", prod="backend-ai"),
+        ),
+    ]
+
+
 class AgentGlobalConfig(BaseConfigSchema):
     """
     Configuration shared across all agents (logging, etcd, API, etc.).
@@ -2597,6 +2625,15 @@ class AgentSpecificConfig(BaseConfigSchema):
             composite=CompositeType.FIELD,
         ),
     ]
+    containerd: Annotated[
+        ContainerdConfig,
+        Field(default_factory=ContainerdConfig),
+        BackendAIConfigMeta(
+            description="containerd backend settings: socket and namespace.",
+            added_version="26.10.0",
+            composite=CompositeType.FIELD,
+        ),
+    ]
 
     model_config = ConfigDict(
         validate_assignment=True,
@@ -2609,6 +2646,8 @@ class AgentSpecificConfig(BaseConfigSchema):
             case AgentBackend.DOCKER:
                 DockerExtraConfig.model_validate(self.container.model_dump())
             case AgentBackend.DUMMY:
+                pass
+            case AgentBackend.CONTAINERD:
                 pass
 
 
