@@ -1,8 +1,12 @@
-from typing import Any
+from pathlib import Path
 
 import pytest
 
-from ai.backend.kernel.service import ServiceArgumentInterpolator, ServiceParser
+from ai.backend.kernel.service import (
+    ServiceDefinition,
+    ServiceOptions,
+    ServiceParser,
+)
 
 
 class TestModelServiceStringCommand:
@@ -46,67 +50,91 @@ class TestModelServiceStringCommand:
         assert env == {}
 
 
-def test_service_argument_interpolation_intrinsic_python_style() -> None:
-    command = ["bash", "-c", 'echo "host = {host}, port = {ports[1]}"']
-    variables = {
-        "host": "99.99.99.99",
-        "ports": [11001, 11002],
-    }
-    ret = ServiceArgumentInterpolator.apply(command, variables)
-
-    assert ret[0] == "bash"  # unchanged
-    assert ret[1] == "-c"  # unchanged
-    assert ret[2] == 'echo "host = 99.99.99.99, port = 11002"'
+_JSON_ARG = """'{"method":"mtp","num_speculative_tokens":3}'"""
+_JINJA_OPTS: ServiceOptions = {
+    "interpolation": {"delimiters": [{"start": "{{", "end": "}}"}]},
+}
 
 
-def test_service_argument_interpolation_intrinsic_github_style() -> None:
-    command = ["bash", "-c", 'echo "host = ${{ host }}, port = ${{ ports[1] }}"']
-    variables = {
-        "host": "99.99.99.99",
-        "ports": [11001, 11002],
-    }
-    ret = ServiceArgumentInterpolator.apply(command, variables)
+class TestServiceParserInterpolation:
+    @pytest.fixture
+    def service_parser(self, tmp_path: Path) -> ServiceParser:
+        return ServiceParser({"runtime_path": "/usr/bin/python3", "out_dir": str(tmp_path)})
 
-    assert ret[0] == "bash"  # unchanged
-    assert ret[1] == "-c"  # unchanged
-    assert ret[2] == 'echo "host = 99.99.99.99, port = 11002"'
-
-
-def test_service_argument_interpolation_skip_shell_envvar_simple() -> None:
-    command = ["bash", "-c", 'echo "kernel_id = $BACKENDAI_KERNEL_ID"']
-    variables: dict[str, Any] = {}
-    ret = ServiceArgumentInterpolator.apply(command, variables)
-
-    assert ret[0] == "bash"  # unchanged
-    assert ret[1] == "-c"  # unchanged
-    assert ret[2] == 'echo "kernel_id = $BACKENDAI_KERNEL_ID"'  # unchanged
-
-
-def test_service_argument_interpolation_skip_shell_envvar_braced() -> None:
-    command = ["bash", "-c", 'echo "kernel_id = ${BACKENDAI_KERNEL_ID/aaa/${magic}}"']
-    variables: dict[str, Any] = {}
-    ret = ServiceArgumentInterpolator.apply(command, variables)
-
-    assert ret[0] == "bash"  # unchanged
-    assert ret[1] == "-c"  # unchanged
-    assert ret[2] == 'echo "kernel_id = ${BACKENDAI_KERNEL_ID/aaa/${magic}}"'  # unchanged
-
-
-def test_service_argument_interpolation_mixed() -> None:
-    command = [
-        "bash",
-        "-c",
-        'echo "host = ${{ host }}, kernel_id = ${BACKENDAI_KERNEL_ID/aaa/${magic}}, port = {ports[0]}"',
-    ]
-    variables = {
-        "host": "99.99.99.99",
-        "ports": [11001, 11002],
-    }
-    ret = ServiceArgumentInterpolator.apply(command, variables)
-
-    assert ret[0] == "bash"  # unchanged
-    assert ret[1] == "-c"  # unchanged
-    assert (
-        ret[2]
-        == 'echo "host = 99.99.99.99, kernel_id = ${BACKENDAI_KERNEL_ID/aaa/${magic}}, port = 11001"'
+    @pytest.mark.parametrize(
+        ("opts", "command", "expected"),
+        [
+            pytest.param({}, "{runtime_path}", "/usr/bin/python3", id="unset-uses-legacy"),
+            pytest.param(
+                _JINJA_OPTS, "{runtime_path}", "{runtime_path}", id="delimiter-skips-legacy"
+            ),
+            pytest.param(_JINJA_OPTS, "{{ runtime_path }}", "/usr/bin/python3", id="delimiter"),
+        ],
     )
+    async def test_command(
+        self, service_parser: ServiceParser, opts: ServiceOptions, command: str, expected: str
+    ) -> None:
+        service_parser.services["app"] = ServiceDefinition(command=[command])
+
+        cmdargs, _ = await service_parser.start_service("app", set(), opts)
+
+        assert cmdargs == [expected]
+
+    async def test_model_service_keeps_json_in_delimiter_mode(
+        self, service_parser: ServiceParser
+    ) -> None:
+        service_parser.add_model_service(
+            "model",
+            {
+                "start_command": f"exec {{{{ runtime_path }}}} server.py {_JSON_ARG}",
+                "shell": "/bin/bash",
+                "pre_start_actions": [],
+            },
+        )
+
+        cmdargs, _ = await service_parser.start_service("model", set(), _JINJA_OPTS)
+
+        assert cmdargs == ["/bin/bash", "-c", f"exec /usr/bin/python3 server.py {_JSON_ARG}"]
+
+    @pytest.mark.parametrize(
+        ("opts", "filename", "line", "expected"),
+        [
+            pytest.param(
+                {},
+                "{out_dir}/cfg",
+                "c.settings = {{'python': '{runtime_path}'}}",
+                "c.settings = {'python': '/usr/bin/python3'}\n",
+                id="legacy",
+            ),
+            pytest.param(
+                _JINJA_OPTS,
+                "{{ out_dir }}/cfg",
+                '{"python": "{{ runtime_path }}", "port": {port}}',
+                '{"python": "/usr/bin/python3", "port": {port}}\n',
+                id="delimiter",
+            ),
+        ],
+    )
+    async def test_prestart_args(
+        self,
+        service_parser: ServiceParser,
+        tmp_path: Path,
+        opts: ServiceOptions,
+        filename: str,
+        line: str,
+        expected: str,
+    ) -> None:
+        service_parser.services["app"] = ServiceDefinition(
+            command=["true"],
+            prestart_actions=[
+                {
+                    "action": "write_file",
+                    "args": {"filename": filename, "body": [line]},
+                    "ref": None,
+                },
+            ],
+        )
+
+        await service_parser.start_service("app", set(), opts)
+
+        assert (tmp_path / "cfg").read_text() == expected
