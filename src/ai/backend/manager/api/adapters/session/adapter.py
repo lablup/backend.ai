@@ -81,7 +81,6 @@ from ai.backend.common.dto.manager.v2.session.response import (
     SessionResourceInfoGQLDTO,
     SessionRuntimeInfoGQLDTO,
     StartSessionServicePayload,
-    TerminateSessionsFailureInfo,
     TerminateSessionsPayload,
     UpdateSessionPayload,
 )
@@ -1030,29 +1029,28 @@ class SessionAdapter(BaseAdapter):
     # -------------------------------------------------------------------------
 
     async def terminate(self, input: TerminateSessionsInput) -> TerminateSessionsPayload:
-        """Terminate one or more sessions, answering for each one."""
+        """Terminate one or more sessions.
+
+        The action answers per session; a denial is raised here because the payload
+        has no place for a session that was not acted on.
+        """
         action = TerminateSessionsAction(
             session_ids=[SessionId(sid) for sid in input.session_ids],
             forced=input.forced,
         )
         result = await self._session.terminate_sessions.run(action)
+        denied = next((item.error for item in result.items if item.is_denied), None)
+        if denied is not None:
+            raise denied
         by_state: dict[SessionTerminationStatus, list[SessionId]] = defaultdict(list)
-        failed: list[TerminateSessionsFailureInfo] = []
         for item in result.items:
             if item.value is not None:
                 by_state[item.value].append(SessionId(item.entity_id))
-            elif item.error is not None:
-                failed.append(
-                    TerminateSessionsFailureInfo(
-                        session_id=SessionID(item.entity_id), message=str(item.error)
-                    )
-                )
         return TerminateSessionsPayload(
             cancelled=by_state[SessionTerminationStatus.CANCELLED],
             terminating=by_state[SessionTerminationStatus.TERMINATING],
             force_terminated=by_state[SessionTerminationStatus.FORCE_TERMINATED],
             skipped=by_state[SessionTerminationStatus.SKIPPED],
-            failed=failed,
         )
 
     async def exclude_idle_checks(
