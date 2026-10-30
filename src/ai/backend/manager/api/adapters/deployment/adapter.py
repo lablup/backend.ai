@@ -22,6 +22,7 @@ from ai.backend.common.config import (
     ModelServiceConfig,
 )
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
@@ -732,6 +733,7 @@ class DeploymentAdapter(BaseAdapter):
             ),
             model_revision=model_revision_creator,
             policy=policy,
+            designated_agents=frozenset(AgentUUID(a) for a in meta.designated_agent_ids or []),
         )
         action_result = await self._deployment.create_deployment.run(
             CreateDeploymentAction(
@@ -872,8 +874,17 @@ class DeploymentAdapter(BaseAdapter):
             replica_count=OptionalState.from_unset(input.replica_count),
             open_to_public=OptionalState.from_unset(input.open_to_public),
         )
+        designated_agent_ids = OptionalState.from_unset(input.designated_agent_ids).optional_value()
         action_result = await self._deployment.update_deployment.run(
-            UpdateDeploymentAction(deployment_id=deployment_id, updater=updater)
+            UpdateDeploymentAction(
+                deployment_id=deployment_id,
+                updater=updater,
+                designated_agents=(
+                    frozenset(AgentUUID(a) for a in designated_agent_ids)
+                    if designated_agent_ids is not None
+                    else None
+                ),
+            )
         )
         return UpdateDeploymentPayload(deployment=self._deployment_data_to_dto(action_result.data))
 
