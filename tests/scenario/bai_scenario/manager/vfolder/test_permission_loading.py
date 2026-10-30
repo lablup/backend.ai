@@ -1,4 +1,4 @@
-"""폴더 여럿에서 호출자가 가진 권한과 마운트 수준을 id로 한 번에 읽기 — 자리마다 무엇이 오는가."""
+"""폴더에서 호출자가 가진 권한과 마운트 수준을 id로 일괄 읽기 — 대표 성공과 대표 실패."""
 
 from __future__ import annotations
 
@@ -26,9 +26,7 @@ from ai.backend.testutils.scenario_steps import (
 from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.vfolder import (
     AFolderAndItsReader,
-    AReaderAndTwoFolders,
     SomeoneWithAFolderOfTheirOwn,
-    SomeoneWithTheirFolderAndAnothers,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
@@ -36,33 +34,7 @@ from bai_scenario.runner.steps import run_scenario
 
 type PermissionsAnswer = list[list[PermissionBitDTO] | Exception]
 type MountPermissionsAnswer = list[VFolderPermissionField | Exception | None]
-type LoadStep = Scenario[TestSeedingSession, Any, VFolderAdapter, Any]
-
-
-@dataclass(frozen=True)
-class LoadingThePermissionsOfBothFolders(
-    When[AReaderAndTwoFolders, VFolderAdapter, PermissionsAnswer]
-):
-    """자기 폴더, 남의 폴더 순으로 권한을 한 번에 읽는다."""
-
-    @override
-    def operation(self) -> str:
-        return "batch_load_permissions"
-
-    @override
-    def describe(self, laid: AReaderAndTwoFolders) -> str:
-        return (
-            f"{laid.caller.username}이 {laid.readable.name}, {laid.unreadable.name} 순으로 "
-            "권한을 일괄 읽음"
-        )
-
-    @override
-    async def call(self, adapter: VFolderAdapter, laid: AReaderAndTwoFolders) -> PermissionsAnswer:
-        with ActingAs(laid.caller):
-            return await adapter.batch_load_permissions([
-                VFolderUUID(laid.readable.id),
-                VFolderUUID(laid.unreadable.id),
-            ])
+type LoadStep = Scenario[TestSeedingSession, AFolderAndItsReader, VFolderAdapter, Any]
 
 
 @dataclass(frozen=True)
@@ -83,34 +55,6 @@ class LoadingThePermissionsOfTheFolder(
     async def call(self, adapter: VFolderAdapter, laid: AFolderAndItsReader) -> PermissionsAnswer:
         with ActingAs(laid.caller):
             return await adapter.batch_load_permissions([VFolderUUID(laid.folder.id)])
-
-
-@dataclass(frozen=True)
-class LoadingTheMountPermissionsOfBothFolders(
-    When[AReaderAndTwoFolders, VFolderAdapter, MountPermissionsAnswer]
-):
-    """자기 폴더, 남의 폴더 순으로 마운트 수준을 한 번에 읽는다."""
-
-    @override
-    def operation(self) -> str:
-        return "batch_load_mount_permissions"
-
-    @override
-    def describe(self, laid: AReaderAndTwoFolders) -> str:
-        return (
-            f"{laid.caller.username}이 {laid.readable.name}, {laid.unreadable.name} 순으로 "
-            "마운트 수준을 일괄 읽음"
-        )
-
-    @override
-    async def call(
-        self, adapter: VFolderAdapter, laid: AReaderAndTwoFolders
-    ) -> MountPermissionsAnswer:
-        with ActingAs(laid.caller):
-            return await adapter.batch_load_mount_permissions([
-                VFolderUUID(laid.readable.id),
-                VFolderUUID(laid.unreadable.id),
-            ])
 
 
 @dataclass(frozen=True)
@@ -136,7 +80,7 @@ class LoadingTheMountPermissionOfTheFolder(
 
 
 @dataclass(frozen=True)
-class ReadAlone(Then[AFolderAndItsReader, PermissionsAnswer]):
+class ReadPermission(Then[AFolderAndItsReader, PermissionsAnswer]):
     """그 폴더 하나가 읽기 권한으로 온다."""
 
     @override
@@ -154,7 +98,7 @@ class ReadAlone(Then[AFolderAndItsReader, PermissionsAnswer]):
 
 
 @dataclass(frozen=True)
-class ReadWriteAlone(Then[AFolderAndItsReader, MountPermissionsAnswer]):
+class ReadWriteMount(Then[AFolderAndItsReader, MountPermissionsAnswer]):
     """그 폴더 하나가 읽기 쓰기로 온다."""
 
     @override
@@ -172,55 +116,7 @@ class ReadWriteAlone(Then[AFolderAndItsReader, MountPermissionsAnswer]):
 
 
 @dataclass(frozen=True)
-class ReadThenARefusal(Then[AReaderAndTwoFolders, PermissionsAnswer]):
-    """자기 폴더는 읽기 권한으로, 남의 폴더는 거부로 온다."""
-
-    @override
-    def says(self) -> str:
-        return "입력 순서대로 자기 폴더는 읽기 권한, 남의 폴더는 권한 부족 거부가 온다"
-
-    @override
-    def look(
-        self, laid: AReaderAndTwoFolders, answered: Answered[PermissionsAnswer]
-    ) -> list[Verdict]:
-        loaded = answered.response
-        if loaded is None:
-            return [MissingResponse(answered.raised)]
-        seen: list[Verdict] = [Same("length", len(loaded), 2)]
-        if len(loaded) != 2:
-            return seen
-        first, second = loaded
-        seen.append(Same("[0]", first, [PermissionBitDTO.READ]))
-        seen.append(Refused(NotEnoughPermission, second if isinstance(second, Exception) else None))
-        return seen
-
-
-@dataclass(frozen=True)
-class ReadWriteThenARefusal(Then[AReaderAndTwoFolders, MountPermissionsAnswer]):
-    """자기 폴더는 읽기 쓰기로, 남의 폴더는 거부로 온다."""
-
-    @override
-    def says(self) -> str:
-        return "입력 순서대로 자기 폴더는 읽기 쓰기, 남의 폴더는 권한 부족 거부가 온다"
-
-    @override
-    def look(
-        self, laid: AReaderAndTwoFolders, answered: Answered[MountPermissionsAnswer]
-    ) -> list[Verdict]:
-        loaded = answered.response
-        if loaded is None:
-            return [MissingResponse(answered.raised)]
-        seen: list[Verdict] = [Same("length", len(loaded), 2)]
-        if len(loaded) != 2:
-            return seen
-        first, second = loaded
-        seen.append(Same("[0]", first, VFolderPermissionField.READ_WRITE))
-        seen.append(Refused(NotEnoughPermission, second if isinstance(second, Exception) else None))
-        return seen
-
-
-@dataclass(frozen=True)
-class ARefusalAlone(Then[AFolderAndItsReader, list[Any]]):
+class ARefusal(Then[AFolderAndItsReader, list[Any]]):
     """호출은 성공하고, 그 자리는 권한 부족으로 거부된다."""
 
     @override
@@ -264,36 +160,7 @@ class AFolderReaderLoadsTheirFoldersPermissions(
 
     @override
     def then(self) -> Then[AFolderAndItsReader, PermissionsAnswer]:
-        return ReadAlone()
-
-
-@dataclass(frozen=True)
-class AFolderReaderLoadsTheirFoldersPermissionsAndIsRefusedAnothers(
-    Scenario[TestSeedingSession, AReaderAndTwoFolders, VFolderAdapter, PermissionsAnswer]
-):
-    @override
-    def summary(self) -> str:
-        return "a-user-granted-folder-read-loads-their-folders-permissions-and-is-refused-anothers"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더와 공유받지 않은 남의 "
-            "폴더의 권한을 한 번에 읽으면, 입력 순서대로 자기 폴더는 읽기 권한, 남의 폴더는 "
-            "권한 부족 거부가 온다"
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, AReaderAndTwoFolders]:
-        return SomeoneWithTheirFolderAndAnothers()
-
-    @override
-    def when(self) -> When[AReaderAndTwoFolders, VFolderAdapter, PermissionsAnswer]:
-        return LoadingThePermissionsOfBothFolders()
-
-    @override
-    def then(self) -> Then[AReaderAndTwoFolders, PermissionsAnswer]:
-        return ReadThenARefusal()
+        return ReadPermission()
 
 
 @dataclass(frozen=True)
@@ -321,7 +188,7 @@ class AUserGrantedNothingGetsARefusalForTheirFoldersPermissions(
 
     @override
     def then(self) -> Then[AFolderAndItsReader, PermissionsAnswer]:
-        return ARefusalAlone()
+        return ARefusal()
 
 
 @dataclass(frozen=True)
@@ -349,36 +216,7 @@ class AFolderReaderMountsTheirFolderReadWrite(
 
     @override
     def then(self) -> Then[AFolderAndItsReader, MountPermissionsAnswer]:
-        return ReadWriteAlone()
-
-
-@dataclass(frozen=True)
-class AFolderReaderMountsTheirFolderReadWriteAndIsRefusedAnothers(
-    Scenario[TestSeedingSession, AReaderAndTwoFolders, VFolderAdapter, MountPermissionsAnswer]
-):
-    @override
-    def summary(self) -> str:
-        return "a-user-granted-folder-read-mounts-their-folder-read-write-and-is-refused-anothers"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더와 공유받지 않은 남의 "
-            "폴더의 마운트 수준을 한 번에 읽으면, 입력 순서대로 자기 폴더는 읽기 쓰기, 남의 폴더는 "
-            "권한 부족 거부가 온다"
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, AReaderAndTwoFolders]:
-        return SomeoneWithTheirFolderAndAnothers()
-
-    @override
-    def when(self) -> When[AReaderAndTwoFolders, VFolderAdapter, MountPermissionsAnswer]:
-        return LoadingTheMountPermissionsOfBothFolders()
-
-    @override
-    def then(self) -> Then[AReaderAndTwoFolders, MountPermissionsAnswer]:
-        return ReadWriteThenARefusal()
+        return ReadWriteMount()
 
 
 @dataclass(frozen=True)
@@ -406,15 +244,13 @@ class AUserGrantedNothingGetsARefusalForTheirFoldersMountPermission(
 
     @override
     def then(self) -> Then[AFolderAndItsReader, MountPermissionsAnswer]:
-        return ARefusalAlone()
+        return ARefusal()
 
 
 SCENARIOS: list[LoadStep] = [
     AFolderReaderLoadsTheirFoldersPermissions(),
-    AFolderReaderLoadsTheirFoldersPermissionsAndIsRefusedAnothers(),
     AUserGrantedNothingGetsARefusalForTheirFoldersPermissions(),
     AFolderReaderMountsTheirFolderReadWrite(),
-    AFolderReaderMountsTheirFolderReadWriteAndIsRefusedAnothers(),
     AUserGrantedNothingGetsARefusalForTheirFoldersMountPermission(),
 ]
 

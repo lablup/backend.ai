@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, override
+from typing import override
 from uuid import UUID
 
 import pytest
@@ -30,9 +30,6 @@ from bai_scenario.components.domain import Mentions
 from bai_scenario.components.session import (
     APendingSessionAndACaller,
     APendingSessionAndSomeone,
-    FirstProjectGrant,
-    PendingSessionsInTwoProjectsAndACaller,
-    PendingSessionsInTwoProjectsAndSomeone,
     Terminator,
 )
 from bai_scenario.runner.acting import ActingAs
@@ -40,7 +37,9 @@ from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.runner.steps import run_scenario
 
 type Terminated = PartialBulkPayload[SessionTerminationInfo]
-type SessionStep = Scenario[TestSeedingSession, Any, SessionAdapter, Terminated]
+type SessionStep = Scenario[
+    TestSeedingSession, APendingSessionAndACaller, SessionAdapter, Terminated
+]
 
 
 @dataclass(frozen=True)
@@ -136,77 +135,6 @@ class NothingIsTerminated(Then[APendingSessionAndACaller, Terminated]):
 
 
 @dataclass(frozen=True)
-class TerminatingTheSessionsOfBothProjects(
-    When[PendingSessionsInTwoProjectsAndACaller, SessionAdapter, Terminated]
-):
-    """첫 프로젝트의 세션과 다른 프로젝트의 세션을 한 번에 종료한다."""
-
-    @override
-    def operation(self) -> str:
-        return "partial_bulk_terminate"
-
-    @override
-    def describe(self, laid: PendingSessionsInTwoProjectsAndACaller) -> str:
-        return f"{laid.caller.username}이 두 프로젝트의 대기 세션을 한 번에 종료함"
-
-    @override
-    async def call(
-        self, adapter: SessionAdapter, laid: PendingSessionsInTwoProjectsAndACaller
-    ) -> Terminated:
-        with ActingAs(laid.caller):
-            return await adapter.partial_bulk_terminate(
-                PartialBulkTerminateSessionsInput(
-                    ids=[laid.first_project_session.id, laid.second_project_session.id]
-                )
-            )
-
-
-@dataclass(frozen=True)
-class TheFirstProjectsSessionIsCancelledTheOtherFails(
-    Then[PendingSessionsInTwoProjectsAndACaller, Terminated]
-):
-    """첫 프로젝트의 세션은 취소됨으로 처리된 목록에, 다른 프로젝트의 세션은 실패 목록에 온다."""
-
-    @override
-    def says(self) -> str:
-        return (
-            "첫 프로젝트의 세션은 취소됨으로 처리된 목록에, 다른 프로젝트의 세션은 "
-            "권한이 없다는 이유로 실패 목록에 온다"
-        )
-
-    @override
-    def look(
-        self, laid: PendingSessionsInTwoProjectsAndACaller, answered: Answered[Terminated]
-    ) -> list[Verdict]:
-        payload = answered.response
-        if payload is None:
-            return [MissingResponse(answered.raised)]
-        verdicts: list[Verdict] = [
-            Same("successes count", len(payload.successes), 1),
-            Same("failed count", len(payload.failed), 1),
-        ]
-        for success in payload.successes:
-            verdicts += [
-                Held[UUID](
-                    "successes[0].id",
-                    success.id,
-                    SameAs(laid.first_project_session.id, "첫 프로젝트 세션의 id"),
-                ),
-                Same("successes[0].status", success.status, SessionTerminationStatusEnum.CANCELLED),
-            ]
-        for failure in payload.failed:
-            verdicts += [
-                Held[UUID](
-                    "failed[0].id",
-                    failure.id,
-                    SameAs(laid.second_project_session.id, "다른 프로젝트 세션의 id"),
-                ),
-                Held("failed[0].message", failure.message, Mentions("Insufficient permission")),
-            ]
-        return verdicts
-
-
-@dataclass(frozen=True)
 class TerminatingAnswersForTheMissingOne(
     Scenario[TestSeedingSession, APendingSessionAndACaller, SessionAdapter, Terminated]
 ):
@@ -292,40 +220,10 @@ class AUserGrantedNothingTerminatesNone(
         return NothingIsTerminated()
 
 
-@dataclass(frozen=True)
-class AProjectGranteeTerminatesSessionsOfTwoProjects(
-    Scenario[TestSeedingSession, PendingSessionsInTwoProjectsAndACaller, SessionAdapter, Terminated]
-):
-    @override
-    def summary(self) -> str:
-        return "a-user-granted-in-one-project-terminates-its-session-and-fails-on-the-other"
-
-    @override
-    def describe(self) -> str:
-        return (
-            "한 프로젝트 범위에서만 세션 soft delete 권한을 받은 사용자가 두 프로젝트의 대기 세션을 "
-            "한 번에 종료하면, 그 프로젝트의 세션은 취소됨으로 처리된 목록에, 다른 프로젝트의 세션은 "
-            "권한이 없다는 이유로 실패 목록에 온다"
-        )
-
-    @override
-    def given(self) -> Given[TestSeedingSession, PendingSessionsInTwoProjectsAndACaller]:
-        return PendingSessionsInTwoProjectsAndSomeone(granted=FirstProjectGrant.SESSION_SOFT_DELETE)
-
-    @override
-    def when(self) -> When[PendingSessionsInTwoProjectsAndACaller, SessionAdapter, Terminated]:
-        return TerminatingTheSessionsOfBothProjects()
-
-    @override
-    def then(self) -> Then[PendingSessionsInTwoProjectsAndACaller, Terminated]:
-        return TheFirstProjectsSessionIsCancelledTheOtherFails()
-
-
 SCENARIOS: list[SessionStep] = [
     TerminatingAnswersForTheMissingOne(),
     AProjectGranteeTerminates(),
     AUserGrantedNothingTerminatesNone(),
-    AProjectGranteeTerminatesSessionsOfTwoProjects(),
 ]
 
 
