@@ -129,17 +129,21 @@ class ROCmPlugin(AbstractComputePlugin):
             except OSError:
                 node = None
             (_, minor, _) = librocm_smi.get_version()
-            if minor == 1:
-                unique_id = librocm_smi.get_serial_number(dev_id)
+            serial = librocm_smi.get_serial_number(dev_id)
+            if minor == 1 and serial is not None:
+                unique_id = serial
             else:
                 unique_id = librocm_smi.get_gpu_uuid(dev_id)[2:]
-            serial = librocm_smi.get_serial_number(dev_id)
+            if serial is None:
+                serial = unique_id
             sku = librocm_smi.get_gpu_sku(dev_id)
+            render_minor = librocm_smi.get_drm_render_minor(dev_id)
 
             if serial in devices_by_serial:
                 dev_info = devices_by_serial[serial]
                 dev_info.xcds.append(
                     ROCmXCD(
+                        render_minor,
                         DeviceId(str(dev_id)),
                         pci_bus_id,
                         raw_info["totalGlobalMem"],
@@ -156,6 +160,7 @@ class ROCmPlugin(AbstractComputePlugin):
                     numa_node=node,
                     xcds=[
                         ROCmXCD(
+                            render_minor,
                             DeviceId(str(dev_id)),
                             pci_bus_id,
                             raw_info["totalGlobalMem"],
@@ -270,7 +275,7 @@ class ROCmPlugin(AbstractComputePlugin):
                         mem_used, mem_total = librocm_smi.get_memory_info(dev_idx)
                         gpu_util = librocm_smi.get_gpu_utilization(dev_idx)
 
-                        device_stats_by_device_filename[f"/dev/dri/renderD{128 + dev_idx}"] = {
+                        device_stats_by_device_filename[xcd.render_node_path] = {
                             "util": gpu_util,
                             "mem_used": mem_used,
                             "mem_total": mem_total,
@@ -370,8 +375,8 @@ class ROCmPlugin(AbstractComputePlugin):
                 "Devices": [
                     *[
                         {
-                            "PathOnHost": f"/dev/dri/renderD{128 + int(xcd.device_id)}",
-                            "PathInContainer": f"/dev/dri/renderD{128 + int(xcd.device_id)}",
+                            "PathOnHost": xcd.render_node_path,
+                            "PathInContainer": xcd.render_node_path,
                             "CgroupPermissions": "mrw",
                         }
                         for xcd in assigned_xcds
@@ -460,7 +465,8 @@ class ROCmPlugin(AbstractComputePlugin):
             for dev_id, alloc in per_device_alloc.items():
                 if alloc > 0:
                     active_device_id_set.add(dev_id)
-        active_device_ids = sorted(active_device_id_set, key=lambda v: int(v))
+        # Device IDs are serial numbers or hex unique IDs, not integer indices.
+        active_device_ids = sorted(active_device_id_set)
         data["ROCm_GLOBAL_DEVICE_IDS"] = ",".join(
             f"{local_idx}:{global_id}" for local_idx, global_id in enumerate(active_device_ids)
         )
