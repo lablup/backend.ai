@@ -221,6 +221,18 @@
       "display_icon": "nvidia",
       "number_format": {"binary": false, "round_length": 0},
       "rank": 1500
+    },
+    {
+      "uuid": "e84dafba-8b90-49ad-94ac-2b0bdf45bfc3",
+      "slot_name": "rebel100.device",
+      "slot_type": "count",
+      "required": false,
+      "display_name": "Rebel100 Device",
+      "description": "Rebel100",
+      "display_unit": "Rebel100",
+      "display_icon": "rebel",
+      "number_format": {"binary": false, "round_length": 0},
+      "rank": 1600
     }
   ]
 }
