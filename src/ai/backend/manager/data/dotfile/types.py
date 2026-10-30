@@ -59,12 +59,11 @@ class DotfileData(FieldData):
 
 @dataclass(frozen=True)
 class DotfileRevisionData(FieldData):
-    """One write of a dotfile's permission and content; the latest one is the current content."""
+    """One write of a dotfile's content; the latest one is the current content."""
 
     id: DotfileRevisionID
     dotfile_id: DotfileID
     revision_number: int
-    perm: str
     data: str
     creator_id: UserID | None
     created_at: datetime
@@ -72,10 +71,11 @@ class DotfileRevisionData(FieldData):
 
 @dataclass(frozen=True)
 class DotfileApplicationData(FieldData):
-    """The dotfile an entity's sessions get for one path."""
+    """The dotfile an entity's sessions get for one path, and the permission it is written with."""
 
     entity: RuntimeEntityID
     path: str
+    perm: str
     dotfile_id: DotfileID
 
 

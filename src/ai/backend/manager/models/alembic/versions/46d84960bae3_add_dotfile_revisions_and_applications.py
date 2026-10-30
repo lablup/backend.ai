@@ -27,7 +27,6 @@ def upgrade() -> None:
         sa.Column("id", GUID(), nullable=False, server_default=sa.text("uuid_generate_v7()")),
         sa.Column("dotfile_id", GUID(), nullable=False),
         sa.Column("revision_number", sa.Integer(), nullable=False),
-        sa.Column("perm", sa.Text(), nullable=False),
         sa.Column("data", sa.Text(), nullable=False),
         sa.Column("creator_id", GUID(), nullable=True),
         sa.Column(
@@ -49,7 +48,6 @@ def upgrade() -> None:
         sa.UniqueConstraint(
             "dotfile_id", "revision_number", name=op.f("uq_dotfile_revisions_dotfile_id")
         ),
-        sa.CheckConstraint("char_length(perm) <= 4", name=op.f("ck_dotfile_revisions_perm_length")),
         sa.CheckConstraint(
             "char_length(data) <= 65536", name=op.f("ck_dotfile_revisions_data_length")
         ),
@@ -59,6 +57,7 @@ def upgrade() -> None:
         sa.Column("entity_type", sa.String(32), nullable=False),
         sa.Column("entity_id", GUID(), nullable=False),
         sa.Column("path", sa.Text(), nullable=False),
+        sa.Column("perm", sa.Text(), nullable=False),
         sa.Column("dotfile_id", GUID(), nullable=False),
         sa.PrimaryKeyConstraint(
             "entity_type", "entity_id", "path", name=op.f("pk_dotfile_applications")
@@ -74,6 +73,9 @@ def upgrade() -> None:
             ["dotfiles.id"],
             name=op.f("fk_dotfile_applications_dotfile_id_dotfiles"),
             ondelete="CASCADE",
+        ),
+        sa.CheckConstraint(
+            "char_length(perm) <= 4", name=op.f("ck_dotfile_applications_perm_length")
         ),
     )
     op.create_index(

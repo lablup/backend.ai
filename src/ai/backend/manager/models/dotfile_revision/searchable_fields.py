@@ -32,7 +32,6 @@ class _DotfileRevisionOwnFields(RowDataConverter[DotfileRevisionRow, DotfileRevi
         IntConditions(DotfileRevisionRow.revision_number),
         ColumnOrder(DotfileRevisionRow.revision_number),
     )
-    perm = SearchableField(DotfileRevisionRow.perm, None, None)
     data = SearchableField(DotfileRevisionRow.data, None, None)
     creator_id = SearchableField(
         DotfileRevisionRow.creator_id,
@@ -51,7 +50,6 @@ class _DotfileRevisionOwnFields(RowDataConverter[DotfileRevisionRow, DotfileRevi
             id=self.field_id.read(row),
             dotfile_id=self.dotfile_id.read(row),
             revision_number=self.revision_number.read(row),
-            perm=self.perm.read(row),
             data=self.data.read(row),
             creator_id=self.creator_id.read(row),
             created_at=self.created_at.read(row),
