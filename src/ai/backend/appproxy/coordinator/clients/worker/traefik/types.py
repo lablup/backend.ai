@@ -82,9 +82,11 @@ class AuthPluginMiddlewareConfig(TypedDict):
     plugin: AuthPluginOptionsByName
 
 
-type HttpMiddlewareConfig = (
-    CorsHeadersMiddlewareConfig | IpAllowListMiddlewareConfig | AuthPluginMiddlewareConfig
-)
-type RoutingConfig = (
-    HttpRouterConfig | TcpRouterConfig | HttpServiceConfig | TcpServiceConfig | HttpMiddlewareConfig
-)
+class IngressRoutingConfigs(TypedDict, total=False):
+    http_router: HttpRouterConfig
+    http_service: HttpServiceConfig
+    cors_headers_middleware: CorsHeadersMiddlewareConfig
+    ip_allowlist_middleware: IpAllowListMiddlewareConfig
+    auth_plugin_middleware: AuthPluginMiddlewareConfig
+    tcp_router: TcpRouterConfig
+    tcp_service: TcpServiceConfig
