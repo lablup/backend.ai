@@ -1146,8 +1146,9 @@ class DeploymentRepository:
                 if rule.action.max_replicas is not None:
                     new_replica_count = min(new_replica_count, rule.action.max_replicas)
 
-                # A count already beyond a limit is clamped against scale_direction.
-                if (new_replica_count - current_replica_count) * scale_direction <= 0:
+                if not self._clamped_replica_count_moves_in_scale_direction(
+                    current_replica_count, new_replica_count, scale_direction
+                ):
                     log.debug(
                         "autoscaling replica count at or beyond limit, rule skipped",
                         deployment_id=deployment.id,
@@ -1187,6 +1188,17 @@ class DeploymentRepository:
                 return new_replica_count
 
         return None
+
+    @staticmethod
+    def _clamped_replica_count_moves_in_scale_direction(
+        current_replica_count: int,
+        clamped_replica_count: int,
+        scale_direction: int,
+    ) -> bool:
+        """Clamping leaves a count at its limit unchanged and moves a count already beyond a
+        limit against the rule (a scale-out rule with `max_replicas` 3 would take 5 down to 3).
+        Only a count that moves the way the triggered threshold asks is applied."""
+        return (clamped_replica_count - current_replica_count) * scale_direction > 0
 
     @deployment_repository_resilience.apply()
     async def fetch_session_statuses_by_route_ids(
