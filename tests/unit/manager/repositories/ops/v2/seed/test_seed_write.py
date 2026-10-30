@@ -145,6 +145,7 @@ def _preset(name: str, *permissions: RolePermissionPresetUpserter) -> SeedWrite:
             name=name,
             scope_type=EntityType("domain"),
             auto_assign=False,
+            auto_assign_to_owner=False,
         ),
         field_upserters=permissions,
         field_purgers=(),
@@ -227,13 +228,18 @@ class TestWrite:
             name="first",
             scope_type=EntityType("domain"),
             auto_assign=False,
+            auto_assign_to_owner=False,
             role_name_template="filled-{scope}",
         )
         await repository.partial_write(
             [SeedWrite(upserter=stated, field_upserters=(), field_purgers=())], overwrite=False
         )
         unstated = TemplatedPresetUpserter(
-            id=preset_id, name="renamed", scope_type=EntityType("domain"), auto_assign=False
+            id=preset_id,
+            name="renamed",
+            scope_type=EntityType("domain"),
+            auto_assign=False,
+            auto_assign_to_owner=False,
         )
 
         results = await repository.partial_write(
@@ -252,7 +258,11 @@ class TestWrite:
         preset = write.upserter
         assert isinstance(preset, RolePresetUpserter)
         nulls = NullOnlyPresetUpserter(
-            id=preset.id, name="first", scope_type=preset.scope_type, auto_assign=False
+            id=preset.id,
+            name="first",
+            scope_type=preset.scope_type,
+            auto_assign=False,
+            auto_assign_to_owner=False,
         )
         null_permission = NullPermissionUpserter(
             entity_type=EntityType("agent"), permission=Permission.READ

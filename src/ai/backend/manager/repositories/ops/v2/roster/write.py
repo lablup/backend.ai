@@ -23,6 +23,7 @@ from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.permission.types import Permission
 from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.manager.data.permission.status import RoleStatus
 from ai.backend.manager.data.project.types import UnassignUserFailure
 from ai.backend.manager.data.user.types import UserData
 from ai.backend.manager.errors.resource import (
@@ -33,6 +34,7 @@ from ai.backend.manager.errors.resource import (
 )
 from ai.backend.manager.models.project.row import ProjectRow, ProjectType
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
+from ai.backend.manager.models.rbac_models.role_preset.row import RolePresetRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.user.searchable_fields import UserSearchableFields
@@ -224,6 +226,27 @@ class V2RosterWriteOps(V2WriteOps, V2CapOps):
         membership_id = await self._reset_share(project_id, user_id)
         await self._insert_caps(membership_id, dict.fromkeys(self._bits_of(self._MEMBER_CAP)))
         await self._grant_auto_assign_roles([project_id], user_id)
+
+    async def _join_as_owner(self, project_id: ProjectID, user_id: UserID) -> None:
+        """Join the user to their personal project and map them to the project's roles
+        whose preset is ``auto_assign_to_owner``."""
+        await self._join(project_id, user_id)
+        role_ids = (
+            await self._sess.scalars(
+                sa.select(RoleRow.id)
+                .join(RolePresetRow, RolePresetRow.id == RoleRow.role_preset_id)
+                .where(
+                    RoleRow.scope_type == ProjectEntityType(),
+                    RoleRow.scope_id == project_id,
+                    RoleRow.status == RoleStatus.ACTIVE,
+                    RolePresetRow.auto_assign_to_owner.is_(True),
+                )
+            )
+        ).all()
+        if role_ids:
+            await self._bulk_insert_ignore_conflicts(
+                [UserRoleRow(user_id=user_id, role_id=role_id) for role_id in role_ids],
+            )
 
     async def _leave(self, project_id: ProjectID, user_id: UserID) -> None:
         """Take the user off the project's roster — the reverse of :meth:`_join`, the

@@ -176,7 +176,7 @@ class V2UserWriteOps(V2RosterWriteOps, V2ResourcePolicyWriteOps):
                 user_id=user_id,
             )
         )
-        await self._join(ProjectID(project.id), user_id)
+        await self._join_as_owner(ProjectID(project.id), user_id)
         await self.restate_project_resource_policy_share(ProjectID(project.id))
         return project
 
