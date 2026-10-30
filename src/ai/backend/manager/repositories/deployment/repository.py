@@ -49,6 +49,7 @@ from ai.backend.manager.clients.valkey_client.statistics import (
 )
 from ai.backend.manager.data.deployment.creator import DeploymentPolicyConfig
 from ai.backend.manager.data.deployment.scale import (
+    AutoScalingAction,
     AutoScalingRule,
     AutoScalingRuleCreator,
     ModelDeploymentAutoScalingRuleCreator,
@@ -1105,10 +1106,10 @@ class DeploymentRepository:
                     )
 
             if should_trigger:
-                # Calculate new replica count
-                new_replica_count = max(
-                    0, current_replica_count + scale_direction * rule.action.step_size
+                new_replica_count = self._replica_count_after_step_within_limit(
+                    current_replica_count, scale_direction, rule.action
                 )
+<<<<<<< HEAD
 
                 # Check min/max limits
                 if (
@@ -1134,6 +1135,16 @@ class DeploymentRepository:
                         rule.id,
                         new_replica_count,
                         rule.action.max_replicas,
+=======
+                if new_replica_count is None:
+                    log.debug(
+                        "autoscaling replica count cannot move, rule skipped",
+                        deployment_id=deployment.id,
+                        rule_id=rule.id,
+                        current_replica_count=current_replica_count,
+                        min_replica_count=rule.action.min_replicas,
+                        max_replica_count=rule.action.max_replicas,
+>>>>>>> 4b856f48 (fix(BA-8151): clamp autoscaling replicas to rule limits instead of skipping (#15081))
                     )
                     continue
 
@@ -1165,6 +1176,27 @@ class DeploymentRepository:
                 return new_replica_count
 
         return None
+
+    @staticmethod
+    def _replica_count_after_step_within_limit(
+        current_replica_count: int,
+        scale_direction: int,
+        action: AutoScalingAction,
+    ) -> int | None:
+        """Scale-out stops at `max_replicas` and scale-in at `min_replicas`; the other limit is
+        not applied, so a count already past it still moves by `step_size` in its direction.
+        None when the count cannot move by even one replica."""
+        if scale_direction > 0:
+            new_replica_count = current_replica_count + action.step_size
+            if action.max_replicas is not None:
+                new_replica_count = min(new_replica_count, action.max_replicas)
+            moves_in_scale_direction = new_replica_count > current_replica_count
+        else:
+            new_replica_count = max(0, current_replica_count - action.step_size)
+            if action.min_replicas is not None:
+                new_replica_count = max(new_replica_count, action.min_replicas)
+            moves_in_scale_direction = new_replica_count < current_replica_count
+        return new_replica_count if moves_in_scale_direction else None
 
     @deployment_repository_resilience.apply()
     async def fetch_session_statuses_by_route_ids(
