@@ -25,7 +25,7 @@ def _reexec_with_argv0(display_name: str) -> None:
             argv = [display_name, "-s", "-m", mod_name]
         else:
             argv = [display_name, "-s", sys.argv[0]]
-        env["PYTHONHOME"] = sys.base_prefix
+        env["PYTHONHOME"] = sys.prefix
         # The process is re-executed in place, overriding argv and cmdline.
         os.execvpe(sys.executable, argv, env)
     else:

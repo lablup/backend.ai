@@ -18,4 +18,4 @@ def test_reexec_sets_pythonhome(monkeypatch: pytest.MonkeyPatch, virtual_env: st
     with patch("os.execvpe") as mock_exec, patch("pathlib.Path.write_text"):
         _reexec_with_argv0("bai-krunner")
     _, _, env = mock_exec.call_args.args
-    assert env["PYTHONHOME"] == sys.base_prefix
+    assert env["PYTHONHOME"] == sys.prefix
