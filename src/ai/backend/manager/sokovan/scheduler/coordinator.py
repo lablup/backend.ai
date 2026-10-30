@@ -468,14 +468,35 @@ class ScheduleCoordinator:
         with with_log_context(schedule_type=schedule_type, handler_name=handler.name()):
             log.debug("cleanup schedule processing")
 
-            with self._operation_metrics.measure_operation(handler.name()):
-                session_ids = await handler.fetch_session_ids()
-                if not session_ids:
-                    return True
+            deadline: asyncio.Timeout | None = None
+            lock_lifetime = 0.0
+            try:
+                async with AsyncExitStack() as stack:
+                    stack.enter_context(self._operation_metrics.measure_operation(handler.name()))
+                    if handler.lock_id is not None:
+                        lock_lifetime = (
+                            self._config_provider.config.manager.session_schedule_lock_lifetime
+                        )
+                        await stack.enter_async_context(
+                            self._lock_factory(handler.lock_id, lock_lifetime)
+                        )
+                        # Held at most its lifetime whatever the handler waits on; a pg advisory
+                        # lock would otherwise be held until the wait ends.
+                        deadline = await stack.enter_async_context(asyncio.timeout(lock_lifetime))
+                    session_ids = await handler.fetch_session_ids()
+                    if not session_ids:
+                        return True
 
-                recorder_scope = f"{schedule_type.value}:cleanup"
-                with SessionRecorderContext.scope(recorder_scope, entity_ids=list(session_ids)):
-                    await handler.execute(session_ids)
+                    recorder_scope = f"{schedule_type.value}:cleanup"
+                    with SessionRecorderContext.scope(recorder_scope, entity_ids=list(session_ids)):
+                        await handler.execute(session_ids)
+            except TimeoutError:
+                if deadline is None or not deadline.expired():
+                    raise
+                log.warning(
+                    "cleanup handler cancelled at its lock lifetime; the rest waits for the next cycle",
+                    lock_lifetime_sec=lock_lifetime,
+                )
 
             return True
 

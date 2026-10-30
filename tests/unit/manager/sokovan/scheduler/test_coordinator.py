@@ -12,6 +12,7 @@ Test Scenarios:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import nullcontext
 from datetime import datetime, timedelta
@@ -33,6 +34,7 @@ from ai.backend.manager.data.session.types import (
     StatusTransitions,
     TransitionStatus,
 )
+from ai.backend.manager.defs import LockID
 from ai.backend.manager.models.scheduling_history.row import SessionSchedulingHistoryRow
 from ai.backend.manager.models.session.updaters import SessionStatusBatchUpdater
 from ai.backend.manager.sokovan.scheduler.coordinator import (
@@ -1477,3 +1479,97 @@ class TestScheduleCoordinatorFaultLogging:
             await coordinator._process_lifecycle_handler_schedule(ScheduleType.SCHEDULE, handler)
 
         assert self._error_records(caplog) == []
+
+
+class TestScheduleCoordinatorCleanupLock:
+    """A cleanup handler runs fetch and execute under the lock it declares."""
+
+    @pytest.fixture
+    def lock_events(self) -> list[str]:
+        return []
+
+    @pytest.fixture
+    def coordinator(self, lock_events: list[str]) -> ScheduleCoordinator:
+        def lock_factory(lock_id: LockID, lifetime: float) -> MagicMock:
+            lock = MagicMock()
+            lock.__aenter__.side_effect = lambda *_: lock_events.append(f"acquire:{lock_id.name}")
+            lock.__aexit__.side_effect = lambda *_: lock_events.append("release")
+            return lock
+
+        coordinator = ScheduleCoordinator.__new__(ScheduleCoordinator)
+        coordinator._operation_metrics = MagicMock()
+        coordinator._operation_metrics.measure_operation.return_value = nullcontext()
+        coordinator._config_provider = MagicMock()
+        coordinator._config_provider.config.manager.session_schedule_lock_lifetime = 30.0
+        coordinator._lock_factory = MagicMock(side_effect=lock_factory)
+        return coordinator
+
+    @pytest.fixture
+    def handler(self, lock_events: list[str]) -> MagicMock:
+        handler = MagicMock()
+        handler.name.return_value = _TEST_HANDLER_NAME
+        handler.lock_id = LockID.LOCKID_SOKOVAN_CLEANUP_FORCE_TERMINATED
+
+        async def fetch() -> list[SessionId]:
+            lock_events.append("fetch")
+            return [SessionId(uuid4())]
+
+        async def execute(_: Any) -> None:
+            lock_events.append("execute")
+
+        handler.fetch_session_ids = fetch
+        handler.execute = execute
+        return handler
+
+    async def test_fetch_and_execute_run_under_the_lock(
+        self,
+        coordinator: ScheduleCoordinator,
+        handler: MagicMock,
+        lock_events: list[str],
+    ) -> None:
+        await coordinator._process_cleanup_schedule(ScheduleType.CLEANUP_FORCE_TERMINATED, handler)
+
+        assert lock_events == [
+            "acquire:LOCKID_SOKOVAN_CLEANUP_FORCE_TERMINATED",
+            "fetch",
+            "execute",
+            "release",
+        ]
+
+    async def test_a_handler_stuck_past_the_lock_lifetime_gives_the_lock_back(
+        self,
+        coordinator: ScheduleCoordinator,
+        handler: MagicMock,
+        lock_events: list[str],
+    ) -> None:
+        """A pg advisory lock ignores its lifetime; the coordinator must end the wait itself."""
+        coordinator._config_provider.config.manager.session_schedule_lock_lifetime = 0.1
+
+        async def stuck(_: Any) -> None:
+            lock_events.append("execute")
+            await asyncio.Event().wait()  # a destroy RPC to an agent that died mid-connection
+
+        handler.execute = stuck
+
+        async with asyncio.timeout(5):
+            done = await coordinator._process_cleanup_schedule(
+                ScheduleType.CLEANUP_FORCE_TERMINATED, handler
+            )
+
+        assert done
+        assert lock_events[-1] == "release"
+
+    async def test_a_timeout_the_handler_raised_itself_is_not_swallowed(
+        self,
+        coordinator: ScheduleCoordinator,
+        handler: MagicMock,
+    ) -> None:
+        async def raises(_: Any) -> None:
+            raise TimeoutError("the handler's own timeout")
+
+        handler.execute = raises
+
+        with pytest.raises(TimeoutError):
+            await coordinator._process_cleanup_schedule(
+                ScheduleType.CLEANUP_FORCE_TERMINATED, handler
+            )
