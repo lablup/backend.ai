@@ -470,6 +470,13 @@ class EnqueueSessionInput(BaseRequestModel):
     attach_network: UUID | None = Field(
         default=None, description="Persistent network UUID to attach."
     )
+    session_group_id: UUID | None = Field(
+        default=None,
+        description=(
+            "Session group UUID the session joins. The group must belong to the session's "
+            "owner and project."
+        ),
+    )
 
     # Metadata
     tag: str | None = Field(default=None, max_length=64, description="User-defined tag.")

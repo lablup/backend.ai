@@ -21,6 +21,7 @@ from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.resource_slot import ResourceSlotName
 from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.filter_specs import StringMatchSpec
@@ -404,6 +405,11 @@ class SessionAdapter(BaseAdapter):
             batch=batch_spec,
             tag=input.tag,
             callback_url=input.callback_url,
+            session_group_id=(
+                SessionGroupID(input.session_group_id)
+                if input.session_group_id is not None
+                else None
+            ),
             user_id=UserID(user_id),
             user_role=UserRole(user_role),
             access_key=AccessKey(access_key),

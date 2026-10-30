@@ -1178,6 +1178,16 @@ class EnqueueSessionInputGQL(PydanticInputMixin[EnqueueSessionInputDTO]):
         default=None,
     )
     attach_network: ID | None = gql_field(default=None, description="Network UUID to attach.")
+    session_group_id: ID | None = gql_added_field(
+        BackendAIGQLMeta(
+            description=(
+                "Session group UUID the session joins. The group must belong to the "
+                "session's owner and project."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+        ),
+        default=None,
+    )
 
     tag: str | None = gql_field(default=None, description="User-defined tag.")
     callback_url: str | None = gql_field(default=None, description="Webhook URL.")

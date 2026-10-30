@@ -8425,6 +8425,11 @@ input EnqueueSessionInput
   """Network UUID to attach."""
   attachNetwork: ID = null
 
+  """
+  Added in 26.10.0. Session group UUID the session joins. The group must belong to the session's owner and project.
+  """
+  sessionGroupId: ID = null
+
   """User-defined tag."""
   tag: String = null
 

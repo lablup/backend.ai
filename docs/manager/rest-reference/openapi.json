@@ -34804,6 +34804,20 @@
             "description": "Persistent network UUID to attach.",
             "title": "Attach Network"
           },
+          "session_group_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Session group UUID the session joins. The group must belong to the session's owner and project.",
+            "title": "Session Group Id"
+          },
           "tag": {
             "anyOf": [
               {

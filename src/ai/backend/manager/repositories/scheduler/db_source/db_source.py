@@ -88,6 +88,7 @@ from ai.backend.manager.data.session.types import (
     SessionSchedulingHistoryData,
     SessionStatus,
 )
+from ai.backend.manager.data.session_group.types import SessionGroupData
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.errors.image import ImageNotFound
 from ai.backend.manager.errors.kernel import IncompleteSessionSpec
@@ -143,6 +144,7 @@ from ai.backend.manager.models.session_designated_agent.creators import (
 )
 from ai.backend.manager.models.session_designated_agent.row import SessionDesignatedAgentRow
 from ai.backend.manager.models.session_group.row import SessionGroupRow
+from ai.backend.manager.models.session_group.searchers import SessionGroupSearcher
 from ai.backend.manager.models.specs.creator import FieldToCreate, NestedFieldToCreate
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import (
@@ -2422,6 +2424,12 @@ class ScheduleDBSource:
         if resource_group_name is None:
             raise ResourceGroupNotFound(f"Resource group not found (id:{resource_group_id})")
         return ResourceGroupName(resource_group_name)
+
+    async def search_session_groups(self, searcher: SessionGroupSearcher) -> list[SessionGroupData]:
+        """Search session groups for a session enqueue."""
+        async with self._reconcile_ops.read_ops() as r:
+            result = await r.search_in_global(searcher)
+        return list(result.items)
 
     async def get_domain_id_by_name(self, name: DomainName) -> DomainID:
         async with self._db.begin_readonly_session_read_committed() as db_sess:
