@@ -38,7 +38,7 @@ class V2StorageStatusWriteOps(V2RelationWriteOps):
         self, report: ServiceVolumeStatusReport
     ) -> BulkResultWithFailures[StorageVolumeID]:
         """Insert each reported volume, its backend and its holding when absent, then write
-        when each holding was last checked, answering per volume. Raises
+        the check time of each checked holding, answering per volume. Raises
         :class:`ServiceCatalogNotFound` when the service has no catalog record."""
         service_id = await self._sess.scalar(
             sa.select(ServiceCatalogRow.id).where(
@@ -66,6 +66,7 @@ class V2StorageStatusWriteOps(V2RelationWriteOps):
                 status_checked_at=volume.check_started_at,
             )
             for volume, volume_id in held
+            if volume.check_started_at is not None
         })
 
     async def _ensure_holdings(

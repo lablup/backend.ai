@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, override
 
-import sqlalchemy as sa
 from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
@@ -22,13 +21,12 @@ __all__ = ("StorageVolumeHoldingStatusUpdater",)
 class StorageVolumeHoldingStatusUpdater(
     GuardedDataUpdater[StorageVolumeServiceHoldingRow, StorageVolumeID]
 ):
-    """Write when a service last checked a volume it holds, or only touch the holding
-    while ``status_checked_at`` is None. The guard picks the reporting service's holding
-    among those of the volume."""
+    """Write when a service last checked a volume it holds. The guard picks the reporting
+    service's holding among those of the volume."""
 
     service_catalog_id: ServiceCatalogID
     storage_volume_id: StorageVolumeID
-    status_checked_at: datetime | None
+    status_checked_at: datetime
 
     @property
     @override
@@ -59,8 +57,6 @@ class StorageVolumeHoldingStatusUpdater(
 
     @override
     def build_values(self) -> dict[str, Any]:
-        if self.status_checked_at is None:
-            return {"updated_at": sa.func.now()}
         return {"status_checked_at": self.status_checked_at}
 
     @property
