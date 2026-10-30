@@ -37,7 +37,10 @@ from ai.backend.manager.data.user.types import (
     UserData,
     UserSearchResult,
 )
-from ai.backend.manager.errors.bootstrap_script import BootstrapScriptNotFound
+from ai.backend.manager.errors.bootstrap_script import (
+    BootstrapScriptEntityMismatch,
+    BootstrapScriptNotFound,
+)
 from ai.backend.manager.errors.storage import DotfileCreationFailed, DotfileNotFound
 from ai.backend.manager.errors.user import KeyPairNotFound
 from ai.backend.manager.models.bootstrap_script.creators import BootstrapScriptCreator
@@ -156,12 +159,13 @@ class UserRepository:
         """Point the user's default at ``script_id``, a live script set on that user."""
         async with self._v2_ops.write_ops() as w:
             target = await w.query_field_data(BootstrapScriptQuerier(script_id=script_id))
-            if (
-                target is None
-                or target.deleted_at is not None
-                or target.entity.entity_type() != UserEntityType()
-                or target.entity != user_id
-            ):
+            if target is None or target.deleted_at is not None:
+                raise BootstrapScriptNotFound(f"Bootstrap script {script_id} not found")
+            if target.entity.entity_type() != UserEntityType():
+                raise BootstrapScriptEntityMismatch(
+                    f"Bootstrap script {script_id} is not set on a user. Default bootstrap script can only be set for user-owned scripts."
+                )
+            if target.entity != user_id:
                 raise BootstrapScriptNotFound(f"Bootstrap script {script_id} not found")
             await w.upsert_field_entity(
                 user_id, UserDefaultBootstrapScriptUpserter(script_id=script_id)

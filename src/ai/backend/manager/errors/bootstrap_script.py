@@ -19,6 +19,17 @@ class BootstrapScriptNotFound(FieldError, web.HTTPNotFound):
         )
 
 
+class BootstrapScriptEntityMismatch(FieldError, web.HTTPBadRequest):
+    error_type = "https://api.backend.ai/probs/bootstrap-script-entity-mismatch"
+    error_title = "The bootstrap script is not set on a user and cannot be a user's default."
+
+    @override
+    def field_error_code(self) -> FieldErrorCode:
+        return FieldErrorCode(
+            BootstrapScriptFieldType(), ActionOperationType.UPDATE, ErrorDetail.INVALID_PARAMETERS
+        )
+
+
 class DefaultBootstrapScriptPurgeForbidden(FieldError, web.HTTPForbidden):
     error_type = "https://api.backend.ai/probs/default-bootstrap-script-purge-forbidden"
     error_title = "The default bootstrap script cannot be purged."
