@@ -1472,6 +1472,13 @@ class SessionUsesGQL(PydanticInputMixin[SessionUses]):
     resource_group: list[UUID] | None = gql_field(
         default=None, description="Resource groups the session runs in."
     )
+    vfolder: list[UUID] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Vfolders the session's kernel groups mount.",
+        ),
+        default=None,
+    )
 
 
 @gql_pydantic_input(

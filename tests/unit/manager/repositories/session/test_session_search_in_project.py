@@ -15,15 +15,18 @@ from dateutil.tz import tzutc
 
 from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.domain import DomainID
+from ai.backend.common.data.entity.kernel_group import KernelGroupRole
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
-from ai.backend.common.data.entity.session import SessionEntityType
+from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import (
     AccessKey,
     AgentId,
     ClusterMode,
     DefaultForUnspecified,
     KernelId,
+    MountPermission,
     ResourceSlot,
     SessionId,
     SessionResult,
@@ -33,11 +36,14 @@ from ai.backend.manager.data.agent.types import AgentStatus
 from ai.backend.manager.data.kernel.types import KernelStatus
 from ai.backend.manager.data.project.types import ProjectType
 from ai.backend.manager.data.session.types import SessionStatus
+from ai.backend.manager.defs import DEFAULT_ROLE
 from ai.backend.manager.models.agent.row import AgentRow
 from ai.backend.manager.models.container_registry.row import ContainerRegistryRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.image.row import ImageRow
 from ai.backend.manager.models.kernel.row import KernelRow
+from ai.backend.manager.models.kernel_group.row import KernelGroupRow
+from ai.backend.manager.models.kernel_group_vfolder_mount.row import KernelGroupVFolderMountRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
@@ -93,7 +99,9 @@ class TestSessionSearchInProject:
                 ContainerRegistryRow,
                 ImageRow,
                 SessionRow,
+                KernelGroupRow,
                 KernelRow,
+                KernelGroupVFolderMountRow,
                 ResourceSlotTypeRow,
                 ResourceAllocationRow,
                 VirtualEntityRow,
@@ -428,3 +436,69 @@ class TestSessionSearchInProject:
             ResourceGroupID(uuid.uuid4())
         )
         assert await self._used_by_ids(db_with_cleanup, used_by) == set()
+
+    @pytest.fixture
+    async def mounted_vfolder_id(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_data: dict[str, uuid.UUID],
+    ) -> VFolderUUID:
+        """A vfolder mounted by running session_a1 and terminated session_b1."""
+        vfolder_id = VFolderUUID(uuid.uuid4())
+        async with db_with_cleanup.begin_session() as db_sess:
+            await db_sess.execute(
+                sa.update(SessionRow)
+                .where(SessionRow.id == test_data["session_b1_id"])
+                .values(status=SessionStatus.TERMINATED)
+            )
+            for session_id in (test_data["session_a1_id"], test_data["session_b1_id"]):
+                group = KernelGroupRow(
+                    session_id=SessionID(session_id), role=KernelGroupRole(DEFAULT_ROLE)
+                )
+                db_sess.add(group)
+                await db_sess.flush()
+                db_sess.add(
+                    KernelGroupVFolderMountRow(
+                        kernel_group_id=group.id,
+                        vfolder_id=vfolder_id,
+                        vfsubpath=".",
+                        mount_destination="/home/work/mnt",
+                        mount_perm=MountPermission.READ_WRITE,
+                    )
+                )
+        return vfolder_id
+
+    async def test_uses_vfolder_narrows_to_the_sessions_mounting_it(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_data: dict[str, uuid.UUID],
+        mounted_vfolder_id: VFolderUUID,
+    ) -> None:
+        """A terminated session keeps its mount and comes back with the running one."""
+        used_by = SessionSearchableFields.linked.usage.vfolders.uses(mounted_vfolder_id)
+        assert await self._used_by_ids(db_with_cleanup, used_by) == {
+            test_data["session_a1_id"],
+            test_data["session_b1_id"],
+        }
+
+    async def test_uses_another_vfolder_returns_none(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        mounted_vfolder_id: VFolderUUID,
+    ) -> None:
+        used_by = SessionSearchableFields.linked.usage.vfolders.uses(VFolderUUID(uuid.uuid4()))
+        assert await self._used_by_ids(db_with_cleanup, used_by) == set()
+
+    async def test_uses_vfolder_leaves_out_a_session_outside_the_scope(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        test_data: dict[str, uuid.UUID],
+        mounted_vfolder_id: VFolderUUID,
+    ) -> None:
+        scope = ProjectSessionTarget(project_id=test_data["project_a_id"])
+        used_by = SessionSearchableFields.linked.usage.vfolders.uses(mounted_vfolder_id)
+        async with db_with_cleanup.begin_readonly_session() as sess:
+            rows = await sess.scalars(
+                sa.select(SessionRow.id).where(scope.to_condition()(), used_by.condition())
+            )
+            assert set(rows) == {test_data["session_a1_id"]}
