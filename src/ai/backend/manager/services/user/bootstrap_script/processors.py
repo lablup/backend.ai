@@ -35,9 +35,8 @@ from ai.backend.manager.services.user.service import UserService
 
 
 class BootstrapScriptProcessors:
-    """A bootstrap script is a field row of the user it is set on, and that user answers
-    for every operation. Create, add-revision and switch-default run a service: each
-    checks or writes more than one row."""
+    """The operations naming a script by its id run through ``scripts``, where the entity
+    the row is set on answers. The ones naming the user run through ``group``."""
 
     create: SingleEntityActionProcessor[
         CreateBootstrapScriptAction, CreateBootstrapScriptActionResult
@@ -50,7 +49,7 @@ class BootstrapScriptProcessors:
     search: ScopeActionProcessor[
         SearchBootstrapScriptsAction, ScopedFieldsOpsResult[BootstrapScriptData]
     ]
-    switch_default: SingleFieldActionProcessor[
+    switch_default: SingleEntityActionProcessor[
         SwitchDefaultBootstrapScriptAction, SwitchDefaultBootstrapScriptActionResult
     ]
     purge: SingleFieldActionProcessor[
@@ -66,13 +65,13 @@ class BootstrapScriptProcessors:
         self.create = group.single_entity(
             CreateBootstrapScriptAction, user_service.create_bootstrap_script
         )
-        self.add_revision = scripts.single_field(
+        self.add_revision = scripts.runtime_single_field(
             AddBootstrapScriptRevisionAction, user_service.add_bootstrap_script_revision
         )
-        self.get = scripts.get_ops(GetBootstrapScriptAction)
+        self.get = scripts.runtime_get_ops(GetBootstrapScriptAction)
         self.bulk_get = scripts.partial_bulk_get_ops(BulkGetBootstrapScriptsAction)
         self.search = scripts.search_ops(SearchBootstrapScriptsAction)
-        self.switch_default = scripts.single_field(
+        self.switch_default = group.single_entity(
             SwitchDefaultBootstrapScriptAction, user_service.switch_default_bootstrap_script
         )
-        self.purge = scripts.purge_ops(PurgeBootstrapScriptAction)
+        self.purge = scripts.runtime_purge_ops(PurgeBootstrapScriptAction)

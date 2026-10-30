@@ -5,7 +5,7 @@ from dataclasses import dataclass, replace
 from typing import Self, override
 
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScriptID
-from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.entity.types import RuntimeEntityID
 from ai.backend.manager.actions.v2.field.ops import PartialBulkGetFieldOpsAction
 from ai.backend.manager.data.bootstrap_script.types import BootstrapScriptData
 from ai.backend.manager.models.bootstrap_script.queriers import BulkBootstrapScriptQuerier
@@ -17,7 +17,9 @@ from ai.backend.manager.services.user.bootstrap_script.actions.lookup_owner impo
 
 @dataclass
 class BulkGetBootstrapScriptsAction(
-    PartialBulkGetFieldOpsAction[BootstrapScriptID, UserID, BootstrapScriptRow, BootstrapScriptData]
+    PartialBulkGetFieldOpsAction[
+        BootstrapScriptID, RuntimeEntityID, BootstrapScriptRow, BootstrapScriptData
+    ]
 ):
     """Read the bootstrap scripts the caller named."""
 

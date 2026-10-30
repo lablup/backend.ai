@@ -287,6 +287,9 @@ if TYPE_CHECKING:
         TemplateProcessors,
     )
     from ai.backend.manager.services.template.service import TemplateService
+    from ai.backend.manager.services.user.bootstrap_script.processors import (
+        BootstrapScriptProcessors,
+    )
     from ai.backend.manager.services.user.processors import UserProcessors
     from ai.backend.manager.services.user.service import UserService
     from ai.backend.manager.services.user_resource_policy.processors import (
@@ -498,6 +501,7 @@ class Processors:
     audit_log: AuditLogProcessors
     entity_label: EntityLabelProcessors
     dotfile: DotfileProcessors
+    bootstrap_script: BootstrapScriptProcessors
     idle_checker_assignment: IdleCheckerAssignmentProcessors
     scheduling_history: SchedulingHistoryProcessors
     service_catalog: ServiceCatalogProcessors
