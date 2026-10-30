@@ -9295,16 +9295,6 @@ type GetPresignedUploadURLPayload
 }
 
 """
-Added in 26.10.0. The name of a singleton scope of the `global` entity type.
-"""
-enum GlobalEntityName
-  @join__type(graph: STRAWBERRY)
-{
-  GLOBAL @join__enumValue(graph: STRAWBERRY)
-  PUBLIC @join__enumValue(graph: STRAWBERRY)
-}
-
-"""
 Added in 24.09.0. Global ID of GQL relay spec. Base64 encoded version of "<node type name>:<node id>". UUID or string type values are also allowed.
 """
 scalar GlobalIDField
@@ -24740,13 +24730,10 @@ type RolePreset implements Node
   """Role preset name."""
   name: String!
 
-  """Scope type this preset targets (e.g., domain, project)."""
+  """
+  Scope type this preset targets (e.g., domain, project). A preset of the `global` type reads as the global entity its role is created in: `global` or `public`.
+  """
   scopeType: String!
-
-  """
-  Added in 26.10.0. The global entity a global preset's role is created in. Null when the preset is not global, or when it applies to every global entity.
-  """
-  globalScope: GlobalEntityName
 
   """
   Added in 26.10.0. Jinja template rendering the name of each role instantiated from this preset.

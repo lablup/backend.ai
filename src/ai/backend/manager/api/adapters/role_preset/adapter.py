@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from ai.backend.common.data.entity.global_entity import GlobalEntityID, GlobalEntityName
+from ai.backend.common.data.entity.global_entity import GlobalEntityID
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_permission_preset import RolePermissionPresetID
 from ai.backend.common.data.entity.role_preset import RolePresetID
@@ -654,8 +654,7 @@ class RolePresetAdapter(BaseAdapter):
             id=data.id,
             entity_id=data.entity_id(),
             name=data.name,
-            scope_type=data.scope_type,
-            global_scope=RolePresetAdapter._global_scope(data),
+            scope_type=RolePresetAdapter._scope_type_or_global_entity_name(data),
             role_name_template=data.role_name_template,
             auto_assign=data.auto_assign,
             deleted=data.deleted_at is not None,
@@ -665,10 +664,10 @@ class RolePresetAdapter(BaseAdapter):
         )
 
     @staticmethod
-    def _global_scope(data: RolePresetData) -> GlobalEntityName | None:
+    def _scope_type_or_global_entity_name(data: RolePresetData) -> str:
         if data.scope_type != GlobalEntityType() or data.scope_id is None:
-            return None
-        return GlobalEntityIDCache.name_of(GlobalEntityID(data.scope_id))
+            return str(data.scope_type)
+        return str(GlobalEntityIDCache.name_of(GlobalEntityID(data.scope_id)))
 
     @staticmethod
     def _permission_data_to_node(data: RolePermissionPresetData) -> RolePermissionPresetNode:

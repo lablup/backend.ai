@@ -4,13 +4,17 @@ from __future__ import annotations
 
 from typing import override
 
+import sqlalchemy as sa
+
 from ai.backend.common.data.entity.role import RoleID
 from ai.backend.common.data.entity.role_preset import RolePresetEntityType
+from ai.backend.common.data.entity.types import GlobalEntityType
 from ai.backend.manager.data.role_preset.types import RolePresetData
 from ai.backend.manager.models.entity_label.searchable_fields import (
     EntityLabelCorrelation,
     EntityLabelSearchableFields,
 )
+from ai.backend.manager.models.global_entity.row import GlobalEntityRow
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.role_permission_preset.row import (
     RolePermissionPresetRow,
@@ -37,12 +41,26 @@ from ai.backend.manager.models.specs.search.usage import UsedByConditions
 
 __all__ = ("RolePresetSearchableFields",)
 
+_SCOPE_TYPE_OR_GLOBAL_ENTITY_NAME = sa.type_coerce(
+    sa.func.coalesce(
+        sa.select(GlobalEntityRow.name)
+        .where(
+            RolePresetRow.scope_type == GlobalEntityType(),
+            GlobalEntityRow.id == RolePresetRow.scope_id,
+        )
+        .scalar_subquery(),
+        RolePresetRow.scope_type,
+    ),
+    sa.String(),
+)
+
 
 class _RolePresetOwnFields(RowDataConverter[RolePresetRow, RolePresetData]):
     """The preset's own columns.
 
     ``role_name_template`` is ``sa.Text`` with no index serving a partial match, so it
-    carries equality and membership only.
+    carries equality and membership only. ``scope_type`` filters and orders on the value
+    the API shows: a ``global`` preset's global entity name.
     """
 
     id = SearchableField(
@@ -60,8 +78,8 @@ class _RolePresetOwnFields(RowDataConverter[RolePresetRow, RolePresetData]):
     )
     scope_type = SearchableField(
         RolePresetRow.scope_type,
-        StringConditions(RolePresetRow.scope_type),
-        ColumnOrder(RolePresetRow.scope_type),
+        StringConditions(_SCOPE_TYPE_OR_GLOBAL_ENTITY_NAME),
+        ColumnOrder(_SCOPE_TYPE_OR_GLOBAL_ENTITY_NAME),
     )
     scope_id = SearchableField(
         RolePresetRow.scope_id,
