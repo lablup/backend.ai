@@ -22,6 +22,8 @@ declare a spec there.
   (`relation.py`), and they name the pair.
 - A relation table has no row id column. The pair of ends is its primary key; a polymorphic
   side adds its type column to the key.
+- A new relation is named by its ends, scope first and target second, in the order
+  `create_relation(creator, scope, target)` takes them: `DomainResourceGroupRelationRow`, table `domain_resource_group_relations`. The order is the permission: the scope reads the target and what the target owns, and the target reads the scope itself only.
 - Create inserts a new pair only. A pair already linked, soft-deleted or not, is left
   as it stands and answered `False`; bringing it back is the restore updater's.
 - Soft delete / restore (`RelationLifecycleUpdater`) writes the soft delete mixin's
