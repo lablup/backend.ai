@@ -1,7 +1,7 @@
 """Add auto-generated file revisions and applications
 
 Revision ID: 46d84960bae3
-Revises: a37b92a3e063
+Revises: 133c191ae872
 Create Date: 2026-10-30 12:00:00.000000
 
 """
@@ -15,7 +15,7 @@ from ai.backend.manager.models.base import GUID
 
 # revision identifiers, used by Alembic.
 revision = "46d84960bae3"
-down_revision = "a37b92a3e063"
+down_revision = "133c191ae872"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
