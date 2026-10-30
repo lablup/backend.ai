@@ -131,7 +131,11 @@ def group_processors(
         valkey_stat_client=valkey_clients.stat,
         group_repositories=repositories,
     )
-    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), service)
+    return ProjectProcessors(
+        processor_registry.group(GroupMeta(ProjectEntityType())),
+        processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        service,
+    )
 
 
 @pytest.fixture()

@@ -8,6 +8,7 @@ from typing import Any
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.types import EntityIdentifier
 from ai.backend.common.exception import BackendAIError
@@ -20,8 +21,16 @@ from ai.backend.logging.structured import StructuredLogger
 from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
 from ai.backend.manager.config.provider import ManagerConfigProvider
 from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.errors.image import ContainerRegistryGroupsAssociationNotFound
 from ai.backend.manager.errors.resource import (
     ProjectNotFound,
+)
+from ai.backend.manager.models.association_container_registries_groups.scopes import (
+    ProjectContainerRegistryAssociationTarget,
+)
+from ai.backend.manager.models.association_container_registries_groups.updaters import (
+    ClearDefaultRegistryUpdater,
+    SetDefaultRegistryUpdater,
 )
 from ai.backend.manager.models.kernel.row import KernelRow
 from ai.backend.manager.models.project.creators import ProjectCreator
@@ -127,6 +136,35 @@ class ProjectRepository:
             if data is None:
                 raise ProjectNotFound(f"Project not found: {updater.target_id_value()}")
             return data
+
+    @project_repository_resilience.apply()
+    async def switch_default_registry(
+        self, project_id: ProjectID, registry_id: ContainerRegistryID
+    ) -> None:
+        """Make ``registry_id``, which the project must already be allowed on, the
+        project's default registry."""
+        scopes = [ProjectContainerRegistryAssociationTarget(project_id)]
+        async with self._v2_ops.write_ops() as w:
+            # The clear locks the project's links, so a concurrent switch waits for this one.
+            await w.batch_update_in_scopes(
+                scopes, ClearDefaultRegistryUpdater(project_id=project_id)
+            )
+            marked = await w.batch_update_in_scopes(
+                scopes, SetDefaultRegistryUpdater(registry_id=registry_id)
+            )
+            if not marked:
+                raise ContainerRegistryGroupsAssociationNotFound(
+                    f"Project {project_id} is not allowed on container registry {registry_id}"
+                )
+
+    @project_repository_resilience.apply()
+    async def clear_default_registry(self, project_id: ProjectID) -> None:
+        """Clear the project's default registry. The project stays allowed on it."""
+        async with self._v2_ops.write_ops() as w:
+            await w.batch_update_in_scopes(
+                [ProjectContainerRegistryAssociationTarget(project_id)],
+                ClearDefaultRegistryUpdater(project_id=project_id),
+            )
 
     @project_repository_resilience.apply()
     async def get_container_stats_for_period(

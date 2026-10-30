@@ -9,7 +9,7 @@ from ai.backend.common.data.entity.domain import DomainEntityType
 from ai.backend.common.data.entity.project import ProjectEntityType
 from ai.backend.common.data.entity.resource_group import ResourceGroupEntityType
 from ai.backend.manager.actions.registry.registry import ProcessorRegistry
-from ai.backend.manager.actions.registry.types import GroupMeta
+from ai.backend.manager.actions.registry.types import Concern, ConcernMeta, GroupMeta
 from ai.backend.manager.api.rest.resource_group.handler import ResourceGroupHandler
 from ai.backend.manager.api.rest.resource_group.registry import register_resource_group_routes
 from ai.backend.manager.api.rest.routing import RouteRegistry
@@ -76,7 +76,11 @@ def project_processors(
         )
     )
     service = ProjectService(storage_manager, config_provider, valkey_clients.stat, repositories)
-    return ProjectProcessors(processor_registry.group(GroupMeta(ProjectEntityType())), service)
+    return ProjectProcessors(
+        processor_registry.group(GroupMeta(ProjectEntityType())),
+        processor_registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        service,
+    )
 
 
 @pytest.fixture()

@@ -668,7 +668,9 @@ def create_processors(
             services.fair_share,
         ),
         project=ProjectProcessors(
-            organization_groups.group(GroupMeta(ProjectEntityType())), services.project
+            organization_groups.group(GroupMeta(ProjectEntityType())),
+            organization_groups.relation_group(),
+            services.project,
         ),
         user=UserProcessors(
             organization_groups.group(GroupMeta(UserEntityType())),

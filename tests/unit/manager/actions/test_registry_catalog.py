@@ -860,7 +860,11 @@ def test_entity_data_loader_reads_are_checked_per_entity() -> None:
             LookupBulkDotfileOwnerAction,
         )
     )
-    ProjectProcessors(registry.group(GroupMeta(ProjectEntityType())), MagicMock())
+    ProjectProcessors(
+        registry.group(GroupMeta(ProjectEntityType())),
+        registry.concern(ConcernMeta(Concern.ORGANIZATION)).relation_group(),
+        MagicMock(),
+    )
     SessionGroupProcessors(registry.group(GroupMeta(SessionGroupEntityType())), MagicMock())
     NotificationProcessors(
         registry.group(GroupMeta(NotificationChannelEntityType())),
