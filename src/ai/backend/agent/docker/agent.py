@@ -1024,6 +1024,12 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                     buf.getvalue().encode("utf8"),
                 )
 
+            await run_in_executor_with_context(
+                None,
+                (self.config_dir / "session_name.txt").write_text,
+                self.kernel_config["session_name"],
+            )
+
             with StringIO() as buf:
                 resource_spec.write_to_file(buf)
                 for dev_type, device_alloc in resource_spec.allocations.items():

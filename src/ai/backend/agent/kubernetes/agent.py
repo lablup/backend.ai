@@ -586,6 +586,13 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                     functools.partial(_write_config, "environ.txt", buf.getvalue()),
                 )
 
+            await run_in_executor_with_context(
+                None,
+                functools.partial(
+                    _write_config, "session_name.txt", self.kernel_config["session_name"]
+                ),
+            )
+
             with StringIO() as buf:
                 resource_spec.write_to_file(buf)
                 for dev_type, device_alloc in resource_spec.allocations.items():
