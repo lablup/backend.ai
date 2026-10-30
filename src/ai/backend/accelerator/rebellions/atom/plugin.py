@@ -19,7 +19,7 @@ log = StructuredLogger(logging.getLogger(__spec__.name))
 
 class ATOMPlugin(AbstractATOMPlugin[ATOMDevice]):
     async def _list_devices(self) -> list[ATOMDevice]:
-        stats = await ATOMAPI.get_stats(self._rbln_stat_path)
+        stats = await ATOMAPI.get_stats(self._rbln_stat_path, self.stat_args)
         devices: list[ATOMDevice] = []
         for device_info in stats.devices:
             if device_info.name not in VALID_DEVICE_NAME:
@@ -51,7 +51,7 @@ class ATOMPlugin(AbstractATOMPlugin[ATOMDevice]):
         device_indexes = [
             d.rbln_stat_info.npu for d in live_devices if d.device_id in assigned_device_ids
         ]
-        return await ATOMAPI.create_group(self._rbln_stat_path, device_indexes)
+        return await ATOMAPI.create_group(self._rbln_stat_path, device_indexes, self.stat_args)
 
     async def list_device_files(
         self,
