@@ -860,6 +860,7 @@ async def client_ctx(
             ),
             base_url=key.endpoint,
             auto_decompress=False,
+            cookie_jar=aiohttp.DummyCookieJar(),
         )
     )
 
