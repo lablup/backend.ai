@@ -9,7 +9,6 @@ from pydantic import Field
 
 from ai.backend.common.api_handlers import BaseResponseModel
 from ai.backend.common.data.entity.role_preset import RolePresetID
-from ai.backend.common.data.entity.types import EntityType
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 
 __all__ = (
@@ -39,7 +38,19 @@ class RolePresetNode(BaseResponseModel):
         description="UUID of the role preset. Added in 26.9.0.",
     )
     name: str = Field(description="Role preset name.")
-    scope_type: EntityType = Field(description="Scope type this preset targets.")
+    scope_type: str = Field(
+        description=(
+            "Scope type this preset targets. A preset of the `global` type reads as the "
+            "global entity its role is created in: `global` or `public`."
+        )
+    )
+    role_name_template: str | None = Field(
+        default=None,
+        description=(
+            "Jinja template rendering the name of each role instantiated from this preset. "
+            f"Added in {NEXT_RELEASE_VERSION}."
+        ),
+    )
     auto_assign: bool = Field(
         description=(
             "Default value for the `auto_assign` flag copied onto roles instantiated "
