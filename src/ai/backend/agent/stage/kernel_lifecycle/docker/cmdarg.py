@@ -1,12 +1,15 @@
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import override
 
 from ai.backend.agent.config.unified import ContainerSandboxType
+from ai.backend.common.json import dump_json_str
 from ai.backend.common.stage.types import (
     ArgsSpecGenerator,
     Provisioner,
     ProvisionStage,
 )
+from ai.backend.common.types import SessionId
 
 
 @dataclass
@@ -16,6 +19,8 @@ class CmdArgSpec:
     sandbox_type: ContainerSandboxType
     jail_args: list[str]
     debug_kernel_runner: bool
+    session_id: SessionId
+    cluster_replicas: Mapping[str, int]
 
 
 class CmdArgSpecGenerator(ArgsSpecGenerator[CmdArgSpec]):
@@ -49,6 +54,12 @@ class CmdArgProvisioner(Provisioner[CmdArgSpec, CmdArgResult]):
             cmdargs += ["--"]
         if spec.debug_kernel_runner:
             krunner_opts.append("--debug")
+        krunner_opts += [
+            "--session-id",
+            str(spec.session_id),
+            "--cluster-replicas",
+            dump_json_str(spec.cluster_replicas),
+        ]
         cmdargs += [
             "/opt/backend.ai/bin/python",
             "-s",

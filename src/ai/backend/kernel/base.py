@@ -409,7 +409,7 @@ class BaseRunner(metaclass=ABCMeta):
                     "and the container may not work as expected."
                 )
             await self._handle_exception(
-                init_sshd_service(self.child_env),
+                init_sshd_service(self.child_env, self.cmdargs.cluster_replicas),
                 "Verify agent installation with the embedded prebuilt binaries",
             )
         finally:
@@ -1017,7 +1017,7 @@ class BaseRunner(metaclass=ABCMeta):
         if service_name not in ("jupyter", "jupyterlab"):
             return cmdargs
         overrides = ['--IdentityProvider.cookie_options={"expires_days": None}']
-        if session_id := os.environ.get("BACKENDAI_SESSION_ID"):
+        if session_id := self.cmdargs.session_id:
             overrides.append(f"--IdentityProvider.cookie_name=bai-jupyter-{session_id}")
         return [*cmdargs, *overrides]
 

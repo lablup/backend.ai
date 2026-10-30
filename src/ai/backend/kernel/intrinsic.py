@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import os
 import shlex
 import shutil
 from collections.abc import Iterable, Mapping, MutableMapping
@@ -17,7 +16,10 @@ AGENT_HOST_KEY_PATH = Path("/home/config/ssh/dropbear_rsa_host_key")
 LEGACY_HOST_KEY_PATH = Path("/tmp/dropbear/dropbear_rsa_host_key")
 
 
-async def init_sshd_service(child_env: MutableMapping[str, str]) -> None:
+async def init_sshd_service(
+    child_env: MutableMapping[str, str],
+    cluster_replicas: Mapping[str, int],
+) -> None:
     if Path("/tmp/dropbear").is_dir():
         shutil.rmtree("/tmp/dropbear")
     Path("/tmp/dropbear").mkdir(parents=True, exist_ok=True)
@@ -99,13 +101,6 @@ async def init_sshd_service(child_env: MutableMapping[str, str]) -> None:
     cluster_ssh_port_mapping_path = Path("/home/config/ssh/port-mapping.json")
     user_ssh_config_path = Path("/home/work/.ssh/config")
     if cluster_privkey_src_path.is_file():
-        replicas = {
-            k: v
-            for k, v in map(
-                lambda pair: pair.rsplit(":", maxsplit=1),
-                os.environ.get("BACKENDAI_CLUSTER_REPLICAS", "main:1").split(","),
-            )
-        }
         if cluster_ssh_port_mapping_path.is_file():
             cluster_ssh_port_mapping = json.loads(cluster_ssh_port_mapping_path.read_text())
 
@@ -120,7 +115,7 @@ async def init_sshd_service(child_env: MutableMapping[str, str]) -> None:
 
             await asyncio.to_thread(_write_ssh_config)
         else:
-            for role_name, role_replica in replicas.items():
+            for role_name in cluster_replicas:
                 try:
                     existing_ssh_config = user_ssh_config_path.read_text()
                     if "\nHost {role_name}*\n" in existing_ssh_config:
