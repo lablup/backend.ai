@@ -1058,6 +1058,10 @@ class SessionAdapter(BaseAdapter):
                 linked.resource_groups.uses(ResourceGroupID(entity_id))
                 for entity_id in (uses.resource_group or () if uses else ())
             ),
+            *(
+                linked.vfolders.uses(VFolderUUID(entity_id))
+                for entity_id in (uses.vfolder or () if uses else ())
+            ),
         ]
 
     def _scoped_search_action(

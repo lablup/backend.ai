@@ -8,6 +8,7 @@ import sqlalchemy as sa
 
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.model_card import ModelCardID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.vfolder import VFolderEntityType
 from ai.backend.common.data.entity.vfolder_mount_policy import VFolderMountPolicyID
 from ai.backend.common.types import VFolderMountPolicy, VFolderUsageMode
@@ -23,6 +24,8 @@ from ai.backend.manager.models.entity_label.searchable_fields import (
     EntityLabelCorrelation,
     EntityLabelSearchableFields,
 )
+from ai.backend.manager.models.kernel_group.row import KernelGroupRow
+from ai.backend.manager.models.kernel_group_vfolder_mount.row import KernelGroupVFolderMountRow
 from ai.backend.manager.models.model_card.row import ModelCardRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
 from ai.backend.manager.models.specs.conditions.boolean import BoolConditions
@@ -234,6 +237,19 @@ class _VFolderUsage:
         ModelCardRow.id,
     )
     """Vfolders a model card is built on."""
+    sessions = UsedByConditions[SessionID](
+        ToManyCorrelation(
+            sa.join(
+                KernelGroupVFolderMountRow,
+                KernelGroupRow,
+                KernelGroupRow.id == KernelGroupVFolderMountRow.kernel_group_id,
+            ),
+            VFolderRow,
+            KernelGroupVFolderMountRow.vfolder_id == VFolderRow.id,
+        ),
+        KernelGroupRow.session_id,
+    )
+    """Vfolders the session's kernel groups mount."""
 
 
 class _VFolderLinkedEntities:

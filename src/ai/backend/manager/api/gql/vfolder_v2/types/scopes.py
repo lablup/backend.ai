@@ -9,9 +9,11 @@ from ai.backend.common.dto.manager.v2.vfolder.types import (
     VFolderUsage,
     VFolderUsedBy,
 )
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import UUIDScopeGQL
 from ai.backend.manager.api.gql.decorators import (
     BackendAIGQLMeta,
+    gql_added_field,
     gql_field,
     gql_pydantic_input,
 )
@@ -58,6 +60,13 @@ class VFolderUsedByGQL(PydanticInputMixin[VFolderUsedBy]):
     )
     model_card: list[UUID] | None = gql_field(
         default=None, description="Model cards built on the vfolder."
+    )
+    session: list[UUID] | None = gql_added_field(
+        BackendAIGQLMeta(
+            added_version=NEXT_RELEASE_VERSION,
+            description="Sessions whose kernel groups mount the vfolder.",
+        ),
+        default=None,
     )
 
 

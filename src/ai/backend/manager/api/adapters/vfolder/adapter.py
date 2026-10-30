@@ -12,6 +12,7 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.data.entity.model_card import ModelCardID
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.session import SessionID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.data.model_deployment.types import DeploymentStrategy
@@ -422,7 +423,7 @@ class VFolderAdapter(BaseAdapter):
         return scopes
 
     def _usage(self, usage: VFolderUsage | None) -> list[UsedBy]:
-        """The uses the request named, deployments before model cards."""
+        """The uses the request named, deployments before model cards before sessions."""
         if usage is None or usage.used_by is None:
             return []
         used_by = usage.used_by
@@ -436,6 +437,7 @@ class VFolderAdapter(BaseAdapter):
                 linked.model_cards.used_by(ModelCardID(entity_id))
                 for entity_id in used_by.model_card or ()
             ),
+            *(linked.sessions.used_by(SessionID(entity_id)) for entity_id in used_by.session or ()),
         ]
 
     def _scoped_search_action(

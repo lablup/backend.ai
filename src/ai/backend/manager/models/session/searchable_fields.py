@@ -11,6 +11,7 @@ from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.image import ImageID
 from ai.backend.common.data.entity.resource_group import ResourceGroupID
 from ai.backend.common.data.entity.session import SessionEntityType, SessionID
+from ai.backend.common.data.entity.vfolder import VFolderUUID
 from ai.backend.common.types import AccessKey, SessionResult, SessionTypes
 from ai.backend.manager.data.session.types import SessionEntityData, SessionStatus
 from ai.backend.manager.models.agent.row import AgentRow
@@ -29,6 +30,7 @@ from ai.backend.manager.models.kernel_group_resource_slot.row import KernelGroup
 from ai.backend.manager.models.kernel_group_resource_slot.searchable_fields import (
     KernelGroupResourceSlotSearchableFields,
 )
+from ai.backend.manager.models.kernel_group_vfolder_mount.row import KernelGroupVFolderMountRow
 from ai.backend.manager.models.network.row import NetworkType
 from ai.backend.manager.models.resource_group.row import ResourceGroupRow
 from ai.backend.manager.models.routing.row import RoutingRow
@@ -330,6 +332,19 @@ class _SessionUsage:
         ResourceGroupRow.id,
     )
     """Sessions a resource group runs."""
+    vfolders = UsesConditions[VFolderUUID](
+        ToManyCorrelation(
+            sa.join(
+                KernelGroupVFolderMountRow,
+                KernelGroupRow,
+                KernelGroupRow.id == KernelGroupVFolderMountRow.kernel_group_id,
+            ),
+            SessionRow,
+            KernelGroupRow.session_id == SessionRow.id,
+        ),
+        KernelGroupVFolderMountRow.vfolder_id,
+    )
+    """Sessions whose kernel groups mount the vfolder."""
 
 
 class _SessionLinkedEntities:
