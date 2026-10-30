@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import enum
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from decimal import Decimal
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, override
+from typing import TYPE_CHECKING, Any, Self, override
 from uuid import UUID
 
 import yarl
@@ -873,6 +873,24 @@ class DeploymentInfo:
     policy: DeploymentPolicyData | None = None
     deploying_revision: ModelRevisionData | None = None
     sub_step: DeploymentLifecycleSubStep | None = None
+
+    def with_revisions_and_policy(
+        self,
+        *,
+        current_revision_id: DeploymentRevisionID | None,
+        deploying_revision_id: DeploymentRevisionID | None,
+        current_revision: ModelRevisionData | None,
+        deploying_revision: ModelRevisionData | None,
+        policy: DeploymentPolicyData | None,
+    ) -> Self:
+        return replace(
+            self,
+            current_revision_id=current_revision_id,
+            deploying_revision_id=deploying_revision_id,
+            current_revision=current_revision,
+            deploying_revision=deploying_revision,
+            policy=policy,
+        )
 
 
 @dataclass(frozen=True)
