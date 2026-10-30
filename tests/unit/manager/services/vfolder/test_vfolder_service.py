@@ -412,3 +412,23 @@ class TestVFolderServiceGetFolderUsage:
         assert result.vfolder_uuid == sample_vfolder_uuid
         assert result.usage is None
         mock_storage_manager.get_manager_facing_client.assert_not_called()
+
+    @pytest.mark.parametrize("status", sorted(VFolderOperationStatus.hard_deleted()))
+    async def test_hard_deleted_vfolder_raises_not_found_without_storage_call(
+        self,
+        vfolder_service: VFolderService,
+        mock_vfolder_repository: MagicMock,
+        mock_storage_manager: MagicMock,
+        sample_vfolder_data: VFolderData,
+        sample_action: GetVFolderUsageAction,
+        status: VFolderOperationStatus,
+    ) -> None:
+        """Hard-deleted vfolders have only their row left: VFolderNotFound is
+        raised and no storage client is consulted."""
+        deleted_data = dataclasses.replace(sample_vfolder_data, status=status)
+        mock_vfolder_repository.get_by_id = AsyncMock(return_value=deleted_data)
+
+        with pytest.raises(VFolderNotFound):
+            await vfolder_service.get_folder_usage(sample_action)
+
+        mock_storage_manager.get_manager_facing_client.assert_not_called()
