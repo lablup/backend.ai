@@ -63,13 +63,13 @@ class TraefikRoutingConfigFactory:
     ) -> IngressRoutingConfigs:
         match ingress.frontend.protocol:
             case IngressProtocol.TCP:
-                return {
-                    "tcp_router": self._tcp_router_config(ingress),
-                    "tcp_service": self._tcp_service_config(ingress.backend),
-                }
+                return IngressRoutingConfigs(
+                    tcp_router=self._tcp_router_config(ingress),
+                    tcp_service=self._tcp_service_config(ingress.backend),
+                )
             case IngressProtocol.HTTP | IngressProtocol.HTTP2:
-                routing_configs: IngressRoutingConfigs = {
-                    "http_router": self._http_router_config(
+                return IngressRoutingConfigs(
+                    http_router=self._http_router_config(
                         ingress,
                         host_rule=self._host_rule(
                             ingress,
@@ -78,15 +78,15 @@ class TraefikRoutingConfigFactory:
                         ),
                         tls_listen=worker_frontend.tls_listen,
                     ),
-                    "http_service": self._http_service_config(ingress.backend),
-                    "cors_headers_middleware": self._cors_headers_middleware_config(),
-                    "auth_plugin_middleware": self._auth_plugin_middleware_config(ingress),
-                }
-                if ingress.access.allowed_client_ips:
-                    routing_configs["ip_allowlist_middleware"] = (
+                    http_service=self._http_service_config(ingress.backend),
+                    cors_headers_middleware=self._cors_headers_middleware_config(),
+                    ip_allowlist_middleware=(
                         self._ip_allowlist_middleware_config(ingress.access)
-                    )
-                return routing_configs
+                        if ingress.access.allowed_client_ips
+                        else None
+                    ),
+                    auth_plugin_middleware=self._auth_plugin_middleware_config(ingress),
+                )
 
     @classmethod
     def build_etcd_subtrees(
@@ -96,25 +96,25 @@ class TraefikRoutingConfigFactory:
         authority = ingress_key.authority
         subtrees_by_etcd_prefix: dict[str, NestedStrKeyedMapping] = {
             cls._router_etcd_key(ingress_key, IngressProtocol.HTTP): convert_to_etcd_dict(
-                routing_configs.get("http_router", {})
+                routing_configs.http_router or {}
             ),
             cls._service_etcd_key(ingress_key, IngressProtocol.HTTP): convert_to_etcd_dict(
-                routing_configs.get("http_service", {})
+                routing_configs.http_service or {}
             ),
             cls._http_middleware_etcd_key(
                 authority, cls._cors_headers_middleware_name(ingress_key)
-            ): convert_to_etcd_dict(routing_configs.get("cors_headers_middleware", {})),
+            ): convert_to_etcd_dict(routing_configs.cors_headers_middleware or {}),
             cls._http_middleware_etcd_key(
                 authority, cls._ip_allowlist_middleware_name(ingress_key)
-            ): convert_to_etcd_dict(routing_configs.get("ip_allowlist_middleware", {})),
+            ): convert_to_etcd_dict(routing_configs.ip_allowlist_middleware or {}),
             cls._http_middleware_etcd_key(
                 authority, cls._auth_plugin_middleware_name(ingress_key)
-            ): convert_to_etcd_dict(routing_configs.get("auth_plugin_middleware", {})),
+            ): convert_to_etcd_dict(routing_configs.auth_plugin_middleware or {}),
             cls._router_etcd_key(ingress_key, IngressProtocol.TCP): convert_to_etcd_dict(
-                routing_configs.get("tcp_router", {})
+                routing_configs.tcp_router or {}
             ),
             cls._service_etcd_key(ingress_key, IngressProtocol.TCP): convert_to_etcd_dict(
-                routing_configs.get("tcp_service", {})
+                routing_configs.tcp_service or {}
             ),
         }
         return subtrees_by_etcd_prefix

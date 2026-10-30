@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import NotRequired, TypedDict
 
 
@@ -82,11 +83,12 @@ class AuthPluginMiddlewareConfig(TypedDict):
     plugin: AuthPluginOptionsByName
 
 
-class IngressRoutingConfigs(TypedDict, total=False):
-    http_router: HttpRouterConfig
-    http_service: HttpServiceConfig
-    cors_headers_middleware: CorsHeadersMiddlewareConfig
-    ip_allowlist_middleware: IpAllowListMiddlewareConfig
-    auth_plugin_middleware: AuthPluginMiddlewareConfig
-    tcp_router: TcpRouterConfig
-    tcp_service: TcpServiceConfig
+@dataclass(frozen=True)
+class IngressRoutingConfigs:
+    http_router: HttpRouterConfig | None = None
+    http_service: HttpServiceConfig | None = None
+    cors_headers_middleware: CorsHeadersMiddlewareConfig | None = None
+    ip_allowlist_middleware: IpAllowListMiddlewareConfig | None = None
+    auth_plugin_middleware: AuthPluginMiddlewareConfig | None = None
+    tcp_router: TcpRouterConfig | None = None
+    tcp_service: TcpServiceConfig | None = None

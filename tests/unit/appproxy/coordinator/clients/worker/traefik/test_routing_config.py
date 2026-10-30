@@ -12,6 +12,8 @@ from ai.backend.appproxy.coordinator.clients.worker.traefik.routing_config impor
     TraefikRoutingConfigFactoryArgs,
 )
 from ai.backend.appproxy.coordinator.clients.worker.traefik.types import (
+    HttpRouterConfig,
+    IngressRoutingConfigs,
     IpAllowListMiddlewareConfig,
     TcpRouterConfig,
 )
@@ -48,8 +50,7 @@ class _ClientIPStrategyCase:
 class _HttpRouterFrontendCase:
     name: str
     frontend: IngressFrontend
-    expected_rule: str
-    expected_entrypoints: list[str]
+    expected_http_router: HttpRouterConfig
 
 
 @dataclass(frozen=True)
@@ -209,8 +210,7 @@ class TestTraefikRoutingConfigFactory:
             WorkerFrontend(hostname="worker-1.example.com", wildcard_domain=None, tls_listen=False),
         )
         assert (
-            routing_configs["ip_allowlist_middleware"]
-            == case.expected_ip_allowlist_middleware_config
+            routing_configs.ip_allowlist_middleware == case.expected_ip_allowlist_middleware_config
         )
 
     @pytest.mark.parametrize(
@@ -235,7 +235,7 @@ class TestTraefikRoutingConfigFactory:
             tcp_ingress,
             WorkerFrontend(hostname="worker-1.example.com", wildcard_domain=None, tls_listen=False),
         )
-        assert routing_configs["tcp_router"] == TcpRouterConfig(
+        assert routing_configs.tcp_router == TcpRouterConfig(
             rule=case.expected_rule,
             service="bai_ingress_port-10205_service",
             entrypoints=["portproxy_10205"],
@@ -244,7 +244,9 @@ class TestTraefikRoutingConfigFactory:
     def test_etcd_subtrees_of_no_config_clear_every_key_of_both_protocols(
         self, port_frontend_ingress_key: IngressKey
     ) -> None:
-        assert TraefikRoutingConfigFactory.build_etcd_subtrees(port_frontend_ingress_key, {}) == {
+        assert TraefikRoutingConfigFactory.build_etcd_subtrees(
+            port_frontend_ingress_key, IngressRoutingConfigs()
+        ) == {
             "worker_worker-1/http/routers/bai_ingress_port-10205_router": {},
             "worker_worker-1/http/services/bai_ingress_port-10205_service": {},
             "worker_worker-1/http/middlewares/bai_ingress_port-10205_cors": {},
@@ -264,8 +266,12 @@ class TestTraefikRoutingConfigFactory:
                     protocol=IngressProtocol.HTTP,
                     port=PortFrontend(number=10205),
                 ),
-                expected_rule="Host(`worker-1.example.com`)",
-                expected_entrypoints=["portproxy_10205"],
+                expected_http_router=HttpRouterConfig(
+                    rule="Host(`worker-1.example.com`)",
+                    service="bai_ingress_port-10205_service",
+                    entrypoints=["portproxy_10205"],
+                    middlewares=["bai_ingress_port-10205_cors", "bai_ingress_port-10205_auth"],
+                ),
             ),
             _HttpRouterFrontendCase(
                 name="wildcard",
@@ -274,8 +280,15 @@ class TestTraefikRoutingConfigFactory:
                     protocol=IngressProtocol.HTTP,
                     wildcard=WildcardFrontend(subdomain="notebook"),
                 ),
-                expected_rule="Host(`notebook.apps.example.com`)",
-                expected_entrypoints=["domainproxy"],
+                expected_http_router=HttpRouterConfig(
+                    rule="Host(`notebook.apps.example.com`)",
+                    service="bai_ingress_wildcard-notebook_service",
+                    entrypoints=["domainproxy"],
+                    middlewares=[
+                        "bai_ingress_wildcard-notebook_cors",
+                        "bai_ingress_wildcard-notebook_auth",
+                    ],
+                ),
             ),
         ],
         ids=lambda case: case.name,
@@ -294,8 +307,4 @@ class TestTraefikRoutingConfigFactory:
                 tls_listen=False,
             ),
         )
-        http_router = routing_configs["http_router"]
-        assert (http_router["rule"], http_router["entrypoints"]) == (
-            case.expected_rule,
-            case.expected_entrypoints,
-        )
+        assert routing_configs.http_router == case.expected_http_router
