@@ -89,6 +89,9 @@ class _ResourceSlotTypeOwnFields(RowDataConverter[ResourceSlotTypeRow, ResourceS
         IntConditions(ResourceSlotTypeRow.rank),
         ColumnOrder(ResourceSlotTypeRow.rank),
     )
+    sealed_launch = SearchableField(ResourceSlotTypeRow.sealed_launch, None, None)
+    max_per_session = SearchableField(ResourceSlotTypeRow.max_per_session, None, None)
+    single_node_only = SearchableField(ResourceSlotTypeRow.single_node_only, None, None)
 
     @override
     def to_data(self, row: ResourceSlotTypeRow) -> ResourceSlotTypeData:
@@ -107,6 +110,9 @@ class _ResourceSlotTypeOwnFields(RowDataConverter[ResourceSlotTypeRow, ResourceS
                 binary=number_format.binary, round_length=number_format.round_length
             ),
             rank=self.rank.read(row),
+            sealed_launch=self.sealed_launch.read(row),
+            max_per_session=self.max_per_session.read(row),
+            single_node_only=self.single_node_only.read(row),
         )
 
 
