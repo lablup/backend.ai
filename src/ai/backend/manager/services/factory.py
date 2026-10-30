@@ -919,7 +919,7 @@ def create_processors(
         ),
         bootstrap_script=BootstrapScriptProcessors(
             organization_groups.group(GroupMeta(UserEntityType())),
-            registry.dangling_lookup_field_group(
+            organization_groups.dangling_lookup_field_group(
                 FieldGroupMeta(BootstrapScriptFieldType()),
                 BootstrapScriptData,
                 LookupBootstrapScriptOwnerAction,
