@@ -1,7 +1,7 @@
 ---
 name: container-registry-adapter-scenarios
 type: reference
-description: container registry adapter scenario guarantees; superadmin-gated management calls, per-id batch load, missing scoped search, RBAC project relations, legacy is_global image visibility, update-only URL validation
+description: container registry adapter scenario guarantees; superadmin-gated management calls, per-id batch load, missing scoped search, RBAC project relations, linking a project as its default, legacy is_global image visibility, update-only URL validation
 scope: src/ai/backend/manager/api/adapters/container_registry
 keywords: [container registry, scenario, adapter, superadmin, scoped_search, operation scope, RBAC, allowed groups, is_global, image visibility]
 sources:
@@ -19,8 +19,8 @@ generated:
   by: codex/gpt-5
   at: 2026-09-14
 updated:
-  by: claude-code/opus-5
-  at: 2026-10-16
+  by: claude-code/opus-5.5
+  at: 2026-10-30
 status: draft
 ---
 # container_registry 어댑터 — 시나리오
@@ -159,6 +159,18 @@ status: draft
   대신할 수 없다.
 - 관계 변경 시나리오는 호출 결과뿐 아니라 연관 테이블의 행 수를 확인하여 생성·유지·삭제 여부와
   거부된 요청에 부수효과가 없음을 검증한다.
+
+## 프로젝트를 레지스트리에 default로 연결한다
+
+레거시 프로젝트 생성은 프로젝트를 만든 뒤 이 호출로 image commit 대상 레지스트리를 연결한다.
+
+| 시나리오 | 상황 | 요청 | 결과 |
+|---|---|---|---|
+| 양쪽 스코프에 생성 권한이 있는 사용자가 연결한다 | 레지스트리와 프로젝트 양쪽에 생성 권한이 있고, 둘은 아직 연결되어 있지 않음 | default로 연결 | 관계가 생성되고 프로젝트의 default 레지스트리가 됨 |
+| 프로젝트 권한이 없는 사용자가 연결한다 | 레지스트리에만 권한이 있음 | default로 연결 | 권한 부족으로 거부되고 관계가 생성되지 않음 |
+
+- 허용 프로젝트 추가와 같은 관계 생성 작업이라 양쪽 스코프의 생성 권한을 요구한다.
+- 연결과 default 지정은 한 쓰기로 이뤄진다. 연결이 거부되면 default 지정도 남지 않는다.
 
 ## purge 는 레지스트리와 허용 프로젝트 관계를 함께 제거한다
 

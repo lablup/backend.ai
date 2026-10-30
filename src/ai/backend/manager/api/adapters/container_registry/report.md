@@ -2,19 +2,20 @@
 
 [무엇을 보장하는가](/src/ai/backend/manager/api/adapters/container_registry/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/container_registry/adapter.py)
 
-시나리오: 미완 2 / 9
+시나리오: 미완 2 / 10
 
 - ops 로 구성 (4)
   - admin_partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
   - admin_search — 대표 성공 ✓ · 대표 실패 ✓
   - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
   - lookup_by_name_and_registry_project — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (5)
+- 직접 구현 (6)
   - admin_create — 성공 있음 2 · 실패 있음 2 (global_scope, relation)
   - admin_purge — 성공 있음 2 · 실패 있음 2 (global_scope)
   - admin_update — 성공 있음 3 · 실패 있음 4 (global_scope, membership, relation)
   - apply_allowed_groups — 성공 있음 6 · 실패 있음 6 (relation)
   - apply_global — 성공 없음 · 실패 없음 (membership) — SCENARIO-GAP
+  - link_project_as_default — 성공 있음 1 · 실패 있음 1 (relation)
 
 **admin_partial_bulk_purge**
 
@@ -94,6 +95,13 @@
 | [레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 프로젝트를 허용하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다](#allowing_projects-a-user-granted-on-the-registry-but-not-the-project-is-refused) | 거부 |
 | [양쪽 스코프에 생성 권한만 받은 사용자가 프로젝트를 제거하면 권한 부족으로 거부된다](#allowing_projects-create-permission-does-not-allow-removing-a-project) | 거부 |
 | [양쪽 스코프에 삭제 권한만 받은 사용자가 프로젝트를 추가하면 권한 부족으로 거부된다](#allowing_projects-soft-delete-permission-does-not-allow-adding-a-project) | 거부 |
+
+**link_project_as_default**
+
+| 시나리오 | 판정 |
+|---|---|
+| [레지스트리와 프로젝트 양쪽에 생성 권한을 받은 사용자는 프로젝트를 레지스트리에 연결하면서 default로 지정할 수 있다](#linking_default_project-create-permission-on-both-scopes-links-a-project-as-its-default) | 성공 |
+| [레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 default로 연결하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다](#linking_default_project-a-user-granted-on-the-registry-but-not-the-project-cannot-link-a-default) | 거부 |
 
 ### admin_partial_bulk_purge
 
@@ -1331,6 +1339,74 @@ Given
 When
 
 - ContainerRegistryAdapter.apply_allowed_groups — user-1이 허용 목록에 넣음
+
+Then
+
+- 거부된다
+  - 거부: NotEnoughPermission
+
+### link_project_as_default
+
+<a id="linking_default_project-create-permission-on-both-scopes-links-a-project-as-its-default"></a>
+
+#### [create-permission-on-both-scopes-links-a-project-as-its-default](/tests/scenario/bai_scenario/manager/container_registry/test_linking_default_project.py) — pass
+
+레지스트리와 프로젝트 양쪽에 생성 권한을 받은 사용자는 프로젝트를 레지스트리에 연결하면서 default로 지정할 수 있다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리, 프로젝트에 권한 있음인 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-project-1: project 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 allow-on-project-1 보유
+
+When
+
+- ContainerRegistryAdapter.link_project_as_default — user-1이 프로젝트를 레지스트리에 default로 연결한다
+
+Then
+
+- 반환값이 없고 예외도 발생하지 않는다
+  - response = None
+
+<a id="linking_default_project-a-user-granted-on-the-registry-but-not-the-project-cannot-link-a-default"></a>
+
+#### [a-user-granted-on-the-registry-but-not-the-project-cannot-link-a-default](/tests/scenario/bai_scenario/manager/container_registry/test_linking_default_project.py) — pass
+
+레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 default로 연결하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리에 권한 있음인 사용자 한 명
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+
+When
+
+- ContainerRegistryAdapter.link_project_as_default — user-1이 프로젝트를 레지스트리에 default로 연결한다
 
 Then
 
