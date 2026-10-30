@@ -345,6 +345,18 @@ class TestCalculateDesiredReplicasForDeployment:
                 expected_replicas=2,
             ),
             _DesiredReplicasCase(
+                current_replicas=1,
+                load=_Load.HIGH,
+                rules=[_RuleLimits(step_size=2, min_replicas=5, max_replicas=None)],
+                expected_replicas=3,
+            ),
+            _DesiredReplicasCase(
+                current_replicas=6,
+                load=_Load.LOW,
+                rules=[_RuleLimits(step_size=1, min_replicas=None, max_replicas=3)],
+                expected_replicas=5,
+            ),
+            _DesiredReplicasCase(
                 current_replicas=3,
                 load=_Load.HIGH,
                 rules=[
@@ -377,7 +389,7 @@ class TestCalculateDesiredReplicasForDeployment:
             f"-{case.current_replicas}-to-{case.expected_replicas}"
         ),
     )
-    async def test_desired_replicas_clamped_to_rule_limits(
+    async def test_desired_replicas_after_step_within_limit(
         self,
         deployment_repository: DeploymentRepository,
         deployment: DeploymentInfo,
