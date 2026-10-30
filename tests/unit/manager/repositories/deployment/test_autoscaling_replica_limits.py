@@ -10,34 +10,36 @@ from unittest.mock import MagicMock
 
 import pytest
 import sqlalchemy as sa
+from sqlalchemy.orm import selectinload
 
-from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
-from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
-from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.user.types import UserRole
+from ai.backend.common.identifier.domain import DomainID, DomainName
 from ai.backend.common.types import AutoScalingMetricSource, ResourceSlot
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow, EndpointRow
-from ai.backend.manager.models.project.row import ProjectRow
+from ai.backend.manager.models.group.row import GroupRow
+from ai.backend.manager.models.hasher.types import PasswordInfo
+from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset_category.row import (
     PrometheusQueryPresetCategoryRow,
 )
-from ai.backend.manager.models.rbac_models.role.row import RoleRow
-from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
+from ai.backend.manager.models.rbac_models.role import RoleRow
+from ai.backend.manager.models.rbac_models.user_role import UserRoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-from ai.backend.manager.models.resource_group.row import ResourceGroupRow
-from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
 from ai.backend.manager.models.resource_policy.row import (
+    KeyPairResourcePolicyRow,
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,
 )
 from ai.backend.manager.models.resource_preset.row import ResourcePresetRow
+from ai.backend.manager.models.scaling_group.row import ScalingGroupOpts, ScalingGroupRow
 from ai.backend.manager.models.user.row import UserRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.manager.models.vfolder.row import VFolderRow
@@ -45,7 +47,6 @@ from ai.backend.manager.repositories.deployment.repository import (
     AutoScalingMetricsData,
     DeploymentRepository,
 )
-from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.testutils.db import with_tables
 from ai.backend.testutils.fixtures import DomainFixtureData
 
@@ -84,14 +85,16 @@ class TestCalculateDesiredReplicasForDeployment:
             database_connection,
             [
                 DomainRow,
-                ResourceGroupRow,
+                ScalingGroupRow,
                 ResourcePresetRow,
                 UserResourcePolicyRow,
                 ProjectResourcePolicyRow,
+                KeyPairResourcePolicyRow,
                 RoleRow,
                 UserRoleRow,
                 UserRow,
-                ProjectRow,
+                KeyPairRow,
+                GroupRow,
                 VFolderRow,
                 EndpointRow,
                 ReplicaGroupRow,
@@ -124,11 +127,11 @@ class TestCalculateDesiredReplicasForDeployment:
         name = f"sg-{suffix}"
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                ResourceGroupRow(
+                ScalingGroupRow(
                     name=name,
                     driver="static",
                     scheduler="fifo",
-                    scheduler_opts=ResourceGroupOpts(),
+                    scheduler_opts=ScalingGroupOpts(),
                 )
             )
         return name
@@ -191,7 +194,6 @@ class TestCalculateDesiredReplicasForDeployment:
                     resource_policy=user_resource_policy,
                     role=UserRole.USER,
                     status=UserStatus.ACTIVE,
-                    domain_id=domain.domain_id,
                 )
             )
         return user_id
@@ -207,7 +209,7 @@ class TestCalculateDesiredReplicasForDeployment:
         project_id = uuid.uuid4()
         async with db_with_cleanup.begin_session() as db_sess:
             db_sess.add(
-                ProjectRow(
+                GroupRow(
                     id=project_id,
                     name=f"g-{suffix}",
                     domain_name=domain.domain_name,
@@ -242,8 +244,17 @@ class TestCalculateDesiredReplicasForDeployment:
             )
             db_sess.add(row)
             await db_sess.flush()
-            await db_sess.refresh(row)
-            return row.to_bare_deployment_info()
+            loaded = await db_sess.scalar(
+                sa.select(EndpointRow)
+                .where(EndpointRow.id == row.id)
+                .options(
+                    selectinload(EndpointRow.primary_replica_group_row),
+                    selectinload(EndpointRow.target_replica_group_row),
+                    selectinload(EndpointRow.deployment_policy),
+                )
+            )
+            assert loaded is not None
+            return loaded.to_modern_deployment_info()
 
     @pytest.fixture
     async def rules(
@@ -254,7 +265,7 @@ class TestCalculateDesiredReplicasForDeployment:
     ) -> list[AutoScalingRule]:
         rows = [
             EndpointAutoScalingRuleRow(
-                id=AutoScalingRuleID(uuid.uuid4()),
+                id=uuid.uuid4(),
                 endpoint=deployment.id,
                 metric_source=AutoScalingMetricSource.PROMETHEUS,
                 metric_name="requests",
@@ -292,12 +303,10 @@ class TestCalculateDesiredReplicasForDeployment:
     ) -> DeploymentRepository:
         return DeploymentRepository(
             db=db_with_cleanup,
-            reconcile_ops_provider=ReconcileOpsProvider(db_with_cleanup),
             storage_manager=MagicMock(),
             valkey_stat=MagicMock(),
             valkey_live=MagicMock(),
             valkey_schedule=MagicMock(),
-            permission_check=MagicMock(),
         )
 
     @pytest.mark.parametrize(
@@ -430,5 +439,5 @@ class TestCalculateDesiredReplicasForDeployment:
             )
         assert result == case.expected_replicas
         assert [
-            last_triggered_at_by_rule_id[AutoScalingRuleID(rule.id)] is not None for rule in rules
+            last_triggered_at_by_rule_id[rule.id] is not None for rule in rules
         ] == case.expected_triggered_per_rule
