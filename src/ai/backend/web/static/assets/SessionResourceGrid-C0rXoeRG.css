@@ -1,0 +1,18 @@
+/*
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ The WebUI's palette for ui-common `UnitGrid` (FR-3569): the seven muted
+ group hues approved for the session resource grid, paired light/dark. Hue
+ overrides are stored by palette index, so index N must mean the same hue in
+ both modes. No theme token carries these.
+
+ The inks contrast the cell fill, not the page, so they do not flip with the
+ mode.
+*/@layer components{.bai-resource-unit-grid{--unit-grid-group-1: light-dark(#8c50bc, #be81ef);--unit-grid-group-2: light-dark(#3469d6, #749ded);--unit-grid-group-3: light-dark(#42825c, #74cb9a);--unit-grid-group-4: light-dark(#417c99, #83c2de);--unit-grid-group-5: light-dark(#b05f1d, #e9d149);--unit-grid-group-6: light-dark(#b84134, #e6786d);--unit-grid-group-7: light-dark(#6c6e76, #8d8f97);--unit-grid-ink-dark: #262626;--unit-grid-ink-light: #fafafa}}@layer reset,theme,base,astryx-base,astryx-theme,ui-common,components,utilities;@layer ui-common{.uic-unit-grid{--unit-grid-group-1:var(--color-icon-purple);--unit-grid-group-2:var(--color-icon-blue);--unit-grid-group-3:var(--color-icon-green);--unit-grid-group-4:var(--color-icon-cyan);--unit-grid-group-5:var(--color-icon-orange);--unit-grid-group-6:var(--color-icon-red);--unit-grid-group-7:var(--color-icon-gray);--unit-grid-cell-stroke:var(--color-border);--unit-grid-cell-empty:color-mix(in srgb, var(--color-background-muted) 60%, transparent);--unit-grid-ink-dark:var(--color-on-light);--unit-grid-ink-light:var(--color-on-dark)}.uic-unit-grid__wrapper{position:relative}.uic-unit-grid__svg{display:block}.uic-unit-grid__svg--clickable{cursor:pointer}.uic-unit-grid__swatch{cursor:pointer;flex-shrink:0}.uic-unit-grid__popover{z-index:var(--unit-grid-popover-z,1000);min-width:200px;max-width:320px;padding:var(--spacing-2);border-width:var(--border-width);border-radius:var(--radius-element);background:var(--color-background-popover);box-shadow:var(--shadow-med);border-style:solid;position:fixed}}/*
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ Co-located styles for <SessionResourceGrid> (P17). The popover usage bar's
+ width/fill are data-driven and stay inline.
+*/.session-resource-grid-usage-track{height:var(--spacing-1);border-radius:var(--radius-element);background:var(--color-background-muted);overflow:hidden}.session-resource-grid-usage-fill{height:100%}

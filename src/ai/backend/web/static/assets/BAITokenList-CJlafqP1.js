@@ -1,0 +1,7 @@
+import{n as e,V as d,T as j,H as m,aU as k,L as h,bM as T}from"./index-CwWAznqi.js";import{T as $}from"./Token-B6wppFPd.js";import{H as v}from"./HoverCard-5uBx5TYH.js";function p({items:n,maxInline:i=3,emptyText:g="-",variant:r="token",trigger:u="hover"}){if(n.length===0)return e.jsx(e.Fragment,{children:g});let l=n.slice(0,i),c=n.slice(i),s=c.length,o=e.jsx(d,{align:"start",className:"uic-token-list__rest",children:c.map((t,a)=>e.jsx(j,{children:t},`${t}-${a}`))}),x=u==="hover"?e.jsx(v,{content:o,touchTrigger:"tap",children:r==="text"?e.jsx(k,{variant:"neutral",label:`+${s}`,tabIndex:0,className:"uic-token-list__count"}):e.jsxs(h,{children:["+",s]})}):e.jsx(T,{label:`+${s}`,content:o,hasCloseButton:!1,hasAutoFocus:!1,role:"none",children:e.jsxs(h,{children:["+",s]})});return r==="text"?e.jsxs(m,{gap:1,align:"center",className:"uic-token-list uic-token-list--text",children:[l.map((t,a)=>e.jsx("span",{className:"uic-token-list__text",children:t},`${t}-${a}`)),s>0&&x]}):e.jsxs("span",{children:[e.jsx(m,{gap:2,align:"center",wrap:"wrap",className:"uic-token-list",children:l.map((t,a)=>e.jsx($,{label:String(t)},`${t}-${a}`))}),s>0&&e.jsxs(e.Fragment,{children:[" ",x]})]})}p.displayName="TokenList";/**
+ @license
+ Copyright (c) 2015-2026 Lablup Inc. All rights reserved.
+
+ ui-common `TokenList` under its BUI name; the props are identical.
+*/const N=p;export{N as B};
+//# sourceMappingURL=BAITokenList-CJlafqP1.js.map

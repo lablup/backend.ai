@@ -1,0 +1,2 @@
+import{n as o,aa as x}from"./index-CwWAznqi.js";import{s as d}from"./astryxPlacement-BxR6_qos.js";import{c as I}from"./icons-BgdBQS0N.js";const A=({title:n,placement:e,open:i,onOpenChange:s,mouseEnterDelay:t,style:a,className:c,iconProps:m,focusable:r})=>{const{placement:p,alignment:l}=d(e);return o.jsx(x,{icon:o.jsx(I,{...m,size:"1em"}),content:n,placement:p,alignment:l,isOpen:i,onOpenChange:s,delay:t===void 0?void 0:t*1e3,style:a,className:c,focusable:r})};export{A as B};
+//# sourceMappingURL=BAIQuestionIconWithTooltip-BVwNHmCw.js.map

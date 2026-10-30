@@ -1,0 +1,2 @@
+import{n as l,a7 as o,a8 as x,a9 as u}from"./index-CwWAznqi.js";const m={span:{k7Eaqz:"xeuugli",k1xSpc:"xrvj5dj",kumcoG:"x1mkdm3x",kZKoxP:"x5yr21d",$$css:!0}};function c({columns:s,rows:a,xstyle:r,className:n,style:e,children:p,ref:i,...t}){const d={...s!=null&&{gridColumn:s==="full"?"1 / -1":`span ${s}`},...a!=null&&{gridRow:`span ${a}`}};return l.jsx("div",{ref:i,...o(u("grid-span"),x(m.span,r),n,{...e,...d}),...t,children:p})}c.displayName="GridSpan";export{c as G};
+//# sourceMappingURL=GridSpan-CXov5J6d.js.map

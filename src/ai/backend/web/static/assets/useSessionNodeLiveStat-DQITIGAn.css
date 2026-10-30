@@ -1,0 +1,1 @@
+@layer reset,theme,base,astryx-base,astryx-theme,ui-common,components,utilities;@layer ui-common{.uic-double-badge__item:not(:first-child){border-start-start-radius:0;border-end-start-radius:0;margin-inline-start:calc(var(--border-width) * -1)}.uic-double-badge__item:not(:last-child){border-start-end-radius:0;border-end-end-radius:0}}
