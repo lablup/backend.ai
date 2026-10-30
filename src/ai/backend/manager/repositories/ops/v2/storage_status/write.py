@@ -10,6 +10,7 @@ from ai.backend.common.data.entity.storage_volume import StorageVolumeID, Storag
 from ai.backend.common.data.storage.types import StorageBackendMetadata, StorageBackendType
 from ai.backend.manager.errors.service_catalog import ServiceCatalogNotFound
 from ai.backend.manager.models.service_catalog.row import ServiceCatalogRow
+from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.models.storage_backend.upserters import (
     StorageBackendTypeUpserter,
     StorageBackendUpserter,
@@ -33,9 +34,11 @@ from ai.backend.manager.repositories.ops.v2.storage_status.types import (
 class V2StorageStatusWriteOps(V2RelationWriteOps):
     """The relation write ops plus the write of a service's storage status report."""
 
-    async def record_volume_status_report(self, report: ServiceVolumeStatusReport) -> None:
+    async def record_volume_status_report(
+        self, report: ServiceVolumeStatusReport
+    ) -> BulkResultWithFailures[StorageVolumeID]:
         """Insert each reported volume, its backend and its holding when absent, then write
-        when each holding was last checked, or only touch it while not checked. Raises
+        when each holding was last checked, answering per volume. Raises
         :class:`ServiceCatalogNotFound` when the service has no catalog record."""
         service_id = await self._sess.scalar(
             sa.select(ServiceCatalogRow.id).where(
@@ -56,14 +59,14 @@ class V2StorageStatusWriteOps(V2RelationWriteOps):
             if volume.volume_name in volume_ids
         ]
         await self._ensure_holdings(service_id, [volume_id for _, volume_id in held])
-        for volume, volume_id in held:
-            await self.batch_update_in_global(
-                StorageVolumeHoldingStatusUpdater(
-                    service_catalog_id=service_id,
-                    storage_volume_id=volume_id,
-                    status_checked_at=volume.check_started_at,
-                )
+        return await self.partial_bulk_update_data({
+            volume_id: StorageVolumeHoldingStatusUpdater(
+                service_catalog_id=service_id,
+                storage_volume_id=volume_id,
+                status_checked_at=volume.check_started_at,
             )
+            for volume, volume_id in held
+        })
 
     async def _ensure_holdings(
         self, service_id: ServiceCatalogID, volume_ids: Collection[StorageVolumeID]

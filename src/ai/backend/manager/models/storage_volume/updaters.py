@@ -6,12 +6,13 @@ from datetime import datetime
 from typing import Any, override
 
 import sqlalchemy as sa
+from sqlalchemy.orm import InstrumentedAttribute
 
 from ai.backend.common.data.entity.service_catalog import ServiceCatalogID
 from ai.backend.common.data.entity.storage_volume import StorageVolumeID
-from ai.backend.manager.models.clauses import QueryCondition
-from ai.backend.manager.models.specs.types import IntegrityErrorCheck
-from ai.backend.manager.models.specs.updater import DataBatchUpdater
+from ai.backend.manager.errors.storage_volume import StorageVolumeHoldingNotFound
+from ai.backend.manager.models.specs.types import GuardCheck, IntegrityErrorCheck
+from ai.backend.manager.models.specs.updater import GuardedDataUpdater
 from ai.backend.manager.models.storage_volume.row import StorageVolumeServiceHoldingRow
 
 __all__ = ("StorageVolumeHoldingStatusUpdater",)
@@ -19,10 +20,11 @@ __all__ = ("StorageVolumeHoldingStatusUpdater",)
 
 @dataclass
 class StorageVolumeHoldingStatusUpdater(
-    DataBatchUpdater[StorageVolumeServiceHoldingRow, StorageVolumeID]
+    GuardedDataUpdater[StorageVolumeServiceHoldingRow, StorageVolumeID]
 ):
     """Write when a service last checked a volume it holds, or only touch the holding
-    while ``status_checked_at`` is None."""
+    while ``status_checked_at`` is None. The guard picks the reporting service's holding
+    among those of the volume."""
 
     service_catalog_id: ServiceCatalogID
     storage_volume_id: StorageVolumeID
@@ -34,13 +36,26 @@ class StorageVolumeHoldingStatusUpdater(
         return StorageVolumeServiceHoldingRow
 
     @override
-    def conditions(self) -> list[QueryCondition]:
-        def inner() -> sa.sql.expression.ColumnElement[bool]:
-            return (
-                StorageVolumeServiceHoldingRow.service_catalog_id == self.service_catalog_id
-            ) & (StorageVolumeServiceHoldingRow.storage_volume_id == self.storage_volume_id)
+    def target_id_column(self) -> InstrumentedAttribute[Any]:
+        return StorageVolumeServiceHoldingRow.storage_volume_id
 
-        return [inner]
+    @override
+    def target_id_value(self) -> StorageVolumeID:
+        return self.storage_volume_id
+
+    @override
+    def guard_checks(self) -> Sequence[GuardCheck]:
+        return (
+            GuardCheck(
+                condition=lambda: (
+                    StorageVolumeServiceHoldingRow.service_catalog_id == self.service_catalog_id
+                ),
+                error=StorageVolumeHoldingNotFound(
+                    f"service_catalog_id={self.service_catalog_id}, "
+                    f"storage_volume_id={self.storage_volume_id}"
+                ),
+            ),
+        )
 
     @override
     def build_values(self) -> dict[str, Any]:

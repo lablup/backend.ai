@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from ai.backend.common.data.entity.storage_volume import StorageVolumeID
 from ai.backend.common.exception import BackendAIError
 from ai.backend.common.metrics.metric import DomainType, LayerType
 from ai.backend.common.resilience.policies.metrics import MetricArgs, MetricPolicy
 from ai.backend.common.resilience.policies.retry import BackoffStrategy, RetryArgs, RetryPolicy
 from ai.backend.common.resilience.resilience import Resilience
+from ai.backend.manager.models.specs.types import BulkResultWithFailures
 from ai.backend.manager.repositories.ops.v2.storage_status.provider import StorageStatusOpsProvider
 from ai.backend.manager.repositories.ops.v2.storage_status.types import ServiceVolumeStatusReport
 
@@ -34,7 +36,10 @@ class StorageStatusRepository:
         self._ops = ops_provider
 
     @storage_status_repository_resilience.apply()
-    async def record_volume_status_report(self, report: ServiceVolumeStatusReport) -> None:
-        """Write the volumes one service reported, in one transaction."""
+    async def record_volume_status_report(
+        self, report: ServiceVolumeStatusReport
+    ) -> BulkResultWithFailures[StorageVolumeID]:
+        """Write the volumes one service reported, in one transaction, answering for each
+        holding whose check time could not be written."""
         async with self._ops.write_ops() as w:
-            await w.record_volume_status_report(report)
+            return await w.record_volume_status_report(report)
