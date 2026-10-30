@@ -41,7 +41,11 @@ from bai_scenario.components.answers import MissingResponse
 from bai_scenario.components.domain import SomeoneOf
 from bai_scenario.runner.planting import TestSeedingSession
 from bai_scenario.seeds.domain.domain import TestSeedDomain
-from bai_scenario.seeds.image.registry import AllowProject, TestSeedContainerRegistry
+from bai_scenario.seeds.image.registry import (
+    AllowProject,
+    AllowProjectAsDefault,
+    TestSeedContainerRegistry,
+)
 from bai_scenario.seeds.project.project import TestSeedProject
 from bai_scenario.seeds.rbac.role import TestSeedPermission, TestSeedRole
 from bai_scenario.seeds.resource_policy.project import TestSeedProjectPolicy
@@ -167,6 +171,8 @@ class ARegistryAndAProjectToAllow(Given[TestSeedingSession, ARegistryToAllowAndA
     on_registry: bool = True
     on_project: bool = True
     allowed: bool = False
+    allowed_as_default: bool = False
+    other_default: bool = False
     permissions: tuple[Permission, ...] = ALLOWING
 
     @override
@@ -177,7 +183,13 @@ class ARegistryAndAProjectToAllow(Given[TestSeedingSession, ARegistryToAllowAndA
             if given
         ]
         holds = ", ".join(held) + "에 권한 있음" if held else "아무 권한도 없음"
-        already = ", 프로젝트는 이미 허용돼 있음" if self.allowed else ""
+        already = ""
+        if self.allowed:
+            already = ", 프로젝트는 이미 허용돼 있음"
+        if self.allowed_as_default:
+            already = ", 프로젝트는 이미 이 레지스트리를 default로 허용돼 있음"
+        if self.other_default:
+            already += ", 프로젝트에는 다른 default 레지스트리가 있음"
         return f"레지스트리 하나, 프로젝트 하나, {holds}인 사용자 한 명{already}"
 
     @override
@@ -188,6 +200,11 @@ class ARegistryAndAProjectToAllow(Given[TestSeedingSession, ARegistryToAllowAndA
         registry = await seeding.creating(TestSeedContainerRegistry(name_hint="host"))
         if self.allowed:
             await seeding.linking(AllowProject(), project, registry)
+        if self.allowed_as_default:
+            await seeding.linking(AllowProjectAsDefault(), project, registry)
+        if self.other_default:
+            other = await seeding.creating(TestSeedContainerRegistry(name_hint="other"))
+            await seeding.linking(AllowProjectAsDefault(), project, other)
         caller = await seeding.within(SomeoneOf(domain, role=self.role))
         if self.on_registry:
             await seeding.within(
@@ -246,6 +263,16 @@ class SomeoneAllowingIn[ScopeData](TestSeedNest[Laid[None]]):
 async def allowed_project_count(engine: ExtendedAsyncSAEngine) -> int:
     async with engine.begin_readonly_session() as session:
         query = sa.select(sa.func.count()).select_from(AssociationContainerRegistriesGroupsRow)
+        return int(await session.scalar(query) or 0)
+
+
+async def default_link_count(engine: ExtendedAsyncSAEngine) -> int:
+    async with engine.begin_readonly_session() as session:
+        query = (
+            sa.select(sa.func.count())
+            .select_from(AssociationContainerRegistriesGroupsRow)
+            .where(AssociationContainerRegistriesGroupsRow.is_default.is_(True))
+        )
         return int(await session.scalar(query) or 0)
 
 

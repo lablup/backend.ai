@@ -13,9 +13,9 @@
   - admin_create — 성공 있음 2 · 실패 있음 2 (global_scope, relation)
   - admin_purge — 성공 있음 2 · 실패 있음 2 (global_scope)
   - admin_update — 성공 있음 3 · 실패 있음 4 (global_scope, membership, relation)
-  - apply_allowed_groups — 성공 있음 6 · 실패 있음 6 (relation)
+  - apply_allowed_groups — 성공 있음 8 · 실패 있음 6 (relation)
   - apply_global — 성공 없음 · 실패 없음 (membership) — SCENARIO-GAP
-  - link_project_as_default — 성공 있음 1 · 실패 있음 1 (relation)
+  - link_project_as_default — 성공 있음 1 · 실패 있음 3 (relation)
 
 **admin_partial_bulk_purge**
 
@@ -84,9 +84,11 @@
 | 시나리오 | 판정 |
 |---|---|
 | [레지스트리와 프로젝트 두 스코프 모두에 권한을 받은 사용자는 그 프로젝트를 허용 목록에 넣을 수 있다](#allowing_projects-a-user-granted-on-both-scopes-allows-a-project-on-a-registry) | 성공 |
+| [이 레지스트리를 default로 허용받은 프로젝트를 허용 목록에 다시 넣어도 거부되지 않고 default 레지스트리도 그대로 유지된다](#allowing_projects-allowing-a-project-already-linked-as-its-default-keeps-the-default) | 성공 |
 | [이미 허용된 프로젝트를 다시 허용 목록에 넣어도 거부되지 않는다. 그 쌍은 데이터베이스에서 건너뛴다](#allowing_projects-allowing-a-project-that-is-already-allowed-is-not-an-error) | 성공 |
 | [이미 허용된 프로젝트는 허용 목록에서 뺄 수 있다](#allowing_projects-an-allowed-project-is-removed-from-the-allowed-list) | 성공 |
 | [양쪽 스코프에 생성 권한만 받은 사용자는 프로젝트를 허용 목록에 넣을 수 있다](#allowing_projects-create-permission-on-both-scopes-is-enough-to-allow-a-project) | 성공 |
+| [이 레지스트리를 default로 허용받은 프로젝트를 허용 목록에서 빼면 association과 함께 default 레지스트리 지정도 사라진다](#allowing_projects-removing-a-project-linked-as-its-default-drops-the-default) | 성공 |
 | [양쪽 스코프에 삭제 권한만 받은 사용자는 허용 프로젝트를 제거할 수 있다](#allowing_projects-soft-delete-permission-on-both-scopes-is-enough-to-remove-a-project) | 성공 |
 | [권한 검사를 끄면 아무 권한도 받지 않은 사용자도 프로젝트를 허용할 수 있다](#allowing_projects-turning-enforcement-off-lets-an-ungranted-user-allow-a-project) | 성공 |
 | [존재하지 않는 프로젝트를 허용 목록에 넣으려 하면 그 프로젝트가 없다는 이유로 거부된다](#allowing_projects-a-superadmin-naming-a-project-that-does-not-exist-is-refused) | 거부 |
@@ -100,8 +102,10 @@
 
 | 시나리오 | 판정 |
 |---|---|
-| [레지스트리와 프로젝트 양쪽에 생성 권한을 받은 사용자는 프로젝트를 레지스트리에 연결하면서 default로 지정할 수 있다](#linking_default_project-create-permission-on-both-scopes-links-a-project-as-its-default) | 성공 |
-| [레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 default로 연결하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다](#linking_default_project-a-user-granted-on-the-registry-but-not-the-project-cannot-link-a-default) | 거부 |
+| [레지스트리와 프로젝트 양쪽에 생성 권한을 받은 사용자는 프로젝트와 레지스트리 사이에 association을 만들며 default로 지정할 수 있다](#linking_default_project-create-permission-on-both-scopes-links-a-project-as-its-default) | 성공 |
+| [레지스트리와 association이 이미 있는 프로젝트에 association을 만들며 default로 지정하려 하면 기존 association은 그대로 남아 default로 지정할 수 없으므로 거부된다](#linking_default_project-a-project-already-allowed-on-the-registry-cannot-link-it-as-a-default) | 거부 |
+| [다른 레지스트리를 이미 default로 가진 프로젝트에 association을 만들며 default로 지정하려 하면 프로젝트당 default 레지스트리는 하나뿐이므로 거부되고, 기존 default 레지스트리는 유지된다](#linking_default_project-a-project-that-already-has-a-default-registry-cannot-link-another) | 거부 |
+| [레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 association을 만들며 default로 지정하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다](#linking_default_project-a-user-granted-on-the-registry-but-not-the-project-cannot-link-a-default) | 거부 |
 
 ### admin_partial_bulk_purge
 
@@ -962,6 +966,44 @@ Then
 - 반환값이 없고 예외도 발생하지 않는다
   - response = None
 
+<a id="allowing_projects-allowing-a-project-already-linked-as-its-default-keeps-the-default"></a>
+
+#### [allowing-a-project-already-linked-as-its-default-keeps-the-default](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
+
+이 레지스트리를 default로 허용받은 프로젝트를 허용 목록에 다시 넣어도 거부되지 않고 default 레지스트리도 그대로 유지된다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리, 프로젝트에 권한 있음인 사용자 한 명, 프로젝트는 이미 이 레지스트리를 default로 허용돼 있음
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 프로젝트 project-1 을 default 레지스트리로 허용한 컨테이너 레지스트리 host-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-project-1: project 전체에 CREATE 허용
+    - 역할 allow-on-project-1: project 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-project-1 보유
+
+When
+
+- ContainerRegistryAdapter.apply_allowed_groups — user-1이 허용 목록에 넣음
+
+Then
+
+- 반환값이 없고 예외도 발생하지 않는다
+  - response = None
+
 <a id="allowing_projects-allowing-a-project-that-is-already-allowed-is-not-an-error"></a>
 
 #### [allowing-a-project-that-is-already-allowed-is-not-an-error](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
@@ -1067,6 +1109,44 @@ Given
 When
 
 - ContainerRegistryAdapter.apply_allowed_groups — user-1이 허용 목록에 넣음
+
+Then
+
+- 반환값이 없고 예외도 발생하지 않는다
+  - response = None
+
+<a id="allowing_projects-removing-a-project-linked-as-its-default-drops-the-default"></a>
+
+#### [removing-a-project-linked-as-its-default-drops-the-default](/tests/scenario/bai_scenario/manager/container_registry/test_allowing_projects.py) — pass
+
+이 레지스트리를 default로 허용받은 프로젝트를 허용 목록에서 빼면 association과 함께 default 레지스트리 지정도 사라진다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리, 프로젝트에 권한 있음인 사용자 한 명, 프로젝트는 이미 이 레지스트리를 default로 허용돼 있음
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 프로젝트 project-1 을 default 레지스트리로 허용한 컨테이너 레지스트리 host-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 역할 allow-on-registry-1: container_registry 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-project-1: project 전체에 CREATE 허용
+    - 역할 allow-on-project-1: project 전체에 SOFT_DELETE 허용
+    - 일반 사용자 user-1: 역할 allow-on-project-1 보유
+
+When
+
+- ContainerRegistryAdapter.apply_allowed_groups — user-1이 허용 목록에서 뺌
 
 Then
 
@@ -1351,7 +1431,7 @@ Then
 
 #### [create-permission-on-both-scopes-links-a-project-as-its-default](/tests/scenario/bai_scenario/manager/container_registry/test_linking_default_project.py) — pass
 
-레지스트리와 프로젝트 양쪽에 생성 권한을 받은 사용자는 프로젝트를 레지스트리에 연결하면서 default로 지정할 수 있다
+레지스트리와 프로젝트 양쪽에 생성 권한을 받은 사용자는 프로젝트와 레지스트리 사이에 association을 만들며 default로 지정할 수 있다
 
 Given
 
@@ -1375,18 +1455,91 @@ Given
 
 When
 
-- ContainerRegistryAdapter.link_project_as_default — user-1이 프로젝트를 레지스트리에 default로 연결한다
+- ContainerRegistryAdapter.link_project_as_default — user-1이 프로젝트와 레지스트리 사이에 association을 만들며 default로 지정한다
 
 Then
 
 - 반환값이 없고 예외도 발생하지 않는다
   - response = None
 
+<a id="linking_default_project-a-project-already-allowed-on-the-registry-cannot-link-it-as-a-default"></a>
+
+#### [a-project-already-allowed-on-the-registry-cannot-link-it-as-a-default](/tests/scenario/bai_scenario/manager/container_registry/test_linking_default_project.py) — pass
+
+레지스트리와 association이 이미 있는 프로젝트에 association을 만들며 default로 지정하려 하면 기존 association은 그대로 남아 default로 지정할 수 없으므로 거부된다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리, 프로젝트에 권한 있음인 사용자 한 명, 프로젝트는 이미 허용돼 있음
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 프로젝트 project-1 을 허용한 컨테이너 레지스트리 host-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-project-1: project 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 allow-on-project-1 보유
+
+When
+
+- ContainerRegistryAdapter.link_project_as_default — user-1이 프로젝트와 레지스트리 사이에 association을 만들며 default로 지정한다
+
+Then
+
+- 거부된다
+  - 거부: ProjectDefaultContainerRegistryConflict
+
+<a id="linking_default_project-a-project-that-already-has-a-default-registry-cannot-link-another"></a>
+
+#### [a-project-that-already-has-a-default-registry-cannot-link-another](/tests/scenario/bai_scenario/manager/container_registry/test_linking_default_project.py) — pass
+
+다른 레지스트리를 이미 default로 가진 프로젝트에 association을 만들며 default로 지정하려 하면 프로젝트당 default 레지스트리는 하나뿐이므로 거부되고, 기존 default 레지스트리는 유지된다
+
+Given
+
+- 레지스트리 하나, 프로젝트 하나, 레지스트리, 프로젝트에 권한 있음인 사용자 한 명, 프로젝트에는 다른 default 레지스트리가 있음
+  - 도메인 home-1
+  - 프로젝트 정책 default: 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
+  - 프로젝트 project-1
+  - 컨테이너 레지스트리 host-1: 이미지를 가져오는 곳
+  - 컨테이너 레지스트리 other-1: 이미지를 가져오는 곳
+  - 프로젝트 project-1 을 default 레지스트리로 허용한 컨테이너 레지스트리 other-1
+  - 도메인에 속한 사용자 한 명 준비
+    - 사용자 정책 user-policy-1: 사용자 한 명당 폴더 10개까지
+    - 키페어 정책 keypair-policy-1: 동시 세션 5개까지
+    - 일반 사용자 user-1: 자기 키와 개인 프로젝트를 갖는다
+  - allow-on-registry 권한을 받은 사용자 준비
+    - 역할 allow-on-registry-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-registry-1: container_registry 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 allow-on-registry-1 보유
+  - allow-on-project 권한을 받은 사용자 준비
+    - 역할 allow-on-project-1: 이 역할이 앉은 스코프 안에서만 통한다
+    - 역할 allow-on-project-1: project 전체에 CREATE 허용
+    - 일반 사용자 user-1: 역할 allow-on-project-1 보유
+
+When
+
+- ContainerRegistryAdapter.link_project_as_default — user-1이 프로젝트와 레지스트리 사이에 association을 만들며 default로 지정한다
+
+Then
+
+- 거부된다
+  - 거부: ProjectDefaultContainerRegistryConflict
+
 <a id="linking_default_project-a-user-granted-on-the-registry-but-not-the-project-cannot-link-a-default"></a>
 
 #### [a-user-granted-on-the-registry-but-not-the-project-cannot-link-a-default](/tests/scenario/bai_scenario/manager/container_registry/test_linking_default_project.py) — pass
 
-레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 default로 연결하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다
+레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 association을 만들며 default로 지정하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다
 
 Given
 
@@ -1406,7 +1559,7 @@ Given
 
 When
 
-- ContainerRegistryAdapter.link_project_as_default — user-1이 프로젝트를 레지스트리에 default로 연결한다
+- ContainerRegistryAdapter.link_project_as_default — user-1이 프로젝트와 레지스트리 사이에 association을 만들며 default로 지정한다
 
 Then
 

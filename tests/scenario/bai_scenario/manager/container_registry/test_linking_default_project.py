@@ -1,4 +1,4 @@
-"""프로젝트를 레지스트리에 default로 연결하는 호출과 권한 검사."""
+"""프로젝트와 레지스트리 사이에 association을 만들며 default로 지정하는 호출과 권한 검사."""
 
 from __future__ import annotations
 
@@ -6,16 +6,13 @@ from dataclasses import dataclass
 from typing import override
 
 import pytest
-import sqlalchemy as sa
 
 from ai.backend.common.data.entity.container_registry import ContainerRegistryID
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.data.permission.types import Permission
+from ai.backend.manager.errors.image import ProjectDefaultContainerRegistryConflict
 from ai.backend.manager.errors.permission import NotEnoughPermission
-from ai.backend.manager.models.association_container_registries_groups.row import (
-    AssociationContainerRegistriesGroupsRow,
-)
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
 from ai.backend.testutils.scenario_steps import (
     Answered,
@@ -30,6 +27,7 @@ from bai_scenario.components.answers import TheCallIsRefused
 from bai_scenario.components.container_registry import (
     ARegistryAndAProjectToAllow,
     ARegistryToAllowAndACaller,
+    default_link_count,
 )
 from bai_scenario.runner.acting import ActingAs
 from bai_scenario.runner.planting import TestSeedingSession
@@ -48,7 +46,7 @@ class LinkingProjectAsDefault(When[ARegistryToAllowAndACaller, ContainerRegistry
 
     @override
     def describe(self, laid: ARegistryToAllowAndACaller) -> str:
-        return f"{laid.caller.username}이 프로젝트를 레지스트리에 default로 연결한다"
+        return f"{laid.caller.username}이 프로젝트와 레지스트리 사이에 association을 만들며 default로 지정한다"
 
     @override
     async def call(
@@ -85,7 +83,7 @@ class LinkingWithCreateOnBothScopes(
     def describe(self) -> str:
         return (
             "레지스트리와 프로젝트 양쪽에 생성 권한을 받은 사용자는 "
-            "프로젝트를 레지스트리에 연결하면서 default로 지정할 수 있다"
+            "프로젝트와 레지스트리 사이에 association을 만들며 default로 지정할 수 있다"
         )
 
     @override
@@ -112,7 +110,7 @@ class LinkingWithoutProjectPermissionIsRefused(
     @override
     def describe(self) -> str:
         return (
-            "레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 default로 연결하려 하면, "
+            "레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 association을 만들며 default로 지정하려 하면, "
             "관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다"
         )
 
@@ -129,25 +127,73 @@ class LinkingWithoutProjectPermissionIsRefused(
         return TheCallIsRefused(NotEnoughPermission)
 
 
+@dataclass(frozen=True)
+class ProjectWithAnotherDefaultIsRefused(
+    Scenario[TestSeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+):
+    @override
+    def summary(self) -> str:
+        return "a-project-that-already-has-a-default-registry-cannot-link-another"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "다른 레지스트리를 이미 default로 가진 프로젝트에 association을 만들며 default로 지정하려 하면 "
+            "프로젝트당 default 레지스트리는 하나뿐이므로 거부되고, 기존 default 레지스트리는 유지된다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow(other_default=True, permissions=(Permission.CREATE,))
+
+    @override
+    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+        return LinkingProjectAsDefault()
+
+    @override
+    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+        return TheCallIsRefused(ProjectDefaultContainerRegistryConflict)
+
+
+@dataclass(frozen=True)
+class AlreadyAllowedPairIsRefused(
+    Scenario[TestSeedingSession, ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]
+):
+    @override
+    def summary(self) -> str:
+        return "a-project-already-allowed-on-the-registry-cannot-link-it-as-a-default"
+
+    @override
+    def describe(self) -> str:
+        return (
+            "레지스트리와 association이 이미 있는 프로젝트에 association을 만들며 default로 지정하려 하면 "
+            "기존 association은 그대로 남아 default로 지정할 수 없으므로 거부된다"
+        )
+
+    @override
+    def given(self) -> Given[TestSeedingSession, ARegistryToAllowAndACaller]:
+        return ARegistryAndAProjectToAllow(allowed=True, permissions=(Permission.CREATE,))
+
+    @override
+    def when(self) -> When[ARegistryToAllowAndACaller, ContainerRegistryAdapter, None]:
+        return LinkingProjectAsDefault()
+
+    @override
+    def then(self) -> Then[ARegistryToAllowAndACaller, None]:
+        return TheCallIsRefused(ProjectDefaultContainerRegistryConflict)
+
+
 SCENARIOS: list[LinkingDefaultScenario] = [
     LinkingWithCreateOnBothScopes(),
     LinkingWithoutProjectPermissionIsRefused(),
+    ProjectWithAnotherDefaultIsRefused(),
+    AlreadyAllowedPairIsRefused(),
 ]
-
-
-async def default_link_count(engine: ExtendedAsyncSAEngine) -> int:
-    async with engine.begin_readonly_session() as session:
-        query = (
-            sa.select(sa.func.count())
-            .select_from(AssociationContainerRegistriesGroupsRow)
-            .where(AssociationContainerRegistriesGroupsRow.is_default.is_(True))
-        )
-        return int(await session.scalar(query) or 0)
 
 
 def expected_default_link_count(scenario: LinkingDefaultScenario) -> int:
     match scenario:
-        case LinkingWithCreateOnBothScopes():
+        case LinkingWithCreateOnBothScopes() | ProjectWithAnotherDefaultIsRefused():
             return 1
         case _:
             return 0
