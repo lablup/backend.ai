@@ -220,7 +220,7 @@ def build_v2_routes(
     storage_host_handler = V2StorageHostHandler(adapter=adapters.storage_host)
     storage_namespace_handler = V2StorageNamespaceHandler(adapter=adapters.storage_namespace)
     system_session_environ_handler = V2SystemSessionEnvironHandler(
-        adapter=adapters.system_session_environ, project_adapter=adapters.project
+        adapter=adapters.system_session_environ
     )
     user_handler = V2UserHandler(adapter=adapters.user)
     vfolder_handler = V2VFolderHandler(adapter=adapters.vfolder)

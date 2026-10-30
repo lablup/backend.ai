@@ -7,7 +7,6 @@ from ai.backend.common.data.entity.system_session_environ import SystemSessionEn
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     AdminSearchSystemSessionEnvironsInput,
     CreateSystemSessionEnvironInput,
-    MySearchSystemSessionEnvironsInput,
     ScopedSearchSystemSessionEnvironsInput,
     UpdateSystemSessionEnvironInput,
 )
@@ -54,18 +53,6 @@ class V2SystemSessionEnvironClient(BaseDomainClient):
         return await self._client.typed_request(
             "POST",
             f"{_PATH}/scoped/search",
-            request=request,
-            response_model=ScopedSearchSystemSessionEnvironsPayload,
-        )
-
-    async def my_search(
-        self, request: MySearchSystemSessionEnvironsInput
-    ) -> ScopedSearchSystemSessionEnvironsPayload:
-        """Search the rows bound to public, the caller's domain and the caller's projects,
-        soft-deleted ones excluded."""
-        return await self._client.typed_request(
-            "POST",
-            f"{_PATH}/my/search",
             request=request,
             response_model=ScopedSearchSystemSessionEnvironsPayload,
         )

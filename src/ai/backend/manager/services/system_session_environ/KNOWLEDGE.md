@@ -64,9 +64,6 @@ domain repository; this package holds the operations a caller reaches through th
 - A domain scope reads the rows bound to the domain itself. The graph binds a project's node
   under its domain, so the target also matches the scope type column to keep the projects'
   rows out.
-- The caller's own search is this operation with public, the caller's domain and projects as
-  the scopes, soft-deleted rows left out. The REST handler and the GQL resolver look the
-  projects up through the project adapter.
 
 ## The value source list is public
 

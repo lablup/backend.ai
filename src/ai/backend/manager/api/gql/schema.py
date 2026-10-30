@@ -666,7 +666,6 @@ from ai.backend.manager.api.gql.system_session_environ.resolver import (
     admin_system_session_environs,
     create_system_session_environ,
     delete_system_session_environ,
-    my_system_session_environs,
     purge_system_session_environ,
     restore_system_session_environ,
     scoped_system_session_environs,
@@ -876,7 +875,6 @@ class Query:
     admin_system_session_environs = admin_system_session_environs
     system_session_environ_value_sources = system_session_environ_value_sources
     scoped_system_session_environs = scoped_system_session_environs
-    my_system_session_environs = my_system_session_environs
     admin_session_lifecycle_handlers = admin_session_lifecycle_handlers
     compute_schedule = compute_schedule
     admin_allowed_resource_groups_for_domain_v2 = admin_allowed_resource_groups_for_domain_v2

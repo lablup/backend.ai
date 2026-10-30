@@ -2,27 +2,16 @@
 
 from __future__ import annotations
 
-from typing import Final
 from uuid import UUID
 
 from strawberry import Info
 from strawberry.relay import PageInfo
 
-from ai.backend.common.contexts.user import current_user
 from ai.backend.common.data.entity.system_session_environ import SystemSessionEnvironID
-from ai.backend.common.dto.manager.query import NullableDateTimeFilter
-from ai.backend.common.dto.manager.v2.group.request import ScopedSearchProjectsInput
-from ai.backend.common.dto.manager.v2.group.types import ProjectScope
-from ai.backend.common.dto.manager.v2.rbac.types import UUIDScope
 from ai.backend.common.dto.manager.v2.system_session_environ.request import (
     AdminSearchSystemSessionEnvironsInput,
     ScopedSearchSystemSessionEnvironsInput,
-    SystemSessionEnvironFilter,
 )
-from ai.backend.common.dto.manager.v2.system_session_environ.types import (
-    SystemSessionEnvironScope,
-)
-from ai.backend.common.exception import UnreachableError
 from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
 from ai.backend.manager.api.gql.base import encode_cursor, to_global_id
 from ai.backend.manager.api.gql.decorators import BackendAIGQLMeta, gql_mutation, gql_root_field
@@ -43,8 +32,6 @@ from ai.backend.manager.api.gql.system_session_environ.types import (
 )
 from ai.backend.manager.api.gql.types import StrawberryGQLContext
 from ai.backend.manager.api.gql.utils import check_admin_only
-
-_MY_PROJECTS_PAGE_SIZE: Final[int] = 100
 
 
 @gql_root_field(
@@ -168,69 +155,6 @@ async def scoped_system_session_environs(
     )
 
 
-@gql_root_field(
-    BackendAIGQLMeta(
-        added_version=NEXT_RELEASE_VERSION,
-        description=(
-            "Page through the system session environ rows bound to public, the current user's "
-            "domain and the projects the current user belongs to, soft-deleted ones excluded."
-        ),
-    )
-)  # type: ignore[misc]
-async def my_system_session_environs(
-    info: Info[StrawberryGQLContext],
-    filter: SystemSessionEnvironFilterGQL | None = None,
-    order_by: list[SystemSessionEnvironOrderByGQL] | None = None,
-    before: str | None = None,
-    after: str | None = None,
-    first: int | None = None,
-    last: int | None = None,
-    limit: int | None = None,
-    offset: int | None = None,
-) -> SystemSessionEnvironConnectionGQL | None:
-    me = current_user()
-    if me is None:
-        raise UnreachableError("User context is not available")
-    my_project_ids = await _project_ids_of(info, me.user_id)
-    payload = await info.context.adapters.system_session_environ.scoped_search(
-        ScopedSearchSystemSessionEnvironsInput(
-            scope=SystemSessionEnvironScope(
-                domain=[UUIDScope(value=me.domain_id)],
-                project=[UUIDScope(value=project_id) for project_id in my_project_ids],
-                public=True,
-            ),
-            filter=SystemSessionEnvironFilter(
-                deleted_at=NullableDateTimeFilter(is_null=True),
-                AND=[filter.to_pydantic()] if filter else None,
-            ),
-            order=[order.to_pydantic() for order in order_by] if order_by else None,
-            first=first,
-            after=after,
-            last=last,
-            before=before,
-            limit=limit,
-            offset=offset,
-        )
-    )
-    nodes = [
-        SystemSessionEnvironGQL.from_pydantic(item, id_field="entity_id") for item in payload.items
-    ]
-    edges = [
-        SystemSessionEnvironEdgeGQL(node=node, cursor=encode_cursor(str(node.entity_id)))
-        for node in nodes
-    ]
-    return SystemSessionEnvironConnectionGQL(
-        edges=edges,
-        page_info=PageInfo(
-            has_next_page=payload.has_next_page,
-            has_previous_page=payload.has_previous_page,
-            start_cursor=edges[0].cursor if edges else None,
-            end_cursor=edges[-1].cursor if edges else None,
-        ),
-        count=payload.total_count,
-    )
-
-
 @gql_mutation(
     BackendAIGQLMeta(
         added_version=NEXT_RELEASE_VERSION,
@@ -309,18 +233,3 @@ async def purge_system_session_environ(
     return PurgeSystemSessionEnvironPayloadGQL.from_pydantic(
         payload, extra={"purged_id": to_global_id(SystemSessionEnvironGQL, payload.entity_id)}
     )
-
-
-async def _project_ids_of(info: Info[StrawberryGQLContext], user_id: UUID) -> list[UUID]:
-    project_ids: list[UUID] = []
-    while True:
-        page = await info.context.adapters.project.scoped_search(
-            ScopedSearchProjectsInput(
-                scope=ProjectScope(user=[UUIDScope(value=user_id)]),
-                limit=_MY_PROJECTS_PAGE_SIZE,
-                offset=len(project_ids),
-            )
-        )
-        project_ids.extend(project.id for project in page.items)
-        if not page.has_next_page:
-            return project_ids

@@ -72,15 +72,6 @@ def session() -> None:
 
 @my.group(
     cls=LazyGroup,
-    import_name="ai.backend.client.cli.v2.my.system_session_environ:system_session_environ",
-    name="system-session-environ",
-)
-def system_session_environ() -> None:
-    """My system session environ commands."""
-
-
-@my.group(
-    cls=LazyGroup,
     import_name="ai.backend.client.cli.v2.my.model_card:model_card",
     name="model-card",
 )
