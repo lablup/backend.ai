@@ -16,6 +16,11 @@ from dateutil.parser import parse as dtparse
 from graphene.types.datetime import DateTime as GQLDateTime
 from graphql import Undefined
 
+from ai.backend.common.data.entity.container_registry import (
+    ContainerRegistryID,
+    ContainerRegistryName,
+    ContainerRegistryProjectName,
+)
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectEntityType, ProjectID
 from ai.backend.common.data.entity.user import UserID
@@ -24,6 +29,7 @@ from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
 from ai.backend.common.types import ResourceSlot, VFolderHostPermissionMap
+from ai.backend.manager.api.adapters.container_registry.adapter import ContainerRegistryAdapter
 from ai.backend.manager.api.adapters.project.adapter import ProjectAdapter
 from ai.backend.manager.api.gql.base import resolve_entity_id
 from ai.backend.manager.data.container_registry.types import ImageCommitRegistry
@@ -584,13 +590,6 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
         )
         integration_id_val = value_or_none(self.integration_id)
         resource_policy_val = value_or_none(self.resource_policy)
-        registry = value_or_none(self.container_registry)
-        container_registry_val = None
-        if registry:
-            parsed = ImageCommitRegistryReq.model_validate(registry)
-            container_registry_val = ImageCommitRegistry(
-                registry_name=parsed.registry, project_name=parsed.project
-            )
 
         return CreateProjectAction(
             domain_id=domain_id,
@@ -605,8 +604,20 @@ class GroupInput(graphene.InputObjectType):  # type: ignore[misc]
                 allowed_vfolder_hosts=allowed_vfolder_hosts_val,
                 integration_name=integration_id_val,
                 resource_policy=resource_policy_val,
-                container_registry=container_registry_val,
             ),
+        )
+
+    def to_image_commit_registry(self) -> ImageCommitRegistry | None:
+        """The registry named to take the project's image commits, ``None`` for none."""
+        registry = self.container_registry
+        if registry is Undefined:
+            return None
+        if not registry:
+            return None
+        parsed = ImageCommitRegistryReq.model_validate(registry)
+        return ImageCommitRegistry(
+            registry_name=parsed.registry,
+            project_name=parsed.project,
         )
 
 
@@ -712,8 +723,26 @@ class CreateGroup(graphene.Mutation):  # type: ignore[misc]
                 LookupDomainAction(name=DomainName(props.domain_name))
             )
         ).entity_id()
+        registry_adapter = ContainerRegistryAdapter(
+            graph_ctx.processors.container_registry, graph_ctx.processors.rbac
+        )
+        # Resolved before the project is created, so a registry that is not there creates
+        # nothing. Linking it after is a run of its own: a refusal leaves the project.
+        registry_id: ContainerRegistryID | None = None
+        registry = props.to_image_commit_registry()
+        if registry is not None:
+            registry_project_name: ContainerRegistryProjectName | None = None
+            if registry.project_name is not None:
+                registry_project_name = ContainerRegistryProjectName(registry.project_name)
+            registry_id = await registry_adapter.lookup_by_name_and_registry_project(
+                ContainerRegistryName(registry.registry_name), registry_project_name
+            )
+
         action = props.to_action(name, domain_id)
         res = await graph_ctx.processors.project.create_project.run(action)
+        if registry_id is not None:
+            project_id = ProjectID(res.data.id)
+            await registry_adapter.link_project_as_default(project_id, registry_id)
         return cls(
             ok=True,
             msg="success",

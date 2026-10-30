@@ -280,6 +280,18 @@ class ContainerRegistryAdapter(BaseAdapter):
                 f"group_ids: {allowed_groups.remove}"
             )
 
+    async def link_project_as_default(
+        self, project_id: ProjectID, registry_id: ContainerRegistryID
+    ) -> None:
+        """Link the registry to a project without a default registry, as its default.
+        The permission is asked of both."""
+        await self._rbac.create_relation.run(
+            CreateRelationAction(
+                pairs=[RelationPair(scope=project_id, target=registry_id)],
+                creator=ContainerRegistryProjectCreator(is_default=True),
+            )
+        )
+
     async def admin_purge(self, registry_id: ContainerRegistryID) -> PurgeContainerRegistryPayload:
         """Purge a container registry (superadmin only)."""
         await self._container_registry.delete_container_registry.run(
