@@ -104,8 +104,8 @@ class TestInitSshdServiceHostKey:
         return {}
 
     @pytest.fixture
-    def cluster_replicas(self) -> dict[str, int]:
-        return {"main": 1}
+    def cluster_roles(self) -> list[str]:
+        return ["main"]
 
     @pytest.fixture
     def user_keygen_proc(self) -> AsyncMock:
@@ -175,10 +175,10 @@ class TestInitSshdServiceHostKey:
     async def test_skips_keygen_when_agent_host_key_exists(
         self,
         child_env: dict[str, str],
-        cluster_replicas: dict[str, int],
+        cluster_roles: list[str],
         mock_init_agent_key_present: AsyncMock,
     ) -> None:
-        await init_sshd_service(child_env, cluster_replicas)
+        await init_sshd_service(child_env, cluster_roles)
 
         assert not any(
             str(LEGACY_HOST_KEY_PATH) in map(str, call[0])
@@ -188,10 +188,10 @@ class TestInitSshdServiceHostKey:
     async def test_generates_key_when_agent_host_key_absent(
         self,
         child_env: dict[str, str],
-        cluster_replicas: dict[str, int],
+        cluster_roles: list[str],
         mock_init_agent_key_absent: AsyncMock,
     ) -> None:
-        await init_sshd_service(child_env, cluster_replicas)
+        await init_sshd_service(child_env, cluster_roles)
 
         assert any(
             str(LEGACY_HOST_KEY_PATH) in map(str, call[0])

@@ -3,7 +3,7 @@ import json
 import logging
 import shlex
 import shutil
-from collections.abc import Iterable, Mapping, MutableMapping
+from collections.abc import Iterable, Mapping, MutableMapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +18,7 @@ LEGACY_HOST_KEY_PATH = Path("/tmp/dropbear/dropbear_rsa_host_key")
 
 async def init_sshd_service(
     child_env: MutableMapping[str, str],
-    cluster_replicas: Mapping[str, int],
+    cluster_roles: Sequence[str],
 ) -> None:
     if Path("/tmp/dropbear").is_dir():
         shutil.rmtree("/tmp/dropbear")
@@ -115,7 +115,7 @@ async def init_sshd_service(
 
             await asyncio.to_thread(_write_ssh_config)
         else:
-            for role_name in cluster_replicas:
+            for role_name in cluster_roles:
                 try:
                     existing_ssh_config = user_ssh_config_path.read_text()
                     if "\nHost {role_name}*\n" in existing_ssh_config:

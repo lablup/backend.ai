@@ -409,7 +409,7 @@ class BaseRunner(metaclass=ABCMeta):
                     "and the container may not work as expected."
                 )
             await self._handle_exception(
-                init_sshd_service(self.child_env, self.cmdargs.cluster_replicas),
+                init_sshd_service(self.child_env, self.cmdargs.cluster_roles),
                 "Verify agent installation with the embedded prebuilt binaries",
             )
         finally:

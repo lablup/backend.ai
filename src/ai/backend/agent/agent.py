@@ -2926,12 +2926,9 @@ class AbstractAgent[
                         cmdargs += ["--"]
                     if self.local_config.debug.kernel_runner:
                         krunner_opts.append("--debug")
-                    krunner_opts += [
-                        "--session-id",
-                        str(session_id),
-                        "--cluster-replicas",
-                        dump_json_str(cluster_info["replicas"]),
-                    ]
+                    krunner_opts += ["--session-id", str(session_id)]
+                    for cluster_role in cluster_info["replicas"]:
+                        krunner_opts += ["--cluster-role", cluster_role]
                     cmdargs += [
                         "/opt/backend.ai/bin/python",
                         "-s",
