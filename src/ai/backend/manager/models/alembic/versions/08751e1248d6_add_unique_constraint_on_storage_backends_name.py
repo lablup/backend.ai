@@ -4,7 +4,7 @@ A status report inserts a backend under its name when absent, which needs the na
 as the conflict key.
 
 Revision ID: 08751e1248d6
-Revises: c5ea6e2fa389
+Revises: a37b92a3e063
 Create Date: 2026-10-29
 
 """
@@ -15,7 +15,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "08751e1248d6"
-down_revision = "c5ea6e2fa389"
+down_revision = "a37b92a3e063"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
