@@ -11,18 +11,19 @@ from unittest.mock import MagicMock
 import pytest
 import sqlalchemy as sa
 
-from ai.backend.common.auth.password import PasswordHashAlgorithm, PasswordInfo
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
 from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.types import AutoScalingMetricSource, ResourceSlot
+from ai.backend.manager.data.auth.hash import PasswordHashAlgorithm
 from ai.backend.manager.data.deployment.scale import AutoScalingRule
 from ai.backend.manager.data.deployment.types import DeploymentInfo
 from ai.backend.manager.data.user.types import UserStatus
 from ai.backend.manager.models.deployment_policy.row import DeploymentPolicyRow
 from ai.backend.manager.models.domain.row import DomainRow
 from ai.backend.manager.models.endpoint.row import EndpointAutoScalingRuleRow, EndpointRow
+from ai.backend.manager.models.hasher.types import PasswordInfo
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.prometheus_query_preset.row import PrometheusQueryPresetRow
 from ai.backend.manager.models.prometheus_query_preset_category.row import (
@@ -31,8 +32,7 @@ from ai.backend.manager.models.prometheus_query_preset_category.row import (
 from ai.backend.manager.models.rbac_models.role.row import RoleRow
 from ai.backend.manager.models.rbac_models.user_role.row import UserRoleRow
 from ai.backend.manager.models.replica_group.row import ReplicaGroupRow
-from ai.backend.manager.models.resource_group.row import ResourceGroupRow
-from ai.backend.manager.models.resource_group.types import ResourceGroupOpts
+from ai.backend.manager.models.resource_group.row import ResourceGroupOpts, ResourceGroupRow
 from ai.backend.manager.models.resource_policy.row import (
     ProjectResourcePolicyRow,
     UserResourcePolicyRow,

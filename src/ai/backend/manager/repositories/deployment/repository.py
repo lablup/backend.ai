@@ -1109,42 +1109,14 @@ class DeploymentRepository:
                 new_replica_count = self._replica_count_after_step_within_limit(
                     current_replica_count, scale_direction, rule.action
                 )
-<<<<<<< HEAD
-
-                # Check min/max limits
-                if (
-                    rule.action.min_replicas is not None
-                    and new_replica_count < rule.action.min_replicas
-                ):
-                    log.info(
-                        "AUTOSCALE(e:{}, rule:{}): new count {} below min {}",
-                        deployment.id,
-                        rule.id,
-                        new_replica_count,
-                        rule.action.min_replicas,
-                    )
-                    continue
-
-                if (
-                    rule.action.max_replicas is not None
-                    and new_replica_count > rule.action.max_replicas
-                ):
-                    log.info(
-                        "AUTOSCALE(e:{}, rule:{}): new count {} above max {}",
-                        deployment.id,
-                        rule.id,
-                        new_replica_count,
-                        rule.action.max_replicas,
-=======
                 if new_replica_count is None:
-                    log.debug(
-                        "autoscaling replica count cannot move, rule skipped",
-                        deployment_id=deployment.id,
-                        rule_id=rule.id,
-                        current_replica_count=current_replica_count,
-                        min_replica_count=rule.action.min_replicas,
-                        max_replica_count=rule.action.max_replicas,
->>>>>>> 4b856f48 (fix(BA-8151): clamp autoscaling replicas to rule limits instead of skipping (#15081))
+                    log.info(
+                        "AUTOSCALE(e:{}, rule:{}): count {} cannot move (min {}, max {})",
+                        deployment.id,
+                        rule.id,
+                        current_replica_count,
+                        rule.action.min_replicas,
+                        rule.action.max_replicas,
                     )
                     continue
 
