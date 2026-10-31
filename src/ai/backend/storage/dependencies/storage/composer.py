@@ -109,8 +109,10 @@ class StorageComposer(DependencyComposer[StorageComposerInput, StorageResources]
         status_probe = await stack.enter_dependency(
             StatusProbeProvider(),
             StatusProbeInput(
+                local_config=local_config,
                 pidx=setup_input.pidx,
                 volume_pool=volume_pool,
+                event_producer=setup_input.event_producer,
             ),
         )
         manager_client_pool = await stack.enter_dependency(
