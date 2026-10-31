@@ -21,7 +21,9 @@ from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.data.storage.types import (
+    StorageBackendCapabilities,
     StorageBackendCapability,
+    StorageBackendMetadata,
     StorageBackendType,
 )
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
@@ -432,11 +434,7 @@ class BaseVolume(AbstractVolume):
             event_producer=event_producer,
             watcher=watcher,
         )
-        self._status_check = (
-            VfsVolumeStatusCheck.create(volume_name, mount_path, status_check_config)
-            if status_check_config is not None
-            else None
-        )
+        self._status_check = None
 
     @override
     def info(self) -> VolumeInfo:
@@ -460,7 +458,18 @@ class BaseVolume(AbstractVolume):
         )
 
     @override
-    def volume_status_checker(self) -> AbstractVolumeStatusCheck | None:
+    async def volume_status_checker(self) -> AbstractVolumeStatusCheck | None:
+        if self._status_check_config is None:
+            return None
+        if self._status_check is None:
+            supported = await self.get_capabilities()
+            metadata = StorageBackendMetadata(
+                name=self.name,
+                capabilities=StorageBackendCapabilities(supported=supported),
+            )
+            self._status_check = VfsVolumeStatusCheck.create(
+                self._volume_name, metadata, self.mount_path, self._status_check_config
+            )
         return self._status_check
 
     @override
