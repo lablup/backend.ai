@@ -236,7 +236,8 @@ class AbstractVolume(metaclass=ABCMeta):
         raise NotImplementedError
 
     @abstractmethod
-    def volume_status_checker(self) -> AbstractVolumeStatusCheck | None:
+    async def volume_status_checker(self) -> AbstractVolumeStatusCheck | None:
+        """The volume's status check, created on the first call; None without one."""
         raise NotImplementedError
 
     @final

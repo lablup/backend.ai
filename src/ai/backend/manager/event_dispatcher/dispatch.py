@@ -103,6 +103,9 @@ from ai.backend.common.events.event_types.session.broadcast import (
     SessionTerminatedBroadcastEvent,
     SessionTerminatingBroadcastEvent,
 )
+from ai.backend.common.events.event_types.storage_status.anycast import (
+    StorageStatusReportEvent,
+)
 from ai.backend.common.events.event_types.vfolder.anycast import (
     VFolderCloneFailureEvent,
     VFolderCloneSuccessEvent,
@@ -141,6 +144,7 @@ from .handlers.kernel import KernelEventHandler
 from .handlers.notification import NotificationEventHandler
 from .handlers.service_catalog import ServiceCatalogEventHandler
 from .handlers.session import SessionEventHandler
+from .handlers.storage_status import StorageStatusEventHandler
 from .handlers.stream_cleanup import StreamCleanupEventHandler
 from .handlers.vfolder import VFolderEventHandler
 from .reporters import EventLogger
@@ -186,6 +190,7 @@ class Dispatchers:
     _artifact_event_handler: ArtifactEventHandler
     _artifact_registry_event_handler: ArtifactRegistryEventHandler
     _service_catalog_event_handler: ServiceCatalogEventHandler
+    _storage_status_event_handler: StorageStatusEventHandler
     stream_cleanup_handler: StreamCleanupEventHandler
 
     def __init__(self, args: DispatcherArgs) -> None:
@@ -253,6 +258,9 @@ class Dispatchers:
         self._service_catalog_event_handler = ServiceCatalogEventHandler(
             args.db, args.repositories.service_catalog.repository
         )
+        self._storage_status_event_handler = StorageStatusEventHandler(
+            args.repositories.storage_status.repository
+        )
         self.stream_cleanup_handler = StreamCleanupEventHandler(args.db)
 
     def dispatch(self, event_dispatcher: EventDispatcher) -> None:
@@ -271,6 +279,7 @@ class Dispatchers:
         self._dispatch_artifact_events(event_dispatcher)
         self._dispatch_artifact_registry_events(event_dispatcher)
         self._dispatch_service_catalog_events(event_dispatcher)
+        self._dispatch_storage_status_events(event_dispatcher)
         self._dispatch_session_broadcast_propagation(event_dispatcher)
         self._dispatch_stream_cleanup_events(event_dispatcher)
 
@@ -650,6 +659,17 @@ class Dispatchers:
             None,
             self._service_catalog_event_handler.handle_sweep_stale_services,
             name="service-catalog.sweep",
+        )
+
+    def _dispatch_storage_status_events(
+        self,
+        event_dispatcher: EventDispatcher,
+    ) -> None:
+        event_dispatcher.consume(
+            StorageStatusReportEvent,
+            None,
+            self._storage_status_event_handler.handle_reported,
+            name="storage-status.reported",
         )
 
     def _dispatch_session_broadcast_propagation(

@@ -45,6 +45,7 @@ from ai.backend.common.configs import (
     ServiceDiscoveryConfig,
 )
 from ai.backend.common.configs.redis import RedisConfig
+from ai.backend.common.configs.storage_status_report import StorageStatusReportConfig
 from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfig
 from ai.backend.common.meta import (
     NEXT_RELEASE_VERSION,
@@ -2530,6 +2531,19 @@ class AgentGlobalConfig(BaseConfigSchema):
         ),
         BackendAIConfigMeta(
             description="Configuration for the periodic status checks of the volumes.",
+            added_version=NEXT_RELEASE_VERSION,
+            composite=CompositeType.FIELD,
+        ),
+    ]
+    storage_status_report: Annotated[
+        StorageStatusReportConfig,
+        Field(
+            default_factory=StorageStatusReportConfig,
+            validation_alias=AliasChoices("storage-status-report", "storage_status_report"),
+            serialization_alias="storage-status-report",
+        ),
+        BackendAIConfigMeta(
+            description="Configuration for the periodic storage status report to the manager.",
             added_version=NEXT_RELEASE_VERSION,
             composite=CompositeType.FIELD,
         ),
