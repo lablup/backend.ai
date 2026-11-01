@@ -331,7 +331,7 @@ class TestContainerSSHProvisioner:
         (ssh_dir / "authorized_keys").symlink_to(outside)
 
         with patch(f"{_UTILS_OS}.geteuid", return_value=1000):
-            provisioner._populate_ssh_config(spec_default, ssh_keypair)
+            provisioner._populate_ssh_config(spec_default)
 
         assert outside.read_bytes() == b"outside"
         assert not (ssh_dir / "authorized_keys").is_symlink()
