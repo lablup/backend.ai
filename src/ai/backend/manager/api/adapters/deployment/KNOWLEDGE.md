@@ -7,6 +7,9 @@ keywords: [deployment, scenario, adapter, rbac, project, revision, auto-scaling 
 generated:
   by: claude-code/opus-5
   at: 2026-09-11
+updated:
+  by: claude-code/opus-5.5
+  at: 2026-10-21
 status: draft
 ---
 # deployment 어댑터 — 시나리오
@@ -292,5 +295,6 @@ deployment가 소유하는 행의 호출은 필드마다 절을 따로 둘 때 �
   `search_access_tokens`, `bulk_delete_access_tokens`, `batch_load_access_tokens_by_ids`
 - 배포 정책: `get_policy`, `upsert_policy`, `search_policies`,
   `batch_load_policies_by_endpoint_ids`
+- 지정 agent: `batch_load_designated_agents`
 - 자동 확장 규칙: `create_rule`, `get_rule`, `update_rule`, `purge_rule`, `search_rules`,
   `bulk_delete_rules`, `batch_load_auto_scaling_rules_by_ids`

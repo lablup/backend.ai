@@ -22,6 +22,7 @@ from ai.backend.common.config import (
     ModelServiceConfig,
 )
 from ai.backend.common.data.endpoint.types import EndpointLifecycle
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleID
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyID
@@ -331,6 +332,9 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_aut
     UpdateAutoScalingRuleAction,
 )
 from ai.backend.manager.services.deployment.actions.bulk_get import BulkGetDeploymentsAction
+from ai.backend.manager.services.deployment.actions.bulk_get_deployment_designated_agents import (
+    BulkGetDeploymentDesignatedAgentsAction,
+)
 from ai.backend.manager.services.deployment.actions.create_deployment import CreateDeploymentAction
 from ai.backend.manager.services.deployment.actions.deployment_policy.bulk_get_deployment_policies import (
     BulkGetDeploymentPoliciesAction,
@@ -1737,6 +1741,24 @@ class DeploymentAdapter(BaseAdapter):
             if (policy := result.designated.get(deployment_id)) is not None
             else None
             for deployment_id in ids
+        ]
+
+    async def batch_load_designated_agents(
+        self,
+        deployment_ids: Sequence[DeploymentID],
+    ) -> list[list[AgentUUID] | Exception]:
+        """Batch load the designated agent UUIDs of each deployment for DataLoader use.
+
+        One answer per deployment in order; a deployment designating none answers ``[]``.
+        """
+        if not deployment_ids:
+            return []
+        result = await self._deployment.bulk_get_deployment_designated_agents.run(
+            BulkGetDeploymentDesignatedAgentsAction(deployment_ids=list(deployment_ids))
+        )
+        return [
+            item.value if item.value is not None else (self.batch_load_failure(item.error) or [])
+            for item in result.items
         ]
 
     # ------------------------------------------------------------------

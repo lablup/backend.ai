@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from ai.backend.common.data.entity.agent import AgentUUID
 from ai.backend.common.data.entity.auto_scaling_rule import AutoScalingRuleFieldType
 from ai.backend.common.data.entity.deployment import DeploymentID
 from ai.backend.common.data.entity.deployment_policy import DeploymentPolicyFieldType
@@ -99,6 +100,9 @@ from ai.backend.manager.services.deployment.actions.auto_scaling_rule.update_aut
     UpdateAutoScalingRuleActionResult,
 )
 from ai.backend.manager.services.deployment.actions.bulk_get import BulkGetDeploymentsAction
+from ai.backend.manager.services.deployment.actions.bulk_get_deployment_designated_agents import (
+    BulkGetDeploymentDesignatedAgentsAction,
+)
 from ai.backend.manager.services.deployment.actions.create_deployment import (
     CreateDeploymentAction,
     CreateDeploymentActionResult,
@@ -327,6 +331,9 @@ class DeploymentProcessors:
     bulk_delete_auto_scaling_rules: PartialBulkActionProcessor[
         BulkDeleteAutoScalingRulesAction, list[UUID]
     ]
+    bulk_get_deployment_designated_agents: PartialBulkActionProcessor[
+        BulkGetDeploymentDesignatedAgentsAction, list[AgentUUID]
+    ]
     partial_bulk_update_auto_scaling_rules: PartialBulkFieldActionProcessor[
         PartialBulkUpdateAutoScalingRulesAction, ModelDeploymentAutoScalingRuleData
     ]
@@ -538,6 +545,9 @@ class DeploymentProcessors:
         )
         self.bulk_delete_auto_scaling_rules = group.partial_bulk(
             BulkDeleteAutoScalingRulesAction, service.bulk_delete_auto_scaling_rules
+        )
+        self.bulk_get_deployment_designated_agents = group.partial_bulk(
+            BulkGetDeploymentDesignatedAgentsAction, service.bulk_get_deployment_designated_agents
         )
         self.partial_bulk_update_auto_scaling_rules = auto_scaling_rules.partial_bulk_field(
             PartialBulkUpdateAutoScalingRulesAction,
