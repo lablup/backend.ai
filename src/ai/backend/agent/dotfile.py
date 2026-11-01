@@ -13,10 +13,12 @@ class DotfileTargetResolver:
         self._work_dir = work_dir.resolve()
 
     def resolve(self, raw_path: str) -> Path:
-        """Symlinks already in the work directory are followed before the containment check."""
-        target = (self._work_dir / DotfilePath(raw_path).relative).resolve()
-        if target == self._work_dir or not target.is_relative_to(self._work_dir):
-            raise InvalidDotfilePath("dotfile path must stay under the kernel work directory.")
+        """Rejects a path with a symlink at any step, inside or outside the work directory."""
+        target = self._work_dir
+        for segment in DotfilePath(raw_path).relative.parts:
+            target /= segment
+            if target.is_symlink():
+                raise InvalidDotfilePath("dotfile path must not pass through a symbolic link.")
         return target
 
     def paths_below_work_dir(self, target: Path) -> list[Path]:

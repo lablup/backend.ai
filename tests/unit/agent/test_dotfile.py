@@ -85,10 +85,17 @@ class TestDotfileTargetResolver:
         with pytest.raises(InvalidDotfilePath):
             DotfileTargetResolver(work_dir).resolve(".link")
 
-    def test_follows_symlink_inside_work_dir(self, work_dir: Path) -> None:
+    def test_rejects_file_symlink_inside_work_dir(self, work_dir: Path) -> None:
         (work_dir / ".real").write_text("")
         (work_dir / ".link").symlink_to(".real")
-        assert DotfileTargetResolver(work_dir).resolve(".link") == work_dir.resolve() / ".real"
+        with pytest.raises(InvalidDotfilePath):
+            DotfileTargetResolver(work_dir).resolve(".link")
+
+    def test_rejects_directory_symlink_to_reserved_path(self, work_dir: Path) -> None:
+        (work_dir / ".ssh").mkdir()
+        (work_dir / ".x").symlink_to(".ssh")
+        with pytest.raises(InvalidDotfilePath):
+            DotfileTargetResolver(work_dir).resolve(".x/authorized_keys")
 
     def test_paths_below_work_dir_stop_at_work_dir(self, work_dir: Path) -> None:
         resolved = work_dir.resolve()
@@ -175,6 +182,16 @@ class TestPrepareContainer:
         await prepare_container([{"path": str(outside_file), "perm": "777", "data": "x\n"}])
         assert outside_file.read_text() == "original"
         assert outside_file.stat().st_mode & 0o777 != 0o777
+
+    async def test_skips_directory_symlink_to_reserved_path_on_restart(
+        self, prepare_container: PrepareContainer, work_dir: Path
+    ) -> None:
+        authorized_keys = work_dir / ".ssh" / "authorized_keys"
+        authorized_keys.parent.mkdir()
+        authorized_keys.write_text("original")
+        (work_dir / ".x").symlink_to(".ssh")
+        await prepare_container([{"path": ".x/authorized_keys", "perm": "644", "data": "x\n"}])
+        assert authorized_keys.read_text() == "original"
 
     async def test_skips_symlink_left_in_work_dir_on_restart(
         self, prepare_container: PrepareContainer, work_dir: Path, outside_file: Path

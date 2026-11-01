@@ -184,3 +184,40 @@ class TestFetchDotfiles:
         assert result.ssh_keypair is not None
         assert result.ssh_keypair.public_key == "public"
         assert result.ssh_keypair.private_key == "private"
+
+    @pytest.mark.parametrize(
+        "path", ["/etc/stored", "/home/config/kconfig.dat", "../config/x", "kconfig.dat"]
+    )
+    async def test_skips_stored_paths_by_the_path_rule(
+        self,
+        db_with_cleanup: ExtendedAsyncSAEngine,
+        dotfile_scope: UserScope,
+        test_access_key: AccessKey,
+        path: str,
+    ) -> None:
+        stored = DotfileEntry(path=path, perm="644", data="stored")
+        async with db_with_cleanup.begin_session() as session:
+            await session.execute(
+                sa.insert(DotfileRow).values(
+                    entity_type=UserEntityType(),
+                    entity_id=dotfile_scope.user_uuid,
+                    path=path,
+                    perm=stored.perm,
+                    data=stored.data,
+                    is_default=True,
+                )
+            )
+            await session.execute(
+                sa.update(ProjectRow)
+                .where(ProjectRow.id == dotfile_scope.group_id)
+                .values(dotfiles=DotfileEntries(entries=(_PROJECT, stored)).pack())
+            )
+            await session.execute(
+                sa.update(DomainRow)
+                .where(DomainRow.name == dotfile_scope.domain_name)
+                .values(dotfiles=DotfileEntries(entries=(stored, _DOMAIN)).pack())
+            )
+        source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
+        async with db_with_cleanup.begin_readonly_session() as session:
+            result = await source._fetch_dotfile_data(session, dotfile_scope, test_access_key)
+        assert result.dotfiles == (_DOMAIN, _PROJECT, _USER)
