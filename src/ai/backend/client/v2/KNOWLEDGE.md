@@ -12,7 +12,7 @@ generated:
 status: stable
 ---
 
-# Client SDK v2 — Knowledge
+# Client SDK v2: Knowledge
 
 > Rules: `AGENTS.md` in the same directory.
 
@@ -20,14 +20,14 @@ Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 ## Why this package exists
 
-It is the typed Python client for the REST v2 API — one domain client per
+It is the typed Python client for the REST v2 API: one domain client per
 entity, with Pydantic request/response models shared with the server
 (`common/dto/manager/v2/`). It exists so that every programmatic consumer talks
 to the API through one validated surface instead of hand-rolled HTTP.
 
 - The **CLI** (`client/cli/v2/`) is built on top of it.
 - **Integration tests** drive the live server with it.
-- A v2 endpoint without an SDK method is invisible to both — shipping an endpoint includes shipping the client method.
+- A v2 endpoint without an SDK method is invisible to both: shipping an endpoint includes shipping the client method.
 
 ## Scoped search unification: the server has moved, the SDK has not
 

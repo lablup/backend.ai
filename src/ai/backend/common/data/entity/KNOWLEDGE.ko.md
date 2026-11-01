@@ -43,75 +43,168 @@ container registry
 └── image
 ```
 
-| 엔티티 | 필드 | 참조 |
-|---|---|---|
-| domain | usage bucket | |
-| project | usage bucket | |
-| user | keypair, error log, login session, login history, usage bucket | resource policy |
-| session | kernel, kernel group, kernel group resource slot | image, vfolder, session group, resource group |
-| deployment | replica group, replica, deployment revision, deployment policy | image, vfolder, runtime variant, deployment revision preset, session group, resource group, prometheus query preset |
-| model card | | vfolder |
-| role | permission | |
-| resource group | fair share | |
-| agent | agent resource | |
-| image | image alias | |
+### domain
+
+| 관계 | 대상 |
+|---|---|
+| field | usage bucket |
+
+### project
+
+| 관계 | 대상 |
+|---|---|
+| field | usage bucket |
+
+### user
+
+| 관계 | 대상 |
+|---|---|
+| field | keypair, error log, login session, login history, usage bucket |
+| reference | resource policy |
+
+### session
+
+| 관계 | 대상 |
+|---|---|
+| field | kernel, kernel group, kernel group resource slot |
+| reference | image, vfolder, session group, resource group |
+
+### deployment
+
+| 관계 | 대상 |
+|---|---|
+| field | replica group, replica, deployment revision, deployment policy |
+| reference | image, vfolder, runtime variant, deployment revision preset, session group, resource group, prometheus query preset |
+
+### model card
+
+| 관계 | 대상 |
+|---|---|
+| reference | vfolder |
+
+### role
+
+| 관계 | 대상 |
+|---|---|
+| field | permission |
+
+### resource group
+
+| 관계 | 대상 |
+|---|---|
+| field | fair share |
+
+### agent
+
+| 관계 | 대상 |
+|---|---|
+| field | agent resource |
+
+### image
+
+| 관계 | 대상 |
+|---|---|
+| field | image alias |
 
 ## public 엔티티
 
 읽기에는 인증만 필요하고, 생성, 변경, 삭제는 admin 전용이다.
 
-| 묶음 | 엔티티 | 고르는 대상 |
-|---|---|---|
-| 실행 스펙 | runtime variant | deployment revision |
-| 실행 스펙 | runtime variant preset | runtime variant 를 참조한다 |
-| 실행 스펙 | deployment revision preset | deployment revision |
-| 실행 스펙 | session template | session |
-| 실행 스펙 | resource preset | session |
-| 실행 스펙 | resource slot type | agent resource |
-| 인증 | login client type | login session |
+### 실행 스펙
+
+| 엔티티 | 고르는 대상 |
+|---|---|
+| runtime variant | deployment revision |
+| runtime variant preset | runtime variant 를 참조한다 |
+| deployment revision preset | deployment revision |
+| session template | session |
+| resource preset | session |
+| resource slot type | agent resource |
+
+### 인증
+
+| 엔티티 | 고르는 대상 |
+|---|---|
+| login client type | login session |
 
 ## global
 
 읽기와 쓰기 모두 admin 전용이다.
+
+### 정책
+
+| 엔티티 | field | reference |
+|---|---|---|
+| resource policy | | |
+| retention policy | | |
+| role preset | role permission preset | |
+
+### 아티팩트
 
 ```
 artifact registry
 └── artifact
 ```
 
-| 묶음 | 엔티티 | 필드 | 참조 |
-|---|---|---|---|
-| 정책 | resource policy | | |
-| 정책 | retention policy | | |
-| 정책 | role preset | role permission preset | |
-| 아티팩트 | artifact registry | huggingface registry, reservoir registry | |
-| 아티팩트 | artifact | | storage namespace |
-| 스토리지 | storage namespace | object storage, vfs storage | |
-| 관측 | audit log | | |
-| 관측 | event log | | |
-| 관측 | prometheus query preset | | prometheus query preset category |
-| 관측 | prometheus query preset category | | |
-| 알림 | notification channel | | |
-| 알림 | notification rule | | notification channel |
-| 설정과 운영 | app config definition | | |
-| 설정과 운영 | app config allow list | app config fragment | app config definition |
-| 설정과 운영 | idle checker | | |
-| 설정과 운영 | service catalog | | |
+| 엔티티 | field | reference |
+|---|---|---|
+| artifact registry | huggingface registry, reservoir registry | |
+| artifact | | storage namespace |
+
+### 스토리지
+
+| 엔티티 | field | reference |
+|---|---|---|
+| storage namespace | object storage, vfs storage | |
+
+### 관측
+
+| 엔티티 | field | reference |
+|---|---|---|
+| audit log | | |
+| event log | | |
+| prometheus query preset | | prometheus query preset category |
+| prometheus query preset category | | |
+
+### 알림
+
+| 엔티티 | field | reference |
+|---|---|---|
+| notification channel | | |
+| notification rule | | notification channel |
+
+### 설정과 운영
+
+| 엔티티 | field | reference |
+|---|---|---|
+| app config definition | | |
+| app config allow list | app config fragment | app config definition |
+| idle checker | | |
+| service catalog | | |
 
 ## 할당
 
 관리자가 공유 자원을 스코프에 할당한다. 어느 쪽도 다른 쪽을 포함하지 않으므로 virtual entity 간선이 아니고,
 할당 테이블은 엔티티 자체가 아니라 두 엔티티 사이의 relation 이다.
 
-| 할당되는 자원 | 할당받는 쪽 |
-|---|---|
-| resource group | domain, project, keypair |
-| idle checker | domain, project, user |
+### resource group
+
+| 할당받는 쪽 |
+|---|
+| domain |
+| project |
+| keypair |
+
+### idle checker
+
+| 할당받는 쪽 |
+|---|
+| domain, project, user |
 
 ## 할당 외래 키는 양쪽 모두 RESTRICT 다
 
 - 소유가 아니므로 한쪽을 삭제해도 다른 쪽은 삭제되지 않는다. 다만 의존이 커서 연결된 엔티티를
-  이동 여부와 삭제 여부는 애플리케이션이 결정한다.
+  이동할 것인지 삭제할 것인지는 애플리케이션이 결정한다.
 - RESTRICT 는 그 결정을 애플리케이션으로 전달한다. 데이터베이스가 조용히 정리하면 그 결정을 내릴 지점이
   사라진다.
 
@@ -119,7 +212,7 @@ artifact registry
 
 자체 row 없이 생성한다. 감사와 권한 부여의 대상으로만 존재한다.
 
-| 엔티티 | 읽는 스코프 |
+| 엔티티 | 읽는 곳 |
 |---|---|
 | app config | 읽는 스코프 |
 

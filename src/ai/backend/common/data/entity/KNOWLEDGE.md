@@ -38,7 +38,8 @@ Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 ## Entity
 
-An entity that belongs somewhere. There is no common root; several entities sit at the top.
+An entity that belongs somewhere. There is no common root: several entities sit at the
+top.
 
 ```
 domain
@@ -61,77 +62,172 @@ container registry
 └── image
 ```
 
-| Entity | Field | Reference |
-|---|---|---|
-| domain | usage bucket | |
-| project | usage bucket | |
-| user | keypair, error log, login session, login history, usage bucket | resource policy |
-| session | kernel, kernel group, kernel group resource slot | image, vfolder, session group, resource group |
-| deployment | replica group, replica, deployment revision, deployment policy | image, vfolder, runtime variant, deployment revision preset, session group, resource group, prometheus query preset |
-| model card | | vfolder |
-| role | permission | |
-| resource group | fair share | |
-| agent | agent resource | |
-| image | image alias | |
+### domain
+
+| Relation | Targets |
+|---|---|
+| field | usage bucket |
+
+### project
+
+| Relation | Targets |
+|---|---|
+| field | usage bucket |
+
+### user
+
+| Relation | Targets |
+|---|---|
+| field | keypair, error log, login session, login history, usage bucket |
+| reference | resource policy |
+
+### session
+
+| Relation | Targets |
+|---|---|
+| field | kernel, kernel group, kernel group resource slot |
+| reference | image, vfolder, session group, resource group |
+
+### deployment
+
+| Relation | Targets |
+|---|---|
+| field | replica group, replica, deployment revision, deployment policy |
+| reference | image, vfolder, runtime variant, deployment revision preset, session group, resource group, prometheus query preset |
+
+### model card
+
+| Relation | Targets |
+|---|---|
+| reference | vfolder |
+
+### role
+
+| Relation | Targets |
+|---|---|
+| field | permission |
+
+### resource group
+
+| Relation | Targets |
+|---|---|
+| field | fair share |
+
+### agent
+
+| Relation | Targets |
+|---|---|
+| field | agent resource |
+
+### image
+
+| Relation | Targets |
+|---|---|
+| field | image alias |
 
 ## Public entity
 
 Reading requires authentication only; creating, updating and deleting are admin-only.
 
-| Group | Entity | Chosen by |
-|---|---|---|
-| Execution spec | runtime variant | deployment revision |
-| Execution spec | runtime variant preset | references a runtime variant |
-| Execution spec | deployment revision preset | deployment revision |
-| Execution spec | session template | session |
-| Execution spec | resource preset | session |
-| Execution spec | resource slot type | agent resource |
-| Authentication | login client type | login session |
+### Execution spec
+
+| Entity | Chosen by |
+|---|---|
+| runtime variant | deployment revision |
+| runtime variant preset | references a runtime variant |
+| deployment revision preset | deployment revision |
+| session template | session |
+| resource preset | session |
+| resource slot type | agent resource |
+
+### Authentication
+
+| Entity | Chosen by |
+|---|---|
+| login client type | login session |
 
 ## Global
 
 Both reading and writing are admin-only.
+
+### Policy
+
+| Entity | Field | Reference |
+|---|---|---|
+| resource policy | | |
+| retention policy | | |
+| role preset | role permission preset | |
+
+### Artifact
 
 ```
 artifact registry
 └── artifact
 ```
 
-| Group | Entity | Field | Reference |
-|---|---|---|---|
-| Policy | resource policy | | |
-| Policy | retention policy | | |
-| Policy | role preset | role permission preset | |
-| Artifact | artifact registry | huggingface registry, reservoir registry | |
-| Artifact | artifact | | storage namespace |
-| Storage | storage namespace | object storage, vfs storage | |
-| Observability | audit log | | |
-| Observability | event log | | |
-| Observability | prometheus query preset | | prometheus query preset category |
-| Observability | prometheus query preset category | | |
-| Notification | notification channel | | |
-| Notification | notification rule | | notification channel |
-| Configuration and operations | app config definition | | |
-| Configuration and operations | app config allow list | app config fragment | app config definition |
-| Configuration and operations | idle checker | | |
-| Configuration and operations | service catalog | | |
+| Entity | Field | Reference |
+|---|---|---|
+| artifact registry | huggingface registry, reservoir registry | |
+| artifact | | storage namespace |
+
+### Storage
+
+| Entity | Field | Reference |
+|---|---|---|
+| storage namespace | object storage, vfs storage | |
+
+### Observability
+
+| Entity | Field | Reference |
+|---|---|---|
+| audit log | | |
+| event log | | |
+| prometheus query preset | | prometheus query preset category |
+| prometheus query preset category | | |
+
+### Notification
+
+| Entity | Field | Reference |
+|---|---|---|
+| notification channel | | |
+| notification rule | | notification channel |
+
+### Configuration and operations
+
+| Entity | Field | Reference |
+|---|---|---|
+| app config definition | | |
+| app config allow list | app config fragment | app config definition |
+| idle checker | | |
+| service catalog | | |
 
 ## Assignment
 
-An administrator assigns a shared resource to a scope. Neither side contains the other, so this is not a
-virtual-entity edge; an assignment table is not an entity itself but a relation between two entities.
+An administrator assigns a shared resource to a scope. Neither side contains the other,
+so this is not a virtual-entity edge; an assignment table is not an entity itself but a
+relation between two entities.
 
-| Assigned | To |
-|---|---|
-| resource group | domain, project, keypair |
-| idle checker | domain, project, user |
+### resource group
+
+| Assigned to |
+|---|
+| domain |
+| project |
+| keypair |
+
+### idle checker
+
+| Assigned to |
+|---|
+| domain, project, user |
 
 ## Assignment foreign keys are RESTRICT on both sides
 
-- This is not ownership, so deleting one side does not mean deleting the other. The dependency is large, though,
-  so whether to move or delete a linked entity is a decision the application must make.
-- RESTRICT raises that decision to the application. If the database quietly cleans up, the point where the
-  decision would be made disappears.
+- This is not ownership, so deleting one side does not mean deleting the other. The
+  dependency is large, though, so whether to move or delete a linked entity is a decision
+  the application must make.
+- RESTRICT raises that decision to the application. If the database quietly cleans up,
+  the point where the decision would be made disappears.
 
 ## Virtual
 
@@ -148,17 +244,18 @@ A virtual entity is the layer that expresses ownership, not an entity.
 ### What names a node
 
 - The two graph edge tables (`entity_memberships`, `scope_bindings`) name both ends by
-  `virtual_entities.id` foreign keys. A scope is an entity and has its own node, so the scope side of a binding is
-  a node foreign key too. Deleting a node cascades to its edges.
-- `permissions` / `field_permissions` keep their scope pair: they must name the global scope, which is no entity.
-- `entity_labels` / `entity_invitations` keep their `(entity_type, entity_id)` pair. They are attributes of an
-  entity, not graph edges; the pair's index answers their reads directly, and they must attach to legacy entities
-  that have no node. Going through the node would add one node resolution per read and make the node a
-  precondition.
-- A node id stays inside the repository layer. `data/` types and service results carry the entity as one
-  `EntityIdentifier`, never the node id.
-- A node is looked up by the `(entity_type, entity_id)` unique index or by primary key. A lookup by `entity_id`
-  alone cannot use the index, so none is written.
+  `virtual_entities.id` foreign keys. A scope is an entity and has its own node, so the
+  scope side of a binding is a node foreign key too. Deleting a node cascades to its edges.
+- `permissions` / `field_permissions` keep their scope pair: they must name the global
+  scope, which is no entity.
+- `entity_labels` / `entity_invitations` keep their `(entity_type, entity_id)` pair. They
+  are attributes of an entity, not graph edges; the pair's index answers their reads
+  directly, and they must attach to legacy entities that have no node. Going through
+  the node would add one node resolution per read and make the node a precondition.
+- A node id stays inside the repository layer. `data/` types and service results carry
+  the entity as one `EntityIdentifier`, never the node id.
+- A node is looked up by the `(entity_type, entity_id)` unique index or by primary key.
+  A lookup by `entity_id` alone cannot use the index, so none is written.
 
 ## Missing foreign keys
 
@@ -173,12 +270,13 @@ Ownership relations with no foreign key declared.
 
 ## Direction: fold identifiers onto the entity axis
 
-Most id types identify an entity or a field, so they are declared in the same file as the type class. Adding only
-one of the two then shows up simply by opening the file, and a file with no type class becomes a signal in itself
-— either a field, or not yet classified.
+Most id types identify an entity or a field, so they are declared in the same file as the
+type class. Adding only one of the two then shows up simply by opening the file,
+and a file with no type class becomes a signal in itself: either a field, or not yet
+classified.
 
 - A scope identifier is an alias of an entity identifier, so it belongs on this axis.
-- A value type that does not identify an entity is not moved along. Values such as an architecture name, or an id
-  naming a single execution, stay with the base types.
-- Giving each entity a package and splitting the details into files leaves room to move related things underneath
-  it later.
+- A value type that does not identify an entity is not moved along. Values such as an
+  architecture name, or an id naming a single execution, stay with the base types.
+- Giving each entity a package and splitting the details into files leaves room to move
+  related things underneath it later.

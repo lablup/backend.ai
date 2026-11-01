@@ -1,7 +1,7 @@
 ---
 name: unset-sentinel-typing
 type: design-rationale
-description: Unset sentinel for absent request fields — why it aliases typing_extensions.Sentinel instead of pydantic MISSING, mypy PEP 661 gap, nested access on OptionalState only, migration steps
+description: Unset sentinel for absent request fields: why it aliases typing_extensions.Sentinel instead of pydantic MISSING, mypy PEP 661 gap, nested access on OptionalState only, migration steps
 scope: src/ai/backend/common/tristate
 keywords: [Unset, UNSET, MISSING, PEP-661, Sentinel, TriState, OptionalState, from_unset, and_optional, and_tri, mypy, pyright]
 sources:
@@ -46,7 +46,7 @@ So `Unset` names the real class the value belongs to, `typing_extensions.Sentine
 the exact `MISSING` type. `isinstance(MISSING, Sentinel)` holds, so the annotation is wider than
 needed but never false. The runtime value stays `MISSING`, so every serialization behaviour holds.
 
-pyright rejects that widening — it treats `MISSING` as its own singleton type. `pants check` runs
+pyright rejects that widening: it treats `MISSING` as its own singleton type. `pants check` runs
 mypy only, so CI is unaffected.
 
 ## Why the explicit generic before `and_optional` / `and_tri`
@@ -85,7 +85,7 @@ Nested access therefore lives on `OptionalState` only. `and_optional` / `and_tri
 child's nullability, and an absent parent is always nop.
 
 A nested model that occupies one nullable column whole is not taken apart. That shape is
-`TriState.from_unset(...).map(...)` — see `_convert_model_definition_state` in
+`TriState.from_unset(...).map(...)`: see `_convert_model_definition_state` in
 `api/adapters/deployment_revision_preset/adapter.py`.
 
 ## Why `isinstance`

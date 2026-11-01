@@ -14,7 +14,7 @@ generated:
 status: stable
 ---
 
-# Events — Knowledge
+# Events: Knowledge
 
 > Rules: `AGENTS.md` in the same directory. Delivery limits of the transport layer:
 > [../message_queue/KNOWLEDGE.md](../message_queue/KNOWLEDGE.md).
@@ -30,22 +30,22 @@ authors must uphold.
 ## Handlers must be idempotent
 
 - An anycast message is acked only after **all** registered handlers have returned.
-- If any handler fails, the message is redelivered and **all handlers run again, including the ones that already succeeded** — every handler must tolerate re-execution.
-- That is why multi-handler anycast events are a risky shape — prefer a single consuming handler per anycast event.
-- Handler failure does not stop the pump, and there are no ordering guarantees — neither across events nor across the handlers of one event.
+- If any handler fails, the message is redelivered and **all handlers run again, including the ones that already succeeded**: every handler must tolerate re-execution.
+- That is why multi-handler anycast events are a risky shape: prefer a single consuming handler per anycast event.
+- Handler failure does not stop the pump, and there are no ordering guarantees: neither across events nor across the handlers of one event.
 
 ## Unhandled events vanish silently
 
 - An event with no registered handler is acked immediately and discarded.
-- If a handler is registered on only some workers, the event is lost whenever another worker picks it up — register handlers unconditionally at startup.
+- If a handler is registered on only some workers, the event is lost whenever another worker picks it up: register handlers unconditionally at startup.
 
 ## Caller context propagates along events
 
 - `EventProducer` puts `current_request_id()`, `current_user()`, and `triggered_user()` into `MessageMetadata`, and the dispatcher re-injects them via `apply_context()` before running the handler.
-- Tracing continues only if relays preserve the metadata — a handler that emits follow-up events without the metadata breaks the trace.
+- Tracing continues only if relays preserve the metadata: a handler that emits follow-up events without the metadata breaks the trace.
 
 ## The cache compensates for lossy broadcast
 
 - Broadcast is fire-and-forget, so two domains (bgtask, session scheduler) also store the latest payload under a `cache_id` with a 5-minute TTL.
 - SSE subscribers first replay the last cached event (closing the "subscribe after it happened" race) and use a polling safety net that re-queries the cache after every 30 seconds of silence.
-- The cache keeps only the latest event per id — a reconnecting client gets a snapshot, not the intermediate events it missed.
+- The cache keeps only the latest event per id: a reconnecting client gets a snapshot, not the intermediate events it missed.
