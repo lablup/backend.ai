@@ -117,8 +117,9 @@ def prepare_container(
 ) -> PrepareContainer:
     """Runs a restart of the backend's `prepare_container` on a real scratch directory."""
 
-    async def run_in_executor_sync(_executor: Any, fn: Any, *args: Any) -> Any:
-        return fn(*args)
+    class _SyncExecutorLoop:
+        async def run_in_executor(self, _executor: Any, fn: Any, *args: Any) -> Any:
+            return fn(*args)
 
     backend: str = request.param
     context_class: Any = (
@@ -127,8 +128,8 @@ def prepare_container(
     kernel_class = "DockerKernel" if backend == "docker" else "KubernetesKernel"
     mocker.patch(f"ai.backend.agent.{backend}.agent.{kernel_class}")
     mocker.patch(
-        f"ai.backend.agent.{backend}.agent.run_in_executor_with_context",
-        side_effect=run_in_executor_sync,
+        f"ai.backend.agent.{backend}.agent.current_loop",
+        return_value=_SyncExecutorLoop(),
     )
     config_dir = scratch_dir / "config"
     (config_dir / "environ.txt").write_text("")

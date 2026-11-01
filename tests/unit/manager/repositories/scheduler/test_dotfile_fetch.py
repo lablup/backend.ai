@@ -1,15 +1,15 @@
-"""User, project and domain dotfiles share one bundle for all creation paths."""
+"""Keypair, project and domain dotfiles share one bundle for all creation paths."""
 
 from __future__ import annotations
 
 import uuid
 
+import msgpack
 import pytest
 import sqlalchemy as sa
 
 from ai.backend.common.data.entity.domain import DomainName
 from ai.backend.common.data.entity.project import ProjectID
-from ai.backend.common.data.entity.user import UserEntityType
 from ai.backend.common.types import AccessKey, SecretKey
 from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry
 from ai.backend.manager.data.session.draft import (
@@ -19,11 +19,9 @@ from ai.backend.manager.data.session.draft import (
     SessionSpecDraft,
 )
 from ai.backend.manager.models.domain.row import DomainRow
-from ai.backend.manager.models.dotfile.row import DotfileRow
 from ai.backend.manager.models.keypair.row import KeyPairRow
 from ai.backend.manager.models.project.row import ProjectRow
 from ai.backend.manager.models.utils import ExtendedAsyncSAEngine
-from ai.backend.manager.models.virtual_entity.virtual_entity import VirtualEntityRow
 from ai.backend.manager.repositories.ops.v2.reconciler.provider import ReconcileOpsProvider
 from ai.backend.manager.repositories.scheduler.db_source.db_source import ScheduleDBSource
 from ai.backend.manager.secret.types import SecretValue
@@ -45,31 +43,6 @@ async def dotfile_scope(
     test_access_key: AccessKey,
 ) -> UserScope:
     async with db_with_cleanup.begin_session() as session:
-        await session.execute(
-            sa.insert(VirtualEntityRow).values(
-                entity_type=UserEntityType(), entity_id=test_user_uuid
-            )
-        )
-        await session.execute(
-            sa.insert(DotfileRow).values(
-                entity_type=UserEntityType(),
-                entity_id=test_user_uuid,
-                path=_USER.path,
-                perm=_USER.perm,
-                data=_USER.data,
-                is_default=True,
-            )
-        )
-        await session.execute(
-            sa.insert(DotfileRow).values(
-                entity_type=UserEntityType(),
-                entity_id=test_user_uuid,
-                path=".ignored",
-                perm="600",
-                data="non-default",
-                is_default=False,
-            )
-        )
         await session.execute(
             sa.update(ProjectRow)
             .where(ProjectRow.id == test_group_id)
@@ -93,6 +66,9 @@ async def dotfile_scope(
                 is_default=True,
                 ssh_public_key="public",
                 ssh_private_key="private",
+                dotfiles=msgpack.packb([
+                    {"path": _USER.path, "perm": _USER.perm, "data": _USER.data}
+                ]),
             )
         )
     return UserScope(
@@ -125,7 +101,6 @@ async def second_access_key(
 
 
 class TestFetchDotfiles:
-    @pytest.mark.parametrize("has_default", [True, False])
     @pytest.mark.parametrize("key_kind", ["default", "non_default", "none"])
     async def test_enqueue_dotfiles_for_selected_key(
         self,
@@ -134,11 +109,7 @@ class TestFetchDotfiles:
         test_access_key: AccessKey,
         second_access_key: AccessKey,
         key_kind: str,
-        has_default: bool,
     ) -> None:
-        if not has_default:
-            async with db_with_cleanup.begin() as conn:
-                await conn.execute(sa.update(DotfileRow).values(is_default=False))
         keys = {"default": test_access_key, "non_default": second_access_key, "none": None}
         draft = SessionSpecDraft(
             resource_spec=SessionResourceSpecDraft(
@@ -154,9 +125,11 @@ class TestFetchDotfiles:
         source = ScheduleDBSource(db_with_cleanup, ReconcileOpsProvider(db_with_cleanup))
         async with db_with_cleanup.begin_readonly_session() as session:
             result = await source._fetch_user_enqueue_fetch(session, draft)
-        expected_dotfiles = (
-            () if key_kind == "none" else (_DOMAIN, _PROJECT, _USER if has_default else _STALE)
-        )
+        expected_dotfiles = {
+            "default": (_DOMAIN, _PROJECT, _USER),
+            "non_default": (_DOMAIN, _PROJECT, _STALE),
+            "none": (),
+        }[key_kind]
         assert result.dotfiles.dotfiles == expected_dotfiles
         if key_kind == "default":
             assert result.dotfiles.ssh_keypair is not None
@@ -198,13 +171,13 @@ class TestFetchDotfiles:
         stored = DotfileEntry(path=path, perm="644", data="stored")
         async with db_with_cleanup.begin_session() as session:
             await session.execute(
-                sa.insert(DotfileRow).values(
-                    entity_type=UserEntityType(),
-                    entity_id=dotfile_scope.user_uuid,
-                    path=path,
-                    perm=stored.perm,
-                    data=stored.data,
-                    is_default=True,
+                sa.update(KeyPairRow)
+                .where(KeyPairRow.access_key == test_access_key)
+                .values(
+                    dotfiles=msgpack.packb([
+                        {"path": _USER.path, "perm": _USER.perm, "data": _USER.data},
+                        {"path": stored.path, "perm": stored.perm, "data": stored.data},
+                    ])
                 )
             )
             await session.execute(
