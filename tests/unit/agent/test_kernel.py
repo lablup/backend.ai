@@ -258,6 +258,7 @@ class TestStatusReplyExtensionTypes:
 
     async def test_ping_reports_a_rejected_status_as_no_reply(self) -> None:
         runner = _runner_that_is_never_answered()
+        runner.kernel_id = cast(Any, "k")
         await runner.status_queue.put(msgpack.packb({"started_at": Decimal("1.5")}))
         assert await runner.ping() is None
 
