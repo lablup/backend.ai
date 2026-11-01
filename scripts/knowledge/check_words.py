@@ -284,9 +284,9 @@ def main() -> int:
     reviews: list[str] = []
     for path, numbers in sorted(targets.items()):
         if not _is_skipped(path):
-            found, review = check_file(args.root, path, numbers, english, korean)
-            problems += found
-            reviews += review
+            file_problems, file_reviews = check_file(args.root, path, numbers, english, korean)
+            problems += file_problems
+            reviews += file_reviews
     for review in reviews:
         print(f"review: {review}")
     for problem in problems:
