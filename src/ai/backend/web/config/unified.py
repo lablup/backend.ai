@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import os
+import re
 from pathlib import Path
 from typing import Annotated
 
@@ -24,6 +25,7 @@ from ai.backend.common.configs import (
 from ai.backend.common.configs.jwt import SharedJWTConfig
 from ai.backend.common.configs.redis import RedisConfig
 from ai.backend.common.meta import (
+    NEXT_RELEASE_VERSION,
     BackendAIConfigMeta,
     CompositeType,
     ConfigExample,
@@ -892,6 +894,11 @@ class CSPConfig(BaseConfigSchema):
     ]
 
 
+_CORS_ORIGIN_PATTERN = re.compile(
+    r"[a-z][a-z0-9+.-]*://([a-z0-9.-]+|\[[0-9a-f:.]+\])(:[0-9]{1,5})?"
+)
+
+
 class SecurityConfig(BaseConfigSchema):
     """Security configuration for the web server.
 
@@ -949,6 +956,26 @@ class SecurityConfig(BaseConfigSchema):
             added_version="25.12.0",
         ),
     ]
+    cors_allowed_origins: Annotated[
+        list[str],
+        Field(
+            default_factory=list,
+            validation_alias=AliasChoices("cors_allowed_origins", "cors-allowed-origins"),
+            serialization_alias="cors-allowed-origins",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "Origins that receive CORS response headers, with credentials allowed. Each value "
+                "is the exact Origin header a browser sends: lowercase scheme://host[:port], "
+                'without a default port or a trailing slash. Wildcards and "null" are rejected. '
+                "When empty, no origin receives CORS response headers."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(
+                local='["http://localhost:9081"]', prod='["https://console.example.com"]'
+            ),
+        ),
+    ]
     csp: Annotated[
         CSPConfig | None,
         Field(default=None),
@@ -967,6 +994,14 @@ class SecurityConfig(BaseConfigSchema):
             composite=CompositeType.FIELD,
         ),
     ]
+
+    @field_validator("cors_allowed_origins")
+    @classmethod
+    def validate_cors_allowed_origins(cls, origins: list[str]) -> list[str]:
+        for origin in origins:
+            if _CORS_ORIGIN_PATTERN.fullmatch(origin) is None:
+                raise ValueError(f"Invalid CORS origin: {origin!r}")
+        return origins
 
 
 class ResourcesConfig(BaseConfigSchema):

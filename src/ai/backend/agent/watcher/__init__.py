@@ -6,7 +6,7 @@ import signal
 import ssl
 import subprocess
 import sys
-from collections.abc import AsyncGenerator, Awaitable, Callable, Sequence
+from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping, Sequence
 from http import HTTPStatus
 from pathlib import Path
 from pprint import pformat, pprint
@@ -39,6 +39,8 @@ __version__ = (Path(__file__).parent.parent / "VERSION").read_text().strip()
 log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 shutdown_enabled = False
+
+_SECRET_KEY_WORDS = ("password", "passwd", "secret", "token")
 
 
 @web.middleware
@@ -340,7 +342,7 @@ async def watcher_server(
                 ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
                 ssl_ctx.load_cert_chain(
                     str(app["config"]["watcher"]["ssl-cert"]),
-                    str(app["config"]["watcher"]["ssl-privkey"]),
+                    str(app["config"]["watcher"]["ssl-key"]),
                 )
             runner = web.AppRunner(app)
             await runner.setup()
@@ -363,6 +365,19 @@ async def watcher_server(
                     log.warning("shutting down the agent node!")
                     await asyncio.to_thread(subprocess.run, ["shutdown", "-h", "now"])
                 await runner.cleanup()
+
+
+def _mask_secrets(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            k: "***"
+            if any(word in str(k).lower() for word in _SECRET_KEY_WORDS)
+            else _mask_secrets(v)
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [_mask_secrets(item) for item in value]
+    return value
 
 
 @click.command()
@@ -436,7 +451,7 @@ def main(
         cfg = config.check(raw_cfg, watcher_config_iv)
         if "debug" in cfg and cfg["debug"]["enabled"]:
             print("== Watcher configuration ==")
-            pprint(cfg)
+            pprint(_mask_secrets(cfg))
         cfg["_src"] = cfg_src_path
         cfg["logging"] = logging_config
     except config.ConfigurationError as e:
