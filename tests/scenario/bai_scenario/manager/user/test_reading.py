@@ -436,7 +436,7 @@ class ABatchLoadAnswersEachElementInOrder(
 
     @override
     def summary(self) -> str:
-        return "a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order"
+        return "a-batch-load-answers-a-node-or-a-rejection-for-each-id-in-order"
 
     @override
     def describe(self) -> str:

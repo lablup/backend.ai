@@ -122,7 +122,7 @@ class AGrantedReaderIsAnsweredPerSlot(
 ):
     @override
     def summary(self) -> str:
-        return "a-granted-reader-gets-a-node-a-refusal-and-a-gap-in-order"
+        return "a-granted-reader-gets-a-node-a-rejection-and-a-gap-in-order"
 
     @override
     def describe(self) -> str:

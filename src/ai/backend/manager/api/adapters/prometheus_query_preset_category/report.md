@@ -17,7 +17,7 @@ Scenario: incomplete 1 / 6
 | scenario | verdict |
 |---|---|
 | [카테고리가 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환된다](#loading-loading-an-empty-id-list-answers-an-empty-list) | answered |
-| [카테고리 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 거부로 반환되고 순서가 요청한 순서와 같다](#loading-loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-refusal) | rejected |
+| [카테고리 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 거부로 반환되고 순서가 요청한 순서와 같다](#loading-loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-rejection) | rejected |
 
 **create**
 
@@ -94,9 +94,9 @@ Then
 - 빈 응답이 반환된다
   - answer = []
 
-<a id="loading-loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-refusal"></a>
+<a id="loading-loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-rejection"></a>
 
-#### [loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-refusal](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_loading.py): pass
+#### [loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-rejection](/tests/scenario/bai_scenario/manager/prometheus_query_preset_category/test_loading.py): pass
 
 카테고리 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 거부로 반환되고 순서가 요청한 순서와 같다
 

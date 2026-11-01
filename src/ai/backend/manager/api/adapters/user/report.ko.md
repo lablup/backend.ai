@@ -104,7 +104,7 @@
 |---|---|
 | [권한 없는 사용자가 빈 id 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다](#reading-a-batch-load-of-no-ids-answers-an-empty-list) | 성공 |
 | [슈퍼관리자가 있는 id와 없는 id를 함께 요청하면, 권한 문을 지나 없는 원소 자리에 빈 값이 온다](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | 성공 |
-| [한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 id를 한 번에 요청하면, 입력 순서대로 원소별 결과가 온다](#reading-a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order) | 거부 |
+| [한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 id를 한 번에 요청하면, 입력 순서대로 원소별 결과가 온다](#reading-a-batch-load-answers-a-node-or-a-rejection-for-each-id-in-order) | 거부 |
 
 **UserAdapter.batch_lookup_by_emails**
 
@@ -974,9 +974,9 @@ Then
   - [0].timestamps.modified_at: 이 실행이 쓴 시각
   - [1] = None
 
-<a id="reading-a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order"></a>
+<a id="reading-a-batch-load-answers-a-node-or-a-rejection-for-each-id-in-order"></a>
 
-#### [a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order](/tests/scenario/bai_scenario/manager/user/test_reading.py): pass
+#### [a-batch-load-answers-a-node-or-a-rejection-for-each-id-in-order](/tests/scenario/bai_scenario/manager/user/test_reading.py): pass
 
 한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 id를 한 번에 요청하면, 입력 순서대로 원소별 결과가 온다
 

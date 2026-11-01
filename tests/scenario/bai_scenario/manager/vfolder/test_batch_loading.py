@@ -277,7 +277,7 @@ class AUserGrantedNothingGetsARefusalForTheirOwnFolder(
 ):
     @override
     def summary(self) -> str:
-        return "a-user-granted-nothing-gets-a-refusal-in-place-of-their-own-folder"
+        return "a-user-granted-nothing-gets-a-rejection-in-place-of-their-own-folder"
 
     @override
     def describe(self) -> str:
@@ -307,7 +307,7 @@ class ABatchLoadAnswersEachElementInOrder(
 
     @override
     def summary(self) -> str:
-        return "a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order"
+        return "a-batch-load-answers-a-node-or-a-rejection-for-each-id-in-order"
 
     @override
     def describe(self) -> str:
@@ -365,7 +365,7 @@ class AnUnansweredOfferGetsARefusalForTheFolder(
 ):
     @override
     def summary(self) -> str:
-        return "an-unanswered-offer-gets-a-refusal-in-place-of-someone-elses-folder"
+        return "an-unanswered-offer-gets-a-rejection-in-place-of-someone-elses-folder"
 
     @override
     def describe(self) -> str:

@@ -32,7 +32,7 @@
 |---|---|
 | [빈 id 목록으로 조회하면, 권한 검사도 거치지 않고 빈 응답이 반환된다](#batch_loading-reading-an-empty-list-answers-empty-without-passing-the-gate) | 성공 |
 | [슈퍼관리자가 있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다](#batch_loading-the-superadmin-reading-present-and-absent-ids-is-answered-in-order-with-a-gap) | 성공 |
-| [한쪽 프로젝트에만 읽기 권한을 받은 사용자가 읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id를 한 번에 조회하면, 요청한 순서대로 기록 전체, 권한 부족, 빈 항목이 반환된다](#batch_loading-a-granted-reader-gets-a-node-a-refusal-and-a-gap-in-order) | 거부 |
+| [한쪽 프로젝트에만 읽기 권한을 받은 사용자가 읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id를 한 번에 조회하면, 요청한 순서대로 기록 전체, 권한 부족, 빈 항목이 반환된다](#batch_loading-a-granted-reader-gets-a-node-a-rejection-and-a-gap-in-order) | 거부 |
 | [기록이 남긴 범위에만 읽기 권한을 받은 사용자가 그 기록과 다른 프로젝트의 기록을 조회하면, 범위로 닿은 기록은 반환되고 다른 기록은 권한 부족으로 응답한다](#batch_loading-a-record-is-read-through-a-scope-it-recorded) | 거부 |
 | [기록을 실행한 사용자에만 읽기 권한을 받은 사용자가 그 기록과 다른 프로젝트의 기록을 조회하면, 실행한 사용자로 닿은 기록은 반환되고 다른 기록은 권한 부족으로 응답한다](#batch_loading-a-record-is-read-through-the-user-who-triggered-it) | 거부 |
 | [읽기 권한이 없는 사용자가 자기에 대한 기록 둘을 id로 조회하면, 항목마다 권한 부족으로 응답한다](#batch_loading-a-user-granted-nothing-is-refused-in-every-slot-even-for-records-about-themselves) | 거부 |
@@ -583,9 +583,9 @@ Then
   - [2].client_ip = None
   - [2].triggered_by = None
 
-<a id="batch_loading-a-granted-reader-gets-a-node-a-refusal-and-a-gap-in-order"></a>
+<a id="batch_loading-a-granted-reader-gets-a-node-a-rejection-and-a-gap-in-order"></a>
 
-#### [a-granted-reader-gets-a-node-a-refusal-and-a-gap-in-order](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py): pass
+#### [a-granted-reader-gets-a-node-a-rejection-and-a-gap-in-order](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py): pass
 
 한쪽 프로젝트에만 읽기 권한을 받은 사용자가 읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id를 한 번에 조회하면, 요청한 순서대로 기록 전체, 권한 부족, 빈 항목이 반환된다
 
