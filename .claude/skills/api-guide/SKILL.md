@@ -32,7 +32,7 @@ APIs implement 6 standard operations:
 
 ## Scope prefix rules
 
-The prefix applies to the API layer. The service and repository layers do not use it.
+The prefix applies to the API layer. The service and repository layers do not use it. Operation names follow `{scope}_operation` for a scoped operation and `admin_operation` for an admin operation.
 
 ### Scoped operations
 

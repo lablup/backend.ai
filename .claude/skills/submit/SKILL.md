@@ -137,7 +137,7 @@ Type checking (`pants check`) and tests (`pants test`) are enforced by CI only. 
 
    ```bash
    git add changes/{pr_number}.{changelog_type}.md
-   git commit -m "changelog: add changelog fragment for PR #{pr_number}"
+   git commit -m "changelog: add news fragment for PR #{pr_number}"
    git push
    ```
 
@@ -150,7 +150,7 @@ Submission Complete
 
   PR:        #{pr_number} - {title}
   URL:       https://github.com/lablup/backend.ai/pull/{pr_number}
-  Issue:     BA-XXXX
+  JIRA:      BA-XXXX
   Branch:    {branch_name}
   Changelog: changes/{pr_number}.{changelog_type}.md
 
@@ -194,14 +194,14 @@ Possible causes:
 Check: gh auth status
 ```
 
-### Branch has no issue key
+### Branch has no JIRA key
 
 ```
-No issue key found.
+No JIRA issue key found.
 
 Options:
-1. Provide the issue key: /submit BA-1234
-2. Continue without an issue key (not recommended)
+1. Provide JIRA key: /submit BA-1234
+2. Continue without JIRA key (not recommended)
 ```
 
 ## Examples

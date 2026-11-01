@@ -100,7 +100,7 @@ class FooDBSource:
 ```
 
 - `read_ops()` and `write_ops()` both open a READ COMMITTED session. The raw engine and session are never exposed.
-- ops methods accept only spec types, never raw `Select`, `Insert`, `Update` or `Delete`.
+- ops methods accept only spec types, never raw `Select/Insert/Update/Delete`.
 
 ### Reads with scope (RBAC)
 
