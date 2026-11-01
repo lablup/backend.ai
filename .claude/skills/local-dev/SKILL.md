@@ -8,11 +8,11 @@ tags:
   - tmux
 ---
 
-# Local development: server management
+# Local Development: Server Management
 
-Tools for managing Backend.AI services locally through tmux sessions.
+Tools for managing Backend.AI services locally via tmux sessions.
 
-## ./dev
+## ./dev: Service Management
 
 ```bash
 ./dev status                         # Show all service statuses
@@ -24,29 +24,32 @@ Tools for managing Backend.AI services locally through tmux sessions.
 
 **Services:** `mgr`, `agent`, `storage`, `web`, `proxy-coordinator`, `proxy-worker`
 
-View runtime logs and metrics through the Grafana MCP. See `/observability`. Query Loki by `service_name` (for example `{service_name="manager"}`) after a restart instead of reading console output.
+**Logs and metrics:** view runtime logs and metrics through the Grafana MCP. See
+`/observability`. Query Loki by `service_name` (for example `{service_name="manager"}`) after a
+restart rather than reading console output.
 
-## Running components directly
+## Running components directly (debugging)
 
-`./dev` is the normal way to run services. To run a component in the foreground, to read startup errors live or check health, use its raw CLI. These are server-execution commands (`./backend.ai <component> ...`), distinct from the `./bai` v2 client. The rule in `/bai-cli` that distinguishes the v1 CLI and `./bai` does not apply here.
+`./dev` is the normal way to run services (tmux-managed). To run a component in the foreground, to read startup errors live or check health, use its raw CLI. These are **server-execution** commands (`./backend.ai <component> ...`), distinct from the `./bai` v2 client. The rule in `/bai-cli` that distinguishes the v1 CLI and `./bai` does not apply here.
 
 | Component | CLI prefix | Commands | Pre-flight (depends on) |
-|---|---|---|---|
-| Manager | `./backend.ai mgr` | `health`, `start-server`, `dbschema show` | PostgreSQL, Valkey, etcd, migrations up to date (`/db-migrate`), config |
+|-----------|-----------|----------|--------------------------|
+| Manager | `./backend.ai mgr` | `health`, `start-server`, `dbschema show` | PostgreSQL, Valkey, etcd, migrations up-to-date (`/db-migrate`), config |
 | Agent | `./backend.ai ag` | `health`, `start-server`, `status` | Manager reachable, Docker daemon, GPU drivers (if GPU), config |
-| Storage proxy | `./backend.ai storage` | `health`, `start-server`, `volume list` | Manager reachable, storage backend, config |
-| Webserver | `./backend.ai web` | `health`, `start-server` | Manager reachable, built assets, config |
-| App proxy coordinator | `./backend.ai app-proxy-coordinator` | `health`, `start-server` | PostgreSQL, Valkey, migrations (`/db-migrate` (appproxy)), config |
-| App proxy worker | `./backend.ai app-proxy-worker` | `health`, `start-server` | Coordinator reachable, Valkey, config |
+| Storage Proxy | `./backend.ai storage` | `health`, `start-server`, `volume list` | Manager reachable, storage backend, config |
+| Web Server | `./backend.ai web` | `health`, `start-server` | Manager reachable, built assets, config |
+| App Proxy Coordinator | `./backend.ai app-proxy-coordinator` | `health`, `start-server` | PostgreSQL, Valkey, migrations (`/db-migrate` (appproxy)), config |
+| App Proxy Worker | `./backend.ai app-proxy-worker` | `health`, `start-server` | Coordinator reachable, Valkey, config |
 
-`start-server` blocks the terminal. Before starting, confirm the infrastructure (DB, Valkey, etcd) is up via `/halfstack` and migrations via `/db-migrate`. When a component fails, check the infrastructure with `/halfstack`, migrations with `/db-migrate`, and runtime logs with `/observability`.
+`start-server` blocks the terminal. Before starting, confirm infra (DB, Valkey, etcd) is up via `/halfstack` and migrations via `/db-migrate`. When a component fails, check infra with `/halfstack`, migrations with `/db-migrate`, and runtime logs with `/observability`.
 
-## Debugging startup crashes
+## Debugging Startup Crashes
 
-`./dev` runs services in tmux. When a service crashes on startup, the tmux window closes and the logs are lost. Run the service directly to see the actual error:
+`./dev` runs services in tmux. If a service crashes on startup, the tmux window
+closes and logs are lost. To see the actual error, run the service directly:
 
 ```bash
-# Run manager directly to see startup errors (for example import errors, schema issues)
+# Run manager directly to see startup errors (e.g., import errors, schema issues)
 PYTHONPATH=src python -c "from ai.backend.manager.api.gql.schema import schema; print('OK')"
 
 # Or test a specific import chain
@@ -55,7 +58,7 @@ PYTHONPATH=src python -c "from ai.backend.manager.api.adapters.registry import A
 
 After fixing, restart with `./dev start mgr`.
 
-## After code changes
+## After Code Changes
 
 Server-side code changes (handler, adapter, DTO, model) require a server restart:
 
@@ -64,7 +67,7 @@ Server-side code changes (handler, adapter, DTO, model) require a server restart
 sleep 5                  # Wait for server initialization
 ```
 
-When DTO changes affect the GQL schema, restart the webserver too:
+If DTO changes affect GQL schema, also restart webserver:
 
 ```bash
 ./dev restart mgr
@@ -72,7 +75,8 @@ When DTO changes affect the GQL schema, restart the webserver too:
 sleep 5
 ```
 
-When GQL schema changes affect the federated supergraph (new types, fields, modules), regenerate it and recreate the Hive Gateway. See `/halfstack`:
+If GQL schema changes affect the federated supergraph (new types, fields, modules),
+regenerate and recreate the Hive Gateway. See `/halfstack` for details:
 
 ```bash
 ./scripts/generate-graphql-schema.sh
@@ -82,7 +86,7 @@ docker compose -f docker-compose.halfstack.current.yml up -d --force-recreate --
 
 ## Related documents
 
-- `/observability` - Inspect logs and metrics via the Grafana MCP after a restart
-- `/bai-cli` - Verify changes via the CLI after restarting services
+- `/observability` - Inspect logs and metrics via Grafana MCP after a restart
+- `/bai-cli` - Verify changes via CLI after restarting services
 - `/halfstack` - Docker Compose infrastructure (DB, Valkey, etcd, Hive Gateway)
 - `/db-migrate` - Check schema and migration state before starting a component

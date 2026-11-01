@@ -12,25 +12,24 @@ tags:
   - business-logic
 ---
 
-# Service layer implementation guide
+# Service Layer Implementation Guide
 
-The service layer uses Actions, Processors and service methods.
+Guide for implementing Backend.AI service layer with Actions, Processors, and Service methods.
 
-## Standard operations
+## Standard Operations
 
 Services implement 6 standard operations:
 
-1. **create** - create a new entity
-2. **get** - get a single entity
-3. **search** - query with filters
-4. **update** - update an entity
-5. **delete** - delete an entity
-6. **purge** - permanently remove an entity
+1. **create** - Create new entity
+2. **get** - Retrieve single entity
+3. **search** - Query with filters
+4. **update** - Update entity
+5. **delete** - Delete entity
+6. **purge** - Permanently remove entity
 
-`batch_*` runs atomically in one statement. `bulk_*` handles rows individually with partial failures. See `/repository-guide`.
+**Multi-target:** `batch_*` (atomic, one statement) versus `bulk_*` (per-row, partial failures). See `/repository-guide`.
 
-Method naming has no prefix:
-
+**Method naming (no prefix):**
 ```python
 await service.create_user(action: CreateUserAction)
 await service.user(action: GetUserAction)
@@ -46,15 +45,14 @@ await service.purge_user(action: PurgeUserAction)
 API Handler → Processor → Service → Repository
 ```
 
-Components:
+**Components:**
+- **Actions**: Immutable dataclasses (operations)
+- **ActionResults**: Immutable dataclasses (results)
+- **Processors**: Orchestrate with hooks and metrics
+- **Service Methods**: Business logic
+- **Repositories**: Data access
 
-- **Actions** - immutable dataclasses that describe operations
-- **ActionResults** - immutable dataclasses that hold results
-- **Processors** - orchestration with hooks and metrics
-- **Service methods** - business logic
-- **Repositories** - data access
-
-## Directory structure
+## Directory Structure
 
 ```
 services/{domain}/
@@ -75,149 +73,190 @@ services/{domain}/
 
 ## Actions and ActionResults
 
+**Pattern:**
 - Frozen dataclasses for immutability
 - Base classes define `entity_id()` and `operation_type()`
 - Concrete actions for each operation (create, get, search, update, delete, purge)
 - Corresponding ActionResult types
 
-See `services/storage_namespace/actions/` for the full implementations and `services/storage_namespace/actions/base.py` for the base classes.
+**See complete examples:**
+- `services/storage_namespace/actions/` - Full action implementations
+- `services/storage_namespace/actions/base.py` - Base classes
 
 ## Processors
 
+**Pattern:**
 - `ActionProcessor` wraps service methods
-- It provides hooks and metrics integration
+- Provides hooks and metrics integration
 - Expose processors via properties
-- Initialize with the service protocol
+- Initialize with service protocol
 
-See `services/storage_namespace/processors.py` for the processor package and `services/processors.py` for the base processor classes.
+**See complete examples:**
+- `services/storage_namespace/processors.py` - Processor package
+- `services/processors.py` - Base processor classes
 
-## Service implementation
+## Service Implementation
 
-- Define a Protocol with all operation methods
-- Implement the service class, which accepts Actions and returns ActionResults
+**Pattern:**
+- Define Protocol with all operation methods
+- Implement service class accepting Actions, returning ActionResults
 - Follow: validate → business rules → repository call → return result
 
-Operation patterns:
+**Operation patterns:**
+- `create_{entity}`: Validate → check existence → create
+- `{entity}`: Fetch → check not found → return
+- `search_{entities}`: Build scope/filters → repository.search
+- `update_{entity}`: Validate → update → return
+- `delete_{entity}`: Mark the row as deleted while keeping it (status change)
+- `purge_{entity}`: Permanently remove the row
 
-- `create_{entity}` - validate → check existence → create
-- `{entity}` - get → check not found → return
-- `search_{entities}` - build scope and filters → `repository.search`
-- `update_{entity}` - validate → update → return
-- `delete_{entity}` - mark the row as deleted while keeping it
-- `purge_{entity}` - permanently remove the entity
+### Repository Call Pattern
 
-### Repository call pattern
+**Core principle (preferred):**
+- Service method should call a single repository method
+- Avoid combining multiple repository calls in service layer
+- If complex composition is needed, consider adding specialized repository method
 
-The service method calls a single repository method. Avoid combining multiple repository calls in the service layer. When complex composition is needed, consider adding a specialized repository method.
-
-Transaction boundary:
-
-- DB sessions are created and managed at the repository method level
+**Transaction boundary:**
+- DB sessions are created and managed at repository method level
 - Service methods do not create transactions directly
-- The repository uses `begin_session()` for writes and `begin_readonly_session()` for reads
+- Repository uses `begin_session()` (write) or `begin_readonly_session()` (read)
 - Each repository public method defines its own transaction scope
 
-Multi-repository coordination is acceptable when the business logic requires it. For example, creating a domain requires both the domain and user_group repositories. Document the reason when combining multiple repository calls.
+**Exception cases:**
+- Multi-repository coordination is acceptable when business logic requires
+- Example: Creating domain requires both domain and user_group repositories
+- Document the reason when combining multiple repository calls
 
-See `services/storage_namespace/service.py:38-81` for the single repository call pattern, `services/domain/service.py` for multi-repository coordination, and `repositories/README.md:54-61` for the service and repository integration principles.
+**See complete examples:**
+- `services/storage_namespace/service.py:38-81` - Single repository call pattern
+- `services/domain/service.py` - Multi-repository coordination (exceptional case)
+- `repositories/README.md:54-61` - Service-Repository integration principles
 
-## Implementation workflow
+## Implementation Workflow
 
-### Step 1: Define the operations enum
+### Step 1: Define Operations Enum
 
 **File:** `services/{domain}/types.py`
 
-Define a `StrEnum` with the 6 operations: CREATE, GET, SEARCH, UPDATE, DELETE, PURGE. See `services/storage_namespace/types.py`.
+Define `StrEnum` with 6 operations: CREATE, GET, SEARCH, UPDATE, DELETE, PURGE
 
-### Step 2: Create the base actions
+**See:** `services/storage_namespace/types.py`
+
+### Step 2: Create Base Actions
 
 **File:** `services/{domain}/actions/base.py`
 
-Define the base classes with `entity_id()` and `operation_type()`.
+Define base classes with `entity_id()` and `operation_type()`
 
-### Step 3: Implement the concrete actions
+### Step 3: Implement Concrete Actions
 
 **Files:** `services/{domain}/actions/{operation}.py`
 
-Create one for each operation: create, get, search, update, delete, purge.
+For each operation: create, get, search, update, delete, purge
 
-### Step 4: Define the service protocol
+### Step 4: Define Service Protocol
 
 **File:** `services/{domain}/service.py`
 
-Define the Protocol with all standard operations.
+Protocol with all standard operations
 
-### Step 5: Implement the service
+### Step 5: Implement Service
 
-In the same file, initialize the service with the repository, implement all operations, and follow: validate → business rules → repository → return result.
+**Same file**
 
-### Step 6: Create the processor package
+- Initialize with repository
+- Implement all operations
+- Follow: validate → business rules → repository → return result
+
+### Step 6: Create Processor Package
 
 **File:** `services/{domain}/processors.py`
 
-Create a processor for each operation and expose them via properties.
+- Processor for each operation
+- Expose via properties
 
-### Step 7: Write tests
+### Step 7: Write Tests
 
-See `/test-guide` for the full testing workflow. Service tests mock the repositories; they do not use a real DB.
+**See:** `/test-guide` for complete testing workflow
 
-### Step 8: Integrate with the API
+**Critical:** Service tests must mock repositories (no real DB)
 
-See `/api-guide` for REST and GraphQL integration.
+### Step 8: Integrate with API
 
-## Common patterns
+**See:** `/api-guide` for REST and GraphQL integration
 
-| Operation | Key steps | Exception handling |
-|---|---|---|
+## Common Patterns
+
+| Operation | Key Steps | Exception Handling |
+|-----------|-----------|-------------------|
 | **create** | validate → check existence → create → return | `{Entity}AlreadyExists` |
-| **get** | get → not found check → return | `{Entity}NotFound` |
-| **search** | build scope → `repository.search` → return | none |
-| **update** | validate → get → update → return | `{Entity}NotFound`, `Invalid{Entity}` |
-| **delete** | check existence → delete → return | `{Entity}NotFound` |
-| **purge** | check existence → check dependencies → purge → return | `{Entity}HasDependents` |
+| **get** | fetch → not found check → return | `{Entity}NotFound` |
+| **search** | build scope → repository.search → return | none |
+| **update** | validate → fetch → update → return | `{Entity}NotFound`, `Invalid{Entity}` |
+| **delete** | check exists → delete → return | `{Entity}NotFound` |
+| **purge** | check exists → check dependencies → purge → return | `{Entity}HasDependents` |
 
 **Complete examples:** `src/ai/backend/manager/services/storage_namespace/service.py`
 
-## Best practices
+## Best Practices
 
-### Action design
-
+### Action Design
 - Immutable: `@dataclass(frozen=True)`
-- Complete: all operation parameters
+- Complete: All operation params
 - Self-describing names
 
-### Service method design
-
+### Service Method Design
 - Single responsibility
-- Explicit exceptions that inherit from `BackendAIError`
+- Explicit exceptions (inherit BackendAIError)
 - Repository coordination only
-- Always return an ActionResult
-- Single repository call per method
-- Transaction boundary managed by the repository
+- Always return ActionResult
+- Single repository call per method (preferred pattern)
+- Transaction boundary managed by repository
 
-### Processor design
-
+### Processor Design
 - Thin orchestration
 - Use ActionProcessor for hooks
 - Property pattern
 
 ### Testing
+- Mock repositories (no real DB)
+- Test business logic
+- Check repository calls
 
-- Mock the repositories; do not use a real DB
-- Test the business logic
-- Check the repository calls
-
-See `/test-guide`.
+**See:** `/test-guide` skill
 
 ## Related documents
 
-- `/repository-guide` - Data access
-- `/api-guide` - REST and GraphQL integration
-- `/test-guide` - Scenario-first testing
-- `src/ai/backend/manager/services/README.md` - Service layer reference
+- **Repository Layer**: `/repository-guide` - Data access
+- **API Integration**: `/api-guide` - REST and GraphQL
+- **Testing**: `/test-guide` - Scenario-first testing
+- **Service README**: `src/ai/backend/manager/services/README.md`
 
 ## Examples
 
+**Complete implementations:**
 - `src/ai/backend/manager/services/storage_namespace/` - Full service
-- `src/ai/backend/manager/services/domain/` - Multi-repository coordination
+- `src/ai/backend/manager/services/domain/` - Multi-repository
 - `src/ai/backend/manager/services/auth/` - Hook integration
+
+## Summary
+
+**Standard operations:**
+- create, get, search, update, delete, purge
+- batch_update, batch_delete, batch_purge
+
+**Components:**
+- Actions/ActionResults (immutable)
+- Processors (orchestration)
+- Service methods (business logic)
+
+**Testing:** Mock repositories (no real DB)
+
+**Next steps:**
+1. Study example services
+2. Define actions and operations
+3. Implement service methods
+4. Create processors
+5. Write tests (`/test-guide`)
+6. Integrate with API (`/api-guide`)
