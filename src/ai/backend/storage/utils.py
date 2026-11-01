@@ -25,14 +25,10 @@ from .errors import (
 )
 from .volumes.types import LoggingInternalMeta
 
-<<<<<<< HEAD
-log = BraceStyleAdapter(logging.getLogger(__spec__.name))
-=======
 if TYPE_CHECKING:
     from ai.backend.common.types import VFolderID
 
-log = StructuredLogger(logging.getLogger(__spec__.name))
->>>>>>> 1dcce1905 (fix(BA-8787): require upload destinations inside the vfolder and open staging paths without following symlinks (#16225))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 # The errnos of an O_NOFOLLOW open whose path is a symlink or not a directory.
 NOFOLLOW_REFUSED_ERRNOS: Final = frozenset({errno.ELOOP, errno.ENOTDIR})

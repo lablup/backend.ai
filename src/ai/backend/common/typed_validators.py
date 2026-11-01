@@ -4,13 +4,8 @@ import os
 import pwd
 from collections.abc import Mapping, Sequence
 from datetime import tzinfo
-<<<<<<< HEAD
-from pathlib import Path
-from typing import Annotated, Any, ClassVar, Final, TypeVar
-=======
 from pathlib import Path, PurePosixPath
-from typing import Annotated, Any, ClassVar, Final, TypeVar, override
->>>>>>> 1dcce1905 (fix(BA-8787): require upload destinations inside the vfolder and open staging paths without following symlinks (#16225))
+from typing import Annotated, Any, ClassVar, Final, TypeVar
 
 import jwt
 from dateutil import tz
