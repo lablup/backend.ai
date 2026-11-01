@@ -133,22 +133,27 @@ def _commit_upload(
                     )
                     os.close(dst_dir_fd)
                     dst_dir_fd = next_fd
-                os.rename(
-                    staging_path.name,
-                    target.name,
-                    src_dir_fd=src_dir_fd,
-                    dst_dir_fd=dst_dir_fd,
-                )
+                try:
+                    os.rename(
+                        staging_path.name,
+                        target.name,
+                        src_dir_fd=src_dir_fd,
+                        dst_dir_fd=dst_dir_fd,
+                    )
+                except IsADirectoryError:
+                    os.unlink(staging_path.name, dir_fd=src_dir_fd)
+                    raise
             finally:
                 os.close(dst_dir_fd)
     except OSError as e:
-        if e.errno in NOFOLLOW_REFUSED_ERRNOS:
+        if isinstance(e, IsADirectoryError) or e.errno in NOFOLLOW_REFUSED_ERRNOS:
             raise InvalidSubpathError(vfid, PurePosixPath(dst_dir or "", relpath)) from e
         raise
-    try:
-        staging_path.parent.rmdir()
-    except OSError:
-        pass
+    finally:
+        try:
+            staging_path.parent.rmdir()
+        except OSError:
+            pass
 
 
 async def _drain_into_upload_file(
@@ -494,7 +499,14 @@ async def tus_upload_part(request: web.Request) -> web.Response:
         headers = await prepare_tus_session_headers(request, token_data, volume)
         vfpath = volume.mangle_vfpath(token_data["vfid"])
         upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
-        resolve_upload_target(token_data["vfid"], vfpath, token_data["relpath"], params["dst_dir"])
+        await run_in_executor_with_context(
+            None,
+            resolve_upload_target,
+            token_data["vfid"],
+            vfpath,
+            token_data["relpath"],
+            params["dst_dir"],
+        )
 
         # TUS protocol requires Upload-Offset validation before appending data
         upload_offset_header = request.headers.get("Upload-Offset")

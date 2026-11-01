@@ -687,6 +687,22 @@ class TestUploadDestination:
 
         assert (vfolder / "real" / "file.txt").read_bytes() == _PAYLOAD
 
+    @pytest.mark.parametrize("relpath", ["real", "link"])
+    async def test_destination_that_is_a_directory_is_refused_and_staging_removed(
+        self, vfolder: Path, staging_file: Path, relpath: str
+    ) -> None:
+        (vfolder / "real").mkdir()
+        (vfolder / "real" / "kept.txt").write_bytes(b"kept")
+        (vfolder / "link").symlink_to(vfolder / "real")
+        request, check_params_patch = _upload_request(vfolder, relpath=relpath)
+
+        with check_params_patch, pytest.raises(InvalidSubpathError):
+            await tus_upload_part(request)
+
+        assert not staging_file.exists()
+        assert (vfolder / "real" / "kept.txt").read_bytes() == b"kept"
+        assert (vfolder / "link").is_symlink()
+
     def test_directory_swapped_for_symlink_after_resolving_is_refused(
         self, vfolder: Path, staging_file: Path, outside: Path
     ) -> None:

@@ -1219,8 +1219,11 @@ async def create_upload_session(request: web.Request) -> web.Response:
             await log_manager_api_entry(log, "create_upload_session", params)
             ctx: RootContext = request.app["ctx"]
             volume = ctx.volume_pool.get_volume_by_name(StorageVolumeName(params["volume"]))
-            resolve_upload_target(
-                params["vfid"], volume.mangle_vfpath(params["vfid"]), params["relpath"]
+            await asyncio.to_thread(
+                resolve_upload_target,
+                params["vfid"],
+                volume.mangle_vfpath(params["vfid"]),
+                params["relpath"],
             )
             session_id = await volume.prepare_upload(params["vfid"])
             await ctx.valkey_tus_client.initialize_offset(TusSessionId(session_id))
