@@ -7,92 +7,97 @@ keywords: [scenario, seeder, rbac, template-database, adapter]
 generated:
   by: claude-code/opus-5
   at: 2026-09-10
+updated:
+  by: claude-code/opus-5-5
+  at: 2026-11-02
 status: draft
 ---
-# 시나리오 테스트 — 배경
+# Scenario tests: background
 
-규칙은 이 디렉터리의 `AGENTS.md`, 구성은 `README.md`에 있다.
+Rules are in `AGENTS.md` in this directory, the layout in `README.md`. Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-## 템플릿 데이터베이스에 무엇이 있는가
+## What the template database holds
 
-스키마뿐이다. 행은 하나도 없다.
+The schema and nothing else. It holds no rows.
 
-131개 테이블의 DDL이 비싸고 복제가 싸서 두는 장치다. `CREATE DATABASE ... TEMPLATE`으로
-테스트마다 복제한다. 그 외의 의미는 없고, 의미가 없어야 한다.
+The DDL of 131 tables is expensive and a copy is cheap, so the template exists. Each test copies it with
+`CREATE DATABASE ... TEMPLATE`. It has no other meaning and must not gain one.
 
-행이 하나라도 들어 있으면 "무엇이 배경이고 무엇이 상황인가"라는 경계 문제가 생긴다. 그
-경계는 언제나 흐려지고, 시나리오는 자기가 기대지 않는다고 생각한 것에 기대게 된다.
+A single row in it raises the question of what is background and what is the situation. That line always
+blurs, and scenarios end up depending on what they believe they do not depend on.
 
-## 왜 공유 배경을 없앴는가
+## Why the shared background was removed
 
-처음에는 사용자 넷, 도메인 하나, 프로젝트 하나, 정책 셋을 템플릿에 심었다. 넷이 문제였다.
+The template first held four users, one domain, one project and three policies. That caused four problems.
 
-- 페르소나 이름 하나가 서로 무관한 넷을 동시에 뜻했다. 어느 사용자 행인가, 그 행의 레거시
-  역할 컬럼이 무엇인가, 어느 프로젝트 명부에 있는가, 어떤 RBAC 권한을 받았는가. 표에는
-  마지막만 보였다.
-- 시나리오가 자기 전제를 바꿀 수 없었다. 다른 역할이 필요하면 배경을 고쳐야 했고, 그러면
-  다른 시나리오가 따라 움직였다.
-- 아무 시나리오도 쓰지 않는 행들이 모든 시나리오의 의존에 들어갔다.
-- 조용히 대주는 것이 있어서, 무엇이 있어야 그 요청이 되는지 표가 말하지 않았다.
+- One persona name meant four unrelated things at once: which user row, the legacy role column of that row,
+  which project roster it is on, and which RBAC permissions it received. The table showed only the last.
+- A scenario could not change its own premise. Needing a different role meant changing the background, and
+  other scenarios moved with it.
+- Rows no scenario used became dependencies of every scenario.
+- The background supplied things silently, so the table did not say what a request needs.
 
-마지막이 가장 컸다. 폴더 하나를 만드는 데 필요한 것이 넷이나 더 있었는데, 배경이 대주는
-동안에는 그것을 아무도 몰랐다.
+The last was the largest. Creating one vfolder needed four more things, and nobody knew while the background
+supplied them.
 
-## 왜 어댑터가 아니라 write spec으로 심는가
+## Why rows are seeded through write specs rather than adapters
 
-상황 세팅은 ops 레이어의 일이고, 어댑터는 검사 대상이지 세팅 도구가 아니다.
+Setting up a situation is work for the ops layer. The adapter is the test target, not a setup tool.
 
-"이전 어댑터 호출들"로 상황을 정의하는 안도 냈다가 기각했다. 세션 시나리오가 폴더를 필요로
-하면 vfolder 어댑터까지 조립하게 되어, 한 시나리오의 의존이 검사 대상 밖으로 번진다.
+Defining a situation as earlier adapter calls was proposed and rejected. A session scenario that needs a
+vfolder would have to assemble the vfolder adapter too, and the dependencies of one scenario would spread
+outside the test target.
 
-대신 시나리오는 `TestSeeder`의 메서드(`creating`, `adding` 등)로만 행을 만든다. 이 메서드들은
-모두 src의 write spec(`Creator`, `Upserter` 등)을 인자로 받는다. 그래서 테스트 코드가 SQL이나
-ORM으로 행을 직접 만들 수 없고, 행은 매니저가 실제로 쓰는 경로로만 만들어진다. 메서드 목록은
-`AGENTS.md`에 있다.
+Scenarios create rows only through `TestSeeder` methods (`creating`, `adding` and others). Every one of these
+methods takes a write spec from src (`Creator`, `Upserter` and others). Test code therefore cannot create rows
+directly with SQL or the ORM, and rows are created only on the paths the manager actually writes through. The
+method list is in `AGENTS.md`.
 
-## 사용자 생성은 왜 다른가
+## Why creating a user is different
 
-사용자 하나를 만드는 것은 행 하나가 아니다. 매니저는 사용자 행, 그 행의 그래프 위치, 프리셋이
-부르는 역할, 인증에 쓰는 키페어, 그 사람만 속하는 개인 프로젝트를 함께 쓴다.
+Creating a user is not one row. The manager writes the user row, the graph position of that row, the role the
+preset names, the keypair used for authentication, and the personal project together.
 
-조각으로 흉내내면 뒤에서 조용히 어긋난다. 개인 폴더는 소유자로 개인 프로젝트를 찾는데, 그
-프로젝트가 없으면 폴더가 매달릴 자리가 없다. 그래서 그 연산을 통째로 쓴다.
+Imitating this in pieces diverges silently later. A personal vfolder finds the personal project through its
+owner, and without that project the vfolder has nowhere to attach. So tests use the whole operation.
 
-## 왜 프리셋을 쓰지 않는가
+## Why role presets are not used
 
-이 트리가 확인할 것은 "권한이 있으면 통과하고 없으면 거부되는가"이고, "출하되는 프리셋이
-관리자에게 무엇을 주는가"는 다른 질문이다. 섞으면 후자가 바뀔 때 전자의 테스트가 깨진다.
+This tree checks whether a request passes with the permission and is rejected without it. What a shipped role
+preset gives an administrator is a different question. Mixing them makes tests of the former break when the
+latter changes.
 
-그리고 출하되는 프리셋 넷은 전부 `deleted: true`라 그대로는 동작하지 않는다. 그것을 되살려
-쓰는 것은 제품 상태를 우회하는 것이다.
+The four shipped role presets are all `deleted: true`, so they do not work as they are. Reviving them bypasses
+the product state.
 
-## 권한을 걸 수 없는 엔티티가 있다
+## Some entities cannot carry permissions
 
-도메인이 그렇다. 어느 스코프에도 속하지 않게 만들어지고 자기 아래 하위 엔티티를 갖지 않는다.
-도메인에 매달리는 것은 프로젝트, 사용자, 그들의 폴더다.
+The domain is one. It is created outside every scope and has no child entities under it. Projects, users and
+their vfolders attach to a domain.
 
-그래서 "도메인 읽기 권한을 받은 사용자" 같은 시나리오는 성립하지 않는다. 도메인을 읽는 문은
-전역 superadmin 역할이고 권한 그래프가 아니다.
+A scenario such as a user granted domain read permission therefore cannot exist. Reading a domain depends on
+the global superadmin role, not on the permission graph.
 
-새 컴포넌트의 시나리오를 쓰기 전에 그 엔티티의 creator spec 갈래를 먼저 본다. 어느 스코프에도
-속하지 않는 갈래면 권한 시나리오를 쓸 수 없다.
+Before writing scenarios for a new component, look at the branches of its entity creator spec. A branch outside
+every scope cannot have permission scenarios.
 
-## 격리는 두 겹이다
+## Isolation has two layers
 
-| 층 | 범위 |
+| Layer | Range |
 |---|---|
-| postgres 컨테이너 | 테스트 프로세스마다 하나. 풀이 슬롯별로 띄운다 |
-| 템플릿 데이터베이스 | 컨테이너마다 하나 |
-| 작업 데이터베이스 | 테스트마다 하나. 끝나면 지운다 |
+| postgres container | One per test process. The pool starts one per slot |
+| template database | One per container |
+| working database | One per test. Deleted at the end |
 
-행 이름을 난수가 아니라 시나리오별 카운터로 짓는 근거가 이것이다. 유일해야 하는 범위가
-테스트 하나 안이므로 카운터로 충분하고, 결정적이라 실패 메시지가 실행마다 같다.
+This is the reason rows are named with a per-scenario counter instead of random values. Names must be unique
+within one test, so a counter is enough, and being deterministic it keeps failure messages the same across runs.
 
-## 시계가 둘이다
+## There are two clocks
 
-타임스탬프는 데이터베이스 서버가 찍고 비교는 테스트 프로세스가 한다. 쓰기 직후에 검사하므로
-두 시계가 조금만 어긋나도 "아직 오지 않은 시각"이 된다. 그래서 시간 조건에는 허용 오차가 있다.
+The database server writes timestamps and the test process compares them. The check runs right after the write,
+so a small skew between the clocks produces a time that has not arrived yet. Time conditions therefore allow a
+tolerance.
 
-조건의 아래끝은 임의로 고른 시간 폭이 아니라 시나리오를 만들기 시작한 시각이다. `TestSeeder`가
-그 시각을 들고 있고 `since_started`가 그것으로 조건을 만든다. "몇 분 안에 찍혔나"는 값이
-맞는지를 말해주지 않는다.
+The lower bound of the condition is the time the scenario started being built, not an arbitrary time window.
+`TestSeeder` holds that time and `since_started` builds the condition from it. Whether a timestamp falls within
+a few minutes says nothing about whether the value is correct.

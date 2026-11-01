@@ -1,9 +1,9 @@
-# 시나리오 테스트
+# Scenario tests
 
-어댑터 하나를 실제 데이터베이스와 실제 Valkey와 함께 돌려, 요청 하나가 무엇을 답하는지 확인한다.
-규칙은 `AGENTS.md`, 배경은 `KNOWLEDGE.md`에 있다.
+Runs one adapter against a real database and a real Valkey to verify what a single request returns.
+Rules are in `AGENTS.md`, background in `KNOWLEDGE.md`.
 
-## 한 행이 어떻게 도는가
+## How a row runs
 
 ```python
 class ADomainAndSomeone(Given[SeedingSession, ADomainAndACaller]):
@@ -27,86 +27,87 @@ class TheDomainNode(Then[ADomainAndACaller, DomainNode]):
         node = answered.response
         return [
             Same("name", node.basic_info.name, laid.domain.name),
-            Skipped("id", "데이터베이스가 만든다"),
+            Skipped("id", "the database generates it"),
             Held("created_at", node.lifecycle.created_at, WrittenByThisRun(self.started)),
         ]
 ```
 
-1. 테스트마다 템플릿 데이터베이스를 복제한다. 템플릿에는 스키마만 있고 행은 없다.
-2. `given`이 자기가 쓸 행을 한 트랜잭션에 쓰고, 쓴 값을 답한다. 그 쓰기는 `when`이 시작하기
-   전에 닫힌다. 어댑터가 자기 연결로 읽기 때문이다.
-3. `when`이 그 값과 어댑터만 받아 호출한다.
-4. `then`이 심은 것과 답 또는 예외를 함께 받아, 자리마다 무엇을 보았는지 답한다.
+1. Each test copies the template database. The template holds the schema and no rows.
+2. `given` writes its rows in one transaction and returns the written values. That write closes before `when`
+   starts, because the adapter reads over its own connection.
+3. `when` calls with only that value and the adapter.
+4. `then` takes what was seeded and the answer or exception, and returns what it saw for each place.
 
-## 무엇이 어디에 있는가
+## Where things are
 
-| 자리 | 무엇 |
+| Path | Contents |
 |---|---|
-| `bai_scenario/manager/<컴포넌트>/` | 시나리오 표와, 어댑터를 조립하는 conftest |
-| `bai_scenario/seeds/` | 행 하나를 뜻하는 seed 클래스와 `TestSeeder` |
-| `bai_scenario/components/` | 표가 쓰는 어휘 — 시나리오 타입, 자주 쓰는 묶음 |
-| `bai_scenario/runner/` | 시나리오 실행과 검사, 픽스처로 심는 자리 |
-| `bai_scenario/setup/` | 공용 셋업이 무엇을 만드는지 확인하는 테스트 |
-| `bai_scenario/fakes/` | 외부 서비스 대역 |
-| `bai_scenario/{db,schema,config,valkey,monitors}.py` | 실행 하나가 필요로 하는 것 |
+| `bai_scenario/manager/<component>/` | Scenario tables and the conftest that assembles the adapter |
+| `bai_scenario/seeds/` | Seed classes that each represent one row, and `TestSeeder` |
+| `bai_scenario/components/` | Vocabulary the tables use: scenario types, common groups |
+| `bai_scenario/runner/` | Scenario execution and checks, seeding with fixtures |
+| `bai_scenario/setup/` | Tests that check what the shared setup creates |
+| `bai_scenario/fakes/` | Stand-ins for external services |
+| `bai_scenario/{db,schema,config,valkey,monitors}.py` | What one run needs |
 
-패키지는 자랄 것에만 둔다. 파일 하나로 끝나는 것은 위 모듈들처럼 평평하게 둔다.
+Add a package only for what will grow. Keep what fits in one file flat, like the modules above.
 
-## 돌리는 법
+## How to run
 
 ```bash
 pants test tests/scenario::
 ```
 
-## 레포트
+## Report
 
-실행 결과에서 각 도메인이 무엇을 보장하는지 뽑는다. 릴리스 PR에 붙일 용도다.
+Generates what each domain guarantees from the run results, for release PRs.
 
 ```bash
 BACKEND_SCENARIO_LOG=dist/scenarios.jsonl pants test tests/scenario::
 python scripts/scenario-report.py dist/scenarios.jsonl -o dist/scenarios.md
 ```
 
-`--split`은 엔티티 패키지마다 `report.md`를 남기고, `--verify`는 그 파일이 실행과 어긋났는지만
-말한다. 덮어쓰지 않는다.
+`--split` writes a `report.md` per entity package. `--verify` reports only whether that file disagrees with the
+run and does not overwrite it.
 
 ```bash
 python scripts/scenario-report.py dist/scenarios.jsonl --split src/ai/backend/manager/api/adapters
 python scripts/scenario-report.py dist/scenarios.jsonl --verify src/ai/backend/manager/api/adapters
 ```
 
-세 가지 형식으로 나온다.
+There are three formats.
 
-| `--format` | 무엇 |
+| `--format` | Contents |
 |---|---|
-| `markdown` (기본) | 사람이 읽는 문서. 릴리스 PR에 붙인다 |
-| `json` | 도구가 읽는 같은 내용 |
-| `summary` | 개수만. 빌드 로그 한 줄 |
+| `markdown` (default) | Document for people. Attach it to release PRs |
+| `json` | The same content for tools |
+| `summary` | Counts only. One line of build log |
 
-한 행이 이렇게 나온다. 사람이 쓴 것은 첫 문장뿐이고, 셋으로 나뉜 아래는 실행에서 뽑은 것이다.
-묶음으로 심은 행은 그 묶음 아래로 들여쓰인다.
+A row looks like this. Only the first sentence is written by a person, and the three parts below it come from the
+run. Rows seeded in a group are indented under that group. Report text is still Korean; this example shows it in
+English.
 
 ```markdown
 #### a-user-granted-folder-create-makes-one-of-their-own — pass
 
-자기 스코프에서 폴더 생성 권한을 받은 사용자가 폴더를 만들면, 그 폴더의 소유는 그 사용자에게 있다
+When a user granted vfolder create permission in their own scope creates a vfolder, the user owns it
 
 Given
 
-- 도메인 home-1, 이 도메인의 폴더는 local:volume1에 놓을 수 있다
-- 폴더를 만들 수 있는 사용자 준비
-  - 도메인에 속한 사용자 한 명 준비
-    - 프로젝트 정책 default, 사용자를 만들 때 딸려 만들어지는 개인 프로젝트가 이 이름으로 찾는다
-    - 사용자 정책 user-policy-1, 사용자 한 명당 폴더 10개까지
-    - 키페어 정책 keypair-policy-1, 동시 세션 5개까지, 폴더는 local:volume1에 놓을 수 있다
-    - 일반 사용자 user-1, 도메인 home-1 소속, 자기 키와 개인 프로젝트를 갖는다  ← 행위자
-  - 역할 folder-owner-1, 일반 사용자 user-1 범위 안에서만 통한다
-  - 역할 folder-owner-1: vfolder 전체에 CREATE 허용
-  - 일반 사용자 user-1: 역할 folder-owner-1 보유
+- Domain home-1, vfolders of this domain can be placed on local:volume1
+- Prepare a user who can create vfolders
+  - Prepare one user in the domain
+    - Project policy default, the personal project created with the user finds it by this name
+    - User policy user-policy-1, up to 10 vfolders per user
+    - Keypair policy keypair-policy-1, up to 5 concurrent sessions, vfolders can be placed on local:volume1
+    - Regular user user-1, in domain home-1, with their own key and personal project  ← actor
+  - Role folder-owner-1, valid only within the scope of regular user user-1
+  - Role folder-owner-1: CREATE allowed on all vfolders
+  - Regular user user-1: holds role folder-owner-1
 
 When
 
-- 일반 사용자 user-1의 create 호출
+- create call by regular user user-1
   - CreateVFolderInput(name='mine', host='local:volume1')
 
 Then
@@ -114,6 +115,6 @@ Then
 - vfolder.access_control.ownership_type = 'user'
 ```
 
-레포트는 어댑터가 제공하는 호출 중 어느 시나리오도 부르지 않은 것도 함께 적는다.
+The report also lists the calls an adapter provides that no scenario calls.
 
-문장은 한글 초안이다. 리뷰를 통과하면 영문으로 옮긴다.
+The `describe` sentences are Korean drafts. They move to English after they pass review.

@@ -1,123 +1,122 @@
-# 시나리오 테스트 — 가드레일
+# Scenario tests: Guardrails
 
-배경과 근거는 이 디렉터리의 `KNOWLEDGE.md`, 구성은 `README.md`에 있다.
+Background and rationale are in `KNOWLEDGE.md` in this directory, the layout in `README.md`.
 
-## 무엇을 옮겨 적는가
+## What to write
 
-- 시나리오는 여기서 짓지 않는다. 엔티티 패키지의 `KNOWLEDGE.md`에 적힌 것을 옮겨 적는다.
-  그 규칙은 `src/ai/backend/manager/api/adapters/AGENTS.md`에 있다.
-- 한 엔티티를 맡으면 그 패키지의 `KNOWLEDGE.md`와 `adapter.py`를 함께 읽고, 거기 적힌
-  시나리오를 하나도 빠뜨리지 않고 옮긴다. 어댑터가 내놓는데 문서에 없는 호출을 보면 문서를
-  먼저 고친다.
-- 문서에 `TODO`만 있는 엔티티는 시나리오가 아직 없다는 뜻이다. 테스트부터 짓지 않는다.
-- 옮긴 뒤 실행 결과를 `--split`으로 뽑아 엔티티 패키지의 `report.md`에 남긴다. 그 파일이
-  실행과 어긋나면 `--verify`가 알린다. 둘이 어긋나면 문장을 먼저 의심한다.
+- Scenarios live in this tree. Read them in the `report.md` of the entity package. Do not write them in
+  `KNOWLEDGE.md`.
+- Work from the `adapter.py` of the entity. Write scenarios for every call it exposes.
+- Do not write what every entity handles the same way as entity scenarios: AND, OR and NOT filter combinations,
+  pagination, default sort direction. Entity scenarios cover the filters and sorts of that entity's fields.
+- After writing, generate the `report.md` of the entity package from the run with `--split`. `--verify` reports
+  when that file disagrees with the run.
 
-## 한 행이 말하는 것
+## What a row says
 
-시나리오는 클래스 하나다. 이름과 보장하는 것, 그리고 세 단계를 답한다.
+A scenario is one class. It answers with its name, what it guarantees, and three steps.
 
-| 부분 | 뜻 |
+| Part | Meaning |
 |---|---|
-| `summary` | kebab 영문 요약. pytest 파라미터 id로도 쓰인다 |
-| `describe` | 이 행이 무엇을 보장하는지 한 문장 |
-| `given` | 요청 시점에 이미 참이어야 하는 것을 세우고, 세운 것을 답한다 |
-| `when` | 그 값과 어댑터만 받아 호출한다 |
-| `then` | 심은 것과 답 또는 예외를 함께 받아 본다 |
+| `summary` | Short kebab-case summary in English. Also the pytest parameter id |
+| `describe` | One sentence on what this row guarantees |
+| `given` | Sets up what must be true at request time and returns what it set up |
+| `when` | Calls with only that value and the adapter |
+| `then` | Takes what was seeded and the answer or exception, and looks at them |
 
-- `given`이 먼저 돌아 실제 값을 답하므로 값을 미뤄 두는 장치가 없다. 지연 호출도, 필드를
-  가리키는 람다도 쓰지 않는다.
-- `given`이 답하는 타입은 그 컴포넌트가 정한다. 뒤 단계가 그 타입을 그대로 받는다.
-- `when`은 `operation`으로 어느 어댑터 호출인지 말한다. 레포트가 그것으로 아무도 부르지 않은
-  호출을 센다.
-- 답이 노드를 감싸고 있으면 `when`이 벗겨서 준다. 그래야 여러 행이 검사기 하나를 같이 쓴다.
-- 설정을 바꿔 도는 행은 `Configured`를 함께 구현한다. 설정 경로를 적는 유일한 자리다.
-- `describe`는 한글로 먼저 쓰고, 리뷰를 통과한 뒤 영문으로 옮긴다.
-- `describe`에 식별자를 적지 않는다. 필드명, 예외 클래스, 파일 경로를 넣지 않는다.
+- `given` runs first and returns real values, so nothing defers a value. Do not use deferred calls or lambdas
+  that point at fields.
+- The component sets the type `given` returns. Later steps receive that type as is.
+- `when` names the adapter call with `operation`. The report uses it to count calls nobody called.
+- If the answer wraps a node, `when` unwraps it, so several rows share one checker.
+- A row that runs with changed config also implements `Configured`. It is the only place that names a config path.
+- Write `describe` in Korean first, and move it to English after it passes review.
+- Do not put identifiers in `describe`: field names, exception classes, file paths.
 
-## 행을 심는 법
+## How to seed rows
 
-- 행은 src의 write spec으로만 만든다. `TestSeeder`의 입구 여덟 — `creating`, `provisioning`,
-  `adding`, `adding_with_nested`, `linking`, `accepting`, `granting`, `joining` — 외에
-  데이터베이스를 건드리지 않는다. `accepting`은 공유 제안을 받는 쪽이 받아들이는 연산을
-  통째로 쓴다. `joining`은 사용자를 프로젝트 명부에 올린다. `adding`은 필드 행을 심는다.
-  매니저가 생성하는 행은 `TestSeedFieldCreator`, upsert하는 행은 `TestSeedFieldUpserter`로 적는다.
-  `adding_with_nested`는 필드 행과 그것이 소유하는 행(감사 기록과 그 스코프 행처럼)을 한
-  쓰기로 심는다. 앞 행을 읽는 seed는 읽는 개수만큼의 입구(`creating_from`,
-  `creating_from_two`, `creating_from_three`)를 쓴다.
-- seed 하나는 클래스 하나다. `TestSeedRow` 계열을 구현해 자기가 무엇인지(`kind`), 무엇을
-  세워두는지(`detail`), 어떤 이름으로 들어가는지(`name`), 무엇을 쓰는지(`seed`)를 답한다.
-- 이름을 매니저가 못박은 행은 `name`이 그 이름을 답한다. 시더가 붙이는 번호를 받지 않는다.
-  그 이름은 src에서 읽는다. 테스트가 리터럴로 다시 적지 않는다.
-- 행 여러 개가 한 전제를 이루면 `TestSeedNest`로 묶는다. `kind`가 무엇을 준비하는지 말하고,
-  `seed.within`으로 심으면 레포트가 그 묶음 아래로 행들을 들여쓴다. 묶음이 묶음을 딛는 것도
-  `within`이다.
-- 한 시나리오에 하나만 있어야 하는 행은 `seed.once`로 심는다. 같음의 기준은 seed의 타입이다.
-- 테이블 간 연결값에 상수를 쓰지 않는다. 정책 이름, 도메인 이름, 소유자 id는 앞 단계가 만든
-  값에서 읽는다.
-- 예외는 src가 못박은 이름뿐이다. 그때는 그 사실을 spec에 적는다.
-- 이름은 힌트와 번호로 만들어진다. 시드가 만든 이름을 요청이 다시 리터럴로 적지 않고,
-  만들어진 행에서 읽는다.
-- src가 여러 행을 한 연산으로 쓰는 자리는 그 연산을 통째로 쓴다. 조각으로 흉내내지 않는다.
-- `detail`에 그 행이 무엇을 세워두는지 적는다. 이름만으로는 레포트를 읽는 사람이 상황을
-  모른다. 허용치처럼 뒤 단계가 기대는 것을 적고, 나머지는 적지 않는다. 그 seed가 스스로
-  아는 것만 적는다. 딛는 행을 문장에 끼워 넣지 않는다.
+- Create rows only with write specs from src. Touch the database only through the eight entries of `TestSeeder`:
+  `creating`, `provisioning`, `adding`, `adding_with_nested`, `linking`, `accepting`, `granting`, `joining`.
+  `accepting` uses the whole operation in which the receiver accepts a share offer. `joining` adds a user to a
+  project roster. `adding` seeds a field row. Write rows the manager creates with `TestSeedFieldCreator`, rows it
+  upserts with `TestSeedFieldUpserter`. `adding_with_nested` seeds a field row and the rows it owns (such as an
+  audit record and its scope rows) in one write. A seed that reads earlier rows uses the entry for that count
+  (`creating_from`, `creating_from_two`, `creating_from_three`).
+- One seed is one class. It implements the `TestSeedRow` family and answers what it is (`kind`), what it sets up
+  (`detail`), which name it goes in under (`name`), and what it writes (`seed`).
+- For a row whose name the manager fixes, `name` returns that name and takes no number from the seeder. Read
+  that name from src. Do not repeat it as a literal in a test.
+- Group rows that form one premise with `TestSeedNest`. `kind` says what it prepares, and rows seeded with
+  `seed.within` are indented under that group in the report. A group that builds on another group also uses
+  `within`.
+- Seed a row that must exist only once in a scenario with `seed.once`. Sameness is decided by the seed type.
+- Do not use constants for values that link tables. Read policy names, domain names and owner ids from the values
+  earlier steps created.
+- The only exception is a name src fixes. State that fact in the spec.
+- Names are built from a hint and a number. Do not repeat a seeded name as a literal in a request. Read it from
+  the created row.
+- Where src writes several rows in one operation, use the whole operation. Do not imitate it in pieces.
+- Write in `detail` what the row sets up. A name alone does not tell a report reader the situation. Write what
+  later steps depend on, such as an allowance, and leave out the rest. Write only what that seed knows itself. Do
+  not put the rows it builds on in the sentence.
 
+## Permissions
 
-## 권한
+- Seed only the permissions needed. Do not depend on shipped role presets.
+- Pair a row with the permission and a row without it. With only one, you cannot tell whether the permission was
+  too broad.
+- The actor of a row that checks permissions must not be superadmin. The checker passes superadmin first, so such
+  a row proves nothing about permissions. The exception is an operation gated by the global role. State that fact
+  in `description` then.
 
-- 필요한 권한만 심는다. 출하되는 역할 프리셋에 기대지 않는다.
-- 권한이 있는 행과 없는 행을 짝으로 둔다. 한쪽만 있으면 권한을 과하게 줬는지 알 수 없다.
-- 권한을 보는 행의 행위자는 superadmin이면 안 된다. 검사기가 superadmin을 먼저 통과시키므로
-  그 행은 권한에 대해 아무것도 증명하지 않는다. 전역 역할이 문인 연산만 예외이고, 그때는
-  `description`에 그 사실을 적는다.
+## Seeding with fixtures
 
-## 픽스처로 심는 자리
+- A scenario table pairs rows around one call. Write a test that asks what the setup itself creates with the
+  `seeding` fixture.
+- `seeding` uses the same seeds, the same `TestSeeder` and the same write paths as the table. The only difference
+  is when it writes. The row is already written when the fixture returns.
+- One fixture handles one row, and rows it builds on come in as fixture arguments. Do not declare rows and write
+  them together at the end, because that depends on fixture creation order.
+- Tests written this way do not appear in the report, because they do not say what they guarantee, what they call
+  and what they expect. Write anything that must count as coverage in the table.
 
-- 시나리오 표는 부르는 것 하나를 두고 짝을 세우는 자리다. 셋업 자체가 무엇을 만드는지를
-  묻는 테스트는 `seeding` 픽스처로 쓴다.
-- `seeding`은 표와 같은 seed, 같은 `TestSeeder`, 같은 쓰기 경로를 쓴다. 다른 것은 쓰는 시점뿐이다.
-  픽스처가 답할 때 그 행은 이미 쓰여 있다.
-- 픽스처 하나가 행 하나를 맡고, 딛는 행은 픽스처 인자로 받는다. 선언만 해두고 마지막에 몰아
-  쓰지 않는다. 그러면 픽스처가 만들어지는 순서에 기대게 된다.
-- 이렇게 쓴 테스트는 레포트에 나오지 않는다. 무엇을 보장하는지, 무엇을 부르고 무엇을
-  기대하는지를 말하지 않기 때문이다. 커버리지로 세어야 하는 것은 표에 쓴다.
+## Shape of the table
 
-## 표의 모양
+- One scenario is one builder function. It takes `TestSeeder`, seeds its rows and returns the scenario.
+- The parameter name is fixed as `scenario`. The report picks rows by that name.
+- Split test modules by behavior. One module holds one behavior of one component.
+- Put the fixture that assembles the adapter in the conftest of those modules. It is the only place that knows the
+  component.
 
-- 시나리오 하나는 빌더 함수 하나다. `TestSeeder`를 받아 자기가 쓸 행을 심고 시나리오를 답한다.
-- 파라미터 이름은 `scenario`로 고정한다. 레포트가 그 이름으로 행을 집는다.
-- 동작마다 테스트 모듈을 나눈다. 한 모듈에 한 컴포넌트의 한 동작이 산다.
-- 어댑터를 조립하는 픽스처는 그 모듈들의 conftest에 둔다. 컴포넌트를 아는 유일한 자리다.
+## Checks
 
-## 검사
+- Do not write checks that look at part of an answer. Looking at one field passes even when the rest changes
+  silently. Do not add helpers that make such checks easy to write.
+- Always look at the whole answer. `then` returns one of three for each place. Report text is still Korean; the
+  table shows it in English.
 
-- 답의 일부만 보는 검사를 두지 않는다. 필드 하나만 보면 나머지가 조용히 바뀌어도 통과한다.
-  그런 검사를 쓰기 쉽게 만드는 장치도 두지 않는다.
-- 답은 언제나 전체를 본다. `then`이 자리마다 셋 중 하나를 답한다.
-
-  | 무엇 | 언제 | 레포트에 나오는 말 |
+  | What | When | Report text |
   |---|---|---|
-  | `Same` | 시나리오가 값을 말할 수 있을 때 | `name = 'host-1'` |
-  | `Held` | 값은 말할 수 없고 조건만 걸 수 있을 때 | `created_at: 이 실행이 쓴 시각` |
-  | `Skipped` | 볼 수 없고 그 이유를 적을 수 있을 때 | `id: 무시함 — 데이터베이스가 만든다` |
+  | `Same` | The scenario can state the value | `name = 'host-1'` |
+  | `Held` | The value cannot be stated, only a condition | `created_at: time written by this run` |
+  | `Skipped` | It cannot be looked at, and the reason can be stated | `id: ignored — the database generates it` |
 
-- 어느 것도 아닌 자리는 없다. 빠뜨린 자리는 조용히 통과하는 자리다.
-- `Held`가 거는 조건은 `Condition` 구현체다. 조건이 스스로 무엇인지 말하고, 그 말에 실제
-  값을 넣지 않는다.
-- 생성된 id를 `Same`의 기대값으로 쓰지 않는다. 그 값은 실행마다 달라 레포트가 흔들린다.
-  다른 자리에서 온 값과 같은지 보는 자리는 `SameAs` 조건을 건다. 그러면 값 대신 어디서 온
-  것인지로 말한다 — `ownership.user_id: 만든 사람와 같다`.
-- 같은 동작이면 두 실행의 레포트가 글자까지 같아야 한다. CI가 그것을 검사한다.
-- 구현 디테일을 검사하지 않는다. 타입이 이미 보장하는 것을 다시 확인하지 않는다.
+- No place is left without one. A place left out passes silently.
+- The condition of `Held` is a `Condition` implementation. The condition says what it is, and that text does not
+  include the actual value.
+- Do not use a generated id as the expected value of `Same`. It differs per run and makes the report unstable. For
+  a place that must equal a value from another place, use the `SameAs` condition. It then reads by where the value
+  came from: `ownership.user_id: same as the creator`.
+- With the same behavior, the reports of two runs must match to the character. CI checks this.
+- Do not check implementation details. Do not check again what the type already guarantees.
 
-## 실패를 읽는 법
+## Reading failures
 
-거부를 보면 전제가 실제로 심겼는지 먼저 확인한다. 심기지 않은 채 거부된 것을 보고 규칙을
-만들어낸 적이 있다.
+On a rejection, first check that the premise was actually seeded. A rule was once invented from a rejection whose
+premise had not been seeded.
 
-## 패키지 경계
+## Package boundaries
 
-- `seeds/`는 `components`, `runner`, 실행 환경 모듈을 import하지 않는다. write spec과 그
-  데이터 타입만 안다.
-- 컴포넌트별 등록소를 두지 않는다. 테스트 모듈이 자기 것만 import한다.
+- `seeds/` does not import `components`, `runner` or the execution environment modules. It knows only write specs
+  and their data types.
+- Do not add per-component registries. A test module imports only what it uses.
