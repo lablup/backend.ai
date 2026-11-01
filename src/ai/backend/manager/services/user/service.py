@@ -4,8 +4,13 @@ from typing import Any
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+<<<<<<< HEAD
 from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
+=======
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
+from ai.backend.common.dotfile import DotfilePath
+>>>>>>> 24972637 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.common.types import AccessKey
@@ -362,6 +367,7 @@ class UserService:
             ssh_public_key=ssh_public_key,
         )
 
+<<<<<<< HEAD
     async def create_dotfile(
         self, action: CreateKeypairDotfileAction
     ) -> CreateKeypairDotfileActionResult:
@@ -371,6 +377,13 @@ class UserService:
         entries = current.added(action.entry)
         await self._write_dotfiles(keypair_id, entries)
         return CreateKeypairDotfileActionResult(entries=entries.entries)
+=======
+    async def create_dotfile(self, action: CreateDotfileAction) -> CreateDotfileActionResult:
+        DotfilePath(action.creator.entry.path)
+        # Variants count too, so creation cannot grow a user's storage without bound.
+        data = await self._user_repository.create_dotfile(action.creator, MAXIMUM_DOTFILE_COUNT)
+        return CreateDotfileActionResult(data=data)
+>>>>>>> 24972637 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
 
     async def update_dotfile(
         self, action: UpdateKeypairDotfileAction

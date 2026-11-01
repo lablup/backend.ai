@@ -9,6 +9,7 @@ from dateutil.relativedelta import relativedelta
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.dotfile import DotfilePath
 from ai.backend.common.exception import (
     InvalidAPIParameters,
 )
@@ -156,8 +157,7 @@ class ProjectService:
     async def create_dotfile(
         self, action: CreateProjectDotfileAction
     ) -> CreateProjectDotfileActionResult:
-        if not verify_dotfile_name(action.entry.path):
-            raise InvalidAPIParameters("dotfile path is reserved for internal operations.")
+        DotfilePath(action.entry.path)
         entries = (await self._read_dotfiles(action.project_id)).added(action.entry)
         await self._write_dotfiles(action.project_id, entries)
         return CreateProjectDotfileActionResult(entries=entries.entries)
@@ -165,6 +165,7 @@ class ProjectService:
     async def update_dotfile(
         self, action: UpdateProjectDotfileAction
     ) -> UpdateProjectDotfileActionResult:
+        DotfilePath(action.entry.path)
         entries = (await self._read_dotfiles(action.project_id)).replaced(action.entry)
         await self._write_dotfiles(action.project_id, entries)
         return UpdateProjectDotfileActionResult(entries=entries.entries)

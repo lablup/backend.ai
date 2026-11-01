@@ -7,7 +7,15 @@ from dataclasses import dataclass
 from typing import Any
 
 from ai.backend.common import msgpack
+<<<<<<< HEAD
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
+=======
+from ai.backend.common.data.entity.dotfile import DotfileID
+from ai.backend.common.data.entity.types import FieldData, RuntimeEntityID
+from ai.backend.common.dotfile import DotfilePath
+from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
+from ai.backend.common.exception import InvalidAPIParameters
+>>>>>>> 24972637 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
 from ai.backend.manager.errors.storage import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
@@ -65,6 +73,19 @@ class DotfileEntries:
                 DotfileEntry(path=row["path"], perm=row["perm"], data=row["data"]) for row in rows
             )
         )
+
+    @classmethod
+    def verify_packed(cls, packed: bytes) -> None:
+        try:
+            cls.unpack(packed).verify_paths()
+        except (ValueError, TypeError, KeyError) as e:
+            raise InvalidAPIParameters(
+                "dotfiles must be a msgpack list of path, perm and data entries."
+            ) from e
+
+    def verify_paths(self) -> None:
+        for entry in self.entries:
+            DotfilePath(entry.path)
 
     def get(self, path: str) -> DotfileEntry:
         for entry in self.entries:
