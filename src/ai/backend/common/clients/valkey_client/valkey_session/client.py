@@ -38,6 +38,13 @@ valkey_session_resilience = Resilience(
     ]
 )
 
+# No retry policy: a retried script whose reply was lost would change the count twice.
+valkey_login_attempt_resilience = Resilience(
+    policies=[
+        MetricPolicy(MetricArgs(domain=DomainType.VALKEY, layer=LayerType.VALKEY_SESSION)),
+    ]
+)
+
 
 SESSION_KEY_PREFIX = "AIOHTTP_SESSION_"
 LOGIN_HISTORY_KEY_PREFIX = "login_history_"
@@ -227,7 +234,7 @@ class ValkeySessionClient:
         async with self._client.client() as conn:
             await conn.delete(keys)
 
-    @valkey_session_resilience.apply()
+    @valkey_login_attempt_resilience.apply()
     async def reserve_login_attempt(
         self, username: str, allowed_fail_count: int, block_duration_seconds: int
     ) -> bool:
@@ -245,7 +252,7 @@ class ValkeySessionClient:
             )
         return bool(result == 1)
 
-    @valkey_session_resilience.apply()
+    @valkey_login_attempt_resilience.apply()
     async def release_login_attempt(self, username: str) -> None:
         """
         Take back an attempt reserved by `reserve_login_attempt`.

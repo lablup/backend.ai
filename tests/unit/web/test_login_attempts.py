@@ -24,12 +24,14 @@ from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.defs import REDIS_STATISTICS_DB
 from ai.backend.common.dto.manager.auth.types import (
+    AuthResponse,
     AuthResponseType,
     AuthSuccessResponse,
     RequireTwoFactorAuthResponse,
     RequireTwoFactorRegistrationResponse,
     TwoFactorType,
 )
+from ai.backend.common.endpoint_pool.exceptions import NoHealthyEndpointError
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
 from ai.backend.common.types import AccessKey, SecretKey, ValkeyTarget
 from ai.backend.common.web.session import SESSION_KEY, Session
@@ -204,6 +206,30 @@ class TestLoginFailCount:
 
         await client.post("/server/login", json=_login_body(username))
 
+        assert await _fail_count(raw_client, username) == 1
+
+    @pytest.mark.parametrize(
+        ("outcome", "expected_status"),
+        [
+            (NoHealthyEndpointError(), 503),
+            (AuthResponse(response_type=AuthResponseType.SUCCESS), 500),
+        ],
+        ids=["no-healthy-endpoint", "unexpected-auth-response"],
+    )
+    async def test_server_side_errors_release_the_reservation(
+        self,
+        web_client: ClientFactory,
+        raw_client: AbstractValkeyClient,
+        username: str,
+        outcome: Any,
+        expected_status: int,
+    ) -> None:
+        client = await web_client(AsyncMock(side_effect=[_api_error(401), outcome]))
+        await client.post("/server/login", json=_login_body(username))
+
+        resp = await client.post("/server/login", json=_login_body(username))
+
+        assert resp.status == expected_status
         assert await _fail_count(raw_client, username) == 1
 
     async def test_changing_domain_shares_the_count(
