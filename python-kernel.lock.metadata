@@ -10,6 +10,7 @@
     "msgpack~=1.2.1",
     "pyzmq~=26.4",
     "setproctitle~=1.3.3",
+    "tornado>=6.6",
     "types-python-dateutil",
     "uvloop~=0.19"
   ],
