@@ -3612,8 +3612,7 @@ async def handle_volume_mount(
             event.fs_type,
             event.cmd_options,
             event.edit_fstab,
-            event.fstab_path,
-            mount_prefix,
+            mount_prefix=mount_prefix,
         )
         if context.local_config.agent.mount_path_uid_gid is not None:
             await chown(
@@ -3660,7 +3659,6 @@ async def handle_volume_umount(
             str(real_path),
             mount_prefix,
             event.edit_fstab,
-            event.fstab_path,
             timeout_sec=float(timeout) if timeout is not None else None,
         )
     except VolumeMountFailed as e:
