@@ -1,4 +1,4 @@
-# Manager GraphQL layer — Guardrails
+# Manager GraphQL layer: Guardrails
 
 > For background (federation collisions, pagination behavior), see `KNOWLEDGE.md` in the same directory; for implementation patterns, see the `/api-guide` skill (GraphQL Patterns).
 
@@ -6,7 +6,7 @@
 
 - Every Strawberry type appends the `GQL` suffix to its **Python class name**: `DomainGQL`, `DomainFilterGQL`, `DomainScopeGQL`. Applies to
   output, input, and connection types alike.
-- The **schema-exposed name** must not contain `GQL`. Always pass `name=` (the class name with `GQL` stripped) to the decorator (e.g.
+- The **schema-exposed name** must not contain `GQL`. Always pass `name=` (the class name with `GQL` stripped) to the decorator (for example,
   `CreateDomainInputGQL` → `name="CreateDomainInput"`). Omitting `name=` leaks `GQL` into the SDL.
 - If the name collides with a v1 Graphene type, use a `V2`-suffixed schema name (`name="KeyPairV2"`). See `KNOWLEDGE.md` for background.
 
@@ -45,8 +45,8 @@
 
 ## Relations
 
-Rules for a table row joining two entities with neither an entity type nor a field type declared for it (user↔role, scope↔idle checker,
-session↔idle checker). Background: `KNOWLEDGE.md`, BEP-1075 (entity relation operations).
+Rules for a table row joining two entities with neither an entity type nor a field type declared for it (user and role, scope and idle checker,
+session and idle checker). Background: `KNOWLEDGE.md`, BEP-1075 (entity relation operations).
 
 - Expose a relation row as a relation type. A relation type implements Node.
 - A relation type's `id` is a global ID built from the type name and the end UUIDs. A polymorphic side adds its type
@@ -63,7 +63,7 @@ session↔idle checker). Background: `KNOWLEDGE.md`, BEP-1075 (entity relation o
 - `filter` and `order_by` on relation connections and root queries are the relation type's Filter and OrderBy. They carry relation value
   conditions and end entity conditions (`checker: IdleCheckerFilter`), with `AND`/`OR`/`NOT`.
 - The cursor encodes the end keys.
-- `node(id:)` and `nodes(ids:)` read a list of end keys at once. End entity fields load through that entity's bulk data loader.
+- `node(id:)` and `nodes(ids:)` read a list of end keys at once. End entity fields load through that entity's bulk DataLoader.
 - A mutation creating or changing a relation takes the end UUIDs. Its payload follows Mutation payload below.
 - A row declared as an entity type (`EntityShare`) is an entity, not a relation, and is a Node.
 - Keep an already published relation Node (`RoleAssignment`) deprecated and add no fields to it.
@@ -95,10 +95,10 @@ Whether the target (entity, field row, relation) still exists when the response 
 
 - Do not fetch related entities via individual fetch functions inside a resolver.
 - Always use `info.context.data_loaders.*` for cross-entity loading.
-- A data loader reads its ids through a bulk action (`partial_bulk_get_ops`, `public_partial_bulk_get_ops` for a public entity,
+- A DataLoader reads its ids through a bulk action (`partial_bulk_get_ops`, `public_partial_bulk_get_ops` for a public entity,
   `batch_load_fields` for field rows). Do not read them through a global search with an id condition.
 - A global search is gated on SUPERADMIN, so a regular user following a node they can read has the whole batch rejected.
-- One batch mixes ids from several resolvers. A bulk action answers per id: only the field awaiting a denied id errors, and a missing id
+- One batch mixes ids from several resolvers. A bulk action returns a result per id: only the field awaiting a denied id errors, and a missing id
   stays `None`.
 
 ## Calling services
@@ -139,8 +139,8 @@ The client must be free to choose cursor or offset. For per-mode behavior, see `
 
 **search: three variants**
 - `adminFoosV2`: superadmin only, no scope; the entire system.
-- `scopedFoosV2` (e.g. `scopedSessionsV2`): non-admin, scope required; within that scope.
-- `myFoosV2`: self-service; sets the current user as the user scope and calls the same adapter `scoped_search` as `scopedFoosV2`.
+- `scopedFoosV2` (for example `scopedSessionsV2`): non-admin, scope required; within that scope.
+- `myFoosV2`: self-service; sets the current user as the user scope and calls the same adapter method `scoped_search` as `scopedFoosV2`.
 - There is no "unscoped system-wide query" for non-admins.
 
 **scoped search convention:**
@@ -156,7 +156,7 @@ The client must be free to choose cursor or offset. For per-mode behavior, see `
 - Put non-empty validation in the DTO's Pydantic `model_validator`, uniformly rejected at the GQL/REST boundary.
 - The resolver passes the scope to the adapter together with the search input DTO. Authorization (RBAC) is the adapter's or service's
   responsibility, not the resolver's.
-- Legacy `{scope}FoosV2` (e.g. `projectSessionsV2`) predates this convention; do not create new ones.
+- Legacy `{scope}FoosV2` (for example `projectSessionsV2`) predates this convention; do not create new ones.
 
 **`myFoosV2` resolver:**
 - The resolver builds the user scope from `current_user()`, puts it in `ScopedSearchFoosInput`, and calls the adapter's `scoped_search`.
@@ -172,14 +172,13 @@ The client must be free to choose cursor or offset. For per-mode behavior, see `
 **Atomic and partial** are distinguished by whether a per-item failure path exists: a write where one item can fail while the rest commit is
 partial, anything else is atomic, and a read is atomic by default.
 
-**The rule that follows**:
 - An atomic field carries no `failed` / `errors` channel. A field that carries one is partial.
 - This must agree with whether the action subclasses `BasePartialBulkAction` (`actions/v2/bulk/base.py`).
 
 **Naming**: `AtomicBulk` or `PartialBulk` goes after the access prefix, and the rest of the name is identical to the single form, with no
-pluralisation: `myScopePermissions` / `myAtomicBulkScopePermissions`.
+pluralization: `myScopePermissions` / `myAtomicBulkScopePermissions`.
 
-**Where the existing surface stands**: 22 payloads carry a `failed` or an `errors` field and the names say nothing about which behaviour
+In the current code, 22 payloads carry a `failed` or an `errors` field and the names say nothing about which behavior
 they have. 18 are genuinely partial. 3 are atomic with a channel that is always empty: `BulkAddRolePermissionPresetsPayload`,
 `ReplaceRolePermissionsPayload`, `UpsertAppConfigFragmentsPayload`. The remaining one, `ScanProjectModelCardsV2Payload`, reports a scan
 summary in `errors` rather than a per-item channel. Renaming the 22 is breaking, so this states the policy and the migration is judged

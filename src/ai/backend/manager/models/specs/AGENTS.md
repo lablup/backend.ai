@@ -1,4 +1,4 @@
-# Write specs (v2 lineage) — Guardrails
+# Write specs (v2 lineage): Guardrails
 
 > For the selection table and design rationale, see `KNOWLEDGE.md` in the same directory.
 
@@ -17,11 +17,11 @@ infrastructure only; do not declare a spec there.
   node in the graph.
 - Its specs are `RelationCreator` / `RelationLifecycleUpdater` / `RelationPurger` (`relation.py`), and they name the pair.
 - A relation table has no row id column. The pair of ends is its primary key; a polymorphic side adds its type column to the key.
-- Create inserts a new pair only. A pair already linked, soft-deleted or not, is left as it stands and the create answers `False`; restoring it belongs to the
+- Create inserts a new pair only. A pair already linked, soft-deleted or not, is left as it stands and the create returns `False`; restoring it belongs to the
   restore updater.
 - Soft delete / restore (`RelationLifecycleUpdater`) writes the soft delete mixin's `deleted_at` alone. What each side reads of the other stays, so a
   soft-deleted relation is still listed on both sides and can be restored. Only purge removes access. Only relations carrying the soft delete mixin
-  declare this updater, one class per direction, each answering a constant.
+  declare this updater, one class per direction, each returning a constant.
 - A business value switched on and off, such as `idle_checker_bindings.enabled`, is not a soft delete. The general updater writes it.
 - Do not carry a relation as a field on a `DataUpdater`. A value whose change drags other writes along does not belong on the general edit path; the
   same rule soft delete follows.
@@ -54,18 +54,18 @@ common supertype is the enforcement. Reuse execution logic through ops-layer hel
 
 - `GuardedEntityCreator.precondition_checks()`, `GuardedDanglingFieldCreator.precondition_checks()`, `GuardedDataUpdater.guard_checks()`,
   `GuardedEntityPurger.guard_checks()` and `GuardedFieldPurger.guard_checks()` are abstract on the root. `EntityCreator`, `DanglingFieldCreator`,
-  `DataUpdater`, `EntityPurger` and `FieldPurger` answer an empty list under `@final`; a spec that rejects inherits the guarded root directly.
+  `DataUpdater`, `EntityPurger` and `FieldPurger` return an empty list under `@final`; a spec that rejects inherits the guarded root directly.
 - Only the single-row create runs preconditions. The batch dangling creates take `DanglingFieldCreator`, so a guarded spec cannot reach them.
 - A `GuardCheck` is a condition on the row already named, paired with the error to raise when it fails. It rides on the UPDATE / DELETE statement; ops
-  distinguishes a missing row (`EntityNotFoundError`) from a rejecting one (the first failing check's error) with one read of that row after the
+  distinguishes a missing row (`EntityNotFoundError`) from a rejection (the first failing check's error) with one read of that row after the
   statement touched nothing.
-- A `PreconditionCheck` names rows elsewhere whose presence turns a create away; a `ConflictCheck` names rows a purge must not leave behind. Neither
+- A `PreconditionCheck` names rows elsewhere whose presence rejects a create; a `ConflictCheck` names rows a purge must not leave behind. Neither
   is a guard.
-- Do not translate a rejection in the caller. The error a guard answers is declared on the spec, and the repository has no `None` to branch on for it.
+- Do not translate a rejection in the caller. The error a guard raises is declared on the spec, and the repository has no `None` to branch on for it.
 
-## An entity answers its own id
+## An entity returns its own id
 
-- A creator and an upserter answer one hook, `entity_id(row)`. It returns an `EntityIdentifier`, which answers its own type, so nothing declares the
+- A creator and an upserter implement one hook, `entity_id(row)`. It returns an `EntityIdentifier`, which carries its own type, so nothing declares the
   type separately.
 - It takes the row because the id does not exist before the insert; the database usually fills it.
 - Some tables key on something else (a resource policy's primary key is `name` and its id is a separate `uuid` column). Which column it is, only the
@@ -80,7 +80,7 @@ created under a global entity too (an image under its container registry), so it
 ## Declaring a relation in the graph
 
 - The graph has two relations. **own**: a virtual entity holds an entity, so the entity is on that virtual entity's list and one hop away. **govern**:
-  a scope rules a virtual entity, so the scope's roles reach everything that virtual entity owns. govern is the wider of the two.
+  a scope governs a virtual entity, so the scope's roles reach everything that virtual entity owns. govern is the wider of the two.
 
 | Hook | own | govern | Meaning |
 |---|---|---|---|
@@ -98,7 +98,7 @@ created under a global entity too (an image under its container registry), so it
 | share, capped | its own govern | yes (a share, the target side of a relation) |
 | share, capped | another's govern | **no** |
 
-- A share is lent to the receiving scope. It answers through that scope's own govern only, not to other scopes governing that virtual entity, and only
+- A share is lent to the receiving scope. It is reachable through that scope's own govern only, not through other scopes governing that virtual entity, and only
   for the shared entity itself: a shared vfolder taken as a scope does not read the invitations under it, and a project shared to a resource group is
   not read by another project governing that resource group.
 - A share is either every field or field paths, and each has replace / widen / narrow.
@@ -111,8 +111,8 @@ created under a global entity too (an image under its container registry), so it
 | remove | `unshare(scope, entities)`: own stays | |
 
 - A share mixing every-field bits and paths is not one replace: `replace_share(cap)` then `widen_share_fields`.
-- Accepting an invitation is `accept_invitation(updater)`: the invitation row's update and `widen_share` in one transaction. An invitation is a share
-  on offer, so it lives with the share writes.
+- Accepting an invitation is `accept_invitation(updater)`: the invitation row's update and `widen_share` in one transaction. An invitation is a proposed entity share,
+  so it lives with the share writes.
 - The three pairs come in through a provider only, per `repositories/AGENTS.md`. Do not use a creator to share what already exists.
 - Entity types are open strings: types outside the RBAC element enum are accepted, and permission-carrying paths convert lazily.
 - Do not keep module-level declaration instances (no `X_MEMBERSHIP = ...()`).
@@ -151,11 +151,11 @@ created under a global entity too (an image under its container registry), so it
   row has to read that entity before it has anything to validate and record against.
 - `FieldOwnerLookup` declares that read: from a field row's id to its owning entity's id. A query rather than conditions, so an owner reached through
   a join is expressible; it selects the pair (row id, owner id), so one spec serves a single row and a batch alike.
-- It takes two type parameters, so the type `field_id()` answers and the type this lookup handles cannot come apart.
+- It takes two type parameters, so the type `field_id()` returns and the type this lookup handles are tied together.
 - `FieldOwnerKeyLookup` reads the same thing from the other end: a caller-facing key to the owner. `FieldKeyLookup` reads the row's id and the owner's
   from that key in one query; an operation naming the row takes its id, so the key has to become one somewhere.
 - Do not pre-read the owner to check existence. Declare the FK violation in `integrity_error_checks()` mapped to the domain error; preconditions
-  beyond existence (e.g. lifecycle) belong to the service layer as EXISTS checks.
+  beyond existence (for example lifecycle) belong to the service layer as EXISTS checks.
 
 ## Soft delete belongs to its own updaters
 

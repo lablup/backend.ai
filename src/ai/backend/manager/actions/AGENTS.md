@@ -1,4 +1,4 @@
-# Manager Actions layer — Guardrails
+# Manager Actions layer: Guardrails
 
 > For design background, see `KNOWLEDGE.md` in the same directory. Action classes live in `services/{domain}/actions/`; file placement and naming rules are in `services/AGENTS.md`.
 
@@ -21,10 +21,10 @@ New actions inherit only from the v2 bases (`actions/v2/`). The shape of the tar
 
 - A `scope`-shaped search takes `targets: Sequence[<Entity>Target]` and nothing else representing a scope. One action per entity, never one per scope
   kind.
-- A `ScopeTarget` (`models/scopes.py`) answers both axes: `scope_id()` names the scope the read is authorized against, `to_condition()` the rows it is
+- A `ScopeTarget` (`models/scopes.py`) covers both axes: `scope_id()` names the scope the read is authorized against, `to_condition()` the rows it is
   restricted to. Declaring them on one class is what keeps a read from being authorized against one thing and served another.
 - The action derives both from that one list and marks them `@final`: `scope_targets()` is every target's `scope_id()`, `operation_scopes()` the
-  targets themselves. Ops ORs the conditions; the gate authorizes each scope, so a caller naming one they cannot see has the whole read rejected.
+  targets themselves. Ops ORs the conditions; the gate authorizes each scope, so the whole read is rejected when a caller names one they cannot see.
 
 ## Linking two entities
 
@@ -33,7 +33,7 @@ New actions inherit only from the v2 bases (`actions/v2/`). The shape of the tar
 | | Example | Shape |
 |---|---|---|
 | Contained | project ⊃ user | `scope`: `scope_targets` = the container, `entity_type` = what it contains |
-| Not contained | resource group ↔ domain | `relation`: `scope_targets` = both, no entity type |
+| Not contained | resource group and domain | `relation`: `scope_targets` = both, no entity type |
 
 - A `relation` action declares no `entity_type`, because what it writes is not an entity. With no type there is nothing to read at a scope, so the
   permission is required of each named scope itself and every one of them has to permit the run.
@@ -72,12 +72,12 @@ New actions inherit only from the v2 bases (`actions/v2/`). The shape of the tar
 - Every write to a field row declares `operation_type() == UPDATE`: create, change, delete and purge alike. Adding or removing a row is a change to that
   entity, and it is that entity's permission that answers for it. Only a read is `GET`.
 - A bulk reads the owners in one go. They may be several, and every one is checked.
-- The answer is per **row** the caller named; the record is per **entity** owning those rows. Which row it was goes in the description; the entity
+- The response is per **row** the caller named; the record is per **entity** owning those rows. Which row it was goes in the description; the entity
   columns take entity ids only.
 - A row that is gone ends at the lookup, whose record carries the key in `lookup_kind` / `lookup_key`.
 - A request naming the row by a caller-facing key (an access key, a name) resolves that key into the row's id first (`LookupFieldByKeyOpsAction`). A
   field action takes the row's id, never the key.
-- That lookup answers with the owner's id beside the row's, because a field row is not an entity and the run still has to be recorded against
+- That lookup returns the owner's id beside the row's, because a field row is not an entity and the run still has to be recorded against
   something. The action that follows runs its own owner lookup; the key lookup is checked against that same owner.
 - Do not resolve the owner in the adapter and pass it to a `single_entity` action. That is the field shape written by hand, and it lets the owner and
   the row part ways.
@@ -97,8 +97,8 @@ New actions inherit only from the v2 bases (`actions/v2/`). The shape of the tar
 
 ## Many-row runs
 
-- The failure mode is named, never an argument: an `AtomicCreate*` base raises and the run is recorded as one failure, a `PartialBulk*` base answers
-  per target and the run itself succeeds. No base is unmarked.
+- The failure mode is named, never an argument: an `AtomicCreate*` base raises and the run is recorded as one failure, a `PartialBulk*` base returns
+  a result per target and the run itself succeeds. No base is unmarked.
 - A read carries it on the factory instead, because the base names the operation rather than the fate: `atomic_bulk_*` when every target shares the
   run's outcome.
 - `Bulk` in a name means the bulk shape; the caller named the targets, so the action answers for each one. A many-row write whose target is a single scope, a
@@ -111,23 +111,23 @@ New actions inherit only from the v2 bases (`actions/v2/`). The shape of the tar
   every generic service has. An atomic shape stays on `BaseBulkAction`; it does not narrow the run.
 - Reserve atomic for the runs that mean it: a permission definition, anything whose targets must all go through or none. Partial is what a bulk run
   normally is.
-- `ActionValidators.partial_bulk` answers per entity; `atomic_bulk` rejects the run. A partial shape takes the partial ones; an entity the caller may
+- `ActionValidators.partial_bulk` returns a result per entity; `atomic_bulk` rejects the run. A partial shape takes the partial ones; an entity the caller may
   not reach is one failed item. Only a shape that cannot narrow gates atomically, and it says so.
 - A field row is denied through its owner: the check is per owner, so a denied one takes every row it owns out of the run. Which rows those are is
   known only after the owner lookup, so that narrowing happens in the processor.
-- A read of several named field rows is the same shape: wire it through `LookupFieldGroup.partial_bulk_get_ops`. The answer is keyed by the row, the
+- A read of several named field rows is the same shape: wire it through `LookupFieldGroup.partial_bulk_get_ops`. The response is keyed by the row, the
   check and the record by the owner. The owner lookup a partial field shape runs first is wired public, for the same reason as the entity bulk lookup
   under Gates.
-- A partial run answers with `PartialBulkResult`, one item per entity the caller named and in that order. Fixed rather than per domain: completing and
-  ordering the answer is the processor's job, and it cannot do that for a shape only the domain knows.
+- A partial run returns `PartialBulkResult`, one item per entity the caller named and in that order. Fixed rather than per domain: completing and
+  ordering the response is the processor's job, and it cannot do that for a shape only the domain knows.
 - What a domain has to say per entity goes in the item's value; a session's four termination states are that value, not four lists. A result keyed
   finer than the entity (a pair, say) is not this shape.
 - The item carries the exception; `BulkEntityResult` carries the audit row's columns. Two readers, two types; do not fold them together, and classify
   a failure only where the run knows which step it came from.
 - The result distinguishes a denial from an id matching no row, and an adapter distinguishes them: a miss stays null and a denial is raised at the field
   that asked for it. The no-leakage rule under Gates covers keys, which a caller can guess; these ids the caller already holds.
-- An item answers in one of four ways, and the two axes are separate: whether the operation ran for that entity (a denied one it never saw), and what
-  came back if it did (a value, nothing, or a failure). `nothing` is not a failure: only the domain knows whether an absent value is the correct answer
+- An item's response is one of four kinds, and the two axes are separate: whether the operation ran for that entity (a denied one it never saw), and what
+  came back if it did (a value, nothing, or a failure). `nothing` is not a failure: only the domain knows whether an absent value is the correct response
   or a miss.
 
 ## Soft delete
@@ -154,16 +154,16 @@ New actions inherit only from the v2 bases (`actions/v2/`). The shape of the tar
 - `lookup_ops` and `bulk_lookup_ops` check authentication first and the permission on whatever the key resolved to after. The check splits in two
   because the entity a key names is not known until the run produces it. The second half takes the `single_entity` and `partial_bulk` validators
   respectively; `LOOKUP` is a read, so it requires read permission on that entity.
-- `bulk_lookup_ops` decides per key. A rejected key fails alone; the rest still answer.
-- A key that named nothing offers no entity to check. It is one failed key.
+- `bulk_lookup_ops` decides per key. A rejected key fails alone; the rest still return.
+- A key that named nothing provides no entity to check. It is one failed key.
 - Wiring through `public_lookup_ops` / `public_bulk_lookup_ops` leaves the second half empty, so every authenticated caller may resolve. A bulk lookup
   feeding a `partial_bulk_get_ops` read may be wired public: the read checks each entity. An entity whose existence the key alone must not reveal (a
   user's email) is wired through `bulk_lookup_ops`.
-- A lookup with a second half answers a key naming nothing and a key the caller may not reach with the same exception (`GenericBadRequest`), so no
-  status code says whether the key exists. A bulk lookup puts that answer in `failures` per key. The processor merges the two; adapters must not
+- A lookup with a second half returns the same exception (`GenericBadRequest`) for a key naming nothing and for a key the caller may not reach, so no
+  status code says whether the key exists. A bulk lookup puts that response in `failures` per key. The processor merges the two; adapters must not
   distinguish them again. The audit record distinguishes the two causes. A superadmin passes every check, so the miss reaches them unmerged.
-- The owner lookup a field operation runs first is checked the same way. It is a different permission from the write that follows: the lookup asks for
-  read, the write for write.
+- The owner lookup a field operation runs first is checked the same way. It is a different permission from the write that follows: the lookup requires read
+  permission and the write requires write permission.
 - `BaseGlobalAction` declares no `entity_id()`.
 - `GlobalEntityType` is what a global operation records when it names no other entity. Wiring only; service and domain code never reference it.
 

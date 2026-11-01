@@ -1,4 +1,4 @@
-# Search field declarations — Guardrails
+# Search field declarations: Guardrails
 
 > For background and rationale, see `KNOWLEDGE.md` in the same directory.
 
@@ -14,7 +14,7 @@ Declares what an entity search can filter and order by. A declaration holds SQL 
 |---|---|---|
 | `own` | The entity's own columns as `SearchableField(column, filter, order)`. Implements `RowDataConverter` to build data from a row | The entity's field cap |
 | `nested` | Rows of other tables the entity owns (labels, mount policies, dangling fields), readable under the entity's own permission. `NestedSearchableField(<other entry>.own, correlation)` | The entity's field cap (`labels.key`) |
-| `linked` | Connections to other entities (`MembershipConditions`, `UsageConditions`) | Scopes, the other entity's permission |
+| `linked` | Connections to other entities (`MembershipConditions`, `UsedByConditions`, `UsesConditions`) | Scopes, the other entity's permission |
 
 - Every data field has a `SearchableField` of the same name, and `to_data` reads every value through `self.<name>.read(row)`. The data constructor requires every field, so a
   missing declaration fails mypy.
@@ -114,7 +114,7 @@ A filled slot is not an API surface by itself.
 | some | Is there any child satisfying the condition | Open | Not open |
 | every / none | Do all children satisfy it / does none | Open | Not open |
 | aggregate | What is the children's count, min or max | Not open | Not open |
-| Child column value | — | Used as a condition inside the three shapes above | No such shape |
+| Child column value | None | Used as a condition inside the three shapes above | No such shape |
 
 - With several children it is undefined which row's value an order would take. A to-one is one row, so `ToOneCorrelation.order` is open.
 - To order by a value folded from the children, promote that value to a parent column and declare it as `own`. Do not turn a child condition into an order key.
@@ -165,14 +165,14 @@ Depth follows the permission axis, not the foreign keys.
 | `UsedByConditions` | `linked.usage.sessions.used_by(session_id)` | The images this session uses |
 | `UsesConditions` | `linked.usage.agents.uses(agent_id)` | The sessions using this agent |
 
-- One declaration answers one direction, because the correlation is built around the searched row. The other direction is declared on the other entity. Do not leave a usage
-  declared from one side only.
+- One declaration covers one direction, because the correlation is built around the searched row. The other direction is declared on the other entity. Do not declare a usage
+  from one side only.
 - Do not declare `UsageConditions` itself. Only the two subtypes that name a direction.
 - The API input carries one `usage` per search, holding `usedBy` and `uses`.
 - The rules are the same both ways: narrow with AND, require the caller to be able to read the entity the condition names, grant no permission, and pull in no row the scopes
   disallow.
 - A scoped search passes them through `ScopedSearcher`; one named entity the caller cannot read rejects the whole search. A global search passes them through `GlobalSearcher`,
-  where the SUPERADMIN gate answers, so the named entities are not checked.
+  where the SUPERADMIN gate applies, so the named entities are not checked.
 - What the search carries is one list either way: `ScopedSearcher.used_by` and `GlobalSearcher.used_by` take both directions' conditions, and one condition is a `UsedBy`.
 - The agent has no `searchable_fields.py` yet, so `used_by.sessions` cannot be declared on it. Fill it in when the agent moves onto the v2 declarations.
 
@@ -185,10 +185,10 @@ The per-entity tables are under `Scopes a search accepts` in `KNOWLEDGE.md`. Add
 | Entity | Every scope entity that can own it, and the scope of every relation that grants READ |
 | Field | The entity that owns the field |
 
-- A field search is the bulk shape that checks permission per owning entity. Its execution path is to move onto the new search path.
+- A field search is the bulk shape that checks permission per owning entity. Its execution will move onto the new search path.
 - Read the owning scopes off `created_in` on the creator and the upserter. Read the READ-granting relations off the `RelationCreator` declarations and the share writes.
 - public is a scope like any other. A public read is a scope action, and one Target declares both what is authorized against (the public singleton) and the row condition (rows
-  registered in public). Precedent: `PublicImageTarget` (`models/image/scopes.py`).
+  registered in public). See `PublicImageTarget` (`models/image/scopes.py`).
 - The `is_global` column keeps its name. It means "registered in public". Names in code say public.
 - Registration in public is membership. An entity whose whole type is public and an entity switched per row by a column (container registry, image, resource preset) both name
   public in `created_in`. For the per-row kind, its Target puts that column on as the row condition.
