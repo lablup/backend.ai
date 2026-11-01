@@ -2,6 +2,7 @@
 
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.data.filter_specs import StringMatchSpec
+from ai.backend.common.dotfile import DotfilePath
 from ai.backend.common.dto.manager.config.response import (
     CreateDotfileResponse,
     DeleteDotfileResponse,
@@ -87,6 +88,7 @@ class UserConfigAdapter:
     async def update_default_dotfile(
         self, input: UpdateDefaultDotfileInput
     ) -> UpdateDotfileResponse:
+        DotfilePath(input.path)
         dotfiles = await self._search_default_dotfiles(input.user_id, input.path)
         if not dotfiles:
             raise DotfileNotFound

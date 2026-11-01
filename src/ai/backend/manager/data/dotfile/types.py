@@ -9,7 +9,9 @@ from typing import Any
 from ai.backend.common import msgpack
 from ai.backend.common.data.entity.dotfile import DotfileID
 from ai.backend.common.data.entity.types import FieldData, RuntimeEntityID
-from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE, RESERVED_DOTFILES
+from ai.backend.common.dotfile import DotfilePath
+from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
+from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.errors.storage import (
     DotfileAlreadyExists,
     DotfileCreationFailed,
@@ -17,10 +19,6 @@ from ai.backend.manager.errors.storage import (
 )
 
 MAXIMUM_DOTFILE_COUNT = 100
-
-
-def verify_dotfile_name(dotfile: str) -> bool:
-    return dotfile not in RESERVED_DOTFILES
 
 
 class DotfileScope(enum.StrEnum):
@@ -76,6 +74,19 @@ class DotfileEntries:
                 DotfileEntry(path=row["path"], perm=row["perm"], data=row["data"]) for row in rows
             )
         )
+
+    @classmethod
+    def verify_packed(cls, packed: bytes) -> None:
+        try:
+            cls.unpack(packed).verify_paths()
+        except (ValueError, TypeError, KeyError) as e:
+            raise InvalidAPIParameters(
+                "dotfiles must be a msgpack list of path, perm and data entries."
+            ) from e
+
+    def verify_paths(self) -> None:
+        for entry in self.entries:
+            DotfilePath(entry.path)
 
     def get(self, path: str) -> DotfileEntry:
         for entry in self.entries:
