@@ -2,13 +2,13 @@
 
 문체 규칙은 [용어집](../GLOSSARY.ko.md)을 따릅니다.
 
-| 한글 | English | 뜻 | 쓰지 않는 어휘 | 메모 |
+| 한글 | English | 뜻 | 사용하지 않는 어휘 | 메모 |
 |---|---|---|---|---|
 | 가속기 | accelerator | agent 에 설치해 resource slot 을 추가하는 플러그인입니다. | Compute Plugins, 액셀러레이터 |   |
 | 에이전트 | Agent | 노드에서 컨테이너 라이프사이클을 관리하고 자원 사용을 감시하며 Manager 에 상태를 보고하는 컴포넌트입니다. | 실행 노드, compute node, 컴퓨트 노드 | Backend.AI 문서 안에서는 Agent 만 써도 됩니다. 에이전트를 가리키지 않고 실행되는 노드만 말할 때는 node 로 씁니다 |
 | 에이전트 선택 전략 | agent selection strategy | 세션을 배치할 agent 를 고르는 전략입니다. |   |   |
 | 알림 | alert | 모니터링 지표 임계값에 따라 외부 메시징 서비스로 자동 알림을 보내는 기능입니다. |   |   |
-| 별칭 | alias | 마운트할 때 폴더 이름 대신 쓰는 경로입니다. | 대체 이름, 대체이름 |   |
+| 별칭 | alias | 마운트할 때 폴더 이름 대신 사용하는 경로입니다. | 대체 이름, 대체이름 |   |
 | 엔드포인트 | API endpoint | 접속할 API 서버 주소입니다. | 엔트포인트 |   |
 | 앱 설정 | app config | 보이는 모든 scope 의 fragment 를 병합한 app config key 의 값입니다. | AppConfig |   |
 | 앱 설정 허용 목록 | app config allow list | config 이름별로 scope 가 값을 쓸 수 있는지와 fragment 병합 순위를 정하는 목록입니다. |   |   |
@@ -76,8 +76,8 @@
 | 최대 요청수 | rate limit | client 가 서버에 과부하를 주지 않도록 API 요청 수를 제한하는 한도입니다. |   |   |
 | 복제본 | replica | deployment 를 서비스하는 session 하나로, healthy 이면 트래픽의 일부를 받습니다. |   |   |
 | 복제본 그룹 | replica group | deployment 의 replica 들을 묶어 리비전 사이를 옮겨가며 트래픽을 조정하는 단위입니다. |   |   |
-| Reservoir | Reservoir | artifact 저장소로 쓰이는 artifact registry 종류입니다. | 리저버, 레저버 | 제품 이름이라 영어로만 씁니다 |
-| 자원 할당 | resource allocation | 커널이 한 자원을 요청하고 받아 실제로 쓴 양을 기록하는 항목입니다. |   |   |
+| Reservoir | Reservoir | artifact 저장소로 사용되는 artifact registry 종류입니다. | 리저버, 레저버 | 제품 이름이라 영어로만 씁니다 |
+| 자원 할당 | resource allocation | 커널이 한 자원을 요청하고 받아 실제로 사용한 양을 기록하는 항목입니다. |   |   |
 | 자원 그룹 | resource group | agent 를 묶어 독립된 scheduler 로 세션을 배치하는 단위입니다. | scaling group, sgroup, 리소스 그룹, 스케일링 그룹 |   |
 | 자원 프리셋 | resource preset | session 이 요청할 수 있는 이름 있는 자원량 묶음입니다. | 리소스 프리셋 |   |
 | 자원 슬롯 | resource slot | 세션에 할당되는 CPU, memory, GPU 등 자원 단위입니다. | 리소스 슬롯 |   |
@@ -97,7 +97,7 @@
 | 세션 그룹 | session group | 여러 세션을 같은 agent 에 모으거나 흩어 배치하는 단위입니다. | placement group |   |
 | 세션 이력 | session history | 세션 스케줄링 handler 가 한 번 실행될 때 상태 변화와 결과를 남긴 기록입니다. |   |   |
 | 세션 수명 | session lifetime | 세션이 실행될 수 있는 최대 시간입니다. |   |   |
-| 세션 템플릿 | session template | 세션을 만들 때 쓰는 저장된 설정입니다. | task template |   |
+| 세션 템플릿 | session template | 세션을 만들 때 사용하는 저장된 설정입니다. | task template |   |
 | 세션 유형 | session type | session 의 종류 값 묶음으로 interactive, batch, inference, system 이 있습니다. | 세션 타입 |   |
 | 스토리지 호스트 | storage host | vfolder 를 두는 storage backend host 입니다. |   |   |
 | 스토리지 네임스페이스 | storage namespace | object storage 의 bucket 이나 VFS storage 의 subpath 입니다. | 네임스페이스 |   |

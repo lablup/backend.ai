@@ -2,12 +2,12 @@
 
 문체 규칙은 [용어집](../GLOSSARY.ko.md)을 따릅니다.
 
-| 한글 | English | 뜻 | 쓰지 않는 어휘 | 메모 |
+| 한글 | English | 뜻 | 사용하지 않는 어휘 | 메모 |
 |---|---|---|---|---|
 | 가속기 플러그인 | accelerator plugin | 가속기를 Backend.AI 와 연결하는 plugin 패키지입니다. |   |   |
 | account manager | account manager | 통합 사용자 프로필과 SSO 를 맡는 별도 daemon 입니다. | AccountManager, accountmgr |   |
 | Action | action | service operation 을 감싸 권한 검사와 감사, 지표를 구조적으로 적용하는 단위입니다. |   |   |
-| adapter | adapter | v2 handler 가 processor 를 직접 부르지 않고 부르는, GQL 계층과 공유하는 호출 계층입니다. |   |   |
+| adapter | adapter | v2 handler 가 processor 를 직접 호출하는 대신 사용하는, GQL 계층과 공유하는 호출 계층입니다. |   |   |
 | Agent Watcher | agent watcher | Agent service 를 감시하고 관리하는 add-on 서비스입니다. |   |   |
 | 스코프별 앱 설정 | app config fragment | 한 스코프가 app config key 에 더하는 값을 JSON 문서로 담은 행입니다. | AppConfigFragment, 앱 설정 프래그먼트, 앱 설정 조각 |   |
 | App Proxy | app proxy | 세션 의 service port 로 오는 트래픽을 동적으로 라우팅하고 로드밸런싱하는 컴포넌트입니다. | AppProxy, wsproxy, WSProxy, WebSocket Proxy | wsproxy 는 옛 이름입니다. 코드 식별자는 별도로 정리합니다 |
@@ -30,12 +30,12 @@
 | 커널 스케줄링 이력 | kernel scheduling history | 커널이 image pull 부터 종료까지 거친 단계와 그 결과를 기록하는 이력입니다. |   |   |
 | Manager | manager | 사용자 요청을 받아 세션을 만들고 agent 에 코드 실행을 라우팅하는 중앙 API gateway 이자 orchestrator 인 컴포넌트입니다. |   |   |
 | 모델 카드 자원 요구 사항 | model card resource requirement | model card 가 slot 별로 요구하는 최소 자원량입니다. |   |   |
-| processor | processor | handler 가 processor 를 부르는, action 을 받아 권한 검사와 감사, 지표를 구조적으로 실행하는 계층입니다. |   |   |
+| processor | processor | handler 가 processor 를 호출하는, action 을 받아 권한 검사와 감사, 지표를 구조적으로 실행하는 계층입니다. |   |   |
 | 프로메테우스 쿼리 프리셋 카테고리 | prometheus query preset category | Prometheus query preset 을 묶는 분류입니다. |   |   |
 | relation | relation | 두 entity 를 잇거나 끊는, 자기 테이블과 자기 연산을 갖는 세 번째 대상입니다. | 엔티티 관계, 관계 |   |
 | 복제본 그룹 이력 | replica group history | replica group handler 의 한 번 실행마다 상태 변화와 결과를 남기는 기록입니다. |   |   |
 | repository | repository | 데이터 접근을 담당하는 계층입니다. |   |   |
-| resolver | resolver | fetcher 를 부르는 얇은 GraphQL operation wrapper 계층입니다. |   |   |
+| resolver | resolver | fetcher 를 호출하는 얇은 GraphQL operation wrapper 계층입니다. |   |   |
 | 라우트 이력 | route history | route handler 가 replica 하나에 대해 한 번 실행될 때의 상태 변화와 결과를 남기는 기록입니다. |   |   |
 | scheduler | scheduler | 대기 세션을 조회해 agent 에 배치하는 실제 스케줄링 알고리즘을 실행하는 sokovan 엔진입니다. |   |   |
 | service | service | 도메인 검증과 business logic 을 두는 계층입니다. | 서비스 |   |
