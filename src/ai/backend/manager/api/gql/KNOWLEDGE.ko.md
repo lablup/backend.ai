@@ -14,9 +14,9 @@ v2 Strawberry schema 는 v1 Graphene schema 와 함께 supergraph 로 구성된�
 
 search 질의는 cursor 와 offset 인자를 모두 받는다.
 
-- **기본(인자 없음):** offset 으로 대체한다(`limit=10, offset=0`).
+- **기본(인자 없음):** offset 을 기본으로 사용한다(`limit=10, offset=0`).
 - **offset(`limit`/`offset`):** 사용자가 지정한 `order_by` 를 적용하고 없으면 엔티티의 기본 정렬을 적용한다. custom 정렬이 필요할 때 사용한다.
-- **cursor(`first`/`after` 또는 `last`/`before`):** 정렬을 엔티티의 cursor key(보통 `created_at` 이나 PK)로 고정한다. 사용자가 지정한 `order_by` 는 무시한다. cursor 일관성에는 고정 정렬이 필요하다. infinite-scroll 이나 "load more" UX 에 적합하다.
+- **cursor(`first`/`after` 또는 `last`/`before`):** 정렬을 엔티티의 cursor key(보통 `created_at` 이나 primary key)로 고정한다. 사용자가 지정한 `order_by` 는 무시한다. cursor 일관성에는 고정 정렬이 필요하다. infinite-scroll 이나 "load more" UX 에 적합하다.
 - 요청마다 모드 하나만 사용한다. `first` 와 `limit` 을 섞으면 에러다.
 
 ## relation 도 Node 다: id 는 끝으로 구성한 global ID 다
@@ -30,7 +30,7 @@ search 질의는 cursor 와 offset 인자를 모두 받는다.
 - Node 는 server 가 id 만으로 다시 가져올 수 있는 객체다(Relay Global Object Identification). relation 은 끝으로 고정되므로 끝을 담은 global ID 가 id 만으로 그것을 다시 가져온다.
 - relation 테이블에는 row id 가 없다. 끝의 쌍이 primary key 다(BEP-1075). 쌍 밖의 id 는 같은 relation 의 두 번째 이름이고, 그것으로 찾은 relation 은 권한을 검사하기 전에 끝으로 다시 읽어야 한다.
 - Node 이므로 relation 은 Relay store 에서 정규화되고 unlink 응답의 `purgedId` 가 `@deleteEdge` 에 들어간다.
-- global ID 는 GQL 계층에 남으므로 client 가 저장한 id 가 relation 을 변경하는 요청으로 바뀌지 않는다. relation 을 변경하는 인자는 끝 UUID 다.
+- global ID 는 GQL 계층에 남으므로 client 가 저장한 id 가 relation 을 변경하는 요청으로 변경되지 않는다. relation 을 변경하는 인자는 끝 UUID 다.
 - 자기 lifecycle 을 가진 row 는 relation 으로 두지 않고 entity type 으로 선언한다.
 
 ## relation 값은 relation type 의 connection 으로 읽는다
@@ -41,13 +41,13 @@ relation row 는 client 가 읽어야 하는 값을 담는다. 누가 언제 부
 |---|---|---|
 | 값 읽기 | edge field | relation type field |
 | relation 당 type | 방향마다 Edge, Filter, OrderBy 하나 | relation type, Filter, OrderBy 를 두 방향이 공유 |
-| relation 값과 엔티티 조건을 함께 필터 | 방향마다 wrapper Filter | relation type 의 Filter 에 end entity 조건을 중첩 |
+| relation 값과 엔티티 조건을 함께 필터링 | 방향마다 wrapper Filter | relation type 의 Filter 에 end entity 조건을 중첩 |
 | mutation payload | 끝 id 만, 또는 별도로 정의한 모양 | 변경된 relation type 객체 |
 | 다른 엔티티까지 거리 | 한 단계 | 두 단계(`node.checker`) |
 
 - relation type 을 Node 로 두므로 그 connection 은 strawberry 의 `Edge` 와 `Connection` generic 을 그대로 사용한다.
-- cursor 는 불투명 문자열이므로 끝 key 를 인코딩해도 id 로 row 를 변경하는 경로가 열리지 않는다. cursor 조건 factory 는 문자열을 받고 primary key column 여럿도 담는다.
-- `node(id:)` 와 `nodes(ids:)` 는 끝 key 목록으로 relation 을 한 번에 읽고 두 끝 scope 에 읽기를 요구한다. global ID 가 두 끝을 담으므로 한쪽만 질문하면 다른 끝 엔티티가 권한 없이 드러난다.
+- cursor 는 불투명 문자열이므로 끝 key 를 인코딩해도 id 로 row 를 변경하는 경로가 열리지 않는다. cursor 조건 factory 는 문자열을 받고 여러 primary key column 도 담는다.
+- `node(id:)` 와 `nodes(ids:)` 는 끝 key 목록으로 relation 을 한 번에 읽고 두 끝 scope 에 읽기를 요구한다. global ID 가 두 끝을 담으므로 한쪽만 요구하면 다른 끝 엔티티가 권한 없이 드러난다.
 
 ## Node 는 id 기반 동작을 거부하면서 id 를 유지할 수 없다
 
@@ -72,9 +72,9 @@ relation row 는 client 가 읽어야 하는 값을 담는다. 누가 언제 부
 
 | relation | table | 코드 이름(Data, DTO, CLI, REST) | relation type |
 |---|---|---|---|
-| session↔idle checker | `session_idle_checks` | `SessionIdleCheckData` | `SessionIdleCheck` |
-| scope↔idle checker | `idle_checker_bindings` | `IdleCheckerAssignmentData`, CLI `idle-checker-assignment` | `IdleCheckerAssignment` |
-| user↔role | `user_roles` | DTO `RoleAssignmentNode`, CLI `rbac assignment`, REST `/assignments` | `RoleAssignmentV2` |
+| session 과 idle checker | `session_idle_checks` | `SessionIdleCheckData` | `SessionIdleCheck` |
+| scope 와 idle checker | `idle_checker_bindings` | `IdleCheckerAssignmentData`, CLI `idle-checker-assignment` | `IdleCheckerAssignment` |
+| user 와 role | `user_roles` | DTO `RoleAssignmentNode`, CLI `rbac assignment`, REST `/assignments` | `RoleAssignmentV2` |
 
 - table 을 따르면 `IdleCheckerBinding` 이 되어 service, CLI, REST 이름과 어긋난다.
 - `UserRole` 은 계정 role enum `UserRoleV2`(`UserV2.role`, `UserV2.roles`) 옆에 놓여 같은 type 의 version 으로 읽힌다.
@@ -83,8 +83,8 @@ relation row 는 client 가 읽어야 하는 값을 담는다. 누가 언제 부
 
 | relation | 현재 | 대상 |
 |---|---|---|
-| user↔role | `RoleAssignment` Node(row id), deprecated | `RoleAssignmentV2` relation Node, (user, role) 로 구성한 id |
-| scope↔idle checker | `IdleCheckerAssignment` Node(row id), 미출시 | 같은 이름의 relation Node, (scope type, scope id, idle checker) 로 구성한 id |
-| session↔idle checker | 읽기 없음, mutation 만 | `SessionIdleCheck` relation Node, (session, idle checker) 로 구성한 id |
+| user 와 role | `RoleAssignment` Node(row id), deprecated | `RoleAssignmentV2` relation Node, (user, role) 로 구성한 id |
+| scope 와 idle checker | `IdleCheckerAssignment` Node(row id), 미출시 | 같은 이름의 relation Node, (scope type, scope id, idle checker) 로 구성한 id |
+| session 과 idle checker | 읽기 없음, mutation 만 | `SessionIdleCheck` relation Node, (session, idle checker) 로 구성한 id |
 
 - `RoleAssignment.id` 는 `ID!` type 을 유지하고 값만 끝의 global ID 가 된다.

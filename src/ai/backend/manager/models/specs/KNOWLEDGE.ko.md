@@ -21,13 +21,13 @@ write spec 은 "무엇을 쓰는가"(row, membership, 무결성 검사)를 schem
 | Field | 다른 엔티티가 소유하는 row(자체 get/delete API 가 있어도) | create 에 `owner_id` 가 필요하고 purge 는 일반 delete 다 |
 | Sidecar | graph 밖의 row. 감사 기록, event log | create 는 insert 만 한다. 지정한 엔티티는 읽기 권한의 근거이지 소유자가 아니다 |
 
-## relation 은 양쪽에 속하므로 어느 자리에도 속하지 않는다
+## relation 은 양쪽에 속하므로 어느 항목에도 속하지 않는다
 
-- write spec 은 소유를 기준으로 나뉘고, 두 자리 모두 소유가 0 또는 1이라고 가정한다. 엔티티는 스스로를
-  소유하고 필드는 엔티티 하나가 소유한다. 두 엔티티를 잇는 row 는 양쪽이 소유하므로 어느 자리도 그렇게
+- write spec 은 소유를 기준으로 나뉘고, 두 항목 모두 소유가 0 또는 1이라고 가정한다. 엔티티는 스스로를
+  own 하고 필드는 엔티티 하나가 소유한다. 두 엔티티를 잇는 row 는 양쪽이 소유하므로 어느 항목도 그렇게
   말할 수 없다.
 - 소유는 호출 지점이 아니라 schema 에서 읽는다. row 가 사라질 때 무엇이 삭제하는지가 소유자다.
-  polymorphic 참조는 외래 키가 없으므로 그 소유는 정리 코드에 대한 사실이다.
+  polymorphic 참조는 외래 키가 없으므로 그 소유는 제약에 대한 사실이 아니라 정리 코드에 대한 사실이다.
 - 그래서 relation 루트는 pair 를 지정하고 row id 는 지정하지 않는다. row 를 쓴 계층 밖에서는 그 id 를
   가지지 않으며, 읽기는 두 엔티티 사이의 row 가 아니라 relation 이 접근하는 엔티티를 반환한다.
 - 끄기는 접근이 아니라 상태다. 프로젝트에서 한동안 제외된 resource group 도 양쪽에서 읽혀야 제외가
@@ -35,7 +35,7 @@ write spec 은 "무엇을 쓰는가"(row, membership, 무결성 검사)를 schem
   에 꺼진 row 를 되살리는 upsert 가 없는 이유이기도 하다. 되살리기는 restore 의 역할이다.
 - 전체 근거: `proposals/BEP-1075-entity-relation-operations.md`.
 
-## sidecar 는 어느 자리에도 속하지 않는다
+## sidecar 는 어느 항목에도 속하지 않는다
 
 - 엔티티는 스스로 설 수 있고 virtual entity 를 통해 다른 엔티티와 엮인다. 필드는 스스로 설 수 없고
   소유자의 값에 덧붙는 확장이며 소유자의 권한으로 처리된다.
@@ -73,8 +73,8 @@ write spec 은 "무엇을 쓰는가"(row, membership, 무결성 검사)를 schem
 ## global 엔티티도 node 를 마련한다
 
 global 엔티티 아래에도 row 가 생성된다. container registry 아래의 image 가 그렇다. node 가 없으면 그
-row 들이 membership 을 걸 대상이 없고, global 엔티티 자체는 super-admin 외에는 접근할 수 없다. 삭제 쪽은
-항상 node 를 정리했고, 생성 쪽은 만든 적 없는 것을 정리하던 비대칭을 없앴다.
+row 들이 membership 이 향할 대상이 없고, global 엔티티 자체는 super-admin 외에는 접근할 수 없다. 삭제 쪽은
+항상 node 를 정리했고, 생성 쪽은 생성한 적 없는 것을 정리하던 비대칭을 없앴다.
 
 ## field row 는 자체 id 를 가진다
 
@@ -92,14 +92,14 @@ row 들이 membership 을 걸 대상이 없고, global 엔티티 자체는 super
 | field row 의 id | 모름 | field | 먼저 읽은 소유 엔티티 |
 | 엔티티의 id | 앎 | scope | 그 엔티티를 스코프로 |
 
-- 그 엔티티의 field row 여럿을 반환하는 읽기는 엔티티에서 시작했으므로 무엇을 건드릴지가 아니라 어디를
-  살필지 지정한다. 소유자를 스코프로 둔 scope 모양이다.
+- 그 엔티티의 field row 여럿을 반환하는 읽기는 엔티티에서 시작했으므로 무엇을 건드리는 대상이 아니라 어디를
+  살펴볼 대상을 지정한다. 소유자를 스코프로 둔 scope 모양이다.
 - field row 생성이 소유 엔티티의 id 를 받는 이유도 같다. 규칙은 `../../actions/AGENTS.md` 에 있다.
 
 ## field row 의 membership 은 소유자를 통해서만 알 수 있다
 
 - field row 는 자체 membership 을 갖지 않으므로 이를 지정한 연산은 검증할 것도 기록할 것도 없다.
-  `FieldOwnerLookup` 이 그 자리를 채운다. field row 의 id 에서 소유 엔티티의 id 로 잇는다.
+  `FieldOwnerLookup` 이 그 역할을 채운다. field row 의 id 에서 소유 엔티티의 id 로 잇는다.
 - 조건이 아니라 질의를 선언하는 이유는 소유자가 join 을 통해서만 접근할 수 있기 때문이고, (row id, 소유자
   id) pair 를 선택하는 것이 batch 에서 각 row 의 소유자를 잃지 않게 하기 때문이다.
 - `Select` 의 type parameter 가 invariant 라 일반적이다. 구체 column type 은 느슨하게 선언한 type 과
@@ -123,7 +123,7 @@ spec 루트와 같은 방식이다. write 를 차단하는 것은 실행 시점�
 
 - own: virtual entity 가 엔티티를 보유한다. 엔티티는 그 virtual entity 의 목록에 있고("목록 = 등재")
   한 홉 떨어져 있다.
-- govern: 스코프가 virtual entity 를 다스린다. 스코프의 역할이 그 virtual entity 가 own 하는 모든 것에
+- govern: 스코프가 virtual entity 를 govern 한다. 스코프의 역할이 그 virtual entity 가 own 하는 모든 것에
   접근한다. 둘 중 넓은 relation 이다.
 - resolver 는 한 홉을 걷는다: `entity → 이를 own 하는 virtual entity → 그것을 govern 하는 스코프 →
   role`. 검사는 ops 에도 있다(`PermissionReadOps`, `PermissionOpsProvider` 의 읽기 쪽).
@@ -135,8 +135,7 @@ spec 루트와 같은 방식이다. write 를 차단하는 것은 실행 시점�
 | govern 검사 | 내 역할이 있는 스코프가 이 스코프의 virtual entity 를 govern 하는가(자기 govern 포함), 그 안에서 이 엔티티 type 에 이 bit 를 주는가: "이 type 과 이 bit 로 이 스코프를 govern 하는가" | `governed_permissions(keys)` |
 
 - entity create 와 search 는 govern 검사(생성되는 것이 스코프 소유가 된다), 단일 엔티티, bulk, relation
-  action 은 own 검사를 쓴다. global 은 graph 밖이다(superadmin). field 검사와 목록 필터(BEP-1077 5.2,
-  5.4)는 후속 작업이다.
+  action 은 own 검사를 쓴다. global 은 graph 밖이다(superadmin). field 검사와 목록 필터(BEP-1077 의 field 검사와 목록 필터 절)는 후속 작업이다.
 - own 검사는 홉마다 인덱스 조회 하나이고 엔티티마다 row 하나를 반환한다. 옛 질의(경로와 bit 마다 row
   하나를 Python 에서 OR)와의 동등성은 CI 마다
   `tests/unit/manager/repositories/permission_controller/test_own_check_query.py` 에서 세 모양(own 사슬,
@@ -147,7 +146,7 @@ spec 루트와 같은 방식이다. write 를 차단하는 것은 실행 시점�
 - `created_in`(session → project, user): 생성된 곳이 이를 own 하고 govern 한다. own 을 통해 프로젝트의
   역할이 session 에 접근해 목록에 올리고, govern 을 통해 session 이 own 하는 것(invitation)에 접근한다.
   domain 은 user 의 virtual entity 를 govern 하므로 user 가 own 하는 session 에 접근한다.
-- project 와 user 도 domain 을 `created_in` 한다. own 은 해석에 더하는 것이 없지만(자기 own 과 govern 이
+- project 와 user 도 domain 을 `created_in` 한다. own 은 해석에 추가하는 것이 없지만(자기 own 과 govern 이
   이미 접근한다) 스코프와 resource 엔티티를 하나의 규칙 아래 둔다. user 의 virtual entity 는 domain 만
   govern 한다. project 가 govern 하면 user 가 own 하는 것이 프로젝트로 새어 나간다(BEP-1077).
 - 예전 `member_of` 도 둘을 모두 썼다. 이름이 own 만 말해서 govern 이 가려졌다.
@@ -160,13 +159,13 @@ spec 루트와 같은 방식이다. write 를 차단하는 것은 실행 시점�
 - relation 테이블은 양쪽에 cascade 외래 키를 가진다(`association_container_registries_groups`,
   `sgroups_for_groups`). spec 은 pair 의 id type 으로 typed 된다.
 - resource group 이 session 과 deployment 를 보는 것은 relation 이 아니다. scheduling 때 session 을
-  공유해 답한다(후속). 그 resource group 을 govern 하는 다른 project 는 share 로 답을 받지 않으므로
+  공유해 응답한다(후속). 그 resource group 을 govern 하는 다른 project 는 share 로 응답을 받지 않으므로
   새지 않는다.
 - 두 축으로 네 루트다. `created_in` 유무(Entity / Global) × 프리셋 역할 유무(plain / RoleManaged).
-  role-managed 는 같은 relation 에 프리셋을 더한다.
-- every-field share 와 field-path share 는 뜻이 다르고 메서드도 다르다. replace 는 앞의 것을 모두 버리고,
-  widen 은 읽어서 더하기만 하고, narrow 는 제거만 한다. 섞인 share 는 replace 후 widen 으로 쓴다.
-- private 기본 연산은 `V2GraphWriteOpsBase` 에만 있고 어떤 provider 도 이를 내주지 않는다. 공개 표면은
+  role-managed 는 같은 relation 에 프리셋을 추가한다.
+- every-field share 와 field-path share 는 의미가 다르고 메서드도 다르다. replace 는 앞의 것을 모두 버리고,
+  widen 은 읽어서 추가만 하고, narrow 는 제거만 한다. 섞인 share 는 replace 후 widen 으로 쓴다.
+- private 기본 연산은 `V2GraphWriteOpsBase` 에만 있고 어떤 provider 도 이를 제공하지 않는다. 공개 표면은
   provider / ops 세 쌍이다.
 
 | relation | write | reverse | 쓰는 쪽 |

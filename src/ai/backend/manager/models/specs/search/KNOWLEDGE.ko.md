@@ -18,7 +18,7 @@ field cap 이 모두 같은 field 목록을 읽는다.
 
 ## type 이 불가능한 것을 정한다
 
-- JSON/JSONB 와 array 는 문서 구조라 크기 비교가 의미 없다. `SecretColumn` 은 암호문을 비교하므로 평문 순서와 무관하고, 동등 비교는 값을 암시한다. 파생 field 는 연산을 걸 column 이 없다.
+- JSON/JSONB 와 array 는 문서 구조라 크기 비교가 의미 없다. `SecretColumn` 은 암호문을 비교하므로 평문 순서와 무관하고, 동등 비교는 값을 암시한다. 파생 field 는 연산을 적용할 column 이 없다.
 - `DecimalType` 은 VARCHAR 로 저장되어 `"10" < "9"` 다. cast 를 하면 성립한다. enum 은 성립하지만 알파벳 순서이지 의미 있는 순서가 아니다.
 
 ## 비용은 column 종류와 인덱스가 정한다
@@ -26,7 +26,7 @@ field cap 이 모두 같은 field 목록을 읽는다.
 - 큰 text column 의 부분 일치는 인덱스를 사용하지 못해 전체를 스캔한다. 짧은 문자열은 전체를 스캔해도 행당 비교가 싸다.
 - 경계는 1024 하나다. 선언된 길이는 16, 20, 32, 64, 128, 255, 256, 500, 512, 1024 에 몰려 있고 다음은 `16 * 1024` 다. 1024 이하는 이름, 경로, URL, 설명 같은 한 줄 값이며 사용자가 부분 일치로 찾는 대상이다. 그보다 크면 `sa.Text` 나 script 다.
 - 256 을 경계로 하면 512 인 `endpoints.name` 과 `model_cards.name` 의 부분 일치가 닫힌다. 구간을 둘로 나누면 257부터 1023까지 규칙이 없어지는데 `groups.description` 도 512 다.
-- to-many 집계는 outer row 마다 subquery 를 다시 수행하므로 `ToManyCorrelation` 에 `order` 가 없다. to-one 은 outer row 당 한 row 이므로 열려 있다. 인덱스는 선언과 같은 변경에 함께 넣는다.
+- to-many 집계는 outer row 마다 subquery 를 다시 수행하므로 `ToManyCorrelation` 에 `order` 가 없다. to-one 은 outer row 당 한 row 이므로 열려 있다. 인덱스는 선언과 같은 변경에 함께 추가한다.
 
 ## 조건 class 는 filter DTO 를 모른다
 
@@ -57,10 +57,10 @@ field cap 이 모두 같은 field 목록을 읽는다.
 ## child 조건은 order key 가 되지 않는다
 
 - 요청하는 것은 boolean 이 아니다. "실행 중인 child 가 있는 것부터" 가 아니라 "정상인 것부터, 그다음 문제가 있는 것" 이다. `Endpoint.status`(`api/gql_legacy/endpoint.py`)가 그 요청을 네 술어에서 나온 다섯 값으로 표현하며, boolean order 는 그 순서를 만들지 못한다.
-- 지금은 Python 에서 값을 접는다. 답은 부모 column 이다. 그러면 `own` field 가 되어 filter 와 order 가 함께 열리고 인덱스가 접근한다. 이는 schema 변경이라 별도 작업이다. `endpoints.replicas` 는 원하는 개수이지 살아 있는 child 수가 아니다.
+- 지금은 Python 에서 값을 접는다. 답은 부모 column 이다. 그러면 `own` field 가 되어 filter 와 order 가 함께 열리고 인덱스로 접근할 수 있다. 이는 schema 변경이라 별도 작업이다. `endpoints.replicas` 는 원하는 개수이지 살아 있는 child 수가 아니다.
 - MIN scalar subquery 로 이미 노출된 order 세 개가 금지 대상이다: `UserV2OrderField.PROJECT_NAME`, `ProjectV2OrderField.USER_USERNAME`, `ProjectV2OrderField.USER_EMAIL`(26.2.0). deprecate 로 표시하고 다음 릴리스에서 제거하되 그때까지 동작하게 둔다.
 
-## 다른 서비스는 to-many order 와 relation filter 를 어디까지 여는가
+## 다른 서비스의 to-many order 와 relation filter 허용 범위
 
 - Hasura 는 집계만, Prisma 는 `_count` 만, Hasura ndc-spec 은 `relationships.order_by_aggregate` 뒤의 `OrderByTarget: aggregate` 를 연다. OData 는 field 경로나 정렬 가능한 함수를 받고 `any` / `all` 은 `$filter` 용으로 둔다. Elasticsearch 는 `mode` 와 다시 선언한 `nested_filter` 를 통해서만 child column 으로 order 한다. GitHub 는 이름 붙은 enum 값 뒤의 미리 계산한 counter 를 연다. 술어로 order 하는 서비스는 없다.
 
@@ -69,12 +69,12 @@ field cap 이 모두 같은 field 목록을 읽는다.
 
 ## 다른 엔티티로의 중첩 filter 는 열지 않는다
 
-- 중첩 filter 는 EXISTS 안에서 상대 row 의 값을 평가할 뿐 호출자가 그 row 를 읽을 수 있는지 묻지 않는다. 그래서 결과가 호출자가 읽을 수 없는 row 의 값(다른 사용자의 email 등)을 드러낼 수 있다.
-- 두 단계 lookup 이나 엔티티 자신의 column 에 복사한 식별자를 사용한다. 열려면 EXISTS 안에 "호출자가 읽을 수 있는 row" 를 더하는 공유 부분이 먼저 필요하다. 같은 이유로 entity share 처럼 자체 권한 type 을 가진 row 는 `nested` 에 두지 않는다.
+- 중첩 filter 는 EXISTS 안에서 상대 row 의 값을 평가할 뿐 호출자가 그 row 를 읽을 수 있는지 검사하지 않는다. 그래서 결과가 호출자가 읽을 수 없는 row 의 값(다른 사용자의 email 등)을 드러낼 수 있다.
+- 두 단계 lookup 이나 엔티티 자신의 column 에 복사한 식별자를 사용한다. 열려면 EXISTS 안에 "호출자가 읽을 수 있는 row" 를 추가하는 공유 부분이 먼저 필요하다. 같은 이유로 entity share 처럼 자체 권한 type 을 가진 row 는 `nested` 에 두지 않는다.
 
 ## Relation 이 아니라 Correlation 이다
 
-- BEP-1075 에서 `Relation` 은 "두 엔티티가 함께 소유하는 link row" 다. 여기의 type 은 상관 subquery 로 다른 테이블의 row 를 찾을 뿐이므로 SQL 용어를 쓴다. `.correlate()` 는 outer SELECT 가 그 테이블을 가질 때만 subquery 의 FROM 에서 제거한다. outer 질의 없이 사용하면 cross join 이 된다.
+- BEP-1075 에서 `Relation` 은 "두 엔티티가 함께 소유하는 link row" 다. 여기의 type 은 상관 subquery 로 다른 테이블의 row 를 찾을 뿐이므로 SQL 용어를 사용한다. `.correlate()` 는 outer SELECT 가 그 테이블을 가질 때만 subquery 의 FROM 에서 제거한다. outer 질의 없이 사용하면 cross join 이 된다.
 
 ## usage relation 은 graph 밖에 둔다
 
@@ -87,18 +87,18 @@ field cap 이 모두 같은 field 목록을 읽는다.
 - 스코프는 그 안에서 결과 엔티티를 읽을 권한(govern)으로 검사하고 결과를 OR 로 넓힌다. usage(`used_by`, `uses`)는 지정한 엔티티의 own READ 로 검사하고 AND 로 좁힌다. filter 는 권한을 검사하지 않고 좁힌다.
 
 - 결과는 스코프가 허용한 row 에서만 나오므로 usage 로 접근한 row 도 호출자가 읽을 수 없으면 빠진다. 권한 모델을 가진 검색 API(GitHub `repo:`, GCP Cloud Asset scope)는 호출자가 읽을 수 없는 target 을 거부하며, 이 패키지도 이를 따른다.
-- 지정한 엔티티의 권한은 질의 전에 검사하므로 SQL 에는 usage 조건만 들어간다. BA-8024 가 `used_by` 를 스코프 validator 에 병합해 둘을 한 번의 왕복으로 읽는다. global 검색은 지정한 엔티티를 검사하지 않는다. SUPERADMIN gate 가 답한다.
+- 지정한 엔티티의 권한은 질의 전에 검사하므로 SQL 에는 usage 조건만 들어간다. BA-8024 가 `used_by` 를 스코프 validator 에 병합해 둘을 한 번의 왕복으로 읽는다. global 검색은 지정한 엔티티를 검사하지 않는다. SUPERADMIN gate 가 검사를 대신한다.
 - 두 방향을 한 묶음에 두는 이유는 검사와 좁히기가 같기 때문이고, 방향은 조건이 어느 column 에 걸리는지를 정한다. 일반 column filter 는 권한을 검사하지 않고 읽을 수 없는 row 가 있음을 드러내므로 이를 대신하지 못한다.
-- "누가 내 자원을 쓰는가" 는 `uses` 다. session 과 agent 를 잇는 조건을 `used_by` 만으로 보내면 어느 쪽을 원하는지 알 수 없다.
+- "누가 내 자원을 사용하는가" 는 `uses` 다. session 과 agent 를 잇는 조건을 `used_by` 만으로 보내면 어느 쪽을 원하는지 알 수 없다.
 
 ## 스코프와 uses 는 searcher 로 전달된다
 
 - `ScopedSearcher(scopes, used_by, searcher)` 와 `GlobalSearcher(used_by, searcher)` 가 ops 입력이다. `ScopeTarget` 은 검사할 스코프 id 와 row 제한을 가지고, `UsedBy` 는 검사할 엔티티와 그 조건을 가진다. 그래서 검사하는 것과 질의하는 것이 어긋나지 않는다.
-- BA-8022 가 `ScopeItem` 을 `OperationScope` 에 병합했다. `RouteHistoryTarget` 은 `ReplicaID`(`FieldIdentifier`)를 key 로 쓰고 소유 deployment 를 지정하려면 target 이 갖지 않은 id 가 필요하므로 `OperationScope` 에 남는다.
+- BA-8022 가 `ScopeItem` 을 `OperationScope` 에 병합했다. `RouteHistoryTarget` 은 `ReplicaID`(`FieldIdentifier`)를 key 로 사용하고 소유 deployment 를 지정하려면 target 이 갖지 않은 id 가 필요하므로 `OperationScope` 에 남는다.
 
 ## field cap 이 선언에 요구하는 것
 
-- 선언 이름, filter DTO field, data field, cap 경로가 하나의 문자열이라 요청 경로를 변환 없이 cap 경로로 쓴다.
+- 선언 이름, filter DTO field, data field, cap 경로가 하나의 문자열이라 요청 경로를 변환 없이 cap 경로로 사용한다.
 - share 가 field 경로 단위라 가리기는 row 단위다. 그래서 filter 는 `cap AND condition`, order 는 `CASE WHEN cap THEN column END` 가 된다.
 - order 도 검사한다. 값은 응답에 없어도 정렬과 반복 filter 로 새어 나간다.
 
@@ -114,9 +114,9 @@ review 가 이를 검사한다.
 
 ### public 이 스코프인 이유
 
-- public processor 는 호출자의 로그인 여부만 검사하고 row 조건을 더하지 않으며 다른 스코프와 함께 받지 않는다. public 스코프는 public singleton 에서 엔티티 type 에 대한 READ 를 검사하고, row 조건(public 에 등재된 row)을 선언하며 Target 목록에 섞인다.
+- public processor 는 호출자의 로그인 여부만 검사하고 row 조건을 추가하지 않으며 다른 스코프와 함께 받지 않는다. public 스코프는 public singleton 에서 엔티티 type 에 대한 READ 를 검사하고, row 조건(public 에 등재된 row)을 선언하며 Target 목록에 섞인다.
 
-- public processor 는 권한을 요구하지 않으므로 public 역할에서 READ 를 빼도 읽기가 통과한다. row 조건도 없다. `image` 의 public 읽기 네 개는 public 에 등재되지 않은 registry 의 image 를 반환한다. 스코프로서는 검사와 row 조건이 한 class 에 있다.
+- public processor 는 권한을 요구하지 않으므로 public 역할에서 READ 를 제거해도 읽기가 통과한다. row 조건도 없다. `image` 의 public 읽기 네 개는 public 에 등재되지 않은 registry 의 image 를 반환한다. 스코프로서는 검사와 row 조건이 한 class 에 있다.
 
 ### public membership 은 두 종류다
 
@@ -139,7 +139,7 @@ Target 이 완전한 패키지는 `scopes.py` 에 선언하고 여기에 row 를
 | `entity_share` | offer 가 붙은 엔티티. 받는 쪽은 user 또는 project |
 | `rbac_models/role` | 역할이 놓인 스코프. 역할을 가진 user |
 | `network`, `session_template` | 검색 없음. `ProjectNetworkTarget`, `DomainNetworkTarget`, `UserSessionTemplateTarget`, `ProjectSessionTemplateTarget`, `DomainSessionTemplateTarget` |
-| `session_group` | 모든 Target 이 replica group 이 보유한 group 을 뺀다 |
+| `session_group` | 모든 Target 이 replica group 이 보유한 group 을 제외한다 |
 | `container_registry` | `is_global` 로 per row public. `ProjectContainerRegistryTarget` 과 `PublicContainerRegistryTarget` 이 missing 이다 |
 | `resource_preset` | `scaling_group_name` 이 NULL 인 row 로 per row public. `PublicResourcePresetTarget` 이 missing 이고, bound row 를 받는 `ResourceGroupResourcePresetTarget` 이 계획 중이다 |
 | `idle_checker`, `resource_policy` | `IdleCheckerAssignmentTarget` binding row 로 접근한다. policy row 는 user 또는 project row 에서 이를 지정하는 column 으로 고른다 |
@@ -166,4 +166,4 @@ linked 스코프로 접근한다. `alembic`, `hasher`, `minilang`, `mixins`, `rb
 | 남은 것 없음 | 없음 | 없음 | `resource_group.get_wsproxy_version` 은 스코프 action 이 되었고 `domain.bulk_get` 은 domain 마다 READ 를 검사하는 읽기로 옮겼다 |
 | `agent`, `artifact_registry`, `domain`, `project`, `resource_group`, `session` | `lookup`, `bulk_lookup` | 이름 또는 pair 에서 id 로 | 옮기지 않음. id 만 반환하고 뒤따르는 get 이 값에 대한 권한을 검사한다 |
 | `etcd_config`, `metric`, `export`, `permission_contoller` | `public_*` | etcd 설정, valkey metadata, Prometheus metric 이름, code 상수와 연결된 action 목록 | 옮기지 않음. 엔티티가 아니다 |
-| `auth` | `public_resolve_access_key_scope` | access key 를 소유한 user 와 그 domain, role | 옮기지 않음. 서비스가 그 user 를 대신해 행동할 수 있는지 직접 정한다 |
+| `auth` | `public_resolve_access_key_scope` | access key 를 소유한 user 와 그 domain, role | 옮기지 않음. 호출자가 그 user 를 대신해 행동할 수 있는지 서비스가 직접 정한다 |

@@ -4,24 +4,24 @@
 
 ## 이 문서가 있는 이유
 
-services 계층은 도메인 검증과 business rule 이 있는 곳이다. 이 문서는 v2 전환에서 계층의 중심 판단, 즉 어떤 entity_type 을 어떤 모양으로 배선하는지와 service 메서드를 언제 남기는지를 담는다. 대량 교체 작업(BA-7295~7302)은 이 표와 다른 것을 모두 맞추는 일이다.
+services 계층은 도메인 검증과 business rule 이 있는 곳이다. 이 문서는 v2 전환에서 계층의 중심 판단, 즉 어떤 entity_type 을 어떤 모양으로 연결하는지와 service 메서드를 언제 남기는지를 담는다. 대량 교체 작업(BA-7295~7302)은 이 표와 다른 것을 모두 맞추는 일이다.
 
-## 판단 기준 셋과 항상 정확히 하나의 parent
+## 판단 기준 세 가지와 항상 정확히 하나의 parent
 
 - **독립 권한 부여 여부**: 이 대상의 접근을 따로 허용하거나 거부하는 데 실제 가치가 있는지 판단한다.
 - **parent 없는 존재 여부**: 다른 row 없이 생성되고 살아남을 수 있는지(독립적인 수명) 판단한다.
-- **사용자 직접 처리 여부**: API 가 이 대상을 CRUD 로 지정하는지 판단한다.
+- **사용자 직접 처리 여부**: API 가 이 대상을 CRUD 대상으로 다루는지 판단한다.
 - parent(`scope_of`)는 항상 정확히 하나이다. 추가 접근 경로는 membership(`member_of`, 공유와 유사)으로 표현한다.
 - 모든 entity 가 scope 를 겸하므로, scope 가 아닌 entity(예: deployment)도 자식을 가질 수 있다.
 
-판단 결과와 배선, spec 대응은 다음과 같다.
+판단 결과와 연결, spec 대응은 다음과 같다.
 
 | 판단 | 조건 | action 모양 | write spec |
 |---|---|---|---|
 | scope 제공 | 셋 다 예이고 다른 entity 를 govern 한다 | scope (create) / single 등 | `RoleManagedEntity*` (preset 역할 부여) |
 | entity | parent 가 있고 직접 다룬다 | scope (create) / single / bulk | `Entity*` (own virtual entity + member_of) |
 | global | RBAC scope 밖이고 직접 다룬다 | global (gate: SA 또는 public read) | `GlobalEntity*` (등록 없음) |
-| field | 독립 권한이 없고 수명이 묶인다 | 소유자 위의 single_entity | `FieldEntity*` (`owner_id` 필요) |
+| field | 독립 권한이 없고 수명이 묶인다 | 소유자 기준 single_entity | `FieldEntity*` (`owner_id` 필요) |
 | action-only | 대상 row 가 없다 (동작 / non-DB) | 대상 성격에 따르고 spec 없음 | 없음 (service 유지) |
 
 ## entity_type 판단: scope 제공과 entity
@@ -76,7 +76,7 @@ RBAC scope 밖의 대상이다. `GlobalEntity*` 이며 membership 등록이 없�
 | agent, image, container_registry, artifact_registry, object_storage, vfs_storage | 관리자 도메인 인프라 |
 | resource_slot_type, retention_policy, runtime_variant(+preset), prometheus_query_preset(+category), login_client_type, role_preset, idle_checker(+assignment), notification_channel, notification_rule, resource policy 3종, service_catalog, app_config_definition | 시스템 설정/catalog 이고 읽기의 공개 범위만 다르다 (public) |
 | audit_log, error_log, scheduling_history 기록 | 시스템 기록이고 `*:scoped_history` 형태만 scoped search 이다 |
-| `invitation` (지금은 `vfolder:invitation`) | 방향: 모든 entity 가 사용할 수 있는 global invitation 하나로 나누고 entity_type/entity_id 를 받는다. 권한 부여는 Grant / Invite 두 경로로 흐른다 |
+| `invitation` (지금은 `vfolder:invitation`) | 모든 entity 가 사용할 수 있는 global invitation 하나로 나누고 entity_type/entity_id 를 받는다. 권한 부여는 Grant / Invite 두 경로로 흐른다 |
 
 ## action-only 로 남는 entity_type: 대상 row 없음
 
@@ -87,7 +87,7 @@ RBAC scope 밖의 대상이다. `GlobalEntity*` 이며 membership 등록이 없�
 | vfolder:file | vfolder 동작이고 subtype 을 유지한다 |
 | auth | user/keypair 위의 동작 |
 | session:file, commit, log 및 그 밖의 subtype | session 동작이고 subtype 을 분리하지 않는다 |
-| stream | 대상은 session 이고 배선 축은 이관 중 확인한다 |
+| stream | 대상은 session 이고 연결 축은 이관 중 확인한다 |
 | etcd_config, manager_admin, metric | DB 가 아니며 아래 예외 목록을 참조한다 |
 | export, events, resource_overview | scoped data 위의 조회/보고 동작 |
 
@@ -112,7 +112,7 @@ class CreateResourceSlotTypeAction(CreateGlobalOpsAction[ResourceSlotTypeRow, Re
         return self.creator
 ```
 
-## 배선은 factory 호출뿐이다
+## 연결은 factory 호출뿐이다
 
 - 전부 pass-through 인 도메인에는 service 가 없다. 실제 코드 `services/app_config_allow_list/processors.py`:
 
@@ -138,7 +138,7 @@ service 메서드를 유지하기로 결정하기 전에 이 표를 본다.
 |---|---|---|
 | id/name 이중 lookup 분기 | adapter 가 실제 action 전에 lookup action 을 실행한다 | 사용 중 |
 | 1~2 줄 검증 (상태 검사, 이름 규칙) | factory 의 `validators=` 추가 인자 | 사용 가능 |
-| lifecycle 값을 status 로 접는 것 (순수 함수) | spec 의 `to_data()` / Searcher 의 data 변환 | 사용 가능 |
+| lifecycle 값을 status 로 합쳐 넣는 것 (순수 함수) | spec 의 `to_data()` / Searcher 의 data 변환 | 사용 가능 |
 | 삭제 | `DataUpdater` (status 전이로 취급하고 deleter spec 은 없다) | 사용 가능 |
 | 순위 할당 | creator 가 `build_row()` 에서 그 column 에 SQL 식을 넣는다 | 사용 중 |
 | parent 와 자식을 함께 생성 | `create_*_with_fields` 가 `FieldCreator` 를 한 transaction 에 넣는다 | 사용 중 |
@@ -152,13 +152,13 @@ service 메서드를 유지하기로 결정하기 전에 이 표를 본다.
 - DB row 가 없는 대상은 spec 없이 이관한다. service 를 유지하고 action base 만 v2 로 옮긴다.
 - v2 이관의 가치는 감사, 지표, gate 가 action 계층에서 한결같이 적용된다는 데 있다.
 
-| 묶음 | 대상 시스템 | 배선 |
+| 묶음 | 대상 시스템 | 연결 |
 |---|---|---|
 | etcd_config (6) | etcd | global (SA), 인증된 조회 3개는 public |
 | manager_admin (6) | etcd, valkey, socket | global (SA), 이관 중 확인한 익명 상태 조회 3개 |
 | stream (7) | agent RPC, valkey | session 대상 action: single_entity(session), 내부 GC 만 global |
 | metric (3) | Prometheus | global + public 조회 |
 | prometheus_query_preset preview/execute | Prometheus 실행 | service 유지 |
-| vfolder file/quota/usage 연산 | storage proxy | service 유지 (vfolder 권한 축) |
+| vfolder file/quota/usage 동작 | storage proxy | service 유지 (vfolder 권한 축) |
 | agent watcher (4) | watcher HTTP | service 유지 |
 | container_registry quota 등 | Harbor API | service 유지 |

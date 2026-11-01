@@ -4,7 +4,7 @@
 
 ## 이 컴포넌트가 존재하는 이유
 
-Manager 는 **business logic 을 결정하는 컴포넌트**다. 실제 동작을 수행하고 확장이 필요한 일은 별도 컴포넌트로 나뉜다. kernel 실행은 agent, 파일은 Storage Proxy, 트래픽은 App Proxy 가 맡는다.
+Manager 는 **business logic 을 결정하는 컴포넌트**다. 실제 동작을 수행하고 확장이 필요한 일은 별도 컴포넌트로 나뉜다. kernel 실행은 agent, 파일은 storage proxy, 트래픽은 app proxy 가 맡는다.
 
 - 변경이 Manager 안에서 workload 를 실행해야 하는 것처럼 보이면 그 일은 다른 컴포넌트에 속한다.
 
@@ -26,10 +26,10 @@ Manager 는 **business logic 을 결정하는 컴포넌트**다. 실제 동작�
 
 - manager → agent / storage proxy / appproxy: 직접 호출한다(RPC, HTTP).
 - 반대 방향(component → manager)의 직접 요청은 권장하지 않는다. 대신 **redis event 나 상태를 가진 source 로 값을 공유하는** 방식을 사용한다.
-- 유실되면 안 되는 Manager 발 지시는 broadcast 만으로 보내지 않는다. 직접 호출하거나 reconcile tick 으로 다시 구동한다.
+- 유실되면 안 되는 Manager 발 지시는 broadcast 만으로 보내지 않는다. 직접 호출하거나 reconcile tick 으로 다시 실행한다.
 - Manager 프로세스는 하나의 consumer group 을 공유한다. anycast event 는 cluster 당 한 번, 어느 프로세스에서든 처리되므로 handler 는 프로세스 로컬 상태에 의존하지 않는다.
 
-## 실행 경로 셋, domain 계층 하나
+## 실행 경로 세 가지, domain 계층 하나
 
 - API 기반: REST/GQL → adapters → processors.
 - event 기반: `event_dispatcher/` 의 handler group.
