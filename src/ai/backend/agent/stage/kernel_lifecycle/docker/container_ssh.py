@@ -10,11 +10,7 @@ from pathlib import Path
 from typing import override
 
 from ai.backend.agent.resources import Mount
-<<<<<<< HEAD
-=======
 from ai.backend.agent.utils import ContainerSSHFileWriter
-from ai.backend.common.asyncio import run_in_executor_with_context
->>>>>>> 1be73ea3 (fix(BA-8796): write kernel SSH files without following symlinks (#16228))
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 from ai.backend.common.types import ContainerSSHKeyPair
 
