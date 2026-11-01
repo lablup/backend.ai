@@ -11,12 +11,12 @@ Backend.AI 와 실제 filesystem, object storage 사이의 stateless data plane 
 - 신뢰할 수 없는 network 에 있는 storage proxy client API 는 스스로 인증하지 않는다. 모든 요청이 **manager 가 발급한** 수명이 짧은 JWT 를 가지며, payload 에 volume/vfolder/path/size 가 들어 있다.
 - authorization 은 발급 시점에 이미 결정되었고, proxy 는 signature 만 검증한다.
 - 신뢰할 수 있는 network 에 있는 storage proxy manager API 는 shared secret header 를 사용한다.
-- 그러므로 client endpoint 를 추가한다는 것은 permission 검사를 추가하는 일이 아니라 **token type 과 manager 쪽 issuer 를 추가하는 일**이다.
+- 그러므로 client 엔드포인트를 추가한다는 것은 permission 검사를 추가하는 일이 아니라 **token type 과 manager 쪽 issuer 를 추가하는 일**이다.
 
 ## 구조상 stateless 다
 
 - relational DB 가 없다. 지속 metadata 는 manager 의 DB 에 있고, proxy 는 etcd(configuration)와 Valkey(events, background tasks, TUS offsets, volume statistics)만 사용한다.
-- TUS offset 을 Valkey lease 로 관리하는 것은 proxy replica 여럿이 같은 upload session 을 처리할 수 있게 하기 위해서다.
+- TUS offset 을 Valkey lease 로 관리하는 것은 proxy replica 여럿이 같은 TUS upload 를 처리할 수 있게 하기 위해서다.
 - table 을 추가하지 않는다. 지속 상태는 manager 에 속한다.
 
 ## quota 단위는 folder 가 아니라 quota scope 다
