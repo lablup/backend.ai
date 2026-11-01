@@ -6,6 +6,8 @@ import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer
 from lark.lexer import Token
 
+from ai.backend.manager.errors.api import InvalidAPIParameters
+
 from . import JSONFieldItem, OrderSpecItem, ORMFieldItem, get_col_from_table
 
 __all__ = (
@@ -109,7 +111,7 @@ class QueryOrderParser:
             )
             return result
         except LarkError as e:
-            raise ValueError(f"Query ordering parsing error: {e}") from e
+            raise InvalidAPIParameters(f"Query ordering parsing error: {e}") from e
 
     def append_ordering(
         self,
