@@ -14,7 +14,7 @@ generated:
 status: stable
 ---
 
-# RBAC graph writes — Knowledge
+# RBAC graph writes: Knowledge
 
 > Rules: `../AGENTS.md`. Design: `proposals/BEP-1075-entity-relation-operations.md`,
 > `proposals/BEP-1076-project-membership.md`, `proposals/BEP-1077-project-scoped-ownership.md`.
@@ -60,8 +60,8 @@ entity type, shape, operation, gate and backing.
 - A pair already linked still has its graph reads (govern and share) registered again.
   The registration is idempotent, so a pair whose row survived without its graph rows is
   filled in when it is created again.
-- The audit row records the direction — `create_relation`, `purge_relation`,
-  `delete_relation`, `restore_relation` — and the scopes it named. The pair is what
+- The audit row records the direction (`create_relation`, `purge_relation`,
+  `delete_relation`, `restore_relation`) and the scopes it named. The pair is what
   tells one relation from another, not the name.
 - What a run of several pairs *means* is still the caller's: the registry's "removing
   where nothing was linked raises" counts what came back.
@@ -75,10 +75,10 @@ entity type, shape, operation, gate and backing.
 - `join_member` and `join_members` pick the users they take by the same check: only
   users of the project's domain, and a user already on the roster is left as it stands
   (its membership row and caps are not written again).
-- A user not taken is left out of the result by `join_members` and refused by
+- A user not taken is left out of the result by `join_members` and rejected by
   `join_member` with `ProjectMemberNotJoinableError`.
 
-## The personal-project refusal is an ops invariant
+## The personal-project rejection is an ops invariant
 
 - A personal project takes no member beyond the user it was created with. The refusal is
   in `V2RosterWriteOps`, so no path reaches around it.
@@ -86,12 +86,12 @@ entity type, shape, operation, gate and backing.
   owner is the one member such a project ever takes.
 - The projects a user is enrolled in are narrowed by several callers, and a filter each
   of them applies is a filter each of them can forget.
-- A roster write onto a project that is not there is refused for the same reason: an
+- A roster write onto a project that is not there is rejected for the same reason: an
   edge to nothing is not a state any caller asked for.
 
 ## The roster is the graph and nothing else
 
-- A roster place is the graph edge and its caps. The graph is where a roster read
+- A roster entry is the graph edge and its caps. The graph is where a roster read
   answers from, and since BA-7796 there is nothing else it could answer from.
 
 ## A role grant is a roster place as well

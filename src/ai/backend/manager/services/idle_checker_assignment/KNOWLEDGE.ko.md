@@ -28,7 +28,7 @@
 
 - 네 쓰기는 rbac 경계의 relation action 네 개이며, 이 도메인의 creator, lifecycle
   updater, purger 를 값으로 갖는다. 이 도메인은 자체 relation action 을 선언하지 않는다.
-  한 실행이 어떤 relation 에 대한 것인지는 spec 이 담으므로, 방향마다 연결 경로 하나가 이 시스템이 쓰는
+  한 실행이 어떤 relation 에 대한 것인지는 spec 이 담으므로, 방향마다 연결 경로 하나가 이 시스템이 사용하는
   모든 relation 을 처리한다.
 - relation 쓰기는 짝만 반환하므로, adapter 는 payload 를 구성하려고 `lookup_by_pair` 로
   할당을 다시 읽는다.

@@ -18,7 +18,7 @@ generated:
 status: draft
 ---
 
-# Authentication service — Knowledge
+# Authentication service: Knowledge
 
 Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 

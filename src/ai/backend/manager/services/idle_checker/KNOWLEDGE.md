@@ -13,7 +13,7 @@ generated:
 status: draft
 ---
 
-# Idle checker service — Knowledge
+# Idle checker service: Knowledge
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
@@ -33,9 +33,9 @@ the entity type, shape, operation, gate and backing.
 
 - The four catalog operations come from the `idle_checker` group; exclude and include
   come from the `session` group.
-- Those two are answered for by the session, not by the checker — the permission to
+- The session answers for those two, not the checker: the permission to
   turn a session's idle check off is a permission on that session.
-- So one package takes two `ProcessorGroup`s. Folded into one, one side's audit rows
+- So one package takes two `ProcessorGroup`s. If the two groups fold into one, one side's audit rows
   would name the wrong entity.
 
 ## A checker definition is global
@@ -52,9 +52,9 @@ the entity type, shape, operation, gate and backing.
 - Both read another entity before writing: they fetch the prometheus query preset the
   utilization spec names and reject filter and group labels that preset does not
   declare as allowed.
-- A check that reads another repository is past what an action validator absorbs, and
-  a spec cannot issue SQL — that is the criterion for keeping a service method.
-- Past the check the service hands the action's spec to ops unchanged. It does nothing
+- A check that reads another repository exceeds what an action validator can handle, and
+  a spec cannot issue SQL. That is the criterion for keeping a service method.
+- After the check, the service passes the action's spec to ops unchanged. It does nothing
   else.
 
 ## The purge is bulk while the API names one

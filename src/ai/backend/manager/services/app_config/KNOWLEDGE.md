@@ -15,7 +15,7 @@ generated:
 status: stable
 ---
 
-# App config service — Knowledge
+# App config service: Knowledge
 
 > Rules: `../AGENTS.md`. Action shapes and the public gate: `../../actions/KNOWLEDGE.md`.
 
@@ -52,7 +52,7 @@ Both carry the entity type `app_config`.
 
 `backend.ai mgr ops list --concern app_config` prints the wired list.
 
-- Several names arrive at once, which is what makes it `SEARCH` rather than `GET`.
+- Several names arrive at once, Several names arrive at once, so it is `SEARCH` rather than `GET`.
 - The user-scope read's three query conditions (public, that user's domain, that user)
   are bound together as one `VisibleAppConfigFragmentTarget`. Left for the call
   site to assemble, a merge could be read with one of the three missing.

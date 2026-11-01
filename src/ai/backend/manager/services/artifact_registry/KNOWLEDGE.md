@@ -17,7 +17,7 @@ generated:
 status: draft
 ---
 
-# Artifact registry service — Knowledge
+# Artifact registry service: Knowledge
 
 A registry is two rows: a per-kind row holding the connection settings (huggingface,
 reservoir) and an `artifact_registries` row holding the name and kind. A write handles both

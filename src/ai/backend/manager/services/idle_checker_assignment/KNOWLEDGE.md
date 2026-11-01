@@ -15,7 +15,7 @@ generated:
 status: draft
 ---
 
-# Idle checker assignment service — Knowledge
+# Idle checker assignment service: Knowledge
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`. Relation
 > rationale: `proposals/BEP-1075-entity-relation-operations.md`. The definition
@@ -51,14 +51,12 @@ Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
   one wiring per direction serves every relation this system writes.
 - A relation write answers with the pair alone, so the adapter reads the binding back
   through `lookup_by_pair` to build its payload.
-- The reads and the lookups take the `idle_checker` group and declare that type. A
-  scope reader sees a binding's checker through the READ govern the link wrote.
 - The reads and the lookup are reads of what the relation reaches, the checker, so
   they take the `idle_checker` group and declare that type. A scope reader sees a
   binding's checker through the READ govern the link wrote.
 - The scope row is a precondition on the creator. Its side of the pair carries no
   foreign key, so the spec declares the row that must be there and the relation write
-  refuses with `IdleCheckerAssignmentScopeNotFound` before it looks for the node.
+  rejects with `IdleCheckerAssignmentScopeNotFound` before it looks for the node.
 - The bindings never touch the legacy source: writes go through the relation write
   ops and reads through the same provider's read ops, always as a searcher. A row id
   is not an entity id, so no querier names one. The reconciler's reads stay on the
@@ -73,13 +71,13 @@ Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
   scope reader holds through the scope's govern. A caller who reads the checker
   nowhere gets the lookup shape's single answer, a 400 that hides whether the id
   exists; one who reads it through another scope resolves the pair and is then
-  refused by the relation check with a 403.
+  rejected by the relation check with a 403.
 - This keeps the API shape while BEP-1075 says a relation's row id does not leave.
   Naming the pair on the API is the follow-up that removes the lookup.
 
 ## What a permission on a binding has to name
 
-- A relation is answered for by both sides. Turning a project's binding off costs
+- Both sides answer for a relation. Turning a project's binding off costs
   SOFT_DELETE on the project and on the checker; unlinking costs HARD_DELETE on both.
   A scope grant alone does not reach it.
 - The checker is a global entity, so a non-superadmin needs a grant naming it. In
@@ -89,7 +87,7 @@ Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 ## Two searches, two gates
 
-- `scoped_search` names every scope up front and is refused whole when one is out of
+- `scoped_search` names every scope up front and is rejected whole when one is out of
   reach; the rows are then OR'd across scopes. Its result reports the checkers the
   page reached, since a relation read answers with what the relation links.
 - `admin_search` reads the whole table behind the SUPERADMIN gate.

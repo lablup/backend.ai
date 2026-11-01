@@ -14,16 +14,16 @@ generated:
 status: draft
 ---
 
-# Model card service — Knowledge
+# Model card service: Knowledge
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
 Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-A model card names, inside a project, a model held in a VFolder. It states the minimum
+A model card names, inside a project, a model held in a vfolder. It states the minimum
 resources the model needs to run alongside it, so this package covers two tables.
 
 ## The processor composition
 
 `backend.ai mgr ops list --concern deployment --entity model_card` prints the wired
-list. Its output answers the entity type, shape, operation, gate and backing.
+list. Its output gives the entity type, shape, operation, gate and backing.

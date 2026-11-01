@@ -17,7 +17,7 @@ updated:
 status: draft
 ---
 
-# Session group service — Knowledge
+# Session group service: Knowledge
 
 > Rules: `../AGENTS.md`. Placement policy: `proposals/BEP-1064-session-group-placement.md`.
 
@@ -40,14 +40,14 @@ shape, operation, gate and backing.
 | `bulk_get_ids` | The same searcher for many ids; a held group answers empty |
 | `scoped_search` | Every `SessionGroupTarget` adds the same condition to its scope condition |
 | `global_search` | Not left out: the superadmin sees every group |
-| `update` | `SessionGroupUpdater` carries the condition as a `GuardCheck`; a held group is refused as in use (409) |
-| `purge` | The purger's guard rides on the DELETE; a held group is refused as in use (409) |
+| `update` | `SessionGroupUpdater` carries the condition as a `GuardCheck`; a held group is rejected as in use (409) |
+| `purge` | The purger's guard rides on the DELETE; a held group is rejected as in use (409) |
 
 - The condition is `SessionGroupSearchableFields.linked.replica_groups.not_exists()`, one
   declaration every path reads.
 - A read answers a held group as not found, not a denial: the caller may hold READ on it
   through the project, so the permission is not what keeps it out.
-- The update and the purge refuse a held group as in use: only a caller holding UPDATE or
+- The update and the purge reject a held group as in use: only a caller holding UPDATE or
   PURGE on the group reaches the guard, and the deployment manages the group it references.
 
 ## The reads by id keep a service
@@ -61,7 +61,7 @@ shape, operation, gate and backing.
 - `bulk_get_ids` is partial: the gate answers per id, and the service answers each id
   that passed with the group or empty.
 - An id the graph has no node for cannot be checked, so to anyone but a superadmin it is
-  a denial rather than an empty slot.
+  a denial rather than an empty entry.
 
 ## The update runs against ops
 
@@ -69,7 +69,7 @@ shape, operation, gate and backing.
   them at every placement, so members placed afterwards follow the new policy.
 - The guard rides on the UPDATE statement, so the generic update needs no service method.
 - Ops reads the row without its guards when there is nothing to set. The update input
-  therefore refuses a call that names neither field.
+  therefore rejects a call that names neither field.
 
 ## The searches run against ops
 

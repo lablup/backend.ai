@@ -19,7 +19,7 @@ updated:
 status: draft
 ---
 
-# System session environ service — Knowledge
+# System session environ service: Knowledge
 
 > Rules: `../AGENTS.md`. Wiring: `backend.ai mgr ops list`.
 
@@ -63,7 +63,7 @@ domain repository; this package holds the operations a caller reaches through th
 
 - The caller names public, domains and projects; the rows of any of them are read,
   soft-deleted ones included. Every named scope is checked before the read, so one scope
-  the caller cannot read refuses the whole search.
+  the caller cannot read rejects the whole search.
 - A domain scope reads the rows bound to the domain itself. The graph binds a project's node
   under its domain, so the target also matches the scope type column to keep the projects'
   rows out.
@@ -73,18 +73,18 @@ domain repository; this package holds the operations a caller reaches through th
 - The value sources are the manager's own list, not rows, so no row permission applies. It
   is wired through `public`, which checks only that the caller is logged in.
 - The API carries a value source as its name rather than an enum, so a new value source
-  leaves the schema unchanged. The adapter refuses a name the manager does not provide.
+  leaves the schema unchanged. The adapter rejects a name the manager does not provide.
 
 ## The create is against its scope
 
 - It takes the scope the row is created in: the public entity, a domain or a project. The
   CREATE grant there answers: a project's admins, a domain's admins for the domain and its
   projects, a superadmin for every scope including public.
-- `scope_id` carries no foreign key, so a domain or a project that is not there is refused
+- `scope_id` carries no foreign key, so a domain or a project that is not there is rejected
   before the write asks the graph for its node.
 - A public row is created in the `global` and `public` scopes, a domain's or a project's in
-  that owner — the same as a seeded row.
-- The database refuses a key another row at the same scope holds, soft-deleted ones
+  that owner, the same as a seeded row.
+- The database rejects a key another row at the same scope holds, soft-deleted ones
   included, and a key that is not an environment variable name.
 
 ## The purge is per row
@@ -100,9 +100,9 @@ domain repository; this package holds the operations a caller reaches through th
 - The UPDATE grant on the row answers: a project's admins for its rows, a domain's admins for
   the domain's rows and its projects' (the graph binds a project under its domain), a
   superadmin for every row. Nobody else holds UPDATE on the public rows.
-- The database refuses a key another row at the same scope holds, and a key that is not an
+- The database rejects a key another row at the same scope holds, and a key that is not an
   environment variable name. The updater maps both to the domain errors.
-- A soft-deleted row is refused; restore it first.
+- A soft-deleted row is rejected; restore it first.
 
 ## Soft delete and restore are per row
 
@@ -110,7 +110,7 @@ domain repository; this package holds the operations a caller reaches through th
   soft-deleted row, so the sessions started after a delete no longer receive it.
 - The SOFT_DELETE grant on the row answers both, held by the same admins as UPDATE.
 - A soft-deleted row keeps its key: no other row at the same scope takes it until the
-  deleted row is purged, so a restore is never refused for its key.
+  deleted row is purged, so a restore is never rejected for its key.
 - The seed upserts on the same key, soft-deleted rows included. After a delete it skips the
   key; an overwrite rewrites the deleted row's value source and leaves it deleted.
 

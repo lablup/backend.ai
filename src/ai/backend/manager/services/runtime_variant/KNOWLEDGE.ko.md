@@ -16,7 +16,7 @@ runtime variant 는 배포 리비전이 실행되는 serving runtime 을 지정�
 ## purge 를 위해 service 를 둔다
 
 - variant 는 preset 을 own 하고, 그 preset 이 먼저 삭제된 뒤에야 row 를 삭제한다. `RuntimeVariantPresetsOfVariantPurger` 를 먼저 호출하고 `RuntimeVariantPurger` 를 호출한다.
-- 한 트랜잭션에 spec 두 개를 쓰는 것은 여러 테이블에 걸친 쓰기이고 generic ops purge 는 하지 않는다. repository 가 이 쓰기를 하고 service 가 action 의 purger 를 전달한다.
+- 한 트랜잭션에 spec 두 개를 사용하는 것은 여러 테이블에 걸친 쓰기이고 generic ops purge 는 하지 않는다. repository 가 이 쓰기를 하고 service 가 action 의 purger 를 전달한다.
 
 ## bulk purge 는 custom backing 을 사용하고 partial 이다
 

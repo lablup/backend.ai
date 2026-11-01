@@ -13,7 +13,7 @@ generated:
 status: draft
 ---
 
-# Runtime variant service — Knowledge
+# Runtime variant service: Knowledge
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
@@ -25,14 +25,14 @@ to ops.
 
 ## The processor fields
 
-`backend.ai mgr ops list` prints the wired list. Its output answers the entity type,
+`backend.ai mgr ops list` prints the connected list. Its output gives the entity type,
 shape, operation, gate and backing.
 
 ## A variant is global and read by everyone
 
 - A `runtime_variants` row belongs to no scope, so nothing is granted per row and only
   a superadmin passes the entity gate on update and purge.
-- Every read — get, bulk get, search, lookup by name — is wired public: naming a runtime
+- Every read (get, bulk get, search, lookup by name) is public: naming a runtime
   costs no permission.
 
 ## The purges keep a service

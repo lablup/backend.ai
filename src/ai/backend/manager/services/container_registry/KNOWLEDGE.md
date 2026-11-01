@@ -17,7 +17,7 @@ generated:
 status: stable
 ---
 
-# Container registry service — Knowledge
+# Container registry service: Knowledge
 
 > Rules: `../AGENTS.md`. Action shapes and the gate: `../../actions/KNOWLEDGE.md`.
 

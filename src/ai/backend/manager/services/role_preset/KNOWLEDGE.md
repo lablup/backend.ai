@@ -14,7 +14,7 @@ generated:
 status: stable
 ---
 
-# Role preset service — Knowledge
+# Role preset service: Knowledge
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
@@ -51,10 +51,10 @@ that group hands out. The entity recorded is always the preset.
   creators together; a preset that survived a failed permission row would grant
   less than it declares.
 - The field creators build from the parent's id, which does not exist until the
-  parent row does — `FieldCreator.build_row(owner_id)` is what makes that
+  parent row does. `FieldCreator.build_row(owner_id)` is what makes that
   orderable inside one write.
 
-## A permission entry is answered for by its preset
+## The owning preset answers for a permission entry
 
 - Adding or removing an entry is a change to the preset, so it is recorded as `UPDATE`.
   An entry carries no permission bit of its own.
@@ -84,9 +84,9 @@ that group hands out. The entity recorded is always the preset.
 - Create, update and partial bulk update are the only operations that take a template,
   so they are the only ones that branch. The rest still run straight against ops.
 - The check renders the template against a dummy scope in a sandboxed Jinja
-  environment, refusing syntax errors, undefined variables and an empty result.
+  environment, rejecting syntax errors, undefined variables and an empty result.
 - Length is not checked: the render truncates to the column limit, so there is nothing
-  to refuse.
+  to reject.
 
 ## A preset change carries over to the roles derived from it
 

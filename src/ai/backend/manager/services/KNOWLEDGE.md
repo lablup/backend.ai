@@ -15,7 +15,7 @@ generated:
 status: draft
 ---
 
-# Manager Services layer — Knowledge
+# Manager Services layer: Knowledge
 
 > Rules: `AGENTS.md` in the same directory. Action-framework design background:
 > `../actions/KNOWLEDGE.md`. Write-spec design background: `../models/specs/KNOWLEDGE.md`.
