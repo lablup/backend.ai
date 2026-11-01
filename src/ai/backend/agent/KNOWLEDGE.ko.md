@@ -4,7 +4,7 @@
 
 ## 이 컴포넌트가 있는 이유
 
-Agent 는 **실제로 커널(container)을 생성하고 관리하는 컴포넌트**다. manager 가 결정한 세션을 node 에서 실행 상태로 만들고 유지하는 일, 곧 생성과 종료, node 자원 할당, 상태 수집과 보고가 모두 여기서 일어난다.
+Agent 는 **실제로 커널(container)을 생성하고 관리하는 컴포넌트**다. manager 가 결정한 세션을 node 에서 실행 상태로 생성하고 유지하는 일이 모두 여기서 일어난다: 종료, node 자원 할당, 상태 수집과 보고.
 
 ## node 가 기준이다
 
@@ -14,7 +14,7 @@ Agent 는 **실제로 커널(container)을 생성하고 관리하는 컴포넌�
 
 ## 세 세대의 RPC 가 공존한다
 
-- v1, v2 class 수준 registry 는 시작 시점에 여전히 연결된다.
+- v1, v2 class 수준 registry 는 시작 시점에 여전히 바인딩된다.
 - 새 handler 는 주입 가능한 v3 registry(`rpc/routing.py`)에 들어간다.
 - v3 dispatch 는 호출 envelope 의 `agent_id` 로 대상 Agent 를 정한다.
 

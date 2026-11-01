@@ -38,5 +38,5 @@
 
 1. 컴포넌트의 `config/unified.py` 에 `BackendAIConfigMeta` 로 field 를 추가한다. `description` 과 `added_version` 은 필수다(version 은 `# Added in X.Y.Z` 주석이 된다).
 2. 다시 생성한다: `./backend.ai {component} config generate-sample --overwrite`
-3. 로컬 개발에 값이 필요하면 `halfstack.toml`/`ci.toml` 을 직접 갱신한다. 이 파일은 생성되지 않는다.
+3. 로컬 개발에 값이 필요하면 `halfstack.toml`/`ci.toml` 을 직접 갱신한다. 이 파일들은 생성되지 않는다.
 4. etcd 기반 key 라면 `unified.py` 의 etcd tree docstring 과 해당 `sample.etcd.*.json` 을 갱신한다.

@@ -17,8 +17,8 @@ PR 제목과 변경 기록 항목(`changes/<PR-number>.<type>.md`)은 서로 다
 | 호환되지 않는 API 변경 | 기반 commit 유형 유지 (`feat`/`refactor`/...) | `breaking` | 전용 접두사 없음, 유형은 그대로 두고 changelog 만 breaking 으로 분류한다 |
 | 테스트만 있는 변경 | `test` | `test` | |
 | 문서 | `doc` | `doc` | |
-| 의존성 갱신 | `deps` | `deps` | |
-| 기존 기능 deprecate | 기반 commit 유형 유지 (`chore`/`feat`/...) | `deprecation` | 전용 접두사 없음 |
+| 의존성 변경 | `deps` | `deps` | |
+| 기존 기능 지원 중단 | 기반 commit 유형 유지 (`chore`/`feat`/...) | `deprecation` | 전용 접두사 없음 |
 
 ## 같은 릴리스의 수정이 `fix` 가 아닌 이유
 

@@ -10,7 +10,7 @@
 ## "behavior, not implementation": 하지 말아야 할 예
 
 - 내부 호출 경로를 단언하는 검사다. `savepoint()` 가 `session.begin_nested()` 를 호출하는지, `write_ops()` 가 특정 session method 를 여는지, 어느 delegation function 이 호출되는지를 감시한다. 이런 검사는 무해한 refactor 에서 깨지고 caller 가 실제로 의존하지 않는 것을 검증한다.
-- 하위 계층의 test 가 이미 검증한 delegation logic 을 다시 단언하는 것. 예를 들어 이미 검증된 `execute_*` 로 전달하는 얇은 wrapper 가 그렇다.
+- 하위 계층의 test 가 이미 검증한 delegation logic 을 다시 단언하는 검사다. 예를 들어 이미 검증된 `execute_*` 로 전달하는 얇은 wrapper 가 그렇다.
 
 ## 테스트 실행
 

@@ -11,7 +11,7 @@ Backend.AI 와 실제 filesystem, object storage 사이의 stateless data plane 
 - 신뢰할 수 없는 network 에 있는 storage proxy client API 는 스스로 인증하지 않는다. 모든 요청이 **manager 가 발급한** 수명이 짧은 JWT 를 가지며, payload 에 volume/vfolder/path/size 가 들어 있다.
 - authorization 은 발급 시점에 이미 결정되었고, proxy 는 signature 만 검증한다.
 - 신뢰할 수 있는 network 에 있는 storage proxy manager API 는 shared secret header 를 사용한다.
-- 그러므로 client 엔드포인트를 추가한다는 것은 permission 검사를 추가하는 일이 아니라 **token type 과 manager 쪽 issuer 를 추가하는 일**이다.
+- 그러므로 client 엔드포인트를 추가한다는 것은 권한 검사를 추가하는 일이 아니라 **token type 과 manager 쪽 issuer 를 추가하는 일**이다.
 
 ## 구조상 stateless 다
 
@@ -24,9 +24,9 @@ Backend.AI 와 실제 filesystem, object storage 사이의 stateless data plane 
 - quota 단위는 quota scope(`(type, uuid)`, user 또는 project)이고, vfolder path 는 그 scope 아래에서 파생된다.
 - quota 지원은 보장이 아니라 **backend 별 capability**(`CAP_QUOTA`)다. code 는 분기하고 capability 가 없는 경우도 처리해야 한다.
 
-## 벤더별 구현은 volume interface 뒤에 있다
+## backend 별 구현은 volume interface 뒤에 있다
 
-- 모든 벤더는 `AbstractVolume` + `AbstractQuotaModel` + `AbstractFSOpModel` 뒤에 있다.
+- 모든 backend 는 `AbstractVolume` + `AbstractQuotaModel` + `AbstractFSOpModel` 뒤에 있다.
 - backend 는 host 상태를 변경할 수 있다. XFS 는 sudo 로 `/etc/projects` 를 변경한다.
 - proxy 자체에서 root 가 필요한 연산은 opt-in watcher subprocess(ZeroMQ IPC, task object)를 거친다. handler 안에서 sudo 를 직접 실행하지 않는다.
 
@@ -38,6 +38,6 @@ Backend.AI 와 실제 filesystem, object storage 사이의 stateless data plane 
 
 ## volume registry 는 `VolumePool` 하나다
 
-- 설정된 모든 volume 은 `VolumePool.create()` 가 한 번 생성하고 `init()` 하며, noop volume 도 여기서 등록한다. volume 은 `[volume.<name>]` configuration key 로 찾는다. request 경로에서 volume 을 생성하는 곳은 없다.
+- 설정된 모든 volume 은 `VolumePool.create()` 가 한 번 생성하고 `init()` 하며, noop volume 도 여기서 등록한다. volume 은 `[volume.<name>]` configuration key 로 조회한다. request 경로에서 volume 을 생성하는 곳은 없다.
 - configuration key 는 system 전체에서 유일한 volume 이름(`StorageVolumeName`)이고, `get_volume_by_name()` 이 그 key 로 volume 을 조회한다. `get_volume(VolumeID)` 는 지원이 중단된 `VolumeService` 에만 남아 있다.
 - 초기화가 eager 이므로 mount 가 깨진 volume 은 첫 request 에서 실패하는 대신 전체 시작을 실패시킨다.

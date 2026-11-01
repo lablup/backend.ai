@@ -10,7 +10,7 @@ message queue 위에 event type, dispatcher, cache 를 두는 컴포넌트 간 e
 
 - anycast 메시지는 등록된 handler 가 **모두** 반환한 뒤에야 ack 응답을 보낸다.
 - handler 하나라도 실패하면 메시지를 재전달하고 **이미 성공한 handler 까지 모두 다시 실행한다**. 모든 handler 는 재실행을 견뎌야 한다.
-- 그래서 handler 가 여럿인 anycast event 는 위험한 모양이다. anycast event 하나에는 소비 handler 하나를 선호한다.
+- 그래서 handler 가 여럿인 anycast event 는 위험한 구조이다. anycast event 하나에는 소비 handler 하나를 선호한다.
 - handler 실패는 pump 를 멈추지 않는다. event 사이에도, event 하나의 handler 사이에도 순서 보장이 없다.
 
 ## 처리할 handler 가 없는 event 는 조용히 사라진다
@@ -25,6 +25,6 @@ message queue 위에 event type, dispatcher, cache 를 두는 컴포넌트 간 e
 
 ## cache 는 유실되는 broadcast 를 보완한다
 
-- broadcast 는 fire-and-forget 이다. 그래서 두 도메인(bgtask, session scheduler)이 최신 payload 를 `cache_id` 아래에 TTL 5분으로 저장한다.
-- SSE subscriber 는 cache 에 저장된 마지막 event 를 먼저 재생하고(발생 후 구독하는 경쟁 조건을 해소한다), 30초 침묵마다 cache 를 다시 조회하는 polling 안전망을 사용한다.
+- broadcast 는 fire-and-forget 이다. 그래서 두 도메인(bgtask, session scheduler)이 최신 payload 를 `cache_id` 아래에 TTL 5분으로 또한 저장한다.
+- SSE subscriber 는 cache 에 저장된 마지막 event 를 먼저 재생해 발생 후 구독하는 경쟁 조건을 해소하고, 30초 침묵마다 cache 를 다시 조회하는 polling 안전망을 사용한다.
 - cache 는 id 마다 최신 event 하나만 보관한다. 다시 연결한 client 는 놓친 중간 event 가 아니라 snapshot 을 받는다.
