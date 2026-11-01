@@ -146,7 +146,7 @@ def _commit_upload(
             raise InvalidSubpathError(vfid, PurePosixPath(dst_dir or "", relpath)) from e
         raise
     try:
-        os.rmdir(staging_path.parent)
+        staging_path.parent.rmdir()
     except OSError:
         pass
 
