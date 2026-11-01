@@ -48,6 +48,7 @@ from ai.backend.agent.resources import (
     Mount,
     known_slot_types,
 )
+from ai.backend.agent.scratch.utils import RestartStateStore
 from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo, Port
 from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cgroup import CgroupController
@@ -1184,11 +1185,8 @@ class KubernetesAgent(
         kernel_id: KernelId,
         name: str,
     ) -> bytes:
-        scratch_dir = (self.local_config.container.scratch_root / str(kernel_id)).resolve()
-        config_dir = scratch_dir / "config"
-        return await run_in_executor_with_context(
-            None,
-            (config_dir / name).read_bytes,
+        return await RestartStateStore(self.local_config.container.scratch_root, kernel_id).load(
+            name
         )
 
     @override
@@ -1198,16 +1196,8 @@ class KubernetesAgent(
         name: str,
         data: bytes,
     ) -> None:
-        scratch_dir = (self.local_config.container.scratch_root / str(kernel_id)).resolve()
-        config_dir = scratch_dir / "config"
-
-        def _write_bytes(data: bytes) -> None:
-            (config_dir / name).write_bytes(data)
-
-        return await run_in_executor_with_context(
-            None,
-            _write_bytes,
-            data,
+        await RestartStateStore(self.local_config.container.scratch_root, kernel_id).store(
+            name, data
         )
 
 

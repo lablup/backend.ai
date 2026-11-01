@@ -424,6 +424,17 @@ class AbstractKernelCreationContext[KernelObjectType: AbstractKernel](aobject):
         """
         self.kernel_config["bootstrap_script"] = script
 
+    def kernel_config_for_restart(self) -> KernelCreationConfig:
+        """
+        Return the kernel config to store for restarts, without the registry account.
+        """
+        image = self.kernel_config["image"]
+        registry = {**image["registry"], "username": None, "password": None}
+        return cast(
+            KernelCreationConfig,
+            {**self.kernel_config, "image": {**image, "registry": registry}},
+        )
+
     @property
     @abstractmethod
     def repl_ports(self) -> Sequence[int]:
@@ -2948,14 +2959,13 @@ class AbstractAgent[
                     await self.restart_kernel__store_config(
                         kernel_id,
                         "kconfig.dat",
-                        pickle.dumps(ctx.kernel_config),
+                        pickle.dumps(ctx.kernel_config_for_restart()),
                     )
-                    if not restarting:
-                        await self.restart_kernel__store_config(
-                            kernel_id,
-                            "cluster.json",
-                            dump_json(cluster_info),
-                        )
+                    await self.restart_kernel__store_config(
+                        kernel_id,
+                        "cluster.json",
+                        dump_json(cluster_info),
+                    )
                     log.debug("kernel restart configs stored")
 
                     if self.local_config.debug.log_kernel_config:
