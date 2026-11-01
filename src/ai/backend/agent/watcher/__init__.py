@@ -339,7 +339,7 @@ async def watcher_server(
                 ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
                 ssl_ctx.load_cert_chain(
                     str(app["config"]["watcher"]["ssl-cert"]),
-                    str(app["config"]["watcher"]["ssl-privkey"]),
+                    str(app["config"]["watcher"]["ssl-key"]),
                 )
             runner = web.AppRunner(app)
             await runner.setup()
