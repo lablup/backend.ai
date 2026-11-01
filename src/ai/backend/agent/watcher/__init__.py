@@ -1,4 +1,5 @@
 import asyncio
+import hmac
 import logging
 import os
 import signal
@@ -46,7 +47,9 @@ async def auth_middleware(
     request: web.Request, handler: Callable[[web.Request], Awaitable[web.StreamResponse]]
 ) -> web.StreamResponse:
     token = request.headers.get("X-BackendAI-Watcher-Token", None)
-    if token == request.app["token"]:
+    if token is not None and hmac.compare_digest(
+        token.encode("utf-8", "surrogateescape"), request.app["token"].encode("utf-8")
+    ):
         try:
             return await handler(request)
         except FileNotFoundError as e:
@@ -141,8 +144,7 @@ async def handle_agent_restart(request: web.Request) -> web.Response:
 
 async def handle_fstab_detail(request: web.Request) -> web.Response:
     log.trace("fstab detail requested")
-    params = request.query
-    fstab_path = params.get("fstab_path", "/etc/fstab")
+    fstab_path = request.app["config"]["watcher"]["fstab-path"]
     async with aiofiles.open(fstab_path) as fp:
         content = await fp.read()
         return web.Response(text=content)
@@ -213,7 +215,7 @@ async def handle_mount(request: web.Request) -> web.Response:
         raise VolumeMountFailedError(extra_msg=err)
     log.info("volume mounted", volume_name=params["name"], mount_prefix=mount_prefix)
     if params["edit_fstab"]:
-        fstab_path = params["fstab_path"] if params["fstab_path"] else "/etc/fstab"
+        fstab_path = request.app["config"]["watcher"]["fstab-path"]
         # FIXME: Remove ignore if https://github.com/python/typeshed/pull/4650 is released
         async with aiofiles.open(fstab_path, mode="r+") as fp:
             fstab = Fstab(fp)
@@ -253,7 +255,7 @@ async def handle_umount(request: web.Request) -> web.Response:
     except OSError:
         pass
     if params["edit_fstab"]:
-        fstab_path = params["fstab_path"] if params["fstab_path"] else "/etc/fstab"
+        fstab_path = request.app["config"]["watcher"]["fstab-path"]
         # FIXME: Remove ignore if https://github.com/python/typeshed/pull/4650 is released
         async with aiofiles.open(fstab_path, mode="r+") as fp:
             fstab = Fstab(fp)
@@ -325,9 +327,9 @@ async def watcher_server(
             app["config_server"] = etcd
 
             token = await etcd.get("config/watcher/token")
+            log.debug("watcher authentication token loaded", token_configured=token is not None)
             if token is None:
                 token = "insecure"
-            log.debug("watcher authentication token set", token=token)
             app["token"] = token
 
             app.middlewares.append(auth_middleware)
@@ -400,6 +402,7 @@ def main(
                 t.Key("ssl-key", default=None): t.Null | tx.Path(type="file"),
                 t.Key("target-service", default="backendai-agent.service"): t.String,
                 t.Key("soft-reset-available", default=False): t.Bool,
+                t.Key("fstab-path", default="/etc/fstab"): t.String,
             }).allow_extra("*"),
             t.Key("logging"): t.Any,  # checked in ai.backend.logging
             t.Key("debug"): t.Dict({
