@@ -11,6 +11,7 @@ from aiohttp import web
 
 from ai.backend.agent.errors.watcher import InvalidWatcherTokenError
 from ai.backend.agent.watcher import auth_middleware, watcher_server
+from ai.backend.logging.utils import BraceMessage
 
 _TOKEN_HEADER = "X-BackendAI-Watcher-Token"
 
@@ -96,4 +97,8 @@ class TestStartupTokenLog:
 
         records = [vars(record) for record in caplog.records]
         assert all("watcher-secret-value" not in str(record) for record in records)
-        assert any(record.get("log_tag_token_configured") is token_configured for record in records)
+        assert any(
+            isinstance(record["msg"], BraceMessage)
+            and record["msg"].kwargs.get("token_configured") is token_configured
+            for record in records
+        )
