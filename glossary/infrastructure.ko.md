@@ -2,9 +2,9 @@
 
 문체 규칙은 [용어집](../GLOSSARY.ko.md)을 따릅니다.
 
-| 한글 | English | 뜻 | 쓰지 않는 어휘 | 메모 |
+| 한글 | English | 뜻 | 사용하지 않는 어휘 | 메모 |
 |---|---|---|---|---|
-| AppProxy tunnel | AppProxy tunnel | 컨테이너에 접근할 때 쓰는 AppProxy 경로입니다. | App Proxy tunnel |   |
+| AppProxy tunnel | AppProxy tunnel | 컨테이너에 접근할 때 사용하는 AppProxy 경로입니다. | App Proxy tunnel |   |
 | bai | bai | Backend.AI v2 CLI 명령입니다. | v2 CLI |   |
 | BEP | BEP | Backend.AI Enhancement Proposal, 설계 배경을 담은 제안 문서입니다. |   |   |
 | Event Stream API | Event Stream API | Server-Sent Events 로 event 를 내보내는 manager API 입니다. | Server-Sent Events |   |
@@ -22,5 +22,5 @@
 | stable | stable | installer 다운로드 링크 중 최신 LTS version 을 가리키는 채널입니다. |   |   |
 | 스토리지 백엔드 | storage backend | storage volume 이 놓이는 storage appliance 를 가리키는 정규화된 레코드입니다. |   |   |
 | 스토리지 백엔드 유형 | storage backend type | volume 을 서비스할 수 있는 storage backend 구현입니다. |   |   |
-| v1 CLI | v1 CLI | v2 CLI 와 분리된 legacy CLI 로 쓰지 말라고 안내합니다. |   |   |
+| v1 CLI | v1 CLI | v2 CLI 와 분리된 legacy CLI 로 사용하지 말라고 안내합니다. |   |   |
 | WebUI | WebUI | manager 의 GraphQL API 를 주로 소비하는 웹 클라이언트입니다. |   |   |

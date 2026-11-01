@@ -2,7 +2,7 @@
 
 문체 규칙은 [용어집](../GLOSSARY.ko.md)을 따릅니다.
 
-| 한글 | English | 뜻 | 쓰지 않는 어휘 | 메모 |
+| 한글 | English | 뜻 | 사용하지 않는 어휘 | 메모 |
 |---|---|---|---|---|
 | additive only | additive only | field 이름과 용도를 바꾸지 않고 새 field 추가와 기존 field deprecate 만 하는 v2 schema 정책입니다. |   |   |
 | 에이전트 heartbeat | agent heartbeat | agent 가 가용 상태를 manager 에 주기적으로 알리는 신호입니다. | heartbeat |   |
@@ -27,9 +27,9 @@
 | 리비전 병합 체인 | revision merge chain | 요청이 비워 둔 model definition 필드를 낮은 우선순위부터 model_mount_destination 기본값, runtime variant baseline, revision preset, deployment-config.yaml, model-definition.yaml, override 순으로 채우는 병합 체인입니다. | merge chain |   |
 | 시나리오 | scenario | 어댑터 하나를 실제 database 와 Valkey 로 돌려 요청 하나가 무엇을 답하는지 확인하는 테스트 단위입니다. |   |   |
 | 스케줄링 이력 | scheduling history | session 의 scheduling 시도마다 phase 와 상태 변화, 결과, 시도 횟수를 남기는 기록입니다. |   |   |
-| seed | seed | mgr seed 명령이 seeds/ 아래 YAML 로 초기 행을 채우는 기능입니다. |   |   |
+| seed | seed | mgr seed 명령이 seeds/ 아래 YAML 로 초기 row 를 채우는 기능입니다. |   | 테스트 코드의 `TestSeeder`, `seed.within` 은 테스트 데이터를 미리 저장하는 코드 이름입니다 |
 | 서비스 카탈로그 heartbeat | service catalog heartbeat | service catalog entry 가 살아 있음을 갱신하는 신호입니다. | heartbeat |   |
 | 서비스 디스커버리 | service discovery | agent 가 etcd 로 cluster 에 등록하고 service instance 등록을 event 로 알리는 기능입니다. | SD, 서비스 복구 |   |
 | 스킬 | skill | Claude Code 가 개발 작업에 호출하는 안내 문서입니다. |   |   |
 | 스윕 | sweep | retention policy 가 자기 category 를 정리하는 동작입니다. | swept |   |
-| 사용량 버킷 | usage bucket | 한 scope 가 한 resource group 에서 한 기간 동안 쓴 자원 사용량 기록입니다. |   |   |
+| 사용량 버킷 | usage bucket | 한 scope 가 한 resource group 에서 한 기간 동안 사용한 자원 사용량 기록입니다. |   |   |

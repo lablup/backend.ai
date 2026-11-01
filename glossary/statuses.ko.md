@@ -2,7 +2,7 @@
 
 문체 규칙은 [용어집](../GLOSSARY.ko.md)을 따릅니다.
 
-| 한글 | English | 뜻 | 쓰지 않는 어휘 | 메모 |
+| 한글 | English | 뜻 | 사용하지 않는 어휘 | 메모 |
 |---|---|---|---|---|
 | 활성 상태 | activeness status | deployment 의 활성 여부 상태로 ACTIVE, INACTIVE 값을 가집니다. |   |   |
 | 에이전트 상태 | agent status | agent 의 운영 상태로 ALIVE, LOST, RESTARTING, TERMINATED 값을 가집니다. |   |   |
@@ -14,7 +14,7 @@
 | 이미지 역할 | image role | 이미지의 용도 구분으로 COMPUTE, INFERENCE, SYSTEM 값을 가집니다. |   |   |
 | 이미지 상태 | image status | image 의 상태로 ALIVE, DELETED, PURGING, PURGE_ERROR 값을 가집니다. | ImageStatusType |   |
 | 커널 상태 | kernel status | kernel 의 생애 상태로 PENDING, RESERVED, SCHEDULED, PREPARING, BUILDING, PULLING, PREPARED, CREATING, RUNNING, RESTARTING, RESIZING, SUSPENDED, TERMINATING, TERMINATED, ERROR, CANCELLED 값을 가집니다. |   |   |
-| 네트워크 유형 | network type | 세션이 쓰는 container 간 network 종류입니다. |   |   |
+| 네트워크 유형 | network type | 세션이 사용하는 container 간 network 종류입니다. |   |   |
 | 라우트 상태 | route status | deployment 안 route 의 생애 주기 상태입니다. |   |   |
 | 서비스 카탈로그 상태 | service catalog status | service catalog 에 등록된 service instance 의 상태 값 묶음입니다. |   |   |
 | 세션 상태 | session status | 세션의 생애 상태로 PENDING, PREPARING, RUNNING, TERMINATED 등의 값을 가집니다. |   |   |

@@ -77,3 +77,4 @@ The term files set the terms. This list covers verbs and predicates. Korean word
 | outgoing pattern, parent-fixed variants are the outgoing pattern | legacy pattern, marked as deprecated |
 | stand for | represent |
 | which is why | so |
+| line (of a table) | row |
