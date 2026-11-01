@@ -449,7 +449,6 @@ class TestVFolderServiceWatcherInfo:
             vfolder_repository=MagicMock(),
             user_repository=MagicMock(),
             valkey_stat_client=MagicMock(),
-            own_check=MagicMock(),
         )
 
         watcher_info = await vfolder_service._get_watcher_info(agent_id)
