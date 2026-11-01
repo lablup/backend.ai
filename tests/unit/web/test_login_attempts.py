@@ -20,15 +20,18 @@ from ai.backend.common.clients.valkey_client.valkey_session.client import (
     LOGIN_FAIL_COUNT_KEY_PREFIX,
     ValkeySessionClient,
 )
+from ai.backend.common.data.entity.user import UserID
+from ai.backend.common.data.user.types import UserRole
 from ai.backend.common.defs import REDIS_STATISTICS_DB
 from ai.backend.common.dto.manager.auth.types import (
+    AuthResponseType,
     AuthSuccessResponse,
     RequireTwoFactorAuthResponse,
     RequireTwoFactorRegistrationResponse,
     TwoFactorType,
 )
 from ai.backend.common.typed_validators import HostPortPair as HostPortPairModel
-from ai.backend.common.types import ValkeyTarget
+from ai.backend.common.types import AccessKey, SecretKey, ValkeyTarget
 from ai.backend.common.web.session import SESSION_KEY, Session
 from ai.backend.web import server
 from ai.backend.web.server import login_handler, token_login_handler
@@ -36,12 +39,13 @@ from ai.backend.web.server import login_handler, token_login_handler
 ALLOWED_FAIL_COUNT = 3
 AUTH_TOKEN_NAME = "sToken"
 AUTH_SUCCESS = AuthSuccessResponse(
-    access_key="AKIATEST",
-    secret_key="secret",
-    role="user",
+    response_type=AuthResponseType.SUCCESS,
+    access_key=AccessKey("AKIATEST"),
+    secret_key=SecretKey("secret"),
+    role=UserRole.USER,
     status="active",
     session_token="session-token",
-    user_id=uuid.uuid4(),
+    user_id=UserID(uuid.uuid4()),
 )
 
 ClientFactory = Callable[[AsyncMock], Awaitable[Any]]
@@ -172,8 +176,15 @@ class TestLoginFailCount:
     @pytest.mark.parametrize(
         "outcome",
         [
-            RequireTwoFactorAuthResponse(type=TwoFactorType.TOTP),
-            RequireTwoFactorRegistrationResponse(type=TwoFactorType.TOTP, token="token"),
+            RequireTwoFactorAuthResponse(
+                response_type=AuthResponseType.REQUIRE_TWO_FACTOR_AUTH,
+                type=TwoFactorType.TOTP,
+            ),
+            RequireTwoFactorRegistrationResponse(
+                response_type=AuthResponseType.REQUIRE_TWO_FACTOR_REGISTRATION,
+                type=TwoFactorType.TOTP,
+                token="token",
+            ),
             _api_error(400),
             _api_error(409),
             _api_error(500),
@@ -250,6 +261,7 @@ class TestTokenLoginBody:
         )
 
         assert resp.status == 200
+        assert authorize.await_args is not None
         kwargs = authorize.await_args.kwargs
         assert kwargs["username"] == "fake-email"
         assert kwargs["password"] == "fake-pwd"
