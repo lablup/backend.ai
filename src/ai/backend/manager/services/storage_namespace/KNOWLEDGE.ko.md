@@ -2,7 +2,7 @@
 
 > 규칙은 `../AGENTS.md`, spec 선택은 `../../models/specs/KNOWLEDGE.md` 에 있다.
 
-스토리지 네임스페이스는 object storage 가 노출하는 bucket 이거나 VFS storage 가 노출하는 subpath 다. artifact 가 이 row 중 하나를 참조해 저장 위치를 기록하므로, 스토리지 네임스페이스가 storage 의 column 으로 있는 대신 자체 식별자를 가져야 하므로 이 패키지가 존재한다.
+스토리지 네임스페이스는 object storage 가 노출하는 bucket 이거나 VFS storage 가 노출하는 subpath 다. artifact 가 이 row 중 하나를 참조해 저장 위치를 기록한다. 스토리지 네임스페이스가 storage 의 column 으로 있는 대신 자체 식별자를 가져야 하므로 이 패키지가 존재한다.
 
 ## processor fields
 
@@ -13,7 +13,7 @@
 ## 등록 해제는 id 를 받고, 호출자는 lookup 으로 짝을 id 로 변환한다
 
 - 등록은 `(storage_id, namespace)` 를 노출하는데, 이것은 테이블의 unique 제약이지 primary key 가 아니다. purge spec 은 primary 값 하나를 key 로 사용한다.
-- purge 가 두 번째 주소 지정 방식을 지원하지 않게 하는 대신, 호출자가 `lookup` 으로 그 짝을 찾아 id 를 전달한다. lookup 은 이미 일치하는 row 가 둘이면 임의의 row 로 응답하지 않고 거부한다.
+- purge 에 두 번째 주소 지정 방식을 추가하는 대신, 호출자가 `lookup` 으로 그 짝을 찾아 id 를 전달한다. lookup 은 이미 일치하는 row 가 둘이면 임의의 row 로 응답하지 않고 거부한다.
 - 이 변환은 adapter 에 있으므로 API 는 등록했을 때와 같은 방식으로 스토리지 네임스페이스를 계속 지정한다.
 
 ## own 하는 storage 는 polymorphic 이고 schema 는 그것을 말하지 않는다
