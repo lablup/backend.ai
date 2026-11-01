@@ -13,32 +13,33 @@ tags:
   - api-patterns
 ---
 
-# API Implementation Guide
+# API implementation guide
 
-Guide for implementing REST and GraphQL APIs with standard operations and scope patterns.
+REST and GraphQL APIs share the standard operations and scope patterns below.
 
-## Standard Operations
+## Standard operations
 
 APIs implement 6 standard operations:
 
-1. **create** - Create new entity
-2. **get** - Retrieve single entity
-3. **search** - Query with filters and pagination
-4. **update** - Update entity
-5. **delete** - Delete entity (soft)
-6. **purge** - Permanently remove entity (hard)
+1. **create** - create a new entity
+2. **get** - get a single entity
+3. **search** - query with filters and pagination
+4. **update** - update an entity
+5. **delete** - delete an entity (soft)
+6. **purge** - permanently remove an entity (hard)
 
-**Multi-target:** `batch_*` (atomic, one statement) vs `bulk_*` (per-row, partial failures). See `/repository-guide`.
+`batch_*` runs atomically in one statement. `bulk_*` handles rows individually with partial failures. See `/repository-guide`.
 
-## Scope Prefix Rules
+## Scope prefix rules
 
-**API layer only** (Service/Repository layers don't use prefix)
+The prefix applies to the API layer. The service and repository layers do not use it.
 
-### Scoped Operations
+### Scoped operations
 
-Operations within a scope use `{scope}_` prefix:
+Operations within a scope use a `{scope}_` prefix.
 
-**REST:**
+REST:
+
 ```
 POST   /domains/{domain}/users        → domain_create_user
 GET    /domains/{domain}/users/{id}   → domain_user
@@ -47,48 +48,51 @@ PATCH  /domains/{domain}/users/{id}   → domain_update_user
 DELETE /domains/{domain}/users/{id}   → domain_delete_user
 ```
 
-**GraphQL:**
+GraphQL:
+
 ```graphql
 mutation domainCreateUser(scope: DomainScope, input: ...)
 query domainUser(scope: DomainScope, id: ID)
 query domainSearchUsers(scope: DomainScope, filter: ...)
 ```
 
-### Admin Operations (No Scope)
+### Admin operations
 
-Operations without scope use `admin_` prefix (superadmin required):
+Operations without a scope use the `admin_` prefix and require the superadmin.
 
-**REST:**
+REST:
+
 ```
 POST   /admin/domains        → admin_create_domain
 GET    /admin/domains/{id}   → admin_domain
 GET    /admin/domains         → admin_search_domains
 ```
 
-**GraphQL:**
+GraphQL:
+
 ```graphql
 mutation adminCreateDomain(input: ...)
 query adminDomain(id: ID)
 query adminSearchDomains(filter: ...)
 ```
 
-### When to Separate admin_ vs Non-admin Endpoints
+### When to separate admin_ and non-admin endpoints
 
-**search — always two variants:**
-- `admin_search_*`: superadmin, no scope — queries entire system.
-- `{scope}_search_*`: non-admin, scope required — queries within the given scope only.
-- There is NO "search everything without scope" for non-admin users.
+**search always has two variants:**
 
-**create / update / get / delete / purge — depends on the entity:**
+- `admin_search_*` - superadmin, no scope, queries the entire system.
+- `{scope}_search_*` - non-admin, scope required, queries within the given scope only.
+- There is no "search everything without scope" for non-admin users.
 
-1. **Admin-only entity** (e.g., Domain, ContainerRegistry): single `admin_` endpoint.
-2. **Both admin and users, but behavior differs** (e.g., admin can set more fields on create/update): separate `admin_` and non-admin endpoints with different DTOs.
-3. **Both admin and users, only permission check differs**: single endpoint — admin already has entity access permissions, no need for a separate `admin_` variant.
+**create, update, get, delete and purge depend on the entity:**
 
-## REST v1 API Patterns (Legacy)
+1. **Admin-only entity** (for example Domain or ContainerRegistry): a single `admin_` endpoint.
+2. **Both admin and users, but behavior differs** (for example the admin can set more fields on create or update): separate `admin_` and non-admin endpoints with different DTOs.
+3. **Both admin and users, with only the permission check differing** - a single endpoint. The admin already has the entity access permissions, so no separate `admin_` variant is needed.
 
-> **New endpoints MUST use REST v2 patterns below.**
-> REST v1 is for existing legacy handlers only — do not add new handlers here.
+## REST v1 API patterns (legacy)
+
+New endpoints use the REST v2 patterns below. REST v1 holds only existing legacy handlers; do not add new handlers there.
 
 ### Architecture
 
@@ -96,19 +100,17 @@ query adminSearchDomains(filter: ...)
 REST v1 Handler → Processor → Service → Repository
 ```
 
-**Key Files:**
+Key files:
+
 - `src/ai/backend/manager/api/rest/{domain}/handler.py` - Handlers
-- `src/ai/backend/manager/api/rest/{domain}/adapter.py` - Filters (per-domain)
+- `src/ai/backend/manager/api/rest/{domain}/adapter.py` - Filters, per domain
 - `src/ai/backend/manager/api/rest/adapter.py` - Base adapter
 
-**See complete examples:**
-- `api/rest/fair_share/handler.py` - Handler calling processor
-- `services/processors.py` - ActionProcessor base class
+See `api/rest/fair_share/handler.py` for a handler that calls a processor, and `services/processors.py` for the ActionProcessor base class.
 
-## REST v2 API Patterns
+## REST v2 API patterns
 
-> REST v2 uses the same DTOs as GraphQL (`common/dto/manager/v2/`), providing a
-> unified schema across both API surfaces.
+REST v2 uses the same DTOs as GraphQL (`common/dto/manager/v2/`), so both API surfaces share one schema.
 
 ### Architecture
 
@@ -116,16 +118,16 @@ REST v1 Handler → Processor → Service → Repository
 REST v2 Handler → Adapter (api/adapters/) → Processor → Service → Repository
 ```
 
-**Key difference from v1:** v2 handlers call shared Adapters instead of Processors directly.
-Adapters are shared with the GQL layer.
+The difference from v1 is that v2 handlers call shared adapters instead of processors directly. The adapters are shared with the GQL layer.
 
-**Key Files:**
+Key files:
+
 - `src/ai/backend/manager/api/rest/v2/{domain}/handler.py` - Handlers
 - `src/ai/backend/manager/api/rest/v2/{domain}/registry.py` - Route registration
-- `src/ai/backend/manager/api/adapters/{domain}.py` - Shared adapters (same as GQL)
+- `src/ai/backend/manager/api/adapters/{domain}.py` - Shared adapters, the same as GQL
 - `src/ai/backend/common/dto/manager/v2/{domain}/` - Shared DTOs
 
-### Handler Pattern
+### Handler pattern
 
 ```python
 from ai.backend.common.api_handlers import APIResponse, BodyParam
@@ -147,84 +149,82 @@ class DomainV2Handler:
         )
 ```
 
-### Scope Pattern
+### Scope pattern
 
-Scope defines access boundaries.
+Scope defines the access boundary.
 
-**Repository Scope:**
+Repository scope:
+
 - `src/ai/backend/manager/repositories/{domain}/types.py`
-- Example: `repositories/fair_share/types.py`
-  - `DomainFairShareSearchScope`, `ProjectFairShareSearchScope`
+- Example: `repositories/fair_share/types.py` with `DomainFairShareSearchScope` and `ProjectFairShareSearchScope`
 
-**Pattern:**
-- Frozen dataclass with scope params
-- `to_conditions()` converts to query conditions
+Pattern:
 
-**See complete examples:**
-- `api/fair_share/handler.py` - Scoped handler implementations
+- A frozen dataclass with scope parameters
+- `to_conditions()` converts it to query conditions
 
-### Scope Parameter Usage
+See `api/fair_share/handler.py` for the scoped handler implementations.
 
-**Scope parameter is needed for:**
+### Scope parameter usage
 
-1. **search** - Filter multiple items within scope
+The scope parameter is needed for:
+
+1. **search**, to filter multiple items within the scope
    ```python
    domain_search_users(scope: DomainScope, filter: ...)
    ```
 
-2. **batch operations** - Process multiple items within scope
+2. **batch operations**, to process multiple items within the scope
    ```python
    domain_batch_update_users(scope: DomainScope, ids: list[ID], ...)
    ```
 
-**Scope parameter is NOT needed for:**
+The scope parameter is not needed for:
 
-1. **get** - ID uniquely identifies item
+1. **get**, because the id uniquely identifies the item
    ```python
    user(id: ID)  # ✅ No scope needed
    # domain_user(scope: DomainScope, id: ID)  # ❌ Unnecessary
    ```
 
-2. **update/delete/purge** - ID uniquely identifies item
+2. **update, delete and purge**, because the id uniquely identifies the item
    ```python
    update_user(id: ID, data: ...)  # ✅ No scope
    delete_user(id: ID)  # ✅ No scope
    ```
 
-3. **create** - Scope info in data
+3. **create**, because the scope information is in the data
    ```python
    create_user(data: CreateUserData)  # data contains domain_name
    ```
 
-**Note:** Scope prefix in API name (`domain_search_users`) is different from scope parameter (`scope: DomainScope`).
+The scope prefix in the API name (`domain_search_users`) differs from the scope parameter (`scope: DomainScope`).
 
-### Filter Pattern
+### Filter pattern
 
-Filters convert API params to QueryCondition.
+Filters convert API parameters to a QueryCondition.
 
-**Adapter:**
+Adapter:
+
 - `api/adapter.py` - BaseFilterAdapter
 - `api/fair_share/adapter.py` - Domain adapters
 
-**Pattern:**
+Pattern:
+
 - `to_conditions(filters)` → `list[QueryCondition]`
 - `to_orders(order_by)` → `list[QueryOrder]`
-- Adapter → `BatchQuerier` → Repository
+- Adapter → `BatchQuerier` → repository
 
-**See complete examples:**
-- `api/fair_share/adapter.py` - Filter adapters
-- `api/fair_share/handler.py` - Handler implementations with BatchQuerier
+See `api/fair_share/adapter.py` for the filter adapters and `api/fair_share/handler.py` for handler implementations with BatchQuerier.
 
-### Admin_ Prefix Pattern
+### admin_ prefix pattern
 
-Admin operations require superadmin check before processing.
+Admin operations require a superadmin check before processing.
 
-**Pattern:**
-- `_check_superadmin(request)` at handler start
-- Raise `InsufficientPermission` if not superadmin
+- `_check_superadmin(request)` at the start of the handler
+- Raise `InsufficientPermission` when the caller is not the superadmin
 
-**See complete examples:**
-- `api/rbac/handler.py` - Admin handler implementations
+See `api/rbac/handler.py` for the admin handler implementations.
 
 ### Pagination
 
@@ -243,9 +243,9 @@ class SearchResult(BaseModel):
     limit: int
 ```
 
-**Client calculates:** `has_next = offset + limit < total_count`
+The client calculates `has_next = offset + limit < total_count`.
 
-## GraphQL Patterns
+## GraphQL patterns
 
 ### Architecture
 
@@ -253,48 +253,51 @@ class SearchResult(BaseModel):
 GraphQL Resolver → check_admin_only (if admin) → Adapter (info.context.adapters.*) → Processor → Service → Repository
 ```
 
-**Key Files:**
+Key files:
+
 - `src/ai/backend/manager/api/gql/{domain}/resolver/` - Resolvers
 - `src/ai/backend/manager/api/gql/decorators.py` - Custom decorators (required)
 - `src/ai/backend/manager/api/gql/pydantic_compat.py` - PydanticNodeMixin, PydanticInputMixin
 - `src/ai/backend/manager/api/gql/utils.py` - Utilities
 
-### Decorator Rules
+### Decorator rules
 
-All GQL types MUST use custom decorators from `decorators.py` — NEVER use `@strawberry.type`, `@strawberry.input`, or `@strawberry.experimental.pydantic.*` directly:
+All GQL types use the custom decorators from `decorators.py`. Do not use `@strawberry.type`, `@strawberry.input` or `@strawberry.experimental.pydantic.*` directly:
 
-- `@gql_node_type(meta)` — Relay Node types (inherit `PydanticNodeMixin[DTO]`)
-- `@gql_pydantic_type(meta, model=DTO)` — output types and payloads backed by a v2 Pydantic DTO
-- `@gql_pydantic_input(meta)` — input types (inherit `PydanticInputMixin[DTO]`)
-- `@gql_pydantic_interface(meta, model=DTO)` — interface types
-- `@gql_connection_type(meta)` — Connection[T] / Edge[T] subclasses
+- `@gql_node_type(meta)` - Relay Node types, which inherit `PydanticNodeMixin[DTO]`
+- `@gql_pydantic_type(meta, model=DTO)` - output types and payloads backed by a v2 Pydantic DTO
+- `@gql_pydantic_input(meta)` - input types, which inherit `PydanticInputMixin[DTO]`
+- `@gql_pydantic_interface(meta, model=DTO)` - interface types
+- `@gql_connection_type(meta)` - `Connection[T]` and `Edge[T]` subclasses
 
-`@strawberry.enum`, `@strawberry.field`, `@strawberry.mutation`, `@strawberry.subscription` may be used directly.
+`@strawberry.enum`, `@strawberry.field`, `@strawberry.mutation` and `@strawberry.subscription` may be used directly.
 
-### Type System Rules
+### Type system rules
 
-**Strawberry Runtime Evaluation:**
+Strawberry runtime evaluation:
+
 - Strawberry types are evaluated at runtime
-- NEVER use TYPE_CHECKING for Strawberry types (Connection, Filter, OrderBy, Input, Type)
-- ALWAYS import Strawberry types directly at module level
-- Only use TYPE_CHECKING for data layer types not used by Strawberry
-- If lazy import needed: use strawberry.lazy() or string-based forward references
+- Do not use `TYPE_CHECKING` for Strawberry types (Connection, Filter, OrderBy, Input, Type)
+- Import Strawberry types directly at module level
+- Use `TYPE_CHECKING` only for data layer types that Strawberry does not use
+- When a lazy import is needed, use `strawberry.lazy()` or string-based forward references
 
-**Naming Convention:**
-- All GraphQL types MUST have `GQL` suffix (DomainGQL, DomainScopeGQL, DomainFilterGQL)
-- Distinguishes GraphQL types from data layer types
+Naming convention:
 
-**Scope vs Filter:**
-- Scope: Required context parameters (resource_group, domain_name, project_id)
-- Filter: Optional filtering conditions (name contains, status equals, created after)
-- NEVER put optional fields in Scope - use Filter instead
-- Scope fields must all be required (no default values, no Optional types)
+- All GraphQL types have the `GQL` suffix (`DomainGQL`, `DomainScopeGQL`, `DomainFilterGQL`)
+- The suffix distinguishes GraphQL types from data layer types
 
-### Cross-Entity Reference Resolvers
+Scope and filter:
 
-When a GQL node references another entity node, use `strawberry.lazy()` to avoid circular imports. Strawberry requires runtime type resolution, so `TYPE_CHECKING` imports alone are insufficient.
+- Scope: required context parameters (`resource_group`, `domain_name`, `project_id`)
+- Filter: optional filtering conditions (name contains, status equals, created after)
+- Do not put optional fields in Scope. Use Filter instead
+- Scope fields are all required, with no default values and no Optional types
 
-**Pattern:**
+### Cross-entity reference resolvers
+
+When a GQL node references another entity node, use `strawberry.lazy()` to avoid circular imports. Strawberry resolves types at runtime, so `TYPE_CHECKING` imports alone are not sufficient.
+
 ```python
 # 1. TYPE_CHECKING: for static analysis (mypy)
 if TYPE_CHECKING:
@@ -311,46 +314,44 @@ async def domain(self, info: Info[StrawberryGQLContext]) -> Annotated[
     return DomainV2GQL.from_data(data)
 ```
 
-**Optional return type:** `| None` must be **outside** `Annotated[]`:
+An optional return type puts `| None` **outside** `Annotated[]`:
+
 ```python
 ) -> Annotated[DomainV2GQL, strawberry.lazy("...")] | None:  # ✅
 ) -> Annotated[DomainV2GQL | None, strawberry.lazy("...")]:   # ❌ lazy cannot resolve union
 ```
 
-**DataLoaders** (`info.context.data_loaders`): Use DataLoaders instead of individual fetch functions to prevent N+1 queries. See `api/gql/data_loader/data_loaders.py` for available loaders.
+DataLoaders (`info.context.data_loaders`) prevent N+1 queries. Use them instead of individual fetch functions. See `api/gql/data_loader/data_loaders.py` for the available loaders.
 
-**See examples:**
+Examples:
+
 - `api/gql/fair_share/types/domain.py` - Cross-entity reference with DataLoader
-- `api/gql/domain_v2/types/node.py` - DomainV2GQL with fair_shares/usage_buckets
-- `api/gql/fair_share/types/*.py` - Scope and Filter patterns
+- `api/gql/domain_v2/types/node.py` - DomainV2GQL with fair_shares and usage_buckets
+- `api/gql/fair_share/types/*.py` - Scope and filter patterns
 
-### Scope Pattern
+### Scope pattern
 
-**Input Types:**
-- `api/gql/types.py`
-  - `ResourceGroupDomainScope`, `ResourceGroupProjectScope`, `ResourceGroupUserScope`
+Input types:
 
-**Pattern:**
-- Strawberry `@input` maps to repository SearchScope
-- GraphQL input → Repository scope type conversion
+- `api/gql/types.py` with `ResourceGroupDomainScope`, `ResourceGroupProjectScope` and `ResourceGroupUserScope`
 
-**See complete examples:**
-- `api/gql/types.py` - Scope input types
-- `api/gql/fair_share/resolver/domain.py` - Resolver implementations
+Pattern:
 
-### Admin Check
+- A Strawberry `@input` maps to the repository SearchScope
+- GraphQL input converts to the repository scope type
 
-**Pattern:**
-- `check_admin_only(info)` at resolver start
-- Raise `InsufficientPermission` if not superadmin
+See `api/gql/types.py` for the scope input types and `api/gql/fair_share/resolver/domain.py` for the resolver implementations.
 
-**See complete examples:**
-- `api/gql/utils.py` - `check_admin_only()` utility
-- `api/gql/*/resolver/*.py` - Admin resolver implementations
+### Admin check
+
+- `check_admin_only(info)` at the start of the resolver
+- Raise `InsufficientPermission` when the caller is not the superadmin
+
+See `api/gql/utils.py` for the `check_admin_only()` utility and `api/gql/*/resolver/*.py` for the admin resolvers.
 
 ### Pagination
 
-GraphQL supports cursor-based (Relay spec).
+GraphQL supports cursor-based pagination, per the Relay spec.
 
 ```python
 @strawberry.type
@@ -367,42 +368,37 @@ class UserConnection:
     total_count: int
 ```
 
-**See:** `api/gql/` for cursor pagination examples
+See `api/gql/` for cursor pagination examples.
 
-## REST v1 vs REST v2 vs GraphQL
+## REST v1, REST v2 and GraphQL
 
-- **REST v1 (legacy)**: Handler → Processor. DTOs from `common/dto/manager/`. Per-domain adapters in `api/rest/{domain}/adapter.py`.
-- **REST v2**: Handler → Adapter. DTOs from `common/dto/manager/v2/`. Shared adapters in `api/adapters/{domain}.py`.
-- **GraphQL**: Resolver → Adapter (same adapters as REST v2). DTOs from `common/dto/manager/v2/`. Strawberry types wrap DTOs via custom decorators.
-- Admin check: REST uses `superadmin_required` middleware, GQL uses `check_admin_only(info)`.
-- Naming: REST uses `domain_create_user`, GQL uses `domainCreateUser`.
+- **REST v1 (legacy)** - handler → processor. DTOs come from `common/dto/manager/`. Per-domain adapters live in `api/rest/{domain}/adapter.py`.
+- **REST v2** - handler → adapter. DTOs come from `common/dto/manager/v2/`. Shared adapters live in `api/adapters/{domain}.py`.
+- **GraphQL** - resolver → adapter, the same adapters as REST v2. DTOs come from `common/dto/manager/v2/`. Strawberry types wrap DTOs through the custom decorators.
+- Admin check: REST uses the `superadmin_required` middleware; GQL uses `check_admin_only(info)`.
+- Naming: REST uses `domain_create_user`; GQL uses `domainCreateUser`.
 
-## Client SDK + CLI Integration
+## Client SDK and CLI integration
 
-**When implementing REST API, also implement:**
+When implementing a REST API, also implement:
 
-1. ✅ **SDK Function** (`client/func/{domain}.py`)
-   - Use `@api_function` decorator
-   - Map to REST endpoint
+1. **SDK function** (`client/func/{domain}.py`), with the `@api_function` decorator, mapped to the REST endpoint
+2. **CLI command** (`client/cli/admin/{domain}.py`), a Click command that calls the SDK function
 
-2. ✅ **CLI Command** (`client/cli/admin/{domain}.py`)
-   - Click command
-   - Calls SDK function
+Integration flow:
 
-**Integration flow:**
 ```
 CLI → SDK → REST API → Processor → Service → Repository
 ```
 
-**See examples:**
-- `src/ai/backend/client/func/admin.py` - SDK
-- `src/ai/backend/client/cli/admin/user.py` - CLI
+See `src/ai/backend/client/func/admin.py` for the SDK and `src/ai/backend/client/cli/admin/user.py` for the CLI.
 
 ## Testing
 
-**See:** `/test-guide` skill and `tests/CLAUDE.md` for complete testing strategies.
+See `/test-guide` and `tests/CLAUDE.md` for the full testing strategies.
 
-**Test hierarchy:**
+Test hierarchy:
+
 ```
 Repository Tests → Real DB (with_tables)
 Service Tests → Mock repositories
@@ -410,86 +406,63 @@ API Handler Tests → Mock processors
 CLI Tests → Mock HTTP
 ```
 
-## Implementation Checklist
+## Implementation checklist
 
-**When implementing new API:**
+When implementing a new API:
 
-1. ✅ **Repository** (`/repository-guide`)
-   - Implement standard operations
-   - Define SearchScope
+1. **Repository** (`/repository-guide`)
+   - Implement the standard operations
+   - Define the SearchScope
 
-2. ✅ **Service** (`/service-guide`)
-   - Define Actions/ActionResults
-   - Implement service methods
-   - Create processors
+2. **Service** (`/service-guide`)
+   - Define the Actions and ActionResults
+   - Implement the service methods
+   - Create the processors
 
-3. ✅ **REST API v2** (all new endpoints)
-   - Handler calls Adapter, uses `common/dto/manager/v2/` DTOs
-   - `BodyParam[DTO]` input, `APIResponse.build(response_model=payload)` output
+3. **REST API v2** (all new endpoints)
+   - The handler calls the adapter and uses the DTOs from `common/dto/manager/v2/`
+   - `BodyParam[DTO]` input and `APIResponse.build(response_model=payload)` output
    - Admin check and scope prefix
 
-4. ✅ **GraphQL** (optional)
-   - `@gql_pydantic_type` / `@gql_pydantic_input` with DTO — no `@strawberry.type` directly
-   - Resolver calls Adapter (`info.context.adapters.*`)
-   - Admin check if needed
+4. **GraphQL** (optional)
+   - `@gql_pydantic_type` and `@gql_pydantic_input` with the DTO, without `@strawberry.type` directly
+   - The resolver calls the adapter (`info.context.adapters.*`)
+   - Admin check when needed
 
-5. ✅ **Client SDK**
-   - Add SDK function
-   - `@api_function` decorator
+5. **Client SDK**
+   - Add the SDK function
+   - Add the `@api_function` decorator
 
-6. ✅ **CLI**
-   - Click command
-   - Integrate with SDK
+6. **CLI**
+   - Add the Click command
+   - Integrate it with the SDK
 
-7. ✅ **Tests**
+7. **Tests**
    - Repository (real DB)
-   - Service (mock repo)
+   - Service (mock repository)
    - Handler (mock processors)
    - CLI (mock HTTP)
 
-## Related Documentation
+## Related documents
 
-- **Service Layer**: `/service-guide` - Actions, Processors
-- **Repository Layer**: `/repository-guide` - Data access
-- **Testing**: `/test-guide` - Scenario-first testing
-- **API README**: `src/ai/backend/manager/api/README.md`
+- `/service-guide` - Actions and Processors
+- `/repository-guide` - Data access
+- `/test-guide` - Scenario-first testing
+- `src/ai/backend/manager/api/README.md` - API layer reference
 
 ## Examples
 
-**REST API:**
+REST API:
+
 - `src/ai/backend/manager/api/fair_share/handler.py`
 - `src/ai/backend/manager/api/rbac/handler.py`
 
-**GraphQL:**
+GraphQL:
+
 - `src/ai/backend/manager/api/gql/fair_share/resolver/domain.py`
 - `src/ai/backend/manager/api/gql/types.py`
 
-**Client SDK/CLI:**
+Client SDK and CLI:
+
 - `src/ai/backend/client/func/admin.py`
 - `src/ai/backend/client/cli/admin/user.py`
-
-## Summary
-
-**Standard operations:**
-- create, get, search, update, delete, purge
-- batch_update, batch_delete, batch_purge
-
-**Scope prefix (API only):**
-- Scoped: `{scope}_operation` (domain_create_user)
-- Admin: `admin_operation` (admin_create_domain)
-
-**Key patterns:**
-- Scope → SearchScope → QueryCondition
-- Filter → Adapter → QueryCondition
-- Admin → check permission first
-
-**Integration:**
-- REST API + SDK + CLI (unified stack)
-- GraphQL (separate, optional)
-
-**Next steps:**
-1. Implement repository (`/repository-guide`)
-2. Implement service (`/service-guide`)
-3. Implement API handlers
-4. Add SDK + CLI
-5. Write tests (`/test-guide`)

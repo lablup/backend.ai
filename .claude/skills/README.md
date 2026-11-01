@@ -1,80 +1,77 @@
-# Backend.AI Claude Code Skills
+# Backend.AI Claude Code skills
 
-This directory contains Claude Code skills for Backend.AI development tasks.
+Skills for Backend.AI development tasks.
 
-## Design & Planning
+## Design and planning
 
-| Skill | Purpose | Use When |
-|-------|---------|----------|
-| `/bep-guide` | BEP creation workflow, document segmentation, overview+index pattern | Writing new BEPs, structuring long proposals |
+| Skill | Purpose | Use when |
+|---|---|---|
+| `/bep-guide` | BEP creation workflow, document segmentation, overview and index pattern | Writing a new BEP, structuring a long proposal |
 
-## Development Guides
+## Development guides
 
-| Skill | Purpose | Use When |
-|-------|---------|----------|
-| `/repository-guide` | Repository base patterns (Querier, Creator, Updater, Purger, SearchScope) | New repository implementation, extending existing |
-| `/service-guide` | Service layer (Actions, Processors, ActionProcessor) | New service implementation, Action/Processor patterns |
-| `/api-guide` | REST/GraphQL API (scope, filter, admin_ prefix, BaseFilterAdapter) | API endpoint implementation |
-| `/cli-sdk-guide` | Client SDK/CLI (Session, @api_function, Click, FieldSpec) | SDK function implementation, CLI command creation |
-| `/test-guide` | Propose scenarios → refine with user → verify each (fixtures, with_tables, optional TDD) | Writing tests for a new feature/bug fix |
+| Skill | Purpose | Use when |
+|---|---|---|
+| `/repository-guide` | Repository base patterns (Querier, Creator, Updater, Purger, SearchScope) | Implementing a new repository, extending an existing one |
+| `/service-guide` | Service layer (Actions, Processors, ActionProcessor) | Implementing a new service, Action and Processor patterns |
+| `/api-guide` | REST and GraphQL API (scope, filter, admin_ prefix, BaseFilterAdapter) | Implementing an API endpoint |
+| `/cli-sdk-guide` | Client SDK and CLI (Session, @api_function, Click, FieldSpec) | Implementing an SDK function, creating a CLI command |
+| `/test-guide` | Propose scenarios, refine them with the user, verify each (fixtures, with_tables, optional TDD) | Writing tests for a new feature or a bug fix |
 
-## Exploration & Navigation
+## Exploration and navigation
 
-| Skill | Purpose | Use When |
-|-------|---------|----------|
-| `/code-trace` | Map a feature across REST/GraphQL/Service/Repository/DB; read the large supergraph.graphql safely | Finding where a feature lives, tracing a request through layers |
+| Skill | Purpose | Use when |
+|---|---|---|
+| `/code-trace` | Map a feature across REST, GraphQL, service, repository and DB. Read the large supergraph.graphql safely | Finding where a feature lives, tracing a request through layers |
 
-For finding/defining exceptions, see `src/ai/backend/manager/errors/AGENTS.md`.
+For finding and defining exceptions, see `src/ai/backend/manager/errors/AGENTS.md`.
 
-## Database Management
+## Database management
 
 | Skill | Purpose |
-|-------|---------|
-| `/db-migrate` | Inspect & apply migrations (status, upgrade/downgrade) |
+|---|---|
+| `/db-migrate` | Inspect and apply migrations (status, upgrade, downgrade) |
 
-## Local Development & CLI
+## Local development and CLI
 
-| Skill | Purpose | Use When |
-|-------|---------|----------|
-| `/local-dev` | Service management (`./dev`) — start, stop, restart, crash debugging | Restarting services after code changes, debugging startup crashes |
-| `/bai-cli` | V2 CLI usage (`./bai`) — config, login, command patterns, entity reference | Testing API changes on live server, discovering CLI commands |
-| `/observability` | Logs/metrics/traces via Grafana MCP (Loki, Prometheus, Tempo, Pyroscope) | Verifying behavior after a restart |
-| `/halfstack` | Docker Compose halfstack — config, service health, DB/Valkey/etcd, supergraph | Halfstack/infra troubleshooting |
+| Skill | Purpose | Use when |
+|---|---|---|
+| `/local-dev` | Service management (`./dev`): start, stop, restart, crash debugging | Restarting services after code changes, debugging startup crashes |
+| `/bai-cli` | `./bai` CLI usage: config, login, command patterns, entity reference | Testing API changes on a live server, discovering CLI commands |
+| `/observability` | Logs, metrics and traces via the Grafana MCP (Loki, Prometheus, Tempo, Pyroscope) | Verifying behavior after a restart |
+| `/halfstack` | Docker Compose halfstack: config, service health, DB, Valkey, etcd, supergraph | Halfstack or infrastructure troubleshooting |
 
 ## Submission
 
-| Skill | Purpose | Use When |
-|-------|---------|----------|
-| `/submit` | Quality checks, commit, PR creation, changelog, push | After finishing implementation, ready to submit PR |
+| Skill | Purpose | Use when |
+|---|---|---|
+| `/submit` | Quality checks, commit, PR creation, changelog, push | After finishing implementation, ready to submit a PR |
 
 ## Release
 
-| Skill | Purpose | Use When |
-|-------|---------|----------|
+| Skill | Purpose | Use when |
+|---|---|---|
 | `/release` | Release script execution, changelog generation, RC consolidation with subsection grouping | Preparing a new version release (RC or final) |
 
-## Skill Integration
+## Skill integration
 
-**Feature Development Flow:**
+Feature development flow:
+
 ```
 bep-guide → ┬→ repository-guide ─┐
             ├→ service-guide ────┼→ integrate → cli-sdk-guide → local-dev → bai-cli
             └→ api-guide ────────┘
 ```
 
-**Testing Flow:**
-test-guide → repository/service/api layer tests
+Testing flow: test-guide → repository, service and API layer tests
 
-**Submission Flow:**
-[implement] → submit (quality checks → commit → PR → changelog → push)
+Submission flow: implement → submit. Submit runs quality checks → commit → PR → changelog → push.
 
-**Release Flow:**
-release (pre-flight → release.sh → changelog editing → RC consolidation → summary)
+Release flow: release runs pre-flight → release.sh → changelog editing → RC consolidation → summary.
 
-**Infrastructure Flow:**
-halfstack → db-migrate → local-dev → bai-cli
+Infrastructure flow: halfstack → db-migrate → local-dev → bai-cli
 
-## Related Documents
+## Related documents
 
 - `CLAUDE.md` - Core development principles
 - `tests/CLAUDE.md` - Testing guidelines

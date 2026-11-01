@@ -11,27 +11,29 @@ tags:
   - search-scope
 ---
 
-# Repository Development Guide
+# Repository development guide
 
-Guide for implementing Backend.AI repositories using base patterns and standard operations.
+Repositories use base patterns and standard operations.
 
-## Standard Operations
+## Standard operations
 
 Repositories implement 6 standard operations:
 
-1. **create** - Create new entity
-2. **get** - Retrieve single entity by ID
-3. **search** - Query with filters and pagination
-4. **update** - Update existing entity
-5. **delete** - Soft delete (status change)
-6. **purge** - Hard delete (permanent removal)
+1. **create** - create a new entity
+2. **get** - get a single entity by id
+3. **search** - query with filters and pagination
+4. **update** - update an existing entity
+5. **delete** - marks the row as deleted while keeping it
+6. **purge** - permanently removes the row
 
-**Target semantics:**
-- **Single** (`create`/`get`/`update`/`delete`/`purge`) — one row by PK.
-- **Batch** (`batch_*`) — many rows in one SQL statement, **atomic** (all-or-nothing); returns only the affected-row count.
-- **Bulk** (`bulk_*`) — rows processed individually, **partial failures allowed** (returns successes + errors).
+Target semantics:
 
-**Method naming (no prefix):**
+- **Single** (`create`, `get`, `update`, `delete`, `purge`): one row by primary key.
+- **Batch** (`batch_*`): many rows in one SQL statement, **atomic** (all or nothing). It returns only the affected-row count.
+- **Bulk** (`bulk_*`): rows processed individually, with **partial failures allowed**. It returns successes and errors.
+
+Method naming has no prefix:
+
 ```python
 await repository.create(data)
 await repository.get(id, scope=None)
@@ -46,44 +48,36 @@ await repository.bulk_create(specs)         # partial failures allowed
 await repository.bulk_upsert(specs)
 ```
 
-## Base Utilities
+## Base utilities
 
-**Located in:** `src/ai/backend/manager/repositories/base/`
-
-All repositories use these base utilities for standard operations:
+The base utilities live in `src/ai/backend/manager/repositories/base/`. All repositories use them for standard operations.
 
 ### SearchScope
-Multi-tenant access control for queries.
 
-**Implementations:** `repositories/{domain}/types.py`
-- Example: `repositories/fair_share/types.py` - `DomainFairShareSearchScope`
-- Example: `repositories/group/types.py` - `GroupSearchScope`
+SearchScope provides multi-tenant access control for queries.
 
-**Pattern:**
-- Frozen dataclass with scope parameters
-- `to_conditions()` method converts to query conditions
+Implementations live in `repositories/{domain}/types.py`. See `repositories/fair_share/types.py` (`DomainFairShareSearchScope`) and `repositories/group/types.py` (`GroupSearchScope`).
 
-### Base Utility Classes
+Pattern:
 
-**Available utilities:**
-- `Creator[TRow]` - Create operations
-- `Querier[TRow]` - Single entity retrieval (get)
-- `BatchQuerier[TRow]` - Search with filters and pagination
-- `Updater[TRow]` - Update with OptionalState pattern
-- `Purger[TRow]` - Hard delete operations
-- `BatchUpdater[TRow]`, `BatchPurger[TRow]` - atomic multi-row (single statement)
-- `BulkCreator[TRow]`, `BulkUpserter[TRow]` - per-row with partial failures (`execute_bulk_*_partial`)
+- A frozen dataclass with scope parameters
+- `to_conditions()` converts it to query conditions
 
-**See implementations:**
-- `repositories/base/` - Base utility source code
-- `repositories/fair_share/repository.py` - Usage examples
+### Base utility classes
 
-## DB Ops Wrapper (`ops/`) — Preferred for new code
+- `Creator[TRow]` - create operations
+- `Querier[TRow]` - single entity retrieval (get)
+- `BatchQuerier[TRow]` - search with filters and pagination
+- `Updater[TRow]` - update with the OptionalState pattern
+- `Purger[TRow]` - purge operations
+- `BatchUpdater[TRow]`, `BatchPurger[TRow]`: atomic multi-row in a single statement
+- `BulkCreator[TRow]`, `BulkUpserter[TRow]`: per-row with partial failures (`execute_bulk_*_partial`)
 
-`ops/provider.py` wraps `ExtendedAsyncSAEngine` and exposes a spec-only operations
-surface. **Migration direction:** db_sources are moving to this wrapper. New or modified
-db_sources SHOULD use `DBOpsProvider` rather than holding the engine and calling
-`session.execute` directly. Existing db_sources are migrated gradually when touched.
+See `repositories/base/` for the source and `repositories/fair_share/repository.py` for usage.
+
+## DB ops wrapper in `ops/`
+
+`ops/provider.py` wraps `ExtendedAsyncSAEngine` and exposes a spec-only operations surface. The db_sources are moving to this wrapper. New or modified db_sources use `DBOpsProvider` rather than holding the engine and calling `session.execute` directly. Existing db_sources are migrated gradually when touched.
 
 ### Entry points
 
@@ -105,29 +99,24 @@ class FooDBSource:
             return result.row.to_data()
 ```
 
-- `read_ops()` / `write_ops()` both open a READ COMMITTED session; the raw engine/
-  session is never exposed.
-- ops methods accept only spec types — never raw `Select/Insert/Update/Delete`.
+- `read_ops()` and `write_ops()` both open a READ COMMITTED session. The raw engine and session are never exposed.
+- ops methods accept only spec types, never raw `Select`, `Insert`, `Update` or `Delete`.
 
 ### Reads with scope (RBAC)
 
 ```python
 async with self._ops.read_ops() as r:
-    # default — scoped query:
+    # default: scoped query
     result = await r.batch_query_with_scopes(sa.select(FooRow), querier, scopes)
-    # superadmin / internal only — bypasses scope filtering:
+    # superadmin or internal only: bypasses scope filtering
     result = await r.batch_query_in_global(sa.select(FooRow), querier)
 ```
 
-Use `batch_query_in_global` only for superadmin-only endpoints or internal system
-operations; it bypasses RBAC scope filtering. Empty `scopes` for the scoped variant
-raises `EmptySearchScopeError` (400).
+Use `batch_query_in_global` only for superadmin-only endpoints or internal system operations; it bypasses RBAC scope filtering. Empty `scopes` for the scoped variant raises `EmptySearchScopeError` (400).
 
-### Single-table specs + multi-table coordination
+### Single-table specs and multi-table coordination
 
-Each spec owns exactly one table — never build child-table rows inside a creator/
-updater spec. For a parent + dependent children, the repository coordinates the
-sequence procedurally (no tree object):
+Each spec owns exactly one table. Do not build child-table rows inside a creator or updater spec. For a parent with dependent children, the repository coordinates the sequence procedurally, without a tree object:
 
 ```python
 async with self._ops.write_ops() as w:
@@ -136,35 +125,29 @@ async with self._ops.write_ops() as w:
     children = (await w.bulk_create_dependent(child_specs, dep)).rows
 ```
 
-- `DependentCreatorSpec[TDependency, TRow].build_row(dependency)` builds one row from a
-  dependency resolved at execution time (e.g. the parent's generated id).
-- `create_dependent` (single) / `bulk_create_dependent` (multiple) execute them.
-- An update that must replace child rows = update parent + purge old children +
-  `bulk_create_dependent` new children, all inside one `write_ops()` block.
+- `DependentCreatorSpec[TDependency, TRow].build_row(dependency)` builds one row from a dependency resolved at execution time, for example the generated id of the parent.
+- `create_dependent` (single) and `bulk_create_dependent` (multiple) execute them.
+- An update that replaces child rows is an update of the parent, a purge of the old children, and `bulk_create_dependent` for the new children, all inside one `write_ops()` block.
 
-## Implementation Pattern
+## Implementation pattern
 
-**Pattern:**
-- Initialize base utilities in `__init__`
-- Implement 6 standard operations using base utilities
-- Use `begin_session()` for writes, `begin_readonly_session()` for reads
-- Pass scope to base utilities
-- Add batch operations if needed
+- Initialize the base utilities in `__init__`
+- Implement the 6 standard operations with the base utilities
+- Use `begin_session()` for writes and `begin_readonly_session()` for reads
+- Pass the scope to the base utilities
+- Add batch operations when needed
 
-**See complete implementation:**
-- `repositories/fair_share/repository.py` - Full repository example
-- `repositories/group/repository.py` - Scope usage patterns
-- `repositories/domain/repository.py` - Standard operations
+See `repositories/fair_share/repository.py` for a full repository, `repositories/group/repository.py` for scope usage, and `repositories/domain/repository.py` for standard operations.
 
-## DB Source and Cache Source Architecture
+## DB source and cache source architecture
 
-**Architecture principle:**
-- Repositories are transitioning to delegate data access to DB Source pattern
-- Repository acts as coordinator between DB Source and Cache Source (if present)
-- Actual database queries and transactions are handled by DB Source
-- Cache operations are handled by Cache Source (optional)
+Repositories are moving to delegate data access to the DB Source pattern. The repository coordinates the DB Source and, when present, the Cache Source.
 
-**Directory structure:**
+- The DB Source handles the actual database queries and transactions.
+- The Cache Source handles cache invalidation and retrieval.
+
+Directory structure:
+
 ```
 repositories/{domain}/
 ├── repository.py        # Public interface, source delegation
@@ -176,165 +159,132 @@ repositories/{domain}/
     └── cache_source.py  # Cache operations implementation
 ```
 
-**Pattern:**
-- Repository imports and uses `db_source` module
+Pattern:
+
+- The repository imports and uses the `db_source` module
 - Repository public methods delegate to DB Source methods
-- Transactions are managed at DB Source level (using `begin_session()` or `begin_readonly_session()`)
-- Cache Source handles cache invalidation and retrieval (when present)
+- Transactions are managed at the DB Source level, with `begin_session()` or `begin_readonly_session()`
+- The Cache Source handles cache invalidation and retrieval when present
 
-**Responsibilities:**
-- **Repository**: Public API, coordination between sources, business logic orchestration
-- **DB Source**: Database queries, transaction management, ORM operations
-- **Cache Source**: Cache reads/writes, invalidation strategies
+Responsibilities:
 
-**See complete examples:**
-- `repositories/fair_share/repository.py:39` - DB Source import and usage
-- `repositories/fair_share/db_source/db_source.py` - DB Source implementation
-- `repositories/scheduler/cache_source/cache_source.py` - Cache Source example
-- `repositories/README.md:78` - Cache management reference
+- **Repository** - public API, coordination between sources, business logic orchestration
+- **DB Source** - database queries, transaction management, ORM operations
+- **Cache Source** - cache reads and writes, invalidation strategies
 
-**Migration status:**
-- Not all repositories have migrated to this pattern yet
-- New repositories SHOULD use this pattern
-- Existing repositories can be migrated gradually when modified
+See `repositories/fair_share/repository.py:39` for DB Source usage, `repositories/fair_share/db_source/db_source.py` for the implementation, `repositories/scheduler/cache_source/cache_source.py` for a Cache Source, and `repositories/README.md:78` for cache management.
 
-## Implementation Steps
+Not all repositories have migrated to this pattern. New repositories use it and existing repositories are migrated gradually when modified.
 
-### 1. Define Types
+## Implementation steps
+
+### 1. Define types
 
 **File:** `repositories/{domain}/types.py`
 
-Define SearchScope dataclass with `to_conditions()` method.
+Define the SearchScope dataclass with a `to_conditions()` method. See `repositories/fair_share/types.py` for multiple scope types and `repositories/group/types.py` for a scope with conditions.
 
-**See examples:**
-- `repositories/fair_share/types.py` - Multiple scope types
-- `repositories/group/types.py` - Scope with conditions
-
-### 2. Implement Repository
+### 2. Implement the repository
 
 **File:** `repositories/{domain}/repository.py`
 
-1. Initialize base utilities in `__init__`
-2. Implement standard 6 operations
-3. Add batch operations if needed
+1. Initialize the base utilities in `__init__`
+2. Implement the 6 standard operations
+3. Add batch operations when needed
 4. Add domain-specific methods
 
-### 3. Write Tests
+### 3. Write tests
 
 **File:** `tests/unit/manager/repositories/{domain}/test_{operation}.py`
 
-- Use `with_tables` fixture for real DB
+- Use the `with_tables` fixture with a real DB
 - Test all standard operations
 - Test scope filtering
 - Test error cases
 
-**See:** `/test-guide` skill for testing workflow
+See `/test-guide` for the testing workflow.
 
-## Transaction Management
+## Transaction management
 
-**Pattern:**
-- Read operations: `begin_readonly_session()`
-- Write operations: `begin_session()`
-- Pass `db_sess` to base utilities
+- Read operations use `begin_readonly_session()`
+- Write operations use `begin_session()`
+- Pass `db_sess` to the base utilities
 
-**See examples:** `repositories/fair_share/repository.py`
+See `repositories/fair_share/repository.py`.
 
-## Query Optimization
+## Query optimization
 
-**Tips:**
-- Select only needed columns
-- Use scope filtering at DB level
+- Select only the needed columns
+- Filter by scope at the DB level
 - Add indexes for frequently filtered columns
 - Use batch operations for multiple entities
 - Avoid N+1 queries
 
-**See:** `repositories/base/` for optimization utilities
+See `repositories/base/` for optimization utilities.
 
-## Scope Usage
+## Scope usage
 
-**Pattern:**
-- Pass scope to base utilities (`query()`, `search()`, `purge()`)
-- Scope `to_conditions()` converts to query filters
-- Domain scope → domain_name filter
-- Project scope → project_id filter
-- User scope → user_uuid filter
+- Pass the scope to the base utilities (`query()`, `search()`, `purge()`)
+- Scope `to_conditions()` converts it to query filters
+- Domain scope becomes a `domain_name` filter
+- Project scope becomes a `project_id` filter
+- User scope becomes a `user_uuid` filter
 
-**See examples:** `repositories/fair_share/repository.py`
+See `repositories/fair_share/repository.py`.
 
-## Type Safety
+## Type safety
 
-**Use domain types:**
+Use domain types:
+
 - `FairShareId` instead of `str`
 - `DomainName` instead of `str`
 - Frozen dataclasses for immutability
 - Comprehensive type hints
 
-## Error Handling
+## Error handling
 
-**Pattern:**
 - Define domain exceptions inheriting from `BackendAIError`
-- Raise specific exceptions (e.g., `EntityNotFound`, `EntityAlreadyExists`)
+- Raise specific exceptions, for example `EntityNotFound` and `EntityAlreadyExists`
 - Provide clear error messages
 
-**See examples:** `repositories/fair_share/repository.py`
+See `repositories/fair_share/repository.py`.
 
-## Example Repositories
+## Example repositories
 
-**Study these implementations:**
 - `src/ai/backend/manager/repositories/fair_share/` - Complete implementation
 - `src/ai/backend/manager/repositories/group/` - Scope usage
 - `src/ai/backend/manager/repositories/domain/` - Standard operations
 
-## Cross-References
+## Related documents
 
-- **Service Layer**: `/service-guide` - Service methods using repositories
-- **API Layer**: `/api-guide` - API handlers calling services
-- **Testing**: `/test-guide` - Scenario-first testing with repositories
-- **Base README**: `repositories/README.md` - Architecture overview
+- `/service-guide` - Service methods that use repositories
+- `/api-guide` - API handlers that call services
+- `/test-guide` - Scenario-first testing with repositories
+- `repositories/README.md` - Architecture overview
 
 ## Troubleshooting
 
-**SearchScope not filtering:**
-- Verify `to_conditions()` returns correct conditions
-- Check scope passed to base utility
-- Verify column names match table
+**SearchScope does not filter:**
+
+- Verify that `to_conditions()` returns the correct conditions
+- Check the scope passed to the base utility
+- Verify that the column names match the table
 
 **FK constraint violations:**
+
 - Create parent entities first in tests
-- Use `with_tables` fixture
-- Check cascade settings
+- Use the `with_tables` fixture
+- Check the cascade settings
 
 **Type errors:**
-- Use correct generic type: `Querier[YourRow]`
-- Match PK column type with table definition
+
+- Use the correct generic type, for example `Querier[YourRow]`
+- Match the primary key column type with the table definition
 - Use domain types consistently
 
 **Performance issues:**
+
 - Add indexes for filtered columns
 - Use `begin_readonly_session()` for reads
-- Batch operations for multiple entities
-- Profile queries with EXPLAIN
-
-## Summary
-
-**Standard operations:**
-- create, get, search, update, delete, purge
-- batch_update, batch_delete, batch_purge
-
-**Base utilities:**
-- Creator, Querier, BatchQuerier, Updater, Purger
-- SearchScope for multi-tenant filtering
-
-**Key principles:**
-- Public methods use standard names (no prefix)
-- Base utilities handle DB operations
-- Scope passed for access control
-- Transaction management via session context
-- Type safety with domain types
-
-**Next steps:**
-1. Study example repositories
-2. Define types and scope
-3. Implement standard operations
-4. Write tests with `/test-guide`
-5. Integrate with service layer (`/service-guide`)
+- Use batch operations for multiple entities
+- Profile the queries with EXPLAIN
