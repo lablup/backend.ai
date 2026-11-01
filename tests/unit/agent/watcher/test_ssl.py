@@ -14,7 +14,12 @@ class TestWatcherSSL:
         key_path = tmp_path / "watcher.key"
         config = {
             "logging": MagicMock(),
-            "etcd": {"user": None, "password": None, "addrs": [], "namespace": "test"},
+            "etcd": {
+                "user": None,
+                "password": None,
+                "addr": HostPortPair("127.0.0.1", 6001),
+                "namespace": "test",
+            },
             "watcher": {
                 "service-addr": HostPortPair("127.0.0.1", 6009),
                 "ssl-enabled": True,
