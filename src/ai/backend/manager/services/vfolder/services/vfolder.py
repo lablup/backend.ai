@@ -873,7 +873,7 @@ class VFolderService:
         raw_watcher_port = await self._etcd.get(
             f"nodes/agents/{agent_id}/watcher_port",
         )
-        watcher_port = 6099 if raw_watcher_port is None else int(raw_watcher_port)
+        watcher_port = 6009 if raw_watcher_port is None else int(raw_watcher_port)
         addr = yarl.URL(f"http://{agent_ip}:{watcher_port}")
         return {
             "addr": addr,
