@@ -947,7 +947,6 @@ async def server_main(
         # Start aiomonitor.
         m = aiomonitor.Monitor(
             loop,
-            host="0.0.0.0",
             termui_port=local_config.proxy_worker.aiomonitor_termui_port + pidx,
             webui_port=local_config.proxy_worker.aiomonitor_webui_port + pidx,
             console_enabled=False,
