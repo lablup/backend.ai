@@ -353,6 +353,7 @@ class TestUpdatePasswordNoAuthCount:
             registry = MagicMock()
             registry.auth.update_password_no_auth = update_password
             config = MagicMock()
+            config.api.domain = "default"
             config.session.login_allowed_fail_count = ALLOWED_FAIL_COUNT
             config.session.login_block_time = 600
             app = web.Application(middlewares=[_session_middleware])
