@@ -19,6 +19,8 @@ status: stable
 
 > Rules: `AGENTS.md` in the same directory. Per-layer knowledge lives in each subpackage's `KNOWLEDGE.md`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Why this component exists
 
 The manager is **the component that decides business logic**. Work that performs

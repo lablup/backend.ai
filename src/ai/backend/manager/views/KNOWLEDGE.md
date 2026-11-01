@@ -17,6 +17,8 @@ status: stable
 
 > Rules: `AGENTS.md` in the same directory.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Why this package exists
 
 It is the read-projection space that holds the shapes of the inputs internal

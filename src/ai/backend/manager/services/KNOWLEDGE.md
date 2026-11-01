@@ -20,6 +20,8 @@ status: draft
 > Rules: `AGENTS.md` in the same directory. Action-framework design background:
 > `../actions/KNOWLEDGE.md`. Write-spec design background: `../models/specs/KNOWLEDGE.md`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Why this document exists
 
 The services layer is where domain validation and business rules live. This

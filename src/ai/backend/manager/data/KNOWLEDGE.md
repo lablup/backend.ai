@@ -16,6 +16,8 @@ status: draft
 
 > Rules: `AGENTS.md` in the same directory.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## The boundary criterion
 
 There are four package axes that handle data — `data/`, `dto/`, `schema/`,

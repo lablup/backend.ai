@@ -16,6 +16,8 @@ status: stable
 
 > For rules, see `AGENTS.md` in the same directory; for implementation patterns, see the `/api-guide` skill.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Two surfaces, one adapter
 
 The layer exposes each operation through two surfaces — REST v2 (`api/rest/v2/`),

@@ -21,6 +21,8 @@ status: stable
 
 > For the rules, see `AGENTS.md` in the same directory; for implementation patterns, see the `/api-guide` skill.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Adapter dependency and operation surface
 
 Resolvers hold no behavior — every resolver calls the shared per-entity adapter

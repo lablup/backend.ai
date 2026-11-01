@@ -16,6 +16,8 @@ status: stable
 
 > Rules: `AGENTS.md` in the same directory.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Why this package exists
 
 It used to hold the wire types for manager-only API handlers. Today it is

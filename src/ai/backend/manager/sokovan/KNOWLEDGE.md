@@ -14,6 +14,8 @@ status: stable
 > For the rules, see `AGENTS.md` in the same directory. For detailed architecture, see `README.md` (and `scheduler/README.md`,
 > `deployment/README.md`); for the design, see `proposals/BEP-1030` (status transitions) and `BEP-1033/*`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Operating model (tick-based coordinator)
 
 The coordinators (Schedule / Deployment / Replica) run one tick periodically, querying entities in the target status and

@@ -13,6 +13,8 @@ status: stable
 
 > For rules, see `AGENTS.md` in the same directory; for implementation patterns, see the `/api-guide` skill.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Adapter dependency and operation surface
 
 Handlers hold no behavior — every handler calls the shared per-entity adapter

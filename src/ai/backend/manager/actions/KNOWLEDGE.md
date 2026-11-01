@@ -18,6 +18,8 @@ status: stable
 
 > Rules: `AGENTS.md` in the same directory.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Why this layer exists
 
 It wraps every service operation in a single uniform envelope so that

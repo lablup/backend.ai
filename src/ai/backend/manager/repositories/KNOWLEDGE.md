@@ -15,6 +15,8 @@ status: stable
 
 > For rules, see `AGENTS.md` in the same directory.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Choosing the data-access path
 
 | Situation | Path |
