@@ -181,21 +181,13 @@ async def _drain_into_upload_file(
                 await f.write(chunk)
                 bytes_written += len(chunk)
             await f.flush()
-<<<<<<< HEAD
             await asyncio.get_running_loop().run_in_executor(None, os.fsync, f.fileno())
-    except FileNotFoundError as e:
-        raise TusSessionNotFoundError(
-            f"Upload session {session_id} staging file is missing at offset {start_offset}"
-        ) from e
-=======
-            await run_in_executor_with_context(None, os.fsync, f.fileno())
     except OSError as e:
         if e.errno in _STAGING_UNAVAILABLE_ERRNOS:
             raise TusSessionNotFoundError(
                 f"Upload session {session_id} staging file is missing at offset {start_offset}"
             ) from e
         raise
->>>>>>> 1dcce190 (fix(BA-8787): require upload destinations inside the vfolder and open staging paths without following symlinks (#16225))
     return bytes_written
 
 
@@ -501,8 +493,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
         headers = await prepare_tus_session_headers(request, token_data, volume)
         vfpath = volume.mangle_vfpath(token_data["vfid"])
         upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
-        await run_in_executor_with_context(
-            None,
+        await asyncio.to_thread(
             resolve_upload_target,
             token_data["vfid"],
             vfpath,
@@ -556,25 +547,9 @@ async def tus_upload_part(request: web.Request) -> web.Response:
             session_id, holder_token, bytes_written
         )
 
-<<<<<<< HEAD
         headers["Upload-Offset"] = str(new_offset)
         if new_offset >= int(token_data["size"]):
-            parent_dir = vfpath
-            if (dst_dir := params["dst_dir"]) is not None:
-                parent_dir = vfpath / dst_dir
-            target_path: Path = parent_dir / token_data["relpath"]
-            if not target_path.parent.exists():
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-            upload_temp_path.rename(target_path)
-            try:
-                await aiofiles.os.rmdir(upload_temp_path.parent)
-            except OSError:
-                pass
-=======
-        headers["Upload-Offset"] = str(upload_state.offset)
-        headers["Upload-Expires"] = _upload_expires_at(token_data["exp"], upload_state.ttl_seconds)
-        if upload_state.offset >= int(token_data["size"]):
-            await run_in_executor_with_context(
+            await asyncio.get_running_loop().run_in_executor(
                 None,
                 _commit_upload,
                 token_data["vfid"],
@@ -583,7 +558,6 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                 token_data["relpath"],
                 params["dst_dir"],
             )
->>>>>>> 1dcce190 (fix(BA-8787): require upload destinations inside the vfolder and open staging paths without following symlinks (#16225))
     return web.Response(status=HTTPStatus.NO_CONTENT, headers=headers)
 
 
@@ -617,7 +591,7 @@ async def prepare_tus_session_headers(
 ) -> MutableMapping[str, str]:
     vfpath = volume.mangle_vfpath(token_data["vfid"])
     upload_temp_path = vfpath / ".upload" / token_data["session"]
-    if not await run_in_executor_with_context(None, _staging_file_exists, upload_temp_path):
+    if not await asyncio.to_thread(_staging_file_exists, upload_temp_path):
         raise TusSessionNotFoundError(
             f"Upload session {token_data['session']} has no on-disk staging file"
         )

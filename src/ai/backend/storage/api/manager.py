@@ -1181,10 +1181,15 @@ async def create_upload_session(request: web.Request) -> web.Response:
             ),
         ),
     ) as params:
-<<<<<<< HEAD
         await log_manager_api_entry(log, "create_upload_session", params)
         ctx: RootContext = request.app["ctx"]
         volume = ctx.volume_pool.get_volume_by_name(params["volume"])
+        await asyncio.to_thread(
+            resolve_upload_target,
+            params["vfid"],
+            volume.mangle_vfpath(params["vfid"]),
+            params["relpath"],
+        )
         session_id = await volume.prepare_upload(params["vfid"])
         await ctx.valkey_tus_client.initialize_offset(TusSessionId(session_id))
         token_data = {
@@ -1206,39 +1211,6 @@ async def create_upload_session(request: web.Request) -> web.Response:
                 "token": token,
             },
         )
-=======
-        with _vfolder_log_context(params["volume"], params["vfid"]):
-            await log_manager_api_entry(log, "create_upload_session", params)
-            ctx: RootContext = request.app["ctx"]
-            volume = ctx.volume_pool.get_volume_by_name(StorageVolumeName(params["volume"]))
-            await asyncio.to_thread(
-                resolve_upload_target,
-                params["vfid"],
-                volume.mangle_vfpath(params["vfid"]),
-                params["relpath"],
-            )
-            session_id = await volume.prepare_upload(params["vfid"])
-            await ctx.valkey_tus_client.initialize_offset(TusSessionId(session_id))
-            token_data = {
-                "op": "upload",
-                "volume": params["volume"],
-                "vfid": str(params["vfid"]),
-                "relpath": str(params["relpath"]),
-                "size": params["size"],
-                "session": session_id,
-                "exp": datetime.now(UTC) + ctx.local_config.storage_proxy.session_expire,
-            }
-            token = jwt.encode(
-                token_data,
-                ctx.local_config.storage_proxy.secret,
-                algorithm="HS256",
-            )
-            return web.json_response(
-                {
-                    "token": token,
-                },
-            )
->>>>>>> 1dcce190 (fix(BA-8787): require upload destinations inside the vfolder and open staging paths without following symlinks (#16225))
 
 
 async def delete_files(request: web.Request) -> web.Response:
