@@ -7,6 +7,7 @@ import sqlalchemy as sa
 
 from ai.backend.manager.api.gql_legacy.group import GroupNode
 from ai.backend.manager.data.project.types import ProjectType
+from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.project import groups
 
@@ -36,5 +37,5 @@ def test_type_filter_supports_exclusion() -> None:
 
 
 def test_type_filter_rejects_an_unknown_type() -> None:
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidAPIParameters):
         _compiled_where('type == "nonexistent"')
