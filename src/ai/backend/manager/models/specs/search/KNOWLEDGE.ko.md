@@ -44,7 +44,7 @@ field 마다 하나의 선언으로 대체한다. filter, order, 권한(field ca
   복원할 수 있다. order 도 같은 정보를 준다.
 - 그래서 field cap 뒤에 값을 가려도 filter 와 order 가 열려 있으면 의미가 없다. cap 이 order 도 검사하는
   이유다.
-- 절충으로 동등 비교만 여는 방식은 쓰지 않는다. token 은 후보 집합이 좁아 동등 비교를 반복하면 확인된다.
+- 절충으로 동등 비교만 여는 방식은 사용하지 않는다. token 은 후보 집합이 좁아 동등 비교를 반복하면 확인된다.
 - access key 는 응답이 이미 나르는 식별자이고, 자격 증명은 그 짝인 `keypairs.secret_key`(`SecretColumn`)다.
   응답이 보내는 값은 반복 filter 로 복원할 것이 없으므로 이 축에 속하지 않는다.
 - 표의 row 는 조사에서 찾은 사례다. `endpoint_tokens.token` 은 `SecretColumn` 이 아니라 `sa.String` 이라
@@ -84,7 +84,7 @@ field 마다 하나의 선언으로 대체한다. filter, order, 권한(field ca
 
 - `None` 을 받으면 값을 확실히 가진 호출자(guard, handler)까지 `QueryCondition | None` 을 받게 되고,
   실행되지 않는 분기가 늘어난다.
-- `@overload` 로 좁히는 방식은 쓰지 않는다. operation 마다 선언이 늘어난다.
+- `@overload` 로 좁히는 방식은 사용하지 않는다. operation 마다 선언이 늘어난다.
 - 설정되지 않은 field 를 건너뛰는 일은 `apply_*_filter` 한 곳에서 한다.
 
 ## own / nested / linked 는 권한 적용 방식으로 나뉜다
@@ -151,7 +151,7 @@ filter 를 여는 이유와 order 를 열지 않는 이유는 다르다.
 
 - 셋 다 M:N child 를 `MIN` 으로 접어 order 한다. 금지하는 모양이 정확히 그것이다.
 - 규칙을 이들에 맞추어 느슨하게 하지 않는다. 이미 나간 것은 규칙의 반례가 아니라 이전 대상이다.
-- 노출된 order field 를 바로 삭제하면 이미 쓰는 client 의 질의가 깨진다. deprecated 로 표시하고 다음
+- 노출된 order field 를 바로 삭제하면 이미 사용하는 client 의 질의가 깨진다. deprecated 로 표시하고 다음
   release 에서 제거하며 그때까지 동작하게 둔다.
 - 규칙을 먼저 적는 이유가 이것이다. 규칙이 없으면 네 번째와 다섯 번째가 같은 방식으로 들어온다.
 
@@ -189,7 +189,7 @@ filter 를 여는 방식` 에 있다.
 
 - BEP-1075 에서 `Relation` 은 "두 엔티티가 함께 소유하는 연결 row" 를 의미한다.
 - 여기의 type 은 상관 subquery 로 outer row 와 연결된 다른 테이블의 row 를 찾을 뿐이므로 SQL 용어를
-  쓴다.
+  사용한다.
 - `.correlate()` 는 outer SELECT 에 그 테이블이 있을 때만 subquery 의 FROM 에서 제거한다. outer 질의 없이
   쓰면 cross join 이 된다.
 
@@ -242,7 +242,7 @@ filter 를 여는 방식` 에 있다.
 - 이전에는 `ScopeItem` 이 `OperationScope` 를 일대일로 감싸 그 짝을 만들었다. `OperationScope` class
   72개 중 31개에 item 이 없어 권한 target 이 선언되지 않았다. BA-8022 가 모든 wrapper 를 그 scope 에
   합치고 나머지를 옮겨 짝이 하나의 class 가 되었다.
-- `RouteHistoryTarget` 은 아직 `OperationScope` 를 쓰는 예외다. `FieldIdentifier` 인 `ReplicaID` 로
+- `RouteHistoryTarget` 은 아직 `OperationScope` 를 사용하는 예외다. `FieldIdentifier` 인 `ReplicaID` 로
   key 를 잡고, replica 는 이를 소유하는 deployment 를 통해 권한을 판정한다. 그 스코프를 지정하려면 소유
   deployment id 가 필요한데 target 은 이를 갖지 않는다.
 
@@ -250,7 +250,7 @@ filter 를 여는 방식` 에 있다.
 
 | 요구 | 이유 |
 |---|---|
-| 선언 이름 = filter DTO field = data field = cap path | 요청 path 를 변환 없이 cap path 로 쓴다 |
+| 선언 이름 = filter DTO field = data field = cap path | 요청 path 를 변환 없이 cap path 로 사용한다 |
 | row 별 masking | share 는 field path 단위이므로 같은 field 도 row 마다 cap 이 다르다. filter 는 `cap AND condition`, order 는 `CASE WHEN cap THEN column END` 가 된다 |
 | order 도 검사 | 응답에 없어도 order 와 반복 filter 로 값이 새어 나간다 |
 

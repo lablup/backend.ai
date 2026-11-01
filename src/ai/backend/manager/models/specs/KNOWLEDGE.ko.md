@@ -151,7 +151,7 @@ restore 는 지금 항상 `active` 를 쓴다.
 | govern 검사 | 내 역할이 있는 스코프가 이 스코프의 virtual entity 를 govern 하는가(자기 govern 포함), 그 안에서 이 엔티티 type 에 이 bit 를 주는가: "이 type 과 이 bit 로 이 스코프를 govern 하는가" | `governed_permissions(keys)` |
 
 - entity create 와 search 는 govern 검사(생성되는 것이 스코프 소유가 된다), 단일 엔티티, bulk, relation
-  action 은 own 검사를 쓴다. global 은 graph 밖이다(superadmin). field 검사와 목록 필터(BEP-1077 의 field 검사와 목록 필터 절)는 후속 작업이다.
+  action 은 own 검사를 사용한다. global 은 graph 밖이다(superadmin). field 검사와 목록 필터(BEP-1077 의 field 검사와 목록 필터 절)는 후속 작업이다.
 - own 검사는 홉마다 인덱스 조회 하나이고 엔티티마다 row 하나를 반환한다.
 
 | 측정 | 방법 |
@@ -223,7 +223,7 @@ restore 는 지금 항상 `active` 를 쓴다.
 
   뒤의 두 ops 는 `V2WriteOps` 를 확장하므로 row write 와 relation write 가 하나의 transaction 을 공유한다
   (vfolder 의 permission row + share, invitation row 의 update + share). "grant" 는 role 에 권한을
-  부여하는 것과 겹쳐 쓰지 않는다.
+  부여하는 것과 겹쳐 사용하지 않는다.
 - 한계: govern 은 한 홉이므로 domain → user → session → invitation 세 단계에서 domain 은 invitation 에
   접근하지 못한다. 필요하면 govern 을 쓸 때 상위 스코프의 govern 을 함께 복사해 닫는다.
 
