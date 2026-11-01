@@ -7,11 +7,8 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declarative_base
 
-<<<<<<< HEAD
-=======
 from ai.backend.manager.errors.api import InvalidAPIParameters
 from ai.backend.manager.models.minilang import ORMFieldItem
->>>>>>> d38f76bc6 (fix(BA-8798): return filter and order parse failures as invalid requests (#16221))
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.utils import agg_to_array
 
@@ -175,8 +172,6 @@ async def test_aggregated_foreign_fields(virtual_grid_db: tuple[Any, Any, Any]) 
     actual_ret = list(await conn.execute(sa_query))
     test_ret = [(2, ["a"]), (1, ["b", "c"])]
     assert test_ret == actual_ret
-<<<<<<< HEAD
-=======
 
 
 async def test_orm_field_ordering(virtual_grid_db: tuple[Any, Any, Any]) -> None:
@@ -219,4 +214,3 @@ def test_order_parse_failure_is_an_invalid_request(order_expr: str) -> None:
 
     with pytest.raises(InvalidAPIParameters, match="Query ordering parsing error"):
         parser.parse_order(table, order_expr)
->>>>>>> d38f76bc6 (fix(BA-8798): return filter and order parse failures as invalid requests (#16221))
