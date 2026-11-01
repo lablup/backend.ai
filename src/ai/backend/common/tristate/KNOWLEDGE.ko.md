@@ -4,9 +4,9 @@
 
 클라이언트가 이 field 를 보내지 않은 경우와 클라이언트가 null 을 보낸 경우를 구분한다.
 
-`UNSET` 은 `pydantic_core.MISSING` 이다. pydantic 은 그것을 가진 field 를 serialization 과 JSON schema 에서 뺀다. 그래서 없는 field 는 wire 에 placeholder 를 남기지 않는다.
+`UNSET` 은 `pydantic_core.MISSING` 이다. pydantic 은 그것을 가진 field 를 직렬화와 JSON schema 에서 제거한다. 그래서 없는 field 는 wire 에 placeholder 를 남기지 않는다.
 
-이전 방식은 `common/api_handlers.py` 의 `Sentinel` enum 이었다. 없는 상태를 정수 `1` 로 serialization 했고, OpenAPI spec 은 이를 `{"type":"integer","enum":[1]}` 로 공개했다.
+이전 방식은 `common/api_handlers.py` 의 `Sentinel` enum 이었다. 없는 상태를 정수 `1` 로 직렬화했고, OpenAPI spec 은 이를 `{"type":"integer","enum":[1]}` 로 공개했다.
 
 ## `Unset` 이 `MISSING` 이 아니라 `Sentinel` 을 alias 로 두는 이유
 
@@ -19,11 +19,11 @@
 | mypy master (2.4.0+dev) | 통과 |
 | pyright 1.1.411 | `enableExperimentalFeatures` 로 통과 |
 
-mypy 는 PEP 661 지원을 merge 했지만(`python/mypy#21647`, 2026-08-07) 아직 release 하지 않았다.
+mypy 는 PEP 661 지원을 병합했지만(`python/mypy#21647`, 2026-08-07) 아직 출시하지 않았다.
 
 그래서 `Unset` 은 정확한 `MISSING` type 대신 값이 속한 실제 class 인 `typing_extensions.Sentinel` 을 참조한다. `isinstance(MISSING, Sentinel)` 이 성립하므로 annotation 은 필요한 것보다 넓지만 거짓이 되지는 않는다. runtime 값은 `MISSING` 으로 남으므로 serialization 동작은 모두 유지된다.
 
-pyright 는 그 넓힘을 거부한다. `MISSING` 을 자체 singleton type 으로 다루기 때문이다. `pants check` 는 mypy 만 실행하므로 CI 는 영향을 받지 않는다.
+pyright 는 이렇게 넓힌 annotation 을 거부한다. `MISSING` 을 자체 singleton type 으로 다루기 때문이다. `pants check` 는 mypy 만 실행하므로 CI 는 영향을 받지 않는다.
 
 ## `and_optional` / `and_tri` 앞에 명시적 generic 을 두는 이유
 
@@ -33,7 +33,7 @@ pyright 는 `Field(default=UNSET)` 을 거부한다.
 error: Type "MISSING" is not assignable to declared type "OptionsReq | Unset | None"
 ```
 
-그러면 field type 은 `Unknown` 이 되고, `from_unset` 이 `TVal` 을 풀지 못하며, 뒤따르는 lambda parameter 도 `Unknown` 이 된다. lambda 본문 전체가 검사되지 않는다.
+그러면 field type 은 `Unknown` 이 되고, `from_unset` 이 `TVal` 을 추론하지 못하며, 뒤따르는 lambda parameter 도 `Unknown` 이 된다. lambda 본문 전체가 검사되지 않는다.
 
 | | `options` | lambda parameter `o` |
 |---|---|---|
@@ -60,7 +60,7 @@ nullable column 하나를 전체로 차지하는 중첩 model 은 분해하지 �
 
 mypy 는 identity 비교를 `None`, enum member, `Literal` 에 대해서만 좁힌다. `value is UNSET` 은 좁히지 않으므로 `from_unset` 본문의 `cls.update(value)` 는 `TVal | Sentinel` 을 받는다.
 
-## mypy 가 PEP 661 을 배포한 뒤
+## mypy 가 PEP 661 지원을 출시한 뒤
 
 변경되는 곳은 두 곳이다. DTO field 78개와 adapter 는 그대로다.
 

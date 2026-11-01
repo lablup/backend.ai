@@ -22,22 +22,22 @@ Backend.AI 와 실제 filesystem, object storage 사이의 stateless data plane 
 ## quota 단위는 folder 가 아니라 quota scope 다
 
 - quota 단위는 quota scope(`(type, uuid)`, user 또는 project)이고, vfolder path 는 그 scope 아래에서 파생된다.
-- quota 지원은 보장이 아니라 **backend 별 capability**(`CAP_QUOTA`)다. code 는 분기하고 그 부재를 허용해야 한다.
+- quota 지원은 보장이 아니라 **backend 별 capability**(`CAP_QUOTA`)다. code 는 분기하고 capability 가 없는 경우도 처리해야 한다.
 
 ## 벤더별 구현은 volume interface 뒤에 있다
 
 - 모든 벤더는 `AbstractVolume` + `AbstractQuotaModel` + `AbstractFSOpModel` 뒤에 있다.
-- backend 는 host 상태를 변경할 수 있다. XFS 는 sudo 로 `/etc/projects` 를 수정한다.
+- backend 는 host 상태를 변경할 수 있다. XFS 는 sudo 로 `/etc/projects` 를 변경한다.
 - proxy 자체에서 root 가 필요한 연산은 opt-in watcher subprocess(ZeroMQ IPC, task object)를 거친다. handler 안에서 sudo 를 직접 실행하지 않는다.
 
 ## 시작은 하나로 조립된 의존성 그래프다
 
 - `StorageDependencyComposer` 가 모든 시작 resource 를 가지고, server, `dependencies verify`, `health check` 가 모두 이를 구동한다. 한 경로에서 직접 조립한 resource 는 다른 경로에서 보이지 않는다.
-- plugin context 는 한 번 조립해 주입한다. volume registry 는 plugin group 을 스스로 load 하지 않고 필요한 backend class 를 받는다.
-- `RootContext` 는 조립된 resource 로 `server.py` 에서 조립된다. stage 가 아니라 값을 전달하는 객체다.
+- plugin context 는 한 번 조립해 주입한다. volume registry 는 plugin group 을 스스로 적재하지 않고 필요한 backend class 를 받는다.
+- `server.py` 는 조립된 resource 로 `RootContext` 를 조립한다. stage 가 아니라 값을 전달하는 객체다.
 
 ## volume registry 는 `VolumePool` 하나다
 
 - 설정된 모든 volume 은 `VolumePool.create()` 가 한 번 생성하고 `init()` 하며, noop volume 도 여기서 등록한다. volume 은 `[volume.<name>]` configuration key 로 찾는다. request 경로에서 volume 을 생성하는 곳은 없다.
-- configuration key 는 system 전체에서 유일한 volume 이름(`StorageVolumeName`)이고, `get_volume_by_name()` 이 그 key 로 volume 을 조회한다. `get_volume(VolumeID)` 는 deprecate 된 `VolumeService` 에만 남아 있다.
+- configuration key 는 system 전체에서 유일한 volume 이름(`StorageVolumeName`)이고, `get_volume_by_name()` 이 그 key 로 volume 을 조회한다. `get_volume(VolumeID)` 는 지원이 중단된 `VolumeService` 에만 남아 있다.
 - 초기화가 eager 이므로 mount 가 깨진 volume 은 첫 request 에서 실패하는 대신 전체 시작을 실패시킨다.

@@ -13,9 +13,9 @@ Redis stream(anycast)과 pub/sub(broadcast) 위의 전달 추상화다. 이 문�
 
 ## anycast 는 at-least-once 다: 얕은 buffer 안에서만
 
-- consumer group 이 읽고, auto-claim loop(60초마다)가 5분 동안 유휴인 메시지를 다시 claim 하며, 재시도 3회 후 메시지는 **ack 되고 폐기된다. DLQ 는 없다**.
+- consumer group 이 읽고, auto-claim loop(60초마다)가 5분 동안 유휴인 메시지를 다시 가져오며, 재시도 3회 후 메시지는 **ack 응답을 받고 폐기된다. DLQ 는 없다**.
 - 재시도는 이전 메시지를 ack 하고 다시 추가하는 방식으로 구현된다. 재전달된 메시지는 stream 끝에서 새 id 를 받으므로 순서를 잃고, 메시지 id 는 중복 제거 key 가 아니다.
-- 메시지를 추가할 때마다 stream 을 약 128개 항목으로 trim 한다. producer 가 consumer 보다 빠르면 ack 하지 않은 항목도 사라질 수 있다. 내구성 있는 전달이 아니다.
+- 메시지를 추가할 때마다 stream 을 약 128개 항목으로 줄인다. producer 가 consumer 보다 빠르면 ack 하지 않은 항목도 사라질 수 있다. 내구성 있는 전달이 아니다.
 - 연결 실패는 loop 를 멈추지 않으며(상한 30초의 무제한 backoff), 사라진 consumer group 은 자동으로 다시 생성된다.
 
 ## broadcast 는 손실을 허용하는 타협이다
