@@ -7,10 +7,13 @@ import graphql
 import pytest
 
 from ai.backend.common import msgpack
-from ai.backend.common.data.entity.domain import DomainID
 from ai.backend.common.dotfile import InvalidDotfilePath
 from ai.backend.common.exception import InvalidAPIParameters
 from ai.backend.manager.api.gql_legacy.domain import CreateDomainNodeInput, ModifyDomainNodeInput
+from ai.backend.manager.data.domain.types import UserInfo
+from ai.backend.manager.models.user import UserRole
+
+_USER_INFO = UserInfo(id=uuid.uuid4(), role=UserRole.SUPERADMIN, domain_name="default")
 
 
 def _packed(path: str) -> bytes:
@@ -29,12 +32,12 @@ class TestDomainNodeInputDotfiles:
     @pytest.mark.parametrize("path", ["/etc/passwd", "../config/x", "kconfig.dat"])
     def test_create_rejects(self, path: str) -> None:
         with pytest.raises(InvalidDotfilePath):
-            _input(CreateDomainNodeInput, name="d", dotfiles=_packed(path)).to_action()
+            _input(CreateDomainNodeInput, name="d", dotfiles=_packed(path)).to_action(_USER_INFO)
 
     @pytest.mark.parametrize("path", ["/etc/passwd", "../config/x", "kconfig.dat"])
     def test_modify_rejects(self, path: str) -> None:
         with pytest.raises(InvalidDotfilePath):
-            _input(ModifyDomainNodeInput, dotfiles=_packed(path)).to_action(DomainID(uuid.uuid4()))
+            _input(ModifyDomainNodeInput, dotfiles=_packed(path)).to_action("d", _USER_INFO)
 
     @pytest.mark.parametrize(
         "packed",
@@ -43,7 +46,7 @@ class TestDomainNodeInputDotfiles:
     )
     def test_create_rejects_malformed_data(self, packed: bytes) -> None:
         with pytest.raises(InvalidAPIParameters):
-            _input(CreateDomainNodeInput, name="d", dotfiles=packed).to_action()
+            _input(CreateDomainNodeInput, name="d", dotfiles=packed).to_action(_USER_INFO)
 
     @pytest.mark.parametrize(
         "packed",
@@ -52,13 +55,25 @@ class TestDomainNodeInputDotfiles:
     )
     def test_modify_rejects_malformed_data(self, packed: bytes) -> None:
         with pytest.raises(InvalidAPIParameters):
-            _input(ModifyDomainNodeInput, dotfiles=packed).to_action(DomainID(uuid.uuid4()))
+            _input(ModifyDomainNodeInput, dotfiles=packed).to_action("d", _USER_INFO)
 
     def test_modify_accepts_path_under_work_dir(self) -> None:
         packed = _packed(".bashrc")
-        action = _input(ModifyDomainNodeInput, dotfiles=packed).to_action(DomainID(uuid.uuid4()))
-        assert action.updater.dotfiles.optional_value() == packed
+        action = _input(ModifyDomainNodeInput, dotfiles=packed).to_action("d", _USER_INFO)
+        assert action.updater.spec.dotfiles.optional_value() == packed
 
     def test_modify_without_dotfiles_skips_the_check(self) -> None:
-        action = _input(ModifyDomainNodeInput).to_action(DomainID(uuid.uuid4()))
-        assert action.updater.dotfiles.optional_value() is None
+        action = _input(ModifyDomainNodeInput).to_action("d", _USER_INFO)
+        assert action.updater.spec.dotfiles.optional_value() is None
+
+    def test_create_accepts_path_under_work_dir(self) -> None:
+        packed = _packed(".bashrc")
+        action = _input(CreateDomainNodeInput, name="d", dotfiles=packed).to_action(_USER_INFO)
+        spec = action.creator.spec
+        assert spec.dotfiles == packed
+
+    def test_create_default_empty_dotfiles_pass(self) -> None:
+        packed = b"\x90"
+        action = _input(CreateDomainNodeInput, name="d", dotfiles=packed).to_action(_USER_INFO)
+        spec = action.creator.spec
+        assert spec.dotfiles == packed

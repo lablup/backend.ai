@@ -6,11 +6,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-<<<<<<< HEAD
-=======
 from ai.backend.common import msgpack
-from ai.backend.common.data.entity.dotfile import DotfileID
-from ai.backend.common.data.entity.types import FieldData, RuntimeEntityID
 from ai.backend.common.dotfile import DotfilePath
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
 from ai.backend.common.exception import InvalidAPIParameters
@@ -22,7 +18,6 @@ from ai.backend.manager.errors.storage import (
 
 MAXIMUM_DOTFILE_COUNT = 100
 
->>>>>>> 249726371 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
 
 class DotfileScope(enum.StrEnum):
     DOMAIN = "domain"
@@ -54,8 +49,6 @@ class DotfileQueryResult:
 
 
 @dataclass(frozen=True)
-<<<<<<< HEAD
-=======
 class DotfileEntries:
     """Dotfiles with shared path, count and serialized-size constraints."""
 
@@ -118,7 +111,6 @@ class DotfileEntries:
 
 
 @dataclass(frozen=True)
->>>>>>> 249726371 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
 class SSHKeypair:
     """SSH keypair pulled from ``keypairs`` for a user session."""
 

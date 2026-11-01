@@ -37,7 +37,10 @@ from ai.backend.common.dto.manager.config.response import (
     UpdateBootstrapScriptResponse,
     UpdateDotfileResponse,
 )
-from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
+from ai.backend.common.dto.manager.config.types import (
+    MAXIMUM_DOTFILE_PATH_LENGTH,
+    MAXIMUM_DOTFILE_SIZE,
+)
 from ai.backend.common.exception import BackendAISchemaValidationFailed
 
 # ---- DotfilePermission validation ----
@@ -91,8 +94,6 @@ class TestMaxLength:
                 permission="644",
             )
 
-<<<<<<< HEAD
-=======
     def test_path_exceeds_limit(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             CreateUserDotfileRequest(
@@ -113,7 +114,6 @@ class TestMaxLength:
         with pytest.raises(InvalidDotfilePath):
             CreateUserDotfileRequest(path=path, data="x", permission="644")
 
->>>>>>> 249726371 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
     def test_bootstrap_script_exceeds_limit(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateBootstrapScriptRequest(
