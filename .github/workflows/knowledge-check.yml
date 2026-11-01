@@ -3,7 +3,7 @@ name: knowledge-check
 on:
   pull_request:
     paths:
-      - "**/KNOWLEDGE.md"
+      - "**/*.md"
       - "scripts/knowledge/**"
       - ".github/workflows/knowledge-check.yml"
 
@@ -18,5 +18,8 @@ jobs:
         uses: actions/checkout@v6
         with:
           lfs: false
+          fetch-depth: 0
       - name: Check KNOWLEDGE.md conformance
         run: python3 scripts/knowledge/check.py
+      - name: Check English and Korean document pairs
+        run: python3 scripts/knowledge/check_bilingual.py --base "origin/${{ github.base_ref }}"

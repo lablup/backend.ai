@@ -73,11 +73,19 @@ Actor convention: `<producer>/<version>` for agents (e.g. `claude-code/fable-5`)
   link it from the header pointer or where the context needs it. Every
   section must be knowledge about this package itself.
 
+## English and Korean
+
+- English goes in `KNOWLEDGE.md`, Korean in `KNOWLEDGE.ko.md` in the same folder.
+- Frontmatter goes only in `KNOWLEDGE.md`. Search and the schema check read only that file.
+- Both files keep the same headings in the same order. Update both in the same change.
+- Do not add Korean to `KNOWLEDGE.md`.
+- Use the words in `GLOSSARY.md` and `glossary/<topic>.md`.
+
 ## Size and splitting
 
 - **One `KNOWLEDGE.md` per package.** The document follows the package
   structure — there are no per-topic knowledge files.
-- Keep a document under **~200 lines** and on one topic cluster. The
+- Keep each language file under **~200 lines** and on one topic cluster. The
   description is the test: when it reads as two unrelated lists, the package
   is carrying two concerns.
 - An oversized `KNOWLEDGE.md` is a package-design signal, not a documentation
@@ -97,11 +105,13 @@ Actor convention: `<producer>/<version>` for agents (e.g. `claude-code/fable-5`)
 
 ```bash
 python3 scripts/knowledge/check.py
+python3 scripts/knowledge/check_bilingual.py --base origin/main
 ```
 
 Validates the schema, scope/sources path existence, body links, name
 uniqueness, and the verified-not-older-than-generated invariant.
-`knowledge-check.yml` runs the same script on pull requests.
+`check_bilingual.py` validates the `.md` and `.ko.md` pairs and rejects Korean
+added to a `.md` file. `knowledge-check.yml` runs both on pull requests.
 
 ## What goes where
 
@@ -110,4 +120,7 @@ uniqueness, and the verified-not-older-than-generated invariant.
 | Imperative rules | `AGENTS.md` |
 | Rationale, decision tables, constraints, canonical examples | `KNOWLEDGE.md` |
 | Human-facing component overview | `README.md` |
+| Pointer to `AGENTS.md` | `CLAUDE.md` (symlink) |
+| Words and writing style | `GLOSSARY.md`, `glossary/<topic>.md` |
+| Scenario test results, generated and never edited by hand | `report.md`, `report.ko.md` |
 | Issue-scoped working notes | outside the repo |
