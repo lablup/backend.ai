@@ -89,6 +89,7 @@ from ai.backend.agent.resources import (
     known_slot_types,
 )
 from ai.backend.agent.scratch import create_loop_filesystem, destroy_loop_filesystem
+from ai.backend.agent.scratch.utils import RestartStateStore
 from ai.backend.agent.types import (
     AgentEventData,
     Container,
@@ -2272,11 +2273,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         kernel_id: KernelId,
         name: str,
     ) -> bytes:
-        scratch_dir = (self.local_config.container.scratch_root / str(kernel_id)).resolve()
-        config_dir = scratch_dir / "config"
-        return await run_in_executor_with_context(
-            None,
-            (config_dir / name).read_bytes,
+        return await RestartStateStore(self.local_config.container.scratch_root, kernel_id).load(
+            name
         )
 
     @override
@@ -2286,16 +2284,8 @@ class DockerAgent(AbstractAgent[DockerKernel, DockerKernelCreationContext]):
         name: str,
         data: bytes,
     ) -> None:
-        scratch_dir = (self.local_config.container.scratch_root / str(kernel_id)).resolve()
-        config_dir = scratch_dir / "config"
-
-        def _write_bytes(data: bytes) -> None:
-            (config_dir / name).write_bytes(data)
-
-        return await run_in_executor_with_context(
-            None,
-            _write_bytes,
-            data,
+        await RestartStateStore(self.local_config.container.scratch_root, kernel_id).store(
+            name, data
         )
 
     @override
