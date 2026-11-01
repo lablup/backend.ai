@@ -34,7 +34,7 @@
 | 에러 | 남는 이유 |
 |---|---|
 | `RoleAlreadyAssigned`, `RoleNotAssigned` | `user_roles` row 에 `EntityType` 이나 `FieldType` 이 없다 |
-| `GroupMembershipNotFoundError` | `entity_memberships` edge 를 읽는데 그 id 는 `data/permission/id.py` 의 평범한 `NewType` 이고 `EntityType` 이 아니다 |
+| `GroupMembershipNotFoundError` | `entity_memberships` edge 를 읽는데 그 id 는 `data/permission/id.py` 의 단순한 `NewType` 이고 `EntityType` 이 아니다 |
 | `ArtifactAssociationDeletionError`, `ArtifactAssociationNotFoundError` | `association_artifacts_storages` row 에 `FieldType` 이 없다 |
 | `ContainerRegistryGroupsAssociationNotFound` | `association_container_registries_groups` row 에 `FieldType` 이 없다 |
 | `InvalidFieldPermission` | permission 항목과 entity share 모두에 요청된 field scope 를 검증하므로 어느 한 row 종류도 지정하지 않는다 |
@@ -46,13 +46,13 @@
 | `DeploymentDefinitionFileReadError` | vfolder 안의 파일이고 어느 row 타입도 선언하지 않는다 |
 | `NoUpdatesToApply` | 아무것도 변경하지 않은 modifier 이고, row 는 호출자가 변경하던 row 다 |
 | `AppServiceStartFailed` | session 안에서 시작한 app 은 row 가 아니고 `ActionOperationType` 에 `start` 가 없다 |
-| `AppProxyConnectionError`, `AppProxyResponseError` | `AGENTS.md` 표에서 App Proxy 는 system 도메인이다 |
+| `AppProxyConnectionError`, `AppProxyResponseError` | `AGENTS.md` 표에서 AppProxy 는 system 도메인이다 |
 | `NotificationProcessingFailure`, `NotificationTemplateRenderingFailure` | notification 을 렌더링해 전달하고 나오는 메시지는 row 가 아니다. 타입이 있는 것은 notification 테이블 둘뿐이다 |
 | `InvalidSecretKeyMaterial`, `SecretEncryptionMisconfigured` | 설정된 암호화 key 와 key provider 이고, 저장된 secret 을 읽어 접근하는 값이 아니다 |
 | `ExportReportNotFound`, `InvalidExportFieldKeys` | report 는 코드에 선언된 registry 의 `ReportDef` 이고 row 가 아니며, 그 field key 도 마찬가지다 |
 | `RetentionCategoryNotSupportedError` | cleanup 이 연결되지 않은 `RetentionCategory` 이고, row 가 아니라 이 build 의 공백이다 |
 | `QuotaScopeNotFoundError`, `StorageProxyNotFound` | quota scope 와 storage proxy 는 row 종류를 선언하지 않는다 |
-| 네 개의 `Dotfile*` 에러 | dotfile 경로와 엔티티별 limit 이 이 에러를 사용하고, 사용자는 기본 msgpack collection 을 편집하며 domain 과 project 는 msgpack column 을 유지한다 |
+| 네 개의 `Dotfile*` 에러 | dotfile 경로와 entity별 limit 이 이 에러를 사용하고, 사용자는 기본 msgpack collection 을 편집하며 domain 과 project 는 msgpack column 을 유지한다 |
 | `VFolderBadRequest`, `VFolderOperationFailed`, `VFolderCreationFailure` | row 가 아니라 storage proxy 호출을 보고하고 `generic` operation 아래에 있다 |
 | `StorageProxyConnectionError`, `StorageProxyTimeoutError`, `UnexpectedStorageProxyResponseError` | 외부 호출 자체이고, `request` 에는 대응하는 `ActionOperationType` 이 없다 |
 | `VFolderPermissionError`, `VFolderInvalidParameter`, `InsufficientStoragePermission` | 호출자에 대한 권한 거부이거나 row 에 이르기 전에 거부한 parameter 다 |
@@ -66,7 +66,7 @@
 | `NoCurrentTaskContext`, `DatabaseConnectionUnavailable`, `ConfigurationLoadFailed`, `DataTransformationFailed`, `DBOperationFailed` | asyncio context, connection, 설정 로드, database 호출 자체다 |
 | `BackendAgentError`, `KernelExecutionFailed`, `InvalidStreamMode` | `access` 나 `execute` 를 보고하고, 둘 다 대응하는 `ActionOperationType` 이 없다 |
 | `AgentConnectionUnavailable` | agent 에 접근하는 일이고 같은 `access` 아래다 |
-| `InvalidSessionId`, `InvalidKernelConfig`, `IncompleteSessionSpec` | row 에 이르기 전에 요청을 거부한다. `IncompleteSessionSpec` 은 `BackendAISchema.build_validation_error` override 셋 중 하나이고 `BackendAIError` 를 반환하도록 선언된 hook 이다 |
+| `InvalidSessionId`, `InvalidKernelConfig`, `IncompleteSessionSpec` | row 에 이르기 전에 요청을 거부한다. `IncompleteSessionSpec` 은 `BackendAISchema.build_validation_error` 세 개의 `BackendAISchema.build_validation_error` override 중 하나이고 `BackendAIError` 를 반환하도록 선언된 hook 이다 |
 | 세 개의 `IdleCheckerAssignment*` 에러 | assignment row 의 id 가 `NewType` 이고 `EntityType` 이 없다 |
 | `IdlePolicyNotFound` | idle-policy row 타입이 없고, row 가 아니라 없는 설정 값을 위해 발생시킨다 |
 | `QuotaExceeded` | resource-policy 한도에 도달한 것이지 한 row 의 상태가 아니다 |
@@ -77,7 +77,7 @@
 | `ArtifactDeletionError`, `RemoteReservoirArtifactImportError`, `ReservoirConnectionError`, `RemoteReservoirScanError` | storage proxy 나 remote reservoir 호출이 실패했다고 보고한다 |
 | `ObjectNotFound` | row 종류를 `object_name` 문자열로만 지정하므로 대응할 타입이 없다 |
 | `clients/container_registry/harbor.py` 에서 발생하는 `ObjectNotFound` | Harbor quota 이고 registry 자신의 객체다 |
-| `services/resource_group/service.py` 에서 발생하는 `ObjectNotFound` | manager 가 없이 시작된 App Proxy client pool 이다 |
+| `services/resource_group/service.py` 에서 발생하는 `ObjectNotFound` | manager 가 없이 시작된 AppProxy client pool 이다 |
 | `services/auth/service.py` 에서 발생하는 `ObjectNotFound` | "그런 project 가 없거나 멤버가 아니다"를 두 경우에 일부러 같은 응답으로 주므로 row 를 지정하지 않는다 |
 | `api/gql_legacy/base.py` `extract_object_uuid` 에서 발생하는 `ObjectNotFound` | row 종류를 호출자에게서 문자열 인자로 받으므로 helper 자신은 row 를 지정하지 않는다 |
 | `URLNotFound`, `MethodNotAllowed`, `ServerFrozen`, `NotImplementedAPI`, `InvalidAPIParameters`, `InvalidGraphQLParameters`, `InvalidCursor` | 경로, method, parameter, cursor 같은 요청이고 row 에 이르기 전에 거부한다 |

@@ -1,6 +1,6 @@
 # Manager Sokovan layer: 배경
 
-> 규칙은 같은 디렉터리의 `AGENTS.md` 에 있다. 상세 구조는 `README.md`(`scheduler/README.md`, `deployment/README.md`)에, 설계는 `proposals/BEP-1030`(상태 전이)과 `BEP-1033/*` 에 있다.
+> 규칙은 같은 디렉터리의 `AGENTS.md` 에 있다. 상세 구조는 `README.md`(`scheduler/README.md`, `deployment/README.md`)에, 설계는 `proposals/BEP-1030`(상태 전이)과 `BEP-1033/*`(scheduler 구조)에 있다.
 
 ## 동작 모델 (tick 기반 coordinator)
 
@@ -9,7 +9,7 @@ coordinator(Schedule, Deployment, Replica)는 주기적으로 tick 하나를 실
 용어: 새 코드와 문서에서는 "route" 보다 **replica** 를 사용한다. `route` 라는 이름(예: `deployment/route/`)은 같은 개념의 legacy 표기(deprecate)다.
 
 - **handler**: 자기 action 의 결과(성공 / 실패 / skip 등)만 판단해 반환한다.
-- **coordinator**: retry / timeout / give_up 같은 history 기반 판단과 상태 전이 적용을 중앙에서 맡는다.
+- **coordinator**: retry/timeout/give_up 같은 history 기반 판단과 상태 전이 적용을 중앙에서 맡는다.
 
 가드레일의 근거:
 - 각 handler 를 별도 모듈로 두는 이유: lifecycle 단계가 늘어도 "파일 하나 = 단계 하나"라서 격리되고 추적하기 쉽다.

@@ -17,7 +17,7 @@
 
 ## v1 surface 를 동결한다
 
-REST v1 과 graphene GQL 계열(`gql_legacy/`)은 대체 대상이지 유지보수 대상이 아니다. 그 위에 구축한 변경은 v2 대체 비용을 높이고, v1 만의 변경은 다른 surface 와 SDK, CLI 가 뒤처지게 한다. 따라서 추가와 수정은 모두 v2 로 가고 v1 은 중요 수정만 받는다.
+REST v1 과 graphene GQL 계열(`gql_legacy/`)은 대체 대상이지 유지보수 대상이 아니다. 그 위에 구축한 변경은 v2 대체 비용을 높이고, v1 만의 변경은 다른 surface 와 SDK, CLI 가 뒤처지게 한다. 따라서 추가와 변경은 모두 v2 로 가고 v1 은 치명적인 결함에 대한 수정만 받는다.
 
 ## v2 endpoint 검증
 

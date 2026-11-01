@@ -4,21 +4,21 @@
 
 ## 이 컴포넌트가 존재하는 이유
 
-Manager 는 **business logic 을 결정하는 컴포넌트**다. 실제 동작을 수행하고 확장이 필요한 일은 별도 컴포넌트로 나뉜다. kernel 실행은 agent, 파일은 storage proxy, 트래픽은 app proxy 가 맡는다.
+Manager 는 **business logic 을 결정하는 컴포넌트**다. 실제 동작을 수행하고 확장이 필요한 일은 별도 컴포넌트로 나뉜다. kernel 실행은 agent, 파일은 storage proxy, 트래픽은 appproxy 가 맡는다.
 
 - 변경이 Manager 안에서 workload 를 실행해야 하는 것처럼 보이면 그 일은 다른 컴포넌트에 속한다.
 
 ## DB 가 기준이 되는 값이다
 
 - 엔티티 상태는 DB 에 있고, 주요 경로는 cache 를 신뢰하지 않고 다시 조회한다. scheduler 는 tick 마다 resource group 을 다시 읽는다.
-- Valkey 는 cache data 를 보유하고 event queue 를 겸한다. 기준이 되는 값은 유실되지 않지만 **event 의존이 커서 Valkey 가 실패하면 대부분의 동작이 중단될 수 있다**. 가용성 의존이 크다.
+- Valkey 는 cache data 를 보유하고 event queue 를 겸한다. 기준이 되는 값은 유실되지 않지만 **event 의존성이 커서 Valkey 가 실패하면 대부분의 동작이 중단될 수 있다**. 가용성 의존성이 크다.
 - etcd 는 설정과 Manager 상태만 담는다.
 - 트랜잭션은 READ COMMITTED 에 충돌 시 재시도를 추가한다. 동시 writer 를 전제하고 배타성은 전제하지 않는다.
 
 ## distributed lock 은 줄어드는 중이다
 
 - 여러 host 에 걸쳐 host 마다 N 개의 worker 프로세스가 있다. API 의 절반은 대칭이고 stateless 다.
-- distributed lock 의존은 크지 않지만 scheduler 가 2 cycle 로 실행되어 coordinator tick 이 현재 lock 을 사용한다(`DistributedLockFactory`, 정수 `LockID`).
+- distributed lock 의존성은 크지 않지만 scheduler 가 2 cycle 로 실행되어 coordinator tick 이 현재는 lock 을 사용한다(`DistributedLockFactory`, 정수 `LockID`).
 - 이 부분은 redis 기반 flag 를 설정하는 방식으로 대체할 예정이고 distributed lock 은 계속 줄어든다.
 - leader election(Valkey lease)에서 leader 는 cron emitter(`LeaderCron`)만 실행한다. leader 의 일은 "publishing" 이고 실행은 queue 가 고른 프로세스가 맡는다.
 

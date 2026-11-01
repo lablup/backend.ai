@@ -8,7 +8,7 @@
 
 ## 실제 경계는 대상이 아니라 API 버전이다
 
-- 명목상 경계는 대상 범위(manager 전용/공유)지만, 새 기능의 DTO 는 모두 `common/dto/manager/v2/` 로 간다(GraphQL 과 REST v2 가 공유한다).
+- 명목상 경계는 대상 범위(manager 전용/공유)지만, 새 기능의 DTO 는 모두 `common/dto/manager/v2/` 로 간다. GraphQL 과 REST v2 가 공유한다.
 - 그래서 이 패키지는 사실상 **REST v1 / legacy handler 묶음**이고, 소비자는 거의 전부 v1 handler 다.
 - 아직 이전할 수 없는 v1 표면을 확장할 때만 여기에 추가한다.
 

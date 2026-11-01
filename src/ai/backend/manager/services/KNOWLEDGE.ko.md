@@ -14,7 +14,7 @@ services 계층에서 도메인 검증과 business rule 을 다룬다. 이 문�
 - parent(`scope_of`)는 항상 정확히 하나이다. 추가 접근 경로는 membership(`member_of`, 공유와 유사)으로 표현한다.
 - 모든 entity 가 scope 를 겸하므로, scope 가 아닌 entity(예: deployment)도 자식을 가질 수 있다.
 
-판단 결과와 연결, spec 대응은 다음과 같다.
+판단 결과와 이에 따른 연결, spec 대응은 다음과 같다.
 
 | 판단 | 조건 | action 모양 | write spec |
 |---|---|---|---|
@@ -74,9 +74,9 @@ RBAC scope 밖의 대상이다. `GlobalEntity*` 이며 membership 등록이 없�
 | entity_type | 메모 |
 |---|---|
 | agent, image, container_registry, artifact_registry, object_storage, vfs_storage | 관리자 도메인 인프라 |
-| resource_slot_type, retention_policy, runtime_variant(+preset), prometheus_query_preset(+category), login_client_type, role_preset, idle_checker(+assignment), notification_channel, notification_rule, resource policy 3종, service_catalog, app_config_definition | 시스템 설정/catalog 이고 읽기의 공개 범위만 다르다 (public) |
+| resource_slot_type, retention_policy, runtime_variant(+preset), prometheus_query_preset(+category), login_client_type, role_preset, idle_checker(+assignment), notification_channel, notification_rule, resource policy 3종, service_catalog, app_config_definition | 시스템 설정/catalog 이고 조회의 공개 범위만 다르다 (public) |
 | audit_log, error_log, scheduling_history 기록 | 시스템 기록이고 `*:scoped_history` 형태만 scoped search 이다 |
-| `invitation` (지금은 `vfolder:invitation`) | 모든 entity 가 사용할 수 있는 global invitation 하나로 나누고 entity_type/entity_id 를 받는다. 권한 부여는 Grant / Invite 두 경로로 흐른다 |
+| `invitation` (지금은 `vfolder:invitation`) | 모든 entity 가 사용할 수 있는 하나의 global invitation 으로 합치고 entity_type/entity_id 를 받는다. 권한 부여는 Grant / Invite 두 경로로 흐른다 |
 
 ## action-only 로 남는 entity_type: 대상 row 없음
 
@@ -144,7 +144,7 @@ service 메서드를 유지하기로 결정하기 전에 이 표를 본다.
 | parent 와 자식을 함께 생성 | `create_*_with_fields` 가 `FieldCreator` 를 한 transaction 에 넣는다 | 사용 중 |
 | 소유자 하나의 field row 읽기 | `FieldProcessorGroup.search_ops` | 사용 중 |
 
-- 순위는 lock 없이 INSERT 안에서 계산한다. 동시 insert 가 같은 값에 놓일 수 있고, 순위가 목록 정렬에만 사용되는 곳에서는 이를 허용한다. 정해진 순서가 필요하면 lock 을 되돌려야 하는데, 이 표의 어떤 도구도 lock 을 제공하지 않는다. spec 이 잠글 대상을 선언해야 한다.
+- 순위는 lock 없이 INSERT 안에서 계산한다. 동시 insert 가 같은 값에 놓일 수 있고, 순위가 목록 정렬에만 사용되는 곳에서는 이를 허용한다. 정해진 순서가 필요하면 lock 을 다시 도입해야 하는데, 이 표의 어떤 도구도 lock 을 제공하지 않는다. spec 이 잠글 대상을 선언해야 한다.
 - SQL 식으로 채운 column 은 insert 후 한 번 다시 읽는다. `_insert_rows` 가 row 에서 이를 판단하므로 spec 은 아무것도 선언하지 않는다.
 
 ## DB 가 아닌 대상은 ops-direct 후보가 아니다

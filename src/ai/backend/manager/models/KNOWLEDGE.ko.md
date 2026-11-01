@@ -15,7 +15,7 @@ DB schema 의 선언 계층이다. 도메인별 패키지(`models/{domain}/row.p
 ## 객체 조작은 spec 을 거친다
 
 - 생성, 삭제, upsert 는 가능한 한 `models/specs/` 의 spec 선언으로 처리한다. db 객체를 직접 조작하는 것보다 우선한다.
-- 이유: RBAC 부수 효과(scope 프로비저닝, 멤버십 등록)는 **spec 의 타입**이 결정한다. Row 를 직접 insert 하면 그 부수 효과를 조용히 건너뛴다([specs/KNOWLEDGE.md](specs/KNOWLEDGE.md)).
+- 이유: RBAC 부수 효과(scope 프로비저닝, 멤버십 등록)는 **spec 의 타입**이 결정한다. Row 를 직접 삽입하면 그 부수 효과를 조용히 건너뛴다([specs/KNOWLEDGE.md](specs/KNOWLEDGE.md)).
 
 ## session 으로 model 을 직접 조작하지 않는다
 
@@ -42,7 +42,7 @@ BEP-1077 이후 소유권은 `scope -> virtual_entity -> entity` 경로만으로
 
 ### 사용자가 사라진 뒤
 
-foreign key 는 `ON DELETE SET NULL` 이다. 사용자를 purge 해도 project 는 가져가지 않는다.
+foreign key 는 `ON DELETE SET NULL` 이다. 사용자를 영구 삭제해도 project 는 가져가지 않는다.
 
 - project 가 보유한 것은 계정보다 오래 남는다. 사용자 row 를 삭제하는 같은 transaction 에서 개인 vfolder 를 삭제하면 데이터를 전달할 방법이 없다.
 - project 삭제는 그 안의 자원을 정리하는 일이고 비동기 작업이다. 동기 purge transaction 에 속하지 않는다.
@@ -80,11 +80,11 @@ field scope 는 소유자 자체와 그 위의 scope 를 함께 받는다. 지�
 
 `entity_memberships` 는 어느 virtual entity 가 row 를 보유하는지 알리고, `scope_bindings` 는 어느 scope 가 virtual entity 를 govern 하는지 알린다. 권한 검사는 둘을 모두 거치므로 첫째만 거치는 scope predicate 는 호출자가 볼 수 있는 것보다 적게 찾는다. domain 은 자기 project 가 보유한 row 를 모두 놓친다. 모든 node 는 자기 자신을 govern 하는 edge 를 가지므로 row 자체를 보유한 scope 도 같은 범위로 응답한다.
 
-membership edge 는 소속과 share 를 구분하지 않고 응답한다. share 를 거쳐 도달한 대상으로 무엇을 할 수 있는지는 그 edge 의 cap 이 제한하므로 scope 가 둘을 구분할 이유가 없다. 반대로 scope 에서 share 를 제외하면 공유된 row 가 조회에서 빠지고, 이는 scope 가 내릴 판단이 아니다.
+membership edge 는 소속과 share 를 구분하지 않고 응답한다. share 를 거쳐 도달한 대상으로 무엇을 할 수 있는지는 그 edge 의 cap 이 제한하므로 scope 가 둘을 구분할 이유가 없다. 반대로 scope 에서 share 를 제외하면 공유된 row 가 조회에서 제외되고, 이는 scope 가 내릴 판단이 아니다.
 
 ### 권한을 요구하지 않는 축
 
-대부분의 축은 호출자를 먼저 검사할 scope 를 지정한다. 모두에게 보이는 것을 읽는 축은 검사할 대상이 없다. 그런 축은 `scope_targets()` 에서 빠지고 `operation_scopes()` 에만 추가된다. gate 가 적용되는 것은 `scope_targets()` 뿐이므로 gate 없는 축을 표현할 수 있다.
+대부분의 축은 호출자를 먼저 검사할 scope 를 지정한다. 모두에게 보이는 것을 읽는 축은 검사할 대상이 없다. 그런 축은 `scope_targets()` 에서 제외되고 `operation_scopes()` 에만 추가된다. gate 가 적용되는 것은 `scope_targets()` 뿐이므로 gate 없는 축을 표현할 수 있다.
 
 `image` 의 `global` 축이 그렇다. image 가 global 인지는 image row 가 아니라 그 image 가 붙은 container registry 의 `is_global` 이 결정한다. 그 column 은 nullable 이고 값을 두지 않은 registry 는 global 이 아니다.
 
