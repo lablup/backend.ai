@@ -142,14 +142,8 @@ async def handle_agent_restart(request: web.Request) -> web.Response:
 
 
 async def handle_fstab_detail(request: web.Request) -> web.Response:
-<<<<<<< HEAD
-    log.info("HANDLE_FSTAB_DETAIL")
-    params = request.query
-    fstab_path = params.get("fstab_path", "/etc/fstab")
-=======
     log.trace("fstab detail requested")
     fstab_path = request.app["config"]["watcher"]["fstab-path"]
->>>>>>> 27c7a24a (fix(BA-8781): read the watcher fstab path from its config and compare tokens in constant time (#16218))
     async with aiofiles.open(fstab_path) as fp:
         content = await fp.read()
         return web.Response(text=content)
@@ -335,10 +329,6 @@ async def watcher_server(
             log.debug("watcher authentication token loaded", token_configured=token is not None)
             if token is None:
                 token = "insecure"
-<<<<<<< HEAD
-            log.debug("watcher authentication token: {}", token)
-=======
->>>>>>> 27c7a24a (fix(BA-8781): read the watcher fstab path from its config and compare tokens in constant time (#16218))
             app["token"] = token
 
             app.middlewares.append(auth_middleware)
