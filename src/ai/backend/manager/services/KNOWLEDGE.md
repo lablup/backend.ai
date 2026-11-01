@@ -23,17 +23,17 @@ status: draft
 ## Why this document exists
 
 The services layer is where domain validation and business rules live. This
-document carries the layer's central judgment for the v2 transition — which
+document carries the layer's central judgment for the v2 transition: which
 entity_type wires as which shape, and when a service method is kept. The bulk
 replacement work (BA-7295~7302) is the job of aligning everything that differs
 from these tables.
 
 ## Three judgment criteria, and always exactly one parent
 
-- **Does it grant independent permissions** — is there real value in allowing/denying access to this target on its own?
-- **Does it exist without a parent** — can the row be created and survive without another row (independent lifetime)?
-- **Do users handle it directly** — does the API address this target for CRUD?
-- The parent (`scope_of`) is always exactly one — additional access paths are expressed as memberships (`member_of`, sharing-like).
+- **Does it grant independent permissions**: is there real value in allowing/denying access to this target on its own?
+- **Does it exist without a parent**: can the row be created and survive without another row (independent lifetime)?
+- **Do users handle it directly**: does the API address this target for CRUD?
+- The parent (`scope_of`) is always exactly one: additional access paths are expressed as memberships (`member_of`, sharing-like).
 - Every entity doubles as a scope, so a non-scope entity (e.g. deployment) can parent children.
 
 Judgment results and their wiring/spec mapping:
@@ -44,9 +44,9 @@ Judgment results and their wiring/spec mapping:
 | Entity | Has a parent, handled directly | scope (create) / single / bulk | `Entity*` (own virtual entity + member_of) |
 | Global | Outside RBAC scopes, handled directly | global (gate: SA or public read) | `GlobalEntity*` (no registration) |
 | Field | No independent permission, lifetime-bound | single_entity on the owner | `FieldEntity*` (requires owner_id) |
-| Action-only | No target row (behavior / non-DB) | by the target's nature, no spec | — (service kept) |
+| Action-only | No target row (behavior / non-DB) | by the target's nature, no spec |: (service kept) |
 
-## entity_type judgments — scope-providing and entity
+## entity_type judgments: scope-providing and entity
 
 Items still marked unresolved are settled in their migration work. Domains not
 listed here split obviously by the criteria (mostly global or entity).
@@ -75,7 +75,7 @@ Entity (`Entity*`):
 
 ## entity_types demoted to fields
 
-Authorized through their owner with no independent permission — `FieldEntity*`,
+Authorized through their owner with no independent permission: `FieldEntity*`,
 never entered into the membership graph.
 
 | entity_type | Owner | Notes |
@@ -84,16 +84,16 @@ never entered into the membership graph.
 | deployment:revision, route, access_token, auto_scaling_rule, replica, replica_group | deployment | (settled) |
 | deployment:policy | deployment | the deployment's single (1:1, FK CASCADE) rollout-strategy config (settled) |
 | role:permission, role:assignment | role | |
-| keypair | user | credential — no independent permission, revoked/reissued rather than renamed |
+| keypair | user | credential: no independent permission, revoked/reissued rather than renamed |
 | dotfile | keypair | packed column inside the keypairs row |
 | image:alias, tag, resource_limit | image | |
 | storage_namespace | object_storage | storage_id+namespace, lifetime-bound |
-| fair_share x3, usage_bucket x3 | resource_group | every row carries `resource_group_id` (fair-share uniqueness is keyed on it) — the rows are the resource group's accounting decomposed by scope; domain/project/user access is a scope filter on reads, management writes are rg-level |
+| fair_share x3, usage_bucket x3 | resource_group | every row carries `resource_group_id` (fair-share uniqueness is keyed on it): the rows are the resource group's accounting decomposed by scope; domain/project/user access is a scope filter on reads, management writes are rg-level |
 | resource_group:domain, resource_group:user_group | resource_group | association rows |
 
 ## entity_types judged global
 
-Targets outside the RBAC scopes — `GlobalEntity*`, no membership registration.
+Targets outside the RBAC scopes: `GlobalEntity*`, no membership registration.
 
 | entity_type | Notes |
 |---|---|
@@ -102,17 +102,17 @@ Targets outside the RBAC scopes — `GlobalEntity*`, no membership registration.
 | audit_log, error_log, the scheduling_history records | system records; only the `*:scoped_history` variants are scoped searches |
 | invitation (today `vfolder:invitation`) | direction: split into one global invitation usable by every entity, taking entity_type/entity_id; permission granting flows through the two paths Grant / Invite |
 
-## entity_types that stay action-only — no target row
+## entity_types that stay action-only: no target row
 
-Behaviors or non-DB targets — no spec, service kept.
+Behaviors or non-DB targets: no spec, service kept.
 
 | entity_type | Notes |
 |---|---|
 | vfolder:file | vfolder behavior, subtypes kept |
 | auth | behaviors on user/keypair |
 | session:file, commit, log and other subtypes | session behaviors; subtypes not split off |
-| stream | target is the session — wiring axis confirmed during migration |
-| etcd_config, manager_admin, metric | non-DB — see the exception list below |
+| stream | target is the session: wiring axis confirmed during migration |
+| etcd_config, manager_admin, metric | non-DB: see the exception list below |
 | export, events, resource_overview | query/report behaviors over scoped data |
 
 ## A pass-through needs exactly one combined base
@@ -153,8 +153,8 @@ class AppConfigAllowListProcessors:
         self.admin_search = group.global_search_ops(AdminSearchAppConfigAllowListAction)
 ```
 
-- A public global read is the variant whose gate swaps SUPERADMIN for authentication — `group.public_get_ops(...)` / `group.public_search_ops(...)`.
-- A service-backed action passes the service method into the shape factory — `group.single_entity(CloneVFolderAction, service.clone)` — distinguishable by name from ops-direct (`*_ops`). The factories exist but have no callers yet; the replacement issues are the first consumers.
+- A public global read is the variant whose gate swaps SUPERADMIN for authentication: `group.public_get_ops(...)` / `group.public_search_ops(...)`.
+- A service-backed action passes the service method into the shape factory (`group.single_entity(CloneVFolderAction, service.clone)`) distinguishable by name from ops-direct (`*_ops`). The factories exist but have no callers yet; the replacement issues are the first consumers.
 - The two search scopes: `operation_scopes()` is the query scope injected into the models-layer statement; `scope_targets()` is the RBAC target. An empty `operation_scopes()` is rejected, never widened to global.
 
 ## Hard actions can still be demoted to pass-throughs
@@ -180,14 +180,14 @@ Consult this table before deciding to keep a service method.
 
 ## Non-DB targets are not ops-direct candidates
 
-- A target with no DB row migrates with no spec — service kept, only the action bases move to v2.
+- A target with no DB row migrates with no spec: service kept, only the action bases move to v2.
 - The value of the v2 move is that audit/metrics/gates apply uniformly at the action layer.
 
 | Group | Target system | Wiring |
 |---|---|---|
 | etcd_config (6) | etcd | global (SA); the 3 authenticated reads are public |
 | manager_admin (6) | etcd, valkey, socket | global (SA); the 3 anonymous status reads confirmed during migration |
-| stream (7) | agent RPC, valkey | session-target actions — single_entity(session); only the internal GC is global |
+| stream (7) | agent RPC, valkey | session-target actions: single_entity(session); only the internal GC is global |
 | metric (3) | Prometheus | global + public reads |
 | prometheus_query_preset preview/execute | Prometheus execution | service kept |
 | vfolder file/quota/usage operations | storage proxy | service kept (vfolder permission axis) |
