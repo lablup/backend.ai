@@ -1,6 +1,6 @@
 # 컨테이너 레지스트리 서비스: 배경
 
-> 규칙: `../AGENTS.md`. Action shape 와 gate: `../../actions/KNOWLEDGE.md`.
+> 규칙: `../AGENTS.md`. action shape 와 gate: `../../actions/KNOWLEDGE.md`.
 
 컨테이너 레지스트리는 Manager 가 이미지를 스캔해 오는 global 엔티티다. 이 서비스는 Harbor 가
 프로젝트마다 두는 스토리지 quota 도 다룬다. quota 연산은 registry 를 직접 받지 않고,
@@ -19,7 +19,7 @@ registry 를 참조하는 프로젝트를 받아 거기서 registry 를 찾는�
 - `global` shape 를 사용하지 않은 이유는 그 SUPERADMIN gate 가 레거시 GraphQL mutation 이 허용하는
   ADMIN 을 잘라내기 때문이다.
 - 지향점은 프로젝트를 스코프로 삼는 `scope` shape 다. seed role 이 아직 `container_registry: [read]` 만
-  주므로, 기록 권한이 role 에 추가된 뒤에 옮긴다.
+  주므로, 쓰기 권한이 role 에 추가된 뒤에 옮긴다.
 - webhook processor 도 같은 anonymous 연결이다. Harbor 는 keypair 가 없으므로 서비스가 webhook secret 을
   직접 검사한다.
 
@@ -38,5 +38,5 @@ registry 를 참조하는 프로젝트를 받아 거기서 registry 를 찾는�
 ## 이름과 registry 내부 프로젝트명 조회는 찾은 registry 의 읽기 권한을 검사한다
 
 - `lookup_by_name_and_registry_project` 는 이름과 registry 내부 프로젝트명을 기존 lookup 으로 해석하고 registry ID 를 반환한다.
-- 인증 후 lookup 을 수행하고, 찾은 registry 의 읽기 권한을 검사한다. 일반 사용자에게는 미존재와 권한 부족을 같은 오류로 반환한다.
+- 인증 후 lookup 을 수행하고, 찾은 registry 의 읽기 권한을 검사한다. 일반 사용자에게는 미존재와 권한 부족을 같은 에러로 반환한다.
 - 여러 registry 가 같은 키에 대응하면 공통 lookup 이 거부하며 임의의 row 를 선택하지 않는다.

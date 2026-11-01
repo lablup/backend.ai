@@ -19,8 +19,8 @@ status: draft
 
 # Artifact registry service — Knowledge
 
-A registry is two rows: a per-kind row carrying the connection settings (huggingface,
-reservoir) and an `artifact_registries` row carrying the name and kind. A write handles both
+A registry is two rows: a per-kind row holding the connection settings (huggingface,
+reservoir) and an `artifact_registries` row holding the name and kind. A write handles both
 rows in one operation of `ArtifactRegistryWriteOps`.
 
 Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
@@ -29,14 +29,14 @@ Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 | Operation | Shape | Reason |
 |---|---|---|
-| update | `single_entity` + service | It edits both rows together. A generic ops update writes one row |
+| update | `single_entity` + service | It updates both rows together. A generic ops update writes one row |
 | purge | `single_entity` + service | It deletes both rows and the graph node together |
 | bulk update | `partial_bulk` + service | Same reason. One savepoint per item |
 | bulk purge | `partial_bulk` + service | Same reason. One savepoint per item |
 
 - A bulk operation checks each registry's permission separately. A registry without
   permission and an absent id become failed items, and the rest are processed.
-- The succeeded items of a bulk purge carry only the ids of the deleted registries. The
+- The succeeded items of a bulk purge hold only the ids of the deleted registries. The
   names were in the rows deleted with them.
 - The single purge action keeps the old name (`delete_*`) and uses the `PURGE` operation
   type. The old delete alias calls the same action.

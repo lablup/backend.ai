@@ -36,13 +36,13 @@ Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 | legacy GraphQL quota mutation | the mutation class's `allowed_roles` | SUPERADMIN, ADMIN |
 | legacy GraphQL `GroupNode.registry_quota` | none | anyone who can read the node |
 
-- The four quota processors are wired as `anonymous_global`. Only the monitor is attached,
+- The four quota processors are connected as `anonymous_global`. Only the monitor is attached,
   with no validator, and the catalog records them under the anonymous gate.
 - The reason for not using the `global` shape is that its SUPERADMIN gate cuts out the ADMIN
   that the legacy GraphQL mutation allows.
 - The target is the `scope` shape with the project as the scope. The seed role still grants
   only `container_registry: [read]`, so it moves after the write permission is added to the role.
-- The webhook processor uses the same anonymous wiring. Harbor has no keypair, so the service
+- The webhook processor uses the same anonymous connection. Harbor has no keypair, so the service
   checks the webhook secret itself.
 
 ## A quota operation reaches the registry through the project
@@ -64,5 +64,5 @@ Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
   through the existing lookup and returns the registry ID.
 - It performs the lookup after authentication and checks read permission on the found registry.
   For an ordinary user it returns non-existence and lack of permission as the same error.
-- When several registries match the same key, the shared lookup rejects it and does not pick an
+- When several registries match the same key, the shared lookup rejects the request and does not pick an
   arbitrary row.

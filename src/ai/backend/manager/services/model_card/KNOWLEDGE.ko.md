@@ -7,5 +7,5 @@
 
 ## processor 구성
 
-`backend.ai mgr ops list --concern deployment --entity model_card` 는 연결된 목록을
+`backend.ai mgr ops list --concern deployment --entity model_card` 는 연결 및 호출 경로로 처리되는 목록을
 출력한다. 그 출력이 엔티티 타입, 모양, 연산, gate, backing 을 나타낸다.

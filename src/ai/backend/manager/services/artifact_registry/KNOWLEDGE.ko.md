@@ -1,13 +1,13 @@
 # Artifact registry 서비스: 배경
 
 registry 하나는 두 row 다. 연결 설정을 담는 종류별 row(huggingface, reservoir)와 이름과 종류를 담는
-`artifact_registries` row. 기록은 두 row 를 `ArtifactRegistryWriteOps` 의 한 연산으로 함께 처리한다.
+`artifact_registries` row. 쓰기는 두 row 를 `ArtifactRegistryWriteOps` 의 한 연산으로 함께 처리한다.
 
-## 기록이 서비스 메서드를 두는 이유
+## 쓰기가 서비스 메서드를 두는 이유
 
 | 동작 | shape | 이유 |
 |---|---|---|
-| 수정 | `single_entity` + 서비스 | 두 row 를 함께 수정한다. 일반 ops 수정은 한 row 만 기록한다 |
+| 수정 | `single_entity` + 서비스 | 두 row 를 함께 수정한다. 일반 ops 수정은 한 row 만 쓴다 |
 | purge | `single_entity` + 서비스 | 두 row 와 그래프 노드를 함께 삭제한다 |
 | 여럿 수정 | `partial_bulk` + 서비스 | 같은 이유. 항목마다 savepoint 하나 |
 | 여럿 purge | `partial_bulk` + 서비스 | 같은 이유. 항목마다 savepoint 하나 |

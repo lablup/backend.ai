@@ -1,7 +1,7 @@
 ---
 name: auth-service-composition
 type: decision-table
-description: why the authentication domain's actions split into the global and user groups, what the three gateway-less wirings verify their caller with, and why login session and SSH keypair operations are recorded per user
+description: why the authentication domain's actions split into the global and user groups, what the three gateway-less connections verify their caller with, and why login session and SSH keypair operations are recorded per user
 scope: src/ai/backend/manager/services/auth
 keywords:
   - AuthProcessors
@@ -26,14 +26,14 @@ Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 The `global` group takes operations that name no entity. Login and expired-password change
 arrive before the caller has a principal. An admin revoking a login session or clearing a
-login block reads no owner. The `user` group takes what one user's rows, credentials and
-login records respond for.
+login block reads no owner. The `user` group holds the operations over one user's rows, credentials and
+login records.
 
-## The three wirings without a gate
+## The three connections without a gate
 
-`authorize`, `signup` and `update_password_no_auth` are wired as `anonymous_global`. All
+`authorize`, `signup` and `update_password_no_auth` are connected as `anonymous_global`. All
 three are on routes without the authentication middleware (`api/rest/auth/registry.py`), so
-there is no caller context to verify. The service verifies the caller itself instead: a
+there is no caller context to check. The service checks the caller itself instead: a
 password is compared against the secret the row holds. `signup` has no row to compare yet,
 and the hook plugin decides the signup request.
 
@@ -47,9 +47,9 @@ that chooses which session to end.
 
 `public_resolve_access_key_scope` finds the keypair owner by access key, mixed with the
 requester's default keypair read and the delegation credential check, so it cannot be
-wired as a lookup. What it responds for is a user, so it is public in the user group. When
+connected as a lookup. Its entity is a user, so it is public in the user group. When
 it names a delegation target, the service compares the roles and domains of the requester
-and the target.
+and the target to decide.
 
 ## Login sessions and SSH keypairs are recorded per user
 
@@ -73,12 +73,12 @@ a logged-in user does on its own session's access key, and key generation exists
 
 Both rows are field rows owned by the user, so a read comes from the sub-group that
 `user_group.field_group(...)` provides. That group creates the owner lookup itself, and the
-domain wires only the four reads. All four go through ops with the `LoginSessionSearcher`
+domain connects only the four reads. All four go through ops with the `LoginSessionSearcher`
 and `LoginHistorySearcher` specs, without a service method.
 
-The scope read is not `scope_search_ops` because the data it responds for has to be
-`EntityData`. A field row is not an entity, so it has no id to respond with, and
-`ScopedFieldsOpsResult` takes that place.
+The scope read is not `scope_search_ops` because the data it returns has to be
+`EntityData`. A field row is not an entity, so it has no id to return, and
+`ScopedFieldsOpsResult` is the item for it.
 
 A scope read for a missing user raises `UserNotFound` as is, because ops runs the scope
 existence check first.
