@@ -4,7 +4,7 @@
 
 ## 이 문서가 있는 이유
 
-services 계층은 도메인 검증과 business rule 이 있는 곳이다. 이 문서는 v2 전환에서 계층의 중심 판단, 즉 어떤 entity_type 을 어떤 모양으로 연결하는지와 service 메서드를 언제 남기는지를 담는다. 대량 교체 작업(BA-7295~7302)은 이 표와 다른 것을 모두 맞추는 일이다.
+services 계층에서 도메인 검증과 business rule 을 다룬다. 이 문서는 v2 전환에서 계층의 중심 판단, 즉 어떤 entity_type 을 어떤 모양으로 연결하는지와 service 메서드를 언제 유지하는지를 담는다. 대량 교체 작업(BA-7295~7302)은 이 표와 다른 것을 모두 맞추는 일이다.
 
 ## 판단 기준 세 가지와 항상 정확히 하나의 parent
 
@@ -18,7 +18,7 @@ services 계층은 도메인 검증과 business rule 이 있는 곳이다. 이 �
 
 | 판단 | 조건 | action 모양 | write spec |
 |---|---|---|---|
-| scope 제공 | 셋 다 예이고 다른 entity 를 govern 한다 | scope (create) / single 등 | `RoleManagedEntity*` (preset 역할 부여) |
+| scope 제공 | 세 기준을 모두 만족하고 다른 entity 를 govern 한다 | scope (create) / single 등 | `RoleManagedEntity*` (preset 역할 부여) |
 | entity | parent 가 있고 직접 다룬다 | scope (create) / single / bulk | `Entity*` (own virtual entity + member_of) |
 | global | RBAC scope 밖이고 직접 다룬다 | global (gate: SA 또는 public read) | `GlobalEntity*` (등록 없음) |
 | field | 독립 권한이 없고 수명이 묶인다 | 소유자 기준 single_entity | `FieldEntity*` (`owner_id` 필요) |
@@ -85,15 +85,15 @@ RBAC scope 밖의 대상이다. `GlobalEntity*` 이며 membership 등록이 없�
 | entity_type | 메모 |
 |---|---|
 | vfolder:file | vfolder 동작이고 subtype 을 유지한다 |
-| auth | user/keypair 위의 동작 |
+| auth | user/keypair 에 대한 동작 |
 | session:file, commit, log 및 그 밖의 subtype | session 동작이고 subtype 을 분리하지 않는다 |
 | stream | 대상은 session 이고 연결 축은 이관 중 확인한다 |
 | etcd_config, manager_admin, metric | DB 가 아니며 아래 예외 목록을 참조한다 |
-| export, events, resource_overview | scoped data 위의 조회/보고 동작 |
+| export, events, resource_overview | scoped data 를 조회/보고하는 동작 |
 
 ## pass-through 는 결합 base 하나만 상속한다
 
-ops-direct action 은 `<Operation><Shape>OpsAction` 결합 base 하나를 상속하고, 여기서 `operation_type()` 이 따라온다. 선언하는 것은 entity_type / action_name / spec getter (+ 모양의 대상 메서드)뿐이다. 실제 코드 `services/resource_slot/actions/create.py`:
+ops-direct action 은 `<Operation><Shape>OpsAction` 결합 base 하나를 상속하고, 여기서 `operation_type()` 이 따라온다. entity_type / action_name / spec getter (+ 모양의 대상 메서드)만 선언한다. 실제 코드 `services/resource_slot/actions/create.py`:
 
 ```python
 @dataclass(frozen=True)
@@ -144,7 +144,7 @@ service 메서드를 유지하기로 결정하기 전에 이 표를 본다.
 | parent 와 자식을 함께 생성 | `create_*_with_fields` 가 `FieldCreator` 를 한 transaction 에 넣는다 | 사용 중 |
 | 소유자 하나의 field row 읽기 | `FieldProcessorGroup.search_ops` | 사용 중 |
 
-- 순위는 lock 없이 INSERT 안에서 계산한다. 동시 insert 가 같은 값에 놓일 수 있고, 순위가 목록 정렬에만 사용되는 곳에서는 이를 허용한다. 결정적인 순서가 필요하면 lock 을 되돌려야 하는데, 이 표의 어떤 도구도 lock 을 제공하지 않는다. spec 이 무엇을 잠글지 선언해야 한다.
+- 순위는 lock 없이 INSERT 안에서 계산한다. 동시 insert 가 같은 값에 놓일 수 있고, 순위가 목록 정렬에만 사용되는 곳에서는 이를 허용한다. 정해진 순서가 필요하면 lock 을 되돌려야 하는데, 이 표의 어떤 도구도 lock 을 제공하지 않는다. spec 이 잠글 대상을 선언해야 한다.
 - SQL 식으로 채운 column 은 insert 후 한 번 다시 읽는다. `_insert_rows` 가 row 에서 이를 판단하므로 spec 은 아무것도 선언하지 않는다.
 
 ## DB 가 아닌 대상은 ops-direct 후보가 아니다

@@ -10,7 +10,7 @@
 | 순수 전달 (spec 입력, 데이터 출력, 분기 없음) | ops-generic service 를 거치는 범용 `OpsRepository`, 도메인 repository 를 아예 작성하지 않는다 |
 | 복잡한 내부 연산 (다중 테이블, scheduler 내부) | db object(`db_source`) 위의 repository 메서드 |
 
-기본은 첫 번째 row 이다. 연산을 spec 으로 실제로 spec 으로 표현할 수 없을 때만 db object 로 내려가고, 순수 전달만 남으면 repository 를 건너뛴다.
+기본은 첫 번째 row 이다. 연산을 spec 으로 실제로 표현할 수 없을 때만 db object 로 내려가고, 순수 전달만 남으면 repository 를 건너뛴다.
 
 ## 연산별로 spec 이 담는 것
 
@@ -43,7 +43,7 @@ tx 경계를 명확히 하기 위해 public 메서드에서 session 을 열고 �
 
 ## spec 이 테이블 하나만 다루는 이유
 
-spec 안에 다중 테이블 write 를 숨기면 순서와 의존성이 드러나지 않는다. 소유자를 먼저 생성하고 소유된 row 는 소유자의 확정된 id 아래에서 구성한 `FieldCreator` 로 두므로, parent→child 순서가 명시적이다.
+spec 안에 다중 테이블 write 를 숨기면 순서와 의존성이 드러나지 않는다. 소유자를 먼저 생성하고 소유된 row 는 소유자의 확정된 id 아래에서 구성된 `FieldCreator` 이므로, parent→child 순서가 명시적이다.
 
 ## scope 필터 기본값
 

@@ -55,7 +55,7 @@
 
 ## many-row write: 실패 모드는 이름으로 정하고 인자로 두지 않는다
 
-- `atomic_*` 는 모든 row 를 함께 flush 하고 첫 실패에서 raise 한다. 실행은 엔티티를 지정하지 않은 실패 하나를 기록한다. 아무것도 기록되지 않았고 어느 row 도 탓할 수 없기 때문이다.
+- `atomic_*` 는 모든 row 를 함께 플러시하고 첫 실패에서 예외를 발생시킨다. 실행은 엔티티를 지정하지 않은 실패 하나를 기록한다. 아무것도 기록되지 않았고 어느 row 도 탓할 수 없기 때문이다.
 - `partial_*` 는 항목마다 savepoint 로 격리하고 항목마다 응답한다. 실행 자체는 성공하고 판정을 담는다.
 - flag 로 고를 수 없다. 반환 type 이 다르고(`list` 대 `BulkResultWithFailures`) 그 type 이 generic service, action result, processor 를 거쳐 전파된다. 값 하나가 네 계층의 type 을 결정할 수 없다.
 - `Bulk` 는 `BaseBulkAction` 모양을 의미한다. 호출자가 엔티티를 지정했으므로 각각 응답한다. 대상이 scope 하나, owner 하나, system 인 many-row write 는 bulk 모양이 아니므로 atomic create 는 scope, single-entity, global 모양이다.
@@ -86,7 +86,7 @@
 - 검사는 type 으로 한다. 질의에 scope 조건을 두지 않으므로 global 권한을 위임받은 user 는 그 type 의 모든 row 를 읽는다. project 나 user 에 속한 자원에 대한 global search 도 다르지 않다.
 - super admin 과 읽기의 monitor 는 user role 에서 바로 통과한다. role row 없이 동작하던 것이 계속 동작하고 둘 다 권한 읽기를 소비하지 않는다.
 - 강제 적용 switch(`manager.rbac.enforcement_enabled`)가 꺼져 있으면 그 두 우회만 남고 나머지는 모두 거부된다. 꺼져 있는 동안 permission row 가 유지된다는 보장이 없으므로 fall-back 은 호출자를 통과시키는 것이 아니라 이전 동작인 super admin 전용이다.
-- role 편집기가 제공하는 목록(`role_grantable_wirings`)은 global 배선을 뺀다. `role_scope_types` 가 `global` 을 지정하지 않고 matrix 에 그 축이 없기 때문이다. gate 는 동작하지만 그 목록으로 위임할 role 은 아직 생성할 수 없다.
+- role 편집기가 제공하는 목록(`role_grantable_wirings`)은 global 배선을 포함하지 않는다. `role_scope_types` 가 `global` 을 지정하지 않고 matrix 에 그 축이 없기 때문이다. gate 는 동작하지만 그 목록으로 위임할 role 은 아직 생성할 수 없다.
 
 ## registry 가 catalog 다
 

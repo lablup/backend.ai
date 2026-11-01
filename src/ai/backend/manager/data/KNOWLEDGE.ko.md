@@ -13,19 +13,19 @@
 | 구조 선언이다(검증 가능한 schema 타입) | `schema/`, 예: `common/schema/` |
 | 결정을 위한 내부 조회 projection 이다(scheduler, coordinator) | `views/`, manager 전용 |
 
-`data/` 는 repository 가 ORM row 대신 반환하는 값이다. 위 계층으로 자유롭게 흐르고, row 는 그렇지 않다.
+`data/` 는 repository 가 ORM row 대신 반환하는 값이다. 상위 계층으로 자유롭게 흐르고, row 는 그렇지 않다.
 
 ## 자기 도메인의 row 만 담으면 조회가 요청한 범위에 머문다
 
 - 다른 테이블의 값을 담으면 그 값을 산출하는 모든 조회가 그 row 까지 접근한다. 목록 조회에서는 이 비용이 row 수만큼 곱해진다.
 - async session 에서 그런 조회는 `MissingGreenlet` 을 일으킨다. eager load 는 에러를 피할 뿐 비용은 줄이지 못한다.
-- eager load 가 포함하는 도메인은 단일 엔티티 read/write spec(`models/specs/`)의 범위를 벗어난다. 그 spec 은 `sa.select(Row)` 하나로 표현되는 읽기를 전제한다.
+- eager load 가 포함하는 도메인은 단일 엔티티 read/write spec(`models/specs/`)의 범위를 벗어난다. 그 spec 은 `sa.select(Row)` 하나로 표현되는 조회를 전제한다.
 
-## Undefined sentinel 은 부분 수정에서 "제공되지 않음"을 나타내는 표시다
+## Undefined sentinel 은 부분 변경에서 "제공되지 않음"을 나타내는 표시다
 
 - `data/common/sentinel.py` 가 `Undefined`/`undefined` singleton 을 정의하고 `TriState` 와 짝을 이룬다.
 - 의미: 없음 = 유지, sentinel = 초기화, 값 = 설정.
-- DTO 수준 SENTINEL pattern(`common/dto/manager/v2/KNOWLEDGE.md`)의 manager 쪽 대응이다.
+- DTO 수준 SENTINEL pattern(`common/dto/manager/v2/KNOWLEDGE.md`)의 manager 쪽 대응 개념이다.
 
 ## 정한 규칙과 현재 코드는 어긋난다
 
