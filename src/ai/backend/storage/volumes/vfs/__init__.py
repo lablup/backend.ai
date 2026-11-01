@@ -247,6 +247,7 @@ class BaseFSOpModel(AbstractFSOpModel):
                 shutil.copytree,
                 src_path,
                 dst_path,
+                symlinks=True,
                 dirs_exist_ok=True,
             ),
         )
