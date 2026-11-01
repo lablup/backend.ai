@@ -24,6 +24,7 @@ from importlib.resources import files
 from typing import (
     Any,
     Literal,
+    NoReturn,
     NotRequired,
     TypedDict,
     cast,
@@ -34,6 +35,13 @@ import zmq
 import zmq.asyncio
 from async_timeout import timeout
 
+<<<<<<< HEAD
+=======
+from ai.backend.agent.errors.kernel import (
+    KernelRunnerInvalidReplyError,
+    KernelRunnerReplyTimeoutError,
+)
+>>>>>>> 23c06d9ce (fix(BA-8788): reject msgpack extension types in kernel runner status replies (#16226))
 from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_task, current_loop
 from ai.backend.common.docker import ImageRef
@@ -901,13 +909,19 @@ class AbstractCodeRunner(aobject, metaclass=ABCMeta):
         sock = await self._get_socket_pair()
         await sock.send_multipart([b"interrupt", b""])
 
+    def _reject_status_ext_type(self, code: int, data: bytes) -> NoReturn:
+        raise KernelRunnerInvalidReplyError(f"status reply has msgpack extension type {code}")
+
     async def feed_and_get_status(self) -> dict[str, float] | None:
         sock = await self._get_socket_pair()
         await sock.send_multipart([b"status", b""])
         try:
             result = await self.status_queue.get()
             self.status_queue.task_done()
-            return cast(dict[str, float] | None, msgpack.unpackb(result))
+            return cast(
+                dict[str, float] | None,
+                msgpack.unpackb(result, ext_hook=self._reject_status_ext_type),
+            )
         except asyncio.CancelledError:
             return None
 
