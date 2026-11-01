@@ -1,3 +1,17 @@
+<!-- context-for-ai
+type: master-bep
+scope: Unified service discovery design for all Backend.AI components
+detail-docs: [data-model.md, config-schema.md, event-registration.md, cli-migration.md, client-pool.md]
+key-decisions:
+  - Redis Event as transport channel, DB as authoritative store
+  - role+scope based multi-endpoint model
+  - Config-driven endpoint registration (with CLI migration tool)
+  - Self-preservation for failure resilience (Eureka pattern)
+  - Agent multi-agent: minimize SD scope (sub-concept)
+  - instance_id: SD config first, component-specific fallback, auto-generation
+implementation: 4 phases, BA-4315~4318
+-->
+
 # DB 기반 서비스 카탈로그를 사용하는 통합 서비스 디스커버리
 
 ## 관련 이슈
