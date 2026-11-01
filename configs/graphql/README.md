@@ -16,12 +16,15 @@ We use [The Guild's Hive Gateway](https://the-guild.dev/graphql/hive/docs/gatewa
 
 The gateway is configured via `gateway.config.ts` which includes:
 
-- **Host/Port**: Binds to `0.0.0.0:4000` for external access
+- **Host/Port**: Listens on `0.0.0.0:4000` inside the container. The halfstack compose files publish the port on `127.0.0.1:4000` only
 - **Supergraph Schema**: Loads from `/gateway/supergraph.graphql` (mounted from `docs/manager/graphql-reference/supergraph.graphql`)
 - **Transport Entries**: Explicitly defines subgraph routing URLs
   - `graphene`: `http://host.docker.internal:8091/admin/gql`
   - `strawberry`: `http://host.docker.internal:8091/admin/gql/strawberry`
 - **Prometheus Metrics**: Exposes metrics at `/metrics` endpoint
+- **Error masking**: The `maskError` of `maskedErrors` replaces the message of gateway failures, manager HTTP errors, and manager errors whose code ends with `_internal-error` with `Unexpected error.`
+  - Manager HTTP errors keep `status` and `statusText` in `extensions.response`. 4xx errors also keep `type`, `title`, `error_code`, and `msg` of `body` (WebUI reads them to detect an expired session)
+  - Other manager GraphQL errors pass through as is
 
 ## Subgraphs
 
