@@ -120,3 +120,18 @@ class KernelRunnerReplyTimeoutError(BackendAIError, web.HTTPGatewayTimeout):
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.TASK_TIMEOUT,
         )
+
+
+class KernelRunnerInvalidReplyError(BackendAIError, web.HTTPBadGateway):
+    """Raised when a kernel runner reply is not in the expected format."""
+
+    error_type = "https://api.backend.ai/probs/agent/kernel-runner-invalid-reply"
+    error_title = "Kernel runner sent an invalid reply."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.ACCESS,
+            error_detail=ErrorDetail.INVALID_DATA_FORMAT,
+        )
