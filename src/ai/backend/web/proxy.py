@@ -23,6 +23,7 @@ from ai.backend.client.exceptions import (
     BackendConnectError,
 )
 from ai.backend.client.request import Request, RequestContent, SessionMode
+from ai.backend.common.clients.valkey_client.valkey_session.client import ValkeySessionClient
 from ai.backend.common.endpoint_pool.exceptions import NoHealthyEndpointError
 from ai.backend.common.endpoint_pool.pool import HealthyEndpointPool
 from ai.backend.common.endpoint_pool.types import AcquiredEndpoint
@@ -45,6 +46,7 @@ from .auth import (
     get_anonymous_session,
     get_api_session,
 )
+from .login_attempts import reserve_login_attempt
 from .stats import WebStats
 
 log = StructuredLogger(logging.getLogger(__spec__.name))
@@ -59,6 +61,12 @@ HTTP_HEADERS_TO_FORWARD = [
 CHUNK_SIZE: Final[int] = 64 * 1024
 
 MAX_SEND_ATTEMPTS: Final[int] = 2
+
+PASSWORD_CHECK_PATHS: Final[frozenset[str]] = frozenset({
+    "auth/authorize",
+    "auth/update-password-no-auth",
+})
+BUFFERED_BODY_KEY: Final[str] = "password_check_body"
 
 HOP_ONLY_HEADERS: Final[CIMultiDict[int]] = CIMultiDict([
     ("Connection", 1),
@@ -227,12 +235,61 @@ def _strip_route_prefix(request: web.Request, *, prefix: str) -> str | None:
     return None
 
 
+def _normalize_path(path: str) -> str:
+    return posixpath.normpath("/" + path).strip("/")
+
+
 def _reject_disabled_signup(request: web.Request, path: str | None) -> None:
     config: WebServerUnifiedConfig = request.app["config"]
     if config.service.enable_signup or path is None:
         return
-    if posixpath.normpath("/" + path).strip("/") == "auth/signup":
+    if _normalize_path(path) == "auth/signup":
         raise SignupDisabledError()
+
+
+def _checks_password(request: web.Request, path: str | None) -> bool:
+    return (
+        request.method == "POST"
+        and path is not None
+        and _normalize_path(path) in PASSWORD_CHECK_PATHS
+    )
+
+
+def _claimed_username(request: web.Request, body: bytes) -> str | None:
+    # The plugin handler drops the charset, so only UTF-8 reads the same in the manager.
+    if (request.charset or "utf-8").lower() not in ("utf-8", "utf8"):
+        return None
+    try:
+        parsed = json.loads(body.decode("utf-8"))
+    except ValueError:
+        return None
+    username = parsed.get("username") if isinstance(parsed, dict) else None
+    return username if isinstance(username, str) and username else None
+
+
+async def _limit_password_attempts(
+    frontend_rqst: web.Request,
+    forward: Callable[[], Awaitable[web.StreamResponse]],
+) -> web.StreamResponse:
+    """Forward a password check to the manager under the login attempt limit."""
+    payload = frontend_rqst.get("payload")
+    body: bytes = payload if payload is not None else await frontend_rqst.read()
+    username = _claimed_username(frontend_rqst, body)
+    if username is None:
+        raise MalformedRequestBody()
+    await reserve_login_attempt(frontend_rqst, username)
+    frontend_rqst[BUFFERED_BODY_KEY] = body
+    valkey_client = cast(ValkeySessionClient, frontend_rqst.app["redis"])
+    status: int | None = None
+    try:
+        response = await forward()
+        status = response.status
+        return response
+    finally:
+        # A closed connection may already have delivered the status.
+        transport = frontend_rqst.transport
+        if status != 401 and transport is not None and not transport.is_closing():
+            await valkey_client.release_login_attempt(username)
 
 
 async def _send_upstream(
@@ -306,6 +363,8 @@ async def _run_proxy_request(
                     # Use the decrypted payload as request content
                     content = cast(bytes, frontend_rqst["payload"])
                     decrypted_payload_length = len(content)
+                elif BUFFERED_BODY_KEY in frontend_rqst:
+                    content = frontend_rqst[BUFFERED_BODY_KEY]
                 else:
                     # Passthrough the streamed content
                     content = frontend_rqst.content
@@ -410,7 +469,8 @@ async def web_handler(
             endpoint_pool=endpoint_pool,
             is_anonymous=is_anonymous,
         )
-    return await _run_proxy_request(
+    forward = partial(
+        _run_proxy_request,
         frontend_rqst,
         endpoint_pool=endpoint_pool,
         path=path,
@@ -418,6 +478,9 @@ async def web_handler(
         http_headers_to_forward_extra=http_headers_to_forward_extra,
         log_prefix="web_handler",
     )
+    if _checks_password(frontend_rqst, path):
+        return await _limit_password_attempts(frontend_rqst, forward)
+    return await forward()
 
 
 async def pipeline_handler(
@@ -544,6 +607,25 @@ async def web_plugin_handler(
     """
     path = frontend_rqst.match_info["path"]
     _reject_disabled_signup(frontend_rqst, path)
+    forward = partial(
+        _run_plugin_request,
+        frontend_rqst,
+        path=path,
+        endpoint_pool=endpoint_pool,
+        is_anonymous=is_anonymous,
+    )
+    if _checks_password(frontend_rqst, path):
+        return await _limit_password_attempts(frontend_rqst, forward)
+    return await forward()
+
+
+async def _run_plugin_request(
+    frontend_rqst: web.Request,
+    *,
+    path: str,
+    endpoint_pool: HealthyEndpointPool,
+    is_anonymous: bool,
+) -> web.StreamResponse:
     stats: WebStats = frontend_rqst.app["stats"]
     stats.active_proxy_plugin_handlers.add(asyncio.current_task())  # type: ignore
     config: WebServerUnifiedConfig = frontend_rqst.app["config"]
@@ -591,7 +673,7 @@ async def web_plugin_handler(
     try:
         content: RequestContent = None
         if frontend_rqst.body_exists:
-            content = frontend_rqst.content
+            content = frontend_rqst.get(BUFFERED_BODY_KEY, frontend_rqst.content)
             if path == "auth/signup":
                 try:
                     body = await frontend_rqst.json()

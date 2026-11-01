@@ -104,6 +104,7 @@ from ai.backend.web.clients.manager_pool import (
 )
 from ai.backend.web.config.unified import EventLoopType, ServiceMode, WebServerUnifiedConfig
 from ai.backend.web.errors import ManagerConnectionUnavailable
+from ai.backend.web.login_attempts import reserve_login_attempt
 from ai.backend.web.ratelimit import manager_proxy_rate_limited
 from ai.backend.web.security import SecurityPolicy, csp_nonce_var, security_policy_middleware
 
@@ -271,6 +272,11 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
         "password_changed_at": None,
     }
 
+    valkey_client: ValkeySessionClient = request.app["redis"]
+    username = creds["username"]
+    await reserve_login_attempt(request, username)
+
+    keep_reservation = False
     manager_pool = cast(HealthyEndpointPool, request.app["manager_pool"])
     registries = cast(
         Mapping[str, BackendAIClientRegistry], request.app["no_auth_client_registries"]
@@ -289,6 +295,8 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
                 extra_headers=build_forwarding_headers(request),
             )
         result["password_changed_at"] = resp.password_changed_at
+        await valkey_client.clear_login_block(username)
+        keep_reservation = True
         log.trace(
             "password update succeeded (email: {}, ip: {})",
             creds["username"],
@@ -311,7 +319,11 @@ async def update_password_no_auth(request: web.Request) -> web.Response:
             "title": e.data.get("title"),
             "details": e.data.get("msg"),
         }
+        keep_reservation = e.status == 401
         return web.json_response(result, status=e.status)
+    finally:
+        if not keep_reservation:
+            await valkey_client.release_login_attempt(username)
     return web.json_response(result)
 
 
@@ -430,24 +442,7 @@ async def login_handler(request: web.Request) -> web.Response:
     valkey_client: ValkeySessionClient = request.app["redis"]
     username = creds["username"]
 
-    # Reserve before authorizing so that concurrent attempts cannot exceed the limit.
-    if not await valkey_client.reserve_login_attempt(
-        username,
-        config.session.login_allowed_fail_count,
-        config.session.login_block_time,
-    ):
-        log.trace(
-            "login blocked after consecutive failures (email: {}, ip: {})",
-            username,
-            client_ip,
-        )
-        raise web.HTTPTooManyRequests(
-            text=json.dumps({
-                "type": "https://api.backend.ai/probs/too-many-requests",
-                "title": "Too many failed login attempts",
-            }),
-            content_type="application/problem+json",
-        )
+    await reserve_login_attempt(request, username)
 
     keep_reservation = False
     manager_pool = cast(HealthyEndpointPool, request.app["manager_pool"])

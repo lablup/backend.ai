@@ -34,7 +34,11 @@ def _build_app(update_password: AsyncMock) -> web.Application:
     app = web.Application()
     config = MagicMock()
     config.api.domain = "default"
+    config.session.login_allowed_fail_count = 3
+    config.session.login_block_time = 600
     app["config"] = config
+    app["redis"] = AsyncMock()
+    app["redis"].reserve_login_attempt.return_value = True
     app["manager_pool"] = manager_pool
     app["no_auth_client_registries"] = {MANAGER_ENDPOINT: registry}
     app.router.add_route("POST", "/server/update-password-no-auth", update_password_no_auth)
