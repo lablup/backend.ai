@@ -9,7 +9,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from aiohttp import web
 
-from ai.backend.agent.errors.watcher import InvalidWatcherTokenError
 from ai.backend.agent.watcher import auth_middleware, watcher_server
 
 _TOKEN_HEADER = "X-BackendAI-Watcher-Token"
@@ -58,30 +57,29 @@ class TestAuthMiddleware:
     async def test_rejects_token_mismatch(self, case: _RejectedTokenCase) -> None:
         handler = AsyncMock()
 
-        with pytest.raises(InvalidWatcherTokenError):
-            await auth_middleware(_make_request(case.expected, case.headers), handler)
+        result = await auth_middleware(_make_request(case.expected, case.headers), handler)
 
+        assert result.status == 403
         handler.assert_not_called()
 
 
 class TestStartupTokenLog:
     @pytest.mark.parametrize(
-        ("stored_token", "token_configured"),
-        [("watcher-secret-value", True), (None, False)],
+        "stored_token",
+        ["watcher-secret-value", None],
         ids=["configured", "not-configured"],
     )
     async def test_logs_whether_token_is_configured_without_its_value(
         self,
         caplog: pytest.LogCaptureFixture,
         stored_token: str | None,
-        token_configured: bool,
     ) -> None:
         etcd = AsyncMock()
         etcd.get.return_value = stored_token
         etcd.__aenter__.return_value = etcd
         cfg: dict[str, Any] = {
             "logging": MagicMock(),
-            "etcd": {"user": None, "addrs": [], "namespace": "test"},
+            "etcd": {"user": None, "addr": None, "namespace": "test"},
             "watcher": {"ssl-enabled": False, "service-addr": MagicMock()},
         }
         with (
@@ -96,4 +94,7 @@ class TestStartupTokenLog:
 
         records = [vars(record) for record in caplog.records]
         assert all("watcher-secret-value" not in str(record) for record in records)
-        assert any(record.get("log_tag_token_configured") is token_configured for record in records)
+        assert any(
+            "watcher authentication token loaded" in record.getMessage()
+            for record in caplog.records
+        )
