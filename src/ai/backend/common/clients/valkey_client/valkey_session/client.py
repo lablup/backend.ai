@@ -1,7 +1,7 @@
 import logging
-from typing import Self
+from typing import Final, Self
 
-from glide import ExpirySet, ExpiryType
+from glide import ExpirySet, ExpiryType, Script
 
 from ai.backend.common.clients.valkey_client.client import (
     AbstractValkeyClient,
@@ -41,6 +41,28 @@ valkey_session_resilience = Resilience(
 
 SESSION_KEY_PREFIX = "AIOHTTP_SESSION_"
 LOGIN_HISTORY_KEY_PREFIX = "login_history_"
+LOGIN_FAIL_COUNT_KEY_PREFIX = "login_fail_count_"
+
+# KEYS[1]: fail count key, ARGV[1]: allowed fail count, ARGV[2]: TTL in seconds.
+RESERVE_LOGIN_ATTEMPT_SCRIPT: Final[str] = """
+local count = tonumber(redis.call('GET', KEYS[1]) or '0')
+if count >= tonumber(ARGV[1]) then
+    redis.call('EXPIRE', KEYS[1], ARGV[2])
+    return 0
+end
+redis.call('INCR', KEYS[1])
+redis.call('EXPIRE', KEYS[1], ARGV[2])
+return 1
+"""
+
+RELEASE_LOGIN_ATTEMPT_SCRIPT: Final[str] = """
+local count = tonumber(redis.call('GET', KEYS[1]) or '0')
+if count <= 1 then
+    redis.call('DEL', KEYS[1])
+    return 0
+end
+return redis.call('DECR', KEYS[1])
+"""
 
 
 class ValkeySessionClient:
@@ -51,6 +73,8 @@ class ValkeySessionClient:
 
     _client: AbstractValkeyClient
     _closed: bool
+    _reserve_login_attempt_script: Script
+    _release_login_attempt_script: Script
 
     def __init__(
         self,
@@ -58,6 +82,8 @@ class ValkeySessionClient:
     ) -> None:
         self._client = client
         self._closed = False
+        self._reserve_login_attempt_script = Script(RESERVE_LOGIN_ATTEMPT_SCRIPT)
+        self._release_login_attempt_script = Script(RELEASE_LOGIN_ATTEMPT_SCRIPT)
 
     @classmethod
     async def create(
@@ -202,34 +228,32 @@ class ValkeySessionClient:
             await conn.delete(keys)
 
     @valkey_session_resilience.apply()
-    async def get_login_history(self, username: str) -> bytes | None:
+    async def reserve_login_attempt(
+        self, username: str, allowed_fail_count: int, block_duration_seconds: int
+    ) -> bool:
         """
-        Get login failure history for a user.
+        Count a login attempt against the user unless the count reached the limit.
+        Both outcomes restart the expiration.
 
-        :param username: The username to check.
-        :return: The login history data as bytes, or None if not found.
+        :return: True if the attempt may proceed, False if the user is blocked.
         """
-        key = f"{LOGIN_HISTORY_KEY_PREFIX}{username}"
         async with self._client.client() as conn:
-            return await conn.get(key)
+            result = await conn.invoke_script(
+                script=self._reserve_login_attempt_script,
+                keys=[f"{LOGIN_FAIL_COUNT_KEY_PREFIX}{username}"],
+                args=[str(allowed_fail_count), str(block_duration_seconds)],
+            )
+        return bool(result == 1)
 
     @valkey_session_resilience.apply()
-    async def set_login_block(
-        self, username: str, block_data: str | bytes, block_duration_seconds: int
-    ) -> None:
+    async def release_login_attempt(self, username: str) -> None:
         """
-        Set login block for a user with expiration.
-
-        :param username: The username to block.
-        :param block_data: The block data to store.
-        :param block_duration_seconds: How long to block in seconds.
+        Take back an attempt reserved by `reserve_login_attempt`.
         """
-        key = f"{LOGIN_HISTORY_KEY_PREFIX}{username}"
         async with self._client.client() as conn:
-            await conn.set(
-                key,
-                block_data,
-                expiry=ExpirySet(ExpiryType.SEC, block_duration_seconds),
+            await conn.invoke_script(
+                script=self._release_login_attempt_script,
+                keys=[f"{LOGIN_FAIL_COUNT_KEY_PREFIX}{username}"],
             )
 
     @valkey_session_resilience.apply()
@@ -239,9 +263,12 @@ class ValkeySessionClient:
 
         :param username: The username whose block to clear.
         """
-        key = f"{LOGIN_HISTORY_KEY_PREFIX}{username}"
+        keys: list[str | bytes] = [
+            f"{LOGIN_FAIL_COUNT_KEY_PREFIX}{username}",
+            f"{LOGIN_HISTORY_KEY_PREFIX}{username}",
+        ]
         async with self._client.client() as conn:
-            await conn.delete([key])
+            await conn.delete(keys)
 
     @valkey_session_resilience.apply()
     async def flush_all_sessions(self) -> None:
