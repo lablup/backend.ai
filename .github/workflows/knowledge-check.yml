@@ -23,3 +23,5 @@ jobs:
         run: python3 scripts/knowledge/check.py
       - name: Check English and Korean document pairs
         run: python3 scripts/knowledge/check_bilingual.py --base "origin/${{ github.base_ref }}"
+      - name: Check words the glossary rejects
+        run: python3 scripts/knowledge/check_words.py --base "origin/${{ github.base_ref }}"

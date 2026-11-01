@@ -9,7 +9,7 @@ This file contains the core rules for AI coding agents. For detailed patterns an
 - A change that shifts a base assumption — an `AGENTS.md` rule rewrite, a migration completing — updates the affected `KNOWLEDGE.md` in the same change. Routine task-level edits do not.
 - **`README.md`**: A document for humans to understand the component's composition. Should not change often. Does not duplicate AGENTS/KNOWLEDGE.
 - **`GLOSSARY.md`, `glossary/`**: The words and writing style for documents. `GLOSSARY.md` holds the style rules and expressions to avoid, `glossary/<topic>.md` the terms by topic.
-- **Bilingual documents**: `KNOWLEDGE.md`, `report.md`, BEPs and the glossary come in pairs in the same folder: English in `<name>.md`, Korean in `<name>.ko.md`. Keep the same sections and update both in the same change. `AGENTS.md` is English only. `scripts/knowledge/check_bilingual.py` checks the pairs.
+- **Bilingual documents**: `KNOWLEDGE.md`, `report.md`, BEPs and the glossary come in pairs in the same folder: English in `<name>.md`, Korean in `<name>.ko.md`. Keep the same sections and update both in the same change. `AGENTS.md` is English only. `scripts/knowledge/check_bilingual.py` checks the pairs, `scripts/knowledge/check_words.py` the words.
 - **`report.md`, `report.ko.md`**: Output of the scenario tests (`scripts/scenario-report.py`). Do not edit them by hand.
 - **Korean goes only in `.ko.md`**: Do not add Korean to a `.md` file.
 - Place a rule **only once, at the highest level** of its scope — global at this root, component-global at the component top level. Do not duplicate an upper-level rule lower down.

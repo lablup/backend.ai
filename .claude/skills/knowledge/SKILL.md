@@ -106,12 +106,15 @@ Actor convention: `<producer>/<version>` for agents (e.g. `claude-code/fable-5`)
 ```bash
 python3 scripts/knowledge/check.py
 python3 scripts/knowledge/check_bilingual.py --base origin/main
+python3 scripts/knowledge/check_words.py --base origin/main
 ```
 
 Validates the schema, scope/sources path existence, body links, name
 uniqueness, and the verified-not-older-than-generated invariant.
 `check_bilingual.py` validates the `.md` and `.ko.md` pairs and rejects Korean
-added to a `.md` file. `knowledge-check.yml` runs both on pull requests.
+added to a `.md` file. `check_words.py` finds the words the glossary rejects in
+added lines, and takes paths to check whole files. `knowledge-check.yml` runs all
+three on pull requests.
 
 ## What goes where
 

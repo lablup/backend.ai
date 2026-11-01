@@ -27,6 +27,8 @@ FENCE = re.compile(r"^\s*(```|~~~)")
 DIFF_FILE = re.compile(r"^\+\+\+ b/(.+)$")
 # The scenario tests still generate report.md in Korean.
 KOREAN_ALLOWED_NAMES = frozenset({"report.md"})
+# The glossary is generated, and a wording fix can change only one language.
+ONE_SIDE_CHANGE_ALLOWED = "glossary/"
 
 
 def _git(root: Path, *args: str) -> str:
@@ -99,6 +101,8 @@ def check_pair_updates(root: Path, base: str) -> list[str]:
     changed = set(_git(root, "diff", "--name-only", f"{base}...HEAD", "--", "*.md").splitlines())
     problems = []
     for path in sorted(changed):
+        if path.startswith(ONE_SIDE_CHANGE_ALLOWED):
+            continue
         if path.endswith(KO_SUFFIX):
             partner = _english_path(path)
         else:
