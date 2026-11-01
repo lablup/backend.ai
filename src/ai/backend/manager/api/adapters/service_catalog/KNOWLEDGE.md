@@ -1,7 +1,7 @@
 ---
 name: service-catalog-adapter-scenarios
 type: reference
-description: what the service catalog adapter guarantees, as scenarios; a single search behind the superadmin role that the monitor role also passes, a status filter checked over one service of every status, a service with endpoints counted once
+description: what the service catalog adapter guarantees; the single search behind the global role that the monitor role also passes, the status filter conditions it accepts, and the cursor fields it ignores
 scope: src/ai/backend/manager/api/adapters/service_catalog
 keywords: [service catalog, scenario, adapter, superadmin, monitor, search, endpoints]
 generated:
@@ -28,18 +28,6 @@ src에서 행을 만드는 write spec은 등록 처리기가 쓰는 upsert spec 
 
 ## 검색
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 검색한다 | 서비스 둘, 그중 하나에 엔드포인트 하나, 전역 역할 있음 | 전체 조회 | 둘 다 한 번씩 반환된다 |
-| `service_group` 필터로 검색한다 | `service_group` 값이 다른 서비스 둘, 전역 역할 있음 | `service_group` 필터로 조회 | `service_group` 값이 일치하는 서비스만 반환된다 |
-| 상태가 같은 것을 고른다 | 정상·비정상·등록 해제 서비스 하나씩, 전역 역할 있음 | `equals` 조건에 비정상을 지정해 조회 | 비정상 서비스만 반환된다 |
-| 상태가 다른 것을 고른다 | 정상·비정상·등록 해제 서비스 하나씩, 전역 역할 있음 | `not_equals` 조건에 비정상을 지정해 조회 | 정상과 등록 해제 서비스만 반환된다 |
-| 상태 목록에 든 것을 고른다 | 정상·비정상·등록 해제 서비스 하나씩, 전역 역할 있음 | `in` 조건에 비정상·등록 해제를 지정해 조회 | 비정상과 등록 해제 서비스만 반환된다 |
-| 상태 목록에 들지 않은 것을 고른다 | 정상·비정상·등록 해제 서비스 하나씩, 전역 역할 있음 | `not_in` 조건에 비정상·등록 해제를 지정해 조회 | 정상 서비스만 반환된다 |
-| 페이지 크기를 생략한다 | 서비스 11개, 전역 역할 있음 | `limit` 없이 조회 | 10건까지 반환되고 다음 페이지가 있다고 응답한다 |
-| 모니터 역할이 검색한다 | 서비스 둘, 모니터 역할 | 전체 조회 | 슈퍼관리자와 같은 응답 |
-| 슈퍼관리자가 아닌 사용자가 검색한다 | 전역 역할 없음 | 전체 조회 | 역할 부족으로 거부 |
-
 상태 필터는 `equals`, `in`, `not_equals`, `not_in` 네 조건을 받고, 상태가 같은 것·다른 것·목록에
 든 것·목록에 들지 않은 것을 검색하는 시나리오가 조건을 하나씩 확인한다. 네 시나리오 모두 상태마다
 서비스 하나씩을 두고, 지정한 상태의 서비스만 남는지 본다.
@@ -47,8 +35,3 @@ src에서 행을 만드는 write spec은 등록 처리기가 쓰는 upsert spec 
 요청 타입에는 `first`·`after`·`last`·`before` 필드가 있지만 이 검색은 페이지 크기(`limit`)와
 `offset` 값만 읽는다. 커서 필드를 함께 지정하면 지금은 오류 없이 무시된다. 커서 시나리오는 이 필드를
 무시할 것인지 사용할 것인지 정한 뒤에 적는다.
-
-## 아직 적지 않은 것
-
-`batch_load_fields`는 모든 어댑터가 상속하는 공용 메서드이지 이 엔티티의 호출이 아니다. 리포트의
-호출 집계에는 포함되지만 이 문서에 적을 시나리오는 없다.

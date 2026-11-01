@@ -1,7 +1,7 @@
 ---
 name: client-ip-masking-adapter-scenarios
 type: reference
-description: what the client IP masking adapter guarantees, as scenarios; one policy per target set by an upsert that replaces the row whole, the superadmin role on upsert and search against the entity gate on purge, single and partial bulk, no single read
+description: what the client IP masking adapter guarantees: one policy per target set by an upsert that replaces the row whole, the superadmin role on upsert and search against the entity gate on purge, single and partial bulk, no single read
 scope: src/ai/backend/manager/api/adapters/client_ip_masking
 keywords: [client ip masking, scenario, adapter, superadmin, monitor, upsert, target, purge]
 generated:
@@ -39,16 +39,6 @@ status: draft
 
 ## Upsert (`upsert`)
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 정책을 새로 만든다 | 정책이 하나도 없다. 호출자는 슈퍼관리자 | `target_type=default`, `mode=truncate`, `ipv4_prefix=24`, `ipv6_prefix=48` | 응답 노드의 `target_type`, `mode`, `ipv4_prefix`, `ipv6_prefix`가 보낸 값과 같다 |
-| prefix를 보내지 않는다 | 정책이 하나도 없다. 호출자는 슈퍼관리자 | `target_type`과 `mode`만 보낸다 | 응답 노드의 `ipv4_prefix`·`ipv6_prefix`가 null이다 |
-| 이미 정책이 있는 `target_type`에 다시 upsert한다 | `target_type`이 `default`인 `truncate` 정책이 있다. 호출자는 슈퍼관리자 | 같은 `target_type=default`에 `mode=drop` | 새 행이 생기지 않는다. 기존 행의 `id`는 그대로이고 `mode`만 `drop`으로 바뀐다 |
-| prefix가 저장된 정책에 prefix 없이 다시 upsert한다 | `target_type`이 `default`이고 `ipv4_prefix=24`, `ipv6_prefix=48`이 저장된 정책이 있다. 호출자는 슈퍼관리자 | `target_type`과 `mode`만 보낸다 | 저장돼 있던 `ipv4_prefix`·`ipv6_prefix`가 null이 된다 |
-| 일반 사용자가 upsert한다 | 호출자는 슈퍼관리자가 아니다 | upsert | `InsufficientPrivilege`로 거부 |
-| 모니터 역할이 upsert한다 | 호출자가 `MONITOR` 역할 | upsert | `InsufficientPrivilege`로 거부 |
-| 권한 검사를 꺼도 일반 사용자는 upsert할 수 없다 | 권한 검사 비활성화. 호출자는 슈퍼관리자가 아니다 | upsert | `InsufficientPrivilege`로 거부 |
-
 upsert는 기존 행과 병합하지 않고 보낸 값으로 행을 통째로 바꾼다. 그래서 요청에서 생략한
 `ipv4_prefix`·`ipv6_prefix`는 저장돼 있던 값이 있어도 null이 된다. 부분 수정처럼 보여 오해하기 쉬운
 동작이라 "prefix가 저장된 정책에 prefix 없이 다시 upsert한다" 시나리오를 따로 둔다.
@@ -63,12 +53,6 @@ upsert는 기존 행과 병합하지 않고 보낸 값으로 행을 통째로 �
 
 ## 검색 (`admin_search`)
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 전체를 조회한다 | `target_type`이 `default`, `login_history`인 정책 둘이 있다. 호출자는 슈퍼관리자 | 필터 없이 조회 | 둘 다 반환되고 `total_count`가 2다 |
-| 모니터 역할이 전체를 조회한다 | `target_type`이 `default`, `login_history`인 정책 둘이 있다. 호출자는 `MONITOR` 역할 | 필터 없이 조회 | 슈퍼관리자와 같은 응답. 둘 다 반환된다 |
-| 일반 사용자가 조회한다 | 호출자는 슈퍼관리자가 아니다 | 필터 없이 조회 | `InsufficientPrivilege`로 거부 |
-
 `target_type`과 `mode` 필터가 무엇을 좁히는지는 시나리오로 두지 않는다. 필터를 조건으로 옮기는 것과
 그 조건으로 행을 고르는 것은 단위 테스트의 자리다. `target_type`이 `default`, `login_history`,
 `audit_logs` 셋뿐이라 정책 행도 셋을 넘지 못하므로, 페이지 크기보다 많은 건수를 만들어 다음 페이지를
@@ -78,14 +62,6 @@ upsert는 기존 행과 병합하지 않고 보낸 값으로 행을 통째로 �
 "모니터 역할이 upsert한다"(거부)가 그 차이를 보여 준다.
 
 ## 완전 삭제 (`purge`)
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 정책을 완전 삭제한다 | 정책 하나가 있다. 호출자는 슈퍼관리자 | 그 정책의 `id`로 purge | 완전 삭제된 정책의 필드를 그대로 담은 응답 |
-| 존재하지 않는 `id`를 완전 삭제한다 | 정책 하나가 있다. 호출자는 슈퍼관리자 | 존재하지 않는 `id`로 purge | `EntityNotFoundError`로 거부 |
-| 일반 사용자가 정책을 완전 삭제한다 | 정책 하나가 있다. 호출자는 아무 권한도 없는 일반 사용자 | 그 정책의 `id`로 purge | `NotEnoughPermission`으로 거부 |
-| 일반 사용자가 존재하지 않는 `id`를 완전 삭제한다 | 정책 하나가 있다. 호출자는 아무 권한도 없는 일반 사용자 | 존재하지 않는 `id`로 purge | `EntityNotFoundError`가 아니라 `NotEnoughPermission`으로 거부 |
-| 권한 검사를 끄면 일반 사용자도 완전 삭제할 수 있다 | 권한 검사 비활성화. 정책 하나가 있고, 호출자는 아무 권한도 없는 일반 사용자 | 그 정책의 `id`로 purge | 완전 삭제된 정책의 필드를 그대로 담은 응답 |
 
 `upsert`, `admin_search`, `purge` 중 `id`를 받는 것은 `purge`뿐이다. upsert는 `target_type`으로 행을 찾고 purge는
 `id`로 찾으므로, 완전 삭제할 `id`는 upsert 응답이나 검색 결과에서 읽어 와야 한다. 하나를 조회하는 호출이 없어
@@ -99,17 +75,5 @@ soft delete는 없다.
 
 ## 여럿 완전 삭제 (`partial_bulk_purge`)
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 둘과 없는 `id` 하나를 한 번에 완전 삭제한다 | `target_type`이 `default`, `login_history`인 정책 둘이 있다. 호출자는 슈퍼관리자 | 셋 purge | 둘은 지워지기 전 필드 그대로 처리된 목록에 오고, 없는 `id`는 대상 없음 이유로 실패 목록에 온다 |
-| 일반 사용자가 여럿을 완전 삭제한다 | 같은 정책 둘. 호출자는 아무 권한도 없는 일반 사용자 | 둘 purge | 지워진 것 없이 둘 다 권한 부족 이유로 실패 목록에 온다 |
-
 여럿 연산은 호출 전체를 거부하지 않는다. 처리한 정책은 처리된 목록에, 처리하지 못한 것은 `id`와
 이유를 실패 목록에 싣는다.
-
-## 아직 적지 않은 것
-
-없다. 어댑터가 제공하는 `upsert`, `admin_search`, `purge`, `partial_bulk_purge`가 모두 위에 있다.
-
-리포트에 함께 포함되는 `batch_load_fields`는 모든 어댑터가 상속받는 공용 메서드이지 이 엔티티의
-호출이 아니라서 시나리오를 두지 않는다.

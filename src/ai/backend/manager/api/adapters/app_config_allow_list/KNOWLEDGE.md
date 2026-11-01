@@ -1,7 +1,7 @@
 ---
 name: app-config-allow-list-adapter-scenarios
 type: reference
-description: app config allow-list adapter authorization, rank, search, batch loading, and purge contracts covered by scenario tests
+description: app config allow-list adapter authorization, rank, search, batch loading, and purge contracts
 scope: src/ai/backend/manager/api/adapters/app_config_allow_list
 keywords: [app config allow list, scenario, adapter, rank, superadmin, cascade]
 generated:
@@ -30,17 +30,6 @@ status: draft
 
 ## 생성은 슈퍼관리자만 할 수 있다
 
-| 상황 | 요청 | 결과 |
-|---|---|---|
-| 슈퍼관리자 | `rank` 값을 생략하고 `scope_type`이 `public`인 `allow_list` 항목 생성 | `rank` 값 100 |
-| 슈퍼관리자 | `rank` 값을 생략하고 `scope_type`이 `domain`인 `allow_list` 항목 생성 | `rank` 값 200 |
-| 슈퍼관리자 | `rank` 값을 생략하고 `scope_type`이 `user`인 `allow_list` 항목 생성 | `rank` 값 300 |
-| 슈퍼관리자 | `rank` 값 250을 지정해 `scope_type`이 `domain`인 `allow_list` 항목 생성 | `rank` 값 250 |
-| 슈퍼관리자 | 등록되지 않은 `config_name` 값을 지정해 생성 | `AppConfigDefinitionNotFound` |
-| 슈퍼관리자 | 같은 `config_name`과 `scope_type` 값으로 다시 생성 | `UniqueConstraintViolationError` |
-| 일반 사용자 | `allow_list` 항목 생성 | `InsufficientPrivilege` |
-| 권한 검사 비활성화, 일반 사용자 | `allow_list` 항목 생성 | `InsufficientPrivilege` |
-
 `rank` 값을 생략하면 `scope_type` 값별 기본값을 사용한다. 100 단위의 간격은 슈퍼관리자가 기존
 기본값 사이에 별도 `rank` 값을 지정할 수 있게 한다.
 
@@ -49,35 +38,15 @@ status: draft
 
 ## 개별 조회는 엔티티 읽기 권한을 검사한다
 
-| 상황 | 요청 | 결과 |
-|---|---|---|
-| 슈퍼관리자 | 존재하는 ID 조회 | `allow_list` 항목의 모든 필드 반환 |
-| 권한이 없는 일반 사용자 | 존재하는 ID 조회 | `NotEnoughPermission` |
-| 슈퍼관리자 | 존재하지 않는 ID 조회 | `EntityNotFoundError` |
-| 권한 검사 비활성화, 일반 사용자 | 존재하는 ID 조회 | `allow_list` 항목의 모든 필드 반환 |
-
 권한 검사가 데이터 조회보다 먼저 실행된다. 따라서 권한이 없는 사용자가 존재하지 않는 ID를
 요청하면 대상을 찾을 수 없어 거부되는 것이 아니라 권한 부족으로 거부된다.
 
 ## 배치 조회는 입력 위치마다 결과를 반환한다
 
-| 상황 | 요청 | 결과 |
-|---|---|---|
-| 슈퍼관리자 | 존재하는 ID 2개와 존재하지 않는 ID 1개 | 존재하는 ID는 노드로, 존재하지 않는 ID는 `None`으로 입력 순서대로 반환 |
-| 슈퍼관리자 | 같은 ID를 2회 지정 | 같은 노드를 각 위치에 반환 |
-| 권한이 없는 일반 사용자 | 존재하는 ID 2개와 존재하지 않는 ID 1개 | 각 위치에 `NotEnoughPermission` 반환 |
-| 일반 사용자 | 빈 목록 | 빈 목록 반환 |
-
 ID 하나의 권한 검사 실패가 배치 전체를 중단하지는 않는다. 존재하지 않는 ID에 `None`이
 반환되는지 권한 부족으로 거부되는지는 그 ID에 대한 권한 검사를 먼저 통과했는지에 따라 달라진다.
 
 ## 전체 검색은 슈퍼관리자만 할 수 있다
-
-| 상황 | 요청 | 결과 |
-|---|---|---|
-| 슈퍼관리자 | 필터 없음 | 모든 `allow_list` 항목과 전체 개수 반환 |
-| 슈퍼관리자 | 생성 시각이 모두 같은 항목들에서, 첫 항목을 가리키는 커서 뒤로 1건 | 바로 다음 항목 1건과 앞뒤 페이지 있음 반환 |
-| 일반 사용자 | 검색 | `InsufficientPrivilege` |
 
 한 요청으로 심긴 항목은 생성 시각이 모두 같다. 기본 순서는 생성 시각 내림차순이고, 같은 값은
 ID 오름차순으로 끊으므로 커서 다음 페이지가 같은 항목을 다시 내놓거나 건너뛰지 않는다.
@@ -86,31 +55,12 @@ ID 오름차순으로 끊으므로 커서 다음 페이지가 같은 항목을 �
 
 ## 수정할 수 있는 필드는 `rank` 하나뿐이다
 
-| 상황 | 요청 | 결과 |
-|---|---|---|
-| 슈퍼관리자 | 새 `rank` 값 지정 | `rank` 값만 변경된 `allow_list` 항목 반환 |
-| 슈퍼관리자 | 빈 수정 요청 | 변경되지 않은 `allow_list` 항목 반환 |
-| 권한이 없는 일반 사용자 | `rank` 값 수정 | `NotEnoughPermission` |
-| 슈퍼관리자 | 존재하지 않는 ID 수정 | `EntityNotFoundError` |
-
 `config_name`과 `scope_type` 필드는 수정 요청 DTO에 없다. 이 두 필드를 바꾸려면 기존
 `allow_list` 항목을 삭제하고 새 `allow_list` 항목을 생성해야 한다.
 
 ## 여럿 수정하기
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 여럿의 순위를 한 번에 바꾼다 | 한 설정 이름의 `allow_list` 항목 둘 | 둘의 `rank` 값 수정 | 둘 다 새 `rank` 값으로 오고 실패한 것은 없음 |
-| 권한이 없는 일반 사용자가 여럿을 수정한다 | 같은 `allow_list` 항목 둘 | 둘의 `rank` 값 수정 | 수정된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
-
 ## 완전 삭제는 `allow_list` 행과 RBAC 노드를 제거한다
-
-| 상황 | 요청 | 결과 |
-|---|---|---|
-| 슈퍼관리자 | `fragment` 행이 없는 `allow_list` 항목 완전 삭제 | 삭제한 `allow_list` 항목의 ID 반환 |
-| 슈퍼관리자 | `fragment` 행이 있는 `allow_list` 항목 완전 삭제 | `fragment` 행이 있어도 삭제되고 `allow_list` 항목의 ID 반환 |
-| 권한이 없는 일반 사용자 | `allow_list` 항목 완전 삭제 | `NotEnoughPermission` |
-| 슈퍼관리자 | 존재하지 않는 ID 완전 삭제 | `EntityNotFoundError` |
 
 `allow_list` 행을 삭제하면 그 행을 참조하는 `fragment` 행도 외래 키 연쇄 삭제로 함께 삭제된다.
 `allow_list` 항목 자체의 RBAC 노드는 완전 삭제 과정에서 함께 삭제된다. soft delete와 복원 호출은
@@ -121,11 +71,6 @@ ID 오름차순으로 끊으므로 커서 다음 페이지가 같은 항목을 �
 응답을 검증하며, 연쇄 삭제된 행과 남은 RBAC 노드는 직접 조회하지 않는다.
 
 ## 여럿 완전 삭제하기
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 둘과 없는 ID 하나를 한 번에 완전 삭제한다 | 한 설정 이름의 `allow_list` 항목 둘 | 셋 완전 삭제 | 둘은 처리된 목록에 오고, 없는 ID는 대상 없음 이유로 실패 목록에 옴 |
-| 권한이 없는 일반 사용자가 여럿을 완전 삭제한다 | 같은 `allow_list` 항목 둘 | 둘 완전 삭제 | 삭제된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
 
 여럿 연산은 호출 전체를 거부하지 않는다. 처리한 항목은 처리된 목록에, 처리하지 못한 것은 ID와 이유를
 실패 목록에 싣는다. 여럿 완전 삭제는 항목마다 `fragment` 행을 먼저 지우고 각자의 savepoint 안에서

@@ -1,7 +1,7 @@
 ---
 name: runtime-variant-preset-adapter-scenarios
 type: reference
-description: what the runtime variant preset adapter guarantees, as scenarios; the rank the insert fills in, the value-type rule checked by the request on create and by the service on update, the batch read that is a search, the partial bulk update and purge that answer per id, the variant column with no foreign key in the ORM
+description: what the runtime variant preset adapter guarantees; the rank the insert fills in, the value-type rule checked by the request on create and by the service on update, the batch read that is a search, the partial bulk update and purge that answer per id, the variant column with no foreign key in the ORM
 scope: src/ai/backend/manager/api/adapters/runtime_variant_preset
 keywords: [runtime variant preset, scenario, adapter, superadmin, rank, value type, flag, public read, partial bulk update, partial bulk purge]
 generated:
@@ -27,17 +27,6 @@ status: draft
 
 ## 생성
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 필수 항목만 지정해 생성한다 | `runtime_variant` 하나, 해당 `runtime_variant`에 프리셋이 없음, 슈퍼관리자 | 이름과 `runtime_variant_id`·`preset_target`·`value_type`·`key` 필드만 지정하여 생성 | `rank` 값은 100이고 `required` 값은 false이며, 나머지 선택 항목은 비어 있음 |
-| 같은 `runtime_variant`에 하나 더 생성한다 | 해당 `runtime_variant`에 프리셋 하나, 슈퍼관리자 | 생성 | 새 프리셋의 `rank` 값이 기존 프리셋보다 100 큼 |
-| `preset_target`·`value_type`·`default_value`·`key` 필드를 모두 지정해 생성한다 | `runtime_variant` 하나, 슈퍼관리자 | `preset_target`·`value_type`·`default_value`·`key` 필드를 모두 지정하여 생성 | 지정한 `preset_target`·`value_type`·`default_value`·`key` 값이 `target_spec` 하나로 묶여 반환됨 |
-| `ui_option` 필드를 지정해 생성한다 | `runtime_variant` 하나, 슈퍼관리자 | `ui_option`에 `slider` 옵션을 추가하여 생성 | `ui_option` 필드에서 읽은 `ui_type` 값이 응답 노드에 함께 포함됨 |
-| 같은 `runtime_variant` 안에서 이름이 중복된다 | 해당 `runtime_variant`에 같은 이름의 프리셋이 있음, 슈퍼관리자 | 생성 | 이름 중복으로 거부 |
-| 다른 `runtime_variant`에 속하면 같은 이름을 쓸 수 있다 | `runtime_variant` 둘, 한쪽에만 프리셋 하나, 슈퍼관리자 | 다른 `runtime_variant`에 같은 이름으로 생성 | 생성됨 |
-| 슈퍼관리자가 아닌 사용자가 생성한다 | `runtime_variant` 하나, 슈퍼관리자 아님 | 생성 | 역할 부족으로 거부 |
-| 권한 검사를 꺼도 슈퍼관리자가 아니면 생성할 수 없다 | 권한 검사 비활성화, 슈퍼관리자 아님 | 생성 | 역할 부족으로 거부 |
-
 `rank` 값은 요청에서 정할 수 없다. 생성 시 같은 `runtime_variant`에서 가장 큰 `rank` 값에 100을
 더하며, 첫 프리셋의 `rank` 값은 100이 된다. 같은 `runtime_variant`에 프리셋을 하나 더 생성하는
 시나리오에서 이 간격을 검사한다.
@@ -57,13 +46,6 @@ status: draft
 
 ## 조회
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| public 에서 읽는 사용자가 ID로 조회한다 | 프리셋 하나, public 조회 권한만 있음 | ID로 조회 | 해당 프리셋 전체 |
-| 존재하지 않는 ID로 조회한다 | 다른 프리셋만 있음 | ID로 조회 | 권한 부족으로 거부 |
-| 존재하는 ID와 존재하지 않는 ID를 함께 조회한다 | 프리셋 둘, public 조회 권한만 있음 | 세 ID를 한 번에 조회 | 요청한 순서대로 반환되며, 존재하지 않는 ID 자리에는 거부가 담긴다 |
-| 빈 목록으로 조회한다 | 프리셋 하나 | 빈 ID 목록으로 조회 | 빈 응답을 반환하고 하위 계층을 호출하지 않음 |
-
 조회는 public 에서 READ 를 검사한다. public 조회 권한만 받은 사용자의 조회가 성공하는 시나리오로
 이를 검증한다. 반면 생성 요청은 슈퍼관리자가 아니면 거부된다. 존재하지 않는 ID와 닿을 수 없는 ID는
 같은 이유로 거부된다.
@@ -75,13 +57,6 @@ status: draft
 
 ## 검색
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 아무 권한도 없는 사용자가 검색한다 | 프리셋 둘, 아무 권한도 없음 | 전체 조회 | 두 프리셋이 모두 반환됨 |
-| `runtime_variant_id` 필터로 검색한다 | 프리셋이 `runtime_variant` 둘에 나뉘어 있음 | `runtime_variant_id` 필터로 조회 | 해당 `runtime_variant`의 프리셋만 반환됨 |
-| `runtime_version` 필터로 검색한다 | `added_version` 값과 `deprecated_version` 값이 서로 다른 프리셋 여러 개 | `runtime_version` 필터로 조회 | 해당 버전에 유효한 프리셋만 반환됨 |
-| 페이지 크기를 생략한다 | 프리셋 11개 | 페이지 크기 없이 조회 | 10건을 반환하고 다음 페이지가 있음을 표시함 |
-
 `runtime_version` 필터는 `added_version` 값 이상이고 `deprecated_version` 값 미만인 프리셋만
 반환한다. `added_version` 값이 비어 있으면 하한 제한이 없고, `deprecated_version` 값이 비어 있으면
 상한 제한이 없다. `runtime_version` 필터로 검색하는 시나리오에서는 `added_version` 값과
@@ -89,16 +64,6 @@ status: draft
 값만 있는 경우, 어느 쪽도 없는 경우를 함께 검사한다.
 
 ## 수정
-
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 이름만 바꾼다 | 프리셋 하나, 슈퍼관리자 | 이름 수정 | 이름만 변경되고 나머지는 유지됨 |
-| 설명을 지운다 | 설명이 있는 프리셋, 슈퍼관리자 | 설명을 비우도록 수정 | 설명이 없어짐 |
-| `rank` 값을 바꾼다 | 프리셋 하나, 슈퍼관리자 | `rank` 값 수정 | `rank` 값이 변경된 노드 |
-| 변경할 값을 지정하지 않는다 | 프리셋 하나, 슈퍼관리자 | 빈 수정 요청 | 아무것도 바뀌지 않은 노드 |
-| 존재하지 않는 ID를 수정한다 | 다른 프리셋만 있음, 슈퍼관리자 | 이름 수정 | 대상을 찾을 수 없어 거부 |
-| 아무 권한도 없는 사용자가 수정한다 | 해당 프리셋에 아무 권한도 없음 | 이름 수정 | 권한 부족으로 거부 |
-| 권한 검사를 끄면 권한 없이도 수정된다 | 권한 검사 비활성화, 아무 권한도 없음 | 이름 수정 | 이름이 변경된 노드 |
 
 수정 요청에는 `preset_target` 값이나 `value_type` 값이 빠질 수 있어 요청 타입만으로는 저장된 값과의
 조합을 검증할 수 없다. 서비스가 저장된 행과 요청을 합쳐 같은 규칙을 검사하는데, 그 검사는 시나리오로
@@ -110,34 +75,12 @@ status: draft
 
 ## 여럿 수정하기
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 여럿의 설명을 한 번에 바꾼다 | 한 변형의 프리셋 둘, 슈퍼관리자 | 둘의 설명 수정 | 둘 다 새 설명으로 오고 실패한 것은 없음 |
-| 아무 권한도 없는 사용자가 여럿을 수정한다 | 같은 프리셋 둘, 아무 권한도 없음 | 둘의 설명 수정 | 수정된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
-
 여럿 수정도 단건 수정과 같은 검사를 프리셋마다 한다. 검사에 걸린 프리셋은 그 이유로 실패 목록에
 오고 나머지는 수정된다.
 
 ## purge
 
-| 시나리오 | 상황 | 요청 | 결과 |
-|---|---|---|---|
-| 슈퍼관리자가 삭제한다 | 프리셋 하나, 슈퍼관리자 | 삭제 | 삭제한 프리셋의 ID를 담은 응답 |
-| 존재하지 않는 ID를 삭제한다 | 다른 프리셋만 있음, 슈퍼관리자 | 삭제 | 대상을 찾을 수 없어 거부 |
-| 아무 권한도 없는 사용자가 삭제한다 | 해당 프리셋에 아무 권한도 없음 | 삭제 | 권한 부족으로 거부 |
-| 권한 검사를 끄면 권한 없이도 삭제된다 | 권한 검사 비활성화, 아무 권한도 없음 | 삭제 | 삭제한 프리셋의 ID를 담은 응답 |
-| 여럿과 없는 ID 하나를 한 번에 purge 한다 | 한 변형의 프리셋 둘, 슈퍼관리자 | 세 ID를 한 번에 | 둘은 purge 되기 전 노드로 처리된 목록에 오고, 없는 ID는 실패 목록에 옴 |
-| 아무 권한도 없는 사용자가 여럿을 purge 한다 | 같은 프리셋 둘, 아무 권한도 없음 | 두 ID를 한 번에 | purge 된 것 없이 둘 다 권한 부족 이유로 실패 목록에 옴 |
-
 여럿 연산은 호출 전체를 거부하지 않는다. 처리한 프리셋은 처리된 목록에, 처리하지 못한 것은 ID와
 이유를 실패 목록에 싣는다.
 
 이 어댑터는 soft delete를 지원하지 않는다.
-
-## 아직 적지 않은 것
-
-없다. 어댑터가 제공하는 `create`, `get`, `search`, `batch_load_by_ids`, `update`,
-`partial_bulk_update`, `purge`, `partial_bulk_purge`가 모두 위에 있다.
-
-`batch_load_fields`는 모든 어댑터가 상속받는 공용 메서드이며 이 엔티티 고유의 호출이 아니다.
-보고서의 호출 목록에는 포함되지만 별도로 작성할 시나리오는 없다.
