@@ -27,6 +27,21 @@ class MissingTraefikConfigError(BackendAIError):
         )
 
 
+class InvalidTraefikEtcdCredentialsError(BackendAIError):
+    """Raised when only one of the Traefik etcd user and password is set."""
+
+    error_type = "https://api.backend.ai/probs/appproxy/invalid-traefik-etcd-credentials"
+    error_title = "Traefik etcd user and password must be set together."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.SETUP,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )
+
+
 class MissingDatabaseURLError(BackendAIError):
     """Raised when database URL is missing from configuration."""
 
