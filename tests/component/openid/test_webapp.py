@@ -265,23 +265,54 @@ class TestWebAppLogin:
 
         assert state["redirect"] == "https://guest.example.com/dashboard"
 
-    async def test_login_without_allowed_hosts_keeps_any_redirect(
+    async def test_login_without_allowed_hosts_keeps_login_uri_host(
         self,
         webapp_plugin: OIDCWebAppPlugin,
         login_request: MagicMock,
         mock_oauth2_client: MagicMock,
     ) -> None:
-        login_request.post = AsyncMock(
-            return_value={"redirect_to": "https://coredev.example.com/dashboard"}
-        )
-
         state = await self._login_state(webapp_plugin, login_request, mock_oauth2_client)
 
-        assert state["redirect"] == "https://coredev.example.com/dashboard"
+        assert state["redirect"] == "https://app.example.com/dashboard"
 
     @pytest.mark.parametrize(
         "redirect_to",
-        ["https://evil.example.com/dashboard", "/dashboard", "javascript:alert(1)", None],
+        [
+            "https://coredev.example.com/dashboard",
+            "https://app.example.com@coredev.example.com/dashboard",
+            "/dashboard",
+            "dashboard",
+            "//coredev.example.com/dashboard",
+            "javascript:alert(1)",
+            "ftp://app.example.com/dashboard",
+            "http://[bad",
+            "https://coredev.example.com\\@app.example.com/",
+            None,
+        ],
+    )
+    async def test_login_without_allowed_hosts_replaces_redirect_with_login_uri(
+        self,
+        webapp_plugin: OIDCWebAppPlugin,
+        login_request: MagicMock,
+        mock_oauth2_client: MagicMock,
+        redirect_to: str | None,
+    ) -> None:
+        post_data = {} if redirect_to is None else {"redirect_to": redirect_to}
+        login_request.post = AsyncMock(return_value=post_data)
+
+        state = await self._login_state(webapp_plugin, login_request, mock_oauth2_client)
+
+        assert state["redirect"] == "https://app.example.com/login"
+
+    @pytest.mark.parametrize(
+        "redirect_to",
+        [
+            "https://evil.example.com/dashboard",
+            "/dashboard",
+            "javascript:alert(1)",
+            "http://[bad",
+            None,
+        ],
     )
     async def test_login_replaces_disallowed_redirect_with_login_uri(
         self,
@@ -392,17 +423,28 @@ class TestWebAppRedirect:
         fetch_kwargs = mock_oauth2_client.fetch_token.call_args.kwargs
         assert fetch_kwargs["redirect_uri"] == "https://app.example.com/func/openid/redirect"
 
-    async def test_redirect_without_allowed_hosts_returns_to_any_host(
+    @pytest.mark.parametrize(
+        "return_uri",
+        [
+            "https://coredev.example.com/dashboard",
+            "/dashboard",
+            "//coredev.example.com/dashboard",
+            "javascript:alert(1)",
+            "http://[bad",
+        ],
+    )
+    async def test_redirect_without_allowed_hosts_returns_to_login_uri(
         self,
         webapp_plugin: OIDCWebAppPlugin,
         redirect_request: MagicMock,
         mock_oauth2_client: MagicMock,
+        return_uri: str,
     ) -> None:
-        self._set_return_uri(redirect_request, "https://coredev.example.com/dashboard")
+        self._set_return_uri(redirect_request, return_uri)
 
         location = await self._redirect(webapp_plugin, redirect_request, mock_oauth2_client)
 
-        assert str(location.with_query(None)) == "https://coredev.example.com/dashboard"
+        assert str(location.with_query(None)) == "https://app.example.com/login"
         assert "sToken" in location.query
 
     async def test_redirect_disallowed_host_returns_to_login_uri(

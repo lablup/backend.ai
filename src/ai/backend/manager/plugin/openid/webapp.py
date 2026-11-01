@@ -355,16 +355,17 @@ class OIDCWebAppPlugin(WebappPlugin):
         return str(yarl.URL(self._config.login_uri).with_path(_CALLBACK_PATH))
 
     def _return_uri(self, candidate: object) -> yarl.URL:
-        """Return ``candidate`` unless ``allowed_redirect_hosts`` rejects its host."""
+        """Return ``candidate`` if its host is the ``login_uri`` host or an allowed one."""
         login_uri = yarl.URL(self._config.login_uri)
         if not isinstance(candidate, str) or not candidate:
             return login_uri
-        uri = yarl.URL(candidate)
-        if self._config.allowed_redirect_hosts is None:
-            return uri
+        try:
+            uri = yarl.URL(candidate)
+        except ValueError:
+            return login_uri
         allowed_hosts = {
             login_uri.host,
-            *(h.strip().lower() for h in self._config.allowed_redirect_hosts),
+            *(h.strip().lower() for h in self._config.allowed_redirect_hosts or ()),
         }
         if uri.scheme not in ("http", "https") or uri.host not in allowed_hosts:
             return login_uri

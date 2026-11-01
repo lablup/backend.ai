@@ -95,8 +95,8 @@ class OIDCWebAppConfig(BackendAISchema):
         default=None,
         description=(
             "Comma-separated hostnames a sign-in may return to, in addition to the login_uri host. "
-            "When set, a sign-in started from any other host returns to login_uri. "
-            "When unset, any return address is accepted."
+            "A sign-in started from any other host returns to login_uri. "
+            "When unset, a sign-in returns to the login_uri host only."
         ),
     )
 
