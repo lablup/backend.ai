@@ -81,7 +81,7 @@ class TestStartupTokenLog:
         etcd.__aenter__.return_value = etcd
         cfg: dict[str, Any] = {
             "logging": MagicMock(),
-            "etcd": {"user": None, "addrs": [], "namespace": "test"},
+            "etcd": {"user": None, "addr": MagicMock(), "namespace": "test"},
             "watcher": {"ssl-enabled": False, "service-addr": MagicMock()},
         }
         with (
