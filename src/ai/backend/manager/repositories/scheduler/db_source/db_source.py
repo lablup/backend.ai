@@ -2380,7 +2380,9 @@ class ScheduleDBSource:
                 DotfilePath(ordered_entry.path)
             except InvalidDotfilePath:
                 log.warning(
-                    "dotfile skipped by the path rule", path=ordered_entry.path, user_id=row.user
+                    "dotfile skipped by the path rule",
+                    path=ordered_entry.path,
+                    user_id=user_scope.user_uuid,
                 )
                 continue
             writable_entries.append(ordered_entry)

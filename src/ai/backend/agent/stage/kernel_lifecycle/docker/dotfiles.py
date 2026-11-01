@@ -4,27 +4,20 @@ Dotfiles stage for kernel lifecycle.
 This stage handles processing and installation of dotfiles in containers.
 """
 
-<<<<<<< HEAD
 import asyncio
-=======
 import logging
->>>>>>> 24972637 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
 from dataclasses import dataclass
 from pathlib import Path
 from typing import override
 
-<<<<<<< HEAD
-=======
 from ai.backend.agent.dotfile import DotfileTargetResolver
-from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.dotfile import InvalidDotfilePath
->>>>>>> 24972637 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
-from ai.backend.logging.structured import StructuredLogger
+from ai.backend.logging.utils import BraceStyleAdapter
 
 from .utils import ChownUtil, PathOwnerDeterminer
 
-log = StructuredLogger(logging.getLogger(__spec__.name))
+log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 
 @dataclass

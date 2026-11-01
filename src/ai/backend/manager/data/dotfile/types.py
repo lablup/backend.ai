@@ -7,15 +7,9 @@ from dataclasses import dataclass
 from typing import Any
 
 from ai.backend.common import msgpack
-<<<<<<< HEAD
-from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
-=======
-from ai.backend.common.data.entity.dotfile import DotfileID
-from ai.backend.common.data.entity.types import FieldData, RuntimeEntityID
 from ai.backend.common.dotfile import DotfilePath
 from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
 from ai.backend.common.exception import InvalidAPIParameters
->>>>>>> 24972637 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
 from ai.backend.manager.errors.storage import (
     DotfileAlreadyExists,
     DotfileCreationFailed,

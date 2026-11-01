@@ -9,8 +9,8 @@ from ai.backend.common.data.entity.domain import DomainID, DomainName
 from ai.backend.common.data.entity.project import ProjectID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.common.dotfile import InvalidDotfilePath
+from ai.backend.common.types import AccessKey
 from ai.backend.manager.data.dotfile.types import DotfileEntries, DotfileEntry
-from ai.backend.manager.models.dotfile.creators import DotfileEntryCreator
 from ai.backend.manager.services.domain.actions.create_domain_dotfile import (
     CreateDomainDotfileAction,
 )
@@ -31,7 +31,9 @@ from ai.backend.manager.services.project.actions.update_project_dotfile import (
     UpdateProjectDotfileAction,
 )
 from ai.backend.manager.services.project.service import ProjectService
-from ai.backend.manager.services.user.actions.create_dotfile import CreateDotfileAction
+from ai.backend.manager.services.user.actions.create_keypair_dotfile import (
+    CreateKeypairDotfileAction,
+)
 from ai.backend.manager.services.user.service import UserService
 
 STORED_PATH = "/etc/stored"
@@ -138,21 +140,23 @@ class TestUserDotfile:
     @pytest.fixture
     def user_service(self) -> MagicMock:
         service = MagicMock(spec=UserService)
-        service._user_repository = MagicMock()
-        service._user_repository.create_dotfile = AsyncMock()
+        service._read_dotfiles = AsyncMock(
+            return_value=(MagicMock(), DotfileEntries(entries=(_entry(STORED_PATH),)))
+        )
+        service._write_dotfiles = AsyncMock()
         return service
 
-    def _action(self, path: str) -> CreateDotfileAction:
-        return CreateDotfileAction(
-            creator=DotfileEntryCreator(owner=UserID(uuid.uuid4()), entry=_entry(path))
+    def _action(self, path: str) -> CreateKeypairDotfileAction:
+        return CreateKeypairDotfileAction(
+            user_id=UserID(uuid.uuid4()), access_key=AccessKey("test"), entry=_entry(path)
         )
 
     @pytest.mark.parametrize("path", INVALID_PATHS)
     async def test_create_rejects(self, user_service: MagicMock, path: str) -> None:
         with pytest.raises(InvalidDotfilePath):
             await UserService.create_dotfile(user_service, self._action(path))
-        user_service._user_repository.create_dotfile.assert_not_awaited()
+        user_service._write_dotfiles.assert_not_awaited()
 
     async def test_create_accepts_path_under_work_dir(self, user_service: MagicMock) -> None:
         await UserService.create_dotfile(user_service, self._action(".bashrc"))
-        user_service._user_repository.create_dotfile.assert_awaited_once()
+        user_service._write_dotfiles.assert_awaited_once()

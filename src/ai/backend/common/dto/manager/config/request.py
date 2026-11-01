@@ -7,21 +7,12 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
-<<<<<<< HEAD
+from ai.backend.common.dotfile import DotfilePath
 
 from .types import MAXIMUM_DOTFILE_SIZE, DotfilePermission
-=======
-from ai.backend.common.dotfile import DotfilePath
-from ai.backend.common.dto.manager.config.types import (
-    MAXIMUM_DOTFILE_PATH_LENGTH,
-    MAXIMUM_DOTFILE_SIZE,
-    NO_NUL_PATTERN,
-    DotfilePermission,
-)
->>>>>>> 24972637 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
 
 __all__ = (
     # User config
@@ -61,15 +52,12 @@ class CreateUserDotfileRequest(BaseRequestModel):
         description="Access key of the target user (for superadmin delegation)",
     )
 
-<<<<<<< HEAD
-=======
     @field_validator("path")
     @classmethod
     def validate_path(cls, value: str) -> str:
         DotfilePath(value)
         return value
 
->>>>>>> 24972637 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
 
 class GetUserDotfileRequest(BaseRequestModel):
     """Request to list or get user dotfiles."""

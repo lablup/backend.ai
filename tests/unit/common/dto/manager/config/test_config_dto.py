@@ -91,21 +91,6 @@ class TestMaxLength:
                 permission="644",
             )
 
-<<<<<<< HEAD
-=======
-    def test_path_exceeds_limit(self) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            CreateUserDotfileRequest(
-                path="." + "x" * MAXIMUM_DOTFILE_PATH_LENGTH,
-                data="x",
-                permission="644",
-            )
-
-    @pytest.mark.parametrize(("path", "data"), [(".a\x00b", "x"), (".bashrc", "a\x00b")])
-    def test_rejects_nul(self, path: str, data: str) -> None:
-        with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
-            CreateUserDotfileRequest(path=path, data=data, permission="644")
-
     @pytest.mark.parametrize(
         "path", [".ssh/authorized_keys", "/etc/passwd", "../x", "/home/config/kconfig.dat"]
     )
@@ -113,7 +98,6 @@ class TestMaxLength:
         with pytest.raises(InvalidDotfilePath):
             CreateUserDotfileRequest(path=path, data="x", permission="644")
 
->>>>>>> 24972637 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
     def test_bootstrap_script_exceeds_limit(self) -> None:
         with pytest.raises((BackendAISchemaValidationFailed, ValidationError)):
             UpdateBootstrapScriptRequest(
