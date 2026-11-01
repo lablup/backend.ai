@@ -14,7 +14,7 @@ Background and rationale are in `KNOWLEDGE.md` in this directory, the layout in 
 
 ## What a row says
 
-A scenario is one class. It answers with its name, what it guarantees, and three steps.
+A scenario is one class. It defines its name, what it guarantees, and three steps.
 
 | Part | Meaning |
 |---|---|
@@ -22,13 +22,13 @@ A scenario is one class. It answers with its name, what it guarantees, and three
 | `describe` | One sentence on what this row guarantees |
 | `given` | Sets up what must be true at request time and returns what it set up |
 | `when` | Calls with only that value and the adapter |
-| `then` | Takes what was seeded and the answer or exception, and looks at them |
+| `then` | Takes what was seeded and the response or exception, and checks them |
 
 - `given` runs first and returns real values, so nothing defers a value. Do not use deferred calls or lambdas
   that point at fields.
 - The component sets the type `given` returns. Later steps receive that type as is.
 - `when` names the adapter call with `operation`. The report uses it to count calls nobody called.
-- If the answer wraps a node, `when` unwraps it, so several rows share one checker.
+- If the response wraps a node, `when` unwraps it, so several rows share one checker.
 - A row that runs with changed config also implements `Configured`. It is the only place that names a config path.
 - Write `describe` in Korean first, and move it to English after it passes review.
 - Do not put identifiers in `describe`: field names, exception classes, file paths.
@@ -38,11 +38,11 @@ A scenario is one class. It answers with its name, what it guarantees, and three
 - Create rows only with write specs from src. Touch the database only through the eight entries of `TestSeeder`:
   `creating`, `provisioning`, `adding`, `adding_with_nested`, `linking`, `accepting`, `granting`, `joining`.
   `accepting` uses the whole operation in which the receiver accepts a share offer. `joining` adds a user to a
-  project roster. `adding` seeds a field row. Write rows the manager creates with `TestSeedFieldCreator`, rows it
+  project member list. `adding` seeds a field row. Write rows the manager creates with `TestSeedFieldCreator`, rows it
   upserts with `TestSeedFieldUpserter`. `adding_with_nested` seeds a field row and the rows it owns (such as an
   audit record and its scope rows) in one write. A seed that reads earlier rows uses the entry for that count
   (`creating_from`, `creating_from_two`, `creating_from_three`).
-- One seed is one class. It implements the `TestSeedRow` family and answers what it is (`kind`), what it sets up
+- One seed is one class. It implements the `TestSeedRow` family and defines what it is (`kind`), what it sets up
   (`detail`), which name it goes in under (`name`), and what it writes (`seed`).
 - For a row whose name the manager fixes, `name` returns that name and takes no number from the seeder. Read
   that name from src. Do not repeat it as a literal in a test.
@@ -90,16 +90,16 @@ A scenario is one class. It answers with its name, what it guarantees, and three
 
 ## Checks
 
-- Do not write checks that look at part of an answer. Looking at one field passes even when the rest changes
+- Do not write checks that check part of a response. Checking one field passes even when the rest changes
   silently. Do not add helpers that make such checks easy to write.
-- Always look at the whole answer. `then` returns one of three for each place. Report text is still Korean; the
+- Always check the whole response. `then` returns one of three for each place. Report text is still Korean; the
   table shows it in English.
 
   | What | When | Report text |
   |---|---|---|
   | `Same` | The scenario can state the value | `name = 'host-1'` |
   | `Held` | The value cannot be stated, only a condition | `created_at: time written by this run` |
-  | `Skipped` | It cannot be looked at, and the reason can be stated | `id: ignored — the database generates it` |
+  | `Skipped` | It cannot be checked, and the reason can be stated | `id: ignored — the database generates it` |
 
 - No place is left without one. A place left out passes silently.
 - The condition of `Held` is a `Condition` implementation. The condition says what it is, and that text does not

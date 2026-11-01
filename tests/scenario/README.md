@@ -36,7 +36,7 @@ class TheDomainNode(Then[ADomainAndACaller, DomainNode]):
 2. `given` writes its rows in one transaction and returns the written values. That write closes before `when`
    starts, because the adapter reads over its own connection.
 3. `when` calls with only that value and the adapter.
-4. `then` takes what was seeded and the answer or exception, and returns what it saw for each place.
+4. `then` takes what was seeded and the response or exception, and returns what it saw for each place.
 
 ## Where things are
 

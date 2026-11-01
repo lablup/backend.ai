@@ -31,14 +31,14 @@ blurs, and scenarios end up depending on what they believe they do not depend on
 The template first held four users, one domain, one project and three policies. That caused four problems.
 
 - One persona name meant four unrelated things at once: which user row, the legacy role column of that row,
-  which project roster it is on, and which RBAC permissions it received. The table showed only the last.
+  which project member list it is on, and which RBAC permissions it received. The table showed only the last.
 - A scenario could not change its own premise. Needing a different role meant changing the background, and
   other scenarios moved with it.
 - Rows no scenario used became dependencies of every scenario.
-- The background supplied things silently, so the table did not say what a request needs.
+- The background provided things silently, so the table did not say what a request needs.
 
 The last was the largest. Creating one vfolder needed four more things, and nobody knew while the background
-supplied them.
+provided them.
 
 ## Why rows are seeded through write specs rather than adapters
 
