@@ -35,13 +35,7 @@ import zmq
 import zmq.asyncio
 from async_timeout import timeout
 
-<<<<<<< HEAD
-=======
-from ai.backend.agent.errors.kernel import (
-    KernelRunnerInvalidReplyError,
-    KernelRunnerReplyTimeoutError,
-)
->>>>>>> 23c06d9ce (fix(BA-8788): reject msgpack extension types in kernel runner status replies (#16226))
+from ai.backend.agent.errors.kernel import KernelRunnerInvalidReplyError
 from ai.backend.common import msgpack
 from ai.backend.common.asyncio import cancel_task, current_loop
 from ai.backend.common.docker import ImageRef

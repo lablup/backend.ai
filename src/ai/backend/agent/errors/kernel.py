@@ -4,6 +4,8 @@ Kernel and runner-related exceptions for the agent.
 
 from __future__ import annotations
 
+from typing import override
+
 from aiohttp import web
 
 from ai.backend.common.exception import (
@@ -97,8 +99,6 @@ class RunIdNotSetError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.NOT_READY,
         )
-<<<<<<< HEAD
-=======
 
 
 class KernelRunnerReplyTimeoutError(BackendAIError, web.HTTPGatewayTimeout):
@@ -129,4 +129,3 @@ class KernelRunnerInvalidReplyError(BackendAIError, web.HTTPBadGateway):
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.INVALID_DATA_FORMAT,
         )
->>>>>>> 23c06d9ce (fix(BA-8788): reject msgpack extension types in kernel runner status replies (#16226))
