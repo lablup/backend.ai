@@ -5,6 +5,7 @@ import {
   WSTransportOptions,
   type GatewayPlugin,
 } from '@graphql-hive/gateway';
+import { GraphQLError } from 'graphql';
 import { Agent as HttpAgent } from 'node:http';
 import { Agent as HttpsAgent } from 'node:https';
 import type { Socket } from 'node:net';
@@ -12,6 +13,10 @@ import type { Socket } from 'node:net';
 const MANAGER_PROBE_PATH = '/health/readyz';
 // WebSocket close code for a connection dropped without a close frame
 const WS_ABNORMAL_CLOSURE = 1006;
+// ErrorDetail.INTERNAL_ERROR at the end of a manager error code
+const INTERNAL_ERROR_CODE_SUFFIX = '_internal-error';
+// Fields of a manager 4xx response that clients read, e.g. to detect an expired session
+const UPSTREAM_ERROR_BODY_FIELDS = ['type', 'title', 'error_code', 'msg'];
 
 // Returns the default when the variable is unset; rejects anything but a positive number
 const readPositiveNumberEnv = (name: string, defaultValue: number): number => {
@@ -295,6 +300,47 @@ const useConnectionParamsToHeadersPlugin = (): GatewayPlugin => {
   };
 };
 
+const isGraphQLErrorChain = (error: unknown): boolean => {
+  let current = error;
+  while (current instanceof GraphQLError && current.originalError) {
+    current = current.originalError;
+  }
+  return current instanceof GraphQLError;
+};
+
+const pickUpstreamErrorResponse = (response: any) => {
+  const { status, statusText, body } = response;
+  if (status >= 500 || typeof body !== 'object' || body === null) {
+    return { status, statusText };
+  }
+  return {
+    status,
+    statusText,
+    body: Object.fromEntries(
+      UPSTREAM_ERROR_BODY_FIELDS.filter((field) => field in body).map((field) => [field, body[field]]),
+    ),
+  };
+};
+
+// Replaces gateway failures, manager HTTP errors and manager internal errors with the generic
+// message. Other GraphQL errors from the manager are the client's to read, so they pass as is.
+const maskError = (error: any, message: string): Error => {
+  const response = error?.extensions?.response;
+  const code = error?.extensions?.code;
+  const isInternalError = typeof code === 'string' && code.endsWith(INTERNAL_ERROR_CODE_SUFFIX);
+  if (isGraphQLErrorChain(error) && !response && !isInternalError) {
+    return error;
+  }
+  return new GraphQLError(message, {
+    nodes: error?.nodes,
+    path: error?.path,
+    extensions: {
+      code: 'INTERNAL_SERVER_ERROR',
+      ...(response ? { response: pickUpstreamErrorResponse(response) } : {}),
+    },
+  });
+};
+
 export const gatewayConfig = defineConfig({
   plugins: (ctx) => [
     // Must come first: the next plugin wraps the executor this one sets
@@ -318,7 +364,7 @@ export const gatewayConfig = defineConfig({
       ? ({ executionRequest }) =>
           executionRequest?.operationType === 'subscription' ? undefined : managerRequestTimeoutMs
       : undefined,
-  maskedErrors: false,
+  maskedErrors: { maskError },
   logging: false,
   supergraph: '/gateway/supergraph.graphql',
   graphqlEndpoint: '/admin/gql',
