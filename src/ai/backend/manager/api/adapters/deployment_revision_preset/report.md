@@ -1,35 +1,35 @@
 ## deployment_revision_preset
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/deployment_revision_preset/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/deployment_revision_preset/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/deployment_revision_preset/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/deployment_revision_preset/adapter.py)
 
-시나리오: 미완 10 / 10
+Scenario: incomplete 10 / 10
 
-- ops 로 구성 (8)
-  - available_presets — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - create — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - get — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - search_resource_slots — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-- ops + 직접 구현 (2)
-  - partial_bulk_update — 성공 있음 2 · 실패 없음 (partial_bulk, single_get_ops) — SCENARIO-GAP
-  - update — 성공 없음 · 실패 없음 (single_entity, single_get_ops) — SCENARIO-GAP
+- built from ops (8)
+  - available_presets — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - create — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - get — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_purge — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - purge — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - search — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - search_resource_slots — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+- ops + direct implementation (2)
+  - partial_bulk_update — success present 2 · refusal absent (partial_bulk, single_get_ops) — SCENARIO-GAP
+  - update — success absent · refusal absent (single_entity, single_get_ops) — SCENARIO-GAP
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프리셋을 읽을 수만 있는 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk-a-preset-reader-purges-none-of-several-presets) | 성공 |
-| [슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk-purging-several-presets-answers-for-the-missing-one) | 성공 |
+| [프리셋을 읽을 수만 있는 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk-a-preset-reader-purges-none-of-several-presets) | answered |
+| [슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk-purging-several-presets-answers-for-the-missing-one) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프리셋을 읽을 수만 있는 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk-a-preset-reader-edits-none-of-several-presets) | 성공 |
-| [슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk-the-superadmin-edits-several-presets-at-once) | 성공 |
+| [프리셋을 읽을 수만 있는 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk-a-preset-reader-edits-none-of-several-presets) | answered |
+| [슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk-the-superadmin-edits-several-presets-at-once) | answered |
 
 ### partial_bulk_purge
 

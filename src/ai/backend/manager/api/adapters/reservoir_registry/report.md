@@ -1,49 +1,49 @@
 ## reservoir_registry
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/reservoir_registry/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/reservoir_registry/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/reservoir_registry/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/reservoir_registry/adapter.py)
 
-시나리오: 미완 7 / 9
+Scenario: incomplete 7 / 9
 
-- ops 로 구성 (1)
-  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-- 직접 구현 (8)
-  - create — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - get — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - get_many — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - partial_bulk_purge — 성공 있음 3 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - partial_bulk_update — 성공 있음 2 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - purge — 성공 있음 1 · 실패 있음 1 (single_entity)
-  - search — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - update — 성공 있음 1 · 실패 있음 1 (single_entity)
+- built from ops (1)
+  - batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+- direct implementation (8)
+  - create — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - get — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - get_many — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - partial_bulk_purge — success present 3 · refusal absent (partial_bulk) — SCENARIO-GAP
+  - partial_bulk_update — success present 2 · refusal absent (partial_bulk) — SCENARIO-GAP
+  - purge — success present 1 · refusal present 1 (single_entity)
+  - search — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - update — success present 1 · refusal present 1 (single_entity)
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 레지스트리 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries) | 성공 |
-| [레지스트리 purge 권한을 받은 사용자가 여럿을 한 번에 purge 하면, 모두의 id 가 처리된 목록에 오고 실패한 것은 없다](#partial_bulk_purging-a-user-granted-purge-purges-several-registries) | 성공 |
-| [슈퍼관리자가 레지스트리 둘과 없는 id 하나를 한 번에 purge 하면, 둘의 id 는 처리된 목록에, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다. 슈퍼관리자는 검사를 모두 통과하므로 대상 없음이 그대로 드러난다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 레지스트리 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries) | answered |
+| [레지스트리 purge 권한을 받은 사용자가 여럿을 한 번에 purge 하면, 모두의 id 가 처리된 목록에 오고 실패한 것은 없다](#partial_bulk_purging-a-user-granted-purge-purges-several-registries) | answered |
+| [슈퍼관리자가 레지스트리 둘과 없는 id 하나를 한 번에 purge 하면, 둘의 id 는 처리된 목록에, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다. 슈퍼관리자는 검사를 모두 통과하므로 대상 없음이 그대로 드러난다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 레지스트리 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-registries) | 성공 |
-| [레지스트리 수정 권한을 받은 사용자가 여럿의 엔드포인트를 한 번에 바꾸면, 모두 새 엔드포인트로 오고 실패한 것은 없다](#partial_bulk_editing-a-user-granted-update-edits-several-registries) | 성공 |
+| [아무 권한도 받지 않은 사용자가 레지스트리 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-registries) | answered |
+| [레지스트리 수정 권한을 받은 사용자가 여럿의 엔드포인트를 한 번에 바꾸면, 모두 새 엔드포인트로 오고 실패한 것은 없다](#partial_bulk_editing-a-user-granted-update-edits-several-registries) | answered |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [레지스트리 purge 권한을 받은 사용자가 purge 하면, purge 한 레지스트리의 id 가 온다](#purging-a-user-granted-purge-purges-a-registry) | 성공 |
-| [아무 권한도 받지 않은 사용자가 purge 하려 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-registry) | 거부 |
+| [레지스트리 purge 권한을 받은 사용자가 purge 하면, purge 한 레지스트리의 id 가 온다](#purging-a-user-granted-purge-purges-a-registry) | answered |
+| [아무 권한도 받지 않은 사용자가 purge 하려 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-registry) | refused |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [레지스트리 수정 권한을 받은 사용자가 엔드포인트를 바꾸면, 그 레지스트리가 새 엔드포인트로 온다](#editing-a-user-granted-update-edits-a-registry) | 성공 |
-| [아무 권한도 받지 않은 사용자가 엔드포인트를 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-registry) | 거부 |
+| [레지스트리 수정 권한을 받은 사용자가 엔드포인트를 바꾸면, 그 레지스트리가 새 엔드포인트로 온다](#editing-a-user-granted-update-edits-a-registry) | answered |
+| [아무 권한도 받지 않은 사용자가 엔드포인트를 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-registry) | refused |
 
 ### partial_bulk_purge
 

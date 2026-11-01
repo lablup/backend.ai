@@ -10,11 +10,51 @@
 
 from __future__ import annotations
 
+import enum
 from abc import ABC, abstractmethod
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any, ClassVar, override
+from typing import Any, ClassVar, Self, override
 from uuid import UUID
+
+
+class Language(enum.StrEnum):
+    """The language a report writes in."""
+
+    ENGLISH = "en"
+    KOREAN = "ko"
+
+
+class Says(str):
+    """A sentence in Korean, with the English one beside it once it has been written.
+
+    Formatting it gives the Korean sentence. The report asks for a language, so a
+    sentence whose English is not written yet still comes out in Korean.
+    """
+
+    english: str
+
+    def __new__(cls, korean: str, english: str = "") -> Self:
+        self = super().__new__(cls, korean)
+        self.english = english
+        return self
+
+    def in_(self, language: Language) -> str:
+        """This sentence in ``language``; English that is not written yet falls back."""
+        if language is Language.ENGLISH and self.english:
+            return self.english
+        return str(self)
+
+    def as_data(self) -> dict[str, str]:
+        """Both sentences, for the JSON record a run writes."""
+        return {"korean": str(self), "english": self.english}
+
+    @classmethod
+    def from_data(cls, raw: str | Mapping[str, str]) -> Says:
+        """A record field; a run may have written it as a bare Korean string."""
+        if isinstance(raw, Mapping):
+            return cls(raw["korean"], raw.get("english", ""))
+        return cls(raw)
 
 
 @dataclass(frozen=True)
@@ -241,7 +281,7 @@ class Scenario[S, G, A, R](ABC):
 
     @abstractmethod
     def describe(self) -> str:
-        """이 행이 무엇을 보장하는지 한 문장."""
+        """이 행이 무엇을 보장하는지 한 문장. :class:`Says`면 영어가 함께 나간다."""
         raise NotImplementedError
 
     @abstractmethod

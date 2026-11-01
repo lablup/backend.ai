@@ -1,144 +1,144 @@
 ## domain
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/domain/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/domain/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/domain/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/domain/adapter.py)
 
-시나리오: 미완 3 / 14
+Scenario: incomplete 3 / 14
 
-- ops 로 구성 (12)
-  - bulk_get_ids — 대표 성공 ✓ · 대표 실패 ✓
-  - bulk_lookup_names — 대표 성공 ✓ · 대표 실패 ✓
-  - delete — 대표 성공 ✓ · 대표 실패 ✓
-  - get — 대표 성공 ✓ · 대표 실패 ✓
-  - global_search — 대표 성공 ✓ · 대표 실패 ✓
-  - lookup_name — 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_delete — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_restore — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - restore — 대표 성공 ✓ · 대표 실패 ✓
-  - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
-  - update — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (2)
-  - create — 성공 있음 2 · 실패 있음 4 (global_scope)
-  - purge — 성공 있음 1 · 실패 있음 4 (single_entity)
+- built from ops (12)
+  - bulk_get_ids — representative success ✓ · representative refusal ✓
+  - bulk_lookup_names — representative success ✓ · representative refusal ✓
+  - delete — representative success ✓ · representative refusal ✓
+  - get — representative success ✓ · representative refusal ✓
+  - global_search — representative success ✓ · representative refusal ✓
+  - lookup_name — representative success ✓ · representative refusal ✓
+  - partial_bulk_delete — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_restore — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_update — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - restore — representative success ✓ · representative refusal ✓
+  - scoped_search — representative success ✓ · representative refusal ✓
+  - update — representative success ✓ · representative refusal ✓
+- direct implementation (2)
+  - create — success present 2 · refusal present 4 (global_scope)
+  - purge — success present 1 · refusal present 4 (single_entity)
 
 **bulk_get_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 id로 도메인 여럿을 읽으면, 그 자리에 도메인이 온다](#bulk_reading-the-superadmin-reads-domains-by-id) | 성공 |
-| [아무 권한도 받지 않은 사용자가 id로 도메인 여럿을 읽으면, 그 자리가 권한 부족으로 거부된다](#bulk_reading-a-user-granted-nothing-may-not-read-domains-by-id) | 거부 |
+| [슈퍼관리자가 id로 도메인 여럿을 읽으면, 그 자리에 도메인이 온다](#bulk_reading-the-superadmin-reads-domains-by-id) | answered |
+| [아무 권한도 받지 않은 사용자가 id로 도메인 여럿을 읽으면, 그 자리가 권한 부족으로 거부된다](#bulk_reading-a-user-granted-nothing-may-not-read-domains-by-id) | refused |
 
 **bulk_lookup_names**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 찾아도 슈퍼관리자와 같은 답이 온다. 이 호출은 인증만 보므로 이름이 있는지는 누구에게나 드러난다](#looking_up-a-user-granted-nothing-gets-the-same-ids-by-name) | 성공 |
-| [슈퍼관리자가 있는 이름과 없는 이름으로 id를 여럿 찾으면, 있는 이름에는 그 도메인의 id, 없는 이름에는 빈 값이 온다](#looking_up-the-superadmin-looks-up-domains-by-name) | 성공 |
-| [로그인 문맥 없이 이름으로 id를 여럿 찾으면, 사용자를 찾을 수 없다는 것으로 거부된다](#looking_up-looking-up-domains-by-name-without-login-is-refused) | 거부 |
+| [아무 권한도 받지 않은 사용자가 찾아도 슈퍼관리자와 같은 답이 온다. 이 호출은 인증만 보므로 이름이 있는지는 누구에게나 드러난다](#looking_up-a-user-granted-nothing-gets-the-same-ids-by-name) | answered |
+| [슈퍼관리자가 있는 이름과 없는 이름으로 id를 여럿 찾으면, 있는 이름에는 그 도메인의 id, 없는 이름에는 빈 값이 온다](#looking_up-the-superadmin-looks-up-domains-by-name) | answered |
+| [로그인 문맥 없이 이름으로 id를 여럿 찾으면, 사용자를 찾을 수 없다는 것으로 거부된다](#looking_up-looking-up-domains-by-name-without-login-is-refused) | refused |
 
 **delete**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [이미 soft delete 된 도메인을 슈퍼관리자가 다시 soft delete 하면, soft delete 했다는 답이 온다](#deleting-soft-deleting-a-domain-already-soft-deleted) | 성공 |
-| [슈퍼관리자가 도메인을 soft delete 하면, soft delete 했다는 답이 온다](#deleting-the-superadmin-soft-deletes-a-domain) | 성공 |
-| [아무 권한도 받지 않은 사용자는 도메인을 soft delete 할 수 없다](#deleting-a-user-granted-nothing-may-not-soft-delete-a-domain) | 거부 |
-| [아무 도메인도 갖지 않은 이름을 soft delete 하려 하면 대상이 없다는 것으로 거부된다](#deleting-soft-deleting-a-name-nothing-answers-to-is-not-found) | 거부 |
+| [이미 soft delete 된 도메인을 슈퍼관리자가 다시 soft delete 하면, soft delete 했다는 답이 온다](#deleting-soft-deleting-a-domain-already-soft-deleted) | answered |
+| [슈퍼관리자가 도메인을 soft delete 하면, soft delete 했다는 답이 온다](#deleting-the-superadmin-soft-deletes-a-domain) | answered |
+| [아무 권한도 받지 않은 사용자는 도메인을 soft delete 할 수 없다](#deleting-a-user-granted-nothing-may-not-soft-delete-a-domain) | refused |
+| [아무 도메인도 갖지 않은 이름을 soft delete 하려 하면 대상이 없다는 것으로 거부된다](#deleting-soft-deleting-a-name-nothing-answers-to-is-not-found) | refused |
 
 **get**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [도메인 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 도메인이 답으로 온다](#reading-the-superadmin-reads-a-domain-by-name) | 성공 |
-| [슈퍼관리자가 도메인을 soft delete 한 뒤 이름으로 조회하면, 비활성 상태를 실은 그 도메인이 온다](#reading-the-superadmin-reads-a-soft-deleted-domain-by-name) | 성공 |
-| [같은 도메인이 있고 사용자가 아무 권한도 받지 않았을 때, 이름으로 조회하면 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-a-domain) | 거부 |
-| [슈퍼관리자가 존재하지 않는 이름으로 조회하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#reading-reading-a-name-nothing-answers-to-is-not-found) | 거부 |
+| [도메인 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 도메인이 답으로 온다](#reading-the-superadmin-reads-a-domain-by-name) | answered |
+| [슈퍼관리자가 도메인을 soft delete 한 뒤 이름으로 조회하면, 비활성 상태를 실은 그 도메인이 온다](#reading-the-superadmin-reads-a-soft-deleted-domain-by-name) | answered |
+| [같은 도메인이 있고 사용자가 아무 권한도 받지 않았을 때, 이름으로 조회하면 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-a-domain) | refused |
+| [슈퍼관리자가 존재하지 않는 이름으로 조회하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#reading-reading-a-name-nothing-answers-to-is-not-found) | refused |
 
 **global_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [도메인 여럿 중 하나의 이름으로 걸러 조회하면, 답에는 그 이름의 도메인만 남는다](#searching-a-name-filter-narrows-the-answer-to-the-domain-it-names) | 성공 |
-| [이 시나리오가 미리 만든 도메인이 넷일 때, 필터 없는 조회는 그 넷이 모두 나온다](#searching-the-answer-counts-every-domain-the-scenario-laid) | 성공 |
-| [미리 만든 도메인 중 하나를 soft delete 한 뒤 필터 없이 search 하면, 그것까지 모두 나온다](#searching-the-answer-includes-soft-deleted-domains-too) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 전체 도메인 조회를 요청하면 역할로 막힌다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-domain) | 거부 |
+| [도메인 여럿 중 하나의 이름으로 걸러 조회하면, 답에는 그 이름의 도메인만 남는다](#searching-a-name-filter-narrows-the-answer-to-the-domain-it-names) | answered |
+| [이 시나리오가 미리 만든 도메인이 넷일 때, 필터 없는 조회는 그 넷이 모두 나온다](#searching-the-answer-counts-every-domain-the-scenario-laid) | answered |
+| [미리 만든 도메인 중 하나를 soft delete 한 뒤 필터 없이 search 하면, 그것까지 모두 나온다](#searching-the-answer-includes-soft-deleted-domains-too) | answered |
+| [슈퍼관리자가 아닌 사용자가 전체 도메인 조회를 요청하면 역할로 막힌다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-domain) | refused |
 
 **lookup_name**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자도 도메인 이름으로 id를 찾을 수 있다. 이 호출은 인증만 보고, 권한은 그 id를 받는 호출이 본다](#looking_up-a-user-granted-nothing-still-looks-up-a-domain-by-name) | 성공 |
-| [슈퍼관리자가 도메인 이름으로 id를 찾으면, 그 도메인의 id가 온다](#looking_up-the-superadmin-looks-up-a-domain-by-name) | 성공 |
-| [아무 도메인도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다](#looking_up-looking-up-a-name-nothing-answers-to-is-not-found) | 거부 |
+| [아무 권한도 받지 않은 사용자도 도메인 이름으로 id를 찾을 수 있다. 이 호출은 인증만 보고, 권한은 그 id를 받는 호출이 본다](#looking_up-a-user-granted-nothing-still-looks-up-a-domain-by-name) | answered |
+| [슈퍼관리자가 도메인 이름으로 id를 찾으면, 그 도메인의 id가 온다](#looking_up-the-superadmin-looks-up-a-domain-by-name) | answered |
+| [아무 도메인도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다](#looking_up-looking-up-a-name-nothing-answers-to-is-not-found) | refused |
 
 **partial_bulk_delete**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-domains) | 성공 |
-| [활성 도메인 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 비활성으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-domains) | answered |
+| [활성 도메인 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 비활성으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | answered |
 
 **partial_bulk_restore**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [soft delete 된 도메인 여럿을 한 번에 restore 하면, 모두 활성으로 온다](#partial_bulk_deleting-restoring-several-brings-them-back) | 성공 |
+| [soft delete 된 도메인 여럿을 한 번에 restore 하면, 모두 활성으로 온다](#partial_bulk_deleting-restoring-several-brings-them-back) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-domains) | 성공 |
-| [활성 플래그와 설명을 섞어 도메인 여럿을 한 번에 고치면, 플래그를 내린 것은 soft delete 되고 올린 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-domains) | 성공 |
-| [슈퍼관리자가 도메인 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-domains-at-once) | 성공 |
+| [아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-domains) | answered |
+| [활성 플래그와 설명을 섞어 도메인 여럿을 한 번에 고치면, 플래그를 내린 것은 soft delete 되고 올린 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-domains) | answered |
+| [슈퍼관리자가 도메인 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-domains-at-once) | answered |
 
 **restore**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [soft delete 되지 않은 도메인을 슈퍼관리자가 restore 하면, restore 했다는 답이 온다](#deleting-restoring-a-domain-that-is-not-soft-deleted) | 성공 |
-| [soft delete 된 도메인을 restore 하면, restore 했다는 답이 온다](#deleting-restoring-answers-that-it-restored) | 성공 |
-| [아무 권한도 받지 않은 사용자는 도메인을 restore 할 수 없다](#deleting-a-user-granted-nothing-may-not-restore-a-domain) | 거부 |
+| [soft delete 되지 않은 도메인을 슈퍼관리자가 restore 하면, restore 했다는 답이 온다](#deleting-restoring-a-domain-that-is-not-soft-deleted) | answered |
+| [soft delete 된 도메인을 restore 하면, restore 했다는 답이 온다](#deleting-restoring-answers-that-it-restored) | answered |
+| [아무 권한도 받지 않은 사용자는 도메인을 restore 할 수 없다](#deleting-a-user-granted-nothing-may-not-restore-a-domain) | refused |
 
 **scoped_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [리소스 그룹 범위에서 도메인 읽기 역할을 받은 사용자가 그 범위에서 search 하면, 슈퍼관리자와 같은 도메인들이 온다](#scoped_searching-a-user-granted-read-in-the-group-searches-its-domains) | 성공 |
-| [슈퍼관리자가 리소스 그룹 범위에서 search 하면, 그 그룹을 쓸 수 있는 도메인만 온다](#scoped_searching-the-superadmin-searches-the-domains-of-a-resource-group) | 성공 |
-| [아무 권한도 받지 않은 사용자가 리소스 그룹 범위에서 search 하면 권한 부족으로 거부된다](#scoped_searching-a-user-granted-nothing-may-not-search-the-domains-of-a-resource-group) | 거부 |
+| [리소스 그룹 범위에서 도메인 읽기 역할을 받은 사용자가 그 범위에서 search 하면, 슈퍼관리자와 같은 도메인들이 온다](#scoped_searching-a-user-granted-read-in-the-group-searches-its-domains) | answered |
+| [슈퍼관리자가 리소스 그룹 범위에서 search 하면, 그 그룹을 쓸 수 있는 도메인만 온다](#scoped_searching-the-superadmin-searches-the-domains-of-a-resource-group) | answered |
+| [아무 권한도 받지 않은 사용자가 리소스 그룹 범위에서 search 하면 권한 부족으로 거부된다](#scoped_searching-a-user-granted-nothing-may-not-search-the-domains-of-a-resource-group) | refused |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [활성 플래그를 내리는 수정은 도메인을 soft delete 하고, 답이 비활성 상태를 실어 온다](#editing-clearing-the-active-flag-soft-deletes-a-domain) | 성공 |
-| [슈퍼관리자가 도메인의 설명만 바꾸면, 설명은 새 값이 되고 이름은 그대로 남는다](#editing-editing-a-description-leaves-the-name-alone) | 성공 |
-| [soft delete 된 도메인의 활성 플래그를 내리며 설명을 바꾸면, 설명은 새 값이 되고 비활성 상태는 그대로다](#editing-lowering-the-active-flag-of-a-soft-deleted-domain-edits-only-the-rest) | 성공 |
-| [soft delete 된 도메인의 활성 플래그를 올리는 수정은 그 도메인을 restore 하고, 답이 활성 상태를 실어 온다](#editing-raising-the-active-flag-restores-a-soft-deleted-domain) | 성공 |
-| [아무 권한도 받지 않은 사용자가 도메인을 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-domain) | 거부 |
-| [아무 도메인도 갖지 않은 이름을 수정하려 하면 대상이 없다는 것으로 거부된다](#editing-editing-a-name-nothing-answers-to-is-not-found) | 거부 |
+| [활성 플래그를 내리는 수정은 도메인을 soft delete 하고, 답이 비활성 상태를 실어 온다](#editing-clearing-the-active-flag-soft-deletes-a-domain) | answered |
+| [슈퍼관리자가 도메인의 설명만 바꾸면, 설명은 새 값이 되고 이름은 그대로 남는다](#editing-editing-a-description-leaves-the-name-alone) | answered |
+| [soft delete 된 도메인의 활성 플래그를 내리며 설명을 바꾸면, 설명은 새 값이 되고 비활성 상태는 그대로다](#editing-lowering-the-active-flag-of-a-soft-deleted-domain-edits-only-the-rest) | answered |
+| [soft delete 된 도메인의 활성 플래그를 올리는 수정은 그 도메인을 restore 하고, 답이 활성 상태를 실어 온다](#editing-raising-the-active-flag-restores-a-soft-deleted-domain) | answered |
+| [아무 권한도 받지 않은 사용자가 도메인을 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-domain) | refused |
+| [아무 도메인도 갖지 않은 이름을 수정하려 하면 대상이 없다는 것으로 거부된다](#editing-editing-a-name-nothing-answers-to-is-not-found) | refused |
 
 **create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 도메인을 만들면 model-store 프로젝트가 함께 생겨, 그 프로젝트를 가진 도메인으로 걸러 찾을 때 만든 도메인이 온다](#creating-creating-a-domain-also-creates-its-model-store-project) | 성공 |
-| [슈퍼관리자가 이름과 설명만 주고 도메인을 만들면, 요청에 없던 값들은 기본값으로 채워진 노드 전체가 답으로 온다](#creating-creating-a-domain-answers-with-the-whole-node) | 성공 |
-| [이름이 공백뿐이면 도메인을 만들 수 없다](#creating-a-blank-name-is-refused) | 거부 |
-| [이미 어떤 도메인이 쓰고 있는 이름으로 만들려 하면, 권한이 있어도 이름이 겹친다는 이유로 거부된다](#creating-a-name-another-domain-already-holds-is-refused) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 도메인을 만들려 하면, 권한을 얼마나 받았는지와 무관하게 역할로 막힌다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-domain) | 거부 |
-| [엔티티 권한 집행을 꺼도 도메인 생성은 여전히 막힌다. 이 문은 권한 그래프가 아니라 역할이 지키기 때문이다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-domain) | 거부 |
+| [슈퍼관리자가 도메인을 만들면 model-store 프로젝트가 함께 생겨, 그 프로젝트를 가진 도메인으로 걸러 찾을 때 만든 도메인이 온다](#creating-creating-a-domain-also-creates-its-model-store-project) | answered |
+| [슈퍼관리자가 이름과 설명만 주고 도메인을 만들면, 요청에 없던 값들은 기본값으로 채워진 노드 전체가 답으로 온다](#creating-creating-a-domain-answers-with-the-whole-node) | answered |
+| [이름이 공백뿐이면 도메인을 만들 수 없다](#creating-a-blank-name-is-refused) | refused |
+| [이미 어떤 도메인이 쓰고 있는 이름으로 만들려 하면, 권한이 있어도 이름이 겹친다는 이유로 거부된다](#creating-a-name-another-domain-already-holds-is-refused) | refused |
+| [슈퍼관리자가 아닌 사용자가 도메인을 만들려 하면, 권한을 얼마나 받았는지와 무관하게 역할로 막힌다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-domain) | refused |
+| [엔티티 권한 집행을 꺼도 도메인 생성은 여전히 막힌다. 이 문은 권한 그래프가 아니라 역할이 지키기 때문이다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-domain) | refused |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무것도 딸려 있지 않은 도메인은 purge 할 수 있다](#deleting-purging-a-domain-nothing-else-refers-to-succeeds) | 성공 |
-| [프로젝트가 딸린 도메인은 슈퍼관리자라도 purge 할 수 없다](#deleting-a-domain-holding-a-project-is-not-purged) | 거부 |
-| [사용자가 딸린 도메인은 슈퍼관리자라도 purge 할 수 없다](#deleting-a-domain-holding-a-user-is-not-purged) | 거부 |
-| [아무 권한도 받지 않은 사용자는 아무것도 딸리지 않은 도메인이라도 purge 할 수 없다](#deleting-a-user-granted-nothing-may-not-purge-a-domain) | 거부 |
-| [아무 도메인도 갖지 않은 이름을 purge 하려 하면 대상이 없다는 것으로 거부된다](#deleting-purging-a-name-nothing-answers-to-is-not-found) | 거부 |
+| [아무것도 딸려 있지 않은 도메인은 purge 할 수 있다](#deleting-purging-a-domain-nothing-else-refers-to-succeeds) | answered |
+| [프로젝트가 딸린 도메인은 슈퍼관리자라도 purge 할 수 없다](#deleting-a-domain-holding-a-project-is-not-purged) | refused |
+| [사용자가 딸린 도메인은 슈퍼관리자라도 purge 할 수 없다](#deleting-a-domain-holding-a-user-is-not-purged) | refused |
+| [아무 권한도 받지 않은 사용자는 아무것도 딸리지 않은 도메인이라도 purge 할 수 없다](#deleting-a-user-granted-nothing-may-not-purge-a-domain) | refused |
+| [아무 도메인도 갖지 않은 이름을 purge 하려 하면 대상이 없다는 것으로 거부된다](#deleting-purging-a-name-nothing-answers-to-is-not-found) | refused |
 
 ### bulk_get_ids
 

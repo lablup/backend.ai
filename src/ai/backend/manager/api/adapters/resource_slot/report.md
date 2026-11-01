@@ -1,175 +1,175 @@
 ## resource_slot
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/resource_slot/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_slot/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/resource_slot/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/resource_slot/adapter.py)
 
-시나리오: 미완 2 / 14
+Scenario: incomplete 2 / 14
 
-- ops 로 구성 (10)
-  - admin_create_slot_type — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_update_slot_type — 대표 성공 ✓ · 대표 실패 ✓
-  - get_slot_type — 대표 성공 ✓ · 대표 실패 ✓
-  - lookup_slot_type — 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_purge_slot_types — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge_slot_type — 대표 성공 ✓ · 대표 실패 ✓
-  - scoped_search_agent_resources — 대표 성공 ✓ · 대표 실패 ✓
-  - search_agent_resources — 대표 성공 ✓ · 대표 실패 ✓
-  - search_allocations — 대표 성공 ✓ · 대표 실패 ✓
-  - search_slot_types — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-- 직접 구현 (4)
-  - get_agent_resource — 성공 있음 2 · 실패 있음 6 (single_entity)
-  - get_domain_resource_overview — 성공 있음 3 · 실패 있음 3 (scope)
-  - get_kernel_allocation — 성공 있음 3 · 실패 있음 4 (single_entity)
-  - get_project_resource_overview — 성공 있음 5 · 실패 있음 1 (scope)
+- built from ops (10)
+  - admin_create_slot_type — representative success ✓ · representative refusal ✓
+  - admin_update_slot_type — representative success ✓ · representative refusal ✓
+  - get_slot_type — representative success ✓ · representative refusal ✓
+  - lookup_slot_type — representative success ✓ · representative refusal ✓
+  - partial_bulk_purge_slot_types — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - purge_slot_type — representative success ✓ · representative refusal ✓
+  - scoped_search_agent_resources — representative success ✓ · representative refusal ✓
+  - search_agent_resources — representative success ✓ · representative refusal ✓
+  - search_allocations — representative success ✓ · representative refusal ✓
+  - search_slot_types — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+- direct implementation (4)
+  - get_agent_resource — success present 2 · refusal present 6 (single_entity)
+  - get_domain_resource_overview — success present 3 · refusal present 3 (scope)
+  - get_kernel_allocation — success present 3 · refusal present 4 (single_entity)
+  - get_project_resource_overview — success present 5 · refusal present 1 (scope)
 
 **admin_create_slot_type**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 표시 이름·설명·단위·아이콘·서식·순위까지 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다](#creating-a-slot-type-made-with-every-display-value-carries-them-back) | 성공 |
-| [슈퍼관리자가 bytes 종류로 생성하면 그 종류가 담긴 노드가 반환된다](#creating-a-slot-type-of-the-bytes-kind-is-made) | 성공 |
-| [슈퍼관리자가 count 종류로 생성하면 그 종류가 담긴 노드가 반환된다](#creating-a-slot-type-of-the-count-kind-is-made) | 성공 |
-| [슈퍼관리자가 unified 종류로 생성하면 그 종류가 담긴 노드가 반환된다](#creating-a-slot-type-of-the-unified-kind-is-made) | 성공 |
-| [슈퍼관리자가 unique 종류로 생성하면 그 종류가 담긴 노드가 반환된다](#creating-a-slot-type-of-the-unique-kind-is-made) | 성공 |
-| [슈퍼관리자가 슬롯 이름과 종류만 지정해 생성하면, 표시용 문자열은 모두 비고 필수 여부는 거짓, 사용 여부는 참, 순위는 0, 숫자 서식은 십진에 반올림 없음인 노드가 반환된다](#creating-the-superadmin-makes-a-slot-type-with-a-name-and-a-kind-alone) | 성공 |
-| [같은 이름의 슬롯 종류가 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다. 이 행은 에이전트 자원·커널 할당·모델 카드 자원 요구·배포 preset 자원 슬롯·배포 리비전 자원 슬롯 테이블이 참조하므로 덮어쓰지 않는다](#creating-a-slot-name-already-taken-is-refused) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 슬롯 종류를 생성하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-slot-type) | 거부 |
-| [권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 생성하지 못한다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-slot-type) | 거부 |
+| [슈퍼관리자가 표시 이름·설명·단위·아이콘·서식·순위까지 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다](#creating-a-slot-type-made-with-every-display-value-carries-them-back) | answered |
+| [슈퍼관리자가 bytes 종류로 생성하면 그 종류가 담긴 노드가 반환된다](#creating-a-slot-type-of-the-bytes-kind-is-made) | answered |
+| [슈퍼관리자가 count 종류로 생성하면 그 종류가 담긴 노드가 반환된다](#creating-a-slot-type-of-the-count-kind-is-made) | answered |
+| [슈퍼관리자가 unified 종류로 생성하면 그 종류가 담긴 노드가 반환된다](#creating-a-slot-type-of-the-unified-kind-is-made) | answered |
+| [슈퍼관리자가 unique 종류로 생성하면 그 종류가 담긴 노드가 반환된다](#creating-a-slot-type-of-the-unique-kind-is-made) | answered |
+| [슈퍼관리자가 슬롯 이름과 종류만 지정해 생성하면, 표시용 문자열은 모두 비고 필수 여부는 거짓, 사용 여부는 참, 순위는 0, 숫자 서식은 십진에 반올림 없음인 노드가 반환된다](#creating-the-superadmin-makes-a-slot-type-with-a-name-and-a-kind-alone) | answered |
+| [같은 이름의 슬롯 종류가 있을 때 그 이름으로 다시 생성하면, 이름 중복으로 거부된다. 이 행은 에이전트 자원·커널 할당·모델 카드 자원 요구·배포 preset 자원 슬롯·배포 리비전 자원 슬롯 테이블이 참조하므로 덮어쓰지 않는다](#creating-a-slot-name-already-taken-is-refused) | refused |
+| [슈퍼관리자가 아닌 사용자가 슬롯 종류를 생성하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-slot-type) | refused |
+| [권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 생성하지 못한다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-slot-type) | refused |
 
 **admin_update_slot_type**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슬롯 이름만 지정하고 나머지를 모두 생략해 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-a-slot-type-edit-giving-no-value-changes-nothing) | 성공 |
-| [사용 중인 슬롯 종류의 사용 여부를 끄면, 사용하지 않는 상태가 담긴 노드가 반환된다](#editing-disabling-a-slot-type-answers-it-disabled) | 성공 |
-| [슈퍼관리자가 이름으로 지정해 표시 이름만 수정하면, 표시 이름은 새 값이 되고 나머지는 그대로 유지된다](#editing-editing-a-slot-type-display-name-leaves-the-rest-alone) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 슬롯 종류를 수정하면 역할 부족으로 거부된다](#editing-a-user-who-is-not-the-superadmin-may-not-edit-a-slot-type) | 거부 |
-| [슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-slot-name-nothing-answers-to-is-not-found) | 거부 |
-| [권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 수정하지 못한다](#editing-turning-enforcement-off-does-not-let-a-user-edit-a-slot-type) | 거부 |
+| [슬롯 이름만 지정하고 나머지를 모두 생략해 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-a-slot-type-edit-giving-no-value-changes-nothing) | answered |
+| [사용 중인 슬롯 종류의 사용 여부를 끄면, 사용하지 않는 상태가 담긴 노드가 반환된다](#editing-disabling-a-slot-type-answers-it-disabled) | answered |
+| [슈퍼관리자가 이름으로 지정해 표시 이름만 수정하면, 표시 이름은 새 값이 되고 나머지는 그대로 유지된다](#editing-editing-a-slot-type-display-name-leaves-the-rest-alone) | answered |
+| [슈퍼관리자가 아닌 사용자가 슬롯 종류를 수정하면 역할 부족으로 거부된다](#editing-a-user-who-is-not-the-superadmin-may-not-edit-a-slot-type) | refused |
+| [슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-slot-name-nothing-answers-to-is-not-found) | refused |
+| [권한 검사를 꺼도 슈퍼관리자가 아니면 슬롯 종류를 수정하지 못한다](#editing-turning-enforcement-off-does-not-let-a-user-edit-a-slot-type) | refused |
 
 **get_slot_type**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 이름으로 조회하면 그 슬롯 종류 전체가 반환된다. 이름을 풀어내는 단계도 그 뒤의 조회도 인증만 확인한다](#reading-a-user-granted-nothing-reads-a-slot-type-by-name) | 성공 |
-| [존재하지 않는 이름으로 조회하면 거부된다. 변환한 대상에 권한 검사가 뒤따르므로 존재하지 않는 이름과 닿지 못하는 이름이 같은 이름으로 거부된다](#reading-reading-a-slot-name-nothing-answers-to-is-refused) | 거부 |
+| [아무 권한도 없는 사용자가 이름으로 조회하면 그 슬롯 종류 전체가 반환된다. 이름을 풀어내는 단계도 그 뒤의 조회도 인증만 확인한다](#reading-a-user-granted-nothing-reads-a-slot-type-by-name) | answered |
+| [존재하지 않는 이름으로 조회하면 거부된다. 변환한 대상에 권한 검사가 뒤따르므로 존재하지 않는 이름과 닿지 못하는 이름이 같은 이름으로 거부된다](#reading-reading-a-slot-name-nothing-answers-to-is-refused) | refused |
 
 **lookup_slot_type**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 이름으로 id를 찾으면 그 슬롯 종류의 id가 반환된다](#looking_up-a-user-granted-nothing-looks-up-a-slot-type-by-name) | 성공 |
-| [존재하지 않는 이름으로 id를 찾으면 잘못된 요청으로 거부된다](#looking_up-looking-up-a-slot-name-nothing-answers-to-is-refused) | 거부 |
+| [아무 권한도 없는 사용자가 이름으로 id를 찾으면 그 슬롯 종류의 id가 반환된다](#looking_up-a-user-granted-nothing-looks-up-a-slot-type-by-name) | answered |
+| [존재하지 않는 이름으로 id를 찾으면 잘못된 요청으로 거부된다](#looking_up-looking-up-a-slot-name-nothing-answers-to-is-refused) | refused |
 
 **partial_bulk_purge_slot_types**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 슬롯 종류 여럿을 한 번에 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-slot-types) | 성공 |
-| [아무것도 참조하지 않는 슬롯 종류 둘과 없는 id 하나를 슈퍼관리자가 한 번에 삭제하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-slot-types-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 없는 사용자가 슬롯 종류 여럿을 한 번에 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-slot-types) | answered |
+| [아무것도 참조하지 않는 슬롯 종류 둘과 없는 id 하나를 슈퍼관리자가 한 번에 삭제하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-slot-types-answers-for-the-missing-one) | answered |
 
 **purge_slot_type**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무것도 참조하지 않는 슬롯 종류를 슈퍼관리자가 id로 삭제하면 삭제한 이름을 담은 응답이 반환된다](#retiring-the-superadmin-purges-a-slot-type-nothing-refers-to) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 슬롯 종류를 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-purge-a-slot-type) | 성공 |
-| [배포 리비전이 아직 사용하는 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다](#retiring-a-slot-type-a-deployment-revision-still-uses-may-not-be-purged) | 거부 |
-| [커널이 아직 할당받은 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다](#retiring-a-slot-type-a-kernel-still-asks-for-may-not-be-purged) | 거부 |
-| [아무 권한도 없는 사용자가 슬롯 종류를 삭제하면 권한 부족으로 거부된다. 수정이 역할 부족으로 거부되는 것과는 다른 검사다](#retiring-a-user-granted-nothing-may-not-purge-a-slot-type) | 거부 |
-| [아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. 호출한 사용자가 쓸 수 있는지를 대상을 찾기 전에 검사하기 때문이다](#retiring-a-user-granted-nothing-purging-an-unknown-slot-type-id-is-refused-by-permission) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-purging-a-slot-type-id-nothing-answers-to-is-not-found) | 거부 |
+| [아무것도 참조하지 않는 슬롯 종류를 슈퍼관리자가 id로 삭제하면 삭제한 이름을 담은 응답이 반환된다](#retiring-the-superadmin-purges-a-slot-type-nothing-refers-to) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 슬롯 종류를 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-purge-a-slot-type) | answered |
+| [배포 리비전이 아직 사용하는 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다](#retiring-a-slot-type-a-deployment-revision-still-uses-may-not-be-purged) | refused |
+| [커널이 아직 할당받은 슬롯 종류를 슈퍼관리자가 삭제하면 아직 사용 중이라는 이유로 거부된다](#retiring-a-slot-type-a-kernel-still-asks-for-may-not-be-purged) | refused |
+| [아무 권한도 없는 사용자가 슬롯 종류를 삭제하면 권한 부족으로 거부된다. 수정이 역할 부족으로 거부되는 것과는 다른 검사다](#retiring-a-user-granted-nothing-may-not-purge-a-slot-type) | refused |
+| [아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. 호출한 사용자가 쓸 수 있는지를 대상을 찾기 전에 검사하기 때문이다](#retiring-a-user-granted-nothing-purging-an-unknown-slot-type-id-is-refused-by-permission) | refused |
+| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-purging-a-slot-type-id-nothing-answers-to-is-not-found) | refused |
 
 **scoped_search_agent_resources**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [리소스 그룹의 에이전트를 읽을 수 있는 사용자가 슬롯 둘을 보고한 에이전트를 지정해 조회하면 그 에이전트가 보고한 슬롯이 모두 반환된다](#scoped_searching_agent_resources-a-user-reading-agents-in-the-group-finds-every-slot-the-agent-reports) | 성공 |
-| [리소스 그룹의 에이전트를 읽을 수 있는 사용자가 아직 슬롯을 보고하지 않은 그 에이전트를 지정해 조회하면 응답이 비어 있다](#scoped_searching_agent_resources-a-user-reading-agents-in-the-group-searches-the-agent-and-finds-no-slot) | 성공 |
-| [슈퍼관리자가 아직 슬롯을 보고하지 않은 에이전트를 지정해 조회하면 응답이 비어 있다](#scoped_searching_agent_resources-the-superadmin-searches-the-agent-and-finds-no-slot) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 에이전트를 지정해 조회할 수 있다](#scoped_searching_agent_resources-turning-enforcement-off-lets-a-user-search-an-agent-s-resources) | 성공 |
-| [아무 권한도 없는 사용자가 에이전트를 지정해 조회하면 권한 부족으로 거부된다](#scoped_searching_agent_resources-a-user-granted-nothing-may-not-search-an-agent-s-resources) | 거부 |
-| [둘 중 한 에이전트만 읽을 수 있는 사용자가 둘을 함께 지정해 조회하면 전체가 권한 부족으로 거부된다. 읽을 수 있는 쪽만 골라 답하지 않는다](#scoped_searching_agent_resources-one-agent-the-caller-may-not-read-refuses-the-whole-search) | 거부 |
+| [리소스 그룹의 에이전트를 읽을 수 있는 사용자가 슬롯 둘을 보고한 에이전트를 지정해 조회하면 그 에이전트가 보고한 슬롯이 모두 반환된다](#scoped_searching_agent_resources-a-user-reading-agents-in-the-group-finds-every-slot-the-agent-reports) | answered |
+| [리소스 그룹의 에이전트를 읽을 수 있는 사용자가 아직 슬롯을 보고하지 않은 그 에이전트를 지정해 조회하면 응답이 비어 있다](#scoped_searching_agent_resources-a-user-reading-agents-in-the-group-searches-the-agent-and-finds-no-slot) | answered |
+| [슈퍼관리자가 아직 슬롯을 보고하지 않은 에이전트를 지정해 조회하면 응답이 비어 있다](#scoped_searching_agent_resources-the-superadmin-searches-the-agent-and-finds-no-slot) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 에이전트를 지정해 조회할 수 있다](#scoped_searching_agent_resources-turning-enforcement-off-lets-a-user-search-an-agent-s-resources) | answered |
+| [아무 권한도 없는 사용자가 에이전트를 지정해 조회하면 권한 부족으로 거부된다](#scoped_searching_agent_resources-a-user-granted-nothing-may-not-search-an-agent-s-resources) | refused |
+| [둘 중 한 에이전트만 읽을 수 있는 사용자가 둘을 함께 지정해 조회하면 전체가 권한 부족으로 거부된다. 읽을 수 있는 쪽만 골라 답하지 않는다](#scoped_searching_agent_resources-one-agent-the-caller-may-not-read-refuses-the-whole-search) | refused |
 
 **search_agent_resources**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [모니터가 필터 없이 조회하면 응답이 반환된다. 슈퍼관리자인지 검사하는 조회는 모니터도 통과한다](#searching_agent_resources-a-monitor-may-search-agent-resources) | 성공 |
-| [슬롯 둘을 보고한 에이전트 하나가 있을 때 한 슬롯의 이름을 필터로 조회하면, 응답에는 그 슬롯의 행만 남는다](#searching_agent_resources-a-slot-name-filter-narrows-the-answer-to-that-slot) | 성공 |
-| [슬롯을 보고한 에이전트 둘이 있을 때 한 에이전트를 필터로 조회하면, 응답에는 그 에이전트의 행만 남는다](#searching_agent_resources-an-agent-filter-narrows-the-answer-to-that-agent-s-slots) | 성공 |
-| [아직 슬롯을 보고하지 않은 에이전트만 있을 때 슈퍼관리자가 필터 없이 조회하면 응답이 비어 있다](#searching_agent_resources-an-agent-reporting-no-slot-means-none-is-found) | 성공 |
-| [보고된 슬롯 둘이 있을 때 앞에서 1건만 요청해 조회하면 슬롯 이름 순서로 앞선 한 건이 반환되고 다음 페이지가 있다고 응답한다](#searching_agent_resources-asking-for-the-first-slot-answers-one-and-a-next-page) | 성공 |
-| [보고된 슬롯 11개가 있을 때 크기 없이 조회하면 슬롯 이름 순서로 앞선 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching_agent_resources-omitting-the-page-size-answers-ten-slots-and-a-next-page) | 성공 |
-| [슬롯을 보고한 에이전트 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 보고된 슬롯이 모두 반환된다](#searching_agent_resources-the-superadmin-finds-every-slot-the-agents-report) | 성공 |
-| [아무 권한도 없는 사용자가 조회하면 역할 부족으로 거부된다](#searching_agent_resources-a-user-granted-nothing-may-not-search-agent-resources) | 거부 |
-| [권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 조회할 수 없다. 슈퍼관리자 검사는 그 설정을 읽지 않는다](#searching_agent_resources-turning-enforcement-off-still-refuses-a-user-searching-agent-resources) | 거부 |
+| [모니터가 필터 없이 조회하면 응답이 반환된다. 슈퍼관리자인지 검사하는 조회는 모니터도 통과한다](#searching_agent_resources-a-monitor-may-search-agent-resources) | answered |
+| [슬롯 둘을 보고한 에이전트 하나가 있을 때 한 슬롯의 이름을 필터로 조회하면, 응답에는 그 슬롯의 행만 남는다](#searching_agent_resources-a-slot-name-filter-narrows-the-answer-to-that-slot) | answered |
+| [슬롯을 보고한 에이전트 둘이 있을 때 한 에이전트를 필터로 조회하면, 응답에는 그 에이전트의 행만 남는다](#searching_agent_resources-an-agent-filter-narrows-the-answer-to-that-agent-s-slots) | answered |
+| [아직 슬롯을 보고하지 않은 에이전트만 있을 때 슈퍼관리자가 필터 없이 조회하면 응답이 비어 있다](#searching_agent_resources-an-agent-reporting-no-slot-means-none-is-found) | answered |
+| [보고된 슬롯 둘이 있을 때 앞에서 1건만 요청해 조회하면 슬롯 이름 순서로 앞선 한 건이 반환되고 다음 페이지가 있다고 응답한다](#searching_agent_resources-asking-for-the-first-slot-answers-one-and-a-next-page) | answered |
+| [보고된 슬롯 11개가 있을 때 크기 없이 조회하면 슬롯 이름 순서로 앞선 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching_agent_resources-omitting-the-page-size-answers-ten-slots-and-a-next-page) | answered |
+| [슬롯을 보고한 에이전트 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 보고된 슬롯이 모두 반환된다](#searching_agent_resources-the-superadmin-finds-every-slot-the-agents-report) | answered |
+| [아무 권한도 없는 사용자가 조회하면 역할 부족으로 거부된다](#searching_agent_resources-a-user-granted-nothing-may-not-search-agent-resources) | refused |
+| [권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 조회할 수 없다. 슈퍼관리자 검사는 그 설정을 읽지 않는다](#searching_agent_resources-turning-enforcement-off-still-refuses-a-user-searching-agent-resources) | refused |
 
 **search_allocations**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슬롯 하나씩 요구하는 커널 둘이 있을 때 한 커널의 id를 필터로 조회하면, 응답에는 그 커널의 할당만 남는다](#searching_allocations-a-kernel-id-filter-narrows-the-answer-to-that-kernel-s-allocations) | 성공 |
-| [모니터가 필터 없이 조회하면 할당이 다 집계된다. 슈퍼관리자인지 검사하는 조회는 모니터도 통과한다](#searching_allocations-a-monitor-counts-every-allocation-laid) | 성공 |
-| [슬롯 둘을 요구하는 커널 하나가 있을 때 한 슬롯의 이름을 필터로 조회하면, 응답에는 그 슬롯의 할당만 남는다](#searching_allocations-a-slot-name-filter-narrows-the-answer-to-that-slot-s-allocation) | 성공 |
-| [할당 11건이 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching_allocations-omitting-the-page-size-answers-ten-allocations-and-a-next-page) | 성공 |
-| [슬롯 둘을 요구하는 커널 하나가 있을 때 슈퍼관리자가 필터 없이 조회하면 할당 둘이 다 집계된다](#searching_allocations-the-superadmin-counts-every-allocation-laid) | 성공 |
-| [아무 권한도 없는 사용자가 조회하면 역할 부족으로 거부된다](#searching_allocations-a-user-granted-nothing-may-not-search-allocations) | 거부 |
-| [권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 조회할 수 없다. 슈퍼관리자 검사는 그 설정을 읽지 않는다](#searching_allocations-turning-enforcement-off-still-refuses-a-user-searching-allocations) | 거부 |
+| [슬롯 하나씩 요구하는 커널 둘이 있을 때 한 커널의 id를 필터로 조회하면, 응답에는 그 커널의 할당만 남는다](#searching_allocations-a-kernel-id-filter-narrows-the-answer-to-that-kernel-s-allocations) | answered |
+| [모니터가 필터 없이 조회하면 할당이 다 집계된다. 슈퍼관리자인지 검사하는 조회는 모니터도 통과한다](#searching_allocations-a-monitor-counts-every-allocation-laid) | answered |
+| [슬롯 둘을 요구하는 커널 하나가 있을 때 한 슬롯의 이름을 필터로 조회하면, 응답에는 그 슬롯의 할당만 남는다](#searching_allocations-a-slot-name-filter-narrows-the-answer-to-that-slot-s-allocation) | answered |
+| [할당 11건이 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching_allocations-omitting-the-page-size-answers-ten-allocations-and-a-next-page) | answered |
+| [슬롯 둘을 요구하는 커널 하나가 있을 때 슈퍼관리자가 필터 없이 조회하면 할당 둘이 다 집계된다](#searching_allocations-the-superadmin-counts-every-allocation-laid) | answered |
+| [아무 권한도 없는 사용자가 조회하면 역할 부족으로 거부된다](#searching_allocations-a-user-granted-nothing-may-not-search-allocations) | refused |
+| [권한 검사를 꺼도 슈퍼관리자나 모니터가 아니면 조회할 수 없다. 슈퍼관리자 검사는 그 설정을 읽지 않는다](#searching_allocations-turning-enforcement-off-still-refuses-a-user-searching-allocations) | refused |
 
 **search_slot_types**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슬롯 종류 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 슬롯 종류만 남는다](#searching-a-name-filter-narrows-the-answer-to-the-slot-type-it-names) | 성공 |
-| [슬롯 종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다](#searching-a-user-granted-nothing-counts-every-slot-type-laid) | 성공 |
-| [슬롯 종류 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching-omitting-the-page-size-answers-ten-slot-types-and-a-next-page) | 성공 |
+| [슬롯 종류 여럿 중 하나의 이름을 필터로 조회하면, 응답에는 그 이름의 슬롯 종류만 남는다](#searching-a-name-filter-narrows-the-answer-to-the-slot-type-it-names) | answered |
+| [슬롯 종류 둘이 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 둘 다 집계된다](#searching-a-user-granted-nothing-counts-every-slot-type-laid) | answered |
+| [슬롯 종류 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching-omitting-the-page-size-answers-ten-slot-types-and-a-next-page) | answered |
 
 **get_agent_resource**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [리소스 그룹의 에이전트를 읽을 수 있는 사용자가 에이전트가 보고한 슬롯을 조회하면 그 슬롯에 보고된 용량과 사용량이 반환된다](#reading_agent_resources-a-user-reading-agents-in-the-group-reads-a-slot-the-agent-reports) | 성공 |
-| [슈퍼관리자가 에이전트가 보고한 슬롯을 조회하면 그 슬롯에 보고된 용량과 사용량이 반환된다](#reading_agent_resources-the-superadmin-reads-a-slot-the-agent-reports) | 성공 |
-| [아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다. 에이전트에 대한 권한을 슬롯을 찾기 전에 검사한다](#reading_agent_resources-a-user-granted-nothing-may-not-read-an-agent-slot) | 거부 |
-| [아무 권한도 없는 사용자가 존재하지 않는 에이전트 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다. 이름을 풀어내는 단계는 인증만 확인하고, 권한은 풀어낸 에이전트에 대해 검사한다](#reading_agent_resources-a-user-granted-nothing-reading-an-unknown-agent-name-is-not-found) | 거부 |
-| [리소스 그룹의 에이전트를 읽을 수 있는 사용자가 에이전트가 보고하지 않는 슬롯을 조회하면 권한 검사를 통과한 뒤 대상을 찾을 수 없다는 이유로 거부된다](#reading_agent_resources-a-user-reading-agents-in-the-group-reaches-the-slot-the-agent-does-not-report) | 거부 |
-| [슈퍼관리자가 에이전트가 보고하지 않는 슬롯을 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading_agent_resources-reading-a-slot-the-agent-does-not-report-is-not-found) | 거부 |
-| [슈퍼관리자가 존재하지 않는 에이전트 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading_agent_resources-reading-an-agent-name-nothing-answers-to-is-not-found) | 거부 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 권한 검사를 통과하고, 에이전트가 보고하지 않는 슬롯이므로 대상을 찾을 수 없다는 이유로 거부된다](#reading_agent_resources-turning-enforcement-off-lets-a-user-pass-the-gate-to-the-slot-the-agent-does-not-report) | 거부 |
+| [리소스 그룹의 에이전트를 읽을 수 있는 사용자가 에이전트가 보고한 슬롯을 조회하면 그 슬롯에 보고된 용량과 사용량이 반환된다](#reading_agent_resources-a-user-reading-agents-in-the-group-reads-a-slot-the-agent-reports) | answered |
+| [슈퍼관리자가 에이전트가 보고한 슬롯을 조회하면 그 슬롯에 보고된 용량과 사용량이 반환된다](#reading_agent_resources-the-superadmin-reads-a-slot-the-agent-reports) | answered |
+| [아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다. 에이전트에 대한 권한을 슬롯을 찾기 전에 검사한다](#reading_agent_resources-a-user-granted-nothing-may-not-read-an-agent-slot) | refused |
+| [아무 권한도 없는 사용자가 존재하지 않는 에이전트 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다. 이름을 풀어내는 단계는 인증만 확인하고, 권한은 풀어낸 에이전트에 대해 검사한다](#reading_agent_resources-a-user-granted-nothing-reading-an-unknown-agent-name-is-not-found) | refused |
+| [리소스 그룹의 에이전트를 읽을 수 있는 사용자가 에이전트가 보고하지 않는 슬롯을 조회하면 권한 검사를 통과한 뒤 대상을 찾을 수 없다는 이유로 거부된다](#reading_agent_resources-a-user-reading-agents-in-the-group-reaches-the-slot-the-agent-does-not-report) | refused |
+| [슈퍼관리자가 에이전트가 보고하지 않는 슬롯을 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading_agent_resources-reading-a-slot-the-agent-does-not-report-is-not-found) | refused |
+| [슈퍼관리자가 존재하지 않는 에이전트 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading_agent_resources-reading-an-agent-name-nothing-answers-to-is-not-found) | refused |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 권한 검사를 통과하고, 에이전트가 보고하지 않는 슬롯이므로 대상을 찾을 수 없다는 이유로 거부된다](#reading_agent_resources-turning-enforcement-off-lets-a-user-pass-the-gate-to-the-slot-the-agent-does-not-report) | refused |
 
 **get_domain_resource_overview**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [도메인 범위에서 세션을 읽을 수 있는 사용자가 그 도메인의 개요를 조회하면 개요가 반환된다](#reading_domain_overview-a-user-reading-sessions-in-the-domain-reads-its-overview) | 성공 |
-| [대기 중인 커널만 있는 도메인의 개요를 슈퍼관리자가 조회하면 점유된 슬롯이 없고 세션 수가 0이다. 개요는 자원을 점유했거나 배정받은 커널만 세고, 요구만 한 커널은 세지 않는다](#reading_domain_overview-the-superadmin-reads-a-domain-overview-that-counts-no-pending-kernel) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 도메인의 개요를 조회할 수 있다](#reading_domain_overview-turning-enforcement-off-lets-a-user-read-a-domain-overview) | 성공 |
-| [아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다](#reading_domain_overview-a-user-granted-nothing-may-not-read-a-domain-overview) | 거부 |
-| [프로젝트 범위에서만 세션을 읽을 수 있는 사용자가 그 프로젝트가 속한 도메인의 개요를 조회하면 권한 부족으로 거부된다. 도메인 개요는 도메인 범위의 권한을 검사한다](#reading_domain_overview-a-user-reading-sessions-in-the-project-may-not-read-the-domain-overview) | 거부 |
-| [존재하지 않는 도메인 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading_domain_overview-reading-the-overview-of-a-domain-name-nothing-answers-to-is-not-found) | 거부 |
+| [도메인 범위에서 세션을 읽을 수 있는 사용자가 그 도메인의 개요를 조회하면 개요가 반환된다](#reading_domain_overview-a-user-reading-sessions-in-the-domain-reads-its-overview) | answered |
+| [대기 중인 커널만 있는 도메인의 개요를 슈퍼관리자가 조회하면 점유된 슬롯이 없고 세션 수가 0이다. 개요는 자원을 점유했거나 배정받은 커널만 세고, 요구만 한 커널은 세지 않는다](#reading_domain_overview-the-superadmin-reads-a-domain-overview-that-counts-no-pending-kernel) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 도메인의 개요를 조회할 수 있다](#reading_domain_overview-turning-enforcement-off-lets-a-user-read-a-domain-overview) | answered |
+| [아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다](#reading_domain_overview-a-user-granted-nothing-may-not-read-a-domain-overview) | refused |
+| [프로젝트 범위에서만 세션을 읽을 수 있는 사용자가 그 프로젝트가 속한 도메인의 개요를 조회하면 권한 부족으로 거부된다. 도메인 개요는 도메인 범위의 권한을 검사한다](#reading_domain_overview-a-user-reading-sessions-in-the-project-may-not-read-the-domain-overview) | refused |
+| [존재하지 않는 도메인 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading_domain_overview-reading-the-overview-of-a-domain-name-nothing-answers-to-is-not-found) | refused |
 
 **get_kernel_allocation**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프로젝트 범위에서 세션을 읽을 수 있는 사용자가 조회하면 그 할당 전체가 반환된다. 할당은 커널이 속한 세션의 것이므로, 세션에 대한 권한이 할당을 읽게 한다](#reading_allocations-a-user-reading-sessions-in-the-project-reads-a-kernel-slot-allocation) | 성공 |
-| [슈퍼관리자가 커널 id와 슬롯 이름으로 조회하면 그 할당 전체가 반환된다. 커널은 아직 스케줄링되지 않았으므로 요구한 양만 있고 실제 사용량은 없다](#reading_allocations-the-superadmin-reads-a-kernel-slot-allocation) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 할당을 조회할 수 있다](#reading_allocations-turning-enforcement-off-lets-a-user-read-a-kernel-slot-allocation) | 성공 |
-| [아무 권한도 없는 사용자가 조회하면 커널 id를 풀어낼 수 없다는 이유로 거부된다. 커널 id를 세션으로 풀어내는 단계가 그 세션에 대한 권한을 검사하고, 권한이 없을 때와 커널이 없을 때 같은 답을 한다](#reading_allocations-a-user-granted-nothing-may-not-read-a-kernel-slot-allocation) | 거부 |
-| [아무 권한도 없는 사용자가 존재하지 않는 커널 id로 조회해도 커널 id를 풀어낼 수 없다는 같은 이유로 거부된다. 답으로는 그 커널이 있는지 알 수 없다](#reading_allocations-a-user-granted-nothing-reading-an-unknown-kernel-id-is-refused-the-same-way) | 거부 |
-| [슈퍼관리자가 존재하지 않는 커널 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다. 모든 검사를 통과하는 슈퍼관리자에게는 없다는 사실을 그대로 답한다](#reading_allocations-reading-a-kernel-id-nothing-answers-to-is-not-found) | 거부 |
-| [슈퍼관리자가 그 커널이 요구하지 않은 슬롯 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading_allocations-reading-a-slot-the-kernel-did-not-ask-for-is-not-found) | 거부 |
+| [프로젝트 범위에서 세션을 읽을 수 있는 사용자가 조회하면 그 할당 전체가 반환된다. 할당은 커널이 속한 세션의 것이므로, 세션에 대한 권한이 할당을 읽게 한다](#reading_allocations-a-user-reading-sessions-in-the-project-reads-a-kernel-slot-allocation) | answered |
+| [슈퍼관리자가 커널 id와 슬롯 이름으로 조회하면 그 할당 전체가 반환된다. 커널은 아직 스케줄링되지 않았으므로 요구한 양만 있고 실제 사용량은 없다](#reading_allocations-the-superadmin-reads-a-kernel-slot-allocation) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 할당을 조회할 수 있다](#reading_allocations-turning-enforcement-off-lets-a-user-read-a-kernel-slot-allocation) | answered |
+| [아무 권한도 없는 사용자가 조회하면 커널 id를 풀어낼 수 없다는 이유로 거부된다. 커널 id를 세션으로 풀어내는 단계가 그 세션에 대한 권한을 검사하고, 권한이 없을 때와 커널이 없을 때 같은 답을 한다](#reading_allocations-a-user-granted-nothing-may-not-read-a-kernel-slot-allocation) | refused |
+| [아무 권한도 없는 사용자가 존재하지 않는 커널 id로 조회해도 커널 id를 풀어낼 수 없다는 같은 이유로 거부된다. 답으로는 그 커널이 있는지 알 수 없다](#reading_allocations-a-user-granted-nothing-reading-an-unknown-kernel-id-is-refused-the-same-way) | refused |
+| [슈퍼관리자가 존재하지 않는 커널 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다. 모든 검사를 통과하는 슈퍼관리자에게는 없다는 사실을 그대로 답한다](#reading_allocations-reading-a-kernel-id-nothing-answers-to-is-not-found) | refused |
+| [슈퍼관리자가 그 커널이 요구하지 않은 슬롯 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading_allocations-reading-a-slot-the-kernel-did-not-ask-for-is-not-found) | refused |
 
 **get_project_resource_overview**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [도메인 범위에서 세션을 읽을 수 있는 사용자가 그 도메인에 속한 프로젝트의 개요를 조회하면 개요가 반환된다. 도메인 범위의 권한은 그 안의 프로젝트에도 미친다](#reading_project_overview-a-user-reading-sessions-in-the-domain-reads-a-project-overview-in-it) | 성공 |
-| [프로젝트 범위에서 세션을 읽을 수 있는 사용자가 그 프로젝트의 개요를 조회하면 개요가 반환된다](#reading_project_overview-a-user-reading-sessions-in-the-project-reads-its-overview) | 성공 |
-| [슈퍼관리자가 존재하지 않는 프로젝트 id로 조회하면 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다. 도메인 개요와 달리 프로젝트는 id로 지정하므로 풀어내는 단계가 없고, 프로젝트가 있는지 확인하지 않는다](#reading_project_overview-reading-the-overview-of-a-project-id-nothing-answers-to-answers-an-empty-overview) | 성공 |
-| [대기 중인 커널만 있는 프로젝트의 개요를 슈퍼관리자가 조회하면 점유된 슬롯이 없고 세션 수가 0이다. 개요는 자원을 점유했거나 배정받은 커널만 세고, 요구만 한 커널은 세지 않는다](#reading_project_overview-the-superadmin-reads-a-project-overview-that-counts-no-pending-kernel) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 프로젝트의 개요를 조회할 수 있다](#reading_project_overview-turning-enforcement-off-lets-a-user-read-a-project-overview) | 성공 |
-| [아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다](#reading_project_overview-a-user-granted-nothing-may-not-read-a-project-overview) | 거부 |
+| [도메인 범위에서 세션을 읽을 수 있는 사용자가 그 도메인에 속한 프로젝트의 개요를 조회하면 개요가 반환된다. 도메인 범위의 권한은 그 안의 프로젝트에도 미친다](#reading_project_overview-a-user-reading-sessions-in-the-domain-reads-a-project-overview-in-it) | answered |
+| [프로젝트 범위에서 세션을 읽을 수 있는 사용자가 그 프로젝트의 개요를 조회하면 개요가 반환된다](#reading_project_overview-a-user-reading-sessions-in-the-project-reads-its-overview) | answered |
+| [슈퍼관리자가 존재하지 않는 프로젝트 id로 조회하면 점유된 슬롯이 없고 세션 수가 0인 개요가 반환된다. 도메인 개요와 달리 프로젝트는 id로 지정하므로 풀어내는 단계가 없고, 프로젝트가 있는지 확인하지 않는다](#reading_project_overview-reading-the-overview-of-a-project-id-nothing-answers-to-answers-an-empty-overview) | answered |
+| [대기 중인 커널만 있는 프로젝트의 개요를 슈퍼관리자가 조회하면 점유된 슬롯이 없고 세션 수가 0이다. 개요는 자원을 점유했거나 배정받은 커널만 세고, 요구만 한 커널은 세지 않는다](#reading_project_overview-the-superadmin-reads-a-project-overview-that-counts-no-pending-kernel) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 프로젝트의 개요를 조회할 수 있다](#reading_project_overview-turning-enforcement-off-lets-a-user-read-a-project-overview) | answered |
+| [아무 권한도 없는 사용자가 조회하면 권한 부족으로 거부된다](#reading_project_overview-a-user-granted-nothing-may-not-read-a-project-overview) | refused |
 
 ### admin_create_slot_type
 

@@ -1,399 +1,399 @@
 ## user
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/user/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/user/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/user/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/user/adapter.py)
 
-시나리오: 미완 8 / 48
+Scenario: incomplete 8 / 48
 
-- ops 로 구성 (23)
-  - LoginHistoryAdapter.admin_search — 대표 성공 ✓ · 대표 실패 ✓
-  - LoginHistoryAdapter.batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - LoginHistoryAdapter.my_search — 대표 성공 ✓ · 대표 실패 ✓
-  - LoginSessionAdapter.admin_search — 대표 성공 ✓ · 대표 실패 ✓
-  - LoginSessionAdapter.batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - LoginSessionAdapter.my_search — 대표 성공 ✓ · 대표 실패 ✓
-  - UserAdapter.admin_search — 대표 성공 ✓ · 대표 실패 ✓
-  - UserAdapter.admin_search_keypairs — 대표 성공 ✓ · 대표 실패 ✓
-  - UserAdapter.batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
-  - UserAdapter.batch_lookup_by_emails — 대표 성공 ✓ · 대표 실패 ✓
-  - UserAdapter.bulk_get_keypair_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - UserAdapter.bulk_lookup_keypair_access_keys — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - UserAdapter.domain_search — 대표 성공 ✓ · 대표 실패 ✓
-  - UserAdapter.gql_admin_search — 대표 성공 ✓ · 대표 실패 ✓
-  - UserAdapter.gql_admin_search_keypairs — 대표 성공 ✓ · 대표 실패 ✓
-  - UserAdapter.gql_scoped_search — 대표 성공 ✓ · 대표 실패 ✓
-  - UserAdapter.gql_search_by_domain — 대표 성공 ✓ · 대표 실패 ✓
-  - UserAdapter.gql_search_by_project — 대표 성공 ✓ · 대표 실패 ✓
-  - UserAdapter.project_search — 대표 성공 ✓ · 대표 실패 ✓
-  - UserAdapter.resolve_domain_id — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - UserAdapter.role_search — 대표 성공 ✓ · 대표 실패 ✓
-  - UserAdapter.scoped_search — 대표 성공 ✓ · 대표 실패 ✓
-  - UserAdapter.search_my_keypairs — 대표 성공 ✓ · 대표 실패 ✓
-- ops + 직접 구현 (7)
-  - UserAdapter.bulk_create_users — 성공 없음 · 실패 있음 1 (atomic_bulk_get_ops, global_scope) — SCENARIO-GAP
-  - UserAdapter.bulk_create_users_with_keypair — 성공 없음 · 실패 있음 1 (atomic_bulk_get_ops, global_scope) — SCENARIO-GAP
-  - UserAdapter.bulk_update_users — 성공 있음 3 · 실패 있음 1 (atomic_bulk_get_ops, global_scope, partial_bulk_get_ops, single_entity)
-  - UserAdapter.create_user — 성공 없음 · 실패 있음 2 (atomic_bulk_get_ops, scope) — SCENARIO-GAP
-  - UserAdapter.delete_user_by_id — 성공 있음 1 · 실패 있음 1 (atomic_bulk_get_ops, single_entity)
-  - UserAdapter.get — 성공 있음 1 · 실패 있음 1 (atomic_bulk_get_ops, single_entity)
-  - UserAdapter.update_user_by_id — 성공 있음 7 · 실패 있음 6 (atomic_bulk_get_ops, single_entity)
-- 직접 구현 (18)
-  - LoginSessionAdapter.admin_revoke — 성공 있음 1 · 실패 있음 2 (global_scope)
-  - LoginSessionAdapter.admin_unblock_user — 성공 있음 2 · 실패 있음 1 (global_scope)
-  - LoginSessionAdapter.my_revoke — 성공 있음 1 · 실패 있음 3 (single_field)
-  - UserAdapter.admin_create_keypair — 성공 있음 1 · 실패 있음 2 (single_entity)
-  - UserAdapter.admin_delete_keypair — 성공 있음 1 · 실패 있음 3 (single_field)
-  - UserAdapter.admin_delete_ssh_keypair — 성공 있음 1 · 실패 있음 2 (single_entity)
-  - UserAdapter.admin_get_keypair — 성공 있음 1 · 실패 있음 1 (single_field)
-  - UserAdapter.admin_get_ssh_keypair — 성공 있음 1 · 실패 있음 1 (single_entity)
-  - UserAdapter.admin_register_ssh_keypair — 성공 있음 1 · 실패 있음 2 (single_entity)
-  - UserAdapter.admin_update_keypair — 성공 있음 1 · 실패 있음 3 (single_field)
-  - UserAdapter.bulk_purge_users — 성공 있음 2 · 실패 있음 1 (global_scope)
-  - UserAdapter.issue_my_keypair — 성공 있음 2 · 실패 있음 1 (single_entity)
-  - UserAdapter.purge_user_by_id — 성공 있음 1 · 실패 있음 2 (single_entity)
-  - UserAdapter.restore_user_by_id — 성공 있음 1 · 실패 있음 2 (single_entity)
-  - UserAdapter.revoke_my_keypair — 성공 있음 1 · 실패 있음 4 (single_field)
-  - UserAdapter.switch_default_access_key — 성공 있음 1 · 실패 있음 2 (single_entity)
-  - UserAdapter.update_my_keypair — 성공 있음 1 · 실패 있음 3 (single_field)
-  - UserAdapter.update_user — 성공 있음 1 · 실패 있음 1 (single_entity)
+- built from ops (23)
+  - LoginHistoryAdapter.admin_search — representative success ✓ · representative refusal ✓
+  - LoginHistoryAdapter.batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - LoginHistoryAdapter.my_search — representative success ✓ · representative refusal ✓
+  - LoginSessionAdapter.admin_search — representative success ✓ · representative refusal ✓
+  - LoginSessionAdapter.batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - LoginSessionAdapter.my_search — representative success ✓ · representative refusal ✓
+  - UserAdapter.admin_search — representative success ✓ · representative refusal ✓
+  - UserAdapter.admin_search_keypairs — representative success ✓ · representative refusal ✓
+  - UserAdapter.batch_load_by_ids — representative success ✓ · representative refusal ✓
+  - UserAdapter.batch_lookup_by_emails — representative success ✓ · representative refusal ✓
+  - UserAdapter.bulk_get_keypair_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - UserAdapter.bulk_lookup_keypair_access_keys — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - UserAdapter.domain_search — representative success ✓ · representative refusal ✓
+  - UserAdapter.gql_admin_search — representative success ✓ · representative refusal ✓
+  - UserAdapter.gql_admin_search_keypairs — representative success ✓ · representative refusal ✓
+  - UserAdapter.gql_scoped_search — representative success ✓ · representative refusal ✓
+  - UserAdapter.gql_search_by_domain — representative success ✓ · representative refusal ✓
+  - UserAdapter.gql_search_by_project — representative success ✓ · representative refusal ✓
+  - UserAdapter.project_search — representative success ✓ · representative refusal ✓
+  - UserAdapter.resolve_domain_id — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - UserAdapter.role_search — representative success ✓ · representative refusal ✓
+  - UserAdapter.scoped_search — representative success ✓ · representative refusal ✓
+  - UserAdapter.search_my_keypairs — representative success ✓ · representative refusal ✓
+- ops + direct implementation (7)
+  - UserAdapter.bulk_create_users — success absent · refusal present 1 (atomic_bulk_get_ops, global_scope) — SCENARIO-GAP
+  - UserAdapter.bulk_create_users_with_keypair — success absent · refusal present 1 (atomic_bulk_get_ops, global_scope) — SCENARIO-GAP
+  - UserAdapter.bulk_update_users — success present 3 · refusal present 1 (atomic_bulk_get_ops, global_scope, partial_bulk_get_ops, single_entity)
+  - UserAdapter.create_user — success absent · refusal present 2 (atomic_bulk_get_ops, scope) — SCENARIO-GAP
+  - UserAdapter.delete_user_by_id — success present 1 · refusal present 1 (atomic_bulk_get_ops, single_entity)
+  - UserAdapter.get — success present 1 · refusal present 1 (atomic_bulk_get_ops, single_entity)
+  - UserAdapter.update_user_by_id — success present 7 · refusal present 6 (atomic_bulk_get_ops, single_entity)
+- direct implementation (18)
+  - LoginSessionAdapter.admin_revoke — success present 1 · refusal present 2 (global_scope)
+  - LoginSessionAdapter.admin_unblock_user — success present 2 · refusal present 1 (global_scope)
+  - LoginSessionAdapter.my_revoke — success present 1 · refusal present 3 (single_field)
+  - UserAdapter.admin_create_keypair — success present 1 · refusal present 2 (single_entity)
+  - UserAdapter.admin_delete_keypair — success present 1 · refusal present 3 (single_field)
+  - UserAdapter.admin_delete_ssh_keypair — success present 1 · refusal present 2 (single_entity)
+  - UserAdapter.admin_get_keypair — success present 1 · refusal present 1 (single_field)
+  - UserAdapter.admin_get_ssh_keypair — success present 1 · refusal present 1 (single_entity)
+  - UserAdapter.admin_register_ssh_keypair — success present 1 · refusal present 2 (single_entity)
+  - UserAdapter.admin_update_keypair — success present 1 · refusal present 3 (single_field)
+  - UserAdapter.bulk_purge_users — success present 2 · refusal present 1 (global_scope)
+  - UserAdapter.issue_my_keypair — success present 2 · refusal present 1 (single_entity)
+  - UserAdapter.purge_user_by_id — success present 1 · refusal present 2 (single_entity)
+  - UserAdapter.restore_user_by_id — success present 1 · refusal present 2 (single_entity)
+  - UserAdapter.revoke_my_keypair — success present 1 · refusal present 4 (single_field)
+  - UserAdapter.switch_default_access_key — success present 1 · refusal present 2 (single_entity)
+  - UserAdapter.update_my_keypair — success present 1 · refusal present 3 (single_field)
+  - UserAdapter.update_user — success present 1 · refusal present 1 (single_entity)
 
 **LoginHistoryAdapter.admin_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [전역 역할이 문인 이력 검색에서 슈퍼관리자가 훑으면, 사용자와 무관하게 심은 이력이 생성 시각 내림차순으로 온다](#login_history-the-superadmin-searches-every-users-login-history) | 성공 |
-| [권한 받은 사용자가 이력 전체 검색을 하려 하면, 전역 역할 문이 막는다](#login_history-a-user-who-is-not-the-superadmin-may-not-search-every-login-history) | 거부 |
+| [전역 역할이 문인 이력 검색에서 슈퍼관리자가 훑으면, 사용자와 무관하게 심은 이력이 생성 시각 내림차순으로 온다](#login_history-the-superadmin-searches-every-users-login-history) | answered |
+| [권한 받은 사용자가 이력 전체 검색을 하려 하면, 전역 역할 문이 막는다](#login_history-a-user-who-is-not-the-superadmin-may-not-search-every-login-history) | refused |
 
 **LoginHistoryAdapter.my_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 스코프에서 READ를 받은 사용자가 훑으면, 다른 사용자의 이력은 빠진다](#login_history-a-user-granted-read-on-themselves-searches-only-their-own-login-history) | 성공 |
-| [역할 없이 자기 이력을 훑으려 하면, 본인이어도 스코프 권한 문이 막는다](#login_history-a-user-granted-nothing-may-not-search-their-own-login-history) | 거부 |
+| [자기 스코프에서 READ를 받은 사용자가 훑으면, 다른 사용자의 이력은 빠진다](#login_history-a-user-granted-read-on-themselves-searches-only-their-own-login-history) | answered |
+| [역할 없이 자기 이력을 훑으려 하면, 본인이어도 스코프 권한 문이 막는다](#login_history-a-user-granted-nothing-may-not-search-their-own-login-history) | refused |
 
 **LoginSessionAdapter.admin_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [전역 역할이 문인 세션 검색에서 슈퍼관리자가 페이지 인자 없이 훑으면, 사용자와 무관하게 심은 세션이 생성 시각 내림차순으로 온다](#login_sessions-the-superadmin-searches-every-users-login-sessions) | 성공 |
-| [권한 받은 사용자가 세션 전체 검색을 하려 하면, 전역 역할 문이 막는다](#login_sessions-a-user-who-is-not-the-superadmin-may-not-search-every-login-session) | 거부 |
+| [전역 역할이 문인 세션 검색에서 슈퍼관리자가 페이지 인자 없이 훑으면, 사용자와 무관하게 심은 세션이 생성 시각 내림차순으로 온다](#login_sessions-the-superadmin-searches-every-users-login-sessions) | answered |
+| [권한 받은 사용자가 세션 전체 검색을 하려 하면, 전역 역할 문이 막는다](#login_sessions-a-user-who-is-not-the-superadmin-may-not-search-every-login-session) | refused |
 
 **LoginSessionAdapter.my_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 스코프에서 READ를 받은 사용자가 훑으면, 다른 사용자의 세션은 빠진다](#login_sessions-a-user-granted-read-on-themselves-searches-only-their-own-login-sessions) | 성공 |
-| [역할 없이 자기 세션을 훑으려 하면, 본인이어도 스코프 권한 문이 막는다](#login_sessions-a-user-granted-nothing-may-not-search-their-own-login-sessions) | 거부 |
+| [자기 스코프에서 READ를 받은 사용자가 훑으면, 다른 사용자의 세션은 빠진다](#login_sessions-a-user-granted-read-on-themselves-searches-only-their-own-login-sessions) | answered |
+| [역할 없이 자기 세션을 훑으려 하면, 본인이어도 스코프 권한 문이 막는다](#login_sessions-a-user-granted-nothing-may-not-search-their-own-login-sessions) | refused |
 
 **UserAdapter.admin_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [전역 역할이 문인 검색에서 슈퍼관리자가 필터 없이 훑으면, 삭제 상태 사용자를 포함해 심은 사용자가 모두 온다](#searching-the-superadmin-searching-every-user-counts-deleted-ones-too) | 성공 |
-| [도메인 스코프 권한을 받은 사용자라도 전체 검색을 하려 하면, 전역 역할 문이 막는다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-user) | 거부 |
+| [전역 역할이 문인 검색에서 슈퍼관리자가 필터 없이 훑으면, 삭제 상태 사용자를 포함해 심은 사용자가 모두 온다](#searching-the-superadmin-searching-every-user-counts-deleted-ones-too) | answered |
+| [도메인 스코프 권한을 받은 사용자라도 전체 검색을 하려 하면, 전역 역할 문이 막는다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-user) | refused |
 
 **UserAdapter.admin_search_keypairs**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [전역 역할이 문인 키 검색에서 슈퍼관리자가 페이지 인자 없이 훑으면, 모든 사용자의 키가 오고 limit 자리는 비어서 온다](#managing_keypairs-the-superadmin-searching-every-key-gets-every-users-key) | 성공 |
-| [권한 받은 사용자가 키 전체 검색을 하려 하면, 전역 역할 문이 막는다](#managing_keypairs-a-user-who-is-not-the-superadmin-may-not-search-every-key) | 거부 |
+| [전역 역할이 문인 키 검색에서 슈퍼관리자가 페이지 인자 없이 훑으면, 모든 사용자의 키가 오고 limit 자리는 비어서 온다](#managing_keypairs-the-superadmin-searching-every-key-gets-every-users-key) | answered |
+| [권한 받은 사용자가 키 전체 검색을 하려 하면, 전역 역할 문이 막는다](#managing_keypairs-a-user-who-is-not-the-superadmin-may-not-search-every-key) | refused |
 
 **UserAdapter.batch_load_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [권한 없는 사용자가 빈 id 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다](#reading-a-batch-load-of-no-ids-answers-an-empty-list) | 성공 |
-| [슈퍼관리자가 있는 id와 없는 id를 함께 요청하면, 권한 문을 지나 없는 원소 자리에 빈 값이 온다](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | 성공 |
-| [한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 id를 한 번에 요청하면, 입력 순서대로 원소별 결과가 온다](#reading-a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order) | 거부 |
+| [권한 없는 사용자가 빈 id 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다](#reading-a-batch-load-of-no-ids-answers-an-empty-list) | answered |
+| [슈퍼관리자가 있는 id와 없는 id를 함께 요청하면, 권한 문을 지나 없는 원소 자리에 빈 값이 온다](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
+| [한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 id를 한 번에 요청하면, 입력 순서대로 원소별 결과가 온다](#reading-a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order) | refused |
 
 **UserAdapter.batch_lookup_by_emails**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 그 사용자의 email 을 찾으면, 그 사용자의 id 가 답으로 온다](#reading-a-user-granted-read-on-another-user-looks-up-their-id-by-email) | 성공 |
-| [권한 없는 사용자가 빈 email 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다](#reading-an-email-lookup-of-no-emails-answers-an-empty-list) | 성공 |
-| [한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 email 을 한 번에 찾으면, 첫째는 id, 나머지 둘은 같은 거부가 입력 순서대로 온다](#reading-an-unreadable-user-and-a-missing-email-are-refused-alike) | 거부 |
+| [대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 그 사용자의 email 을 찾으면, 그 사용자의 id 가 답으로 온다](#reading-a-user-granted-read-on-another-user-looks-up-their-id-by-email) | answered |
+| [권한 없는 사용자가 빈 email 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다](#reading-an-email-lookup-of-no-emails-answers-an-empty-list) | answered |
+| [한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 email 을 한 번에 찾으면, 첫째는 id, 나머지 둘은 같은 거부가 입력 순서대로 온다](#reading-an-unreadable-user-and-a-missing-email-are-refused-alike) | refused |
 
 **UserAdapter.domain_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [도메인 스코프에서 사용자 READ를 받은 사용자가 도메인 이름으로 훑으면, 다른 도메인 사용자는 빠진다](#searching-a-user-granted-on-a-domain-searching-it-by-name-finds-only-its-users) | 성공 |
-| [역할을 받지 않은 사용자가 도메인 이름으로 훑으려 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-search-a-domain-by-name) | 거부 |
-| [권한 받은 사용자가 없는 도메인 이름으로 훑으려 하면, 스코프 검사 전에 이름 조회 단계가 대상 없음으로 막는다](#searching-searching-a-domain-name-nothing-answers-to-is-not-found) | 거부 |
+| [도메인 스코프에서 사용자 READ를 받은 사용자가 도메인 이름으로 훑으면, 다른 도메인 사용자는 빠진다](#searching-a-user-granted-on-a-domain-searching-it-by-name-finds-only-its-users) | answered |
+| [역할을 받지 않은 사용자가 도메인 이름으로 훑으려 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-search-a-domain-by-name) | refused |
+| [권한 받은 사용자가 없는 도메인 이름으로 훑으려 하면, 스코프 검사 전에 이름 조회 단계가 대상 없음으로 막는다](#searching-searching-a-domain-name-nothing-answers-to-is-not-found) | refused |
 
 **UserAdapter.gql_admin_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 커서와 페이지 인자를 모두 생략하고 훑으면, 생성 시각 내림차순으로 열 명까지 오고 다음 페이지 여부가 함께 온다](#searching-a-gql-search-without-page-arguments-answers-the-newest-ten) | 성공 |
-| [권한 받은 사용자가 GQL 전체 검색을 하려 하면, 전역 역할 문이 막는다](#searching-a-user-who-is-not-the-superadmin-may-not-gql-search-every-user) | 거부 |
+| [슈퍼관리자가 커서와 페이지 인자를 모두 생략하고 훑으면, 생성 시각 내림차순으로 열 명까지 오고 다음 페이지 여부가 함께 온다](#searching-a-gql-search-without-page-arguments-answers-the-newest-ten) | answered |
+| [권한 받은 사용자가 GQL 전체 검색을 하려 하면, 전역 역할 문이 막는다](#searching-a-user-who-is-not-the-superadmin-may-not-gql-search-every-user) | refused |
 
 **UserAdapter.gql_admin_search_keypairs**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [전역 역할이 문인 GQL 키 검색에서 슈퍼관리자가 정책 이름을 주면, 그 정책을 쓰는 키만 온다](#managing_keypairs-the-superadmin-gql-key-search-by-policy-name-gets-that-policys-keys-only) | 성공 |
-| [권한 받은 사용자가 GQL 키 검색을 하려 하면, 전역 역할 문이 막는다](#managing_keypairs-a-user-who-is-not-the-superadmin-may-not-search-every-key-over-gql) | 거부 |
+| [전역 역할이 문인 GQL 키 검색에서 슈퍼관리자가 정책 이름을 주면, 그 정책을 쓰는 키만 온다](#managing_keypairs-the-superadmin-gql-key-search-by-policy-name-gets-that-policys-keys-only) | answered |
+| [권한 받은 사용자가 GQL 키 검색을 하려 하면, 전역 역할 문이 막는다](#managing_keypairs-a-user-who-is-not-the-superadmin-may-not-search-every-key-over-gql) | refused |
 
 **UserAdapter.gql_scoped_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [같은 권한으로 GQL 스코프 검색을 하면, 두 스코프 사용자가 커서 답으로 온다](#searching-a-gql-scoped-search-over-two-granted-scopes-joins-their-users) | 성공 |
-| [한 스코프에만 READ를 받고 GQL 스코프 검색에 둘을 주면, 스코프 권한 문이 전체를 막는다](#searching-one-scope-without-a-grant-refuses-the-whole-gql-scoped-search) | 거부 |
+| [같은 권한으로 GQL 스코프 검색을 하면, 두 스코프 사용자가 커서 답으로 온다](#searching-a-gql-scoped-search-over-two-granted-scopes-joins-their-users) | answered |
+| [한 스코프에만 READ를 받고 GQL 스코프 검색에 둘을 주면, 스코프 권한 문이 전체를 막는다](#searching-one-scope-without-a-grant-refuses-the-whole-gql-scoped-search) | refused |
 
 **UserAdapter.gql_search_by_domain**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [같은 권한으로 GQL 도메인 검색을 하면, 그 도메인 사용자만 커서 답으로 온다](#searching-a-user-granted-on-a-domain-gql-searching-it-finds-only-its-users) | 성공 |
-| [역할 없이 GQL 도메인 검색을 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-gql-search-a-domain) | 거부 |
+| [같은 권한으로 GQL 도메인 검색을 하면, 그 도메인 사용자만 커서 답으로 온다](#searching-a-user-granted-on-a-domain-gql-searching-it-finds-only-its-users) | answered |
+| [역할 없이 GQL 도메인 검색을 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-gql-search-a-domain) | refused |
 
 **UserAdapter.gql_search_by_project**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [같은 권한으로 GQL 프로젝트 검색을 하면, 명부의 사용자만 커서 답으로 온다](#searching-a-user-granted-on-a-project-gql-searching-it-finds-only-its-roster) | 성공 |
-| [역할 없이 GQL 프로젝트 검색을 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-gql-search-a-project) | 거부 |
+| [같은 권한으로 GQL 프로젝트 검색을 하면, 명부의 사용자만 커서 답으로 온다](#searching-a-user-granted-on-a-project-gql-searching-it-finds-only-its-roster) | answered |
+| [역할 없이 GQL 프로젝트 검색을 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-gql-search-a-project) | refused |
 
 **UserAdapter.project_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프로젝트 스코프에서 사용자 READ를 받은 사용자가 그 프로젝트로 훑으면, 명부에 오른 사용자만 온다](#searching-a-user-granted-on-a-project-searching-it-finds-only-its-roster) | 성공 |
-| [역할 없이 프로젝트 검색을 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-search-a-project) | 거부 |
+| [프로젝트 스코프에서 사용자 READ를 받은 사용자가 그 프로젝트로 훑으면, 명부에 오른 사용자만 온다](#searching-a-user-granted-on-a-project-searching-it-finds-only-its-roster) | answered |
+| [역할 없이 프로젝트 검색을 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-search-a-project) | refused |
 
 **UserAdapter.role_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [역할이 걸린 스코프의 사용자 READ를 받은 사용자가 역할 하나를 주면, 그 역할을 배정받은 사용자만 온다](#searching-a-user-granted-on-the-role-scope-searching-by-role-finds-only-its-holders) | 성공 |
-| [전역 역할이 문인 역할 검색에서 슈퍼관리자가 역할 하나를 주면, 그 역할을 배정받은 사용자만 온다](#searching-the-superadmin-searching-by-role-finds-only-its-holders) | 성공 |
-| [아무 권한도 받지 않은 사용자가 역할로 훑으려 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-search-by-role) | 거부 |
+| [역할이 걸린 스코프의 사용자 READ를 받은 사용자가 역할 하나를 주면, 그 역할을 배정받은 사용자만 온다](#searching-a-user-granted-on-the-role-scope-searching-by-role-finds-only-its-holders) | answered |
+| [전역 역할이 문인 역할 검색에서 슈퍼관리자가 역할 하나를 주면, 그 역할을 배정받은 사용자만 온다](#searching-the-superadmin-searching-by-role-finds-only-its-holders) | answered |
+| [아무 권한도 받지 않은 사용자가 역할로 훑으려 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-search-by-role) | refused |
 
 **UserAdapter.scoped_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [도메인과 프로젝트 스코프 모두에서 READ를 받은 사용자가 두 스코프를 함께 주면, 두 스코프의 사용자가 중복 없이 합쳐진다](#searching-a-scoped-search-over-two-granted-scopes-joins-their-users) | 성공 |
-| [권한 받은 사용자가 페이지 인자 없이 스코프 검색을 하면, limit 50 offset 0이 답에 실린다](#searching-a-scoped-search-without-page-arguments-answers-up-to-fifty) | 성공 |
-| [첫 스코프에만 READ를 받은 사용자가 두 스코프를 함께 주면, 스코프 권한 문이 전체를 막는다](#searching-one-scope-without-a-grant-refuses-the-whole-scoped-search) | 거부 |
+| [도메인과 프로젝트 스코프 모두에서 READ를 받은 사용자가 두 스코프를 함께 주면, 두 스코프의 사용자가 중복 없이 합쳐진다](#searching-a-scoped-search-over-two-granted-scopes-joins-their-users) | answered |
+| [권한 받은 사용자가 페이지 인자 없이 스코프 검색을 하면, limit 50 offset 0이 답에 실린다](#searching-a-scoped-search-without-page-arguments-answers-up-to-fifty) | answered |
+| [첫 스코프에만 READ를 받은 사용자가 두 스코프를 함께 주면, 스코프 권한 문이 전체를 막는다](#searching-one-scope-without-a-grant-refuses-the-whole-scoped-search) | refused |
 
 **UserAdapter.search_my_keypairs**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 스코프에서 READ를 받은 사용자가 자기 키를 훑으면, 다른 사용자의 키는 빠진다](#own_keypairs-a-user-granted-read-searching-their-keys-sees-only-their-own) | 성공 |
-| [권한 받은 사용자가 페이지 인자 없이 훑으면, 생성 시각 내림차순 열 개와 다음 페이지 여부가 온다](#own_keypairs-searching-own-keys-without-page-arguments-answers-the-ten-newest) | 성공 |
-| [역할 없이 자기 키를 훑으려 하면, 스코프 권한 문이 막는다](#own_keypairs-a-user-granted-nothing-may-not-search-their-own-keys) | 거부 |
+| [자기 스코프에서 READ를 받은 사용자가 자기 키를 훑으면, 다른 사용자의 키는 빠진다](#own_keypairs-a-user-granted-read-searching-their-keys-sees-only-their-own) | answered |
+| [권한 받은 사용자가 페이지 인자 없이 훑으면, 생성 시각 내림차순 열 개와 다음 페이지 여부가 온다](#own_keypairs-searching-own-keys-without-page-arguments-answers-the-ten-newest) | answered |
+| [역할 없이 자기 키를 훑으려 하면, 스코프 권한 문이 막는다](#own_keypairs-a-user-granted-nothing-may-not-search-their-own-keys) | refused |
 
 **UserAdapter.bulk_create_users**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [도메인 스코프에서 CREATE를 받은 사용자라도 일괄 생성을 하려 하면, 전역 역할 문이 막는다](#creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users) | 거부 |
+| [도메인 스코프에서 CREATE를 받은 사용자라도 일괄 생성을 하려 하면, 전역 역할 문이 막는다](#creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users) | refused |
 
 **UserAdapter.bulk_create_users_with_keypair**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [권한 받은 사용자가 이 일괄 생성을 하려 하면, 전역 역할 문이 막는다](#creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs) | 거부 |
+| [권한 받은 사용자가 이 일괄 생성을 하려 하면, 전역 역할 문이 막는다](#creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs) | refused |
 
 **UserAdapter.bulk_update_users**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 일괄 수정으로 활성 사용자에 DELETED, 삭제 상태 사용자에 ACTIVE, 다른 삭제 상태 사용자에 전체 이름을 주면, 둘은 물리고 되살린 뒤 수정 목록에, 하나는 실패로 담긴다](#retiring-a-bulk-edit-deletes-and-restores-per-item-and-refuses-a-deleted-user-edit) | 성공 |
-| [슈퍼관리자가 일괄 수정과 함께 남의 키로 기본 키 전환을 주면, 그 사용자는 수정 목록에서 빠지고 실패로 담긴다](#editing-a-bulk-edit-whose-default-key-switch-fails-reports-that-user-as-failed) | 성공 |
-| [전역 역할이 문인 일괄 수정에서 슈퍼관리자가 있는 사용자와 이름이 겹치게 바꾸는 사용자를 함께 주면, 하나는 수정되고 하나는 사용자 id와 함께 실패로 담긴다](#editing-the-superadmin-bulk-edit-answers-the-updated-and-the-failed-apart) | 성공 |
-| [도메인 스코프에서 UPDATE를 받은 사용자라도 일괄 수정을 하려 하면, 전역 역할 문이 막는다](#editing-a-user-who-is-not-the-superadmin-may-not-bulk-edit-users) | 거부 |
+| [슈퍼관리자가 일괄 수정으로 활성 사용자에 DELETED, 삭제 상태 사용자에 ACTIVE, 다른 삭제 상태 사용자에 전체 이름을 주면, 둘은 물리고 되살린 뒤 수정 목록에, 하나는 실패로 담긴다](#retiring-a-bulk-edit-deletes-and-restores-per-item-and-refuses-a-deleted-user-edit) | answered |
+| [슈퍼관리자가 일괄 수정과 함께 남의 키로 기본 키 전환을 주면, 그 사용자는 수정 목록에서 빠지고 실패로 담긴다](#editing-a-bulk-edit-whose-default-key-switch-fails-reports-that-user-as-failed) | answered |
+| [전역 역할이 문인 일괄 수정에서 슈퍼관리자가 있는 사용자와 이름이 겹치게 바꾸는 사용자를 함께 주면, 하나는 수정되고 하나는 사용자 id와 함께 실패로 담긴다](#editing-the-superadmin-bulk-edit-answers-the-updated-and-the-failed-apart) | answered |
+| [도메인 스코프에서 UPDATE를 받은 사용자라도 일괄 수정을 하려 하면, 전역 역할 문이 막는다](#editing-a-user-who-is-not-the-superadmin-may-not-bulk-edit-users) | refused |
 
 **UserAdapter.create_user**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [역할을 받지 않은 사용자가 만들려 하면, 도메인 스코프 권한 문이 막는다](#creating-a-user-granted-nothing-may-not-create-a-user) | 거부 |
-| [권한 받은 사용자가 없는 도메인 이름을 주면, 도메인 이름 조회 단계가 대상 없음으로 막는다](#creating-a-user-may-not-be-created-in-a-domain-name-nothing-answers-to) | 거부 |
+| [역할을 받지 않은 사용자가 만들려 하면, 도메인 스코프 권한 문이 막는다](#creating-a-user-granted-nothing-may-not-create-a-user) | refused |
+| [권한 받은 사용자가 없는 도메인 이름을 주면, 도메인 이름 조회 단계가 대상 없음으로 막는다](#creating-a-user-may-not-be-created-in-a-domain-name-nothing-answers-to) | refused |
 
 **UserAdapter.delete_user_by_id**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 물리면, 성공이 오고 그 사용자 상태가 삭제로 바뀐다](#retiring-a-user-granted-soft-delete-marks-another-user-deleted) | 성공 |
-| [역할 없이 물리려 하면, 엔티티 권한 문이 막는다](#retiring-a-user-granted-nothing-may-not-delete-another-user) | 거부 |
+| [대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 물리면, 성공이 오고 그 사용자 상태가 삭제로 바뀐다](#retiring-a-user-granted-soft-delete-marks-another-user-deleted) | answered |
+| [역할 없이 물리려 하면, 엔티티 권한 문이 막는다](#retiring-a-user-granted-nothing-may-not-delete-another-user) | refused |
 
 **UserAdapter.get**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 읽으면, 기본 키까지 채운 노드 전체가 답으로 온다](#reading-a-user-granted-read-on-another-user-reads-their-whole-node) | 성공 |
-| [아무 역할도 받지 않은 사용자가 다른 사용자를 읽으려 하면, 엔티티 권한 문이 막는다](#reading-a-user-granted-nothing-may-not-read-another-user) | 거부 |
+| [대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 읽으면, 기본 키까지 채운 노드 전체가 답으로 온다](#reading-a-user-granted-read-on-another-user-reads-their-whole-node) | answered |
+| [아무 역할도 받지 않은 사용자가 다른 사용자를 읽으려 하면, 엔티티 권한 문이 막는다](#reading-a-user-granted-nothing-may-not-read-another-user) | refused |
 
 **UserAdapter.update_user_by_id**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 전체 이름만 주면, 전체 이름만 바뀐 노드가 온다](#editing-a-user-granted-update-changing-only-the-full-name-leaves-the-rest) | 성공 |
-| [대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 삭제 상태 사용자에 수정으로 ACTIVE를 주면, 되살리기와 같이 활성이 된다](#retiring-an-edit-to-active-on-a-deleted-user-restores-the-user) | 성공 |
-| [대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 수정으로 DELETED를 주면, 물리기와 같이 삭제 상태가 된다](#retiring-an-edit-to-deleted-soft-deletes-the-user) | 성공 |
-| [대상 사용자 스코프에서 UPDATE와 READ를 받은 다른 사용자가 비밀번호 변경을 요구받는 사용자에게 새 비밀번호만 주면, 요구가 남은 노드가 온다](#editing-another-users-new-password-leaves-the-password-change-requirement) | 성공 |
-| [권한 받은 사용자가 대상 사용자의 다른 키를 기본 키로 주면, 수정이 반영된 뒤 기본 키가 옮겨간 노드가 온다](#editing-naming-a-default-key-in-an-edit-moves-the-default-to-it) | 성공 |
-| [권한 받은 사용자가 소속 프로젝트 자리에 빈 값을 주면, 소속을 건드리지 않고 나머지 수정만 반영된다](#editing-null-project-ids-in-an-edit-leave-the-membership-as-it-is) | 성공 |
-| [비밀번호 변경을 요구받는 사용자가 자기 사용자 스코프에서 UPDATE와 READ를 받고, 새 비밀번호와 요구 해제를 함께 주면, 요구가 풀린 노드가 온다](#editing-setting-ones-own-new-password-lifts-the-password-change-requirement) | 성공 |
-| [역할을 받지 않은 사용자가 수정하려 하면, 엔티티 권한 문이 막는다](#editing-a-user-granted-nothing-may-not-edit-another-user) | 거부 |
-| [권한 받은 사용자가 이미 쓰이는 사용자 이름을 주면, 입력 검증이 막는다](#editing-a-username-another-user-holds-may-not-be-taken) | 거부 |
-| [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 삭제 상태 사용자의 전체 이름을 고치면, 삭제된 사용자라 막힌다](#retiring-an-edit-of-another-field-on-a-deleted-user-is-refused) | 거부 |
-| [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 수정으로 BEFORE_VERIFICATION을 주면, 입력 검증이 막는다](#retiring-an-edit-to-a-status-other-than-active-or-inactive-is-refused) | 거부 |
-| [대상 사용자 스코프에서 UPDATE와 READ만 받은 사용자가 수정으로 DELETED를 주면, 물리기의 엔티티 권한 문이 막는다](#retiring-an-edit-to-deleted-is-refused-without-soft-delete) | 거부 |
-| [삭제 상태 사용자에 수정으로 DELETED만 주면, 아무것도 바뀌지 않고 그 사용자가 온다](#retiring-an-edit-to-deleted-on-a-deleted-user-changes-nothing) | 거부 |
+| [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 전체 이름만 주면, 전체 이름만 바뀐 노드가 온다](#editing-a-user-granted-update-changing-only-the-full-name-leaves-the-rest) | answered |
+| [대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 삭제 상태 사용자에 수정으로 ACTIVE를 주면, 되살리기와 같이 활성이 된다](#retiring-an-edit-to-active-on-a-deleted-user-restores-the-user) | answered |
+| [대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 수정으로 DELETED를 주면, 물리기와 같이 삭제 상태가 된다](#retiring-an-edit-to-deleted-soft-deletes-the-user) | answered |
+| [대상 사용자 스코프에서 UPDATE와 READ를 받은 다른 사용자가 비밀번호 변경을 요구받는 사용자에게 새 비밀번호만 주면, 요구가 남은 노드가 온다](#editing-another-users-new-password-leaves-the-password-change-requirement) | answered |
+| [권한 받은 사용자가 대상 사용자의 다른 키를 기본 키로 주면, 수정이 반영된 뒤 기본 키가 옮겨간 노드가 온다](#editing-naming-a-default-key-in-an-edit-moves-the-default-to-it) | answered |
+| [권한 받은 사용자가 소속 프로젝트 자리에 빈 값을 주면, 소속을 건드리지 않고 나머지 수정만 반영된다](#editing-null-project-ids-in-an-edit-leave-the-membership-as-it-is) | answered |
+| [비밀번호 변경을 요구받는 사용자가 자기 사용자 스코프에서 UPDATE와 READ를 받고, 새 비밀번호와 요구 해제를 함께 주면, 요구가 풀린 노드가 온다](#editing-setting-ones-own-new-password-lifts-the-password-change-requirement) | answered |
+| [역할을 받지 않은 사용자가 수정하려 하면, 엔티티 권한 문이 막는다](#editing-a-user-granted-nothing-may-not-edit-another-user) | refused |
+| [권한 받은 사용자가 이미 쓰이는 사용자 이름을 주면, 입력 검증이 막는다](#editing-a-username-another-user-holds-may-not-be-taken) | refused |
+| [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 삭제 상태 사용자의 전체 이름을 고치면, 삭제된 사용자라 막힌다](#retiring-an-edit-of-another-field-on-a-deleted-user-is-refused) | refused |
+| [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 수정으로 BEFORE_VERIFICATION을 주면, 입력 검증이 막는다](#retiring-an-edit-to-a-status-other-than-active-or-inactive-is-refused) | refused |
+| [대상 사용자 스코프에서 UPDATE와 READ만 받은 사용자가 수정으로 DELETED를 주면, 물리기의 엔티티 권한 문이 막는다](#retiring-an-edit-to-deleted-is-refused-without-soft-delete) | refused |
+| [삭제 상태 사용자에 수정으로 DELETED만 주면, 아무것도 바뀌지 않고 그 사용자가 온다](#retiring-an-edit-to-deleted-on-a-deleted-user-changes-nothing) | refused |
 
 **LoginSessionAdapter.admin_revoke**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [전역 역할이 문인 관리자 회수에서 슈퍼관리자가 다른 사용자의 세션을 회수하면, 성공이 오고 세션 전체 검색에서 빠지며 관리자가 회수했다는 이력이 생긴다](#login_sessions-the-superadmin-revokes-another-users-login-session) | 성공 |
-| [권한 받은 사용자가 관리자 회수를 하려 하면, 전역 역할 문이 막는다](#login_sessions-a-user-who-is-not-the-superadmin-may-not-revoke-a-login-session-as-admin) | 거부 |
-| [슈퍼관리자가 없는 세션 id를 주면, 입력 검증이 막는다](#login_sessions-even-the-superadmin-may-not-revoke-a-login-session-that-does-not-exist) | 거부 |
+| [전역 역할이 문인 관리자 회수에서 슈퍼관리자가 다른 사용자의 세션을 회수하면, 성공이 오고 세션 전체 검색에서 빠지며 관리자가 회수했다는 이력이 생긴다](#login_sessions-the-superadmin-revokes-another-users-login-session) | answered |
+| [권한 받은 사용자가 관리자 회수를 하려 하면, 전역 역할 문이 막는다](#login_sessions-a-user-who-is-not-the-superadmin-may-not-revoke-a-login-session-as-admin) | refused |
+| [슈퍼관리자가 없는 세션 id를 주면, 입력 검증이 막는다](#login_sessions-even-the-superadmin-may-not-revoke-a-login-session-that-does-not-exist) | refused |
 
 **LoginSessionAdapter.admin_unblock_user**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [전역 역할이 문인 차단 해제에서 슈퍼관리자가 사용자 이름을 주면, 성공이 오고 그 이름의 차단 기록이 사라진다](#login_sessions-the-superadmin-unblocks-a-user) | 성공 |
-| [슈퍼관리자가 어떤 사용자도 아닌 이름을 주면, 존재를 확인하지 않고 성공이 온다](#login_sessions-unblocking-a-username-nobody-holds-still-succeeds) | 성공 |
-| [권한 받은 사용자가 차단을 풀려 하면, 전역 역할 문이 막는다](#login_sessions-a-user-who-is-not-the-superadmin-may-not-unblock-a-user) | 거부 |
+| [전역 역할이 문인 차단 해제에서 슈퍼관리자가 사용자 이름을 주면, 성공이 오고 그 이름의 차단 기록이 사라진다](#login_sessions-the-superadmin-unblocks-a-user) | answered |
+| [슈퍼관리자가 어떤 사용자도 아닌 이름을 주면, 존재를 확인하지 않고 성공이 온다](#login_sessions-unblocking-a-username-nobody-holds-still-succeeds) | answered |
+| [권한 받은 사용자가 차단을 풀려 하면, 전역 역할 문이 막는다](#login_sessions-a-user-who-is-not-the-superadmin-may-not-unblock-a-user) | refused |
 
 **LoginSessionAdapter.my_revoke**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 스코프에서 READ와 UPDATE를 받은 사용자가 자기 세션을 회수하면, 성공이 오고 그 세션은 더 조회되지 않으며 사용자가 회수했다는 이력이 생긴다](#login_sessions-a-user-granted-update-on-themselves-revokes-their-own-login-session) | 성공 |
-| [역할 없이 회수하려 하면, 소유자 조회 단계가 막는다](#login_sessions-a-user-granted-nothing-may-not-revoke-their-own-login-session) | 거부 |
-| [자기 스코프에서만 READ와 UPDATE를 받은 사용자가 다른 사용자의 세션을 주면, 그 소유자에 대한 조회 단계가 막는다](#login_sessions-a-user-granted-only-on-themselves-may-not-revoke-another-users-login-session) | 거부 |
-| [READ만 받고 회수하려 하면, 엔티티 권한 문이 막는다](#login_sessions-a-user-granted-only-read-may-not-revoke-their-own-login-session) | 거부 |
+| [자기 스코프에서 READ와 UPDATE를 받은 사용자가 자기 세션을 회수하면, 성공이 오고 그 세션은 더 조회되지 않으며 사용자가 회수했다는 이력이 생긴다](#login_sessions-a-user-granted-update-on-themselves-revokes-their-own-login-session) | answered |
+| [역할 없이 회수하려 하면, 소유자 조회 단계가 막는다](#login_sessions-a-user-granted-nothing-may-not-revoke-their-own-login-session) | refused |
+| [자기 스코프에서만 READ와 UPDATE를 받은 사용자가 다른 사용자의 세션을 주면, 그 소유자에 대한 조회 단계가 막는다](#login_sessions-a-user-granted-only-on-themselves-may-not-revoke-another-users-login-session) | refused |
+| [READ만 받고 회수하려 하면, 엔티티 권한 문이 막는다](#login_sessions-a-user-granted-only-read-may-not-revoke-their-own-login-session) | refused |
 
 **UserAdapter.admin_create_keypair**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 아니어도 대상 사용자 스코프에서 UPDATE를 받은 사용자가 정책을 주고 키를 만들면, 기본 아닌 새 키와 secret이 온다](#managing_keypairs-a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy) | 성공 |
-| [권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막는다](#managing_keypairs-a-key-may-not-be-made-under-a-policy-that-does-not-exist) | 거부 |
-| [역할 없이 키를 만들려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-nothing-may-not-make-a-key-for-another) | 거부 |
+| [슈퍼관리자가 아니어도 대상 사용자 스코프에서 UPDATE를 받은 사용자가 정책을 주고 키를 만들면, 기본 아닌 새 키와 secret이 온다](#managing_keypairs-a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy) | answered |
+| [권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막는다](#managing_keypairs-a-key-may-not-be-made-under-a-policy-that-does-not-exist) | refused |
+| [역할 없이 키를 만들려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-nothing-may-not-make-a-key-for-another) | refused |
 
 **UserAdapter.admin_delete_keypair**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [대상 스코프에서 READ와 UPDATE를 받은 사용자가 지우면, 지운 키의 access key가 답으로 온다](#managing_keypairs-a-granted-user-deleting-another-users-extra-key-gets-its-access-key) | 성공 |
-| [역할 없이 지우려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-delete-another-users-key) | 거부 |
-| [READ만 받고 지우려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-only-read-may-not-delete-another-users-key) | 거부 |
-| [권한 받은 사용자가 대상의 기본 키를 지우려 하면, 입력 검증이 막는다](#managing_keypairs-another-users-default-key-may-not-be-deleted) | 거부 |
+| [대상 스코프에서 READ와 UPDATE를 받은 사용자가 지우면, 지운 키의 access key가 답으로 온다](#managing_keypairs-a-granted-user-deleting-another-users-extra-key-gets-its-access-key) | answered |
+| [역할 없이 지우려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-delete-another-users-key) | refused |
+| [READ만 받고 지우려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-only-read-may-not-delete-another-users-key) | refused |
+| [권한 받은 사용자가 대상의 기본 키를 지우려 하면, 입력 검증이 막는다](#managing_keypairs-another-users-default-key-may-not-be-deleted) | refused |
 
 **UserAdapter.admin_delete_ssh_keypair**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [대상 스코프에서 READ와 UPDATE를 받은 사용자가 지우면, access key가 오고 공개키가 비워진다](#managing_keypairs-a-granted-user-clearing-another-users-ssh-key-empties-the-public-key) | 성공 |
-| [역할 없이 지우려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-clear-another-users-ssh-key) | 거부 |
-| [READ만 받고 지우려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-only-read-may-not-clear-another-users-ssh-key) | 거부 |
+| [대상 스코프에서 READ와 UPDATE를 받은 사용자가 지우면, access key가 오고 공개키가 비워진다](#managing_keypairs-a-granted-user-clearing-another-users-ssh-key-empties-the-public-key) | answered |
+| [역할 없이 지우려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-clear-another-users-ssh-key) | refused |
+| [READ만 받고 지우려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-only-read-may-not-clear-another-users-ssh-key) | refused |
 
 **UserAdapter.admin_get_keypair**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [대상 스코프에서 READ를 받은 사용자가 읽으면, 그 키 노드 전체가 온다](#managing_keypairs-a-granted-user-reads-another-users-key-by-access-key) | 성공 |
-| [역할 없이 읽으려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-read-another-users-key) | 거부 |
+| [대상 스코프에서 READ를 받은 사용자가 읽으면, 그 키 노드 전체가 온다](#managing_keypairs-a-granted-user-reads-another-users-key-by-access-key) | answered |
+| [역할 없이 읽으려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-read-another-users-key) | refused |
 
 **UserAdapter.admin_get_ssh_keypair**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [대상 스코프에서 READ를 받은 사용자가 읽으면, access key와 공개키만 오고 개인키는 오지 않는다](#managing_keypairs-a-granted-user-reads-another-users-ssh-public-key-only) | 성공 |
-| [역할 없이 읽으려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-read-another-users-ssh-public-key) | 거부 |
+| [대상 스코프에서 READ를 받은 사용자가 읽으면, access key와 공개키만 오고 개인키는 오지 않는다](#managing_keypairs-a-granted-user-reads-another-users-ssh-public-key-only) | answered |
+| [역할 없이 읽으려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-read-another-users-ssh-public-key) | refused |
 
 **UserAdapter.admin_register_ssh_keypair**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [대상 스코프에서 READ와 UPDATE를 받은 사용자가 공개키와 개인키를 주면, 형식 검사 없이 덮어쓰고 access key가 답으로 온다](#managing_keypairs-a-granted-user-registering-another-users-ssh-key-gets-the-access-key) | 성공 |
-| [역할 없이 등록하려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-register-another-users-ssh-key) | 거부 |
-| [READ만 받고 등록하려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-only-read-may-not-register-another-users-ssh-key) | 거부 |
+| [대상 스코프에서 READ와 UPDATE를 받은 사용자가 공개키와 개인키를 주면, 형식 검사 없이 덮어쓰고 access key가 답으로 온다](#managing_keypairs-a-granted-user-registering-another-users-ssh-key-gets-the-access-key) | answered |
+| [역할 없이 등록하려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-register-another-users-ssh-key) | refused |
+| [READ만 받고 등록하려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-only-read-may-not-register-another-users-ssh-key) | refused |
 
 **UserAdapter.admin_update_keypair**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [대상 스코프에서 READ와 UPDATE를 받은 사용자가 요청 한도만 주면, 나머지는 그대로이고 한도만 바뀐 키 노드가 온다](#managing_keypairs-a-granted-user-changing-another-users-rate-limit-changes-only-that) | 성공 |
-| [역할 없이 바꾸려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-change-another-users-key) | 거부 |
-| [READ만 받고 바꾸려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-only-read-may-not-change-another-users-key) | 거부 |
-| [권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막는다](#managing_keypairs-another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist) | 거부 |
+| [대상 스코프에서 READ와 UPDATE를 받은 사용자가 요청 한도만 주면, 나머지는 그대로이고 한도만 바뀐 키 노드가 온다](#managing_keypairs-a-granted-user-changing-another-users-rate-limit-changes-only-that) | answered |
+| [역할 없이 바꾸려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-change-another-users-key) | refused |
+| [READ만 받고 바꾸려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-only-read-may-not-change-another-users-key) | refused |
+| [권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막는다](#managing_keypairs-another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist) | refused |
 
 **UserAdapter.bulk_purge_users**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 있는 사용자와 없는 id를 함께 주면, 하나는 지워지고 없는 id는 실패로 담긴다](#retiring-a-bulk-purge-records-a-missing-id-as-a-failure) | 성공 |
-| [전역 역할이 문인 일괄 지우기에서 슈퍼관리자가 사용자 둘을 주면, 두 id와 개수 둘이 온다](#retiring-the-superadmin-bulk-purge-answers-the-purged-ids-and-count) | 성공 |
-| [도메인 스코프에서 HARD_DELETE를 받은 사용자라도 일괄 지우기를 하려 하면, 전역 역할 문이 막는다](#retiring-a-user-who-is-not-the-superadmin-may-not-purge-in-bulk) | 거부 |
+| [슈퍼관리자가 있는 사용자와 없는 id를 함께 주면, 하나는 지워지고 없는 id는 실패로 담긴다](#retiring-a-bulk-purge-records-a-missing-id-as-a-failure) | answered |
+| [전역 역할이 문인 일괄 지우기에서 슈퍼관리자가 사용자 둘을 주면, 두 id와 개수 둘이 온다](#retiring-the-superadmin-bulk-purge-answers-the-purged-ids-and-count) | answered |
+| [도메인 스코프에서 HARD_DELETE를 받은 사용자라도 일괄 지우기를 하려 하면, 전역 역할 문이 막는다](#retiring-a-user-who-is-not-the-superadmin-may-not-purge-in-bulk) | refused |
 
 **UserAdapter.issue_my_keypair**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 사용자 스코프에서 UPDATE를 받은 사용자가 발급하면, 기본 키의 관리자 표시, 정책, 요청 한도를 따르고 기본 표시는 없는 키와 secret이 온다](#own_keypairs-a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key) | 성공 |
-| [권한 받은 사용자가 키를 발급하고 그 키로 기본 키를 옮긴 다음 원래 기본 키를 회수하면, 세 호출이 차례로 통과하고 발급한 키 하나만 남는다](#own_keypairs-an-issued-key-made-default-lets-the-original-default-key-be-revoked) | 성공 |
-| [역할을 받지 않은 사용자가 자기 키를 발급하려 하면, 본인이어도 엔티티 권한 문이 막는다](#own_keypairs-a-user-granted-nothing-may-not-issue-their-own-key) | 거부 |
+| [자기 사용자 스코프에서 UPDATE를 받은 사용자가 발급하면, 기본 키의 관리자 표시, 정책, 요청 한도를 따르고 기본 표시는 없는 키와 secret이 온다](#own_keypairs-a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key) | answered |
+| [권한 받은 사용자가 키를 발급하고 그 키로 기본 키를 옮긴 다음 원래 기본 키를 회수하면, 세 호출이 차례로 통과하고 발급한 키 하나만 남는다](#own_keypairs-an-issued-key-made-default-lets-the-original-default-key-be-revoked) | answered |
+| [역할을 받지 않은 사용자가 자기 키를 발급하려 하면, 본인이어도 엔티티 권한 문이 막는다](#own_keypairs-a-user-granted-nothing-may-not-issue-their-own-key) | refused |
 
 **UserAdapter.purge_user_by_id**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [대상 사용자 스코프에서 HARD_DELETE를 받은 사용자가 물리지 않은 사용자를 지워도, 성공이 오고 그 사용자를 더 찾을 수 없다](#retiring-a-user-granted-hard-delete-purges-a-user-with-no-folders-or-sessions) | 성공 |
-| [역할 없이 지우려 하면, 엔티티 권한 문이 막는다](#retiring-a-user-granted-nothing-may-not-purge-another-user) | 거부 |
-| [권한 받은 사용자가 넘겨받을 관리자로 없는 id를 주면, 입력 검증이 막는다](#retiring-purging-a-user-to-an-admin-who-does-not-exist-is-refused) | 거부 |
+| [대상 사용자 스코프에서 HARD_DELETE를 받은 사용자가 물리지 않은 사용자를 지워도, 성공이 오고 그 사용자를 더 찾을 수 없다](#retiring-a-user-granted-hard-delete-purges-a-user-with-no-folders-or-sessions) | answered |
+| [역할 없이 지우려 하면, 엔티티 권한 문이 막는다](#retiring-a-user-granted-nothing-may-not-purge-another-user) | refused |
+| [권한 받은 사용자가 넘겨받을 관리자로 없는 id를 주면, 입력 검증이 막는다](#retiring-purging-a-user-to-an-admin-who-does-not-exist-is-refused) | refused |
 
 **UserAdapter.restore_user_by_id**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 삭제 상태 사용자를 되살리면, 성공이 오고 상태가 활성으로 바뀐다](#retiring-a-user-granted-soft-delete-restores-a-deleted-user-to-active) | 성공 |
-| [역할 없이 되살리려 하면, 엔티티 권한 문이 막는다](#retiring-a-user-granted-nothing-may-not-restore-another-user) | 거부 |
-| [권한 받은 사용자가 물리지 않은 비활성 사용자를 되살리려 하면, 삭제 상태가 아니라 막힌다](#retiring-restoring-a-user-who-was-not-deleted-is-refused) | 거부 |
+| [대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 삭제 상태 사용자를 되살리면, 성공이 오고 상태가 활성으로 바뀐다](#retiring-a-user-granted-soft-delete-restores-a-deleted-user-to-active) | answered |
+| [역할 없이 되살리려 하면, 엔티티 권한 문이 막는다](#retiring-a-user-granted-nothing-may-not-restore-another-user) | refused |
+| [권한 받은 사용자가 물리지 않은 비활성 사용자를 되살리려 하면, 삭제 상태가 아니라 막힌다](#retiring-restoring-a-user-who-was-not-deleted-is-refused) | refused |
 
 **UserAdapter.revoke_my_keypair**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [권한 받은 사용자가 자기의 기본 아닌 키를 회수하면, 성공이 오고 자기 키 검색에서 그 키가 빠진다](#own_keypairs-a-user-granted-read-and-update-revokes-a-non-default-key) | 성공 |
-| [역할을 받지 않은 사용자가 회수하려 하면, 소유자 조회 단계가 없는 키와 같은 예외로 막는다](#own_keypairs-a-user-granted-nothing-may-not-revoke-their-own-key) | 거부 |
-| [자기 스코프에서 READ만 받은 사용자가 회수하려 하면, 소유자 조회는 지나고 엔티티 권한 문이 막는다](#own_keypairs-a-user-granted-only-read-may-not-revoke-their-own-key) | 거부 |
-| [권한 받은 사용자가 어떤 키도 아닌 값을 주면, 소유자 조회 단계가 권한 없음과 같은 예외로 막는다](#own_keypairs-an-access-key-nobody-holds-may-not-be-revoked) | 거부 |
-| [권한 받은 사용자가 자기 기본 키를 회수하려 하면, 입력 검증이 막는다](#own_keypairs-the-default-key-may-not-be-revoked) | 거부 |
+| [권한 받은 사용자가 자기의 기본 아닌 키를 회수하면, 성공이 오고 자기 키 검색에서 그 키가 빠진다](#own_keypairs-a-user-granted-read-and-update-revokes-a-non-default-key) | answered |
+| [역할을 받지 않은 사용자가 회수하려 하면, 소유자 조회 단계가 없는 키와 같은 예외로 막는다](#own_keypairs-a-user-granted-nothing-may-not-revoke-their-own-key) | refused |
+| [자기 스코프에서 READ만 받은 사용자가 회수하려 하면, 소유자 조회는 지나고 엔티티 권한 문이 막는다](#own_keypairs-a-user-granted-only-read-may-not-revoke-their-own-key) | refused |
+| [권한 받은 사용자가 어떤 키도 아닌 값을 주면, 소유자 조회 단계가 권한 없음과 같은 예외로 막는다](#own_keypairs-an-access-key-nobody-holds-may-not-be-revoked) | refused |
+| [권한 받은 사용자가 자기 기본 키를 회수하려 하면, 입력 검증이 막는다](#own_keypairs-the-default-key-may-not-be-revoked) | refused |
 
 **UserAdapter.switch_default_access_key**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 스코프에서 UPDATE를 받은 사용자가 기본 아닌 활성 키로 기본 키를 옮기면, 성공이 오고 사용자 노드의 기본 키가 그 키가 된다](#own_keypairs-a-user-granted-read-and-update-moves-their-default-key) | 성공 |
-| [역할 없이 기본 키를 옮기려 하면, 엔티티 권한 문이 막는다](#own_keypairs-a-user-granted-nothing-may-not-move-their-default-key) | 거부 |
-| [권한 받은 사용자가 다른 사용자의 키를 주면, 입력 검증이 막는다](#own_keypairs-someone-elses-key-may-not-become-the-default-key) | 거부 |
+| [자기 스코프에서 UPDATE를 받은 사용자가 기본 아닌 활성 키로 기본 키를 옮기면, 성공이 오고 사용자 노드의 기본 키가 그 키가 된다](#own_keypairs-a-user-granted-read-and-update-moves-their-default-key) | answered |
+| [역할 없이 기본 키를 옮기려 하면, 엔티티 권한 문이 막는다](#own_keypairs-a-user-granted-nothing-may-not-move-their-default-key) | refused |
+| [권한 받은 사용자가 다른 사용자의 키를 주면, 입력 검증이 막는다](#own_keypairs-someone-elses-key-may-not-become-the-default-key) | refused |
 
 **UserAdapter.update_my_keypair**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 스코프에서 READ와 UPDATE를 받은 사용자가 기본 아닌 키를 비활성으로 바꾸면, 활성만 바뀐 키 노드가 온다](#own_keypairs-a-user-granted-read-and-update-turns-off-a-non-default-key) | 성공 |
-| [역할 없이 키를 끄려 하면, 소유자 조회 단계가 막는다](#own_keypairs-a-user-granted-nothing-may-not-turn-off-their-own-key) | 거부 |
-| [READ만 받고 키를 끄려 하면, 엔티티 권한 문이 막는다](#own_keypairs-a-user-granted-only-read-may-not-turn-off-their-own-key) | 거부 |
-| [권한 받은 사용자가 자기 기본 키를 비활성으로 바꾸려 하면, 입력 검증이 막는다](#own_keypairs-the-default-key-may-not-be-turned-off) | 거부 |
+| [자기 스코프에서 READ와 UPDATE를 받은 사용자가 기본 아닌 키를 비활성으로 바꾸면, 활성만 바뀐 키 노드가 온다](#own_keypairs-a-user-granted-read-and-update-turns-off-a-non-default-key) | answered |
+| [역할 없이 키를 끄려 하면, 소유자 조회 단계가 막는다](#own_keypairs-a-user-granted-nothing-may-not-turn-off-their-own-key) | refused |
+| [READ만 받고 키를 끄려 하면, 엔티티 권한 문이 막는다](#own_keypairs-a-user-granted-only-read-may-not-turn-off-their-own-key) | refused |
+| [권한 받은 사용자가 자기 기본 키를 비활성으로 바꾸려 하면, 입력 검증이 막는다](#own_keypairs-the-default-key-may-not-be-turned-off) | refused |
 
 **UserAdapter.update_user**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [대상 사용자 스코프에서 UPDATE를 받은 사용자가 허용 IP만 담은 수정을 보내면, 성공 표시가 오고 그 사용자의 허용 IP가 바뀐다](#editing-a-user-granted-update-changes-the-allowed-client-ip) | 성공 |
-| [역할 없이 허용 IP 수정을 보내면, 엔티티 권한 문이 막는다](#editing-a-user-granted-nothing-may-not-change-the-allowed-client-ip) | 거부 |
+| [대상 사용자 스코프에서 UPDATE를 받은 사용자가 허용 IP만 담은 수정을 보내면, 성공 표시가 오고 그 사용자의 허용 IP가 바뀐다](#editing-a-user-granted-update-changes-the-allowed-client-ip) | answered |
+| [역할 없이 허용 IP 수정을 보내면, 엔티티 권한 문이 막는다](#editing-a-user-granted-nothing-may-not-change-the-allowed-client-ip) | refused |
 
 ### LoginHistoryAdapter.admin_search
 

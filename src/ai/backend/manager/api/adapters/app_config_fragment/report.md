@@ -1,114 +1,114 @@
 ## app_config_fragment
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/app_config_fragment/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/app_config_fragment/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/app_config_fragment/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/app_config_fragment/adapter.py)
 
-시나리오: 미완 1 / 10
+Scenario: incomplete 1 / 10
 
-- ops 로 구성 (10)
-  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
-  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
-  - get — 대표 성공 ✓ · 대표 실패 ✓
-  - my_app_config_fragments_by_names — 대표 성공 ✓ · 대표 실패 ✓
-  - my_atomic_bulk_upsert — 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge — 대표 성공 ✓ · 대표 실패 ✓
-  - scoped_app_config_fragments_by_names — 대표 성공 ✓ · 대표 실패 ✓
-  - scoped_atomic_bulk_upsert — 대표 성공 ✓ · 대표 실패 ✓
-  - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
+- built from ops (10)
+  - admin_search — representative success ✓ · representative refusal ✓
+  - batch_load_by_ids — representative success ✓ · representative refusal ✓
+  - get — representative success ✓ · representative refusal ✓
+  - my_app_config_fragments_by_names — representative success ✓ · representative refusal ✓
+  - my_atomic_bulk_upsert — representative success ✓ · representative refusal ✓
+  - partial_bulk_purge — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - purge — representative success ✓ · representative refusal ✓
+  - scoped_app_config_fragments_by_names — representative success ✓ · representative refusal ✓
+  - scoped_atomic_bulk_upsert — representative success ✓ · representative refusal ✓
+  - scoped_search — representative success ✓ · representative refusal ✓
 
 **admin_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [공개·도메인·사용자 스코프에 조각 넷이 있고 슈퍼관리자가 전체를 검색하면, 넷 다 집계된다. 전체 검색은 슈퍼관리자인지 검사한다](#searching-the-superadmin-counts-every-fragment-across-scopes) | 성공 |
-| [자기 도메인 스코프에 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체를 검색하면, 역할 부족으로 거부된다. 한 스코프를 검색하는 경로와 전체를 검색하는 경로가 다르다](#searching-a-user-granted-read-may-not-search-every-fragment) | 거부 |
+| [공개·도메인·사용자 스코프에 조각 넷이 있고 슈퍼관리자가 전체를 검색하면, 넷 다 집계된다. 전체 검색은 슈퍼관리자인지 검사한다](#searching-the-superadmin-counts-every-fragment-across-scopes) | answered |
+| [자기 도메인 스코프에 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체를 검색하면, 역할 부족으로 거부된다. 한 스코프를 검색하는 경로와 전체를 검색하는 경로가 다르다](#searching-a-user-granted-read-may-not-search-every-fragment) | refused |
 
 **batch_load_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다](#reading_many-an-empty-id-list-answers-empty-without-calling-anything) | 성공 |
-| [슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 id에 해당하는 항목은 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다](#reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty) | 성공 |
-| [자기 스코프에만 읽기 권한을 받은 사용자가 자기 조각, 다른 사용자의 조각, 없는 id를 한 번에 조회하면, 목록 순서대로 자기 것은 노드, 남의 것과 없는 id는 그 항목만 권한 부족으로 거부된다](#reading_many-mine-anothers-and-a-missing-id-are-each-answered-in-order-for-a-plain-user) | 거부 |
+| [빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다](#reading_many-an-empty-id-list-answers-empty-without-calling-anything) | answered |
+| [슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 id에 해당하는 항목은 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다](#reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty) | answered |
+| [자기 스코프에만 읽기 권한을 받은 사용자가 자기 조각, 다른 사용자의 조각, 없는 id를 한 번에 조회하면, 목록 순서대로 자기 것은 노드, 남의 것과 없는 id는 그 항목만 권한 부족으로 거부된다](#reading_many-mine-anothers-and-a-missing-id-are-each-answered-in-order-for-a-plain-user) | refused |
 
 **get**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 조각 하나가 있고 자기 스코프에 읽기 권한을 받은 사용자가 id로 조회하면, 그 조각 전체가 반환된다](#reading-a-user-granted-read-on-their-own-scope-reads-their-fragment-by-id) | 성공 |
-| [다른 사용자의 조각을 자기 스코프에만 읽기 권한을 받은 사용자가 id로 조회하면, 권한 부족으로 거부된다](#reading-a-user-granted-read-on-their-own-scope-may-not-read-another-users-fragment) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
-| [자기 스코프에 읽기 권한을 받은 사용자가 존재하지 않는 id로 조회하면, 대상 없음이 아니라 권한 부족으로 거부된다. 없는 행에는 부여된 권한도 없기 때문이다](#reading-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | 거부 |
+| [자기 조각 하나가 있고 자기 스코프에 읽기 권한을 받은 사용자가 id로 조회하면, 그 조각 전체가 반환된다](#reading-a-user-granted-read-on-their-own-scope-reads-their-fragment-by-id) | answered |
+| [다른 사용자의 조각을 자기 스코프에만 읽기 권한을 받은 사용자가 id로 조회하면, 권한 부족으로 거부된다](#reading-a-user-granted-read-on-their-own-scope-may-not-read-another-users-fragment) | refused |
+| [슈퍼관리자가 존재하지 않는 id로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
+| [자기 스코프에 읽기 권한을 받은 사용자가 존재하지 않는 id로 조회하면, 대상 없음이 아니라 권한 부족으로 거부된다. 없는 행에는 부여된 권한도 없기 때문이다](#reading-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | refused |
 
 **my_app_config_fragments_by_names**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [같은 이름에 다른 사용자의 조각이 있어도, 자기 조각을 조회하면 자기 것만 반환된다](#reading_by_names-another-users-fragment-under-the-same-name-is-not-answered) | 성공 |
-| [같은 이름에 자기 도메인의 조각이 있어도, 자기 조각을 조회하면 자기 것만 반환된다. 이 조회는 사용자 스코프 하나만 본다](#reading_by_names-the-domains-fragment-under-the-same-name-is-not-answered) | 성공 |
-| [사용자 스코프에 허용된 이름 셋 중 둘에 자기 조각이 있고 읽기 권한을 받은 사용자가 셋을 조회하면, 세 항목이 요청 순서대로 반환되고 조각이 없는 항목은 비어 있다](#reading_by_names-three-names-answer-a-fragment-or-an-empty-slot-each-in-request-order) | 성공 |
-| [자기 조각이 있어도 아무 권한도 없는 사용자가 이름으로 조회하면, 권한 부족으로 거부된다](#reading_by_names-a-user-granted-nothing-may-not-read-their-own-fragments) | 거부 |
+| [같은 이름에 다른 사용자의 조각이 있어도, 자기 조각을 조회하면 자기 것만 반환된다](#reading_by_names-another-users-fragment-under-the-same-name-is-not-answered) | answered |
+| [같은 이름에 자기 도메인의 조각이 있어도, 자기 조각을 조회하면 자기 것만 반환된다. 이 조회는 사용자 스코프 하나만 본다](#reading_by_names-the-domains-fragment-under-the-same-name-is-not-answered) | answered |
+| [사용자 스코프에 허용된 이름 셋 중 둘에 자기 조각이 있고 읽기 권한을 받은 사용자가 셋을 조회하면, 세 항목이 요청 순서대로 반환되고 조각이 없는 항목은 비어 있다](#reading_by_names-three-names-answer-a-fragment-or-an-empty-slot-each-in-request-order) | answered |
+| [자기 조각이 있어도 아무 권한도 없는 사용자가 이름으로 조회하면, 권한 부족으로 거부된다](#reading_by_names-a-user-granted-nothing-may-not-read-their-own-fragments) | refused |
 
 **my_atomic_bulk_upsert**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [쓰기 권한을 받은 사용자가 자기 조각을 처음 쓰면, 요청이 지정하지 않은 소유자와 스코프 종류가 호출자 정보로 채워진 노드가 반환된다](#writing-a-user-granted-write-writes-their-first-own-fragment) | 성공 |
-| [사용자 스코프에 허용된 이름 둘에 한 번에 쓰면, 둘 다 쓰이고 요청 순서대로 반환된다](#writing-several-names-are-written-at-once-in-request-order) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 자기 조각을 쓸 수 있다](#writing-turning-enforcement-off-lets-a-user-granted-nothing-write) | 성공 |
-| [이미 자기 조각이 있는 이름에 다른 키를 담아 다시 쓰면, id는 그대로인 채 값은 새 값뿐이다. 이전 키가 남지 않는다](#writing-writing-the-same-name-again-replaces-the-value-whole) | 성공 |
-| [등록되지 않은 이름에 쓰기 권한을 받은 사용자가 쓰면, 쓰기 허용 안 됨으로 거부된다](#writing-a-name-nothing-registers-cannot-be-written) | 거부 |
-| [도메인 종류에만 허용된 이름에 쓰기 권한을 받은 사용자가 자기 조각을 쓰면, 쓰기 허용 안 됨으로 거부된다. 등록되지 않은 이름과 같은 검사다](#writing-a-name-opened-only-to-the-domain-kind-cannot-be-written-by-a-user) | 거부 |
-| [자기 스코프에 생성 권한만 있고 수정 권한이 없는 사용자가 쓰면, 권한 부족으로 거부된다. 쓰기는 생성과 수정 권한 둘 다를 요구한다](#writing-a-user-granted-create-alone-may-not-write) | 거부 |
-| [사용자 종류에 허용된 이름에 아무 권한도 없는 사용자가 쓰면, 권한 부족으로 거부된다](#writing-a-user-granted-nothing-may-not-write-their-own-fragment) | 거부 |
-| [허용된 이름과 허용되지 않은 이름을 함께 쓰면, 쓰기 허용 안 됨으로 거부된다. 쓰기는 전부 아니면 전무다](#writing-one-name-not-opened-to-the-user-kind-refuses-the-whole-write) | 거부 |
+| [쓰기 권한을 받은 사용자가 자기 조각을 처음 쓰면, 요청이 지정하지 않은 소유자와 스코프 종류가 호출자 정보로 채워진 노드가 반환된다](#writing-a-user-granted-write-writes-their-first-own-fragment) | answered |
+| [사용자 스코프에 허용된 이름 둘에 한 번에 쓰면, 둘 다 쓰이고 요청 순서대로 반환된다](#writing-several-names-are-written-at-once-in-request-order) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 자기 조각을 쓸 수 있다](#writing-turning-enforcement-off-lets-a-user-granted-nothing-write) | answered |
+| [이미 자기 조각이 있는 이름에 다른 키를 담아 다시 쓰면, id는 그대로인 채 값은 새 값뿐이다. 이전 키가 남지 않는다](#writing-writing-the-same-name-again-replaces-the-value-whole) | answered |
+| [등록되지 않은 이름에 쓰기 권한을 받은 사용자가 쓰면, 쓰기 허용 안 됨으로 거부된다](#writing-a-name-nothing-registers-cannot-be-written) | refused |
+| [도메인 종류에만 허용된 이름에 쓰기 권한을 받은 사용자가 자기 조각을 쓰면, 쓰기 허용 안 됨으로 거부된다. 등록되지 않은 이름과 같은 검사다](#writing-a-name-opened-only-to-the-domain-kind-cannot-be-written-by-a-user) | refused |
+| [자기 스코프에 생성 권한만 있고 수정 권한이 없는 사용자가 쓰면, 권한 부족으로 거부된다. 쓰기는 생성과 수정 권한 둘 다를 요구한다](#writing-a-user-granted-create-alone-may-not-write) | refused |
+| [사용자 종류에 허용된 이름에 아무 권한도 없는 사용자가 쓰면, 권한 부족으로 거부된다](#writing-a-user-granted-nothing-may-not-write-their-own-fragment) | refused |
+| [허용된 이름과 허용되지 않은 이름을 함께 쓰면, 쓰기 허용 안 됨으로 거부된다. 쓰기는 전부 아니면 전무다](#writing-one-name-not-opened-to-the-user-kind-refuses-the-whole-write) | refused |
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 스코프에만 삭제 권한을 받은 사용자가 자기 조각 둘, 다른 사용자의 조각, 없는 id를 한 번에 삭제하면, 자기 둘은 삭제된 목록에, 남의 것과 없는 id는 실패 목록에 이유와 함께 반환된다](#purging-mine-anothers-and-a-missing-id-are-each-answered-for-a-plain-user) | 성공 |
-| [슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다](#purging-the-superadmin-purges-both-and-a-missing-id-fails-alone) | 성공 |
+| [자기 스코프에만 삭제 권한을 받은 사용자가 자기 조각 둘, 다른 사용자의 조각, 없는 id를 한 번에 삭제하면, 자기 둘은 삭제된 목록에, 남의 것과 없는 id는 실패 목록에 이유와 함께 반환된다](#purging-mine-anothers-and-a-missing-id-are-each-answered-for-a-plain-user) | answered |
+| [슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다](#purging-the-superadmin-purges-both-and-a-missing-id-fails-alone) | answered |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 조각 하나가 있고 자기 스코프에 삭제 권한을 받은 사용자가 삭제하면, 삭제한 id를 담은 응답이 반환된다](#purging-a-user-granted-hard-delete-on-their-own-scope-purges-their-fragment) | 성공 |
-| [다른 사용자의 조각을 자기 스코프에만 삭제 권한을 받은 사용자가 삭제하면, 권한 부족으로 거부된다](#purging-a-user-granted-hard-delete-on-their-own-scope-may-not-purge-another-users-fragment) | 거부 |
-| [자기 조각에 읽기 권한만 받은 사용자가 삭제하면, 권한 부족으로 거부된다. 삭제는 읽기와 다른 권한을 검사한다](#purging-a-user-granted-read-alone-may-not-purge-their-fragment) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
+| [자기 조각 하나가 있고 자기 스코프에 삭제 권한을 받은 사용자가 삭제하면, 삭제한 id를 담은 응답이 반환된다](#purging-a-user-granted-hard-delete-on-their-own-scope-purges-their-fragment) | answered |
+| [다른 사용자의 조각을 자기 스코프에만 삭제 권한을 받은 사용자가 삭제하면, 권한 부족으로 거부된다](#purging-a-user-granted-hard-delete-on-their-own-scope-may-not-purge-another-users-fragment) | refused |
+| [자기 조각에 읽기 권한만 받은 사용자가 삭제하면, 권한 부족으로 거부된다. 삭제는 읽기와 다른 권한을 검사한다](#purging-a-user-granted-read-alone-may-not-purge-their-fragment) | refused |
+| [슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
 
 **scoped_app_config_fragments_by_names**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [도메인 조각이 있고 그 도메인 스코프에 읽기 권한을 받은 사용자가 도메인을 지정해 조회하면, 그 조각이 반환된다](#reading_by_names-a-user-granted-read-on-the-domain-reads-its-fragment-by-name) | 성공 |
-| [공개 조각이 있고 아무 권한도 없는 사용자가 공개 스코프를 지정해 조회하면, 그 조각이 반환된다. 공개 조각에는 보호할 스코프가 없다](#reading_by_names-anyone-signed-in-reads-a-public-fragment-by-name) | 성공 |
-| [슈퍼관리자가 어느 도메인도 아닌 id를 지정해 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다](#reading_by_names-a-domain-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
-| [자기 도메인에 읽기 권한을 받은 사용자가 어느 도메인도 아닌 id를 지정해 조회하면, 대상 없음이 아니라 권한 부족으로 거부된다](#reading_by_names-a-domain-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | 거부 |
-| [자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 조회하면, 권한 부족으로 거부된다](#reading_by_names-a-user-granted-read-on-their-own-scope-may-not-read-another-users) | 거부 |
+| [도메인 조각이 있고 그 도메인 스코프에 읽기 권한을 받은 사용자가 도메인을 지정해 조회하면, 그 조각이 반환된다](#reading_by_names-a-user-granted-read-on-the-domain-reads-its-fragment-by-name) | answered |
+| [공개 조각이 있고 아무 권한도 없는 사용자가 공개 스코프를 지정해 조회하면, 그 조각이 반환된다. 공개 조각에는 보호할 스코프가 없다](#reading_by_names-anyone-signed-in-reads-a-public-fragment-by-name) | answered |
+| [슈퍼관리자가 어느 도메인도 아닌 id를 지정해 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다](#reading_by_names-a-domain-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
+| [자기 도메인에 읽기 권한을 받은 사용자가 어느 도메인도 아닌 id를 지정해 조회하면, 대상 없음이 아니라 권한 부족으로 거부된다](#reading_by_names-a-domain-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | refused |
+| [자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 조회하면, 권한 부족으로 거부된다](#reading_by_names-a-user-granted-read-on-their-own-scope-may-not-read-another-users) | refused |
 
 **scoped_atomic_bulk_upsert**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 도메인 스코프에 쓰기 권한을 받은 사용자가 도메인을 지정해 쓰면, 스코프 종류는 도메인이고 소유자는 그 도메인이다](#writing-a-user-granted-write-on-the-domain-writes-a-domain-fragment) | 성공 |
-| [슈퍼관리자가 공개 스코프를 지정해 쓰면, 스코프 종류는 공개이고 소유자 필드는 비어 있다. 공개 쓰기는 슈퍼관리자인지 검사한다](#writing-the-superadmin-writes-a-public-fragment-owned-by-no-one) | 성공 |
-| [자기 스코프에만 쓰기 권한을 받은 사용자가 다른 사용자를 지정해 쓰면, 권한 부족으로 거부된다](#writing-a-user-granted-write-on-their-own-scope-may-not-write-at-another-users) | 거부 |
-| [자기 도메인 스코프에 쓰기 권한을 받았어도 슈퍼관리자가 아닌 사용자가 공개 스코프를 지정해 쓰면, 역할 부족으로 거부된다. 공개 조각에는 대응하는 스코프가 없다](#writing-a-user-who-is-not-the-superadmin-may-not-write-a-public-fragment) | 거부 |
-| [슈퍼관리자가 어느 사용자도 아닌 id를 소유자로 지정해 쓰면, 소유자 없음으로 거부된다. 소유자가 있는지는 권한 그래프에서 확인한다](#writing-the-superadmin-naming-an-owner-nothing-answers-to-is-refused) | 거부 |
-| [권한 검사를 꺼도 슈퍼관리자가 아니면 공개 조각을 쓸 수 없다](#writing-turning-enforcement-off-still-does-not-let-a-user-write-a-public-fragment) | 거부 |
+| [자기 도메인 스코프에 쓰기 권한을 받은 사용자가 도메인을 지정해 쓰면, 스코프 종류는 도메인이고 소유자는 그 도메인이다](#writing-a-user-granted-write-on-the-domain-writes-a-domain-fragment) | answered |
+| [슈퍼관리자가 공개 스코프를 지정해 쓰면, 스코프 종류는 공개이고 소유자 필드는 비어 있다. 공개 쓰기는 슈퍼관리자인지 검사한다](#writing-the-superadmin-writes-a-public-fragment-owned-by-no-one) | answered |
+| [자기 스코프에만 쓰기 권한을 받은 사용자가 다른 사용자를 지정해 쓰면, 권한 부족으로 거부된다](#writing-a-user-granted-write-on-their-own-scope-may-not-write-at-another-users) | refused |
+| [자기 도메인 스코프에 쓰기 권한을 받았어도 슈퍼관리자가 아닌 사용자가 공개 스코프를 지정해 쓰면, 역할 부족으로 거부된다. 공개 조각에는 대응하는 스코프가 없다](#writing-a-user-who-is-not-the-superadmin-may-not-write-a-public-fragment) | refused |
+| [슈퍼관리자가 어느 사용자도 아닌 id를 소유자로 지정해 쓰면, 소유자 없음으로 거부된다. 소유자가 있는지는 권한 그래프에서 확인한다](#writing-the-superadmin-naming-an-owner-nothing-answers-to-is-refused) | refused |
+| [권한 검사를 꺼도 슈퍼관리자가 아니면 공개 조각을 쓸 수 없다](#writing-turning-enforcement-off-still-does-not-let-a-user-write-a-public-fragment) | refused |
 
 **scoped_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [공개 조각 둘이 있고 아무 권한도 없는 사용자가 공개 스코프를 지정해 검색하면, 둘 다 집계된다. 공개 조각에는 보호할 스코프가 없다](#searching-anyone-signed-in-searches-the-public-scope) | 성공 |
-| [자기 조각 둘과 다른 사용자의 조각 하나가 있고 자기 스코프에 읽기 권한을 받은 사용자가 자기 스코프를 검색하면, 자기 조각 둘만 집계된다](#searching-searching-my-own-scope-counts-only-my-fragments) | 성공 |
-| [슈퍼관리자가 어느 도메인도 아닌 id를 지정해 검색하면, 대상을 찾을 수 없다는 이유로 거부된다](#searching-a-domain-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
-| [자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 검색하면, 권한 부족으로 거부된다](#searching-a-user-granted-read-on-their-own-scope-may-not-search-another-users) | 거부 |
-| [읽기 권한을 받은 사용자가 도메인과 사용자를 함께 지정해 검색하면, 잘못된 입력으로 거부된다. 이 검색은 한 스코프에서만 실행된다](#searching-naming-two-scopes-at-once-is-refused-as-bad-input) | 거부 |
+| [공개 조각 둘이 있고 아무 권한도 없는 사용자가 공개 스코프를 지정해 검색하면, 둘 다 집계된다. 공개 조각에는 보호할 스코프가 없다](#searching-anyone-signed-in-searches-the-public-scope) | answered |
+| [자기 조각 둘과 다른 사용자의 조각 하나가 있고 자기 스코프에 읽기 권한을 받은 사용자가 자기 스코프를 검색하면, 자기 조각 둘만 집계된다](#searching-searching-my-own-scope-counts-only-my-fragments) | answered |
+| [슈퍼관리자가 어느 도메인도 아닌 id를 지정해 검색하면, 대상을 찾을 수 없다는 이유로 거부된다](#searching-a-domain-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
+| [자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 검색하면, 권한 부족으로 거부된다](#searching-a-user-granted-read-on-their-own-scope-may-not-search-another-users) | refused |
+| [읽기 권한을 받은 사용자가 도메인과 사용자를 함께 지정해 검색하면, 잘못된 입력으로 거부된다. 이 검색은 한 스코프에서만 실행된다](#searching-naming-two-scopes-at-once-is-refused-as-bad-input) | refused |
 
 ### admin_search
 

@@ -4,13 +4,13 @@ Background and rationale are in `KNOWLEDGE.md` in this directory, the layout in 
 
 ## What to write
 
-- Scenarios live in this tree. Read them in the `report.md` of the entity package. Do not write them in
-  `KNOWLEDGE.md`.
+- Scenarios live in this tree. Read them in the `report.md` (English) and `report.ko.md` (Korean) of the
+  entity package. Do not write them in `KNOWLEDGE.md`.
 - Work from the `adapter.py` of the entity. Write scenarios for every call it exposes.
-- Do not write what every entity handles the same way as entity scenarios: AND, OR and NOT filter combinations,
+- Do not write scenarios for what every entity handles the same way: AND, OR and NOT filter combinations,
   pagination, default sort direction. Entity scenarios cover the filters and sorts of that entity's fields.
-- After writing, generate the `report.md` of the entity package from the run with `--split`. `--verify` reports
-  when that file disagrees with the run.
+- After writing, generate the reports of the entity package from the run with `--split`. `--verify` reports
+  when either file disagrees with the run.
 
 ## What a row says
 
@@ -25,12 +25,15 @@ A scenario is one class. It defines its name, what it guarantees, and three step
 | `then` | Takes what was seeded and the response or exception, and checks them |
 
 - `given` runs first and returns real values, so nothing defers a value. Do not use deferred calls or lambdas
-  that point at fields.
+  that refer to fields.
 - The component sets the type `given` returns. Later steps receive that type as is.
-- `when` names the adapter call with `operation`. The report uses it to count calls nobody called.
+- `when` names the adapter call with `operation`. The report uses it to count the adapter calls no scenario
+  called.
 - If the response wraps a node, `when` unwraps it, so several rows share one checker.
 - A row that runs with changed config also implements `Configured`. It is the only place that names a config path.
-- Write `describe` in Korean first, and move it to English after it passes review.
+- Write `describe` with `Says` from `ai.backend.testutils.scenario_steps`: the Korean sentence, and the English
+  one beside it. Write the Korean sentence first and add the English one after it passes review. A `Says`
+  without English is written in Korean in both reports.
 - Do not put identifiers in `describe`: field names, exception classes, file paths.
 
 ## How to seed rows
@@ -43,7 +46,7 @@ A scenario is one class. It defines its name, what it guarantees, and three step
   audit record and its scope rows) in one write. A seed that reads earlier rows uses the entry for that count
   (`creating_from`, `creating_from_two`, `creating_from_three`).
 - One seed is one class. It implements the `TestSeedRow` family and defines what it is (`kind`), what it sets up
-  (`detail`), which name it goes in under (`name`), and what it writes (`seed`).
+  (`detail`), the name it appears under (`name`), and what it writes (`seed`).
 - For a row whose name the manager fixes, `name` returns that name and takes no number from the seeder. Read
   that name from src. Do not repeat it as a literal in a test.
 - Group rows that form one premise with `TestSeedNest`. `kind` says what it prepares, and rows seeded with
@@ -65,13 +68,13 @@ A scenario is one class. It defines its name, what it guarantees, and three step
 - Seed only the permissions needed. Do not depend on shipped role presets.
 - Pair a row with the permission and a row without it. With only one, you cannot tell whether the permission was
   too broad.
-- The actor of a row that checks permissions must not be superadmin. The checker passes superadmin first, so such
-  a row proves nothing about permissions. The exception is an operation gated by the global role. State that fact
-  in `description` then.
+- The requesting user of a row that checks permissions must not be superadmin. The checker passes superadmin
+  first, so such a row proves nothing about permissions. The exception is an operation gated by the global role.
+  State that fact in `description` then.
 
 ## Seeding with fixtures
 
-- A scenario table pairs rows around one call. Write a test that asks what the setup itself creates with the
+- A scenario table pairs rows around one call. Write a test that checks what the setup itself creates with the
   `seeding` fixture.
 - `seeding` uses the same seeds, the same `TestSeeder` and the same write paths as the table. The only difference
   is when it writes. The row is already written when the fixture returns.
@@ -92,8 +95,8 @@ A scenario is one class. It defines its name, what it guarantees, and three step
 
 - Do not write checks that check part of a response. Checking one field passes even when the rest changes
   silently. Do not add helpers that make such checks easy to write.
-- Always check the whole response. `then` returns one of three for each place. Report text is still Korean; the
-  table shows it in English.
+- Always check the whole response. `then` returns one of three for each field. Report sentences are still Korean
+  until they gain English; the table shows them in English.
 
   | What | When | Report text |
   |---|---|---|
@@ -101,11 +104,11 @@ A scenario is one class. It defines its name, what it guarantees, and three step
   | `Held` | The value cannot be stated, only a condition | `created_at: time written by this run` |
   | `Skipped` | It cannot be checked, and the reason can be stated | `id: ignored — the database generates it` |
 
-- No place is left without one. A place left out passes silently.
+- No field is left without one. A field left out passes silently.
 - The condition of `Held` is a `Condition` implementation. The condition says what it is, and that text does not
   include the actual value.
 - Do not use a generated id as the expected value of `Same`. It differs per run and makes the report unstable. For
-  a place that must equal a value from another place, use the `SameAs` condition. It then reads by where the value
+  a field that must equal a value from another field, use the `SameAs` condition. It then states where the value
   came from: `ownership.user_id: same as the creator`.
 - With the same behavior, the reports of two runs must match to the character. CI checks this.
 - Do not check implementation details. Do not check again what the type already guarantees.

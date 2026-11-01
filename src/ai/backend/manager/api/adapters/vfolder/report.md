@@ -1,110 +1,110 @@
 ## vfolder
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/vfolder/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/vfolder/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/vfolder/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/vfolder/adapter.py)
 
-시나리오: 미완 25 / 30
+Scenario: incomplete 25 / 30
 
-- ops 로 구성 (4)
-  - admin_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
-  - project_search — 대표 성공 ✓ · 대표 실패 ✓
-  - scoped_search — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-- 직접 구현 (26)
-  - batch_load_mount_permissions — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - batch_load_permissions — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - bulk_delete — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - bulk_purge — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - clone — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - create — 성공 있음 1 · 실패 있음 1 (scope)
-  - create_download_session — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - create_in_project — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
-  - create_upload_session — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - delete — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - delete_files — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - deploy — 성공 없음 · 실패 없음 (scope, single_entity) — SCENARIO-GAP
-  - get — 성공 있음 2 · 실패 있음 2 (single_entity)
-  - get_folder_usage — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - list_files — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - list_mount_policies — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - mkdir — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - move_file — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - partial_bulk_delete — 성공 있음 2 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - partial_bulk_restore — 성공 있음 1 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - partial_bulk_update — 성공 있음 2 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - purge — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - restore — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - set_mount_policy — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - unset_mount_policy — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - update — 성공 있음 1 · 실패 있음 2 (single_entity)
+- built from ops (4)
+  - admin_search — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_by_ids — representative success ✓ · representative refusal ✓
+  - project_search — representative success ✓ · representative refusal ✓
+  - scoped_search — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+- direct implementation (26)
+  - batch_load_mount_permissions — success absent · refusal absent (partial_bulk) — SCENARIO-GAP
+  - batch_load_permissions — success absent · refusal absent (partial_bulk) — SCENARIO-GAP
+  - bulk_delete — success absent · refusal absent (partial_bulk) — SCENARIO-GAP
+  - bulk_purge — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - clone — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - create — success present 1 · refusal present 1 (scope)
+  - create_download_session — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - create_in_project — success absent · refusal absent (scope) — SCENARIO-GAP
+  - create_upload_session — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - delete — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - delete_files — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - deploy — success absent · refusal absent (scope, single_entity) — SCENARIO-GAP
+  - get — success present 2 · refusal present 2 (single_entity)
+  - get_folder_usage — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - list_files — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - list_mount_policies — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - mkdir — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - move_file — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - partial_bulk_delete — success present 2 · refusal absent (partial_bulk) — SCENARIO-GAP
+  - partial_bulk_restore — success present 1 · refusal absent (partial_bulk) — SCENARIO-GAP
+  - partial_bulk_update — success present 2 · refusal absent (partial_bulk) — SCENARIO-GAP
+  - purge — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - restore — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - set_mount_policy — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - unset_mount_policy — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - update — success present 1 · refusal present 2 (single_entity)
 
 **batch_load_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 빈 id 목록을 주면, 권한 검사 없이 빈 목록이 온다](#batch_loading-a-batch-load-of-no-ids-answers-an-empty-list) | 성공 |
-| [자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다](#batch_loading-a-user-granted-folder-read-loads-their-own-folder-by-id) | 성공 |
-| [남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다](#batch_loading-an-accepted-share-loads-someone-elses-folder-by-id) | 성공 |
-| [슈퍼관리자가 남의 폴더와 없는 id를 함께 요청하면, 그 폴더는 노드로, 없는 id 자리는 빈 값으로 온다](#batch_loading-the-superadmin-batch-load-leaves-a-missing-id-empty) | 성공 |
-| [자기 폴더만 읽을 수 있는 사용자가 자기 폴더, 공유받지 않은 남의 폴더, 없는 id를 한 번에 요청하면, 입력 순서대로 그 폴더, 거부, 거부가 온다](#batch_loading-a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order) | 거부 |
-| [아무 권한도 받지 않은 사용자가 자기 폴더 id로 일괄 읽기를 하면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다](#batch_loading-a-user-granted-nothing-gets-a-refusal-in-place-of-their-own-folder) | 거부 |
-| [남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더 id로 일괄 읽기를 하면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다](#batch_loading-an-unanswered-offer-gets-a-refusal-in-place-of-someone-elses-folder) | 거부 |
+| [아무 권한도 받지 않은 사용자가 빈 id 목록을 주면, 권한 검사 없이 빈 목록이 온다](#batch_loading-a-batch-load-of-no-ids-answers-an-empty-list) | answered |
+| [자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다](#batch_loading-a-user-granted-folder-read-loads-their-own-folder-by-id) | answered |
+| [남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더 id로 일괄 읽기를 하면, 그 폴더가 온다](#batch_loading-an-accepted-share-loads-someone-elses-folder-by-id) | answered |
+| [슈퍼관리자가 남의 폴더와 없는 id를 함께 요청하면, 그 폴더는 노드로, 없는 id 자리는 빈 값으로 온다](#batch_loading-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
+| [자기 폴더만 읽을 수 있는 사용자가 자기 폴더, 공유받지 않은 남의 폴더, 없는 id를 한 번에 요청하면, 입력 순서대로 그 폴더, 거부, 거부가 온다](#batch_loading-a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order) | refused |
+| [아무 권한도 받지 않은 사용자가 자기 폴더 id로 일괄 읽기를 하면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다](#batch_loading-a-user-granted-nothing-gets-a-refusal-in-place-of-their-own-folder) | refused |
+| [남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더 id로 일괄 읽기를 하면, 호출은 성공하되 그 자리는 권한 부족으로 거부된다](#batch_loading-an-unanswered-offer-gets-a-refusal-in-place-of-someone-elses-folder) | refused |
 
 **project_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프로젝트에서 폴더 읽기 권한을 받은 사용자가 그 프로젝트의 폴더를 조회하면, 그 프로젝트의 폴더가 온다](#reaching-a-user-granted-folder-read-in-a-project-lists-its-folder) | 성공 |
-| [아무 권한도 받지 않은 사용자가 프로젝트의 폴더를 조회하려 하면 권한 부족으로 거부된다](#reaching-a-user-granted-nothing-may-not-list-a-projects-folders) | 거부 |
+| [프로젝트에서 폴더 읽기 권한을 받은 사용자가 그 프로젝트의 폴더를 조회하면, 그 프로젝트의 폴더가 온다](#reaching-a-user-granted-folder-read-in-a-project-lists-its-folder) | answered |
+| [아무 권한도 받지 않은 사용자가 프로젝트의 폴더를 조회하려 하면 권한 부족으로 거부된다](#reaching-a-user-granted-nothing-may-not-list-a-projects-folders) | refused |
 
 **scoped_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [폴더를 하나도 만들지 않은 사용자가 자기 폴더를 조회하면, 답은 비어 있다](#vfolder-a-user-who-has-made-no-folder-lists-none) | 성공 |
+| [폴더를 하나도 만들지 않은 사용자가 자기 폴더를 조회하면, 답은 비어 있다](#vfolder-a-user-who-has-made-no-folder-lists-none) | answered |
 
 **create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 스코프에서 폴더 생성 권한을 받은 사용자가 폴더를 만들면, 그 폴더의 소유는 그 사용자에게 있다](#vfolder-a-user-granted-folder-create-makes-one-of-their-own) | 성공 |
-| [아무 권한도 받지 않은 사용자가 폴더를 만들려 하면 권한 부족으로 거부된다](#vfolder-a-user-granted-nothing-may-not-make-a-folder) | 거부 |
+| [자기 스코프에서 폴더 생성 권한을 받은 사용자가 폴더를 만들면, 그 폴더의 소유는 그 사용자에게 있다](#vfolder-a-user-granted-folder-create-makes-one-of-their-own) | answered |
+| [아무 권한도 받지 않은 사용자가 폴더를 만들려 하면 권한 부족으로 거부된다](#vfolder-a-user-granted-nothing-may-not-make-a-folder) | refused |
 
 **get**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더를 읽으면, 그 폴더가 온다](#reaching-a-user-granted-folder-read-reads-their-own-folder) | 성공 |
-| [남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더를 읽으면, 그 폴더가 온다](#reaching-an-accepted-share-reads-someone-elses-folder) | 성공 |
-| [아무 권한도 받지 않은 사용자가 자기 폴더를 읽으려 하면 권한 부족으로 거부된다](#reaching-a-user-granted-nothing-may-not-read-their-own-folder) | 거부 |
-| [남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더를 읽으려 하면 권한 부족으로 거부된다](#reaching-an-unanswered-offer-may-not-read-someone-elses-folder) | 거부 |
+| [자기 개인 프로젝트에서 폴더 읽기 권한을 받은 사용자가 자기 폴더를 읽으면, 그 폴더가 온다](#reaching-a-user-granted-folder-read-reads-their-own-folder) | answered |
+| [남의 폴더를 읽기로 공유받아 받아들인 사용자가 그 폴더를 읽으면, 그 폴더가 온다](#reaching-an-accepted-share-reads-someone-elses-folder) | answered |
+| [아무 권한도 받지 않은 사용자가 자기 폴더를 읽으려 하면 권한 부족으로 거부된다](#reaching-a-user-granted-nothing-may-not-read-their-own-folder) | refused |
+| [남의 폴더를 공유 제안만 받고 받아들이지 않은 사용자가 그 폴더를 읽으려 하면 권한 부족으로 거부된다](#reaching-an-unanswered-offer-may-not-read-someone-elses-folder) | refused |
 
 **partial_bulk_delete**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 개인 프로젝트에서 폴더 soft delete 권한을 받은 사용자가 자기 폴더 둘과 남의 폴더 하나를 한 번에 soft delete 하면, 자기 폴더 둘은 삭제 대기로 오고 남의 폴더는 권한 부족으로 실패 목록에 온다](#partial_bulk-a-user-granted-folder-soft-delete-soft-deletes-their-folders-of-several) | 성공 |
-| [아무 권한도 받지 않은 사용자가 폴더 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk-a-user-granted-nothing-soft-deletes-none-of-several-folders) | 성공 |
+| [자기 개인 프로젝트에서 폴더 soft delete 권한을 받은 사용자가 자기 폴더 둘과 남의 폴더 하나를 한 번에 soft delete 하면, 자기 폴더 둘은 삭제 대기로 오고 남의 폴더는 권한 부족으로 실패 목록에 온다](#partial_bulk-a-user-granted-folder-soft-delete-soft-deletes-their-folders-of-several) | answered |
+| [아무 권한도 받지 않은 사용자가 폴더 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk-a-user-granted-nothing-soft-deletes-none-of-several-folders) | answered |
 
 **partial_bulk_restore**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [폴더 soft delete 권한을 받은 사용자가 soft delete 한 자기 폴더 둘을 한 번에 restore 하면, 둘 다 쓸 수 있는 상태로 온다](#partial_bulk-restoring-several-folders-brings-them-back) | 성공 |
+| [폴더 soft delete 권한을 받은 사용자가 soft delete 한 자기 폴더 둘을 한 번에 restore 하면, 둘 다 쓸 수 있는 상태로 온다](#partial_bulk-restoring-several-folders-brings-them-back) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 개인 프로젝트에서 폴더 수정 권한을 받은 사용자가 자기 폴더 둘과 남의 폴더 하나를 한 번에 수정하면, 자기 폴더 둘은 수정되어 오고 남의 폴더는 권한 부족으로 실패 목록에 온다](#partial_bulk-a-user-granted-folder-update-updates-their-folders-of-several) | 성공 |
-| [아무 권한도 받지 않은 사용자가 폴더 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk-a-user-granted-nothing-updates-none-of-several-folders) | 성공 |
+| [자기 개인 프로젝트에서 폴더 수정 권한을 받은 사용자가 자기 폴더 둘과 남의 폴더 하나를 한 번에 수정하면, 자기 폴더 둘은 수정되어 오고 남의 폴더는 권한 부족으로 실패 목록에 온다](#partial_bulk-a-user-granted-folder-update-updates-their-folders-of-several) | answered |
+| [아무 권한도 받지 않은 사용자가 폴더 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk-a-user-granted-nothing-updates-none-of-several-folders) | answered |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 개인 프로젝트에서 폴더 수정 권한을 받은 사용자가 자기 폴더의 이름과 옵션을 바꾸면, 바뀐 폴더가 온다](#editing-a-user-granted-folder-update-renames-their-folder) | 성공 |
-| [아무 권한도 받지 않은 사용자가 자기 폴더를 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-update-their-folder) | 거부 |
-| [자기 다른 폴더가 이미 쓰는 이름으로 바꾸려 하면, 잘못된 값으로 거부된다](#editing-renaming-to-a-name-the-owner-already-uses-is-refused) | 거부 |
+| [자기 개인 프로젝트에서 폴더 수정 권한을 받은 사용자가 자기 폴더의 이름과 옵션을 바꾸면, 바뀐 폴더가 온다](#editing-a-user-granted-folder-update-renames-their-folder) | answered |
+| [아무 권한도 받지 않은 사용자가 자기 폴더를 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-update-their-folder) | refused |
+| [자기 다른 폴더가 이미 쓰는 이름으로 바꾸려 하면, 잘못된 값으로 거부된다](#editing-renaming-to-a-name-the-owner-already-uses-is-refused) | refused |
 
 ### batch_load_by_ids
 

@@ -1,41 +1,41 @@
 ## fair_share
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/fair_share/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/fair_share/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/fair_share/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/fair_share/adapter.py)
 
-시나리오: 미완 13 / 15
+Scenario: incomplete 13 / 15
 
-- 직접 구현 (15)
-  - atomic_bulk_upsert_domain — 성공 있음 1 · 실패 있음 2 (scope)
-  - atomic_bulk_upsert_project — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
-  - atomic_bulk_upsert_user — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
-  - get_domain — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
-  - get_project — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
-  - get_user — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
-  - search_domain — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - search_project — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - search_rg_domain — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
-  - search_rg_project — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
-  - search_rg_user — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
-  - search_user — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - upsert_domain — 성공 있음 1 · 실패 있음 2 (scope)
-  - upsert_project — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
-  - upsert_user — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
+- direct implementation (15)
+  - atomic_bulk_upsert_domain — success present 1 · refusal present 2 (scope)
+  - atomic_bulk_upsert_project — success absent · refusal absent (scope) — SCENARIO-GAP
+  - atomic_bulk_upsert_user — success absent · refusal absent (scope) — SCENARIO-GAP
+  - get_domain — success absent · refusal absent (scope) — SCENARIO-GAP
+  - get_project — success absent · refusal absent (scope) — SCENARIO-GAP
+  - get_user — success absent · refusal absent (scope) — SCENARIO-GAP
+  - search_domain — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - search_project — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - search_rg_domain — success absent · refusal absent (scope) — SCENARIO-GAP
+  - search_rg_project — success absent · refusal absent (scope) — SCENARIO-GAP
+  - search_rg_user — success absent · refusal absent (scope) — SCENARIO-GAP
+  - search_user — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - upsert_domain — success present 1 · refusal present 2 (scope)
+  - upsert_project — success absent · refusal absent (scope) — SCENARIO-GAP
+  - upsert_user — success absent · refusal absent (scope) — SCENARIO-GAP
 
 **atomic_bulk_upsert_domain**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 도메인 둘의 가중치를 한 번에 정하면, 둘을 정했다는 개수가 온다](#atomic_bulk_upserting-the-superadmin-sets-several-domain-weights-at-once) | 성공 |
-| [아무 권한도 받지 않은 사용자가 도메인 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부된다](#atomic_bulk_upserting-a-user-granted-nothing-may-not-set-several-domain-weights) | 거부 |
-| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 도메인 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부된다. 가중치 쓰기는 그룹이 아니라 전역 대상으로 권한을 본다](#atomic_bulk_upserting-a-user-granted-update-on-the-group-may-not-set-several-domain-weights) | 거부 |
+| [슈퍼관리자가 도메인 둘의 가중치를 한 번에 정하면, 둘을 정했다는 개수가 온다](#atomic_bulk_upserting-the-superadmin-sets-several-domain-weights-at-once) | answered |
+| [아무 권한도 받지 않은 사용자가 도메인 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부된다](#atomic_bulk_upserting-a-user-granted-nothing-may-not-set-several-domain-weights) | refused |
+| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 도메인 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부된다. 가중치 쓰기는 그룹이 아니라 전역 대상으로 권한을 본다](#atomic_bulk_upserting-a-user-granted-update-on-the-group-may-not-set-several-domain-weights) | refused |
 
 **upsert_domain**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 그룹 안 도메인의 가중치를 정하면, 그 가중치를 실은 기록이 오고 나머지 설정은 그룹 기본값이다](#upserting-the-superadmin-sets-a-domain-weight) | 성공 |
-| [아무 권한도 받지 않은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 거부된다](#upserting-a-user-granted-nothing-may-not-set-a-domain-weight) | 거부 |
-| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 거부된다. 가중치 쓰기는 그룹이 아니라 전역 대상으로 권한을 본다](#upserting-a-user-granted-update-on-the-group-may-not-set-a-domain-weight) | 거부 |
+| [슈퍼관리자가 그룹 안 도메인의 가중치를 정하면, 그 가중치를 실은 기록이 오고 나머지 설정은 그룹 기본값이다](#upserting-the-superadmin-sets-a-domain-weight) | answered |
+| [아무 권한도 받지 않은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 거부된다](#upserting-a-user-granted-nothing-may-not-set-a-domain-weight) | refused |
+| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 거부된다. 가중치 쓰기는 그룹이 아니라 전역 대상으로 권한을 본다](#upserting-a-user-granted-update-on-the-group-may-not-set-a-domain-weight) | refused |
 
 ### atomic_bulk_upsert_domain
 

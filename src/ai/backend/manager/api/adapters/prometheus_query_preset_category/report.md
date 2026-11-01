@@ -1,66 +1,66 @@
 ## prometheus_query_preset_category
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/prometheus_query_preset_category/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/prometheus_query_preset_category/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/prometheus_query_preset_category/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/prometheus_query_preset_category/adapter.py)
 
-시나리오: 미완 1 / 6
+Scenario: incomplete 1 / 6
 
-- ops 로 구성 (6)
-  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
-  - create — 대표 성공 ✓ · 대표 실패 ✓
-  - get — 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge — 대표 성공 ✓ · 대표 실패 ✓
-  - search — 대표 성공 ✓ · 대표 실패 ✓
+- built from ops (6)
+  - batch_load_by_ids — representative success ✓ · representative refusal ✓
+  - create — representative success ✓ · representative refusal ✓
+  - get — representative success ✓ · representative refusal ✓
+  - partial_bulk_purge — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - purge — representative success ✓ · representative refusal ✓
+  - search — representative success ✓ · representative refusal ✓
 
 **batch_load_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [카테고리가 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환된다](#loading-loading-an-empty-id-list-answers-an-empty-list) | 성공 |
-| [카테고리 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 거부로 반환되고 순서가 요청한 순서와 같다](#loading-loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-refusal) | 거부 |
+| [카테고리가 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환된다](#loading-loading-an-empty-id-list-answers-an-empty-list) | answered |
+| [카테고리 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 거부로 반환되고 순서가 요청한 순서와 같다](#loading-loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-refusal) | refused |
 
 **create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 이름과 설명을 함께 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다](#creating-creating-a-category-with-a-description-carries-it-on-the-node) | 성공 |
-| [슈퍼관리자가 이름만 지정해 카테고리를 생성하면, 설명이 비어 있는 노드 전체가 반환된다](#creating-creating-a-category-with-a-name-alone-answers-with-the-whole-node) | 성공 |
-| [이미 다른 카테고리가 사용 중인 이름으로 슈퍼관리자가 다시 생성하면, 이름 중복으로 거부된다. 저장소의 유일 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다](#creating-a-name-another-category-already-holds-is-refused) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 카테고리를 생성하려 하면, 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-category) | 거부 |
-| [권한 검사를 꺼도 카테고리 생성은 여전히 거부된다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-category) | 거부 |
+| [슈퍼관리자가 이름과 설명을 함께 지정해 생성하면, 지정한 값이 그대로 담긴 노드가 반환된다](#creating-creating-a-category-with-a-description-carries-it-on-the-node) | answered |
+| [슈퍼관리자가 이름만 지정해 카테고리를 생성하면, 설명이 비어 있는 노드 전체가 반환된다](#creating-creating-a-category-with-a-name-alone-answers-with-the-whole-node) | answered |
+| [이미 다른 카테고리가 사용 중인 이름으로 슈퍼관리자가 다시 생성하면, 이름 중복으로 거부된다. 저장소의 유일 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다](#creating-a-name-another-category-already-holds-is-refused) | refused |
+| [슈퍼관리자가 아닌 사용자가 카테고리를 생성하려 하면, 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-category) | refused |
+| [권한 검사를 꺼도 카테고리 생성은 여전히 거부된다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-category) | refused |
 
 **get**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [카테고리 하나가 있고 아무 권한도 없는 사용자가 id로 조회하면, 그 카테고리 전체가 반환된다](#reading-a-user-granted-nothing-reads-a-category-by-id) | 성공 |
-| [카테고리 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 호출자를 알 수 없어 거부된다](#reading-a-call-carrying-no-user-may-not-read-a-category) | 거부 |
-| [public 에서 읽을 수 있는 사용자가 존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다](#reading-an-id-nothing-answers-to-is-refused) | 거부 |
+| [카테고리 하나가 있고 아무 권한도 없는 사용자가 id로 조회하면, 그 카테고리 전체가 반환된다](#reading-a-user-granted-nothing-reads-a-category-by-id) | answered |
+| [카테고리 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 호출자를 알 수 없어 거부된다](#reading-a-call-carrying-no-user-may-not-read-a-category) | refused |
+| [public 에서 읽을 수 있는 사용자가 존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다](#reading-an-id-nothing-answers-to-is-refused) | refused |
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 카테고리 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-categories) | 성공 |
-| [슈퍼관리자가 카테고리 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-categories-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 카테고리 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-categories) | answered |
+| [슈퍼관리자가 카테고리 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-categories-answers-for-the-missing-one) | answered |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [카테고리 하나가 있고 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다](#purging-the-superadmin-removes-a-category) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 카테고리를 삭제할 수 있다](#purging-turning-enforcement-off-lets-a-user-remove-a-category) | 성공 |
-| [같은 카테고리가 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-remove-a-category) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
+| [카테고리 하나가 있고 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다](#purging-the-superadmin-removes-a-category) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 카테고리를 삭제할 수 있다](#purging-turning-enforcement-off-lets-a-user-remove-a-category) | answered |
+| [같은 카테고리가 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-remove-a-category) | refused |
+| [슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
 
 **search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [카테고리 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계된다](#searching-a-user-granted-nothing-counts-every-category) | 성공 |
-| [이름이 다른 카테고리 셋이 있을 때 이름 필터로 검색하면, 그 이름의 카테고리만 반환된다](#searching-filtering-by-name-keeps-only-the-category-of-that-name) | 성공 |
-| [카테고리 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching-omitting-the-page-size-answers-ten-and-says-there-is-a-next-page) | 성공 |
-| [카테고리 하나가 있고 사용자 컨텍스트 없이 검색하면, 인증 실패로 거부된다](#searching-a-call-carrying-no-user-may-not-search-categories) | 거부 |
+| [카테고리 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계된다](#searching-a-user-granted-nothing-counts-every-category) | answered |
+| [이름이 다른 카테고리 셋이 있을 때 이름 필터로 검색하면, 그 이름의 카테고리만 반환된다](#searching-filtering-by-name-keeps-only-the-category-of-that-name) | answered |
+| [카테고리 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching-omitting-the-page-size-answers-ten-and-says-there-is-a-next-page) | answered |
+| [카테고리 하나가 있고 사용자 컨텍스트 없이 검색하면, 인증 실패로 거부된다](#searching-a-call-carrying-no-user-may-not-search-categories) | refused |
 
 ### batch_load_by_ids
 

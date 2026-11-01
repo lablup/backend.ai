@@ -1,77 +1,77 @@
 ## session_group
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/session_group/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/session_group/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/session_group/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/session_group/adapter.py)
 
-시나리오: 완성
+Scenario: complete
 
-- ops 로 구성 (5)
-  - create — 대표 성공 ✓ · 대표 실패 ✓
-  - global_search — 대표 성공 ✓ · 대표 실패 ✓
-  - purge — 대표 성공 ✓ · 대표 실패 ✓
-  - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
-  - update — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (2)
-  - bulk_get_ids — 성공 있음 2 · 실패 있음 1 (partial_bulk)
-  - get — 성공 있음 1 · 실패 있음 2 (single_entity)
+- built from ops (5)
+  - create — representative success ✓ · representative refusal ✓
+  - global_search — representative success ✓ · representative refusal ✓
+  - purge — representative success ✓ · representative refusal ✓
+  - scoped_search — representative success ✓ · representative refusal ✓
+  - update — representative success ✓ · representative refusal ✓
+- direct implementation (2)
+  - bulk_get_ids — success present 2 · refusal present 1 (partial_bulk)
+  - get — success present 1 · refusal present 2 (single_entity)
 
 **create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프로젝트에서 세션 그룹 생성 권한을 받은 사용자가 그 프로젝트에 세션 그룹을 만들면, 그 사용자가 소유자이고 입력한 배치 정책을 가진 세션 그룹이 온다](#creating-a-user-granted-create-in-a-project-creates-a-session-group-there) | 성공 |
-| [다른 프로젝트에서만 세션 그룹 생성 권한을 받은 사용자가 그 프로젝트에 세션 그룹을 만들면, 권한 부족으로 거부되고 세션 그룹은 생기지 않는다](#creating-a-user-granted-create-only-in-another-project-may-not-create-a-session-group) | 거부 |
-| [프로젝트에서 세션 그룹 읽기 권한만 받은 사용자가 그 프로젝트에 세션 그룹을 만들면, 권한 부족으로 거부되고 세션 그룹은 생기지 않는다](#creating-a-user-granted-only-read-in-a-project-may-not-create-a-session-group) | 거부 |
+| [프로젝트에서 세션 그룹 생성 권한을 받은 사용자가 그 프로젝트에 세션 그룹을 만들면, 그 사용자가 소유자이고 입력한 배치 정책을 가진 세션 그룹이 온다](#creating-a-user-granted-create-in-a-project-creates-a-session-group-there) | answered |
+| [다른 프로젝트에서만 세션 그룹 생성 권한을 받은 사용자가 그 프로젝트에 세션 그룹을 만들면, 권한 부족으로 거부되고 세션 그룹은 생기지 않는다](#creating-a-user-granted-create-only-in-another-project-may-not-create-a-session-group) | refused |
+| [프로젝트에서 세션 그룹 읽기 권한만 받은 사용자가 그 프로젝트에 세션 그룹을 만들면, 권한 부족으로 거부되고 세션 그룹은 생기지 않는다](#creating-a-user-granted-only-read-in-a-project-may-not-create-a-session-group) | refused |
 
 **global_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 슈퍼관리자가 한 프로젝트로 걸러 전체 검색하면, 그 프로젝트의 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹이 모두 온다. 이 문은 역할이라 행위자가 슈퍼관리자다](#searching-the-superadmin-finds-a-users-group-and-a-deployments-group) | 성공 |
-| [그 프로젝트에서 세션 그룹 읽기 권한을 받았어도 슈퍼관리자가 아닌 사용자가 전체 검색하면, 역할로 거부된다](#searching-a-user-who-is-not-a-superadmin-may-not-search-every-session-group) | 거부 |
+| [아무 권한도 받지 않은 슈퍼관리자가 한 프로젝트로 걸러 전체 검색하면, 그 프로젝트의 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹이 모두 온다. 이 문은 역할이라 행위자가 슈퍼관리자다](#searching-the-superadmin-finds-a-users-group-and-a-deployments-group) | answered |
+| [그 프로젝트에서 세션 그룹 읽기 권한을 받았어도 슈퍼관리자가 아닌 사용자가 전체 검색하면, 역할로 거부된다](#searching-a-user-who-is-not-a-superadmin-may-not-search-every-session-group) | refused |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 자기가 만든 세션 그룹을 지우면, 그 세션 그룹의 id가 오고 멤버 세션은 세션 그룹이 비워진 채 남는다](#purging-the-owner-purges-a-users-session-group-keeping-its-members) | 성공 |
-| [자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 지우면, replica group이 사용 중이라는 것으로 거부되고 세션 그룹은 남는다](#purging-a-deployments-session-group-is-refused-as-in-use) | 거부 |
-| [아무 권한도 받지 않은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 세션 그룹은 남는다](#purging-a-user-granted-nothing-may-not-purge-a-session-group) | 거부 |
-| [자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 세션 그룹은 남는다](#purging-a-user-granted-only-read-may-not-purge-a-session-group) | 거부 |
+| [자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 자기가 만든 세션 그룹을 지우면, 그 세션 그룹의 id가 오고 멤버 세션은 세션 그룹이 비워진 채 남는다](#purging-the-owner-purges-a-users-session-group-keeping-its-members) | answered |
+| [자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 지우면, replica group이 사용 중이라는 것으로 거부되고 세션 그룹은 남는다](#purging-a-deployments-session-group-is-refused-as-in-use) | refused |
+| [아무 권한도 받지 않은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 세션 그룹은 남는다](#purging-a-user-granted-nothing-may-not-purge-a-session-group) | refused |
+| [자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 세션 그룹은 남는다](#purging-a-user-granted-only-read-may-not-purge-a-session-group) | refused |
 
 **scoped_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 그 프로젝트 범위로 검색하면, 배포의 replica group이 가진 세션 그룹과 다른 프로젝트의 세션 그룹은 빠지고 그 프로젝트의 사용자가 만든 세션 그룹만 온다](#scoped_searching-a-granted-user-finds-only-the-users-group-of-the-project) | 성공 |
-| [자기 스코프와 다른 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 두 스코프를 함께 넘겨 검색하면, 자기가 만든 세션 그룹과 그 프로젝트에서 다른 사용자가 만든 세션 그룹이 합쳐져 오고 배포의 replica group이 가진 세션 그룹은 빠진다](#scoped_searching-a-user-scope-and-a-project-scope-are-joined) | 성공 |
-| [자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자가 자기 스코프로 검색하면, 두 프로젝트에 자기가 만든 세션 그룹이 오고 배포의 replica group이 가진 세션 그룹과 다른 사용자가 만든 세션 그룹은 빠진다](#scoped_searching-an-owner-finds-the-groups-they-made-in-their-own-scope) | 성공 |
-| [다른 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들이 있는 프로젝트 범위로 검색하면, 권한 부족으로 거부된다](#scoped_searching-searching-a-project-not-granted-is-refused) | 거부 |
-| [세션 그룹들이 있는 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들을 만든 사용자의 스코프로 검색하면, 권한 부족으로 거부된다](#scoped_searching-searching-another-users-scope-is-refused) | 거부 |
+| [그 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 그 프로젝트 범위로 검색하면, 배포의 replica group이 가진 세션 그룹과 다른 프로젝트의 세션 그룹은 빠지고 그 프로젝트의 사용자가 만든 세션 그룹만 온다](#scoped_searching-a-granted-user-finds-only-the-users-group-of-the-project) | answered |
+| [자기 스코프와 다른 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 두 스코프를 함께 넘겨 검색하면, 자기가 만든 세션 그룹과 그 프로젝트에서 다른 사용자가 만든 세션 그룹이 합쳐져 오고 배포의 replica group이 가진 세션 그룹은 빠진다](#scoped_searching-a-user-scope-and-a-project-scope-are-joined) | answered |
+| [자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자가 자기 스코프로 검색하면, 두 프로젝트에 자기가 만든 세션 그룹이 오고 배포의 replica group이 가진 세션 그룹과 다른 사용자가 만든 세션 그룹은 빠진다](#scoped_searching-an-owner-finds-the-groups-they-made-in-their-own-scope) | answered |
+| [다른 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들이 있는 프로젝트 범위로 검색하면, 권한 부족으로 거부된다](#scoped_searching-searching-a-project-not-granted-is-refused) | refused |
+| [세션 그룹들이 있는 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들을 만든 사용자의 스코프로 검색하면, 권한 부족으로 거부된다](#scoped_searching-searching-another-users-scope-is-refused) | refused |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향만 바꾸면, 강제 수준은 그대로인 그 세션 그룹이 온다](#updating-an-owner-changes-only-the-direction) | 성공 |
-| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향과 강제 수준을 바꾸면, 두 항목이 바뀐 그 세션 그룹이 온다](#updating-an-owner-changes-the-direction-and-the-enforcement) | 성공 |
-| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기 배포의 replica group이 가진 세션 그룹 정책을 바꾸면, 권한이 아니라 사용 중이라는 것으로 거부된다](#updating-a-deployments-session-group-is-refused-as-in-use) | 거부 |
-| [자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹의 정책을 바꾸면, 권한 부족으로 거부된다](#updating-an-owner-granted-only-read-may-not-update) | 거부 |
+| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향만 바꾸면, 강제 수준은 그대로인 그 세션 그룹이 온다](#updating-an-owner-changes-only-the-direction) | answered |
+| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향과 강제 수준을 바꾸면, 두 항목이 바뀐 그 세션 그룹이 온다](#updating-an-owner-changes-the-direction-and-the-enforcement) | answered |
+| [자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기 배포의 replica group이 가진 세션 그룹 정책을 바꾸면, 권한이 아니라 사용 중이라는 것으로 거부된다](#updating-a-deployments-session-group-is-refused-as-in-use) | refused |
+| [자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹의 정책을 바꾸면, 권한 부족으로 거부된다](#updating-an-owner-granted-only-read-may-not-update) | refused |
 
 **bulk_get_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹을 함께 읽으면, 요청한 순서대로 그 세션 그룹과 빈 값이 온다](#bulk_reading-a-granted-user-bulk-reads-a-users-group-and-a-deployments-group) | 성공 |
-| [슈퍼관리자가 아무 세션 그룹도 갖지 않은 id로 여럿 읽으면, 그 자리가 빈 값으로 온다. 권한 검사를 통과하는 사람이어야 읽기의 답을 볼 수 있어 행위자가 슈퍼관리자다](#bulk_reading-the-superadmin-bulk-reads-a-missing-id-as-empty) | 성공 |
-| [아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 여럿 읽으면, 그 자리가 권한 부족으로 거부된다](#bulk_reading-a-user-granted-nothing-may-not-bulk-read-a-session-group) | 거부 |
+| [그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹을 함께 읽으면, 요청한 순서대로 그 세션 그룹과 빈 값이 온다](#bulk_reading-a-granted-user-bulk-reads-a-users-group-and-a-deployments-group) | answered |
+| [슈퍼관리자가 아무 세션 그룹도 갖지 않은 id로 여럿 읽으면, 그 자리가 빈 값으로 온다. 권한 검사를 통과하는 사람이어야 읽기의 답을 볼 수 있어 행위자가 슈퍼관리자다](#bulk_reading-the-superadmin-bulk-reads-a-missing-id-as-empty) | answered |
+| [아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 여럿 읽으면, 그 자리가 권한 부족으로 거부된다](#bulk_reading-a-user-granted-nothing-may-not-bulk-read-a-session-group) | refused |
 
 **get**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹을 id로 조회하면, 그 세션 그룹이 온다](#reading-a-granted-user-reads-a-users-session-group) | 성공 |
-| [그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 id로 조회하면, 권한이 아니라 대상이 없다는 것으로 거부된다](#reading-a-deployments-session-group-is-not-found-even-when-granted) | 거부 |
-| [아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 조회하면, 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-a-session-group) | 거부 |
+| [그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹을 id로 조회하면, 그 세션 그룹이 온다](#reading-a-granted-user-reads-a-users-session-group) | answered |
+| [그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 id로 조회하면, 권한이 아니라 대상이 없다는 것으로 거부된다](#reading-a-deployments-session-group-is-not-found-even-when-granted) | refused |
+| [아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 조회하면, 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-a-session-group) | refused |
 
 ### create
 

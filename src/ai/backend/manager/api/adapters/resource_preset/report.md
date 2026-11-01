@@ -1,52 +1,52 @@
 ## resource_preset
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/resource_preset/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_preset/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/resource_preset/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/resource_preset/adapter.py)
 
-시나리오: 미완 6 / 9
+Scenario: incomplete 6 / 9
 
-- ops 로 구성 (5)
-  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - get — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✓
-  - search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-- 직접 구현 (4)
-  - apply_resource_group — 성공 없음 · 실패 없음 (membership) — SCENARIO-GAP
-  - create — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - purge — 성공 있음 1 · 실패 있음 2 (single_entity)
-  - update — 성공 있음 2 · 실패 있음 2 (membership, single_entity)
+- built from ops (5)
+  - batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - get — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_purge — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_update — representative success ✓ · representative refusal ✓
+  - search — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+- direct implementation (4)
+  - apply_resource_group — success absent · refusal absent (membership) — SCENARIO-GAP
+  - create — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - purge — success present 1 · refusal present 2 (single_entity)
+  - update — success present 2 · refusal present 2 (membership, single_entity)
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | 성공 |
-| [프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워진 노드로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | answered |
+| [프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워진 노드로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | 성공 |
-| [슈퍼관리자가 프리셋 여럿의 공유 메모리를 한 번에 바꾸면, 모두 새 공유 메모리로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | 성공 |
-| [프리셋 여럿을 고치며 하나의 자원을 필수 슬롯 없이 바꾸면, 요청 전체가 입력 오류로 거부된다](#partial_bulk_editing-editing-several-with-slots-missing-intrinsic-ones-is-refused) | 거부 |
+| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | answered |
+| [슈퍼관리자가 프리셋 여럿의 공유 메모리를 한 번에 바꾸면, 모두 새 공유 메모리로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | answered |
+| [프리셋 여럿을 고치며 하나의 자원을 필수 슬롯 없이 바꾸면, 요청 전체가 입력 오류로 거부된다](#partial_bulk_editing-editing-several-with-slots-missing-intrinsic-ones-is-refused) | refused |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 프리셋을 purge 하면 지운 프리셋의 id 가 온다](#purging-the-superadmin-purges-a-preset) | 성공 |
-| [아무 권한도 받지 않은 사용자가 프리셋을 purge 하려 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-preset) | 거부 |
-| [슈퍼관리자가 없는 id 의 프리셋을 purge 하려 하면 대상이 없다는 것으로 거부된다](#purging-purging-an-id-nothing-answers-to-is-not-found) | 거부 |
+| [슈퍼관리자가 프리셋을 purge 하면 지운 프리셋의 id 가 온다](#purging-the-superadmin-purges-a-preset) | answered |
+| [아무 권한도 받지 않은 사용자가 프리셋을 purge 하려 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-preset) | refused |
+| [슈퍼관리자가 없는 id 의 프리셋을 purge 하려 하면 대상이 없다는 것으로 거부된다](#purging-purging-an-id-nothing-answers-to-is-not-found) | refused |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [public 에서 수정 권한을 받은 사용자가 프리셋의 이름을 바꾸면, 새 이름의 프리셋이 온다](#editing-a-user-granted-update-in-public-renames-a-preset) | 성공 |
-| [슈퍼관리자가 프리셋의 이름만 바꾸면, 이름은 새 값이 되고 나머지는 그대로 남는다](#editing-the-superadmin-renames-a-preset) | 성공 |
-| [아무 권한도 받지 않은 사용자가 프리셋을 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-preset) | 거부 |
-| [슈퍼관리자가 없는 id 의 프리셋을 수정하려 하면 대상이 없다는 것으로 거부된다](#editing-editing-an-id-nothing-answers-to-is-not-found) | 거부 |
+| [public 에서 수정 권한을 받은 사용자가 프리셋의 이름을 바꾸면, 새 이름의 프리셋이 온다](#editing-a-user-granted-update-in-public-renames-a-preset) | answered |
+| [슈퍼관리자가 프리셋의 이름만 바꾸면, 이름은 새 값이 되고 나머지는 그대로 남는다](#editing-the-superadmin-renames-a-preset) | answered |
+| [아무 권한도 받지 않은 사용자가 프리셋을 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-preset) | refused |
+| [슈퍼관리자가 없는 id 의 프리셋을 수정하려 하면 대상이 없다는 것으로 거부된다](#editing-editing-an-id-nothing-answers-to-is-not-found) | refused |
 
 ### partial_bulk_purge
 

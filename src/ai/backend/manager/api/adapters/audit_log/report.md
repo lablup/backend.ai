@@ -1,78 +1,78 @@
 ## audit_log
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/audit_log/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/audit_log/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/audit_log/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/audit_log/adapter.py)
 
-시나리오: 미완 1 / 5
+Scenario: incomplete 1 / 5
 
-- ops 로 구성 (5)
-  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
-  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
-  - batch_load_scopes_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
-  - search_scopes — 대표 성공 ✓ · 대표 실패 ✓
+- built from ops (5)
+  - admin_search — representative success ✓ · representative refusal ✓
+  - batch_load_by_ids — representative success ✓ · representative refusal ✓
+  - batch_load_scopes_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - scoped_search — representative success ✓ · representative refusal ✓
+  - search_scopes — representative success ✓ · representative refusal ✓
 
 **admin_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [한 실행이 여러 엔티티에 기록을 남겼을 때 그 실행 필터로 검색하면, 그 실행이 남긴 기록이 모두, 그리고 그것만 반환된다](#searching-a-run-filter-answers-every-record-the-run-left-and-only-those) | 성공 |
-| [성공 기록과 거부 기록이 섞여 있을 때 성공 상태 필터로 검색하면, 성공한 기록만 반환된다](#searching-a-status-filter-narrows-the-answer-to-the-status-it-names) | 성공 |
-| [두 사용자가 각각 기록을 남겼을 때 한 사용자 필터로 검색하면, 그 사용자가 실행한 기록만 반환된다](#searching-an-actor-filter-narrows-the-answer-to-the-user-who-triggered-it) | 성공 |
-| [페이지 크기를 지정하지 않고 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching-omitting-the-page-size-caps-the-page-and-says-more-follow) | 성공 |
-| [검색은 읽기 연산이므로 모니터 역할 사용자도 슈퍼관리자 검사를 통과해 슈퍼관리자와 같은 응답을 받는다](#searching-the-monitor-role-searching-sees-the-same-records-as-the-superadmin) | 성공 |
-| [기록 둘이 있고 슈퍼관리자가 필터 없이 검색하면, 둘 다 반환되고 최근 것이 먼저다](#searching-the-superadmin-searching-without-a-filter-sees-every-record-newest-first) | 성공 |
-| [해석할 수 없는 커서로 검색하면, 잘못된 커서로 거부된다](#searching-a-cursor-that-cannot-be-decoded-is-refused) | 거부 |
-| [슈퍼관리자도 모니터도 아닌 사용자가 전체를 검색하면, 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-record) | 거부 |
-| [오프셋 방식과 커서 방식을 함께 지정해 검색하면, 잘못된 입력으로 거부된다](#searching-naming-two-pagination-modes-at-once-is-refused) | 거부 |
-| [권한 검사를 꺼도 슈퍼관리자가 아닌 사용자는 전체를 검색할 수 없다](#searching-turning-enforcement-off-does-not-let-a-plain-user-search-every-record) | 거부 |
+| [한 실행이 여러 엔티티에 기록을 남겼을 때 그 실행 필터로 검색하면, 그 실행이 남긴 기록이 모두, 그리고 그것만 반환된다](#searching-a-run-filter-answers-every-record-the-run-left-and-only-those) | answered |
+| [성공 기록과 거부 기록이 섞여 있을 때 성공 상태 필터로 검색하면, 성공한 기록만 반환된다](#searching-a-status-filter-narrows-the-answer-to-the-status-it-names) | answered |
+| [두 사용자가 각각 기록을 남겼을 때 한 사용자 필터로 검색하면, 그 사용자가 실행한 기록만 반환된다](#searching-an-actor-filter-narrows-the-answer-to-the-user-who-triggered-it) | answered |
+| [페이지 크기를 지정하지 않고 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching-omitting-the-page-size-caps-the-page-and-says-more-follow) | answered |
+| [검색은 읽기 연산이므로 모니터 역할 사용자도 슈퍼관리자 검사를 통과해 슈퍼관리자와 같은 응답을 받는다](#searching-the-monitor-role-searching-sees-the-same-records-as-the-superadmin) | answered |
+| [기록 둘이 있고 슈퍼관리자가 필터 없이 검색하면, 둘 다 반환되고 최근 것이 먼저다](#searching-the-superadmin-searching-without-a-filter-sees-every-record-newest-first) | answered |
+| [해석할 수 없는 커서로 검색하면, 잘못된 커서로 거부된다](#searching-a-cursor-that-cannot-be-decoded-is-refused) | refused |
+| [슈퍼관리자도 모니터도 아닌 사용자가 전체를 검색하면, 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-record) | refused |
+| [오프셋 방식과 커서 방식을 함께 지정해 검색하면, 잘못된 입력으로 거부된다](#searching-naming-two-pagination-modes-at-once-is-refused) | refused |
+| [권한 검사를 꺼도 슈퍼관리자가 아닌 사용자는 전체를 검색할 수 없다](#searching-turning-enforcement-off-does-not-let-a-plain-user-search-every-record) | refused |
 
 **batch_load_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [빈 id 목록으로 조회하면, 권한 검사도 거치지 않고 빈 응답이 반환된다](#batch_loading-reading-an-empty-list-answers-empty-without-passing-the-gate) | 성공 |
-| [슈퍼관리자가 있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다](#batch_loading-the-superadmin-reading-present-and-absent-ids-is-answered-in-order-with-a-gap) | 성공 |
-| [한쪽 프로젝트에만 읽기 권한을 받은 사용자가 읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id를 한 번에 조회하면, 요청한 순서대로 기록 전체, 권한 부족, 빈 항목이 반환된다](#batch_loading-a-granted-reader-gets-a-node-a-refusal-and-a-gap-in-order) | 거부 |
-| [기록이 남긴 범위에만 읽기 권한을 받은 사용자가 그 기록과 다른 프로젝트의 기록을 조회하면, 범위로 닿은 기록은 반환되고 다른 기록은 권한 부족으로 응답한다](#batch_loading-a-record-is-read-through-a-scope-it-recorded) | 거부 |
-| [기록을 실행한 사용자에만 읽기 권한을 받은 사용자가 그 기록과 다른 프로젝트의 기록을 조회하면, 실행한 사용자로 닿은 기록은 반환되고 다른 기록은 권한 부족으로 응답한다](#batch_loading-a-record-is-read-through-the-user-who-triggered-it) | 거부 |
-| [읽기 권한이 없는 사용자가 자기에 대한 기록 둘을 id로 조회하면, 항목마다 권한 부족으로 응답한다](#batch_loading-a-user-granted-nothing-is-refused-in-every-slot-even-for-records-about-themselves) | 거부 |
-| [아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, 항목마다 권한 부족으로 응답한다](#batch_loading-the-monitor-role-without-a-grant-is-refused-in-every-slot) | 거부 |
+| [빈 id 목록으로 조회하면, 권한 검사도 거치지 않고 빈 응답이 반환된다](#batch_loading-reading-an-empty-list-answers-empty-without-passing-the-gate) | answered |
+| [슈퍼관리자가 있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다](#batch_loading-the-superadmin-reading-present-and-absent-ids-is-answered-in-order-with-a-gap) | answered |
+| [한쪽 프로젝트에만 읽기 권한을 받은 사용자가 읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id를 한 번에 조회하면, 요청한 순서대로 기록 전체, 권한 부족, 빈 항목이 반환된다](#batch_loading-a-granted-reader-gets-a-node-a-refusal-and-a-gap-in-order) | refused |
+| [기록이 남긴 범위에만 읽기 권한을 받은 사용자가 그 기록과 다른 프로젝트의 기록을 조회하면, 범위로 닿은 기록은 반환되고 다른 기록은 권한 부족으로 응답한다](#batch_loading-a-record-is-read-through-a-scope-it-recorded) | refused |
+| [기록을 실행한 사용자에만 읽기 권한을 받은 사용자가 그 기록과 다른 프로젝트의 기록을 조회하면, 실행한 사용자로 닿은 기록은 반환되고 다른 기록은 권한 부족으로 응답한다](#batch_loading-a-record-is-read-through-the-user-who-triggered-it) | refused |
+| [읽기 권한이 없는 사용자가 자기에 대한 기록 둘을 id로 조회하면, 항목마다 권한 부족으로 응답한다](#batch_loading-a-user-granted-nothing-is-refused-in-every-slot-even-for-records-about-themselves) | refused |
+| [아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, 항목마다 권한 부족으로 응답한다](#batch_loading-the-monitor-role-without-a-grant-is-refused-in-every-slot) | refused |
 
 **scoped_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있을 때 그 프로젝트를 지정해 검색하면, 대상 엔티티가 그 프로젝트가 아니어도 그 기록이 반환된다](#scoped_searching-a-record-tagged-with-a-scope-is-found-by-searching-that-scope) | 성공 |
-| [한 엔티티에 두 실행이 남긴 기록이 있을 때 그것을 지정하고 한 실행 필터로 검색하면, 그 실행이 남긴 기록만 모두 반환된다](#scoped_searching-a-run-filter-narrows-within-the-named-scope) | 성공 |
-| [한 엔티티에 성공 기록과 거부 기록이 있을 때 그것을 지정하고 성공 상태 필터로 검색하면, 성공한 기록만 반환된다](#scoped_searching-a-status-filter-narrows-within-the-named-scope) | 성공 |
-| [두 사용자가 각각 기록을 남겼고 한 사용자에 읽기 권한을 받은 사용자가 그 사용자를 실행한 사용자로 지정해 검색하면, 그 사용자가 실행한 기록만 반환된다](#scoped_searching-a-user-granted-read-on-an-actor-reads-only-what-that-actor-triggered) | 성공 |
-| [두 엔티티에 기록이 하나씩 있고 한쪽에만 읽기 권한을 받은 사용자가 그 엔티티를 지정해 검색하면, 그 엔티티의 기록만 반환된다](#scoped_searching-a-user-granted-read-on-an-entity-reads-only-that-entitys-records) | 성공 |
-| [두 엔티티에 모두 읽기 권한을 받은 사용자가 둘을 함께 지정해 검색하면, 두 기록이 다 반환되고 최근 것이 먼저다](#scoped_searching-naming-several-readable-entities-merges-their-records-newest-first) | 성공 |
-| [지정한 엔티티에 기록이 많고 페이지 크기를 지정하지 않으면, 10건까지 반환되고 다음 페이지가 있다고 응답한다](#scoped_searching-omitting-the-page-size-caps-a-scoped-page-and-says-more-follow) | 성공 |
-| [슈퍼관리자가 어느 엔티티도 아닌 id를 지정해 검색하면, 권한 검사를 지나가므로 거부되지 않고 빈 페이지가 온다](#scoped_searching-the-superadmin-naming-an-entity-nothing-answers-to-finds-nothing) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 엔티티를 지정해 그 기록을 검색할 수 있다](#scoped_searching-turning-enforcement-off-reads-a-named-entitys-records-without-a-grant) | 성공 |
-| [지정한 id가 id 형식이 아니면, 잘못된 입력으로 거부된다](#scoped_searching-a-scope-id-that-is-not-an-entity-id-is-refused) | 거부 |
-| [자기 자신에 읽기 권한을 받지 않은 사용자가 자기를 실행한 사용자로 지정해 검색하면, 권한 부족으로 거부된다. 자기 기록을 조회하는 호출이 따로 없기 때문이다](#scoped_searching-a-user-granted-nothing-may-not-read-even-the-records-they-triggered) | 거부 |
-| [아무 권한도 없는 사용자가 엔티티를 지정해 검색하면, 권한 부족으로 거부된다](#scoped_searching-a-user-granted-nothing-may-not-scope-search-an-entity) | 거부 |
-| [다른 엔티티에 읽기 권한을 받은 사용자가 어느 엔티티도 아닌 id를 지정해 검색하면, 그 id에 부여된 권한이 없어 권한 부족으로 거부된다](#scoped_searching-naming-an-entity-nothing-answers-to-is-refused-as-permission) | 거부 |
-| [한쪽에만 읽기 권한을 받은 사용자가 두 엔티티를 함께 지정해 검색하면, 볼 수 있는 것만 주는 대신 요청 전체가 권한 부족으로 거부된다](#scoped_searching-one-unreadable-entity-among-those-named-refuses-the-whole-read) | 거부 |
-| [모니터 역할 사용자라도 권한 없이 엔티티를 지정해 검색하면, 권한 부족으로 거부된다. 모니터가 통과하는 것은 슈퍼관리자 검사뿐이고 이 검색은 권한 그래프로 보호된다](#scoped_searching-the-monitor-role-without-a-grant-may-not-scope-search) | 거부 |
+| [다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있을 때 그 프로젝트를 지정해 검색하면, 대상 엔티티가 그 프로젝트가 아니어도 그 기록이 반환된다](#scoped_searching-a-record-tagged-with-a-scope-is-found-by-searching-that-scope) | answered |
+| [한 엔티티에 두 실행이 남긴 기록이 있을 때 그것을 지정하고 한 실행 필터로 검색하면, 그 실행이 남긴 기록만 모두 반환된다](#scoped_searching-a-run-filter-narrows-within-the-named-scope) | answered |
+| [한 엔티티에 성공 기록과 거부 기록이 있을 때 그것을 지정하고 성공 상태 필터로 검색하면, 성공한 기록만 반환된다](#scoped_searching-a-status-filter-narrows-within-the-named-scope) | answered |
+| [두 사용자가 각각 기록을 남겼고 한 사용자에 읽기 권한을 받은 사용자가 그 사용자를 실행한 사용자로 지정해 검색하면, 그 사용자가 실행한 기록만 반환된다](#scoped_searching-a-user-granted-read-on-an-actor-reads-only-what-that-actor-triggered) | answered |
+| [두 엔티티에 기록이 하나씩 있고 한쪽에만 읽기 권한을 받은 사용자가 그 엔티티를 지정해 검색하면, 그 엔티티의 기록만 반환된다](#scoped_searching-a-user-granted-read-on-an-entity-reads-only-that-entitys-records) | answered |
+| [두 엔티티에 모두 읽기 권한을 받은 사용자가 둘을 함께 지정해 검색하면, 두 기록이 다 반환되고 최근 것이 먼저다](#scoped_searching-naming-several-readable-entities-merges-their-records-newest-first) | answered |
+| [지정한 엔티티에 기록이 많고 페이지 크기를 지정하지 않으면, 10건까지 반환되고 다음 페이지가 있다고 응답한다](#scoped_searching-omitting-the-page-size-caps-a-scoped-page-and-says-more-follow) | answered |
+| [슈퍼관리자가 어느 엔티티도 아닌 id를 지정해 검색하면, 권한 검사를 지나가므로 거부되지 않고 빈 페이지가 온다](#scoped_searching-the-superadmin-naming-an-entity-nothing-answers-to-finds-nothing) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 엔티티를 지정해 그 기록을 검색할 수 있다](#scoped_searching-turning-enforcement-off-reads-a-named-entitys-records-without-a-grant) | answered |
+| [지정한 id가 id 형식이 아니면, 잘못된 입력으로 거부된다](#scoped_searching-a-scope-id-that-is-not-an-entity-id-is-refused) | refused |
+| [자기 자신에 읽기 권한을 받지 않은 사용자가 자기를 실행한 사용자로 지정해 검색하면, 권한 부족으로 거부된다. 자기 기록을 조회하는 호출이 따로 없기 때문이다](#scoped_searching-a-user-granted-nothing-may-not-read-even-the-records-they-triggered) | refused |
+| [아무 권한도 없는 사용자가 엔티티를 지정해 검색하면, 권한 부족으로 거부된다](#scoped_searching-a-user-granted-nothing-may-not-scope-search-an-entity) | refused |
+| [다른 엔티티에 읽기 권한을 받은 사용자가 어느 엔티티도 아닌 id를 지정해 검색하면, 그 id에 부여된 권한이 없어 권한 부족으로 거부된다](#scoped_searching-naming-an-entity-nothing-answers-to-is-refused-as-permission) | refused |
+| [한쪽에만 읽기 권한을 받은 사용자가 두 엔티티를 함께 지정해 검색하면, 볼 수 있는 것만 주는 대신 요청 전체가 권한 부족으로 거부된다](#scoped_searching-one-unreadable-entity-among-those-named-refuses-the-whole-read) | refused |
+| [모니터 역할 사용자라도 권한 없이 엔티티를 지정해 검색하면, 권한 부족으로 거부된다. 모니터가 통과하는 것은 슈퍼관리자 검사뿐이고 이 검색은 권한 그래프로 보호된다](#scoped_searching-the-monitor-role-without-a-grant-may-not-scope-search) | refused |
 
 **search_scopes**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [기록이 남긴 범위 하나에만 읽기 권한을 받은 사용자가 검색하면, 그 기록이 남긴 범위가 모두 반환된다](#scope_searching-a-reader-of-one-scope-reads-every-scope-of-the-record) | 성공 |
-| [기록의 대상 엔티티에만 읽기 권한을 받은 사용자가 검색하면, 그 기록의 범위가 반환된다](#scope_searching-a-reader-of-the-entity-a-record-is-about-reads-its-scopes) | 성공 |
-| [기록을 실행한 사용자에만 읽기 권한을 받은 사용자가 검색하면, 그 기록의 범위가 반환된다](#scope_searching-a-reader-of-the-user-who-triggered-a-record-reads-its-scopes) | 성공 |
-| [범위를 남기지 않은 기록을 그 대상에 읽기 권한을 받은 사용자가 검색하면, 빈 페이지가 반환된다](#scope_searching-a-record-that-recorded-no-scope-answers-an-empty-page) | 성공 |
-| [범위 둘을 남긴 기록을 범위 하나의 식별자를 지정해 검색하면, 그 범위만 반환된다](#scope_searching-a-scope-id-filter-narrows-the-answer-to-that-scope) | 성공 |
-| [범위 둘을 남긴 기록을 프로젝트 종류만 지정해 검색하면, 프로젝트 범위만 반환된다](#scope_searching-a-scope-type-filter-narrows-the-answer-to-that-type) | 성공 |
-| [범위 둘을 남긴 기록을 슈퍼관리자가 검색하면, 범위 둘이 반환된다](#scope_searching-the-superadmin-reads-every-scope-a-record-recorded) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 기록의 범위를 검색할 수 있다](#scope_searching-turning-enforcement-off-reads-the-scopes-without-a-grant) | 성공 |
-| [기록의 소유자를 하나도 읽을 수 없는 사용자가 검색하면, 권한 부족으로 거부된다](#scope_searching-a-user-who-can-read-no-owner-is-refused) | 거부 |
-| [어느 기록에도 해당하지 않는 id로 슈퍼관리자가 검색하면, 찾을 수 없음으로 거부된다](#scope_searching-searching-a-record-that-does-not-exist-is-not-found) | 거부 |
-| [아무 권한도 받지 않은 모니터 역할 사용자가 검색하면, 권한 부족으로 거부된다. 이 검색은 권한 그래프로 보호된다](#scope_searching-the-monitor-role-without-a-grant-is-refused) | 거부 |
+| [기록이 남긴 범위 하나에만 읽기 권한을 받은 사용자가 검색하면, 그 기록이 남긴 범위가 모두 반환된다](#scope_searching-a-reader-of-one-scope-reads-every-scope-of-the-record) | answered |
+| [기록의 대상 엔티티에만 읽기 권한을 받은 사용자가 검색하면, 그 기록의 범위가 반환된다](#scope_searching-a-reader-of-the-entity-a-record-is-about-reads-its-scopes) | answered |
+| [기록을 실행한 사용자에만 읽기 권한을 받은 사용자가 검색하면, 그 기록의 범위가 반환된다](#scope_searching-a-reader-of-the-user-who-triggered-a-record-reads-its-scopes) | answered |
+| [범위를 남기지 않은 기록을 그 대상에 읽기 권한을 받은 사용자가 검색하면, 빈 페이지가 반환된다](#scope_searching-a-record-that-recorded-no-scope-answers-an-empty-page) | answered |
+| [범위 둘을 남긴 기록을 범위 하나의 식별자를 지정해 검색하면, 그 범위만 반환된다](#scope_searching-a-scope-id-filter-narrows-the-answer-to-that-scope) | answered |
+| [범위 둘을 남긴 기록을 프로젝트 종류만 지정해 검색하면, 프로젝트 범위만 반환된다](#scope_searching-a-scope-type-filter-narrows-the-answer-to-that-type) | answered |
+| [범위 둘을 남긴 기록을 슈퍼관리자가 검색하면, 범위 둘이 반환된다](#scope_searching-the-superadmin-reads-every-scope-a-record-recorded) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 기록의 범위를 검색할 수 있다](#scope_searching-turning-enforcement-off-reads-the-scopes-without-a-grant) | answered |
+| [기록의 소유자를 하나도 읽을 수 없는 사용자가 검색하면, 권한 부족으로 거부된다](#scope_searching-a-user-who-can-read-no-owner-is-refused) | refused |
+| [어느 기록에도 해당하지 않는 id로 슈퍼관리자가 검색하면, 찾을 수 없음으로 거부된다](#scope_searching-searching-a-record-that-does-not-exist-is-not-found) | refused |
+| [아무 권한도 받지 않은 모니터 역할 사용자가 검색하면, 권한 부족으로 거부된다. 이 검색은 권한 그래프로 보호된다](#scope_searching-the-monitor-role-without-a-grant-is-refused) | refused |
 
 ### admin_search
 

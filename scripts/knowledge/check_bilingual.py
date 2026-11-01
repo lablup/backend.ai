@@ -25,7 +25,7 @@ HANGUL = re.compile(r"[\u1100-\u11ff\u3130-\u318f\uac00-\ud7a3]")
 HEADING = re.compile(r"^(#{1,6}) ")
 FENCE = re.compile(r"^\s*(```|~~~)")
 DIFF_FILE = re.compile(r"^\+\+\+ b/(.+)$")
-# The scenario tests still generate report.md in Korean.
+# The scenario report falls back to Korean for sentences without English yet.
 KOREAN_ALLOWED_NAMES = frozenset({"report.md"})
 # The glossary is generated, and a wording fix can change only one language.
 ONE_SIDE_CHANGE_ALLOWED = "glossary/"

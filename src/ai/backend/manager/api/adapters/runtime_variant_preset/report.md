@@ -1,90 +1,90 @@
 ## runtime_variant_preset
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/runtime_variant_preset/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/runtime_variant_preset/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/runtime_variant_preset/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/runtime_variant_preset/adapter.py)
 
-시나리오: 미완 4 / 8
+Scenario: incomplete 4 / 8
 
-- ops 로 구성 (6)
-  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - create — 대표 성공 ✓ · 대표 실패 ✓
-  - get — 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge — 대표 성공 ✓ · 대표 실패 ✓
-  - search — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-- 직접 구현 (2)
-  - partial_bulk_update — 성공 있음 2 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - update — 성공 있음 5 · 실패 있음 2 (single_entity)
+- built from ops (6)
+  - batch_load_by_ids — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - create — representative success ✓ · representative refusal ✓
+  - get — representative success ✓ · representative refusal ✓
+  - partial_bulk_purge — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - purge — representative success ✓ · representative refusal ✓
+  - search — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+- direct implementation (2)
+  - partial_bulk_update — success present 2 · refusal absent (partial_bulk) — SCENARIO-GAP
+  - update — success present 5 · refusal present 2 (single_entity)
 
 **batch_load_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [빈 ID 목록으로 조회하면 빈 응답이 반환되며 하위 계층은 호출하지 않는다](#reading-an-empty-preset-id-list-answers-empty-without-a-call) | 성공 |
-| [존재하는 ID 둘과 존재하지 않는 ID 하나를 함께 조회하면 요청한 순서대로 반환되고, 존재하지 않는 ID의 위치는 비어 있다](#reading-presets-read-by-many-ids-come-back-in-the-order-asked) | 성공 |
+| [빈 ID 목록으로 조회하면 빈 응답이 반환되며 하위 계층은 호출하지 않는다](#reading-an-empty-preset-id-list-answers-empty-without-a-call) | answered |
+| [존재하는 ID 둘과 존재하지 않는 ID 하나를 함께 조회하면 요청한 순서대로 반환되고, 존재하지 않는 ID의 위치는 비어 있다](#reading-presets-read-by-many-ids-come-back-in-the-order-asked) | answered |
 
 **create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프리셋이 하나 있는 변형에 슈퍼관리자가 하나 더 생성하면 새 프리셋의 순위가 100 더 크다](#creating-a-second-preset-in-the-same-variant-is-ranked-a-hundred-higher) | 성공 |
-| [슬라이더 옵션을 추가하여 생성하면 UI 종류를 옵션에서 읽어 응답 노드에 함께 담는다](#creating-a-ui-option-given-on-create-carries-its-type-into-the-node) | 성공 |
-| [대상·값 종류·기본값·키를 모두 지정해 생성하면 네 값이 하나의 명세로 묶여 반환된다](#creating-target-value-type-default-and-key-come-back-as-one-spec) | 성공 |
-| [프리셋이 없는 변형에 슈퍼관리자가 필수 항목만 지정해 생성하면 순위는 100이고, 필수 항목으로 지정되지 않으며, 나머지 선택 항목은 비어 있다](#creating-the-first-preset-of-a-variant-is-ranked-a-hundred) | 성공 |
-| [고유성 제약은 변형과 이름의 조합에 적용되므로 다른 변형에는 같은 이름의 프리셋을 생성할 수 있다](#creating-the-same-preset-name-is-free-in-another-variant) | 성공 |
-| [같은 변형에 같은 이름의 프리셋을 다시 생성하면 이름이 중복되어 요청이 거부된다](#creating-a-preset-name-taken-in-the-same-variant-is-refused) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 프리셋을 생성하면 역할이 부족하여 요청이 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-preset) | 거부 |
-| [권한 검사를 꺼도 슈퍼관리자가 아니면 프리셋을 생성할 수 없다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-preset) | 거부 |
+| [프리셋이 하나 있는 변형에 슈퍼관리자가 하나 더 생성하면 새 프리셋의 순위가 100 더 크다](#creating-a-second-preset-in-the-same-variant-is-ranked-a-hundred-higher) | answered |
+| [슬라이더 옵션을 추가하여 생성하면 UI 종류를 옵션에서 읽어 응답 노드에 함께 담는다](#creating-a-ui-option-given-on-create-carries-its-type-into-the-node) | answered |
+| [대상·값 종류·기본값·키를 모두 지정해 생성하면 네 값이 하나의 명세로 묶여 반환된다](#creating-target-value-type-default-and-key-come-back-as-one-spec) | answered |
+| [프리셋이 없는 변형에 슈퍼관리자가 필수 항목만 지정해 생성하면 순위는 100이고, 필수 항목으로 지정되지 않으며, 나머지 선택 항목은 비어 있다](#creating-the-first-preset-of-a-variant-is-ranked-a-hundred) | answered |
+| [고유성 제약은 변형과 이름의 조합에 적용되므로 다른 변형에는 같은 이름의 프리셋을 생성할 수 있다](#creating-the-same-preset-name-is-free-in-another-variant) | answered |
+| [같은 변형에 같은 이름의 프리셋을 다시 생성하면 이름이 중복되어 요청이 거부된다](#creating-a-preset-name-taken-in-the-same-variant-is-refused) | refused |
+| [슈퍼관리자가 아닌 사용자가 프리셋을 생성하면 역할이 부족하여 요청이 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-preset) | refused |
+| [권한 검사를 꺼도 슈퍼관리자가 아니면 프리셋을 생성할 수 없다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-preset) | refused |
 
 **get**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 ID로 조회해도 해당 프리셋 전체가 반환된다. 이 조회는 인증 여부만 확인한다](#reading-a-user-granted-nothing-reads-a-preset-by-id) | 성공 |
-| [존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다](#reading-reading-a-preset-id-nothing-answers-to-is-refused) | 거부 |
+| [아무 권한도 없는 사용자가 ID로 조회해도 해당 프리셋 전체가 반환된다. 이 조회는 인증 여부만 확인한다](#reading-a-user-granted-nothing-reads-a-preset-by-id) | answered |
+| [존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다](#reading-reading-a-preset-id-nothing-answers-to-is-refused) | refused |
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | 성공 |
-| [슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 처리된 목록에 오고 없는 id 는 실패 목록에 온다](#partial_bulk_purging-purging-several-presets-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 없는 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | answered |
+| [슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 처리된 목록에 오고 없는 id 는 실패 목록에 온다](#partial_bulk_purging-purging-several-presets-answers-for-the-missing-one) | answered |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 프리셋을 삭제하면 삭제한 프리셋의 ID를 담은 응답이 반환된다](#retiring-the-superadmin-deletes-a-preset) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-delete-a-preset) | 성공 |
-| [아무 권한도 없는 사용자가 프리셋을 삭제하면 권한이 부족하여 요청이 거부된다](#retiring-a-user-granted-nothing-may-not-delete-a-preset) | 거부 |
-| [슈퍼관리자가 존재하지 않는 ID를 삭제하면 대상을 찾을 수 없어 요청이 거부된다](#retiring-deleting-a-preset-id-nothing-answers-to-is-not-found) | 거부 |
+| [슈퍼관리자가 프리셋을 삭제하면 삭제한 프리셋의 ID를 담은 응답이 반환된다](#retiring-the-superadmin-deletes-a-preset) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-delete-a-preset) | answered |
+| [아무 권한도 없는 사용자가 프리셋을 삭제하면 권한이 부족하여 요청이 거부된다](#retiring-a-user-granted-nothing-may-not-delete-a-preset) | refused |
+| [슈퍼관리자가 존재하지 않는 ID를 삭제하면 대상을 찾을 수 없어 요청이 거부된다](#retiring-deleting-a-preset-id-nothing-answers-to-is-not-found) | refused |
 
 **search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프리셋이 둘 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 두 프리셋이 모두 반환된다](#searching-a-user-granted-nothing-counts-every-preset-laid) | 성공 |
-| [프리셋이 두 변형에 나뉘어 있을 때 한 변형을 필터로 조회하면 해당 변형의 프리셋만 반환된다](#searching-a-variant-filter-narrows-the-answer-to-that-variants-presets) | 성공 |
-| [추가 버전과 폐기 버전이 서로 다른 프리셋을 버전 필터로 조회하면 추가 버전 이상이고 폐기 버전 미만인 프리셋만 반환된다. 값이 비어 있는 쪽에는 제한이 없다](#searching-a-version-filter-keeps-only-the-presets-valid-at-that-version) | 성공 |
-| [프리셋이 11개 있을 때 페이지 크기를 생략하면 10건을 반환하고 다음 페이지가 있음을 표시한다](#searching-omitting-the-page-size-answers-ten-presets-and-a-next-page) | 성공 |
+| [프리셋이 둘 있을 때 아무 권한도 없는 사용자가 필터 없이 조회하면 두 프리셋이 모두 반환된다](#searching-a-user-granted-nothing-counts-every-preset-laid) | answered |
+| [프리셋이 두 변형에 나뉘어 있을 때 한 변형을 필터로 조회하면 해당 변형의 프리셋만 반환된다](#searching-a-variant-filter-narrows-the-answer-to-that-variants-presets) | answered |
+| [추가 버전과 폐기 버전이 서로 다른 프리셋을 버전 필터로 조회하면 추가 버전 이상이고 폐기 버전 미만인 프리셋만 반환된다. 값이 비어 있는 쪽에는 제한이 없다](#searching-a-version-filter-keeps-only-the-presets-valid-at-that-version) | answered |
+| [프리셋이 11개 있을 때 페이지 크기를 생략하면 10건을 반환하고 다음 페이지가 있음을 표시한다](#searching-omitting-the-page-size-answers-ten-presets-and-a-next-page) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | 성공 |
-| [슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | 성공 |
+| [아무 권한도 없는 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | answered |
+| [슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | answered |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [변경할 값을 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-a-preset-edit-giving-no-value-changes-nothing) | 성공 |
-| [설명이 있는 프리셋의 설명을 비우면 설명이 없어진다](#editing-clearing-a-preset-description-leaves-it-empty) | 성공 |
-| [슈퍼관리자가 프리셋의 순위를 바꾸면 순위가 변경된 노드가 반환된다](#editing-editing-a-preset-rank-sets-the-new-rank) | 성공 |
-| [슈퍼관리자가 프리셋의 이름만 바꾸면 이름은 새 값으로 바뀌고 나머지는 그대로 유지된다](#editing-renaming-a-preset-leaves-the-rest-alone) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다](#editing-turning-enforcement-off-lets-a-user-edit-a-preset) | 성공 |
-| [아무 권한도 없는 사용자가 프리셋을 수정하면 권한이 부족하여 요청이 거부된다. 프리셋은 어느 스코프에도 속하지 않아 현재는 해당 권한을 부여할 방법이 없다](#editing-a-user-granted-nothing-may-not-edit-a-preset) | 거부 |
-| [슈퍼관리자가 존재하지 않는 ID를 수정하면 대상을 찾을 수 없어 요청이 거부된다](#editing-the-superadmin-editing-a-preset-id-nothing-answers-to-is-not-found) | 거부 |
+| [변경할 값을 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-a-preset-edit-giving-no-value-changes-nothing) | answered |
+| [설명이 있는 프리셋의 설명을 비우면 설명이 없어진다](#editing-clearing-a-preset-description-leaves-it-empty) | answered |
+| [슈퍼관리자가 프리셋의 순위를 바꾸면 순위가 변경된 노드가 반환된다](#editing-editing-a-preset-rank-sets-the-new-rank) | answered |
+| [슈퍼관리자가 프리셋의 이름만 바꾸면 이름은 새 값으로 바뀌고 나머지는 그대로 유지된다](#editing-renaming-a-preset-leaves-the-rest-alone) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다](#editing-turning-enforcement-off-lets-a-user-edit-a-preset) | answered |
+| [아무 권한도 없는 사용자가 프리셋을 수정하면 권한이 부족하여 요청이 거부된다. 프리셋은 어느 스코프에도 속하지 않아 현재는 해당 권한을 부여할 방법이 없다](#editing-a-user-granted-nothing-may-not-edit-a-preset) | refused |
+| [슈퍼관리자가 존재하지 않는 ID를 수정하면 대상을 찾을 수 없어 요청이 거부된다](#editing-the-superadmin-editing-a-preset-id-nothing-answers-to-is-not-found) | refused |
 
 ### batch_load_by_ids
 

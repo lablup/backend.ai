@@ -1,252 +1,252 @@
 ## resource_group
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/resource_group/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_group/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/resource_group/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/resource_group/adapter.py)
 
-시나리오: 미완 4 / 25
+Scenario: incomplete 4 / 25
 
-- ops 로 구성 (10)
-  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_by_names — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - get — 대표 성공 ✓ · 대표 실패 ✓
-  - get_allowed_resource_groups_for_domain — 대표 성공 ✓ · 대표 실패 ✓
-  - get_allowed_resource_groups_for_project — 대표 성공 ✓ · 대표 실패 ✓
-  - lookup_name — 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
-  - search — 대표 성공 ✓ · 대표 실패 ✓
-- ops + 직접 구현 (1)
-  - get_fair_share_spec — 성공 있음 2 · 실패 있음 2 (partial_bulk_get_ops, single_entity)
-- 직접 구현 (14)
-  - admin_replace_default_deployment_options — 성공 있음 2 · 실패 있음 2 (single_entity)
-  - admin_replace_default_session_options — 성공 있음 1 · 실패 있음 2 (single_entity)
-  - create — 성공 있음 2 · 실패 있음 3 (global_scope)
-  - get_allowed_domains_for_resource_group — 성공 있음 2 · 실패 있음 1 (single_entity)
-  - get_allowed_projects_for_resource_group — 성공 있음 1 · 실패 있음 1 (single_entity)
-  - get_resource_info — 성공 있음 2 · 실패 있음 2 (single_entity)
-  - purge — 성공 있음 2 · 실패 있음 2 (single_entity)
-  - update — 성공 있음 5 · 실패 있음 3 (single_entity)
-  - update_allowed_domains_for_resource_group — 성공 있음 1 · 실패 있음 3 (relation, single_entity)
-  - update_allowed_projects_for_resource_group — 성공 있음 1 · 실패 있음 1 (relation, single_entity)
-  - update_allowed_resource_groups_for_domain — 성공 있음 3 · 실패 있음 2 (global_scope, relation, single_entity)
-  - update_allowed_resource_groups_for_project — 성공 있음 1 · 실패 있음 1 (global_scope, relation, single_entity)
-  - update_config — 성공 있음 2 · 실패 있음 1 (single_entity)
-  - update_fair_share_spec — 성공 있음 2 · 실패 있음 2 (single_entity)
+- built from ops (10)
+  - batch_load_by_ids — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_by_names — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - get — representative success ✓ · representative refusal ✓
+  - get_allowed_resource_groups_for_domain — representative success ✓ · representative refusal ✓
+  - get_allowed_resource_groups_for_project — representative success ✓ · representative refusal ✓
+  - lookup_name — representative success ✓ · representative refusal ✓
+  - partial_bulk_purge — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_update — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - scoped_search — representative success ✓ · representative refusal ✓
+  - search — representative success ✓ · representative refusal ✓
+- ops + direct implementation (1)
+  - get_fair_share_spec — success present 2 · refusal present 2 (partial_bulk_get_ops, single_entity)
+- direct implementation (14)
+  - admin_replace_default_deployment_options — success present 2 · refusal present 2 (single_entity)
+  - admin_replace_default_session_options — success present 1 · refusal present 2 (single_entity)
+  - create — success present 2 · refusal present 3 (global_scope)
+  - get_allowed_domains_for_resource_group — success present 2 · refusal present 1 (single_entity)
+  - get_allowed_projects_for_resource_group — success present 1 · refusal present 1 (single_entity)
+  - get_resource_info — success present 2 · refusal present 2 (single_entity)
+  - purge — success present 2 · refusal present 2 (single_entity)
+  - update — success present 5 · refusal present 3 (single_entity)
+  - update_allowed_domains_for_resource_group — success present 1 · refusal present 3 (relation, single_entity)
+  - update_allowed_projects_for_resource_group — success present 1 · refusal present 1 (relation, single_entity)
+  - update_allowed_resource_groups_for_domain — success present 3 · refusal present 2 (global_scope, relation, single_entity)
+  - update_allowed_resource_groups_for_project — success present 1 · refusal present 1 (global_scope, relation, single_entity)
+  - update_config — success present 2 · refusal present 1 (single_entity)
+  - update_fair_share_spec — success present 2 · refusal present 2 (single_entity)
 
 **batch_load_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다](#reading-a-batch-load-of-no-ids-answers-an-empty-list) | 성공 |
-| [아무 권한도 없는 사용자가 그룹 둘을 id로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다](#reading-a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item) | 성공 |
-| [슈퍼관리자가 미리 만들어 둔 그룹 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다](#reading-the-superadmin-batch-load-by-ids-leaves-a-missing-id-empty) | 성공 |
+| [빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다](#reading-a-batch-load-of-no-ids-answers-an-empty-list) | answered |
+| [아무 권한도 없는 사용자가 그룹 둘을 id로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다](#reading-a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item) | answered |
+| [슈퍼관리자가 미리 만들어 둔 그룹 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다](#reading-the-superadmin-batch-load-by-ids-leaves-a-missing-id-empty) | answered |
 
 **batch_load_by_names**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [빈 이름 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다](#reading-a-batch-load-of-no-names-answers-an-empty-list) | 성공 |
-| [아무 권한도 없는 사용자가 그룹 둘을 이름으로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다](#reading-a-user-granted-nothing-batch-loading-by-names-is-refused-per-item) | 성공 |
-| [슈퍼관리자가 미리 만들어 둔 그룹 둘과 없는 이름 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 이름에 해당하는 항목은 비어 있다](#reading-the-superadmin-batch-load-by-names-leaves-a-missing-name-empty) | 성공 |
+| [빈 이름 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다](#reading-a-batch-load-of-no-names-answers-an-empty-list) | answered |
+| [아무 권한도 없는 사용자가 그룹 둘을 이름으로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다](#reading-a-user-granted-nothing-batch-loading-by-names-is-refused-per-item) | answered |
+| [슈퍼관리자가 미리 만들어 둔 그룹 둘과 없는 이름 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 이름에 해당하는 항목은 비어 있다](#reading-the-superadmin-batch-load-by-names-leaves-a-missing-name-empty) | answered |
 
 **get**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 이름으로 조회하면 그 그룹 전체가 반환된다. 그룹이 자기 스코프이므로 그룹에 앉힌 역할이 닿는다](#reading-a-user-granted-read-on-the-group-reads-it-by-name) | 성공 |
-| [리소스 그룹 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 그룹 전체가 반환된다](#reading-the-superadmin-reads-a-resource-group-by-name) | 성공 |
-| [아무 권한도 없는 사용자가 이름으로 조회하면 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-a-resource-group) | 거부 |
-| [아무 권한도 없는 사용자가 존재하지 않는 이름으로 조회해도 권한 부족이 아니라 대상을 찾을 수 없다는 이유로 거부된다. 이름으로 id를 찾는 자리는 인증만 확인하고 권한 검사는 찾은 뒤에 온다](#reading-a-user-granted-nothing-reading-a-name-nothing-answers-to-is-not-found-too) | 거부 |
-| [슈퍼관리자가 존재하지 않는 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-the-superadmin-reading-a-name-nothing-answers-to-is-not-found) | 거부 |
+| [그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 이름으로 조회하면 그 그룹 전체가 반환된다. 그룹이 자기 스코프이므로 그룹에 앉힌 역할이 닿는다](#reading-a-user-granted-read-on-the-group-reads-it-by-name) | answered |
+| [리소스 그룹 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 그룹 전체가 반환된다](#reading-the-superadmin-reads-a-resource-group-by-name) | answered |
+| [아무 권한도 없는 사용자가 이름으로 조회하면 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-a-resource-group) | refused |
+| [아무 권한도 없는 사용자가 존재하지 않는 이름으로 조회해도 권한 부족이 아니라 대상을 찾을 수 없다는 이유로 거부된다. 이름으로 id를 찾는 자리는 인증만 확인하고 권한 검사는 찾은 뒤에 온다](#reading-a-user-granted-nothing-reading-a-name-nothing-answers-to-is-not-found-too) | refused |
+| [슈퍼관리자가 존재하지 않는 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-the-superadmin-reading-a-name-nothing-answers-to-is-not-found) | refused |
 
 **get_allowed_resource_groups_for_domain**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [도메인 범위에서 리소스 그룹 읽기 역할을 받은 사용자가 그 도메인의 허용 목록을 읽으면 건 그룹 이름만 담긴다](#allowing-a-user-granted-read-in-the-domain-reads-the-groups-allowed-for-it) | 성공 |
-| [도메인에 건 그룹과 걸지 않은 그룹이 있을 때 슈퍼관리자가 도메인의 허용 목록을 읽으면 건 그룹 이름만 담긴다](#allowing-the-superadmin-reads-the-groups-allowed-for-a-domain) | 성공 |
-| [아무 권한도 없는 사용자가 자기 도메인의 허용 목록을 읽으려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-domain) | 거부 |
-| [존재하지 않는 도메인 이름의 허용 목록을 읽으려 하면 대상을 찾을 수 없다는 이유로 거부된다](#allowing-reading-the-groups-allowed-for-a-domain-nothing-answers-to-is-not-found) | 거부 |
+| [도메인 범위에서 리소스 그룹 읽기 역할을 받은 사용자가 그 도메인의 허용 목록을 읽으면 건 그룹 이름만 담긴다](#allowing-a-user-granted-read-in-the-domain-reads-the-groups-allowed-for-it) | answered |
+| [도메인에 건 그룹과 걸지 않은 그룹이 있을 때 슈퍼관리자가 도메인의 허용 목록을 읽으면 건 그룹 이름만 담긴다](#allowing-the-superadmin-reads-the-groups-allowed-for-a-domain) | answered |
+| [아무 권한도 없는 사용자가 자기 도메인의 허용 목록을 읽으려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-domain) | refused |
+| [존재하지 않는 도메인 이름의 허용 목록을 읽으려 하면 대상을 찾을 수 없다는 이유로 거부된다](#allowing-reading-the-groups-allowed-for-a-domain-nothing-answers-to-is-not-found) | refused |
 
 **get_allowed_resource_groups_for_project**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프로젝트에 건 그룹이 있을 때 슈퍼관리자가 프로젝트의 허용 목록을 읽으면 건 그룹 이름이 담긴다](#allowing-the-superadmin-reads-the-groups-allowed-for-a-project) | 성공 |
-| [아무 권한도 없는 사용자가 프로젝트의 허용 목록을 읽으려 하면 권한 부족으로 거부된다. 자기 도메인, 그 프로젝트, 자기 자신 세 스코프 모두에서 읽을 수 있어야 한다](#allowing-a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-project) | 거부 |
+| [프로젝트에 건 그룹이 있을 때 슈퍼관리자가 프로젝트의 허용 목록을 읽으면 건 그룹 이름이 담긴다](#allowing-the-superadmin-reads-the-groups-allowed-for-a-project) | answered |
+| [아무 권한도 없는 사용자가 프로젝트의 허용 목록을 읽으려 하면 권한 부족으로 거부된다. 자기 도메인, 그 프로젝트, 자기 자신 세 스코프 모두에서 읽을 수 있어야 한다](#allowing-a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-project) | refused |
 
 **lookup_name**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자도 리소스 그룹 이름으로 id를 찾을 수 있다. 이 호출은 인증만 보고, 권한은 그 id를 받는 호출이 본다](#looking_up-a-user-granted-nothing-still-looks-up-a-resource-group-by-name) | 성공 |
-| [슈퍼관리자가 리소스 그룹 이름으로 id를 찾으면, 그 리소스 그룹의 id가 온다](#looking_up-the-superadmin-looks-up-a-resource-group-by-name) | 성공 |
-| [아무 리소스 그룹도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다](#looking_up-looking-up-a-resource-group-name-nothing-answers-to-is-not-found) | 거부 |
+| [아무 권한도 받지 않은 사용자도 리소스 그룹 이름으로 id를 찾을 수 있다. 이 호출은 인증만 보고, 권한은 그 id를 받는 호출이 본다](#looking_up-a-user-granted-nothing-still-looks-up-a-resource-group-by-name) | answered |
+| [슈퍼관리자가 리소스 그룹 이름으로 id를 찾으면, 그 리소스 그룹의 id가 온다](#looking_up-the-superadmin-looks-up-a-resource-group-by-name) | answered |
+| [아무 리소스 그룹도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다](#looking_up-looking-up-a-resource-group-name-nothing-answers-to-is-not-found) | refused |
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 그룹 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-resource-groups) | 성공 |
-| [슈퍼관리자가 그룹 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 지운 그대로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-resource-groups-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 그룹 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-resource-groups) | answered |
+| [슈퍼관리자가 그룹 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 지운 그대로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-resource-groups-answers-for-the-missing-one) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 그룹 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-resource-groups) | 성공 |
-| [슈퍼관리자가 그룹 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-resource-groups-at-once) | 성공 |
+| [아무 권한도 받지 않은 사용자가 그룹 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-resource-groups) | answered |
+| [슈퍼관리자가 그룹 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-resource-groups-at-once) | answered |
 
 **scoped_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [도메인 범위에서 리소스 그룹 읽기 역할을 받은 사용자가 그 도메인 스코프로 조회하면, 도메인에 건 그룹 하나만 반환되고 걸지 않은 그룹은 나오지 않는다](#searching-a-user-granted-read-in-the-domain-searches-the-groups-linked-to-it) | 성공 |
-| [슈퍼관리자가 도메인 스코프로 조회해도 그 도메인에 건 그룹 하나만 반환된다](#searching-the-superadmin-searching-a-domain-scope-sees-only-the-groups-linked-to-it) | 성공 |
-| [아무 권한도 없는 사용자가 자기 도메인 스코프로 조회하면 권한 부족으로 거부된다](#searching-a-user-granted-nothing-may-not-search-a-domain-scope) | 거부 |
+| [도메인 범위에서 리소스 그룹 읽기 역할을 받은 사용자가 그 도메인 스코프로 조회하면, 도메인에 건 그룹 하나만 반환되고 걸지 않은 그룹은 나오지 않는다](#searching-a-user-granted-read-in-the-domain-searches-the-groups-linked-to-it) | answered |
+| [슈퍼관리자가 도메인 스코프로 조회해도 그 도메인에 건 그룹 하나만 반환된다](#searching-the-superadmin-searching-a-domain-scope-sees-only-the-groups-linked-to-it) | answered |
+| [아무 권한도 없는 사용자가 자기 도메인 스코프로 조회하면 권한 부족으로 거부된다](#searching-a-user-granted-nothing-may-not-search-a-domain-scope) | refused |
 
 **search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [리소스 그룹 둘 중 한쪽 이름을 필터로 조회하면 그 그룹 하나만 반환된다](#searching-a-name-filter-narrows-the-answer-to-that-resource-group) | 성공 |
-| [활성 그룹과 비활성 그룹이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 반환된다](#searching-an-active-filter-leaves-only-the-active-resource-groups) | 성공 |
-| [리소스 그룹 둘이 있을 때 앞에서 한 건만 요청하면 한 건이 반환되고 다음 페이지가 있다고 응답한다](#searching-asking-for-the-first-resource-group-only-says-there-is-a-next-page) | 성공 |
-| [모니터가 필터 없이 조회하면 슈퍼관리자와 같은 응답을 받는다](#searching-the-monitor-searches-resource-groups-like-the-superadmin) | 성공 |
-| [리소스 그룹 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 반환된다](#searching-the-superadmin-counts-every-resource-group-laid) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 필터 없이 전체를 조회하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-resource-group) | 거부 |
+| [리소스 그룹 둘 중 한쪽 이름을 필터로 조회하면 그 그룹 하나만 반환된다](#searching-a-name-filter-narrows-the-answer-to-that-resource-group) | answered |
+| [활성 그룹과 비활성 그룹이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 반환된다](#searching-an-active-filter-leaves-only-the-active-resource-groups) | answered |
+| [리소스 그룹 둘이 있을 때 앞에서 한 건만 요청하면 한 건이 반환되고 다음 페이지가 있다고 응답한다](#searching-asking-for-the-first-resource-group-only-says-there-is-a-next-page) | answered |
+| [모니터가 필터 없이 조회하면 슈퍼관리자와 같은 응답을 받는다](#searching-the-monitor-searches-resource-groups-like-the-superadmin) | answered |
+| [리소스 그룹 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 반환된다](#searching-the-superadmin-counts-every-resource-group-laid) | answered |
+| [슈퍼관리자가 아닌 사용자가 필터 없이 전체를 조회하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-resource-group) | refused |
 
 **get_fair_share_spec**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 에이전트 없는 그룹의 fair share 설정을 읽으면 코드가 정한 기본값이 반환되고 가중치 목록은 비어 있다](#fair_share-a-user-granted-read-on-the-group-reads-its-fair-share-spec) | 성공 |
-| [에이전트가 없는 그룹의 fair share 설정을 슈퍼관리자가 읽으면 코드가 정한 기본값이 반환되고 가중치 목록은 비어 있다](#fair_share-the-superadmin-reads-the-default-fair-share-spec) | 성공 |
-| [아무 권한도 없는 사용자가 fair share 설정을 읽으려 하면 권한 부족으로 거부된다](#fair_share-a-user-granted-nothing-may-not-read-the-fair-share-spec) | 거부 |
-| [슈퍼관리자가 존재하지 않는 이름의 fair share 설정을 읽으면 대상을 찾을 수 없다는 이유로 거부된다](#fair_share-reading-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found) | 거부 |
+| [그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 에이전트 없는 그룹의 fair share 설정을 읽으면 코드가 정한 기본값이 반환되고 가중치 목록은 비어 있다](#fair_share-a-user-granted-read-on-the-group-reads-its-fair-share-spec) | answered |
+| [에이전트가 없는 그룹의 fair share 설정을 슈퍼관리자가 읽으면 코드가 정한 기본값이 반환되고 가중치 목록은 비어 있다](#fair_share-the-superadmin-reads-the-default-fair-share-spec) | answered |
+| [아무 권한도 없는 사용자가 fair share 설정을 읽으려 하면 권한 부족으로 거부된다](#fair_share-a-user-granted-nothing-may-not-read-the-fair-share-spec) | refused |
+| [슈퍼관리자가 존재하지 않는 이름의 fair share 설정을 읽으면 대상을 찾을 수 없다는 이유로 거부된다](#fair_share-reading-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found) | refused |
 
 **admin_replace_default_deployment_options**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 기본 배포 옵션을 갈아끼우면 준 옵션이 통째로 반환된다](#options-a-user-granted-update-on-the-group-replaces-the-default-deployment-options) | 성공 |
-| [슈퍼관리자가 등록된 처리기 하나의 설정을 담아 기본 배포 옵션을 갈아끼우면 준 옵션이 통째로 반환된다](#options-the-superadmin-replaces-the-default-deployment-options-whole) | 성공 |
-| [아무 권한도 없는 사용자가 기본 배포 옵션을 갈아끼우려 하면 권한 부족으로 거부된다](#options-a-user-granted-nothing-may-not-replace-the-default-deployment-options) | 거부 |
-| [등록되지 않은 배포 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다](#options-naming-an-unregistered-deployment-handler-is-refused) | 거부 |
+| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 기본 배포 옵션을 갈아끼우면 준 옵션이 통째로 반환된다](#options-a-user-granted-update-on-the-group-replaces-the-default-deployment-options) | answered |
+| [슈퍼관리자가 등록된 처리기 하나의 설정을 담아 기본 배포 옵션을 갈아끼우면 준 옵션이 통째로 반환된다](#options-the-superadmin-replaces-the-default-deployment-options-whole) | answered |
+| [아무 권한도 없는 사용자가 기본 배포 옵션을 갈아끼우려 하면 권한 부족으로 거부된다](#options-a-user-granted-nothing-may-not-replace-the-default-deployment-options) | refused |
+| [등록되지 않은 배포 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다](#options-naming-an-unregistered-deployment-handler-is-refused) | refused |
 
 **admin_replace_default_session_options**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 우선순위와 등록된 처리기 하나의 설정을 담아 기본 세션 옵션을 갈아끼우면 준 옵션이 통째로 반환되고 주지 않은 자리는 코드의 기본값이다](#options-the-superadmin-replaces-the-default-session-options-whole) | 성공 |
-| [아무 권한도 없는 사용자가 기본 세션 옵션을 갈아끼우려 하면 권한 부족으로 거부된다](#options-a-user-granted-nothing-may-not-replace-the-default-session-options) | 거부 |
-| [등록되지 않은 세션 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다](#options-naming-an-unregistered-session-handler-is-refused) | 거부 |
+| [슈퍼관리자가 우선순위와 등록된 처리기 하나의 설정을 담아 기본 세션 옵션을 갈아끼우면 준 옵션이 통째로 반환되고 주지 않은 자리는 코드의 기본값이다](#options-the-superadmin-replaces-the-default-session-options-whole) | answered |
+| [아무 권한도 없는 사용자가 기본 세션 옵션을 갈아끼우려 하면 권한 부족으로 거부된다](#options-a-user-granted-nothing-may-not-replace-the-default-session-options) | refused |
+| [등록되지 않은 세션 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다](#options-naming-an-unregistered-session-handler-is-refused) | refused |
 
 **create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [기본 그룹이 없을 때 슈퍼관리자가 기본으로 지정해 만들면 기본인 그룹이 반환된다](#creating-a-resource-group-made-as-the-default-answers-default) | 성공 |
-| [슈퍼관리자가 이름만 주고 리소스 그룹을 만들면, 활성이고 공개이며 기본이 아닌 그룹 전체가 코드의 기본값으로 채워져 반환된다](#creating-the-superadmin-makes-a-resource-group) | 성공 |
-| [이미 어떤 그룹이 쓰고 있는 이름으로 만들려 하면 이름 중복으로 거부된다](#creating-a-name-another-resource-group-already-holds-is-refused) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-make-a-resource-group) | 거부 |
-| [모니터가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다](#creating-the-monitor-may-not-make-a-resource-group) | 거부 |
+| [기본 그룹이 없을 때 슈퍼관리자가 기본으로 지정해 만들면 기본인 그룹이 반환된다](#creating-a-resource-group-made-as-the-default-answers-default) | answered |
+| [슈퍼관리자가 이름만 주고 리소스 그룹을 만들면, 활성이고 공개이며 기본이 아닌 그룹 전체가 코드의 기본값으로 채워져 반환된다](#creating-the-superadmin-makes-a-resource-group) | answered |
+| [이미 어떤 그룹이 쓰고 있는 이름으로 만들려 하면 이름 중복으로 거부된다](#creating-a-name-another-resource-group-already-holds-is-refused) | refused |
+| [슈퍼관리자가 아닌 사용자가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-make-a-resource-group) | refused |
+| [모니터가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다](#creating-the-monitor-may-not-make-a-resource-group) | refused |
 
 **get_allowed_domains_for_resource_group**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 그룹의 허용 도메인을 읽으면 걸린 도메인이 없어 빈 목록이 반환된다](#allowing-a-user-granted-read-on-the-group-reads-the-domains-allowed-for-it) | 성공 |
-| [도메인에 건 그룹의 허용 도메인을 슈퍼관리자가 읽으면 그 도메인 이름이 담긴다](#allowing-the-superadmin-reads-the-domains-allowed-for-a-resource-group) | 성공 |
-| [아무 권한도 없는 사용자가 그룹의 허용 도메인을 읽으려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-read-the-domains-allowed-for-a-resource-group) | 거부 |
+| [그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 그룹의 허용 도메인을 읽으면 걸린 도메인이 없어 빈 목록이 반환된다](#allowing-a-user-granted-read-on-the-group-reads-the-domains-allowed-for-it) | answered |
+| [도메인에 건 그룹의 허용 도메인을 슈퍼관리자가 읽으면 그 도메인 이름이 담긴다](#allowing-the-superadmin-reads-the-domains-allowed-for-a-resource-group) | answered |
+| [아무 권한도 없는 사용자가 그룹의 허용 도메인을 읽으려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-read-the-domains-allowed-for-a-resource-group) | refused |
 
 **get_allowed_projects_for_resource_group**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프로젝트에 건 그룹의 허용 프로젝트를 슈퍼관리자가 읽으면 그 프로젝트 id가 담긴다](#allowing-the-superadmin-reads-the-projects-allowed-for-a-resource-group) | 성공 |
-| [아무 권한도 없는 사용자가 그룹의 허용 프로젝트를 읽으려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-read-the-projects-allowed-for-a-resource-group) | 거부 |
+| [프로젝트에 건 그룹의 허용 프로젝트를 슈퍼관리자가 읽으면 그 프로젝트 id가 담긴다](#allowing-the-superadmin-reads-the-projects-allowed-for-a-resource-group) | answered |
+| [아무 권한도 없는 사용자가 그룹의 허용 프로젝트를 읽으려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-read-the-projects-allowed-for-a-resource-group) | refused |
 
 **get_resource_info**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 리소스 현황을 조회하면 슈퍼관리자와 같은 응답을 받는다](#reading-a-user-granted-read-on-the-group-reads-its-resource-info) | 성공 |
-| [에이전트가 없는 그룹의 리소스 현황을 슈퍼관리자가 조회하면 용량·사용량·여유가 모두 비어 있다](#reading-the-superadmin-reads-an-empty-resource-info-of-a-group-without-agents) | 성공 |
-| [아무 권한도 없는 사용자가 리소스 현황을 조회하면 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-the-resource-info) | 거부 |
-| [슈퍼관리자가 존재하지 않는 이름의 리소스 현황을 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-the-resource-info-of-a-name-nothing-answers-to-is-not-found) | 거부 |
+| [그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 리소스 현황을 조회하면 슈퍼관리자와 같은 응답을 받는다](#reading-a-user-granted-read-on-the-group-reads-its-resource-info) | answered |
+| [에이전트가 없는 그룹의 리소스 현황을 슈퍼관리자가 조회하면 용량·사용량·여유가 모두 비어 있다](#reading-the-superadmin-reads-an-empty-resource-info-of-a-group-without-agents) | answered |
+| [아무 권한도 없는 사용자가 리소스 현황을 조회하면 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-the-resource-info) | refused |
+| [슈퍼관리자가 존재하지 않는 이름의 리소스 현황을 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-the-resource-info-of-a-name-nothing-answers-to-is-not-found) | refused |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 그룹에 앉힌 역할로 완전 삭제 권한을 받은 사용자가 완전 삭제하면 지운 그룹 전체가 반환된다](#retiring-a-user-granted-hard-delete-on-the-group-purges-it) | 성공 |
-| [리소스 그룹 하나가 있고 슈퍼관리자가 완전 삭제하면 지운 그룹 전체가 반환된다](#retiring-the-superadmin-purges-a-resource-group) | 성공 |
-| [아무 권한도 없는 사용자가 완전 삭제하려 하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-resource-group) | 거부 |
-| [슈퍼관리자가 존재하지 않는 이름을 완전 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-the-superadmin-purging-a-name-nothing-answers-to-is-not-found) | 거부 |
+| [그 그룹에 앉힌 역할로 완전 삭제 권한을 받은 사용자가 완전 삭제하면 지운 그룹 전체가 반환된다](#retiring-a-user-granted-hard-delete-on-the-group-purges-it) | answered |
+| [리소스 그룹 하나가 있고 슈퍼관리자가 완전 삭제하면 지운 그룹 전체가 반환된다](#retiring-the-superadmin-purges-a-resource-group) | answered |
+| [아무 권한도 없는 사용자가 완전 삭제하려 하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-resource-group) | refused |
+| [슈퍼관리자가 존재하지 않는 이름을 완전 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-the-superadmin-purging-a-name-nothing-answers-to-is-not-found) | refused |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 설명을 바꾸면 설명이 새 값인 그룹이 반환된다](#editing-a-user-granted-update-on-the-group-changes-its-description) | 성공 |
-| [아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 그룹이 반환된다](#editing-an-edit-naming-no-field-changes-nothing) | 성공 |
-| [활성 그룹을 비활성으로 바꾸면 비활성인 그룹이 반환된다](#editing-deactivating-a-resource-group-answers-it-inactive) | 성공 |
-| [기본 그룹이 없을 때 그룹을 기본으로 바꾸면 기본인 그룹이 반환된다](#editing-making-a-resource-group-the-default-answers-it-default) | 성공 |
-| [슈퍼관리자가 설명만 바꾸면 설명은 새 값이고 나머지는 그대로인 그룹 전체가 반환된다](#editing-the-superadmin-changing-the-description-leaves-the-rest) | 성공 |
-| [아무 권한도 없는 사용자가 설명을 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-resource-group) | 거부 |
-| [기본 그룹이 따로 있을 때 다른 그룹을 기본으로 바꾸려 하면 기본 그룹이 이미 있다는 이유로 거부된다](#editing-making-a-second-resource-group-the-default-is-refused) | 거부 |
-| [슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-name-nothing-answers-to-is-not-found) | 거부 |
+| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 설명을 바꾸면 설명이 새 값인 그룹이 반환된다](#editing-a-user-granted-update-on-the-group-changes-its-description) | answered |
+| [아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 그룹이 반환된다](#editing-an-edit-naming-no-field-changes-nothing) | answered |
+| [활성 그룹을 비활성으로 바꾸면 비활성인 그룹이 반환된다](#editing-deactivating-a-resource-group-answers-it-inactive) | answered |
+| [기본 그룹이 없을 때 그룹을 기본으로 바꾸면 기본인 그룹이 반환된다](#editing-making-a-resource-group-the-default-answers-it-default) | answered |
+| [슈퍼관리자가 설명만 바꾸면 설명은 새 값이고 나머지는 그대로인 그룹 전체가 반환된다](#editing-the-superadmin-changing-the-description-leaves-the-rest) | answered |
+| [아무 권한도 없는 사용자가 설명을 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-resource-group) | refused |
+| [기본 그룹이 따로 있을 때 다른 그룹을 기본으로 바꾸려 하면 기본 그룹이 이미 있다는 이유로 거부된다](#editing-making-a-second-resource-group-the-default-is-refused) | refused |
+| [슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-name-nothing-answers-to-is-not-found) | refused |
 
 **update_allowed_domains_for_resource_group**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 그룹의 허용 도메인에 도메인을 더하면 그 도메인 이름이 담긴 목록이 반환된다](#allowing-the-superadmin-allows-a-domain-for-a-resource-group) | 성공 |
-| [아무 권한도 없는 사용자가 그룹의 허용 도메인에 도메인을 더하려 하면 권한 부족으로 거부된다. 관계를 쓰는 자리가 양쪽 스코프의 권한을 검사한다](#allowing-a-user-granted-nothing-may-not-allow-a-domain-for-a-resource-group) | 거부 |
-| [존재하지 않는 도메인 이름을 그룹의 허용 도메인에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다](#allowing-allowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found) | 거부 |
-| [존재하지 않는 도메인 이름을 그룹의 허용 도메인에서 빼려 하면 건너뛰지 않고 대상을 찾을 수 없다는 이유로 거부된다. 도메인 쪽에서 없는 그룹 이름을 빼는 것은 건너뛴다](#allowing-disallowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found) | 거부 |
+| [슈퍼관리자가 그룹의 허용 도메인에 도메인을 더하면 그 도메인 이름이 담긴 목록이 반환된다](#allowing-the-superadmin-allows-a-domain-for-a-resource-group) | answered |
+| [아무 권한도 없는 사용자가 그룹의 허용 도메인에 도메인을 더하려 하면 권한 부족으로 거부된다. 관계를 쓰는 자리가 양쪽 스코프의 권한을 검사한다](#allowing-a-user-granted-nothing-may-not-allow-a-domain-for-a-resource-group) | refused |
+| [존재하지 않는 도메인 이름을 그룹의 허용 도메인에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다](#allowing-allowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found) | refused |
+| [존재하지 않는 도메인 이름을 그룹의 허용 도메인에서 빼려 하면 건너뛰지 않고 대상을 찾을 수 없다는 이유로 거부된다. 도메인 쪽에서 없는 그룹 이름을 빼는 것은 건너뛴다](#allowing-disallowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found) | refused |
 
 **update_allowed_projects_for_resource_group**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 그룹의 허용 프로젝트에 프로젝트를 더하면 그 프로젝트 id가 담긴 목록이 반환된다](#allowing-the-superadmin-allows-a-project-for-a-resource-group) | 성공 |
-| [아무 권한도 없는 사용자가 그룹의 허용 프로젝트에 프로젝트를 더하려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-allow-a-project-for-a-resource-group) | 거부 |
+| [슈퍼관리자가 그룹의 허용 프로젝트에 프로젝트를 더하면 그 프로젝트 id가 담긴 목록이 반환된다](#allowing-the-superadmin-allows-a-project-for-a-resource-group) | answered |
+| [아무 권한도 없는 사용자가 그룹의 허용 프로젝트에 프로젝트를 더하려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-allow-a-project-for-a-resource-group) | refused |
 
 **update_allowed_resource_groups_for_domain**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [존재하지 않는 그룹 이름을 도메인의 허용 목록에서 빼려 하면 그 이름은 건너뛰고 빈 목록이 반환된다](#allowing-disallowing-a-group-name-nothing-answers-to-for-a-domain-is-skipped) | 성공 |
-| [슈퍼관리자가 도메인의 허용 목록에 그룹을 더하면 그 그룹 이름이 담긴 목록이 반환된다](#allowing-the-superadmin-allows-a-resource-group-for-a-domain) | 성공 |
-| [도메인에 건 그룹을 슈퍼관리자가 허용 목록에서 빼면 빈 목록이 반환된다](#allowing-the-superadmin-disallows-a-resource-group-for-a-domain) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 도메인의 허용 목록에 그룹을 더하려 하면 역할 부족으로 거부된다. 그룹 이름을 id로 바꾸는 자리가 슈퍼관리자 검사를 거친다](#allowing-a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-domain) | 거부 |
-| [존재하지 않는 그룹 이름을 도메인의 허용 목록에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다](#allowing-allowing-a-group-name-nothing-answers-to-for-a-domain-is-not-found) | 거부 |
+| [존재하지 않는 그룹 이름을 도메인의 허용 목록에서 빼려 하면 그 이름은 건너뛰고 빈 목록이 반환된다](#allowing-disallowing-a-group-name-nothing-answers-to-for-a-domain-is-skipped) | answered |
+| [슈퍼관리자가 도메인의 허용 목록에 그룹을 더하면 그 그룹 이름이 담긴 목록이 반환된다](#allowing-the-superadmin-allows-a-resource-group-for-a-domain) | answered |
+| [도메인에 건 그룹을 슈퍼관리자가 허용 목록에서 빼면 빈 목록이 반환된다](#allowing-the-superadmin-disallows-a-resource-group-for-a-domain) | answered |
+| [슈퍼관리자가 아닌 사용자가 도메인의 허용 목록에 그룹을 더하려 하면 역할 부족으로 거부된다. 그룹 이름을 id로 바꾸는 자리가 슈퍼관리자 검사를 거친다](#allowing-a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-domain) | refused |
+| [존재하지 않는 그룹 이름을 도메인의 허용 목록에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다](#allowing-allowing-a-group-name-nothing-answers-to-for-a-domain-is-not-found) | refused |
 
 **update_allowed_resource_groups_for_project**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 프로젝트의 허용 목록에 그룹을 더하면 그 그룹 이름이 담긴 목록이 반환된다](#allowing-the-superadmin-allows-a-resource-group-for-a-project) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 프로젝트의 허용 목록에 그룹을 더하려 하면 역할 부족으로 거부된다](#allowing-a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-project) | 거부 |
+| [슈퍼관리자가 프로젝트의 허용 목록에 그룹을 더하면 그 그룹 이름이 담긴 목록이 반환된다](#allowing-the-superadmin-allows-a-resource-group-for-a-project) | answered |
+| [슈퍼관리자가 아닌 사용자가 프로젝트의 허용 목록에 그룹을 더하려 하면 역할 부족으로 거부된다](#allowing-a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-project) | refused |
 
 **update_config**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 선점 설정을 바꾸면 선점 설정이 새 값인 그룹 전체가 반환된다](#editing-the-superadmin-changes-the-preemption-config) | 성공 |
-| [슈퍼관리자가 스케줄러를 후입선출로, 비공개로, 호스트 네트워크로, 프록시 주소를 지정해 설정을 바꾸면 그 값들이 새 값인 그룹 전체가 반환된다](#editing-the-superadmin-changes-the-scheduler-visibility-and-network-config) | 성공 |
-| [아무 권한도 없는 사용자가 설정을 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-the-config) | 거부 |
+| [슈퍼관리자가 선점 설정을 바꾸면 선점 설정이 새 값인 그룹 전체가 반환된다](#editing-the-superadmin-changes-the-preemption-config) | answered |
+| [슈퍼관리자가 스케줄러를 후입선출로, 비공개로, 호스트 네트워크로, 프록시 주소를 지정해 설정을 바꾸면 그 값들이 새 값인 그룹 전체가 반환된다](#editing-the-superadmin-changes-the-scheduler-visibility-and-network-config) | answered |
+| [아무 권한도 없는 사용자가 설정을 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-the-config) | refused |
 
 **update_fair_share_spec**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 반감기를 바꾸면 그룹 전체가 반환된다](#fair_share-a-user-granted-update-on-the-group-changes-its-fair-share-spec) | 성공 |
-| [슈퍼관리자가 반감기를 바꾸면 그룹 전체가 반환된다. 반환되는 노드에는 이 설정이 실리지 않는다](#fair_share-the-superadmin-changes-the-fair-share-half-life) | 성공 |
-| [아무 권한도 없는 사용자가 반감기를 바꾸려 하면 권한 부족으로 거부된다](#fair_share-a-user-granted-nothing-may-not-change-the-fair-share-spec) | 거부 |
-| [슈퍼관리자가 존재하지 않는 이름의 반감기를 바꾸면 대상을 찾을 수 없다는 이유로 거부된다](#fair_share-changing-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found) | 거부 |
+| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 반감기를 바꾸면 그룹 전체가 반환된다](#fair_share-a-user-granted-update-on-the-group-changes-its-fair-share-spec) | answered |
+| [슈퍼관리자가 반감기를 바꾸면 그룹 전체가 반환된다. 반환되는 노드에는 이 설정이 실리지 않는다](#fair_share-the-superadmin-changes-the-fair-share-half-life) | answered |
+| [아무 권한도 없는 사용자가 반감기를 바꾸려 하면 권한 부족으로 거부된다](#fair_share-a-user-granted-nothing-may-not-change-the-fair-share-spec) | refused |
+| [슈퍼관리자가 존재하지 않는 이름의 반감기를 바꾸면 대상을 찾을 수 없다는 이유로 거부된다](#fair_share-changing-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found) | refused |
 
 ### batch_load_by_ids
 

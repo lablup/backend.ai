@@ -1,92 +1,92 @@
 ## retention_policy
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/retention_policy/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/retention_policy/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/retention_policy/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/retention_policy/adapter.py)
 
-시나리오: 미완 3 / 8
+Scenario: incomplete 3 / 8
 
-- ops 로 구성 (8)
-  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - create — 대표 성공 ✓ · 대표 실패 ✓
-  - get — 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge — 대표 성공 ✓ · 대표 실패 ✓
-  - search — 대표 성공 ✓ · 대표 실패 ✓
-  - update — 대표 성공 ✓ · 대표 실패 ✓
+- built from ops (8)
+  - batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - create — representative success ✓ · representative refusal ✓
+  - get — representative success ✓ · representative refusal ✓
+  - partial_bulk_purge — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_update — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - purge — representative success ✓ · representative refusal ✓
+  - search — representative success ✓ · representative refusal ✓
+  - update — representative success ✓ · representative refusal ✓
 
 **create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 deployments 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-deployments-category-is-made) | 성공 |
-| [슈퍼관리자가 login 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-login-category-is-made) | 성공 |
-| [슈퍼관리자가 logs 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-logs-category-is-made) | 성공 |
-| [슈퍼관리자가 reconcile_history 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-reconcile-history-category-is-made) | 성공 |
-| [슈퍼관리자가 roles_invitations 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-roles-invitations-category-is-made) | 성공 |
-| [슈퍼관리자가 sessions 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-sessions-category-is-made) | 성공 |
-| [슈퍼관리자가 usage_buckets 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-usage-buckets-category-is-made) | 성공 |
-| [슈퍼관리자가 usage_records 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-usage-records-category-is-made) | 성공 |
-| [활성 여부를 거짓으로 지정해 생성하면 비활성 상태가 담긴 노드가 반환된다](#creating-a-policy-made-inactive-comes-back-inactive) | 성공 |
-| [슈퍼관리자가 카테고리와 보존 일수만 지정해 생성하면, 활성 여부는 참이고 마지막 정리 시각은 비어 있는 노드가 반환된다](#creating-the-superadmin-makes-a-policy-that-is-active-and-never-swept) | 성공 |
-| [어떤 카테고리의 정책이 이미 있을 때 같은 카테고리로 다시 생성하면, 카테고리 중복으로 거부된다](#creating-a-second-policy-for-the-same-category-is-refused) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 정책을 생성하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-policy) | 거부 |
-| [모니터 역할이 정책을 생성하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다](#creating-the-monitor-may-not-create-a-policy) | 거부 |
-| [권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 생성하지 못한다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-policy) | 거부 |
+| [슈퍼관리자가 deployments 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-deployments-category-is-made) | answered |
+| [슈퍼관리자가 login 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-login-category-is-made) | answered |
+| [슈퍼관리자가 logs 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-logs-category-is-made) | answered |
+| [슈퍼관리자가 reconcile_history 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-reconcile-history-category-is-made) | answered |
+| [슈퍼관리자가 roles_invitations 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-roles-invitations-category-is-made) | answered |
+| [슈퍼관리자가 sessions 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-sessions-category-is-made) | answered |
+| [슈퍼관리자가 usage_buckets 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-usage-buckets-category-is-made) | answered |
+| [슈퍼관리자가 usage_records 카테고리의 정책을 생성하면 그 카테고리가 담긴 노드가 반환된다](#creating-a-policy-for-the-usage-records-category-is-made) | answered |
+| [활성 여부를 거짓으로 지정해 생성하면 비활성 상태가 담긴 노드가 반환된다](#creating-a-policy-made-inactive-comes-back-inactive) | answered |
+| [슈퍼관리자가 카테고리와 보존 일수만 지정해 생성하면, 활성 여부는 참이고 마지막 정리 시각은 비어 있는 노드가 반환된다](#creating-the-superadmin-makes-a-policy-that-is-active-and-never-swept) | answered |
+| [어떤 카테고리의 정책이 이미 있을 때 같은 카테고리로 다시 생성하면, 카테고리 중복으로 거부된다](#creating-a-second-policy-for-the-same-category-is-refused) | refused |
+| [슈퍼관리자가 아닌 사용자가 정책을 생성하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-policy) | refused |
+| [모니터 역할이 정책을 생성하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다](#creating-the-monitor-may-not-create-a-policy) | refused |
+| [권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 생성하지 못한다](#creating-turning-enforcement-off-does-not-let-a-user-create-a-policy) | refused |
 
 **get**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [정책 하나가 있고 슈퍼관리자가 id로 조회하면, 그 정책 전체가 반환된다](#reading-the-superadmin-reads-a-policy-by-id) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 조회할 수 있다](#reading-turning-enforcement-off-lets-a-user-read-a-policy) | 성공 |
-| [아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다. 인증만으로 조회되는 다른 카탈로그와 달리 이 조회는 권한 검사를 거친다](#reading-a-user-granted-nothing-may-not-read-a-policy) | 거부 |
-| [아무 권한도 없는 사용자가 존재하지 않는 id로 조회하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다](#reading-a-user-granted-nothing-reading-an-unknown-policy-id-is-refused-for-permission) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-the-superadmin-reading-a-policy-id-nothing-answers-to-is-not-found) | 거부 |
+| [정책 하나가 있고 슈퍼관리자가 id로 조회하면, 그 정책 전체가 반환된다](#reading-the-superadmin-reads-a-policy-by-id) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 조회할 수 있다](#reading-turning-enforcement-off-lets-a-user-read-a-policy) | answered |
+| [아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다. 인증만으로 조회되는 다른 카탈로그와 달리 이 조회는 권한 검사를 거친다](#reading-a-user-granted-nothing-may-not-read-a-policy) | refused |
+| [아무 권한도 없는 사용자가 존재하지 않는 id로 조회하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다](#reading-a-user-granted-nothing-reading-an-unknown-policy-id-is-refused-for-permission) | refused |
+| [슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-the-superadmin-reading-a-policy-id-nothing-answers-to-is-not-found) | refused |
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 정책 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-policies) | 성공 |
-| [슈퍼관리자가 정책 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-policies-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 없는 사용자가 정책 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-policies) | answered |
+| [슈퍼관리자가 정책 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-policies-answers-for-the-missing-one) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-policies) | 성공 |
-| [슈퍼관리자가 정책 여럿의 보존 일수를 한 번에 바꾸면, 모두 새 일수로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-policies-at-once) | 성공 |
+| [아무 권한도 없는 사용자가 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-policies) | answered |
+| [슈퍼관리자가 정책 여럿의 보존 일수를 한 번에 바꾸면, 모두 새 일수로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-policies-at-once) | answered |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 정책을 완전 삭제하면 삭제한 정책의 id를 담은 응답이 반환된다](#retiring-the-superadmin-purges-a-policy) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 완전 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-purge-a-policy) | 성공 |
-| [아무 권한도 없는 사용자가 정책을 완전 삭제하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-policy) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 완전 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-purging-a-policy-id-nothing-answers-to-is-not-found) | 거부 |
+| [슈퍼관리자가 정책을 완전 삭제하면 삭제한 정책의 id를 담은 응답이 반환된다](#retiring-the-superadmin-purges-a-policy) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 완전 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-purge-a-policy) | answered |
+| [아무 권한도 없는 사용자가 정책을 완전 삭제하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-policy) | refused |
+| [슈퍼관리자가 존재하지 않는 id를 완전 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-purging-a-policy-id-nothing-answers-to-is-not-found) | refused |
 
 **search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [카테고리가 다른 정책 여럿 중 하나의 카테고리를 필터로 조회하면 그 카테고리의 정책 하나만 반환된다](#searching-a-category-filter-narrows-the-answer-to-that-category) | 성공 |
-| [활성과 비활성이 섞여 있을 때 활성 필터로 조회하면 활성인 정책만 반환된다](#searching-an-enabled-filter-keeps-only-the-active-policies) | 성공 |
-| [모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다](#searching-the-monitor-searches-policies-like-the-superadmin) | 성공 |
-| [카테고리가 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다](#searching-the-superadmin-counts-every-policy-laid) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-policies) | 거부 |
+| [카테고리가 다른 정책 여럿 중 하나의 카테고리를 필터로 조회하면 그 카테고리의 정책 하나만 반환된다](#searching-a-category-filter-narrows-the-answer-to-that-category) | answered |
+| [활성과 비활성이 섞여 있을 때 활성 필터로 조회하면 활성인 정책만 반환된다](#searching-an-enabled-filter-keeps-only-the-active-policies) | answered |
+| [모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다](#searching-the-monitor-searches-policies-like-the-superadmin) | answered |
+| [카테고리가 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다](#searching-the-superadmin-counts-every-policy-laid) | answered |
+| [슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-policies) | refused |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-a-policy-edit-giving-no-value-changes-nothing) | 성공 |
-| [활성 정책의 활성 여부를 끄면 비활성 상태가 담긴 노드가 반환된다](#editing-disabling-a-policy-answers-it-inactive) | 성공 |
-| [슈퍼관리자가 보존 일수만 수정하면, 일수는 새 값이 되고 카테고리와 활성 여부는 그대로 유지된다](#editing-editing-the-retention-days-leaves-the-rest-alone) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 수정할 수 있다](#editing-turning-enforcement-off-lets-a-user-edit-a-policy) | 성공 |
-| [아무 권한도 없는 사용자가 정책을 수정하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-policy) | 거부 |
-| [정책 둘 중 한쪽의 카테고리를 다른 쪽 카테고리로 바꾸면, 카테고리 중복으로 거부된다. 생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다](#editing-moving-a-policy-to-a-category-already-taken-is-refused) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-policy-id-nothing-answers-to-is-not-found) | 거부 |
+| [값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-a-policy-edit-giving-no-value-changes-nothing) | answered |
+| [활성 정책의 활성 여부를 끄면 비활성 상태가 담긴 노드가 반환된다](#editing-disabling-a-policy-answers-it-inactive) | answered |
+| [슈퍼관리자가 보존 일수만 수정하면, 일수는 새 값이 되고 카테고리와 활성 여부는 그대로 유지된다](#editing-editing-the-retention-days-leaves-the-rest-alone) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 수정할 수 있다](#editing-turning-enforcement-off-lets-a-user-edit-a-policy) | answered |
+| [아무 권한도 없는 사용자가 정책을 수정하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-policy) | refused |
+| [정책 둘 중 한쪽의 카테고리를 다른 쪽 카테고리로 바꾸면, 카테고리 중복으로 거부된다. 생성할 때와 달리 저장소의 제약 위반이 그대로 전파된다](#editing-moving-a-policy-to-a-category-already-taken-is-refused) | refused |
+| [슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-policy-id-nothing-answers-to-is-not-found) | refused |
 
 ### create
 

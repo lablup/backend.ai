@@ -1,41 +1,41 @@
 ## entity_label
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/entity_label/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/entity_label/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/entity_label/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/entity_label/adapter.py)
 
-시나리오: 미완 6 / 7
+Scenario: incomplete 6 / 7
 
-- ops 로 구성 (7)
-  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_upsert — 대표 성공 ✓ · 대표 실패 ✓
-  - purge — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - search_on — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - upsert — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+- built from ops (7)
+  - batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_purge — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_upsert — representative success ✓ · representative refusal ✓
+  - purge — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - search — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - search_on — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - upsert — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [있는 id 뒤에 없는 id 를 붙여 떼면, 있는 것은 떼어지고 없는 id 는 실패 목록에 온다](#partial_bulk_purging-a-missing-id-beside-a-label-is-one-failed-item) | 성공 |
-| [아무 권한도 없는 사용자가 라벨 둘을 떼면, 떼어진 것 없이 둘 다 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-nothing) | 성공 |
-| [엔티티 둘에 붙은 라벨을 하나씩 떼면, 둘 다 떼어진다](#partial_bulk_purging-a-writer-purges-labels-of-two-entities) | 성공 |
-| [수정 권한을 받은 사용자가 한 엔티티의 라벨 둘을 떼면, 둘 다 떼어지고 실패한 것은 없다](#partial_bulk_purging-a-writer-purges-two-labels-of-one-entity) | 성공 |
-| [없는 id 만 둘 떼면, 떼어진 것 없이 둘 다 실패 목록에 온다](#partial_bulk_purging-every-id-missing-is-answered-per-id) | 성공 |
-| [한 엔티티에만 수정 권한이 있으면, 그 엔티티의 라벨만 떼어지고 다른 쪽은 실패 목록에 온다](#partial_bulk_purging-only-the-label-of-the-writable-entity-is-purged) | 성공 |
-| [RBAC 강제를 끄면 아무 권한도 없는 사용자도 라벨 둘을 뗀다](#partial_bulk_purging-turning-enforcement-off-lets-anyone-purge) | 성공 |
+| [있는 id 뒤에 없는 id 를 붙여 떼면, 있는 것은 떼어지고 없는 id 는 실패 목록에 온다](#partial_bulk_purging-a-missing-id-beside-a-label-is-one-failed-item) | answered |
+| [아무 권한도 없는 사용자가 라벨 둘을 떼면, 떼어진 것 없이 둘 다 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-nothing) | answered |
+| [엔티티 둘에 붙은 라벨을 하나씩 떼면, 둘 다 떼어진다](#partial_bulk_purging-a-writer-purges-labels-of-two-entities) | answered |
+| [수정 권한을 받은 사용자가 한 엔티티의 라벨 둘을 떼면, 둘 다 떼어지고 실패한 것은 없다](#partial_bulk_purging-a-writer-purges-two-labels-of-one-entity) | answered |
+| [없는 id 만 둘 떼면, 떼어진 것 없이 둘 다 실패 목록에 온다](#partial_bulk_purging-every-id-missing-is-answered-per-id) | answered |
+| [한 엔티티에만 수정 권한이 있으면, 그 엔티티의 라벨만 떼어지고 다른 쪽은 실패 목록에 온다](#partial_bulk_purging-only-the-label-of-the-writable-entity-is-purged) | answered |
+| [RBAC 강제를 끄면 아무 권한도 없는 사용자도 라벨 둘을 뗀다](#partial_bulk_purging-turning-enforcement-off-lets-anyone-purge) | answered |
 
 **partial_bulk_upsert**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [이미 붙은 키를 다시 붙이면, 같은 라벨이 값만 바뀌어 온다](#partial_bulk_upserting-a-key-already-on-the-entity-takes-the-new-value) | 성공 |
-| [아무 권한도 없는 사용자가 붙이면, 붙은 라벨 없이 엔티티 둘 다 실패 목록에 온다](#partial_bulk_upserting-a-user-granted-nothing-labels-nothing) | 성공 |
-| [수정 권한을 받은 사용자가 엔티티 둘에 키 둘을 붙이면, 라벨 넷이 오고 실패한 것은 없다](#partial_bulk_upserting-a-writer-labels-two-entities-with-two-keys) | 성공 |
-| [같은 엔티티가 여러 항목에 나오면, 그 엔티티의 라벨이 키마다 오고 실패한 것은 없다](#partial_bulk_upserting-one-entity-in-several-items-gets-every-key) | 성공 |
-| [한 엔티티에만 수정 권한이 있으면, 그 엔티티의 라벨 둘이 오고 다른 엔티티는 키마다 하나씩 실패 목록에 온다](#partial_bulk_upserting-only-the-writable-entity-is-labeled) | 성공 |
-| [RBAC 강제를 끄면 아무 권한도 없는 사용자도 엔티티 둘에 라벨을 붙이고 실패한 것은 없다](#partial_bulk_upserting-turning-enforcement-off-lets-anyone-label) | 성공 |
-| [배선되지 않은 타입이 하나라도 섞여 있으면 잘못된 요청으로 통째로 거부되고 아무것도 쓰이지 않는다](#partial_bulk_upserting-an-unwired-type-refuses-the-whole-call) | 거부 |
+| [이미 붙은 키를 다시 붙이면, 같은 라벨이 값만 바뀌어 온다](#partial_bulk_upserting-a-key-already-on-the-entity-takes-the-new-value) | answered |
+| [아무 권한도 없는 사용자가 붙이면, 붙은 라벨 없이 엔티티 둘 다 실패 목록에 온다](#partial_bulk_upserting-a-user-granted-nothing-labels-nothing) | answered |
+| [수정 권한을 받은 사용자가 엔티티 둘에 키 둘을 붙이면, 라벨 넷이 오고 실패한 것은 없다](#partial_bulk_upserting-a-writer-labels-two-entities-with-two-keys) | answered |
+| [같은 엔티티가 여러 항목에 나오면, 그 엔티티의 라벨이 키마다 오고 실패한 것은 없다](#partial_bulk_upserting-one-entity-in-several-items-gets-every-key) | answered |
+| [한 엔티티에만 수정 권한이 있으면, 그 엔티티의 라벨 둘이 오고 다른 엔티티는 키마다 하나씩 실패 목록에 온다](#partial_bulk_upserting-only-the-writable-entity-is-labeled) | answered |
+| [RBAC 강제를 끄면 아무 권한도 없는 사용자도 엔티티 둘에 라벨을 붙이고 실패한 것은 없다](#partial_bulk_upserting-turning-enforcement-off-lets-anyone-label) | answered |
+| [배선되지 않은 타입이 하나라도 섞여 있으면 잘못된 요청으로 통째로 거부되고 아무것도 쓰이지 않는다](#partial_bulk_upserting-an-unwired-type-refuses-the-whole-call) | refused |
 
 ### partial_bulk_purge
 

@@ -1,66 +1,66 @@
 ## session
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/session/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/session/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/session/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/session/adapter.py)
 
-시나리오: 미완 28 / 30
+Scenario: incomplete 28 / 30
 
-- ops 로 구성 (7)
-  - batch_load_kernel_group_environs_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_kernel_group_resource_slots_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_kernel_groups_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_main_kernel_groups — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - scoped_search_kernel_group_environs — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - scoped_search_kernel_group_resource_slots — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - scoped_search_kernel_groups — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-- ops + 직접 구현 (10)
-  - admin_search — 성공 있음 3 · 실패 있음 1 (global_searcher_ops, partial_bulk)
-  - admin_search_kernels — 성공 없음 · 실패 없음 (atomic_bulk_field, global_searcher_ops) — SCENARIO-GAP
-  - batch_load_by_ids — 성공 없음 · 실패 없음 (partial_bulk, partial_bulk_get_ops) — SCENARIO-GAP
-  - batch_load_kernels_by_ids — 성공 없음 · 실패 없음 (atomic_bulk_field, partial_bulk_get_ops) — SCENARIO-GAP
-  - gql_search_by_project — 성공 없음 · 실패 없음 (partial_bulk, scoped_search_ops) — SCENARIO-GAP
-  - project_search — 성공 없음 · 실패 없음 (partial_bulk, scoped_search_ops) — SCENARIO-GAP
-  - scoped_search — 성공 없음 · 실패 없음 (partial_bulk, scoped_search_ops) — SCENARIO-GAP
-  - search_kernels_by_agent — 성공 없음 · 실패 없음 (atomic_bulk_field, global_searcher_ops) — SCENARIO-GAP
-  - search_kernels_by_session — 성공 없음 · 실패 없음 (atomic_bulk_field, atomic_bulk_scoped_search_ops) — SCENARIO-GAP
-  - search_sessions_by_agent — 성공 없음 · 실패 없음 (global_searcher_ops, partial_bulk) — SCENARIO-GAP
-- 직접 구현 (13)
-  - batch_resource_allocation_by_kernel — 성공 없음 · 실패 없음 (atomic_bulk_field) — SCENARIO-GAP
-  - batch_resource_allocation_by_session — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - compute_schedule — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - enqueue — 성공 없음 · 실패 없음 (partial_bulk, scope) — SCENARIO-GAP
-  - exclude_idle_checks — 성공 없음 · 실패 없음 (legacy_partial_bulk) — SCENARIO-GAP
-  - get — 성공 없음 · 실패 없음 (partial_bulk, single_entity) — SCENARIO-GAP
-  - get_logs — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - include_idle_checks — 성공 없음 · 실패 없음 (legacy_partial_bulk) — SCENARIO-GAP
-  - partial_bulk_terminate — 성공 있음 3 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - shutdown_service — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - start_service — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - terminate — 성공 있음 1 · 실패 있음 1 (partial_bulk)
-  - update — 성공 없음 · 실패 없음 (partial_bulk, single_entity) — SCENARIO-GAP
+- built from ops (7)
+  - batch_load_kernel_group_environs_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_kernel_group_resource_slots_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_kernel_groups_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_main_kernel_groups — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - scoped_search_kernel_group_environs — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - scoped_search_kernel_group_resource_slots — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - scoped_search_kernel_groups — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+- ops + direct implementation (10)
+  - admin_search — success present 3 · refusal present 1 (global_searcher_ops, partial_bulk)
+  - admin_search_kernels — success absent · refusal absent (atomic_bulk_field, global_searcher_ops) — SCENARIO-GAP
+  - batch_load_by_ids — success absent · refusal absent (partial_bulk, partial_bulk_get_ops) — SCENARIO-GAP
+  - batch_load_kernels_by_ids — success absent · refusal absent (atomic_bulk_field, partial_bulk_get_ops) — SCENARIO-GAP
+  - gql_search_by_project — success absent · refusal absent (partial_bulk, scoped_search_ops) — SCENARIO-GAP
+  - project_search — success absent · refusal absent (partial_bulk, scoped_search_ops) — SCENARIO-GAP
+  - scoped_search — success absent · refusal absent (partial_bulk, scoped_search_ops) — SCENARIO-GAP
+  - search_kernels_by_agent — success absent · refusal absent (atomic_bulk_field, global_searcher_ops) — SCENARIO-GAP
+  - search_kernels_by_session — success absent · refusal absent (atomic_bulk_field, atomic_bulk_scoped_search_ops) — SCENARIO-GAP
+  - search_sessions_by_agent — success absent · refusal absent (global_searcher_ops, partial_bulk) — SCENARIO-GAP
+- direct implementation (13)
+  - batch_resource_allocation_by_kernel — success absent · refusal absent (atomic_bulk_field) — SCENARIO-GAP
+  - batch_resource_allocation_by_session — success absent · refusal absent (partial_bulk) — SCENARIO-GAP
+  - compute_schedule — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - enqueue — success absent · refusal absent (partial_bulk, scope) — SCENARIO-GAP
+  - exclude_idle_checks — success absent · refusal absent (legacy_partial_bulk) — SCENARIO-GAP
+  - get — success absent · refusal absent (partial_bulk, single_entity) — SCENARIO-GAP
+  - get_logs — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - include_idle_checks — success absent · refusal absent (legacy_partial_bulk) — SCENARIO-GAP
+  - partial_bulk_terminate — success present 3 · refusal absent (partial_bulk) — SCENARIO-GAP
+  - shutdown_service — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - start_service — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - terminate — success present 1 · refusal present 1 (partial_bulk)
+  - update — success absent · refusal absent (partial_bulk, single_entity) — SCENARIO-GAP
 
 **admin_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [세션을 하나도 심지 않은 상태에서 슈퍼관리자가 조회하면, 답은 비어 있다](#session-a-scenario-that-laid-no-session-finds-none) | 성공 |
-| [슈퍼관리자가 지정된 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-scheduling-conditions-are-preserved-when-configured) | 성공 |
-| [슈퍼관리자가 미설정인 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-scheduling-conditions-are-preserved-when-unset) | 성공 |
-| [필터 없는 전체 조회는 슈퍼관리자 역할로만 열리므로, 아무 권한도 받지 않은 사용자는 역할 부족으로 거부된다](#session-a-user-granted-nothing-may-not-search-sessions) | 거부 |
+| [세션을 하나도 심지 않은 상태에서 슈퍼관리자가 조회하면, 답은 비어 있다](#session-a-scenario-that-laid-no-session-finds-none) | answered |
+| [슈퍼관리자가 지정된 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-scheduling-conditions-are-preserved-when-configured) | answered |
+| [슈퍼관리자가 미설정인 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-scheduling-conditions-are-preserved-when-unset) | answered |
+| [필터 없는 전체 조회는 슈퍼관리자 역할로만 열리므로, 아무 권한도 받지 않은 사용자는 역할 부족으로 거부된다](#session-a-user-granted-nothing-may-not-search-sessions) | refused |
 
 **partial_bulk_terminate**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 종료된 것 없이 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_terminating-a-user-granted-nothing-terminates-none) | 성공 |
-| [프로젝트 범위에서 세션 soft delete 권한을 받은 사용자가 그 프로젝트의 대기 세션을 종료하면, 취소됨으로 처리된 목록에 온다](#partial_bulk_terminating-a-user-granted-session-soft-delete-in-the-project-terminates-its-session) | 성공 |
-| [슈퍼관리자가 대기 세션과 없는 id 하나를 한 번에 종료하면, 대기 세션은 취소됨, 없는 id 는 건너뜀으로 처리된 목록에 온다](#partial_bulk_terminating-terminating-several-skips-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 종료된 것 없이 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_terminating-a-user-granted-nothing-terminates-none) | answered |
+| [프로젝트 범위에서 세션 soft delete 권한을 받은 사용자가 그 프로젝트의 대기 세션을 종료하면, 취소됨으로 처리된 목록에 온다](#partial_bulk_terminating-a-user-granted-session-soft-delete-in-the-project-terminates-its-session) | answered |
+| [슈퍼관리자가 대기 세션과 없는 id 하나를 한 번에 종료하면, 대기 세션은 취소됨, 없는 id 는 건너뜀으로 처리된 목록에 온다](#partial_bulk_terminating-terminating-several-skips-the-missing-one) | answered |
 
 **terminate**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 대기 세션을 종료하면, 취소된 목록에 온다](#terminating-a-superadmin-terminates-a-pending-session) | 성공 |
-| [아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 호출 전체가 거부된다](#terminating-a-user-granted-nothing-may-not-terminate) | 거부 |
+| [슈퍼관리자가 대기 세션을 종료하면, 취소된 목록에 온다](#terminating-a-superadmin-terminates-a-pending-session) | answered |
+| [아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 호출 전체가 거부된다](#terminating-a-user-granted-nothing-may-not-terminate) | refused |
 
 ### admin_search
 

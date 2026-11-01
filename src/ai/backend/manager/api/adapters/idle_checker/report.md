@@ -1,24 +1,24 @@
 ## idle_checker
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/idle_checker/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/idle_checker/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/idle_checker/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/idle_checker/adapter.py)
 
-시나리오: 미완 6 / 6
+Scenario: incomplete 6 / 6
 
-- ops 로 구성 (4)
-  - admin_partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - admin_purge — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - admin_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-- 직접 구현 (2)
-  - admin_create — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - admin_update — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
+- built from ops (4)
+  - admin_partial_bulk_purge — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - admin_purge — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - admin_search — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+- direct implementation (2)
+  - admin_create — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - admin_update — success absent · refusal absent (global_scope) — SCENARIO-GAP
 
 **admin_partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 검사기 여럿을 한 번에 purge 하려 하면, 지운 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-checkers) | 성공 |
-| [슈퍼관리자가 검사기 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지운 검사기로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-the-superadmin-purges-several-and-is-answered-for-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 검사기 여럿을 한 번에 purge 하려 하면, 지운 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-checkers) | answered |
+| [슈퍼관리자가 검사기 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지운 검사기로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-the-superadmin-purges-several-and-is-answered-for-the-missing-one) | answered |
 
 ### admin_partial_bulk_purge
 

@@ -1,91 +1,91 @@
 ## artifact
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/artifact/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/artifact/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/artifact/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/artifact/adapter.py)
 
-시나리오: 미완 21 / 25
+Scenario: incomplete 21 / 25
 
-- ops 로 구성 (9)
-  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_revisions_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - delete — 대표 성공 ✓ · 대표 실패 ✓
-  - get_revision — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_delete — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_restore — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - restore — 대표 성공 ✓ · 대표 실패 ✓
-  - search_revisions_of_artifact_gql — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-- 직접 구현 (16)
-  - admin_search — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - admin_search_gql — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - approve_revision — 성공 없음 · 실패 없음 (single_field) — SCENARIO-GAP
-  - cancel_import — 성공 없음 · 실패 없음 (single_field) — SCENARIO-GAP
-  - cleanup_revision — 성공 없음 · 실패 없음 (single_field) — SCENARIO-GAP
-  - delegate_import_batch — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - delegate_scan — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - delete_artifacts — 성공 있음 1 · 실패 있음 1 (global_scope)
-  - get — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - import_revision — 성공 없음 · 실패 없음 (single_field) — SCENARIO-GAP
-  - reject_revision — 성공 없음 · 실패 없음 (single_field) — SCENARIO-GAP
-  - restore_artifacts — 성공 있음 1 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - retrieve_models — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - scan — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - search_revisions_gql — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - update — 성공 있음 1 · 실패 있음 2 (single_entity)
+- built from ops (9)
+  - batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_revisions_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - delete — representative success ✓ · representative refusal ✓
+  - get_revision — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_delete — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_restore — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_update — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - restore — representative success ✓ · representative refusal ✓
+  - search_revisions_of_artifact_gql — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+- direct implementation (16)
+  - admin_search — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - admin_search_gql — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - approve_revision — success absent · refusal absent (single_field) — SCENARIO-GAP
+  - cancel_import — success absent · refusal absent (single_field) — SCENARIO-GAP
+  - cleanup_revision — success absent · refusal absent (single_field) — SCENARIO-GAP
+  - delegate_import_batch — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - delegate_scan — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - delete_artifacts — success present 1 · refusal present 1 (global_scope)
+  - get — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - import_revision — success absent · refusal absent (single_field) — SCENARIO-GAP
+  - reject_revision — success absent · refusal absent (single_field) — SCENARIO-GAP
+  - restore_artifacts — success present 1 · refusal absent (global_scope) — SCENARIO-GAP
+  - retrieve_models — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - scan — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - search_revisions_gql — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - update — success present 1 · refusal present 2 (single_entity)
 
 **delete**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 아티팩트를 soft delete 하면, 삭제됨 상태의 아티팩트가 온다](#deleting-the-superadmin-soft-deletes-an-artifact) | 성공 |
-| [아무 권한도 받지 않은 사용자는 아티팩트를 soft delete 할 수 없다](#deleting-a-user-granted-nothing-may-not-soft-delete-an-artifact) | 거부 |
+| [슈퍼관리자가 아티팩트를 soft delete 하면, 삭제됨 상태의 아티팩트가 온다](#deleting-the-superadmin-soft-deletes-an-artifact) | answered |
+| [아무 권한도 받지 않은 사용자는 아티팩트를 soft delete 할 수 없다](#deleting-a-user-granted-nothing-may-not-soft-delete-an-artifact) | refused |
 
 **partial_bulk_delete**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 아티팩트 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-artifacts) | 성공 |
-| [아티팩트 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 삭제됨 상태로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 아티팩트 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-artifacts) | answered |
+| [아티팩트 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 삭제됨 상태로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | answered |
 
 **partial_bulk_restore**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [soft delete 된 아티팩트 여럿을 한 번에 restore 하면, 모두 살아 있는 상태로 온다](#partial_bulk_deleting-restoring-several-brings-them-back) | 성공 |
+| [soft delete 된 아티팩트 여럿을 한 번에 restore 하면, 모두 살아 있는 상태로 온다](#partial_bulk_deleting-restoring-several-brings-them-back) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 아티팩트 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-artifacts) | 성공 |
-| [슈퍼관리자가 아티팩트 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-artifacts-at-once) | 성공 |
+| [아무 권한도 받지 않은 사용자가 아티팩트 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-artifacts) | answered |
+| [슈퍼관리자가 아티팩트 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-artifacts-at-once) | answered |
 
 **restore**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [soft delete 된 아티팩트를 restore 하면, 살아 있는 상태의 아티팩트가 온다](#deleting-restoring-brings-an-artifact-back) | 성공 |
-| [아무 권한도 받지 않은 사용자는 아티팩트를 restore 할 수 없다](#deleting-a-user-granted-nothing-may-not-restore-an-artifact) | 거부 |
+| [soft delete 된 아티팩트를 restore 하면, 살아 있는 상태의 아티팩트가 온다](#deleting-restoring-brings-an-artifact-back) | answered |
+| [아무 권한도 받지 않은 사용자는 아티팩트를 restore 할 수 없다](#deleting-a-user-granted-nothing-may-not-restore-an-artifact) | refused |
 
 **delete_artifacts**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 아티팩트 여럿을 id 목록으로 soft delete 하면, 모두 삭제됨 상태로 온다](#bulk_deleting-the-superadmin-soft-deletes-artifacts-by-ids) | 성공 |
-| [슈퍼관리자가 아닌 사용자는 아티팩트 여럿을 id 목록으로 soft delete 할 수 없고, 역할로 거부된다](#bulk_deleting-a-user-who-is-not-superadmin-may-not-soft-delete-artifacts-by-ids) | 거부 |
+| [슈퍼관리자가 아티팩트 여럿을 id 목록으로 soft delete 하면, 모두 삭제됨 상태로 온다](#bulk_deleting-the-superadmin-soft-deletes-artifacts-by-ids) | answered |
+| [슈퍼관리자가 아닌 사용자는 아티팩트 여럿을 id 목록으로 soft delete 할 수 없고, 역할로 거부된다](#bulk_deleting-a-user-who-is-not-superadmin-may-not-soft-delete-artifacts-by-ids) | refused |
 
 **restore_artifacts**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 soft delete 된 아티팩트 여럿을 id 목록으로 restore 하면, 모두 살아 있는 상태로 온다](#bulk_deleting-the-superadmin-restores-artifacts-by-ids) | 성공 |
+| [슈퍼관리자가 soft delete 된 아티팩트 여럿을 id 목록으로 restore 하면, 모두 살아 있는 상태로 온다](#bulk_deleting-the-superadmin-restores-artifacts-by-ids) | answered |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 아티팩트의 설명을 바꾸면, 새 설명을 실은 아티팩트가 온다](#editing-the-superadmin-edits-an-artifact) | 성공 |
-| [soft delete 된 아티팩트는 슈퍼관리자라도 고칠 수 없고, 대상이 없다는 것으로 거부된다](#editing-a-soft-deleted-artifact-is-not-edited) | 거부 |
-| [아무 권한도 받지 않은 사용자는 아티팩트를 고칠 수 없다](#editing-a-user-granted-nothing-may-not-edit-an-artifact) | 거부 |
+| [슈퍼관리자가 아티팩트의 설명을 바꾸면, 새 설명을 실은 아티팩트가 온다](#editing-the-superadmin-edits-an-artifact) | answered |
+| [soft delete 된 아티팩트는 슈퍼관리자라도 고칠 수 없고, 대상이 없다는 것으로 거부된다](#editing-a-soft-deleted-artifact-is-not-edited) | refused |
+| [아무 권한도 받지 않은 사용자는 아티팩트를 고칠 수 없다](#editing-a-user-granted-nothing-may-not-edit-an-artifact) | refused |
 
 ### delete
 

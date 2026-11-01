@@ -1,105 +1,105 @@
 ## rbac
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/rbac/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/rbac/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/rbac/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/rbac/adapter.py)
 
-시나리오: 미완 33 / 37
+Scenario: incomplete 33 / 37
 
-- ops 로 구성 (22)
-  - admin_search_permissions_gql — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - admin_search_roles_gql — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_permissions_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_permissions_by_role_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_roles_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - bulk_add_role_permissions — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - bulk_remove_role_permissions — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - create — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - create_permission — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - delete — 대표 성공 ✓ · 대표 실패 ✓
-  - my_search_roles — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_delete — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_restore — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge — 대표 성공 ✓ · 대표 실패 ✓
-  - purge_permission — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - restore — 대표 성공 ✓ · 대표 실패 ✓
-  - search_role_permissions — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - search_roles_in_scope — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - update — 대표 성공 ✓ · 대표 실패 ✓
-  - update_permission — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-- 직접 구현 (15)
-  - admin_search_role_assignments — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-  - assign_role — 성공 없음 · 실패 없음 (relation) — SCENARIO-GAP
-  - batch_load_role_assignments_by_ids — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
-  - bulk_assign_role — 성공 없음 · 실패 없음 (relation) — SCENARIO-GAP
-  - bulk_revoke_role — 성공 없음 · 실패 없음 (relation) — SCENARIO-GAP
-  - get — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - get_entity_operation_combinations — 성공 없음 · 실패 없음 (public) — SCENARIO-GAP
-  - get_permission_matrix — 성공 없음 · 실패 없음 (public) — SCENARIO-GAP
-  - get_scope_entity_combinations — 성공 없음 · 실패 없음 (public) — SCENARIO-GAP
-  - my_atomic_bulk_scope_permissions — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
-  - my_scope_permissions — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
-  - my_search_role_assignments — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
-  - replace_role_permissions — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - revoke_role — 성공 없음 · 실패 없음 (relation) — SCENARIO-GAP
-  - search_role_assignments_in_scope — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
+- built from ops (22)
+  - admin_search_permissions_gql — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - admin_search_roles_gql — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_permissions_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_permissions_by_role_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_roles_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - bulk_add_role_permissions — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - bulk_remove_role_permissions — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - create — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - create_permission — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - delete — representative success ✓ · representative refusal ✓
+  - my_search_roles — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_delete — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_purge — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_restore — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_update — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - purge — representative success ✓ · representative refusal ✓
+  - purge_permission — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - restore — representative success ✓ · representative refusal ✓
+  - search_role_permissions — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - search_roles_in_scope — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - update — representative success ✓ · representative refusal ✓
+  - update_permission — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+- direct implementation (15)
+  - admin_search_role_assignments — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - assign_role — success absent · refusal absent (relation) — SCENARIO-GAP
+  - batch_load_role_assignments_by_ids — success absent · refusal absent (scope) — SCENARIO-GAP
+  - bulk_assign_role — success absent · refusal absent (relation) — SCENARIO-GAP
+  - bulk_revoke_role — success absent · refusal absent (relation) — SCENARIO-GAP
+  - get — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - get_entity_operation_combinations — success absent · refusal absent (public) — SCENARIO-GAP
+  - get_permission_matrix — success absent · refusal absent (public) — SCENARIO-GAP
+  - get_scope_entity_combinations — success absent · refusal absent (public) — SCENARIO-GAP
+  - my_atomic_bulk_scope_permissions — success absent · refusal absent (scope) — SCENARIO-GAP
+  - my_scope_permissions — success absent · refusal absent (scope) — SCENARIO-GAP
+  - my_search_role_assignments — success absent · refusal absent (scope) — SCENARIO-GAP
+  - replace_role_permissions — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - revoke_role — success absent · refusal absent (relation) — SCENARIO-GAP
+  - search_role_assignments_in_scope — success absent · refusal absent (scope) — SCENARIO-GAP
 
 **delete**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 역할을 soft delete 하면, 그 역할의 id 가 온다](#deleting-the-superadmin-soft-deletes-a-role) | 성공 |
-| [아무 권한도 받지 않은 사용자는 역할을 soft delete 할 수 없다](#deleting-a-user-granted-nothing-may-not-soft-delete-a-role) | 거부 |
+| [슈퍼관리자가 역할을 soft delete 하면, 그 역할의 id 가 온다](#deleting-the-superadmin-soft-deletes-a-role) | answered |
+| [아무 권한도 받지 않은 사용자는 역할을 soft delete 할 수 없다](#deleting-a-user-granted-nothing-may-not-soft-delete-a-role) | refused |
 
 **partial_bulk_delete**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 역할 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-roles) | 성공 |
-| [활성 역할 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 삭제 상태로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 역할 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-roles) | answered |
+| [활성 역할 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 삭제 상태로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | answered |
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 역할 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-a-user-granted-nothing-purges-none-of-several-roles) | 성공 |
-| [슈퍼관리자가 역할 여럿을 한 번에 purge 하면, 모두 처리된 목록에 오고 실패한 것은 없다](#partial_bulk_deleting-the-superadmin-purges-several-roles-at-once) | 성공 |
+| [아무 권한도 받지 않은 사용자가 역할 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-a-user-granted-nothing-purges-none-of-several-roles) | answered |
+| [슈퍼관리자가 역할 여럿을 한 번에 purge 하면, 모두 처리된 목록에 오고 실패한 것은 없다](#partial_bulk_deleting-the-superadmin-purges-several-roles-at-once) | answered |
 
 **partial_bulk_restore**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [soft delete 된 역할 여럿을 한 번에 restore 하면, 모두 활성으로 온다](#partial_bulk_deleting-restoring-several-brings-them-back) | 성공 |
+| [soft delete 된 역할 여럿을 한 번에 restore 하면, 모두 활성으로 온다](#partial_bulk_deleting-restoring-several-brings-them-back) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 역할 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-roles) | 성공 |
-| [soft delete 된 역할 여럿의 status 를 한 번에 ACTIVE 로 고치면, restore 되어 모두 활성으로 온다](#partial_bulk_editing-editing-status-to-active-restores-several-roles) | 성공 |
-| [슈퍼관리자가 역할 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-roles-at-once) | 성공 |
+| [아무 권한도 받지 않은 사용자가 역할 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-roles) | answered |
+| [soft delete 된 역할 여럿의 status 를 한 번에 ACTIVE 로 고치면, restore 되어 모두 활성으로 온다](#partial_bulk_editing-editing-status-to-active-restores-several-roles) | answered |
+| [슈퍼관리자가 역할 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-roles-at-once) | answered |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 역할을 purge 하면, 그 역할의 id 가 온다](#deleting-the-superadmin-purges-a-role) | 성공 |
-| [아무 권한도 받지 않은 사용자는 역할을 purge 할 수 없다](#deleting-a-user-granted-nothing-may-not-purge-a-role) | 거부 |
+| [슈퍼관리자가 역할을 purge 하면, 그 역할의 id 가 온다](#deleting-the-superadmin-purges-a-role) | answered |
+| [아무 권한도 받지 않은 사용자는 역할을 purge 할 수 없다](#deleting-a-user-granted-nothing-may-not-purge-a-role) | refused |
 
 **restore**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [soft delete 된 역할을 restore 하면, 그 역할의 id 가 온다](#deleting-restoring-a-soft-deleted-role) | 성공 |
-| [아무 권한도 받지 않은 사용자는 역할을 restore 할 수 없다](#deleting-a-user-granted-nothing-may-not-restore-a-role) | 거부 |
+| [soft delete 된 역할을 restore 하면, 그 역할의 id 가 온다](#deleting-restoring-a-soft-deleted-role) | answered |
+| [아무 권한도 받지 않은 사용자는 역할을 restore 할 수 없다](#deleting-a-user-granted-nothing-may-not-restore-a-role) | refused |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 역할의 status 를 DELETED 로 고치면, soft delete 되어 삭제 상태로 온다](#editing-editing-status-to-deleted-soft-deletes-the-role) | 성공 |
-| [슈퍼관리자가 역할의 설명을 바꾸면, 새 설명을 실은 역할 전체가 온다](#editing-the-superadmin-edits-a-role) | 성공 |
-| [아무 권한도 받지 않은 사용자는 역할을 수정할 수 없다](#editing-a-user-granted-nothing-may-not-edit-a-role) | 거부 |
+| [슈퍼관리자가 역할의 status 를 DELETED 로 고치면, soft delete 되어 삭제 상태로 온다](#editing-editing-status-to-deleted-soft-deletes-the-role) | answered |
+| [슈퍼관리자가 역할의 설명을 바꾸면, 새 설명을 실은 역할 전체가 온다](#editing-the-superadmin-edits-a-role) | answered |
+| [아무 권한도 받지 않은 사용자는 역할을 수정할 수 없다](#editing-a-user-granted-nothing-may-not-edit-a-role) | refused |
 
 ### delete
 

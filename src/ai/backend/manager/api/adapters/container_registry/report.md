@@ -1,111 +1,111 @@
 ## container_registry
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/container_registry/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/container_registry/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/container_registry/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/container_registry/adapter.py)
 
-시나리오: 미완 2 / 10
+Scenario: incomplete 2 / 10
 
-- ops 로 구성 (4)
-  - admin_partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
-  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
-  - lookup_by_name_and_registry_project — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (6)
-  - admin_create — 성공 있음 2 · 실패 있음 2 (global_scope, relation)
-  - admin_purge — 성공 있음 2 · 실패 있음 2 (global_scope)
-  - admin_update — 성공 있음 3 · 실패 있음 4 (global_scope, membership, relation)
-  - apply_allowed_groups — 성공 있음 8 · 실패 있음 6 (relation)
-  - apply_global — 성공 없음 · 실패 없음 (membership) — SCENARIO-GAP
-  - link_project_as_default — 성공 있음 1 · 실패 있음 3 (relation)
+- built from ops (4)
+  - admin_partial_bulk_purge — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - admin_search — representative success ✓ · representative refusal ✓
+  - batch_load_by_ids — representative success ✓ · representative refusal ✓
+  - lookup_by_name_and_registry_project — representative success ✓ · representative refusal ✓
+- direct implementation (6)
+  - admin_create — success present 2 · refusal present 2 (global_scope, relation)
+  - admin_purge — success present 2 · refusal present 2 (global_scope)
+  - admin_update — success present 3 · refusal present 4 (global_scope, membership, relation)
+  - apply_allowed_groups — success present 8 · refusal present 6 (relation)
+  - apply_global — success absent · refusal absent (membership) — SCENARIO-GAP
+  - link_project_as_default — success present 1 · refusal present 3 (relation)
 
 **admin_partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 레지스트리 여럿을 한 번에 영구 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries) | 성공 |
-| [슈퍼관리자가 레지스트리 둘과 없는 id 하나를 한 번에 영구 삭제하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-registries-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 레지스트리 여럿을 한 번에 영구 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries) | answered |
+| [슈퍼관리자가 레지스트리 둘과 없는 id 하나를 한 번에 영구 삭제하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-registries-answers-for-the-missing-one) | answered |
 
 **admin_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 전역 여부 필터로 검색하면 전역이 아닌 레지스트리만 남는다](#searching-filtering-by-global-visibility-leaves-only-non-global-registries) | 성공 |
-| [슈퍼관리자가 종류 필터로 검색하면 그 종류의 레지스트리만 남는다](#searching-filtering-by-type-leaves-only-matching-registries) | 성공 |
-| [슈퍼관리자가 조건 없이 검색하면 미리 만들어 둔 레지스트리가 모두 반환된다](#searching-searching-without-a-filter-counts-every-registry) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 레지스트리를 검색하려 하면 권한 부족으로 거부된다. 이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다](#searching-a-user-who-is-not-the-superadmin-may-not-search-registries) | 거부 |
+| [슈퍼관리자가 전역 여부 필터로 검색하면 전역이 아닌 레지스트리만 남는다](#searching-filtering-by-global-visibility-leaves-only-non-global-registries) | answered |
+| [슈퍼관리자가 종류 필터로 검색하면 그 종류의 레지스트리만 남는다](#searching-filtering-by-type-leaves-only-matching-registries) | answered |
+| [슈퍼관리자가 조건 없이 검색하면 미리 만들어 둔 레지스트리가 모두 반환된다](#searching-searching-without-a-filter-counts-every-registry) | answered |
+| [슈퍼관리자가 아닌 사용자가 레지스트리를 검색하려 하면 권한 부족으로 거부된다. 이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다](#searching-a-user-who-is-not-the-superadmin-may-not-search-registries) | refused |
 
 **batch_load_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환된다](#reading-an-empty-id-list-answers-empty-without-calling-the-wiring) | 성공 |
-| [슈퍼관리자가 미리 만들어 둔 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 조회하면, 미리 만들어 둔 레지스트리는 요청한 순서대로 반환된다. 존재하지 않는 id의 항목에 무엇이 반환되는지는 아직 정해지지 않았다](#reading-loading-many-ids-keeps-the-order) | 성공 |
-| [권한을 받지 않은 사용자가 id 여럿을 한 번에 조회하면, 요청 전체가 거부되는 대신 항목마다 권한 부족 거부가 담겨 반환된다. 존재하지 않는 id도 같은 거부로 반환되어 있는지 없는지가 드러나지 않는다](#reading-a-plain-user-loading-many-ids-is-refused-on-every-id) | 거부 |
+| [빈 id 목록으로 조회하면 하위 계층을 호출하지 않고 빈 응답이 반환된다](#reading-an-empty-id-list-answers-empty-without-calling-the-wiring) | answered |
+| [슈퍼관리자가 미리 만들어 둔 레지스트리 둘과 존재하지 않는 id 하나를 한 번에 조회하면, 미리 만들어 둔 레지스트리는 요청한 순서대로 반환된다. 존재하지 않는 id의 항목에 무엇이 반환되는지는 아직 정해지지 않았다](#reading-loading-many-ids-keeps-the-order) | answered |
+| [권한을 받지 않은 사용자가 id 여럿을 한 번에 조회하면, 요청 전체가 거부되는 대신 항목마다 권한 부족 거부가 담겨 반환된다. 존재하지 않는 id도 같은 거부로 반환되어 있는지 없는지가 드러나지 않는다](#reading-a-plain-user-loading-many-ids-is-refused-on-every-id) | refused |
 
 **lookup_by_name_and_registry_project**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [읽기 권한이 있는 사용자는 registry 내부 프로젝트명이 없는 레지스트리의 이름을 식별자로 변환할 수 있다](#looking_up-readable-registry-key-resolves) | 성공 |
-| [존재하지 않는 이름은 읽기 권한이 없는 경우와 같은 오류로 거부된다](#looking_up-missing-registry-key-is-unresolvable) | 거부 |
-| [읽기 권한이 없는 사용자의 이름 조회는 대상의 존재 여부를 드러내지 않고 거부된다](#looking_up-unreadable-registry-key-is-unresolvable) | 거부 |
+| [읽기 권한이 있는 사용자는 registry 내부 프로젝트명이 없는 레지스트리의 이름을 식별자로 변환할 수 있다](#looking_up-readable-registry-key-resolves) | answered |
+| [존재하지 않는 이름은 읽기 권한이 없는 경우와 같은 오류로 거부된다](#looking_up-missing-registry-key-is-unresolvable) | refused |
+| [읽기 권한이 없는 사용자의 이름 조회는 대상의 존재 여부를 드러내지 않고 거부된다](#looking_up-unreadable-registry-key-is-unresolvable) | refused |
 
 **admin_create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 허용 프로젝트를 함께 지정해 레지스트리를 생성하면 그 관계도 생성된다](#creating-a-project-named-while-creating-is-allowed-on-the-new-registry) | 성공 |
-| [슈퍼관리자가 주소·이름·종류만 지정해 레지스트리를 생성하면, 나머지 필드가 모두 비어 있는 노드가 반환된다](#creating-creating-a-registry-with-only-the-required-values-leaves-the-rest-empty) | 성공 |
-| [존재하지 않는 프로젝트를 허용 목록에 넣고 레지스트리를 생성하려 하면, 그 프로젝트를 찾을 수 없어 거부된다](#creating-a-project-that-does-not-exist-is-refused-while-creating) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 레지스트리를 생성하려 하면 권한 부족으로 거부된다. 이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-registry) | 거부 |
+| [슈퍼관리자가 허용 프로젝트를 함께 지정해 레지스트리를 생성하면 그 관계도 생성된다](#creating-a-project-named-while-creating-is-allowed-on-the-new-registry) | answered |
+| [슈퍼관리자가 주소·이름·종류만 지정해 레지스트리를 생성하면, 나머지 필드가 모두 비어 있는 노드가 반환된다](#creating-creating-a-registry-with-only-the-required-values-leaves-the-rest-empty) | answered |
+| [존재하지 않는 프로젝트를 허용 목록에 넣고 레지스트리를 생성하려 하면, 그 프로젝트를 찾을 수 없어 거부된다](#creating-a-project-that-does-not-exist-is-refused-while-creating) | refused |
+| [슈퍼관리자가 아닌 사용자가 레지스트리를 생성하려 하면 권한 부족으로 거부된다. 이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-registry) | refused |
 
 **admin_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 레지스트리를 삭제하면 삭제한 id를 담은 응답이 반환된다](#retiring-deleting-a-registry-answers-with-the-id-it-removed) | 성공 |
-| [허용 프로젝트가 있는 레지스트리를 삭제하면, 외래 키를 통해 그 허용 목록까지 함께 삭제된다](#retiring-deleting-a-registry-takes-its-allowed-projects-with-it) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 레지스트리를 삭제하려 하면 권한 부족으로 거부된다. 이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다](#retiring-a-user-who-is-not-the-superadmin-may-not-delete-a-registry) | 거부 |
-| [존재하지 않는 id를 삭제하려 하면 대상을 찾을 수 없어 거부된다](#retiring-deleting-an-id-that-holds-no-registry-is-refused) | 거부 |
+| [슈퍼관리자가 레지스트리를 삭제하면 삭제한 id를 담은 응답이 반환된다](#retiring-deleting-a-registry-answers-with-the-id-it-removed) | answered |
+| [허용 프로젝트가 있는 레지스트리를 삭제하면, 외래 키를 통해 그 허용 목록까지 함께 삭제된다](#retiring-deleting-a-registry-takes-its-allowed-projects-with-it) | answered |
+| [슈퍼관리자가 아닌 사용자가 레지스트리를 삭제하려 하면 권한 부족으로 거부된다. 이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다](#retiring-a-user-who-is-not-the-superadmin-may-not-delete-a-registry) | refused |
+| [존재하지 않는 id를 삭제하려 하면 대상을 찾을 수 없어 거부된다](#retiring-deleting-an-id-that-holds-no-registry-is-refused) | refused |
 
 **admin_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-an-edit-that-names-no-value-changes-nothing) | 성공 |
-| [슈퍼관리자가 주소만 수정하면 주소만 새 값이 되고 나머지 필드는 그대로다](#editing-changing-only-the-address-leaves-every-other-field-alone) | 성공 |
-| [슈퍼관리자가 레지스트리를 수정하며 프로젝트를 허용하면 그 관계가 생성된다](#editing-editing-a-registry-can-add-an-allowed-project) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 레지스트리를 수정하려 하면 권한 부족으로 거부된다. 이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다](#editing-a-user-who-is-not-the-superadmin-may-not-edit-a-registry) | 거부 |
-| [슈퍼관리자가 호스트가 없는 주소로 수정하려 하면, 수정 후의 행을 검사하는 단계에서 주소 형식 오류로 거부된다](#editing-an-address-whose-host-is-empty-is-refused-on-update) | 거부 |
-| [존재하지 않는 id를 수정하려 하면 대상을 찾을 수 없어 거부된다](#editing-editing-an-id-that-holds-no-registry-is-refused) | 거부 |
-| [프로젝트가 비어 있는 레지스트리를 harbor 종류로 수정하려 하면, harbor는 프로젝트를 요구하므로 거부된다](#editing-turning-a-registry-into-harbor-without-a-project-is-refused) | 거부 |
+| [슈퍼관리자가 값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-an-edit-that-names-no-value-changes-nothing) | answered |
+| [슈퍼관리자가 주소만 수정하면 주소만 새 값이 되고 나머지 필드는 그대로다](#editing-changing-only-the-address-leaves-every-other-field-alone) | answered |
+| [슈퍼관리자가 레지스트리를 수정하며 프로젝트를 허용하면 그 관계가 생성된다](#editing-editing-a-registry-can-add-an-allowed-project) | answered |
+| [슈퍼관리자가 아닌 사용자가 레지스트리를 수정하려 하면 권한 부족으로 거부된다. 이 호출은 호출자가 슈퍼관리자인지만 검사하고, 부여된 권한은 보지 않는다](#editing-a-user-who-is-not-the-superadmin-may-not-edit-a-registry) | refused |
+| [슈퍼관리자가 호스트가 없는 주소로 수정하려 하면, 수정 후의 행을 검사하는 단계에서 주소 형식 오류로 거부된다](#editing-an-address-whose-host-is-empty-is-refused-on-update) | refused |
+| [존재하지 않는 id를 수정하려 하면 대상을 찾을 수 없어 거부된다](#editing-editing-an-id-that-holds-no-registry-is-refused) | refused |
+| [프로젝트가 비어 있는 레지스트리를 harbor 종류로 수정하려 하면, harbor는 프로젝트를 요구하므로 거부된다](#editing-turning-a-registry-into-harbor-without-a-project-is-refused) | refused |
 
 **apply_allowed_groups**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [레지스트리와 프로젝트 두 스코프 모두에 권한을 받은 사용자는 그 프로젝트를 허용 목록에 넣을 수 있다](#allowing_projects-a-user-granted-on-both-scopes-allows-a-project-on-a-registry) | 성공 |
-| [이 레지스트리를 default로 허용받은 프로젝트를 허용 목록에 다시 넣어도 거부되지 않고 default 레지스트리도 그대로 유지된다](#allowing_projects-allowing-a-project-already-linked-as-its-default-keeps-the-default) | 성공 |
-| [이미 허용된 프로젝트를 다시 허용 목록에 넣어도 거부되지 않는다. 그 쌍은 데이터베이스에서 건너뛴다](#allowing_projects-allowing-a-project-that-is-already-allowed-is-not-an-error) | 성공 |
-| [이미 허용된 프로젝트는 허용 목록에서 뺄 수 있다](#allowing_projects-an-allowed-project-is-removed-from-the-allowed-list) | 성공 |
-| [양쪽 스코프에 생성 권한만 받은 사용자는 프로젝트를 허용 목록에 넣을 수 있다](#allowing_projects-create-permission-on-both-scopes-is-enough-to-allow-a-project) | 성공 |
-| [이 레지스트리를 default로 허용받은 프로젝트를 허용 목록에서 빼면 association과 함께 default 레지스트리 지정도 사라진다](#allowing_projects-removing-a-project-linked-as-its-default-drops-the-default) | 성공 |
-| [양쪽 스코프에 삭제 권한만 받은 사용자는 허용 프로젝트를 제거할 수 있다](#allowing_projects-soft-delete-permission-on-both-scopes-is-enough-to-remove-a-project) | 성공 |
-| [권한 검사를 끄면 아무 권한도 받지 않은 사용자도 프로젝트를 허용할 수 있다](#allowing_projects-turning-enforcement-off-lets-an-ungranted-user-allow-a-project) | 성공 |
-| [존재하지 않는 프로젝트를 허용 목록에 넣으려 하면 그 프로젝트가 없다는 이유로 거부된다](#allowing_projects-a-superadmin-naming-a-project-that-does-not-exist-is-refused) | 거부 |
-| [지정한 프로젝트 중 실제로 허용된 것이 하나도 없으면, 제거할 관계가 없다는 이유로 거부된다](#allowing_projects-a-superadmin-removing-a-project-that-was-never-allowed-is-refused) | 거부 |
-| [프로젝트에만 권한을 받고 레지스트리에는 받지 못한 사용자가 프로젝트를 허용하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다](#allowing_projects-a-user-granted-on-the-project-but-not-the-registry-is-refused) | 거부 |
-| [레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 프로젝트를 허용하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다](#allowing_projects-a-user-granted-on-the-registry-but-not-the-project-is-refused) | 거부 |
-| [양쪽 스코프에 생성 권한만 받은 사용자가 프로젝트를 제거하면 권한 부족으로 거부된다](#allowing_projects-create-permission-does-not-allow-removing-a-project) | 거부 |
-| [양쪽 스코프에 삭제 권한만 받은 사용자가 프로젝트를 추가하면 권한 부족으로 거부된다](#allowing_projects-soft-delete-permission-does-not-allow-adding-a-project) | 거부 |
+| [레지스트리와 프로젝트 두 스코프 모두에 권한을 받은 사용자는 그 프로젝트를 허용 목록에 넣을 수 있다](#allowing_projects-a-user-granted-on-both-scopes-allows-a-project-on-a-registry) | answered |
+| [이 레지스트리를 default로 허용받은 프로젝트를 허용 목록에 다시 넣어도 거부되지 않고 default 레지스트리도 그대로 유지된다](#allowing_projects-allowing-a-project-already-linked-as-its-default-keeps-the-default) | answered |
+| [이미 허용된 프로젝트를 다시 허용 목록에 넣어도 거부되지 않는다. 그 쌍은 데이터베이스에서 건너뛴다](#allowing_projects-allowing-a-project-that-is-already-allowed-is-not-an-error) | answered |
+| [이미 허용된 프로젝트는 허용 목록에서 뺄 수 있다](#allowing_projects-an-allowed-project-is-removed-from-the-allowed-list) | answered |
+| [양쪽 스코프에 생성 권한만 받은 사용자는 프로젝트를 허용 목록에 넣을 수 있다](#allowing_projects-create-permission-on-both-scopes-is-enough-to-allow-a-project) | answered |
+| [이 레지스트리를 default로 허용받은 프로젝트를 허용 목록에서 빼면 association과 함께 default 레지스트리 지정도 사라진다](#allowing_projects-removing-a-project-linked-as-its-default-drops-the-default) | answered |
+| [양쪽 스코프에 삭제 권한만 받은 사용자는 허용 프로젝트를 제거할 수 있다](#allowing_projects-soft-delete-permission-on-both-scopes-is-enough-to-remove-a-project) | answered |
+| [권한 검사를 끄면 아무 권한도 받지 않은 사용자도 프로젝트를 허용할 수 있다](#allowing_projects-turning-enforcement-off-lets-an-ungranted-user-allow-a-project) | answered |
+| [존재하지 않는 프로젝트를 허용 목록에 넣으려 하면 그 프로젝트가 없다는 이유로 거부된다](#allowing_projects-a-superadmin-naming-a-project-that-does-not-exist-is-refused) | refused |
+| [지정한 프로젝트 중 실제로 허용된 것이 하나도 없으면, 제거할 관계가 없다는 이유로 거부된다](#allowing_projects-a-superadmin-removing-a-project-that-was-never-allowed-is-refused) | refused |
+| [프로젝트에만 권한을 받고 레지스트리에는 받지 못한 사용자가 프로젝트를 허용하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다](#allowing_projects-a-user-granted-on-the-project-but-not-the-registry-is-refused) | refused |
+| [레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 프로젝트를 허용하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다](#allowing_projects-a-user-granted-on-the-registry-but-not-the-project-is-refused) | refused |
+| [양쪽 스코프에 생성 권한만 받은 사용자가 프로젝트를 제거하면 권한 부족으로 거부된다](#allowing_projects-create-permission-does-not-allow-removing-a-project) | refused |
+| [양쪽 스코프에 삭제 권한만 받은 사용자가 프로젝트를 추가하면 권한 부족으로 거부된다](#allowing_projects-soft-delete-permission-does-not-allow-adding-a-project) | refused |
 
 **link_project_as_default**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [레지스트리와 프로젝트 양쪽에 생성 권한을 받은 사용자는 프로젝트와 레지스트리 사이에 association을 만들며 default로 지정할 수 있다](#linking_default_project-create-permission-on-both-scopes-links-a-project-as-its-default) | 성공 |
-| [레지스트리와 association이 이미 있는 프로젝트에 association을 만들며 default로 지정하려 하면 기존 association은 그대로 남아 default로 지정할 수 없으므로 거부된다](#linking_default_project-a-project-already-allowed-on-the-registry-cannot-link-it-as-a-default) | 거부 |
-| [다른 레지스트리를 이미 default로 가진 프로젝트에 association을 만들며 default로 지정하려 하면 프로젝트당 default 레지스트리는 하나뿐이므로 거부되고, 기존 default 레지스트리는 유지된다](#linking_default_project-a-project-that-already-has-a-default-registry-cannot-link-another) | 거부 |
-| [레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 association을 만들며 default로 지정하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다](#linking_default_project-a-user-granted-on-the-registry-but-not-the-project-cannot-link-a-default) | 거부 |
+| [레지스트리와 프로젝트 양쪽에 생성 권한을 받은 사용자는 프로젝트와 레지스트리 사이에 association을 만들며 default로 지정할 수 있다](#linking_default_project-create-permission-on-both-scopes-links-a-project-as-its-default) | answered |
+| [레지스트리와 association이 이미 있는 프로젝트에 association을 만들며 default로 지정하려 하면 기존 association은 그대로 남아 default로 지정할 수 없으므로 거부된다](#linking_default_project-a-project-already-allowed-on-the-registry-cannot-link-it-as-a-default) | refused |
+| [다른 레지스트리를 이미 default로 가진 프로젝트에 association을 만들며 default로 지정하려 하면 프로젝트당 default 레지스트리는 하나뿐이므로 거부되고, 기존 default 레지스트리는 유지된다](#linking_default_project-a-project-that-already-has-a-default-registry-cannot-link-another) | refused |
+| [레지스트리에만 권한을 받고 프로젝트에는 받지 못한 사용자가 association을 만들며 default로 지정하려 하면, 관계 연산은 지정한 스코프 모두의 권한을 검사하므로 권한 부족으로 거부된다](#linking_default_project-a-user-granted-on-the-registry-but-not-the-project-cannot-link-a-default) | refused |
 
 ### admin_partial_bulk_purge
 

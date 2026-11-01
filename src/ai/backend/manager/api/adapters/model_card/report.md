@@ -1,65 +1,65 @@
 ## model_card
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/model_card/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/model_card/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/model_card/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/model_card/adapter.py)
 
-시나리오: 미완 13 / 16
+Scenario: incomplete 13 / 16
 
-- ops 로 구성 (8)
-  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
-  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - create — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - get — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - min_resources — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - ownership_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - project_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - scoped_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-- ops + 직접 구현 (3)
-  - deploy — 성공 없음 · 실패 없음 (scope, single_get_ops) — SCENARIO-GAP
-  - partial_bulk_update — 성공 있음 2 · 실패 없음 (atomic_bulk_scoped_search_ops, partial_bulk) — SCENARIO-GAP
-  - update — 성공 있음 1 · 실패 있음 1 (atomic_bulk_scoped_search_ops, single_entity)
-- 직접 구현 (4)
-  - admin_bulk_delete — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - partial_bulk_purge — 성공 있음 3 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - purge — 성공 있음 1 · 실패 있음 1 (single_entity)
-  - scan_project — 성공 없음 · 실패 없음 (global_scope) — SCENARIO-GAP
-- Action 없음 (1)
-  - available_presets — 성공 없음 · 실패 없음 — SCENARIO-GAP
+- built from ops (8)
+  - admin_search — representative success ✓ · representative refusal ✓
+  - batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - create — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - get — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - min_resources — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - ownership_search — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - project_search — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - scoped_search — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+- ops + direct implementation (3)
+  - deploy — success absent · refusal absent (scope, single_get_ops) — SCENARIO-GAP
+  - partial_bulk_update — success present 2 · refusal absent (atomic_bulk_scoped_search_ops, partial_bulk) — SCENARIO-GAP
+  - update — success present 1 · refusal present 1 (atomic_bulk_scoped_search_ops, single_entity)
+- direct implementation (4)
+  - admin_bulk_delete — success absent · refusal absent (partial_bulk) — SCENARIO-GAP
+  - partial_bulk_purge — success present 3 · refusal absent (partial_bulk) — SCENARIO-GAP
+  - purge — success present 1 · refusal present 1 (single_entity)
+  - scan_project — success absent · refusal absent (global_scope) — SCENARIO-GAP
+- no Action (1)
+  - available_presets — success absent · refusal absent — SCENARIO-GAP
 
 **admin_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [모델 카드를 하나도 심지 않은 상태에서 슈퍼관리자가 전체 조회를 하면, 답은 비어 있다](#model_card-a-scenario-that-laid-no-model-card-finds-none) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 전체 모델 카드 조회를 요청하면 역할로 막힌다](#model_card-a-user-who-is-not-the-superadmin-may-not-search-every-model-card) | 거부 |
+| [모델 카드를 하나도 심지 않은 상태에서 슈퍼관리자가 전체 조회를 하면, 답은 비어 있다](#model_card-a-scenario-that-laid-no-model-card-finds-none) | answered |
+| [슈퍼관리자가 아닌 사용자가 전체 모델 카드 조회를 요청하면 역할로 막힌다](#model_card-a-user-who-is-not-the-superadmin-may-not-search-every-model-card) | refused |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 카드 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-model-cards) | 성공 |
-| [프로젝트에서 모델 카드 읽기와 수정 권한을 받은 사용자가 카드 여럿의 제목을 한 번에 바꾸면, 모두 새 제목으로 오고 실패한 것은 없다](#partial_bulk_editing-a-user-granted-update-edits-several-model-cards) | 성공 |
+| [아무 권한도 받지 않은 사용자가 카드 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-model-cards) | answered |
+| [프로젝트에서 모델 카드 읽기와 수정 권한을 받은 사용자가 카드 여럿의 제목을 한 번에 바꾸면, 모두 새 제목으로 오고 실패한 것은 없다](#partial_bulk_editing-a-user-granted-update-edits-several-model-cards) | answered |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프로젝트에서 모델 카드 읽기와 수정 권한을 받은 사용자가 카드의 제목을 바꾸면, 제목은 새 값이 되고 나머지는 그대로 남는다](#editing-a-user-granted-update-in-the-project-edits-a-model-card) | 성공 |
-| [아무 권한도 받지 않은 사용자가 모델 카드를 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-model-card) | 거부 |
+| [프로젝트에서 모델 카드 읽기와 수정 권한을 받은 사용자가 카드의 제목을 바꾸면, 제목은 새 값이 되고 나머지는 그대로 남는다](#editing-a-user-granted-update-in-the-project-edits-a-model-card) | answered |
+| [아무 권한도 받지 않은 사용자가 모델 카드를 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-model-card) | refused |
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 카드 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-model-cards) | 성공 |
-| [프로젝트에서 모델 카드 purge 권한을 받은 사용자가 카드 둘을 한 번에 purge 하면, 둘 다 처리된 목록에 오고 실패한 것은 없다](#partial_bulk_purging-a-user-granted-purge-purges-several-model-cards) | 성공 |
-| [슈퍼관리자가 카드 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다. 권한 검사는 슈퍼관리자를 먼저 통과시키므로 없는 id 가 purge 까지 간다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 카드 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-model-cards) | answered |
+| [프로젝트에서 모델 카드 purge 권한을 받은 사용자가 카드 둘을 한 번에 purge 하면, 둘 다 처리된 목록에 오고 실패한 것은 없다](#partial_bulk_purging-a-user-granted-purge-purges-several-model-cards) | answered |
+| [슈퍼관리자가 카드 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다. 권한 검사는 슈퍼관리자를 먼저 통과시키므로 없는 id 가 purge 까지 간다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | answered |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프로젝트에서 모델 카드 purge 권한을 받은 사용자가 카드를 purge 하면, 그 카드의 id 가 온다](#purging-a-user-granted-purge-in-the-project-purges-a-model-card) | 성공 |
-| [아무 권한도 받지 않은 사용자가 모델 카드를 purge 하려 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-model-card) | 거부 |
+| [프로젝트에서 모델 카드 purge 권한을 받은 사용자가 카드를 purge 하면, 그 카드의 id 가 온다](#purging-a-user-granted-purge-in-the-project-purges-a-model-card) | answered |
+| [아무 권한도 받지 않은 사용자가 모델 카드를 purge 하려 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-model-card) | refused |
 
 ### admin_search
 

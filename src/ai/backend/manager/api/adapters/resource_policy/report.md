@@ -1,256 +1,256 @@
 ## resource_policy
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/resource_policy/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_policy/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/resource_policy/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/resource_policy/adapter.py)
 
-시나리오: 미완 16 / 33
+Scenario: incomplete 16 / 33
 
-- ops 로 구성 (33)
-  - admin_create_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_create_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_create_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_get_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_get_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_get_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_search_keypair_resource_policies — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_search_project_resource_policies — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_search_user_resource_policies — 대표 성공 ✓ · 대표 실패 ✓
-  - bulk_get_keypair_resource_policy_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - bulk_get_project_resource_policy_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - bulk_get_user_resource_policy_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - bulk_lookup_keypair_resource_policy_names — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - bulk_lookup_project_resource_policy_names — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - bulk_lookup_user_resource_policy_names — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - get_my_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - get_my_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - get_project_resource_policy — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - lookup_keypair_resource_policy — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - lookup_project_resource_policy — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - lookup_user_resource_policy — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_purge_keypair_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_purge_project_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_purge_user_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update_keypair_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update_project_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update_user_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - purge_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - purge_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - update_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - update_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - update_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+- built from ops (33)
+  - admin_create_keypair_resource_policy — representative success ✓ · representative refusal ✓
+  - admin_create_project_resource_policy — representative success ✓ · representative refusal ✓
+  - admin_create_user_resource_policy — representative success ✓ · representative refusal ✓
+  - admin_get_keypair_resource_policy — representative success ✓ · representative refusal ✓
+  - admin_get_project_resource_policy — representative success ✓ · representative refusal ✓
+  - admin_get_user_resource_policy — representative success ✓ · representative refusal ✓
+  - admin_search_keypair_resource_policies — representative success ✓ · representative refusal ✓
+  - admin_search_project_resource_policies — representative success ✓ · representative refusal ✓
+  - admin_search_user_resource_policies — representative success ✓ · representative refusal ✓
+  - bulk_get_keypair_resource_policy_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - bulk_get_project_resource_policy_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - bulk_get_user_resource_policy_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - bulk_lookup_keypair_resource_policy_names — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - bulk_lookup_project_resource_policy_names — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - bulk_lookup_user_resource_policy_names — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - get_my_keypair_resource_policy — representative success ✓ · representative refusal ✓
+  - get_my_user_resource_policy — representative success ✓ · representative refusal ✓
+  - get_project_resource_policy — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - lookup_keypair_resource_policy — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - lookup_project_resource_policy — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - lookup_user_resource_policy — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_purge_keypair_resource_policies — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_purge_project_resource_policies — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_purge_user_resource_policies — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_update_keypair_resource_policies — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_update_project_resource_policies — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_update_user_resource_policies — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - purge_keypair_resource_policy — representative success ✓ · representative refusal ✓
+  - purge_project_resource_policy — representative success ✓ · representative refusal ✓
+  - purge_user_resource_policy — representative success ✓ · representative refusal ✓
+  - update_keypair_resource_policy — representative success ✓ · representative refusal ✓
+  - update_project_resource_policy — representative success ✓ · representative refusal ✓
+  - update_user_resource_policy — representative success ✓ · representative refusal ✓
 
 **admin_create_keypair_resource_policy**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 한 자원의 전체 슬롯을 무제한으로 지정해 키페어 정책을 생성하면, 그 자원은 무제한으로 표시되고 수량은 비어 있다](#creating-an-unlimited-slot-of-a-keypair-policy-comes-back-marked-unlimited) | 성공 |
-| [슈퍼관리자가 생략할 수 있는 항목을 모두 생략하고 키페어 정책을 생성하면, 생략한 필드가 비어 있는 노드 전체가 반환된다](#creating-leaving-the-optional-values-out-of-a-keypair-policy-leaves-them-empty) | 성공 |
-| [슈퍼관리자가 모든 값을 지정해 키페어 정책을 생성하면, 지정한 값이 그대로 담긴 노드 전체가 반환된다](#creating-the-superadmin-creates-a-keypair-policy-giving-every-value) | 성공 |
-| [모니터 역할 사용자가 키페어 정책을 생성하려 하면 역할 부족으로 거부된다. 슈퍼관리자 검사는 모니터에게 읽기만 허용한다](#creating-a-monitor-may-not-create-a-keypair-policy) | 거부 |
-| [이미 다른 키페어 정책이 사용 중인 이름으로 생성하려 하면, 이름 중복으로 거부된다](#creating-a-name-another-keypair-policy-already-holds-is-refused) | 거부 |
-| [슈퍼관리자가 우선순위 상한을 세션 우선순위 범위 밖 값으로 지정해 키페어 정책을 생성하려 하면, 제약 위반으로 거부된다](#creating-a-priority-cap-outside-the-session-range-is-refused) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 키페어 정책을 생성하려 하면, 어떤 권한을 받았는지와 무관하게 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-keypair-policy) | 거부 |
-| [권한 검사를 꺼도 키페어 정책 생성은 여전히 거부된다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-keypair-policy) | 거부 |
+| [슈퍼관리자가 한 자원의 전체 슬롯을 무제한으로 지정해 키페어 정책을 생성하면, 그 자원은 무제한으로 표시되고 수량은 비어 있다](#creating-an-unlimited-slot-of-a-keypair-policy-comes-back-marked-unlimited) | answered |
+| [슈퍼관리자가 생략할 수 있는 항목을 모두 생략하고 키페어 정책을 생성하면, 생략한 필드가 비어 있는 노드 전체가 반환된다](#creating-leaving-the-optional-values-out-of-a-keypair-policy-leaves-them-empty) | answered |
+| [슈퍼관리자가 모든 값을 지정해 키페어 정책을 생성하면, 지정한 값이 그대로 담긴 노드 전체가 반환된다](#creating-the-superadmin-creates-a-keypair-policy-giving-every-value) | answered |
+| [모니터 역할 사용자가 키페어 정책을 생성하려 하면 역할 부족으로 거부된다. 슈퍼관리자 검사는 모니터에게 읽기만 허용한다](#creating-a-monitor-may-not-create-a-keypair-policy) | refused |
+| [이미 다른 키페어 정책이 사용 중인 이름으로 생성하려 하면, 이름 중복으로 거부된다](#creating-a-name-another-keypair-policy-already-holds-is-refused) | refused |
+| [슈퍼관리자가 우선순위 상한을 세션 우선순위 범위 밖 값으로 지정해 키페어 정책을 생성하려 하면, 제약 위반으로 거부된다](#creating-a-priority-cap-outside-the-session-range-is-refused) | refused |
+| [슈퍼관리자가 아닌 사용자가 키페어 정책을 생성하려 하면, 어떤 권한을 받았는지와 무관하게 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-keypair-policy) | refused |
+| [권한 검사를 꺼도 키페어 정책 생성은 여전히 거부된다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-keypair-policy) | refused |
 
 **admin_create_project_resource_policy**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 모든 값을 지정해 프로젝트 정책을 생성하면, 지정한 값이 그대로 담긴 노드 전체가 반환된다](#creating-the-superadmin-creates-a-project-policy-giving-every-value) | 성공 |
-| [모니터 역할 사용자가 프로젝트 정책을 생성하려 하면 역할 부족으로 거부된다. 슈퍼관리자 검사는 모니터에게 읽기만 허용한다](#creating-a-monitor-may-not-create-a-project-policy) | 거부 |
-| [이미 다른 프로젝트 정책이 사용 중인 이름으로 생성하려 하면, 이름 중복으로 거부된다](#creating-a-name-another-project-policy-already-holds-is-refused) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 프로젝트 정책을 생성하려 하면, 어떤 권한을 받았는지와 무관하게 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-project-policy) | 거부 |
-| [권한 검사를 꺼도 프로젝트 정책 생성은 여전히 거부된다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-project-policy) | 거부 |
+| [슈퍼관리자가 모든 값을 지정해 프로젝트 정책을 생성하면, 지정한 값이 그대로 담긴 노드 전체가 반환된다](#creating-the-superadmin-creates-a-project-policy-giving-every-value) | answered |
+| [모니터 역할 사용자가 프로젝트 정책을 생성하려 하면 역할 부족으로 거부된다. 슈퍼관리자 검사는 모니터에게 읽기만 허용한다](#creating-a-monitor-may-not-create-a-project-policy) | refused |
+| [이미 다른 프로젝트 정책이 사용 중인 이름으로 생성하려 하면, 이름 중복으로 거부된다](#creating-a-name-another-project-policy-already-holds-is-refused) | refused |
+| [슈퍼관리자가 아닌 사용자가 프로젝트 정책을 생성하려 하면, 어떤 권한을 받았는지와 무관하게 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-project-policy) | refused |
+| [권한 검사를 꺼도 프로젝트 정책 생성은 여전히 거부된다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-project-policy) | refused |
 
 **admin_create_user_resource_policy**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 생략할 수 있는 항목을 모두 생략하고 사용자 정책을 생성하면, 생략한 필드가 비어 있는 노드 전체가 반환된다](#creating-leaving-the-optional-values-out-of-a-user-policy-leaves-them-empty) | 성공 |
-| [슈퍼관리자가 모든 값을 지정해 사용자 정책을 생성하면, 지정한 값이 그대로 담긴 노드 전체가 반환된다](#creating-the-superadmin-creates-a-user-policy-giving-every-value) | 성공 |
-| [모니터 역할 사용자가 사용자 정책을 생성하려 하면 역할 부족으로 거부된다. 슈퍼관리자 검사는 모니터에게 읽기만 허용한다](#creating-a-monitor-may-not-create-a-user-policy) | 거부 |
-| [이미 다른 사용자 정책이 사용 중인 이름으로 생성하려 하면, 이름 중복으로 거부된다](#creating-a-name-another-user-policy-already-holds-is-refused) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 사용자 정책을 생성하려 하면, 어떤 권한을 받았는지와 무관하게 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-user-policy) | 거부 |
-| [권한 검사를 꺼도 사용자 정책 생성은 여전히 거부된다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-user-policy) | 거부 |
+| [슈퍼관리자가 생략할 수 있는 항목을 모두 생략하고 사용자 정책을 생성하면, 생략한 필드가 비어 있는 노드 전체가 반환된다](#creating-leaving-the-optional-values-out-of-a-user-policy-leaves-them-empty) | answered |
+| [슈퍼관리자가 모든 값을 지정해 사용자 정책을 생성하면, 지정한 값이 그대로 담긴 노드 전체가 반환된다](#creating-the-superadmin-creates-a-user-policy-giving-every-value) | answered |
+| [모니터 역할 사용자가 사용자 정책을 생성하려 하면 역할 부족으로 거부된다. 슈퍼관리자 검사는 모니터에게 읽기만 허용한다](#creating-a-monitor-may-not-create-a-user-policy) | refused |
+| [이미 다른 사용자 정책이 사용 중인 이름으로 생성하려 하면, 이름 중복으로 거부된다](#creating-a-name-another-user-policy-already-holds-is-refused) | refused |
+| [슈퍼관리자가 아닌 사용자가 사용자 정책을 생성하려 하면, 어떤 권한을 받았는지와 무관하게 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-user-policy) | refused |
+| [권한 검사를 꺼도 사용자 정책 생성은 여전히 거부된다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-user-policy) | refused |
 
 **admin_get_keypair_resource_policy**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [키페어 정책 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 정책 전체가 반환된다](#reading-the-superadmin-reads-a-keypair-policy-by-name) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 키페어 정책을 이름으로 조회할 수 있다](#reading-turning-enforcement-off-lets-a-user-granted-nothing-read-a-keypair-policy) | 성공 |
-| [같은 키페어 정책이 있고 아무 권한도 없는 사용자가 이름으로 조회하면, 정책을 찾을 수 없다는 이유로 거부된다](#reading-a-user-granted-nothing-cannot-resolve-a-keypair-policy-name) | 거부 |
-| [슈퍼관리자가 어느 키페어 정책에도 없는 이름으로 조회하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#reading-reading-a-keypair-policy-name-nothing-answers-to-is-not-found) | 거부 |
+| [키페어 정책 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 정책 전체가 반환된다](#reading-the-superadmin-reads-a-keypair-policy-by-name) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 키페어 정책을 이름으로 조회할 수 있다](#reading-turning-enforcement-off-lets-a-user-granted-nothing-read-a-keypair-policy) | answered |
+| [같은 키페어 정책이 있고 아무 권한도 없는 사용자가 이름으로 조회하면, 정책을 찾을 수 없다는 이유로 거부된다](#reading-a-user-granted-nothing-cannot-resolve-a-keypair-policy-name) | refused |
+| [슈퍼관리자가 어느 키페어 정책에도 없는 이름으로 조회하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#reading-reading-a-keypair-policy-name-nothing-answers-to-is-not-found) | refused |
 
 **admin_get_project_resource_policy**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프로젝트 정책 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 정책 전체가 반환된다](#reading-the-superadmin-reads-a-project-policy-by-name) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 프로젝트 정책을 이름으로 조회할 수 있다](#reading-turning-enforcement-off-lets-a-user-granted-nothing-read-a-project-policy) | 성공 |
-| [같은 프로젝트 정책이 있고 아무 권한도 없는 사용자가 이름으로 조회하면, 정책을 찾을 수 없다는 이유로 거부된다](#reading-a-user-granted-nothing-cannot-resolve-a-project-policy-name) | 거부 |
-| [슈퍼관리자가 어느 프로젝트 정책에도 없는 이름으로 조회하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#reading-reading-a-project-policy-name-nothing-answers-to-is-not-found) | 거부 |
+| [프로젝트 정책 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 정책 전체가 반환된다](#reading-the-superadmin-reads-a-project-policy-by-name) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 프로젝트 정책을 이름으로 조회할 수 있다](#reading-turning-enforcement-off-lets-a-user-granted-nothing-read-a-project-policy) | answered |
+| [같은 프로젝트 정책이 있고 아무 권한도 없는 사용자가 이름으로 조회하면, 정책을 찾을 수 없다는 이유로 거부된다](#reading-a-user-granted-nothing-cannot-resolve-a-project-policy-name) | refused |
+| [슈퍼관리자가 어느 프로젝트 정책에도 없는 이름으로 조회하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#reading-reading-a-project-policy-name-nothing-answers-to-is-not-found) | refused |
 
 **admin_get_user_resource_policy**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [사용자 정책 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 정책 전체가 반환된다](#reading-the-superadmin-reads-a-user-policy-by-name) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 사용자 정책을 이름으로 조회할 수 있다](#reading-turning-enforcement-off-lets-a-user-granted-nothing-read-a-user-policy) | 성공 |
-| [같은 사용자 정책이 있고 아무 권한도 없는 사용자가 이름으로 조회하면, 정책을 찾을 수 없다는 이유로 거부된다](#reading-a-user-granted-nothing-cannot-resolve-a-user-policy-name) | 거부 |
-| [슈퍼관리자가 어느 사용자 정책에도 없는 이름으로 조회하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#reading-reading-a-user-policy-name-nothing-answers-to-is-not-found) | 거부 |
+| [사용자 정책 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 정책 전체가 반환된다](#reading-the-superadmin-reads-a-user-policy-by-name) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 사용자 정책을 이름으로 조회할 수 있다](#reading-turning-enforcement-off-lets-a-user-granted-nothing-read-a-user-policy) | answered |
+| [같은 사용자 정책이 있고 아무 권한도 없는 사용자가 이름으로 조회하면, 정책을 찾을 수 없다는 이유로 거부된다](#reading-a-user-granted-nothing-cannot-resolve-a-user-policy-name) | refused |
+| [슈퍼관리자가 어느 사용자 정책에도 없는 이름으로 조회하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#reading-reading-a-user-policy-name-nothing-answers-to-is-not-found) | refused |
 
 **admin_search_keypair_resource_policies**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [모니터 역할 사용자가 키페어 정책 전체를 검색하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사가 읽기는 모니터에게도 허용하기 때문이다](#searching-a-monitor-finds-every-keypair-policy-like-the-superadmin) | 성공 |
-| [키페어 정책 여럿이 있고 슈퍼관리자가 특정 사용자의 키페어를 필터로 검색하면, 그 사용자의 키페어에 할당된 정책만 반환된다](#searching-filtering-keypair-policy-search-by-a-user-leaves-the-one-their-keypair-holds) | 성공 |
-| [이름이 다른 키페어 정책 여럿이 있고 슈퍼관리자가 그중 한 이름을 필터로 검색하면, 그 이름의 정책만 반환된다](#searching-filtering-keypair-policy-search-by-name-leaves-that-one) | 성공 |
-| [키페어 정책 여럿이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 미리 만들어 둔 정책이 모두, 그리고 그것만 반환된다](#searching-the-superadmin-finds-every-keypair-policy) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 키페어 정책 전체를 검색하려 하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-keypair-policy) | 거부 |
+| [모니터 역할 사용자가 키페어 정책 전체를 검색하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사가 읽기는 모니터에게도 허용하기 때문이다](#searching-a-monitor-finds-every-keypair-policy-like-the-superadmin) | answered |
+| [키페어 정책 여럿이 있고 슈퍼관리자가 특정 사용자의 키페어를 필터로 검색하면, 그 사용자의 키페어에 할당된 정책만 반환된다](#searching-filtering-keypair-policy-search-by-a-user-leaves-the-one-their-keypair-holds) | answered |
+| [이름이 다른 키페어 정책 여럿이 있고 슈퍼관리자가 그중 한 이름을 필터로 검색하면, 그 이름의 정책만 반환된다](#searching-filtering-keypair-policy-search-by-name-leaves-that-one) | answered |
+| [키페어 정책 여럿이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 미리 만들어 둔 정책이 모두, 그리고 그것만 반환된다](#searching-the-superadmin-finds-every-keypair-policy) | answered |
+| [슈퍼관리자가 아닌 사용자가 키페어 정책 전체를 검색하려 하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-keypair-policy) | refused |
 
 **admin_search_project_resource_policies**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [모니터 역할 사용자가 프로젝트 정책 전체를 검색하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사가 읽기는 모니터에게도 허용하기 때문이다](#searching-a-monitor-finds-every-project-policy-like-the-superadmin) | 성공 |
-| [이름이 다른 프로젝트 정책 여럿이 있고 슈퍼관리자가 그중 한 이름을 필터로 검색하면, 그 이름의 정책만 반환된다](#searching-filtering-project-policy-search-by-name-leaves-that-one) | 성공 |
-| [프로젝트 정책 여럿이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 미리 만들어 둔 정책이 모두, 그리고 그것만 반환된다](#searching-the-superadmin-finds-every-project-policy) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 프로젝트 정책 전체를 검색하려 하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-project-policy) | 거부 |
+| [모니터 역할 사용자가 프로젝트 정책 전체를 검색하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사가 읽기는 모니터에게도 허용하기 때문이다](#searching-a-monitor-finds-every-project-policy-like-the-superadmin) | answered |
+| [이름이 다른 프로젝트 정책 여럿이 있고 슈퍼관리자가 그중 한 이름을 필터로 검색하면, 그 이름의 정책만 반환된다](#searching-filtering-project-policy-search-by-name-leaves-that-one) | answered |
+| [프로젝트 정책 여럿이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 미리 만들어 둔 정책이 모두, 그리고 그것만 반환된다](#searching-the-superadmin-finds-every-project-policy) | answered |
+| [슈퍼관리자가 아닌 사용자가 프로젝트 정책 전체를 검색하려 하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-project-policy) | refused |
 
 **admin_search_user_resource_policies**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [모니터 역할 사용자가 사용자 정책 전체를 검색하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사가 읽기는 모니터에게도 허용하기 때문이다](#searching-a-monitor-finds-every-user-policy-like-the-superadmin) | 성공 |
-| [이름이 다른 사용자 정책 여럿이 있고 슈퍼관리자가 그중 한 이름을 필터로 검색하면, 그 이름의 정책만 반환된다](#searching-filtering-user-policy-search-by-name-leaves-that-one) | 성공 |
-| [사용자 정책 여럿이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 미리 만들어 둔 정책이 모두, 그리고 그것만 반환된다](#searching-the-superadmin-finds-every-user-policy) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 사용자 정책 전체를 검색하려 하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-user-policy) | 거부 |
+| [모니터 역할 사용자가 사용자 정책 전체를 검색하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사가 읽기는 모니터에게도 허용하기 때문이다](#searching-a-monitor-finds-every-user-policy-like-the-superadmin) | answered |
+| [이름이 다른 사용자 정책 여럿이 있고 슈퍼관리자가 그중 한 이름을 필터로 검색하면, 그 이름의 정책만 반환된다](#searching-filtering-user-policy-search-by-name-leaves-that-one) | answered |
+| [사용자 정책 여럿이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 미리 만들어 둔 정책이 모두, 그리고 그것만 반환된다](#searching-the-superadmin-finds-every-user-policy) | answered |
+| [슈퍼관리자가 아닌 사용자가 사용자 정책 전체를 검색하려 하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-user-policy) | refused |
 
 **get_my_keypair_resource_policy**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 스코프에서 키페어 정책을 읽을 권한을 받은 사용자가 자기 정책을 조회하면, 그 사용자에게 할당된 정책 전체가 반환된다](#reading_own-a-user-granted-read-in-their-own-scope-reads-their-keypair-policy) | 성공 |
-| [기본 키페어 외에 다른 키페어 정책이 할당된 활성 키페어를 하나 더 가진 사용자가 자기 키페어 정책을 조회하면, 기본 키페어에 할당된 정책이 반환된다](#reading_own-among-several-keys-the-default-one-names-the-keypair-policy) | 성공 |
-| [기본 키페어는 비활성이고 다른 키페어 정책이 할당된 활성 키페어를 하나 더 가진 사용자가 자기 키페어 정책을 조회하면, 그 활성 키페어에 할당된 정책이 반환된다](#reading_own-an-inactive-default-key-yields-to-the-active-one) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 자기 키페어 정책을 조회할 수 있다](#reading_own-turning-enforcement-off-lets-a-user-granted-nothing-read-their-own-keypair-policy) | 성공 |
-| [아무 권한도 없는 사용자가 자기 키페어 정책을 조회하면 권한 부족으로 거부된다. 자기 정책을 읽는 호출도 범위만 좁히는 것이 아니라 권한을 검사한다](#reading_own-a-user-granted-nothing-may-not-read-their-own-keypair-policy) | 거부 |
-| [활성 키페어가 없는 사용자가 자기 키페어 정책을 조회하면, 권한이 있어도 정책에 도달할 키페어가 없어 대상을 찾을 수 없다는 이유로 거부된다](#reading_own-a-user-with-no-active-key-finds-no-keypair-policy-of-their-own) | 거부 |
+| [자기 스코프에서 키페어 정책을 읽을 권한을 받은 사용자가 자기 정책을 조회하면, 그 사용자에게 할당된 정책 전체가 반환된다](#reading_own-a-user-granted-read-in-their-own-scope-reads-their-keypair-policy) | answered |
+| [기본 키페어 외에 다른 키페어 정책이 할당된 활성 키페어를 하나 더 가진 사용자가 자기 키페어 정책을 조회하면, 기본 키페어에 할당된 정책이 반환된다](#reading_own-among-several-keys-the-default-one-names-the-keypair-policy) | answered |
+| [기본 키페어는 비활성이고 다른 키페어 정책이 할당된 활성 키페어를 하나 더 가진 사용자가 자기 키페어 정책을 조회하면, 그 활성 키페어에 할당된 정책이 반환된다](#reading_own-an-inactive-default-key-yields-to-the-active-one) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 자기 키페어 정책을 조회할 수 있다](#reading_own-turning-enforcement-off-lets-a-user-granted-nothing-read-their-own-keypair-policy) | answered |
+| [아무 권한도 없는 사용자가 자기 키페어 정책을 조회하면 권한 부족으로 거부된다. 자기 정책을 읽는 호출도 범위만 좁히는 것이 아니라 권한을 검사한다](#reading_own-a-user-granted-nothing-may-not-read-their-own-keypair-policy) | refused |
+| [활성 키페어가 없는 사용자가 자기 키페어 정책을 조회하면, 권한이 있어도 정책에 도달할 키페어가 없어 대상을 찾을 수 없다는 이유로 거부된다](#reading_own-a-user-with-no-active-key-finds-no-keypair-policy-of-their-own) | refused |
 
 **get_my_user_resource_policy**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [자기 스코프에서 사용자 정책을 읽을 권한을 받은 사용자가 자기 정책을 조회하면, 그 사용자에게 할당된 정책 전체가 반환된다](#reading_own-a-user-granted-read-in-their-own-scope-reads-their-user-policy) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 자기 사용자 정책을 조회할 수 있다](#reading_own-turning-enforcement-off-lets-a-user-granted-nothing-read-their-own-user-policy) | 성공 |
-| [아무 권한도 없는 사용자가 자기 사용자 정책을 조회하면 권한 부족으로 거부된다. 자기 정책을 읽는 호출도 범위만 좁히는 것이 아니라 권한을 검사한다](#reading_own-a-user-granted-nothing-may-not-read-their-own-user-policy) | 거부 |
+| [자기 스코프에서 사용자 정책을 읽을 권한을 받은 사용자가 자기 정책을 조회하면, 그 사용자에게 할당된 정책 전체가 반환된다](#reading_own-a-user-granted-read-in-their-own-scope-reads-their-user-policy) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 자기 사용자 정책을 조회할 수 있다](#reading_own-turning-enforcement-off-lets-a-user-granted-nothing-read-their-own-user-policy) | answered |
+| [아무 권한도 없는 사용자가 자기 사용자 정책을 조회하면 권한 부족으로 거부된다. 자기 정책을 읽는 호출도 범위만 좁히는 것이 아니라 권한을 검사한다](#reading_own-a-user-granted-nothing-may-not-read-their-own-user-policy) | refused |
 
 **partial_bulk_purge_keypair_resource_policies**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 키페어 정책 여럿을 한 번에 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-keypair-policys) | 성공 |
-| [슈퍼관리자가 아무도 사용하지 않는 키페어 정책 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-keypair-policys-answers-for-the-missing-one) | 성공 |
-| [슈퍼관리자가 아직 할당된 키페어 정책과 아무도 사용하지 않는 것을 한 번에 삭제하면, 사용하지 않는 것은 처리된 목록에 오고 할당된 것은 아직 참조 중이라는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-keypair-policys-answers-for-the-one-still-held) | 성공 |
+| [아무 권한도 받지 않은 사용자가 키페어 정책 여럿을 한 번에 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-keypair-policys) | answered |
+| [슈퍼관리자가 아무도 사용하지 않는 키페어 정책 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-keypair-policys-answers-for-the-missing-one) | answered |
+| [슈퍼관리자가 아직 할당된 키페어 정책과 아무도 사용하지 않는 것을 한 번에 삭제하면, 사용하지 않는 것은 처리된 목록에 오고 할당된 것은 아직 참조 중이라는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-keypair-policys-answers-for-the-one-still-held) | answered |
 
 **partial_bulk_purge_project_resource_policies**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 프로젝트 정책 여럿을 한 번에 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-project-policys) | 성공 |
-| [슈퍼관리자가 아무도 사용하지 않는 프로젝트 정책 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-project-policys-answers-for-the-missing-one) | 성공 |
-| [슈퍼관리자가 아직 할당된 프로젝트 정책과 아무도 사용하지 않는 것을 한 번에 삭제하면, 사용하지 않는 것은 처리된 목록에 오고 할당된 것은 아직 참조 중이라는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-project-policys-answers-for-the-one-still-held) | 성공 |
+| [아무 권한도 받지 않은 사용자가 프로젝트 정책 여럿을 한 번에 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-project-policys) | answered |
+| [슈퍼관리자가 아무도 사용하지 않는 프로젝트 정책 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-project-policys-answers-for-the-missing-one) | answered |
+| [슈퍼관리자가 아직 할당된 프로젝트 정책과 아무도 사용하지 않는 것을 한 번에 삭제하면, 사용하지 않는 것은 처리된 목록에 오고 할당된 것은 아직 참조 중이라는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-project-policys-answers-for-the-one-still-held) | answered |
 
 **partial_bulk_purge_user_resource_policies**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 사용자 정책 여럿을 한 번에 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-user-policys) | 성공 |
-| [슈퍼관리자가 아무도 사용하지 않는 사용자 정책 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-user-policys-answers-for-the-missing-one) | 성공 |
-| [슈퍼관리자가 아직 할당된 사용자 정책과 아무도 사용하지 않는 것을 한 번에 삭제하면, 사용하지 않는 것은 처리된 목록에 오고 할당된 것은 아직 참조 중이라는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-user-policys-answers-for-the-one-still-held) | 성공 |
+| [아무 권한도 받지 않은 사용자가 사용자 정책 여럿을 한 번에 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-user-policys) | answered |
+| [슈퍼관리자가 아무도 사용하지 않는 사용자 정책 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-user-policys-answers-for-the-missing-one) | answered |
+| [슈퍼관리자가 아직 할당된 사용자 정책과 아무도 사용하지 않는 것을 한 번에 삭제하면, 사용하지 않는 것은 처리된 목록에 오고 할당된 것은 아직 참조 중이라는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-user-policys-answers-for-the-one-still-held) | answered |
 
 **partial_bulk_update_keypair_resource_policies**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 키페어 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-keypair-policys) | 성공 |
-| [슈퍼관리자가 키페어 정책 여럿의 한도 하나를 한 번에 바꾸면, 모두 그 한도만 새 값으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-keypair-policys-at-once) | 성공 |
+| [아무 권한도 받지 않은 사용자가 키페어 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-keypair-policys) | answered |
+| [슈퍼관리자가 키페어 정책 여럿의 한도 하나를 한 번에 바꾸면, 모두 그 한도만 새 값으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-keypair-policys-at-once) | answered |
 
 **partial_bulk_update_project_resource_policies**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 프로젝트 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-project-policys) | 성공 |
-| [슈퍼관리자가 프로젝트 정책 여럿의 한도 하나를 한 번에 바꾸면, 모두 그 한도만 새 값으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-project-policys-at-once) | 성공 |
+| [아무 권한도 받지 않은 사용자가 프로젝트 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-project-policys) | answered |
+| [슈퍼관리자가 프로젝트 정책 여럿의 한도 하나를 한 번에 바꾸면, 모두 그 한도만 새 값으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-project-policys-at-once) | answered |
 
 **partial_bulk_update_user_resource_policies**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 사용자 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-user-policys) | 성공 |
-| [슈퍼관리자가 사용자 정책 여럿의 한도 하나를 한 번에 바꾸면, 모두 그 한도만 새 값으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-user-policys-at-once) | 성공 |
+| [아무 권한도 받지 않은 사용자가 사용자 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-user-policys) | answered |
+| [슈퍼관리자가 사용자 정책 여럿의 한도 하나를 한 번에 바꾸면, 모두 그 한도만 새 값으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-user-policys-at-once) | answered |
 
 **purge_keypair_resource_policy**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무도 사용하지 않는 키페어 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다](#retiring-the-superadmin-purges-a-keypair-policy-nobody-holds) | 성공 |
-| [같은 키페어 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-keypair-policy) | 거부 |
-| [슈퍼관리자가 어느 키페어 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#retiring-purging-a-keypair-policy-name-nothing-answers-to-is-not-found) | 거부 |
-| [아직 누군가에게 할당된 키페어 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다](#retiring-purging-a-keypair-policy-still-held-is-refused) | 거부 |
+| [아무도 사용하지 않는 키페어 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다](#retiring-the-superadmin-purges-a-keypair-policy-nobody-holds) | answered |
+| [같은 키페어 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-keypair-policy) | refused |
+| [슈퍼관리자가 어느 키페어 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#retiring-purging-a-keypair-policy-name-nothing-answers-to-is-not-found) | refused |
+| [아직 누군가에게 할당된 키페어 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다](#retiring-purging-a-keypair-policy-still-held-is-refused) | refused |
 
 **purge_project_resource_policy**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무도 사용하지 않는 프로젝트 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다](#retiring-the-superadmin-purges-a-project-policy-nobody-holds) | 성공 |
-| [같은 프로젝트 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-project-policy) | 거부 |
-| [슈퍼관리자가 어느 프로젝트 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#retiring-purging-a-project-policy-name-nothing-answers-to-is-not-found) | 거부 |
-| [아직 누군가에게 할당된 프로젝트 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다](#retiring-purging-a-project-policy-still-held-is-refused) | 거부 |
+| [아무도 사용하지 않는 프로젝트 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다](#retiring-the-superadmin-purges-a-project-policy-nobody-holds) | answered |
+| [같은 프로젝트 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-project-policy) | refused |
+| [슈퍼관리자가 어느 프로젝트 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#retiring-purging-a-project-policy-name-nothing-answers-to-is-not-found) | refused |
+| [아직 누군가에게 할당된 프로젝트 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다](#retiring-purging-a-project-policy-still-held-is-refused) | refused |
 
 **purge_user_resource_policy**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무도 사용하지 않는 사용자 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다](#retiring-the-superadmin-purges-a-user-policy-nobody-holds) | 성공 |
-| [같은 사용자 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-user-policy) | 거부 |
-| [슈퍼관리자가 어느 사용자 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#retiring-purging-a-user-policy-name-nothing-answers-to-is-not-found) | 거부 |
-| [아직 누군가에게 할당된 사용자 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다](#retiring-purging-a-user-policy-still-held-is-refused) | 거부 |
+| [아무도 사용하지 않는 사용자 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다](#retiring-the-superadmin-purges-a-user-policy-nobody-holds) | answered |
+| [같은 사용자 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-user-policy) | refused |
+| [슈퍼관리자가 어느 사용자 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#retiring-purging-a-user-policy-name-nothing-answers-to-is-not-found) | refused |
+| [아직 누군가에게 할당된 사용자 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다](#retiring-purging-a-user-policy-still-held-is-refused) | refused |
 
 **update_keypair_resource_policy**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 키페어 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다](#editing-clearing-a-non-nullable-value-of-a-keypair-policy-leaves-it-as-it-was) | 성공 |
-| [비울 수 있는 항목에 값이 설정된 키페어 정책을 슈퍼관리자가 그 항목을 비우도록 수정하면, 그 항목이 비어 있는 노드가 반환된다](#editing-clearing-a-nullable-value-of-a-keypair-policy-empties-it) | 성공 |
-| [슈퍼관리자가 키페어 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-giving-no-value-changes-nothing-of-a-keypair-policy) | 성공 |
-| [키페어 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다](#editing-the-superadmin-changes-one-limit-of-a-keypair-policy) | 성공 |
-| [같은 키페어 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-keypair-policy) | 거부 |
-| [슈퍼관리자가 어느 키페어 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#editing-editing-a-keypair-policy-name-nothing-answers-to-is-not-found) | 거부 |
-| [슈퍼관리자가 키페어 정책의 우선순위 상한을 세션 우선순위 범위 밖으로 수정하려 하면, 제약 위반으로 거부된다](#editing-moving-the-priority-cap-outside-the-session-range-is-refused) | 거부 |
+| [슈퍼관리자가 키페어 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다](#editing-clearing-a-non-nullable-value-of-a-keypair-policy-leaves-it-as-it-was) | answered |
+| [비울 수 있는 항목에 값이 설정된 키페어 정책을 슈퍼관리자가 그 항목을 비우도록 수정하면, 그 항목이 비어 있는 노드가 반환된다](#editing-clearing-a-nullable-value-of-a-keypair-policy-empties-it) | answered |
+| [슈퍼관리자가 키페어 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-giving-no-value-changes-nothing-of-a-keypair-policy) | answered |
+| [키페어 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다](#editing-the-superadmin-changes-one-limit-of-a-keypair-policy) | answered |
+| [같은 키페어 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-keypair-policy) | refused |
+| [슈퍼관리자가 어느 키페어 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#editing-editing-a-keypair-policy-name-nothing-answers-to-is-not-found) | refused |
+| [슈퍼관리자가 키페어 정책의 우선순위 상한을 세션 우선순위 범위 밖으로 수정하려 하면, 제약 위반으로 거부된다](#editing-moving-the-priority-cap-outside-the-session-range-is-refused) | refused |
 
 **update_project_resource_policy**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 프로젝트 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다](#editing-clearing-a-non-nullable-value-of-a-project-policy-leaves-it-as-it-was) | 성공 |
-| [슈퍼관리자가 프로젝트 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-giving-no-value-changes-nothing-of-a-project-policy) | 성공 |
-| [프로젝트 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다](#editing-the-superadmin-changes-one-limit-of-a-project-policy) | 성공 |
-| [같은 프로젝트 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-project-policy) | 거부 |
-| [슈퍼관리자가 어느 프로젝트 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#editing-editing-a-project-policy-name-nothing-answers-to-is-not-found) | 거부 |
+| [슈퍼관리자가 프로젝트 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다](#editing-clearing-a-non-nullable-value-of-a-project-policy-leaves-it-as-it-was) | answered |
+| [슈퍼관리자가 프로젝트 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-giving-no-value-changes-nothing-of-a-project-policy) | answered |
+| [프로젝트 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다](#editing-the-superadmin-changes-one-limit-of-a-project-policy) | answered |
+| [같은 프로젝트 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-project-policy) | refused |
+| [슈퍼관리자가 어느 프로젝트 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#editing-editing-a-project-policy-name-nothing-answers-to-is-not-found) | refused |
 
 **update_user_resource_policy**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 사용자 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다](#editing-clearing-a-non-nullable-value-of-a-user-policy-leaves-it-as-it-was) | 성공 |
-| [비울 수 있는 항목에 값이 설정된 사용자 정책을 슈퍼관리자가 그 항목을 비우도록 수정하면, 그 항목이 비어 있는 노드가 반환된다](#editing-clearing-a-nullable-value-of-a-user-policy-empties-it) | 성공 |
-| [슈퍼관리자가 사용자 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-giving-no-value-changes-nothing-of-a-user-policy) | 성공 |
-| [사용자 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다](#editing-the-superadmin-changes-one-limit-of-a-user-policy) | 성공 |
-| [같은 사용자 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-user-policy) | 거부 |
-| [슈퍼관리자가 어느 사용자 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#editing-editing-a-user-policy-name-nothing-answers-to-is-not-found) | 거부 |
+| [슈퍼관리자가 사용자 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다](#editing-clearing-a-non-nullable-value-of-a-user-policy-leaves-it-as-it-was) | answered |
+| [비울 수 있는 항목에 값이 설정된 사용자 정책을 슈퍼관리자가 그 항목을 비우도록 수정하면, 그 항목이 비어 있는 노드가 반환된다](#editing-clearing-a-nullable-value-of-a-user-policy-empties-it) | answered |
+| [슈퍼관리자가 사용자 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-giving-no-value-changes-nothing-of-a-user-policy) | answered |
+| [사용자 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다](#editing-the-superadmin-changes-one-limit-of-a-user-policy) | answered |
+| [같은 사용자 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-user-policy) | refused |
+| [슈퍼관리자가 어느 사용자 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다](#editing-editing-a-user-policy-name-nothing-answers-to-is-not-found) | refused |
 
 ### admin_create_keypair_resource_policy
 

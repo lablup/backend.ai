@@ -1,184 +1,184 @@
 ## image
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/image/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/image/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/image/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/image/adapter.py)
 
-시나리오: 미완 3 / 17
+Scenario: incomplete 3 / 17
 
-- ops 로 구성 (12)
-  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_search_images_gql — 대표 성공 ✓ · 대표 실패 ✓
-  - batch_load_aliases_by_ids — 대표 성공 ✓ · 대표 실패 ✓
-  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
-  - delete — 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_delete — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_restore — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - restore — 대표 성공 ✓ · 대표 실패 ✓
-  - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
-  - scoped_search_aliases — 대표 성공 ✓ · 대표 실패 ✓
-  - update — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (5)
-  - admin_alias — 성공 있음 1 · 실패 있음 3 (global_scope)
-  - admin_dealias — 성공 있음 1 · 실패 있음 2 (global_scope)
-  - admin_purge — 성공 있음 3 · 실패 있음 3 (single_entity)
-  - admin_scan_image — 성공 있음 2 · 실패 있음 3 (global_scope)
-  - admin_search_image_aliases — 성공 있음 3 · 실패 있음 1 (global_scope)
+- built from ops (12)
+  - admin_search — representative success ✓ · representative refusal ✓
+  - admin_search_images_gql — representative success ✓ · representative refusal ✓
+  - batch_load_aliases_by_ids — representative success ✓ · representative refusal ✓
+  - batch_load_by_ids — representative success ✓ · representative refusal ✓
+  - delete — representative success ✓ · representative refusal ✓
+  - partial_bulk_delete — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_restore — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_update — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - restore — representative success ✓ · representative refusal ✓
+  - scoped_search — representative success ✓ · representative refusal ✓
+  - scoped_search_aliases — representative success ✓ · representative refusal ✓
+  - update — representative success ✓ · representative refusal ✓
+- direct implementation (5)
+  - admin_alias — success present 1 · refusal present 3 (global_scope)
+  - admin_dealias — success present 1 · refusal present 2 (global_scope)
+  - admin_purge — success present 3 · refusal present 3 (single_entity)
+  - admin_scan_image — success present 2 · refusal present 3 (global_scope)
+  - admin_search_image_aliases — success present 3 · refusal present 1 (global_scope)
 
 **admin_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 크기와 오프셋 없이 커서만 지정해 검색하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다](#searching-a-cursor-alone-answers-the-first-page-and-says-there-is-more) | 성공 |
-| [호출자와 다른 사용자가 각각 커밋한 커스텀 이미지 중 호출자가 커밋한 것으로 검색하면 호출자가 커밋한 이미지만 반환된다](#searching-filtering-images-by-creator-returns-only-images-they-committed) | 성공 |
-| [커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지로 검색하면 커스텀 이미지만 커밋한 사용자와 함께 반환된다](#searching-filtering-images-by-customized-returns-only-customized-images) | 성공 |
-| [슈퍼관리자가 한 이미지의 이름으로 검색하면 그 이미지만 반환된다](#searching-filtering-images-by-name-returns-only-the-match) | 성공 |
-| [커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지가 아닌 것으로 검색하면 커스텀 이미지가 아닌 이미지만 반환된다](#searching-filtering-images-by-not-customized-returns-only-uncustomized-images) | 성공 |
-| [살아 있는 이미지와 삭제된 이미지 중 살아 있는 상태로 검색하면 해당 이미지만 반환된다](#searching-filtering-images-by-status-returns-only-alive-images) | 성공 |
-| [슈퍼관리자가 페이지 크기를 생략하고 검색하면, 50개까지만 반환되고 다음 페이지가 있다고 알린다](#searching-omitting-the-page-size-answers-with-fifty-and-says-there-is-more) | 성공 |
-| [이름 내림차순으로 정렬하고 첫 항목을 제외하면 두 번째와 세 번째 이미지가 반환된다](#searching-ordering-by-name-and-offsetting-returns-the-middle-page) | 성공 |
-| [슈퍼관리자가 조건 없이 검색하면 미리 만들어 둔 이미지가 모두 반환된다](#searching-searching-without-a-filter-counts-every-image) | 성공 |
-| [크기와 커서를 함께 지정하면 입력이 잘못되어 거부된다](#searching-a-size-beside-a-cursor-is-refused) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 이미지를 검색하려 하면 슈퍼관리자 권한 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-images) | 거부 |
+| [슈퍼관리자가 크기와 오프셋 없이 커서만 지정해 검색하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다](#searching-a-cursor-alone-answers-the-first-page-and-says-there-is-more) | answered |
+| [호출자와 다른 사용자가 각각 커밋한 커스텀 이미지 중 호출자가 커밋한 것으로 검색하면 호출자가 커밋한 이미지만 반환된다](#searching-filtering-images-by-creator-returns-only-images-they-committed) | answered |
+| [커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지로 검색하면 커스텀 이미지만 커밋한 사용자와 함께 반환된다](#searching-filtering-images-by-customized-returns-only-customized-images) | answered |
+| [슈퍼관리자가 한 이미지의 이름으로 검색하면 그 이미지만 반환된다](#searching-filtering-images-by-name-returns-only-the-match) | answered |
+| [커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지가 아닌 것으로 검색하면 커스텀 이미지가 아닌 이미지만 반환된다](#searching-filtering-images-by-not-customized-returns-only-uncustomized-images) | answered |
+| [살아 있는 이미지와 삭제된 이미지 중 살아 있는 상태로 검색하면 해당 이미지만 반환된다](#searching-filtering-images-by-status-returns-only-alive-images) | answered |
+| [슈퍼관리자가 페이지 크기를 생략하고 검색하면, 50개까지만 반환되고 다음 페이지가 있다고 알린다](#searching-omitting-the-page-size-answers-with-fifty-and-says-there-is-more) | answered |
+| [이름 내림차순으로 정렬하고 첫 항목을 제외하면 두 번째와 세 번째 이미지가 반환된다](#searching-ordering-by-name-and-offsetting-returns-the-middle-page) | answered |
+| [슈퍼관리자가 조건 없이 검색하면 미리 만들어 둔 이미지가 모두 반환된다](#searching-searching-without-a-filter-counts-every-image) | answered |
+| [크기와 커서를 함께 지정하면 입력이 잘못되어 거부된다](#searching-a-size-beside-a-cursor-is-refused) | refused |
+| [슈퍼관리자가 아닌 사용자가 이미지를 검색하려 하면 슈퍼관리자 권한 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-images) | refused |
 
 **admin_search_images_gql**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 커서로 앞에서부터 조회하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다](#searching-a-cursor-search-answers-the-first-page-and-says-there-is-more) | 성공 |
-| [해석할 수 없는 커서 값을 지정하면 커서가 잘못되어 거부된다](#searching-a-cursor-that-cannot-be-read-is-refused) | 거부 |
-| [크기와 커서를 함께 지정하면 입력이 잘못되어 거부된다. 요청 타입이 아니라 어댑터가 페이지 방식을 고르는 과정에서 발생한다](#searching-naming-two-pagination-modes-at-once-is-refused) | 거부 |
+| [슈퍼관리자가 커서로 앞에서부터 조회하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다](#searching-a-cursor-search-answers-the-first-page-and-says-there-is-more) | answered |
+| [해석할 수 없는 커서 값을 지정하면 커서가 잘못되어 거부된다](#searching-a-cursor-that-cannot-be-read-is-refused) | refused |
+| [크기와 커서를 함께 지정하면 입력이 잘못되어 거부된다. 요청 타입이 아니라 어댑터가 페이지 방식을 고르는 과정에서 발생한다](#searching-naming-two-pagination-modes-at-once-is-refused) | refused |
 
 **batch_load_aliases_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [빈 별칭 ID 목록으로 조회하면 빈 목록이 반환된다](#reading-an-empty-alias-id-list-answers-with-an-empty-list) | 성공 |
-| [슈퍼관리자가 미리 만들어 둔 별칭 1개와 어느 별칭도 가리키지 않는 ID 1개를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 ID 위치만 비어 있다](#reading-loading-many-alias-ids-keeps-the-order-and-leaves-a-hole) | 성공 |
-| [아무 권한도 받지 않은 사용자가 별칭 ID 여러 개를 한 번에 조회하면, 있는 별칭 위치에는 권한 부족 거부가 반환되고 없는 ID 위치는 비어 있다](#reading-a-plain-user-loading-many-alias-ids-is-refused-per-element) | 거부 |
+| [빈 별칭 ID 목록으로 조회하면 빈 목록이 반환된다](#reading-an-empty-alias-id-list-answers-with-an-empty-list) | answered |
+| [슈퍼관리자가 미리 만들어 둔 별칭 1개와 어느 별칭도 가리키지 않는 ID 1개를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 ID 위치만 비어 있다](#reading-loading-many-alias-ids-keeps-the-order-and-leaves-a-hole) | answered |
+| [아무 권한도 받지 않은 사용자가 별칭 ID 여러 개를 한 번에 조회하면, 있는 별칭 위치에는 권한 부족 거부가 반환되고 없는 ID 위치는 비어 있다](#reading-a-plain-user-loading-many-alias-ids-is-refused-per-element) | refused |
 
 **batch_load_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [빈 ID 목록으로 조회하면 빈 목록이 반환된다](#reading-an-empty-image-id-list-answers-with-an-empty-list) | 성공 |
-| [같은 이미지 ID를 두 번 조회하면 같은 이미지가 두 위치에 반환된다](#reading-duplicate-image-ids-keep-both-input-positions) | 성공 |
-| [슈퍼관리자가 미리 만들어 둔 이미지 2개와 어느 이미지도 가리키지 않는 ID 1개를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 ID 위치만 비어 있다](#reading-loading-many-image-ids-keeps-the-order-and-leaves-a-hole) | 성공 |
-| [아무 권한도 받지 않은 사용자가 ID 여러 개를 한 번에 조회하면, 요청 전체가 아니라 원소마다 권한 부족 거부가 입력 순서대로 반환된다](#reading-a-plain-user-loading-many-image-ids-is-refused-per-element) | 거부 |
+| [빈 ID 목록으로 조회하면 빈 목록이 반환된다](#reading-an-empty-image-id-list-answers-with-an-empty-list) | answered |
+| [같은 이미지 ID를 두 번 조회하면 같은 이미지가 두 위치에 반환된다](#reading-duplicate-image-ids-keep-both-input-positions) | answered |
+| [슈퍼관리자가 미리 만들어 둔 이미지 2개와 어느 이미지도 가리키지 않는 ID 1개를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 ID 위치만 비어 있다](#reading-loading-many-image-ids-keeps-the-order-and-leaves-a-hole) | answered |
+| [아무 권한도 받지 않은 사용자가 ID 여러 개를 한 번에 조회하면, 요청 전체가 아니라 원소마다 권한 부족 거부가 입력 순서대로 반환된다](#reading-a-plain-user-loading-many-image-ids-is-refused-per-element) | refused |
 
 **delete**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [레지스트리에서 이미지 권한을 받은 사용자는 커스텀 이미지가 아닌 이미지도 소프트 삭제할 수 있고, 삭제됨 상태가 반환된다](#forgetting-a-granted-user-may-forget-an-image-they-did-not-customize) | 성공 |
-| [슈퍼관리자가 이미지를 소프트 삭제하면, 행은 남고 삭제됨 상태가 담긴 노드가 반환된다](#forgetting-forgetting-an-image-marks-it-deleted-and-keeps-the-row) | 성공 |
-| [자기가 커밋한 커스텀 이미지를 자기 개인 프로젝트의 권한으로 소프트 삭제하면, 이미지가 그 개인 프로젝트에 속하므로 이미지 권한 검사를 통과해 삭제됨 상태가 반환된다](#forgetting-the-maker-of-a-custom-image-may-forget-it) | 성공 |
-| [아무 권한도 받지 않은 사용자가 이미지를 소프트 삭제하려 하면 권한 부족으로 거부된다](#forgetting-a-user-granted-nothing-may-not-forget-an-image) | 거부 |
-| [다른 사용자가 커밋한 커스텀 이미지는 그 사람의 개인 프로젝트에 속하므로, 자기 개인 프로젝트에서 권한을 받은 사용자가 소프트 삭제하려 하면 권한 부족으로 거부된다](#forgetting-a-user-may-not-forget-a-custom-image-another-user-made) | 거부 |
-| [완전 삭제 중인 이미지를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다. 살아 있는 이미지만 소프트 삭제할 수 있다](#forgetting-an-image-a-purge-is-working-through-cannot-be-reached) | 거부 |
-| [어느 이미지도 가리키지 않는 ID를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다](#forgetting-forgetting-an-id-that-holds-no-image-is-refused) | 거부 |
+| [레지스트리에서 이미지 권한을 받은 사용자는 커스텀 이미지가 아닌 이미지도 소프트 삭제할 수 있고, 삭제됨 상태가 반환된다](#forgetting-a-granted-user-may-forget-an-image-they-did-not-customize) | answered |
+| [슈퍼관리자가 이미지를 소프트 삭제하면, 행은 남고 삭제됨 상태가 담긴 노드가 반환된다](#forgetting-forgetting-an-image-marks-it-deleted-and-keeps-the-row) | answered |
+| [자기가 커밋한 커스텀 이미지를 자기 개인 프로젝트의 권한으로 소프트 삭제하면, 이미지가 그 개인 프로젝트에 속하므로 이미지 권한 검사를 통과해 삭제됨 상태가 반환된다](#forgetting-the-maker-of-a-custom-image-may-forget-it) | answered |
+| [아무 권한도 받지 않은 사용자가 이미지를 소프트 삭제하려 하면 권한 부족으로 거부된다](#forgetting-a-user-granted-nothing-may-not-forget-an-image) | refused |
+| [다른 사용자가 커밋한 커스텀 이미지는 그 사람의 개인 프로젝트에 속하므로, 자기 개인 프로젝트에서 권한을 받은 사용자가 소프트 삭제하려 하면 권한 부족으로 거부된다](#forgetting-a-user-may-not-forget-a-custom-image-another-user-made) | refused |
+| [완전 삭제 중인 이미지를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다. 살아 있는 이미지만 소프트 삭제할 수 있다](#forgetting-an-image-a-purge-is-working-through-cannot-be-reached) | refused |
+| [어느 이미지도 가리키지 않는 ID를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다](#forgetting-forgetting-an-id-that-holds-no-image-is-refused) | refused |
 
 **partial_bulk_delete**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 소프트 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_forgetting-a-user-granted-nothing-forgets-none-of-several-images) | 성공 |
-| [살아 있는 이미지 둘과 없는 id 하나를 한 번에 소프트 삭제하면, 둘은 삭제됨 상태로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_forgetting-forgetting-several-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 소프트 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_forgetting-a-user-granted-nothing-forgets-none-of-several-images) | answered |
+| [살아 있는 이미지 둘과 없는 id 하나를 한 번에 소프트 삭제하면, 둘은 삭제됨 상태로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_forgetting-forgetting-several-answers-for-the-missing-one) | answered |
 
 **partial_bulk_restore**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [소프트 삭제한 이미지 여럿을 한 번에 복원하면, 모두 살아 있는 상태로 온다](#partial_bulk_forgetting-restoring-several-brings-them-back-alive) | 성공 |
+| [소프트 삭제한 이미지 여럿을 한 번에 복원하면, 모두 살아 있는 상태로 온다](#partial_bulk_forgetting-restoring-several-brings-them-back-alive) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-images) | 성공 |
-| [슈퍼관리자가 이미지 여럿의 태그를 한 번에 바꾸면, 모두 새 태그로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-images-at-once) | 성공 |
+| [아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-images) | answered |
+| [슈퍼관리자가 이미지 여럿의 태그를 한 번에 바꾸면, 모두 새 태그로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-images-at-once) | answered |
 
 **restore**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 삭제된 이미지를 복원하면 살아 있는 상태가 담긴 노드가 반환된다](#forgetting-restoring-a-forgotten-image-brings-it-back-alive) | 성공 |
-| [살아 있는 이미지를 복원해도 살아 있는 상태 그대로다](#forgetting-restoring-an-image-that-was-never-forgotten-leaves-it-alive) | 성공 |
-| [아무 권한도 받지 않은 사용자가 이미지를 복원하려 하면 권한 부족으로 거부된다](#forgetting-a-user-granted-nothing-may-not-restore-an-image) | 거부 |
-| [어느 이미지도 가리키지 않는 ID를 복원하려 하면 대상을 찾을 수 없어 거부된다](#forgetting-restoring-an-id-that-holds-no-image-is-refused) | 거부 |
+| [슈퍼관리자가 삭제된 이미지를 복원하면 살아 있는 상태가 담긴 노드가 반환된다](#forgetting-restoring-a-forgotten-image-brings-it-back-alive) | answered |
+| [살아 있는 이미지를 복원해도 살아 있는 상태 그대로다](#forgetting-restoring-an-image-that-was-never-forgotten-leaves-it-alive) | answered |
+| [아무 권한도 받지 않은 사용자가 이미지를 복원하려 하면 권한 부족으로 거부된다](#forgetting-a-user-granted-nothing-may-not-restore-an-image) | refused |
+| [어느 이미지도 가리키지 않는 ID를 복원하려 하면 대상을 찾을 수 없어 거부된다](#forgetting-restoring-an-id-that-holds-no-image-is-refused) | refused |
 
 **scoped_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [이미지가 레지스트리 2개에 나뉘어 있을 때 한쪽 레지스트리에 권한을 받은 사용자가 그 레지스트리를 스코프로 조회하면, 그 레지스트리의 이미지만 반환되고 다른 쪽은 집계되지 않는다](#searching-a-user-granted-on-a-registry-reads-the-images-it-holds) | 성공 |
-| [아무 권한도 받지 않은 사용자가 한 레지스트리를 스코프로 이미지를 조회하려 하면 권한 부족으로 거부된다](#searching-a-user-who-cannot-read-the-registry-is-refused-its-images) | 거부 |
+| [이미지가 레지스트리 2개에 나뉘어 있을 때 한쪽 레지스트리에 권한을 받은 사용자가 그 레지스트리를 스코프로 조회하면, 그 레지스트리의 이미지만 반환되고 다른 쪽은 집계되지 않는다](#searching-a-user-granted-on-a-registry-reads-the-images-it-holds) | answered |
+| [아무 권한도 받지 않은 사용자가 한 레지스트리를 스코프로 이미지를 조회하려 하면 권한 부족으로 거부된다](#searching-a-user-who-cannot-read-the-registry-is-refused-its-images) | refused |
 
 **scoped_search_aliases**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그 이미지에 권한을 받은 사용자가 그 이미지의 별칭을 검색하면 등록해 둔 별칭이 반환된다](#searching-a-user-who-can-read-the-image-gets-its-aliases) | 성공 |
-| [아무 권한도 받지 않은 사용자가 그 이미지의 별칭을 검색하려 하면 권한 부족으로 거부된다](#searching-a-user-who-cannot-read-the-image-is-refused-its-aliases) | 거부 |
+| [그 이미지에 권한을 받은 사용자가 그 이미지의 별칭을 검색하면 등록해 둔 별칭이 반환된다](#searching-a-user-who-can-read-the-image-gets-its-aliases) | answered |
+| [아무 권한도 받지 않은 사용자가 그 이미지의 별칭을 검색하려 하면 권한 부족으로 거부된다](#searching-a-user-who-cannot-read-the-image-is-refused-its-aliases) | refused |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-an-edit-that-names-no-value-changes-nothing) | 성공 |
-| [슈퍼관리자가 레이블과 CPU 하한·상한을 수정하면 지정한 값이 반환된다](#editing-changing-labels-and-resource-limits-returns-the-new-values) | 성공 |
-| [슈퍼관리자가 태그만 수정하면 태그만 새 값이 되고 나머지 필드는 그대로다](#editing-changing-only-the-tag-leaves-every-other-field-alone) | 성공 |
-| [슈퍼관리자가 이름과 레지스트리 등의 기본 필드를 함께 수정하면 지정한 값이 반환된다](#editing-changing-the-remaining-scalar-fields-returns-the-new-values) | 성공 |
-| [슈퍼관리자가 가속기 목록을 비우는 수정을 하면 그 필드가 빈 채로 반환된다. 생략과 비우기를 구분할 수 있는 필드는 이것뿐이다](#editing-clearing-the-accelerator-list-empties-it) | 성공 |
-| [슈퍼관리자가 가속기 이름을 지정하면 그 이름이 담긴 노드가 반환된다](#editing-writing-an-accelerator-onto-an-image-that-had-none) | 성공 |
-| [아무 권한도 받지 않은 사용자가 이미지를 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-an-image) | 거부 |
-| [어느 이미지도 가리키지 않는 ID를 수정하려 하면 대상을 찾을 수 없어 거부된다](#editing-editing-an-id-that-holds-no-image-is-refused) | 거부 |
+| [슈퍼관리자가 값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다](#editing-an-edit-that-names-no-value-changes-nothing) | answered |
+| [슈퍼관리자가 레이블과 CPU 하한·상한을 수정하면 지정한 값이 반환된다](#editing-changing-labels-and-resource-limits-returns-the-new-values) | answered |
+| [슈퍼관리자가 태그만 수정하면 태그만 새 값이 되고 나머지 필드는 그대로다](#editing-changing-only-the-tag-leaves-every-other-field-alone) | answered |
+| [슈퍼관리자가 이름과 레지스트리 등의 기본 필드를 함께 수정하면 지정한 값이 반환된다](#editing-changing-the-remaining-scalar-fields-returns-the-new-values) | answered |
+| [슈퍼관리자가 가속기 목록을 비우는 수정을 하면 그 필드가 빈 채로 반환된다. 생략과 비우기를 구분할 수 있는 필드는 이것뿐이다](#editing-clearing-the-accelerator-list-empties-it) | answered |
+| [슈퍼관리자가 가속기 이름을 지정하면 그 이름이 담긴 노드가 반환된다](#editing-writing-an-accelerator-onto-an-image-that-had-none) | answered |
+| [아무 권한도 받지 않은 사용자가 이미지를 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-an-image) | refused |
+| [어느 이미지도 가리키지 않는 ID를 수정하려 하면 대상을 찾을 수 없어 거부된다](#editing-editing-an-id-that-holds-no-image-is-refused) | refused |
 
 **admin_alias**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 이미지에 별칭을 등록하면 그 별칭과 가리키는 이미지가 반환된다](#aliasing-aliasing-an-image-answers-with-the-alias-and-the-image-it-names) | 성공 |
-| [어느 이미지도 가리키지 않는 ID에 별칭을 등록하려 하면 대상을 찾을 수 없어 거부된다](#aliasing-aliasing-an-id-that-holds-no-image-is-refused) | 거부 |
-| [이미 사용 중인 별칭을 등록하려 하면 유니크 제약 위반으로 거부된다](#aliasing-an-alias-that-is-already-in-use-is-refused) | 거부 |
-| [자기가 만든 커스텀 이미지라도 별칭은 등록할 수 없다. 별칭 등록은 해당 이미지의 권한이 아니라 슈퍼관리자 검사로 보호되기 때문이다](#aliasing-the-maker-of-a-custom-image-still-may-not-alias-it) | 거부 |
+| [슈퍼관리자가 이미지에 별칭을 등록하면 그 별칭과 가리키는 이미지가 반환된다](#aliasing-aliasing-an-image-answers-with-the-alias-and-the-image-it-names) | answered |
+| [어느 이미지도 가리키지 않는 ID에 별칭을 등록하려 하면 대상을 찾을 수 없어 거부된다](#aliasing-aliasing-an-id-that-holds-no-image-is-refused) | refused |
+| [이미 사용 중인 별칭을 등록하려 하면 유니크 제약 위반으로 거부된다](#aliasing-an-alias-that-is-already-in-use-is-refused) | refused |
+| [자기가 만든 커스텀 이미지라도 별칭은 등록할 수 없다. 별칭 등록은 해당 이미지의 권한이 아니라 슈퍼관리자 검사로 보호되기 때문이다](#aliasing-the-maker-of-a-custom-image-still-may-not-alias-it) | refused |
 
 **admin_dealias**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 등록된 별칭을 해제하면 해제된 별칭과 그 이미지가 반환된다](#aliasing-dealiasing-answers-with-the-alias-it-removed) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 별칭을 해제하려 하면 슈퍼관리자 권한 부족으로 거부된다](#aliasing-a-user-who-is-not-the-superadmin-may-not-dealias) | 거부 |
-| [어느 이미지도 가리키지 않는 별칭을 해제하려 하면 대상을 찾을 수 없어 거부된다](#aliasing-dealiasing-a-name-no-image-holds-is-refused) | 거부 |
+| [슈퍼관리자가 등록된 별칭을 해제하면 해제된 별칭과 그 이미지가 반환된다](#aliasing-dealiasing-answers-with-the-alias-it-removed) | answered |
+| [슈퍼관리자가 아닌 사용자가 별칭을 해제하려 하면 슈퍼관리자 권한 부족으로 거부된다](#aliasing-a-user-who-is-not-the-superadmin-may-not-dealias) | refused |
+| [어느 이미지도 가리키지 않는 별칭을 해제하려 하면 대상을 찾을 수 없어 거부된다](#aliasing-dealiasing-a-name-no-image-holds-is-refused) | refused |
 
 **admin_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [별칭이 등록된 이미지를 완전 삭제하면 삭제된 이미지가 반환된다](#retiring-purging-an-aliased-image-answers-with-the-image-it-removed) | 성공 |
-| [슈퍼관리자가 이미지를 완전 삭제하면 삭제된 이미지가 반환된다](#retiring-purging-an-image-answers-with-the-image-it-removed) | 성공 |
-| [자기가 커밋한 커스텀 이미지를 자기 개인 프로젝트의 권한으로 완전 삭제하면, 이미지가 그 개인 프로젝트에 속하므로 이미지 권한과 커스텀 이미지 작성자 검사를 모두 통과해 삭제된 이미지가 반환된다](#retiring-the-maker-of-a-custom-image-may-purge-it) | 성공 |
-| [커스텀 이미지가 아닌 이미지는 권한을 받은 사용자라도 완전 삭제할 수 없다. 이미지 권한 검사를 통과한 뒤 커스텀 이미지 작성자 검사에서 거부된다](#retiring-a-granted-user-may-not-purge-an-image-they-did-not-customize) | 거부 |
-| [아무 권한도 받지 않은 사용자가 이미지를 완전 삭제하려 하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-an-image) | 거부 |
-| [어느 이미지도 가리키지 않는 ID를 완전 삭제하려 하면 대상을 찾을 수 없어 거부된다](#retiring-purging-an-id-that-holds-no-image-is-refused) | 거부 |
+| [별칭이 등록된 이미지를 완전 삭제하면 삭제된 이미지가 반환된다](#retiring-purging-an-aliased-image-answers-with-the-image-it-removed) | answered |
+| [슈퍼관리자가 이미지를 완전 삭제하면 삭제된 이미지가 반환된다](#retiring-purging-an-image-answers-with-the-image-it-removed) | answered |
+| [자기가 커밋한 커스텀 이미지를 자기 개인 프로젝트의 권한으로 완전 삭제하면, 이미지가 그 개인 프로젝트에 속하므로 이미지 권한과 커스텀 이미지 작성자 검사를 모두 통과해 삭제된 이미지가 반환된다](#retiring-the-maker-of-a-custom-image-may-purge-it) | answered |
+| [커스텀 이미지가 아닌 이미지는 권한을 받은 사용자라도 완전 삭제할 수 없다. 이미지 권한 검사를 통과한 뒤 커스텀 이미지 작성자 검사에서 거부된다](#retiring-a-granted-user-may-not-purge-an-image-they-did-not-customize) | refused |
+| [아무 권한도 받지 않은 사용자가 이미지를 완전 삭제하려 하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-an-image) | refused |
+| [어느 이미지도 가리키지 않는 ID를 완전 삭제하려 하면 대상을 찾을 수 없어 거부된다](#retiring-purging-an-id-that-holds-no-image-is-refused) | refused |
 
 **admin_scan_image**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 이미 등록된 이미지를 scan하면 새 이미지를 만들지 않고 등록된 이미지를 레지스트리 값으로 갱신해 반환한다](#scanning-scanning-a-registered-image-refreshes-it-from-the-registry) | 성공 |
-| [슈퍼관리자가 미등록된 이미지를 scan하면 요청한 아키텍처의 이미지 하나가 반환된다. scan은 슈퍼관리자 역할이 있어야만 실행된다](#scanning-scanning-an-unregistered-image-registers-the-requested-architecture) | 성공 |
-| [이미지에 맞는 registry가 없으면 scan하지 않고 거부한다. 레지스트리 이름만 주어도 레지스트리 전체를 스캔하지 않는다](#scanning-a-name-no-registry-holds-as-an-image-is-refused-without-a-scan) | 거부 |
-| [레지스트리에 없는 태그를 scan하면 이미지를 찾을 수 없어 거부된다](#scanning-a-tag-the-registry-does-not-hold-is-refused) | 거부 |
-| [일반 사용자는 scan을 실행할 수 없어 슈퍼관리자 권한 부족으로 거부된다](#scanning-a-user-who-is-not-the-superadmin-may-not-scan) | 거부 |
+| [슈퍼관리자가 이미 등록된 이미지를 scan하면 새 이미지를 만들지 않고 등록된 이미지를 레지스트리 값으로 갱신해 반환한다](#scanning-scanning-a-registered-image-refreshes-it-from-the-registry) | answered |
+| [슈퍼관리자가 미등록된 이미지를 scan하면 요청한 아키텍처의 이미지 하나가 반환된다. scan은 슈퍼관리자 역할이 있어야만 실행된다](#scanning-scanning-an-unregistered-image-registers-the-requested-architecture) | answered |
+| [이미지에 맞는 registry가 없으면 scan하지 않고 거부한다. 레지스트리 이름만 주어도 레지스트리 전체를 스캔하지 않는다](#scanning-a-name-no-registry-holds-as-an-image-is-refused-without-a-scan) | refused |
+| [레지스트리에 없는 태그를 scan하면 이미지를 찾을 수 없어 거부된다](#scanning-a-tag-the-registry-does-not-hold-is-refused) | refused |
+| [일반 사용자는 scan을 실행할 수 없어 슈퍼관리자 권한 부족으로 거부된다](#scanning-a-user-who-is-not-the-superadmin-may-not-scan) | refused |
 
 **admin_search_image_aliases**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 한 이미지의 별칭만 이름 내림차순으로 검색하면 해당 별칭만 정렬되어 반환된다](#searching-filtering-aliases-by-image-and-ordering-by-name) | 성공 |
-| [별칭이 등록되어 있을 때 슈퍼관리자가 별칭을 검색하면 그 별칭이 반환된다](#searching-searching-aliases-answers-with-the-one-that-was-attached) | 성공 |
-| [별칭을 하나도 등록하지 않은 상태에서 슈퍼관리자가 별칭을 검색하면 응답이 비어 있다](#searching-searching-aliases-when-none-were-attached-answers-empty) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 별칭을 검색하려 하면 슈퍼관리자 권한 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-aliases) | 거부 |
+| [슈퍼관리자가 한 이미지의 별칭만 이름 내림차순으로 검색하면 해당 별칭만 정렬되어 반환된다](#searching-filtering-aliases-by-image-and-ordering-by-name) | answered |
+| [별칭이 등록되어 있을 때 슈퍼관리자가 별칭을 검색하면 그 별칭이 반환된다](#searching-searching-aliases-answers-with-the-one-that-was-attached) | answered |
+| [별칭을 하나도 등록하지 않은 상태에서 슈퍼관리자가 별칭을 검색하면 응답이 비어 있다](#searching-searching-aliases-when-none-were-attached-answers-empty) | answered |
+| [슈퍼관리자가 아닌 사용자가 별칭을 검색하려 하면 슈퍼관리자 권한 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-aliases) | refused |
 
 ### admin_search
 

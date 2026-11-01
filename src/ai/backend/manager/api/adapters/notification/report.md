@@ -1,195 +1,195 @@
 ## notification
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/notification/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/notification/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/notification/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/notification/adapter.py)
 
-시나리오: 미완 6 / 18
+Scenario: incomplete 6 / 18
 
-- ops 로 구성 (16)
-  - batch_load_channels_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_rules_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - create_channel — 대표 성공 ✓ · 대표 실패 ✓
-  - create_rule — 대표 성공 ✓ · 대표 실패 ✓
-  - get_channel — 대표 성공 ✓ · 대표 실패 ✓
-  - get_rule — 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_purge_channels — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_purge_rules — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update_channels — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update_rules — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge_channel — 대표 성공 ✓ · 대표 실패 ✓
-  - purge_rule — 대표 성공 ✓ · 대표 실패 ✓
-  - search_channels — 대표 성공 ✓ · 대표 실패 ✓
-  - search_rules — 대표 성공 ✓ · 대표 실패 ✓
-  - update_channel — 대표 성공 ✓ · 대표 실패 ✓
-  - update_rule — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (2)
-  - validate_channel — 성공 있음 1 · 실패 있음 2 (single_entity)
-  - validate_rule — 성공 있음 1 · 실패 있음 3 (single_entity)
+- built from ops (16)
+  - batch_load_channels_by_ids — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_rules_by_ids — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - create_channel — representative success ✓ · representative refusal ✓
+  - create_rule — representative success ✓ · representative refusal ✓
+  - get_channel — representative success ✓ · representative refusal ✓
+  - get_rule — representative success ✓ · representative refusal ✓
+  - partial_bulk_purge_channels — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_purge_rules — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_update_channels — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_update_rules — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - purge_channel — representative success ✓ · representative refusal ✓
+  - purge_rule — representative success ✓ · representative refusal ✓
+  - search_channels — representative success ✓ · representative refusal ✓
+  - search_rules — representative success ✓ · representative refusal ✓
+  - update_channel — representative success ✓ · representative refusal ✓
+  - update_rule — representative success ✓ · representative refusal ✓
+- direct implementation (2)
+  - validate_channel — success present 1 · refusal present 2 (single_entity)
+  - validate_rule — success present 1 · refusal present 3 (single_entity)
 
 **batch_load_channels_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다](#reading_channels-a-batch-load-of-no-channel-ids-answers-an-empty-list) | 성공 |
-| [아무 권한도 없는 사용자가 채널 둘을 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다](#reading_channels-a-user-granted-nothing-batch-loading-channels-is-refused-per-item) | 성공 |
-| [슈퍼관리자가 미리 만들어 둔 채널 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다](#reading_channels-the-superadmin-batch-load-leaves-a-missing-id-empty) | 성공 |
+| [빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다](#reading_channels-a-batch-load-of-no-channel-ids-answers-an-empty-list) | answered |
+| [아무 권한도 없는 사용자가 채널 둘을 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다](#reading_channels-a-user-granted-nothing-batch-loading-channels-is-refused-per-item) | answered |
+| [슈퍼관리자가 미리 만들어 둔 채널 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다](#reading_channels-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
 
 **batch_load_rules_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다](#reading_rules-a-batch-load-of-no-rule-ids-answers-an-empty-list) | 성공 |
-| [아무 권한도 없는 사용자가 규칙 둘을 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다](#reading_rules-a-user-granted-nothing-batch-loading-rules-is-refused-per-item) | 성공 |
-| [슈퍼관리자가 미리 만들어 둔 규칙 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다](#reading_rules-the-superadmin-batch-load-leaves-a-missing-rule-id-empty) | 성공 |
+| [빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다](#reading_rules-a-batch-load-of-no-rule-ids-answers-an-empty-list) | answered |
+| [아무 권한도 없는 사용자가 규칙 둘을 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다](#reading_rules-a-user-granted-nothing-batch-loading-rules-is-refused-per-item) | answered |
+| [슈퍼관리자가 미리 만들어 둔 규칙 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다](#reading_rules-the-superadmin-batch-load-leaves-a-missing-rule-id-empty) | answered |
 
 **create_channel**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 비활성으로 지정해 채널을 만들면 비활성인 채널이 반환된다](#creating_channels-a-channel-made-disabled-answers-disabled) | 성공 |
-| [슈퍼관리자가 이름과 주소만 주고 webhook 채널을 만들면, 활성 상태이고 설명이 비어 있는 채널 전체가 반환된다](#creating_channels-the-superadmin-makes-a-webhook-channel) | 성공 |
-| [슈퍼관리자가 SMTP 접속과 보내는 사람, 받는 사람, 인증 계정을 주고 email 채널을 만들면, 인증 계정의 이름은 있고 비밀번호는 없는 채널 전체가 반환된다](#creating_channels-the-superadmin-makes-an-email-channel) | 성공 |
-| [email 종류라고 하면서 webhook 명세를 주고 만들려 하면, 쓴 행을 읽어 돌려주는 자리에서 명세가 종류에 맞지 않아 거부되고 쓴 것은 되돌려진다](#creating_channels-a-channel-type-and-a-spec-that-disagree-are-refused) | 거부 |
-| [webhook도 email도 주지 않은 명세로 만들려 하면 잘못된 입력으로 거부된다](#creating_channels-a-spec-naming-neither-webhook-nor-email-is-refused) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 채널을 만들려 하면 역할 부족으로 거부된다](#creating_channels-a-user-who-is-not-the-superadmin-may-not-make-a-channel) | 거부 |
-| [모니터가 채널을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다](#creating_channels-the-monitor-may-not-make-a-channel) | 거부 |
+| [슈퍼관리자가 비활성으로 지정해 채널을 만들면 비활성인 채널이 반환된다](#creating_channels-a-channel-made-disabled-answers-disabled) | answered |
+| [슈퍼관리자가 이름과 주소만 주고 webhook 채널을 만들면, 활성 상태이고 설명이 비어 있는 채널 전체가 반환된다](#creating_channels-the-superadmin-makes-a-webhook-channel) | answered |
+| [슈퍼관리자가 SMTP 접속과 보내는 사람, 받는 사람, 인증 계정을 주고 email 채널을 만들면, 인증 계정의 이름은 있고 비밀번호는 없는 채널 전체가 반환된다](#creating_channels-the-superadmin-makes-an-email-channel) | answered |
+| [email 종류라고 하면서 webhook 명세를 주고 만들려 하면, 쓴 행을 읽어 돌려주는 자리에서 명세가 종류에 맞지 않아 거부되고 쓴 것은 되돌려진다](#creating_channels-a-channel-type-and-a-spec-that-disagree-are-refused) | refused |
+| [webhook도 email도 주지 않은 명세로 만들려 하면 잘못된 입력으로 거부된다](#creating_channels-a-spec-naming-neither-webhook-nor-email-is-refused) | refused |
+| [슈퍼관리자가 아닌 사용자가 채널을 만들려 하면 역할 부족으로 거부된다](#creating_channels-a-user-who-is-not-the-superadmin-may-not-make-a-channel) | refused |
+| [모니터가 채널을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다](#creating_channels-the-monitor-may-not-make-a-channel) | refused |
 
 **create_rule**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 비활성으로 지정해 규칙을 만들면 비활성인 규칙이 반환된다](#creating_rules-a-rule-made-disabled-answers-disabled) | 성공 |
-| [어느 행에도 없는 채널 id를 가리켜 규칙을 만들면 막히지 않고 그대로 만들어진다. 두 테이블 사이에 외래 키가 없다](#creating_rules-a-rule-pointing-at-a-channel-id-nothing-answers-to-is-made-all-the-same) | 성공 |
-| [슈퍼관리자가 종류와 채널과 템플릿을 주고 규칙을 만들면, 활성 상태이고 설명이 비어 있는 규칙 전체가 반환된다](#creating_rules-the-superadmin-makes-a-rule-through-a-channel) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 규칙을 만들려 하면 역할 부족으로 거부된다](#creating_rules-a-user-who-is-not-the-superadmin-may-not-make-a-rule) | 거부 |
-| [모니터가 규칙을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다](#creating_rules-the-monitor-may-not-make-a-rule) | 거부 |
+| [슈퍼관리자가 비활성으로 지정해 규칙을 만들면 비활성인 규칙이 반환된다](#creating_rules-a-rule-made-disabled-answers-disabled) | answered |
+| [어느 행에도 없는 채널 id를 가리켜 규칙을 만들면 막히지 않고 그대로 만들어진다. 두 테이블 사이에 외래 키가 없다](#creating_rules-a-rule-pointing-at-a-channel-id-nothing-answers-to-is-made-all-the-same) | answered |
+| [슈퍼관리자가 종류와 채널과 템플릿을 주고 규칙을 만들면, 활성 상태이고 설명이 비어 있는 규칙 전체가 반환된다](#creating_rules-the-superadmin-makes-a-rule-through-a-channel) | answered |
+| [슈퍼관리자가 아닌 사용자가 규칙을 만들려 하면 역할 부족으로 거부된다](#creating_rules-a-user-who-is-not-the-superadmin-may-not-make-a-rule) | refused |
+| [모니터가 규칙을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다](#creating_rules-the-monitor-may-not-make-a-rule) | refused |
 
 **get_channel**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [채널 하나가 있고 슈퍼관리자가 id로 조회하면, 그 채널 전체가 반환된다](#reading_channels-the-superadmin-reads-a-channel-by-id) | 성공 |
-| [아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다. 만든 사람으로 기록되어 있어도 같다](#reading_channels-a-user-granted-nothing-may-not-read-a-channel) | 거부 |
-| [아무 권한도 없는 사용자가 존재하지 않는 id로 조회하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다](#reading_channels-a-user-granted-nothing-reading-an-unknown-channel-id-is-refused-for-permission) | 거부 |
-| [모니터가 id로 조회하면 권한 부족으로 거부된다. 검색은 통과하지만 id 조회는 권한 검사이고 모니터에게도 부여된 권한이 없다](#reading_channels-the-monitor-may-not-read-a-channel-by-id) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading_channels-the-superadmin-reading-a-channel-id-nothing-answers-to-is-not-found) | 거부 |
+| [채널 하나가 있고 슈퍼관리자가 id로 조회하면, 그 채널 전체가 반환된다](#reading_channels-the-superadmin-reads-a-channel-by-id) | answered |
+| [아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다. 만든 사람으로 기록되어 있어도 같다](#reading_channels-a-user-granted-nothing-may-not-read-a-channel) | refused |
+| [아무 권한도 없는 사용자가 존재하지 않는 id로 조회하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다](#reading_channels-a-user-granted-nothing-reading-an-unknown-channel-id-is-refused-for-permission) | refused |
+| [모니터가 id로 조회하면 권한 부족으로 거부된다. 검색은 통과하지만 id 조회는 권한 검사이고 모니터에게도 부여된 권한이 없다](#reading_channels-the-monitor-may-not-read-a-channel-by-id) | refused |
+| [슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading_channels-the-superadmin-reading-a-channel-id-nothing-answers-to-is-not-found) | refused |
 
 **get_rule**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [규칙 하나가 있고 슈퍼관리자가 id로 조회하면, 그 규칙 전체가 반환된다](#reading_rules-the-superadmin-reads-a-rule-by-id) | 성공 |
-| [아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다](#reading_rules-a-user-granted-nothing-may-not-read-a-rule) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading_rules-the-superadmin-reading-a-rule-id-nothing-answers-to-is-not-found) | 거부 |
+| [규칙 하나가 있고 슈퍼관리자가 id로 조회하면, 그 규칙 전체가 반환된다](#reading_rules-the-superadmin-reads-a-rule-by-id) | answered |
+| [아무 권한도 없는 사용자가 id로 조회하면 권한 부족으로 거부된다](#reading_rules-a-user-granted-nothing-may-not-read-a-rule) | refused |
+| [슈퍼관리자가 존재하지 않는 id로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading_rules-the-superadmin-reading-a-rule-id-nothing-answers-to-is-not-found) | refused |
 
 **partial_bulk_purge_channels**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 채널 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging_channels-a-user-granted-nothing-purges-none-of-several-channels) | 성공 |
-| [슈퍼관리자가 채널 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지우기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging_channels-purging-several-channels-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 없는 사용자가 채널 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging_channels-a-user-granted-nothing-purges-none-of-several-channels) | answered |
+| [슈퍼관리자가 채널 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지우기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging_channels-purging-several-channels-answers-for-the-missing-one) | answered |
 
 **partial_bulk_purge_rules**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 규칙 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging_rules-a-user-granted-nothing-purges-none-of-several-rules) | 성공 |
-| [슈퍼관리자가 규칙 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지우기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging_rules-purging-several-rules-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 없는 사용자가 규칙 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging_rules-a-user-granted-nothing-purges-none-of-several-rules) | answered |
+| [슈퍼관리자가 규칙 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지우기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging_rules-purging-several-rules-answers-for-the-missing-one) | answered |
 
 **partial_bulk_update_channels**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 채널 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing_channels-a-user-granted-nothing-edits-none-of-several-channels) | 성공 |
-| [슈퍼관리자가 채널 둘의 설명을 한 번에 바꾸면, 둘 다 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing_channels-the-superadmin-describes-several-channels-at-once) | 성공 |
+| [아무 권한도 없는 사용자가 채널 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing_channels-a-user-granted-nothing-edits-none-of-several-channels) | answered |
+| [슈퍼관리자가 채널 둘의 설명을 한 번에 바꾸면, 둘 다 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing_channels-the-superadmin-describes-several-channels-at-once) | answered |
 
 **partial_bulk_update_rules**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 없는 사용자가 규칙 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing_rules-a-user-granted-nothing-edits-none-of-several-rules) | 성공 |
-| [슈퍼관리자가 규칙 둘의 설명을 한 번에 바꾸면, 둘 다 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing_rules-the-superadmin-describes-several-rules-at-once) | 성공 |
+| [아무 권한도 없는 사용자가 규칙 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing_rules-a-user-granted-nothing-edits-none-of-several-rules) | answered |
+| [슈퍼관리자가 규칙 둘의 설명을 한 번에 바꾸면, 둘 다 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing_rules-the-superadmin-describes-several-rules-at-once) | answered |
 
 **purge_channel**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [규칙이 가리키는 채널을 슈퍼관리자가 삭제하면 막히지 않고 삭제한 채널의 id가 반환된다. 두 테이블 사이에 외래 키가 없어 규칙은 남는다](#retiring_channels-a-channel-a-rule-points-at-is-deleted-all-the-same) | 성공 |
-| [채널 하나가 있고 슈퍼관리자가 삭제하면 삭제한 채널의 id가 반환된다](#retiring_channels-the-superadmin-deletes-a-channel) | 성공 |
-| [아무 권한도 없는 사용자가 삭제하려 하면 권한 부족으로 거부된다](#retiring_channels-a-user-granted-nothing-may-not-delete-a-channel) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring_channels-the-superadmin-deleting-a-channel-id-nothing-answers-to-is-not-found) | 거부 |
+| [규칙이 가리키는 채널을 슈퍼관리자가 삭제하면 막히지 않고 삭제한 채널의 id가 반환된다. 두 테이블 사이에 외래 키가 없어 규칙은 남는다](#retiring_channels-a-channel-a-rule-points-at-is-deleted-all-the-same) | answered |
+| [채널 하나가 있고 슈퍼관리자가 삭제하면 삭제한 채널의 id가 반환된다](#retiring_channels-the-superadmin-deletes-a-channel) | answered |
+| [아무 권한도 없는 사용자가 삭제하려 하면 권한 부족으로 거부된다](#retiring_channels-a-user-granted-nothing-may-not-delete-a-channel) | refused |
+| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring_channels-the-superadmin-deleting-a-channel-id-nothing-answers-to-is-not-found) | refused |
 
 **purge_rule**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [규칙 하나가 있고 슈퍼관리자가 삭제하면 삭제한 규칙의 id가 반환된다](#retiring_rules-the-superadmin-deletes-a-rule) | 성공 |
-| [아무 권한도 없는 사용자가 삭제하려 하면 권한 부족으로 거부된다](#retiring_rules-a-user-granted-nothing-may-not-delete-a-rule) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring_rules-the-superadmin-deleting-a-rule-id-nothing-answers-to-is-not-found) | 거부 |
+| [규칙 하나가 있고 슈퍼관리자가 삭제하면 삭제한 규칙의 id가 반환된다](#retiring_rules-the-superadmin-deletes-a-rule) | answered |
+| [아무 권한도 없는 사용자가 삭제하려 하면 권한 부족으로 거부된다](#retiring_rules-a-user-granted-nothing-may-not-delete-a-rule) | refused |
+| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring_rules-the-superadmin-deleting-a-rule-id-nothing-answers-to-is-not-found) | refused |
 
 **search_channels**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [webhook 채널과 email 채널이 있을 때 email 종류를 필터로 조회하면 email 채널 하나만 반환된다](#searching_channels-a-channel-type-filter-narrows-the-answer-to-that-kind) | 성공 |
-| [채널 둘 중 한쪽 이름을 필터로 조회하면 그 채널 하나만 반환된다](#searching_channels-a-name-filter-narrows-the-answer-to-that-channel) | 성공 |
-| [활성 채널과 비활성 채널이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 반환된다](#searching_channels-an-enabled-filter-leaves-only-the-enabled-channels) | 성공 |
-| [채널 둘이 있을 때 앞에서 한 건만 요청하면 한 건이 반환되고 다음 페이지가 있다고 응답한다](#searching_channels-asking-for-the-first-channel-only-says-there-is-a-next-page) | 성공 |
-| [모니터가 필터 없이 조회하면 슈퍼관리자와 같은 응답을 받는다](#searching_channels-the-monitor-searches-channels-like-the-superadmin) | 성공 |
-| [채널 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 반환된다](#searching_channels-the-superadmin-counts-every-channel-laid) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 필터 없이 조회하면 역할 부족으로 거부된다](#searching_channels-a-user-who-is-not-the-superadmin-may-not-search-channels) | 거부 |
+| [webhook 채널과 email 채널이 있을 때 email 종류를 필터로 조회하면 email 채널 하나만 반환된다](#searching_channels-a-channel-type-filter-narrows-the-answer-to-that-kind) | answered |
+| [채널 둘 중 한쪽 이름을 필터로 조회하면 그 채널 하나만 반환된다](#searching_channels-a-name-filter-narrows-the-answer-to-that-channel) | answered |
+| [활성 채널과 비활성 채널이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 반환된다](#searching_channels-an-enabled-filter-leaves-only-the-enabled-channels) | answered |
+| [채널 둘이 있을 때 앞에서 한 건만 요청하면 한 건이 반환되고 다음 페이지가 있다고 응답한다](#searching_channels-asking-for-the-first-channel-only-says-there-is-a-next-page) | answered |
+| [모니터가 필터 없이 조회하면 슈퍼관리자와 같은 응답을 받는다](#searching_channels-the-monitor-searches-channels-like-the-superadmin) | answered |
+| [채널 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 반환된다](#searching_channels-the-superadmin-counts-every-channel-laid) | answered |
+| [슈퍼관리자가 아닌 사용자가 필터 없이 조회하면 역할 부족으로 거부된다](#searching_channels-a-user-who-is-not-the-superadmin-may-not-search-channels) | refused |
 
 **search_rules**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [규칙 둘 중 한쪽 이름을 필터로 조회하면 그 규칙 하나만 반환된다](#searching_rules-a-name-filter-narrows-the-answer-to-that-rule) | 성공 |
-| [종류가 다른 규칙 둘 중 한쪽 종류를 필터로 조회하면 그 규칙 하나만 반환된다](#searching_rules-a-rule-type-filter-narrows-the-answer-to-that-kind) | 성공 |
-| [활성 규칙과 비활성 규칙이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 반환된다](#searching_rules-an-enabled-filter-leaves-only-the-enabled-rules) | 성공 |
-| [모니터가 필터 없이 조회하면 슈퍼관리자와 같은 응답을 받는다](#searching_rules-the-monitor-searches-rules-like-the-superadmin) | 성공 |
-| [규칙 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 반환된다](#searching_rules-the-superadmin-counts-every-rule-laid) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 필터 없이 조회하면 역할 부족으로 거부된다](#searching_rules-a-user-who-is-not-the-superadmin-may-not-search-rules) | 거부 |
+| [규칙 둘 중 한쪽 이름을 필터로 조회하면 그 규칙 하나만 반환된다](#searching_rules-a-name-filter-narrows-the-answer-to-that-rule) | answered |
+| [종류가 다른 규칙 둘 중 한쪽 종류를 필터로 조회하면 그 규칙 하나만 반환된다](#searching_rules-a-rule-type-filter-narrows-the-answer-to-that-kind) | answered |
+| [활성 규칙과 비활성 규칙이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 반환된다](#searching_rules-an-enabled-filter-leaves-only-the-enabled-rules) | answered |
+| [모니터가 필터 없이 조회하면 슈퍼관리자와 같은 응답을 받는다](#searching_rules-the-monitor-searches-rules-like-the-superadmin) | answered |
+| [규칙 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 반환된다](#searching_rules-the-superadmin-counts-every-rule-laid) | answered |
+| [슈퍼관리자가 아닌 사용자가 필터 없이 조회하면 역할 부족으로 거부된다](#searching_rules-a-user-who-is-not-the-superadmin-may-not-search-rules) | refused |
 
 **update_channel**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 채널이 반환된다](#editing_channels-an-edit-naming-no-field-changes-nothing) | 성공 |
-| [webhook 채널의 명세를 다른 주소로 바꾸면 주소가 새 값인 채널이 반환된다](#editing_channels-changing-a-webhook-spec-moves-the-channel-to-the-new-url) | 성공 |
-| [설명이 있는 채널의 설명을 비우면 설명이 비어 있는 채널이 반환된다](#editing_channels-clearing-a-channel-description-leaves-it-empty) | 성공 |
-| [활성 채널을 비활성으로 바꾸면 비활성인 채널이 반환된다](#editing_channels-disabling-a-channel-answers-it-disabled) | 성공 |
-| [슈퍼관리자가 이름만 바꾸면 이름은 새 값이고 나머지는 그대로인 채널 전체가 반환된다](#editing_channels-the-superadmin-renaming-a-channel-leaves-the-rest) | 성공 |
-| [아무 권한도 없는 사용자가 이름을 바꾸려 하면 권한 부족으로 거부된다](#editing_channels-a-user-granted-nothing-may-not-edit-a-channel) | 거부 |
-| [webhook도 email도 주지 않은 명세로 수정하려 하면 잘못된 입력으로 거부된다](#editing_channels-an-edit-with-a-spec-naming-neither-webhook-nor-email-is-refused) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing_channels-the-superadmin-editing-a-channel-id-nothing-answers-to-is-not-found) | 거부 |
+| [아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 채널이 반환된다](#editing_channels-an-edit-naming-no-field-changes-nothing) | answered |
+| [webhook 채널의 명세를 다른 주소로 바꾸면 주소가 새 값인 채널이 반환된다](#editing_channels-changing-a-webhook-spec-moves-the-channel-to-the-new-url) | answered |
+| [설명이 있는 채널의 설명을 비우면 설명이 비어 있는 채널이 반환된다](#editing_channels-clearing-a-channel-description-leaves-it-empty) | answered |
+| [활성 채널을 비활성으로 바꾸면 비활성인 채널이 반환된다](#editing_channels-disabling-a-channel-answers-it-disabled) | answered |
+| [슈퍼관리자가 이름만 바꾸면 이름은 새 값이고 나머지는 그대로인 채널 전체가 반환된다](#editing_channels-the-superadmin-renaming-a-channel-leaves-the-rest) | answered |
+| [아무 권한도 없는 사용자가 이름을 바꾸려 하면 권한 부족으로 거부된다](#editing_channels-a-user-granted-nothing-may-not-edit-a-channel) | refused |
+| [webhook도 email도 주지 않은 명세로 수정하려 하면 잘못된 입력으로 거부된다](#editing_channels-an-edit-with-a-spec-naming-neither-webhook-nor-email-is-refused) | refused |
+| [슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing_channels-the-superadmin-editing-a-channel-id-nothing-answers-to-is-not-found) | refused |
 
 **update_rule**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 규칙이 반환된다](#editing_rules-a-rule-edit-naming-no-field-changes-nothing) | 성공 |
-| [규칙의 템플릿을 바꾸면 템플릿이 새 값인 규칙이 반환된다](#editing_rules-changing-a-rule-template-answers-the-new-template) | 성공 |
-| [설명이 있는 규칙의 설명을 비우면 설명이 비어 있는 규칙이 반환된다](#editing_rules-clearing-a-rule-description-leaves-it-empty) | 성공 |
-| [활성 규칙을 비활성으로 바꾸면 비활성인 규칙이 반환된다](#editing_rules-disabling-a-rule-answers-it-disabled) | 성공 |
-| [슈퍼관리자가 이름만 바꾸면 이름은 새 값이고 나머지는 그대로인 규칙 전체가 반환된다](#editing_rules-the-superadmin-renaming-a-rule-leaves-the-rest) | 성공 |
-| [아무 권한도 없는 사용자가 이름을 바꾸려 하면 권한 부족으로 거부된다](#editing_rules-a-user-granted-nothing-may-not-edit-a-rule) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing_rules-the-superadmin-editing-a-rule-id-nothing-answers-to-is-not-found) | 거부 |
+| [아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 규칙이 반환된다](#editing_rules-a-rule-edit-naming-no-field-changes-nothing) | answered |
+| [규칙의 템플릿을 바꾸면 템플릿이 새 값인 규칙이 반환된다](#editing_rules-changing-a-rule-template-answers-the-new-template) | answered |
+| [설명이 있는 규칙의 설명을 비우면 설명이 비어 있는 규칙이 반환된다](#editing_rules-clearing-a-rule-description-leaves-it-empty) | answered |
+| [활성 규칙을 비활성으로 바꾸면 비활성인 규칙이 반환된다](#editing_rules-disabling-a-rule-answers-it-disabled) | answered |
+| [슈퍼관리자가 이름만 바꾸면 이름은 새 값이고 나머지는 그대로인 규칙 전체가 반환된다](#editing_rules-the-superadmin-renaming-a-rule-leaves-the-rest) | answered |
+| [아무 권한도 없는 사용자가 이름을 바꾸려 하면 권한 부족으로 거부된다](#editing_rules-a-user-granted-nothing-may-not-edit-a-rule) | refused |
+| [슈퍼관리자가 존재하지 않는 id를 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing_rules-the-superadmin-editing-a-rule-id-nothing-answers-to-is-not-found) | refused |
 
 **validate_channel**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [webhook 채널 하나가 있고 슈퍼관리자가 시험 메시지로 검증하면 검증한 채널의 id가 반환된다](#validating_channels-the-superadmin-validates-a-webhook-channel) | 성공 |
-| [아무 권한도 없는 사용자가 검증하려 하면 권한 부족으로 거부된다](#validating_channels-a-user-granted-nothing-may-not-validate-a-channel) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 검증하면 대상을 찾을 수 없다는 이유로 거부된다](#validating_channels-the-superadmin-validating-a-channel-id-nothing-answers-to-is-not-found) | 거부 |
+| [webhook 채널 하나가 있고 슈퍼관리자가 시험 메시지로 검증하면 검증한 채널의 id가 반환된다](#validating_channels-the-superadmin-validates-a-webhook-channel) | answered |
+| [아무 권한도 없는 사용자가 검증하려 하면 권한 부족으로 거부된다](#validating_channels-a-user-granted-nothing-may-not-validate-a-channel) | refused |
+| [슈퍼관리자가 존재하지 않는 id를 검증하면 대상을 찾을 수 없다는 이유로 거부된다](#validating_channels-the-superadmin-validating-a-channel-id-nothing-answers-to-is-not-found) | refused |
 
 **validate_rule**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [세션 시작 규칙 하나가 있고 슈퍼관리자가 그 종류에 맞는 시험 데이터로 검증하면, 템플릿에 데이터를 넣어 만든 문자열이 반환된다](#validating_rules-the-superadmin-validates-a-rule-with-test-data) | 성공 |
-| [없는 채널 id를 가리키는 규칙을 검증하면 채널을 찾을 수 없다는 이유로 거부된다](#validating_rules-a-rule-pointing-at-a-channel-id-nothing-answers-to-is-refused) | 거부 |
-| [아무 권한도 없는 사용자가 검증하려 하면 권한 부족으로 거부된다](#validating_rules-a-user-granted-nothing-may-not-validate-a-rule) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 검증하면 대상을 찾을 수 없다는 이유로 거부된다](#validating_rules-the-superadmin-validating-a-rule-id-nothing-answers-to-is-not-found) | 거부 |
+| [세션 시작 규칙 하나가 있고 슈퍼관리자가 그 종류에 맞는 시험 데이터로 검증하면, 템플릿에 데이터를 넣어 만든 문자열이 반환된다](#validating_rules-the-superadmin-validates-a-rule-with-test-data) | answered |
+| [없는 채널 id를 가리키는 규칙을 검증하면 채널을 찾을 수 없다는 이유로 거부된다](#validating_rules-a-rule-pointing-at-a-channel-id-nothing-answers-to-is-refused) | refused |
+| [아무 권한도 없는 사용자가 검증하려 하면 권한 부족으로 거부된다](#validating_rules-a-user-granted-nothing-may-not-validate-a-rule) | refused |
+| [슈퍼관리자가 존재하지 않는 id를 검증하면 대상을 찾을 수 없다는 이유로 거부된다](#validating_rules-the-superadmin-validating-a-rule-id-nothing-answers-to-is-not-found) | refused |
 
 ### batch_load_channels_by_ids
 

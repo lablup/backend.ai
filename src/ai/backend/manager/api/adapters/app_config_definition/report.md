@@ -1,67 +1,67 @@
 ## app_config_definition
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/app_config_definition/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/app_config_definition/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/app_config_definition/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/app_config_definition/adapter.py)
 
-시나리오: 미완 1 / 6
+Scenario: incomplete 1 / 6
 
-- ops 로 구성 (4)
-  - admin_create — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_get — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
-  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (2)
-  - partial_bulk_purge — 성공 있음 2 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - purge — 성공 있음 2 · 실패 있음 2 (single_entity)
+- built from ops (4)
+  - admin_create — representative success ✓ · representative refusal ✓
+  - admin_get — representative success ✓ · representative refusal ✓
+  - admin_search — representative success ✓ · representative refusal ✓
+  - batch_load_by_ids — representative success ✓ · representative refusal ✓
+- direct implementation (2)
+  - partial_bulk_purge — success present 2 · refusal absent (partial_bulk) — SCENARIO-GAP
+  - purge — success present 2 · refusal present 2 (single_entity)
 
 **admin_create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 이름만 지정해 설정 정의를 등록하면, 이름은 지정한 그대로이고 ID와 시각은 서버가 채운 노드가 반환된다](#registering-the-superadmin-registers-a-name) | 성공 |
-| [이미 등록된 이름으로 슈퍼관리자가 다시 등록하면 거부되지만, 응답이 이름 중복이라고 알려 주지 않고 데이터베이스의 제약 위반이 그대로 전파된다](#registering-a-name-already-registered-is-refused-as-a-constraint-violation) | 거부 |
-| [일반 사용자가 설정 정의를 등록하려 하면, 슈퍼관리자 권한이 없어 거부된다](#registering-a-user-who-is-not-the-superadmin-may-not-register-a-name) | 거부 |
-| [RBAC 강제를 꺼도 일반 사용자의 설정 정의 등록은 거부된다](#registering-turning-enforcement-off-still-does-not-let-a-user-register-a-name) | 거부 |
+| [슈퍼관리자가 이름만 지정해 설정 정의를 등록하면, 이름은 지정한 그대로이고 ID와 시각은 서버가 채운 노드가 반환된다](#registering-the-superadmin-registers-a-name) | answered |
+| [이미 등록된 이름으로 슈퍼관리자가 다시 등록하면 거부되지만, 응답이 이름 중복이라고 알려 주지 않고 데이터베이스의 제약 위반이 그대로 전파된다](#registering-a-name-already-registered-is-refused-as-a-constraint-violation) | refused |
+| [일반 사용자가 설정 정의를 등록하려 하면, 슈퍼관리자 권한이 없어 거부된다](#registering-a-user-who-is-not-the-superadmin-may-not-register-a-name) | refused |
+| [RBAC 강제를 꺼도 일반 사용자의 설정 정의 등록은 거부된다](#registering-turning-enforcement-off-still-does-not-let-a-user-register-a-name) | refused |
 
 **admin_get**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [설정 정의 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 정의의 모든 필드가 반환된다](#reading-the-superadmin-reads-a-definition-by-id) | 성공 |
-| [RBAC 강제를 끄면 권한이 없는 일반 사용자도 설정 정의를 조회할 수 있다](#reading-turning-enforcement-off-lets-a-plain-user-read) | 성공 |
-| [같은 설정 정의가 있고 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 거부된다](#reading-a-user-who-is-not-the-superadmin-may-not-read-a-definition) | 거부 |
-| [슈퍼관리자가 존재하지 않는 ID로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
+| [설정 정의 하나가 있고 슈퍼관리자가 ID로 조회하면, 그 정의의 모든 필드가 반환된다](#reading-the-superadmin-reads-a-definition-by-id) | answered |
+| [RBAC 강제를 끄면 권한이 없는 일반 사용자도 설정 정의를 조회할 수 있다](#reading-turning-enforcement-off-lets-a-plain-user-read) | answered |
+| [같은 설정 정의가 있고 권한이 없는 일반 사용자가 조회하면, 엔티티 읽기 권한이 없어 거부된다](#reading-a-user-who-is-not-the-superadmin-may-not-read-a-definition) | refused |
+| [슈퍼관리자가 존재하지 않는 ID로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
 
 **admin_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [설정 정의 셋이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 셋 다 집계된다](#searching-the-superadmin-counts-every-definition) | 성공 |
-| [일반 사용자가 전체를 검색하면, 슈퍼관리자 권한이 없어 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-definitions) | 거부 |
+| [설정 정의 셋이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 셋 다 집계된다](#searching-the-superadmin-counts-every-definition) | answered |
+| [일반 사용자가 전체를 검색하면, 슈퍼관리자 권한이 없어 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-definitions) | refused |
 
 **batch_load_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [빈 ID 목록을 주면 빈 응답이 반환된다](#reading_many-an-empty-id-list-answers-empty) | 성공 |
-| [슈퍼관리자가 같은 설정 정의 ID를 두 번 조회하면, 입력 순서를 보존해 같은 노드가 두 번 반환된다](#reading_many-duplicate-ids-keep-their-input-positions) | 성공 |
-| [슈퍼관리자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 ID에 해당하는 항목은 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다](#reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 요청 전체가 막히는 것이 아니라 세 항목 모두 그 항목만 권한 부족으로 거부된다](#reading_many-a-user-who-is-not-the-superadmin-is-refused-per-id) | 거부 |
+| [빈 ID 목록을 주면 빈 응답이 반환된다](#reading_many-an-empty-id-list-answers-empty) | answered |
+| [슈퍼관리자가 같은 설정 정의 ID를 두 번 조회하면, 입력 순서를 보존해 같은 노드가 두 번 반환된다](#reading_many-duplicate-ids-keep-their-input-positions) | answered |
+| [슈퍼관리자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 ID에 해당하는 항목은 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다](#reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty) | answered |
+| [슈퍼관리자가 아닌 사용자가 설정 정의 둘과 없는 ID 하나를 한 번에 조회하면, 요청 전체가 막히는 것이 아니라 세 항목 모두 그 항목만 권한 부족으로 거부된다](#reading_many-a-user-who-is-not-the-superadmin-is-refused-per-id) | refused |
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [권한이 없는 일반 사용자가 설정 정의 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-definitions) | 성공 |
-| [슈퍼관리자가 설정 정의 둘과 존재하지 않는 ID를 한 번에 영구 삭제하면, 둘은 처리된 목록에 오고 없는 ID는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | 성공 |
+| [권한이 없는 일반 사용자가 설정 정의 둘을 한 번에 영구 삭제하려 하면, 삭제된 것 없이 둘 다 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-definitions) | answered |
+| [슈퍼관리자가 설정 정의 둘과 존재하지 않는 ID를 한 번에 영구 삭제하면, 둘은 처리된 목록에 오고 없는 ID는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-answers-for-the-missing-one) | answered |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [허용 목록 항목과 설정 조각이 딸린 설정 정의를 슈퍼관리자가 영구 삭제하면, 종속 행이 삭제를 막지 않고 정의의 ID가 반환된다](#purging-a-definition-holding-an-entry-and-a-fragment-is-still-purged) | 성공 |
-| [종속 행이 없는 설정 정의를 슈퍼관리자가 영구 삭제하면, 삭제한 ID가 반환된다](#purging-the-superadmin-purges-a-definition) | 성공 |
-| [같은 설정 정의가 있고 권한이 없는 일반 사용자가 영구 삭제하면, 엔티티 영구 삭제 권한이 없어 거부된다](#purging-a-user-who-is-not-the-superadmin-may-not-purge-a-definition) | 거부 |
-| [슈퍼관리자가 존재하지 않는 ID를 영구 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
+| [허용 목록 항목과 설정 조각이 딸린 설정 정의를 슈퍼관리자가 영구 삭제하면, 종속 행이 삭제를 막지 않고 정의의 ID가 반환된다](#purging-a-definition-holding-an-entry-and-a-fragment-is-still-purged) | answered |
+| [종속 행이 없는 설정 정의를 슈퍼관리자가 영구 삭제하면, 삭제한 ID가 반환된다](#purging-the-superadmin-purges-a-definition) | answered |
+| [같은 설정 정의가 있고 권한이 없는 일반 사용자가 영구 삭제하면, 엔티티 영구 삭제 권한이 없어 거부된다](#purging-a-user-who-is-not-the-superadmin-may-not-purge-a-definition) | refused |
+| [슈퍼관리자가 존재하지 않는 ID를 영구 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
 
 ### admin_create
 

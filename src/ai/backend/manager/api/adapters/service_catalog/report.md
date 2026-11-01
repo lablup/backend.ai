@@ -1,27 +1,27 @@
 ## service_catalog
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/service_catalog/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/service_catalog/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/service_catalog/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/service_catalog/adapter.py)
 
-시나리오: 미완 1 / 2
+Scenario: incomplete 1 / 2
 
-- ops 로 구성 (1)
-  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (1)
-  - batch_load_by_ids — 성공 없음 · 실패 없음 (partial_bulk) — SCENARIO-GAP
+- built from ops (1)
+  - admin_search — representative success ✓ · representative refusal ✓
+- direct implementation (1)
+  - batch_load_by_ids — success absent · refusal absent (partial_bulk) — SCENARIO-GAP
 
 **admin_search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [그룹이 다른 서비스 둘 중 한 그룹으로 걸러 조회하면, 답에는 그 그룹의 서비스만 남는다](#searching-a-group-filter-narrows-the-answer-to-the-services-of-that-group) | 성공 |
-| [상태마다 하나씩 있는 서비스를 비정상과 같은 것으로 걸러 조회하면 비정상 서비스만 반환된다](#searching-a-status-equals-filter-keeps-the-services-of-that-status) | 성공 |
-| [상태마다 하나씩 있는 서비스를 비정상·등록 해제 목록에 든 것으로 걸러 조회하면 비정상과 등록 해제 서비스만 반환된다](#searching-a-status-in-filter-keeps-the-services-of-a-listed-status) | 성공 |
-| [상태마다 하나씩 있는 서비스를 비정상과 다른 것으로 걸러 조회하면 정상과 등록 해제 서비스만 반환된다](#searching-a-status-not-equals-filter-drops-the-services-of-that-status) | 성공 |
-| [상태마다 하나씩 있는 서비스를 비정상·등록 해제 목록에 들지 않은 것으로 걸러 조회하면 정상 서비스만 반환된다](#searching-a-status-not-in-filter-drops-the-services-of-a-listed-status) | 성공 |
-| [서비스 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching-omitting-the-page-size-answers-ten-services-and-a-next-page) | 성공 |
-| [모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 답을 받는다. 이 검색은 읽기 연산이라 모니터 역할이 전역 역할 검사를 통과한다](#searching-the-monitor-role-counts-every-service-as-the-superadmin-does) | 성공 |
-| [서비스 둘 중 하나가 엔드포인트를 가질 때 슈퍼관리자가 필터 없이 조회하면, 둘 다 한 번씩 집계된다](#searching-the-superadmin-counts-every-service-laid-once) | 성공 |
-| [슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-services) | 거부 |
+| [그룹이 다른 서비스 둘 중 한 그룹으로 걸러 조회하면, 답에는 그 그룹의 서비스만 남는다](#searching-a-group-filter-narrows-the-answer-to-the-services-of-that-group) | answered |
+| [상태마다 하나씩 있는 서비스를 비정상과 같은 것으로 걸러 조회하면 비정상 서비스만 반환된다](#searching-a-status-equals-filter-keeps-the-services-of-that-status) | answered |
+| [상태마다 하나씩 있는 서비스를 비정상·등록 해제 목록에 든 것으로 걸러 조회하면 비정상과 등록 해제 서비스만 반환된다](#searching-a-status-in-filter-keeps-the-services-of-a-listed-status) | answered |
+| [상태마다 하나씩 있는 서비스를 비정상과 다른 것으로 걸러 조회하면 정상과 등록 해제 서비스만 반환된다](#searching-a-status-not-equals-filter-drops-the-services-of-that-status) | answered |
+| [상태마다 하나씩 있는 서비스를 비정상·등록 해제 목록에 들지 않은 것으로 걸러 조회하면 정상 서비스만 반환된다](#searching-a-status-not-in-filter-drops-the-services-of-a-listed-status) | answered |
+| [서비스 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching-omitting-the-page-size-answers-ten-services-and-a-next-page) | answered |
+| [모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 답을 받는다. 이 검색은 읽기 연산이라 모니터 역할이 전역 역할 검사를 통과한다](#searching-the-monitor-role-counts-every-service-as-the-superadmin-does) | answered |
+| [서비스 둘 중 하나가 엔드포인트를 가질 때 슈퍼관리자가 필터 없이 조회하면, 둘 다 한 번씩 집계된다](#searching-the-superadmin-counts-every-service-laid-once) | answered |
+| [슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-services) | refused |
 
 ### admin_search
 

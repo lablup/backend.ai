@@ -1,118 +1,118 @@
 ## prometheus_query_preset
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/prometheus_query_preset/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/prometheus_query_preset/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/prometheus_query_preset/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/prometheus_query_preset/adapter.py)
 
-시나리오: 미완 3 / 10
+Scenario: incomplete 3 / 10
 
-- ops 로 구성 (5)
-  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - get — 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge — 대표 성공 ✓ · 대표 실패 ✓
-  - search — 대표 성공 ✓ · 대표 실패 ✓
-- 직접 구현 (5)
-  - admin_preview — 성공 있음 2 · 실패 있음 2 (global_scope)
-  - create — 성공 있음 4 · 실패 있음 4 (global_scope)
-  - execute_preset — 성공 있음 3 · 실패 있음 4 (single_entity)
-  - partial_bulk_update — 성공 있음 3 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - update — 성공 있음 6 · 실패 있음 3 (single_entity)
+- built from ops (5)
+  - batch_load_by_ids — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - get — representative success ✓ · representative refusal ✓
+  - partial_bulk_purge — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - purge — representative success ✓ · representative refusal ✓
+  - search — representative success ✓ · representative refusal ✓
+- direct implementation (5)
+  - admin_preview — success present 2 · refusal present 2 (global_scope)
+  - create — success present 4 · refusal present 4 (global_scope)
+  - execute_preset — success present 3 · refusal present 4 (single_entity)
+  - partial_bulk_update — success present 3 · refusal absent (partial_bulk) — SCENARIO-GAP
+  - update — success present 6 · refusal present 3 (single_entity)
 
 **batch_load_by_ids**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프리셋이 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환된다](#loading-loading-an-empty-id-list-answers-an-empty-list) | 성공 |
-| [프리셋 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 빈 항목으로 반환되고 순서가 요청한 순서와 같다](#loading-loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-gap) | 성공 |
+| [프리셋이 있어도 빈 id 목록으로 조회하면, 빈 응답이 반환된다](#loading-loading-an-empty-id-list-answers-an-empty-list) | answered |
+| [프리셋 둘과 없는 id 하나를 섞어 한 번에 조회하면, 있는 둘은 노드로 없는 하나는 빈 항목으로 반환되고 순서가 요청한 순서와 같다](#loading-loading-laid-ids-and-an-unknown-one-answers-in-order-with-a-gap) | answered |
 
 **get**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프리셋 하나가 있고 아무 권한도 없는 사용자가 id로 조회하면, 그 프리셋 전체가 반환된다](#reading-a-user-granted-nothing-reads-a-preset-by-id) | 성공 |
-| [프리셋 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 호출자를 알 수 없어 거부된다](#reading-a-call-carrying-no-user-may-not-read-a-preset) | 거부 |
-| [public 에서 읽을 수 있는 사용자가 존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다](#reading-an-id-nothing-answers-to-is-refused) | 거부 |
+| [프리셋 하나가 있고 아무 권한도 없는 사용자가 id로 조회하면, 그 프리셋 전체가 반환된다](#reading-a-user-granted-nothing-reads-a-preset-by-id) | answered |
+| [프리셋 하나가 있고 사용자 컨텍스트 없이 id로 조회하면, 호출자를 알 수 없어 거부된다](#reading-a-call-carrying-no-user-may-not-read-a-preset) | refused |
+| [public 에서 읽을 수 있는 사용자가 존재하지 않는 id로 조회하면 거부된다. 권한을 물을 대상이 없으므로, 없는 것인지 닿지 못하는 것인지는 응답으로 드러나지 않는다](#reading-an-id-nothing-answers-to-is-refused) | refused |
 
 **partial_bulk_purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | 성공 |
-| [슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-presets-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets) | answered |
+| [슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워지기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_purging-purging-several-presets-answers-for-the-missing-one) | answered |
 
 **purge**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프리셋 하나가 있고 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다](#purging-the-superadmin-removes-a-preset) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다](#purging-turning-enforcement-off-lets-a-user-remove-a-preset) | 성공 |
-| [같은 프리셋이 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-remove-a-preset) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
+| [프리셋 하나가 있고 슈퍼관리자가 삭제하면, 삭제한 id를 담은 응답이 반환된다](#purging-the-superadmin-removes-a-preset) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 삭제할 수 있다](#purging-turning-enforcement-off-lets-a-user-remove-a-preset) | answered |
+| [같은 프리셋이 있고 아무 권한도 없는 사용자가 삭제하면, 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-remove-a-preset) | refused |
+| [슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-removing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
 
 **search**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프리셋 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계된다](#searching-a-user-granted-nothing-counts-every-preset) | 성공 |
-| [두 카테고리에 프리셋이 나뉘어 있을 때 한 카테고리 필터로 검색하면, 그 카테고리의 프리셋만 반환된다](#searching-filtering-by-category-keeps-only-the-presets-filed-under-it) | 성공 |
-| [이름이 다른 프리셋 셋이 있을 때 이름 필터로 검색하면, 그 이름의 프리셋만 반환된다](#searching-filtering-by-name-keeps-only-the-preset-of-that-name) | 성공 |
-| [프리셋 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching-omitting-the-page-size-answers-ten-and-says-there-is-a-next-page) | 성공 |
-| [프리셋 하나가 있고 사용자 컨텍스트 없이 검색하면, 호출자를 알 수 없어 거부된다](#searching-a-call-carrying-no-user-may-not-search-presets) | 거부 |
+| [프리셋 둘이 있고 아무 권한도 없는 사용자가 필터 없이 검색하면, 둘 다 집계된다](#searching-a-user-granted-nothing-counts-every-preset) | answered |
+| [두 카테고리에 프리셋이 나뉘어 있을 때 한 카테고리 필터로 검색하면, 그 카테고리의 프리셋만 반환된다](#searching-filtering-by-category-keeps-only-the-presets-filed-under-it) | answered |
+| [이름이 다른 프리셋 셋이 있을 때 이름 필터로 검색하면, 그 이름의 프리셋만 반환된다](#searching-filtering-by-name-keeps-only-the-preset-of-that-name) | answered |
+| [프리셋 11개가 있을 때 크기 없이 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching-omitting-the-page-size-answers-ten-and-says-there-is-a-next-page) | answered |
+| [프리셋 하나가 있고 사용자 컨텍스트 없이 검색하면, 호출자를 알 수 없어 거부된다](#searching-a-call-carrying-no-user-may-not-search-presets) | refused |
 
 **admin_preview**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 템플릿만 지정해 미리 보면, 순간 질의로 응답하고 모의 서버가 받은 질의의 시간 창은 서버 설정의 기본 시간 창이며 라벨은 비어 있다](#previewing-previewing-a-template-is-an-instant-query-with-the-server-window-and-no-label) | 성공 |
-| [모니터 역할이 템플릿을 미리 보면, 모의 서버가 응답한 결과가 반환된다. 슈퍼관리자 검사는 읽기에 한해 모니터를 허용한다](#previewing-the-monitor-role-previews-a-template) | 성공 |
-| [슈퍼관리자가 빈 질의로 렌더되는 템플릿을 미리 보면, Prometheus가 그 질의를 거부하고 그 거부가 평가 실패로 바뀌어 전파된다. 실행의 같은 시나리오와 다른 오류로 거부된다](#previewing-a-query-prometheus-refuses-is-refused-as-an-evaluation-failure) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 미리 보려 하면, 역할 부족으로 거부된다](#previewing-a-user-who-is-not-the-superadmin-may-not-preview-a-template) | 거부 |
+| [슈퍼관리자가 템플릿만 지정해 미리 보면, 순간 질의로 응답하고 모의 서버가 받은 질의의 시간 창은 서버 설정의 기본 시간 창이며 라벨은 비어 있다](#previewing-previewing-a-template-is-an-instant-query-with-the-server-window-and-no-label) | answered |
+| [모니터 역할이 템플릿을 미리 보면, 모의 서버가 응답한 결과가 반환된다. 슈퍼관리자 검사는 읽기에 한해 모니터를 허용한다](#previewing-the-monitor-role-previews-a-template) | answered |
+| [슈퍼관리자가 빈 질의로 렌더되는 템플릿을 미리 보면, Prometheus가 그 질의를 거부하고 그 거부가 평가 실패로 바뀌어 전파된다. 실행의 같은 시나리오와 다른 오류로 거부된다](#previewing-a-query-prometheus-refuses-is-refused-as-an-evaluation-failure) | refused |
+| [슈퍼관리자가 아닌 사용자가 미리 보려 하면, 역할 부족으로 거부된다](#previewing-a-user-who-is-not-the-superadmin-may-not-preview-a-template) | refused |
 
 **create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [이미 다른 프리셋이 사용 중인 이름으로 슈퍼관리자가 다시 생성하면, 생성된다. 프리셋의 이름에는 유일 제약이 없다](#creating-a-name-another-preset-already-holds-is-allowed) | 성공 |
-| [카테고리 하나가 있고 슈퍼관리자가 그 카테고리를 지정해 생성하면, 응답의 카테고리가 그것을 가리킨다](#creating-creating-a-preset-under-a-category-points-the-node-at-that-category) | 성공 |
-| [슈퍼관리자가 시간 창을 함께 지정해 생성하면, 노드에 그 시간 창이 담긴다](#creating-creating-a-preset-with-a-window-carries-that-window-on-the-node) | 성공 |
-| [슈퍼관리자가 이름, 지표 이름, 템플릿, 허용 라벨 목록만 지정해 생성하면, 순위는 0이고 카테고리·설명·시간 창은 비어 있는 노드 전체가 반환된다](#creating-creating-a-preset-with-the-required-values-answers-with-the-whole-node) | 성공 |
-| [슈퍼관리자가 존재하지 않는 카테고리 id를 지정해 생성하면, 카테고리가 없다는 이유로 거부된다. 저장소의 참조 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다](#creating-a-category-id-nothing-answers-to-is-refused) | 거부 |
-| [슈퍼관리자가 아닌 사용자가 프리셋을 생성하려 하면, 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-preset) | 거부 |
-| [모니터 역할이 프리셋을 생성하려 하면, 역할 부족으로 거부된다. 슈퍼관리자 검사는 읽기에만 모니터를 허용한다](#creating-the-monitor-role-may-not-create-a-preset) | 거부 |
-| [권한 검사를 꺼도 프리셋 생성은 여전히 거부된다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-preset) | 거부 |
+| [이미 다른 프리셋이 사용 중인 이름으로 슈퍼관리자가 다시 생성하면, 생성된다. 프리셋의 이름에는 유일 제약이 없다](#creating-a-name-another-preset-already-holds-is-allowed) | answered |
+| [카테고리 하나가 있고 슈퍼관리자가 그 카테고리를 지정해 생성하면, 응답의 카테고리가 그것을 가리킨다](#creating-creating-a-preset-under-a-category-points-the-node-at-that-category) | answered |
+| [슈퍼관리자가 시간 창을 함께 지정해 생성하면, 노드에 그 시간 창이 담긴다](#creating-creating-a-preset-with-a-window-carries-that-window-on-the-node) | answered |
+| [슈퍼관리자가 이름, 지표 이름, 템플릿, 허용 라벨 목록만 지정해 생성하면, 순위는 0이고 카테고리·설명·시간 창은 비어 있는 노드 전체가 반환된다](#creating-creating-a-preset-with-the-required-values-answers-with-the-whole-node) | answered |
+| [슈퍼관리자가 존재하지 않는 카테고리 id를 지정해 생성하면, 카테고리가 없다는 이유로 거부된다. 저장소의 참조 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다](#creating-a-category-id-nothing-answers-to-is-refused) | refused |
+| [슈퍼관리자가 아닌 사용자가 프리셋을 생성하려 하면, 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-create-a-preset) | refused |
+| [모니터 역할이 프리셋을 생성하려 하면, 역할 부족으로 거부된다. 슈퍼관리자 검사는 읽기에만 모니터를 허용한다](#creating-the-monitor-role-may-not-create-a-preset) | refused |
+| [권한 검사를 꺼도 프리셋 생성은 여전히 거부된다](#creating-turning-enforcement-off-still-does-not-let-a-user-create-a-preset) | refused |
 
 **execute_preset**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 시작·끝·간격을 지정해 실행하면, 모의 서버가 범위 질의로 응답한다](#executing-running-a-preset-over-a-range-is-a-range-query) | 성공 |
-| [시간 창이 없는 프리셋을 슈퍼관리자가 시간 창을 지정하고 조회 구간 없이 실행하면, 순간 질의로 응답하고 모의 서버가 받은 질의에 요청의 시간 창이 들어 있다](#executing-running-a-preset-without-a-range-is-an-instant-query-carrying-the-asked-window) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 실행할 수 있다](#executing-turning-enforcement-off-lets-a-user-run-a-preset) | 성공 |
-| [라벨 없이는 빈 질의로 렌더되는 프리셋을 슈퍼관리자가 라벨 없이 실행하면, Prometheus가 그 질의를 거부하고 그 거부가 지표를 얻지 못했다는 이유로 그대로 전파된다](#executing-a-query-prometheus-refuses-is-refused-as-a-failed-metric-read) | 거부 |
-| [아무 권한도 없는 사용자가 프리셋을 실행하면 권한 부족으로 거부된다. 실행은 조회와 같은 권한을 묻는다](#executing-a-user-granted-nothing-may-not-run-a-preset) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id로 실행하면, 대상을 찾을 수 없다는 이유로 거부된다. 실행은 서비스가 프리셋을 직접 읽어서 내는 오류라 수정과 삭제의 대상 없음과 종류가 다르다](#executing-running-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
-| [아무 권한도 없는 사용자가 존재하지 않는 id로 실행하면, 대상 없음이 아니라 권한 부족으로 거부된다. 없는 행에는 부여된 권한도 없기 때문이다](#executing-running-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | 거부 |
+| [슈퍼관리자가 시작·끝·간격을 지정해 실행하면, 모의 서버가 범위 질의로 응답한다](#executing-running-a-preset-over-a-range-is-a-range-query) | answered |
+| [시간 창이 없는 프리셋을 슈퍼관리자가 시간 창을 지정하고 조회 구간 없이 실행하면, 순간 질의로 응답하고 모의 서버가 받은 질의에 요청의 시간 창이 들어 있다](#executing-running-a-preset-without-a-range-is-an-instant-query-carrying-the-asked-window) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 실행할 수 있다](#executing-turning-enforcement-off-lets-a-user-run-a-preset) | answered |
+| [라벨 없이는 빈 질의로 렌더되는 프리셋을 슈퍼관리자가 라벨 없이 실행하면, Prometheus가 그 질의를 거부하고 그 거부가 지표를 얻지 못했다는 이유로 그대로 전파된다](#executing-a-query-prometheus-refuses-is-refused-as-a-failed-metric-read) | refused |
+| [아무 권한도 없는 사용자가 프리셋을 실행하면 권한 부족으로 거부된다. 실행은 조회와 같은 권한을 묻는다](#executing-a-user-granted-nothing-may-not-run-a-preset) | refused |
+| [슈퍼관리자가 존재하지 않는 id로 실행하면, 대상을 찾을 수 없다는 이유로 거부된다. 실행은 서비스가 프리셋을 직접 읽어서 내는 오류라 수정과 삭제의 대상 없음과 종류가 다르다](#executing-running-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
+| [아무 권한도 없는 사용자가 존재하지 않는 id로 실행하면, 대상 없음이 아니라 권한 부족으로 거부된다. 없는 행에는 부여된 권한도 없기 때문이다](#executing-running-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | refused |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 프리셋 여럿을 한 번에 고치며 하나에 잘못된 템플릿을 주면, 그 하나만 템플릿 검사의 이유로 실패 목록에 오고 나머지는 고쳐진다](#partial_bulk_editing-a-broken-template-fails-only-the-preset-it-was-meant-for) | 성공 |
-| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | 성공 |
-| [슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | 성공 |
+| [슈퍼관리자가 프리셋 여럿을 한 번에 고치며 하나에 잘못된 템플릿을 주면, 그 하나만 템플릿 검사의 이유로 실패 목록에 오고 나머지는 고쳐진다](#partial_bulk_editing-a-broken-template-fails-only-the-preset-it-was-meant-for) | answered |
+| [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | answered |
+| [슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | answered |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [슈퍼관리자가 값을 하나도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-an-update-giving-no-value-answers-the-node-unchanged) | 성공 |
-| [필터 라벨과 그룹 라벨이 모두 있는 프리셋을 슈퍼관리자가 필터 라벨만 수정하면, 필터 라벨은 새 값이고 그룹 라벨은 그대로다](#editing-changing-only-the-filter-labels-keeps-the-group-labels) | 성공 |
-| [설명이 있는 프리셋을 슈퍼관리자가 설명을 비우도록 수정하면, 설명이 없어진다](#editing-clearing-the-description-leaves-it-empty) | 성공 |
-| [카테고리 둘 중 한쪽에 속한 프리셋을 슈퍼관리자가 다른 카테고리로 옮기면, 응답의 카테고리가 그것을 가리킨다](#editing-moving-a-preset-to-another-category-points-the-node-at-that-one) | 성공 |
-| [프리셋 하나가 있고 슈퍼관리자가 템플릿만 수정하면, 템플릿은 새 값이고 나머지는 그대로다](#editing-the-superadmin-changes-the-template-and-the-rest-stays) | 성공 |
-| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다](#editing-turning-enforcement-off-lets-a-user-edit-a-preset) | 성공 |
-| [같은 프리셋이 있고 아무 권한도 없는 사용자가 이름을 수정하면, 권한 부족으로 거부된다. 이 엔티티는 어느 스코프에도 속하지 않아 권한을 받을 방법이 없다](#editing-a-user-granted-nothing-may-not-edit-a-preset) | 거부 |
-| [슈퍼관리자가 존재하지 않는 id의 이름을 수정하면, 대상을 찾을 수 없다는 이유로 거부된다](#editing-editing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | 거부 |
-| [슈퍼관리자가 존재하지 않는 카테고리 id로 수정하면, 카테고리가 없다는 이유로 거부된다. 저장소의 참조 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다](#editing-moving-a-preset-to-a-category-id-nothing-answers-to-is-refused) | 거부 |
+| [슈퍼관리자가 값을 하나도 지정하지 않고 수정하면, 아무것도 바뀌지 않은 노드가 반환된다](#editing-an-update-giving-no-value-answers-the-node-unchanged) | answered |
+| [필터 라벨과 그룹 라벨이 모두 있는 프리셋을 슈퍼관리자가 필터 라벨만 수정하면, 필터 라벨은 새 값이고 그룹 라벨은 그대로다](#editing-changing-only-the-filter-labels-keeps-the-group-labels) | answered |
+| [설명이 있는 프리셋을 슈퍼관리자가 설명을 비우도록 수정하면, 설명이 없어진다](#editing-clearing-the-description-leaves-it-empty) | answered |
+| [카테고리 둘 중 한쪽에 속한 프리셋을 슈퍼관리자가 다른 카테고리로 옮기면, 응답의 카테고리가 그것을 가리킨다](#editing-moving-a-preset-to-another-category-points-the-node-at-that-one) | answered |
+| [프리셋 하나가 있고 슈퍼관리자가 템플릿만 수정하면, 템플릿은 새 값이고 나머지는 그대로다](#editing-the-superadmin-changes-the-template-and-the-rest-stays) | answered |
+| [권한 검사를 끄면 아무 권한도 없는 사용자도 프리셋을 수정할 수 있다](#editing-turning-enforcement-off-lets-a-user-edit-a-preset) | answered |
+| [같은 프리셋이 있고 아무 권한도 없는 사용자가 이름을 수정하면, 권한 부족으로 거부된다. 이 엔티티는 어느 스코프에도 속하지 않아 권한을 받을 방법이 없다](#editing-a-user-granted-nothing-may-not-edit-a-preset) | refused |
+| [슈퍼관리자가 존재하지 않는 id의 이름을 수정하면, 대상을 찾을 수 없다는 이유로 거부된다](#editing-editing-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
+| [슈퍼관리자가 존재하지 않는 카테고리 id로 수정하면, 카테고리가 없다는 이유로 거부된다. 저장소의 참조 제약이 막는 것이고 도메인 오류로 옮겨져 있지 않다](#editing-moving-a-preset-to-a-category-id-nothing-answers-to-is-refused) | refused |
 
 ### batch_load_by_ids
 

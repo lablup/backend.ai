@@ -1,78 +1,78 @@
 ## project
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/project/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/project/adapter.py)
+[what it guarantees](/src/ai/backend/manager/api/adapters/project/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/project/adapter.py)
 
-시나리오: 미완 15 / 17
+Scenario: incomplete 15 / 17
 
-- ops 로 구성 (11)
-  - admin_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_image_commit_registries — 대표 성공 ✓ · 대표 실패 ✓
-  - delete — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - get — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_delete — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_restore — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - restore — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - scoped_search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - search_by_domain_name — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - search_by_user — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-- ops + 직접 구현 (4)
-  - assign_users — 성공 있음 1 · 실패 없음 (atomic_bulk_get_ops, scope) — SCENARIO-GAP
-  - partial_bulk_update — 성공 있음 3 · 실패 없음 (partial_bulk, partial_bulk_delete_ops, partial_bulk_restore_ops) — SCENARIO-GAP
-  - unassign_users — 성공 없음 · 실패 없음 (atomic_bulk_get_ops, scope) — SCENARIO-GAP
-  - update — 성공 있음 2 · 실패 없음 (single_delete_ops, single_entity, single_restore_ops) — SCENARIO-GAP
-- 직접 구현 (2)
-  - admin_create — 성공 있음 1 · 실패 있음 1 (scope)
-  - admin_purge — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
+- built from ops (11)
+  - admin_search — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_image_commit_registries — representative success ✓ · representative refusal ✓
+  - delete — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - get — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_delete — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - partial_bulk_restore — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
+  - restore — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - scoped_search — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - search_by_domain_name — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - search_by_user — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+- ops + direct implementation (4)
+  - assign_users — success present 1 · refusal absent (atomic_bulk_get_ops, scope) — SCENARIO-GAP
+  - partial_bulk_update — success present 3 · refusal absent (partial_bulk, partial_bulk_delete_ops, partial_bulk_restore_ops) — SCENARIO-GAP
+  - unassign_users — success absent · refusal absent (atomic_bulk_get_ops, scope) — SCENARIO-GAP
+  - update — success present 2 · refusal absent (single_delete_ops, single_entity, single_restore_ops) — SCENARIO-GAP
+- direct implementation (2)
+  - admin_create — success present 1 · refusal present 1 (scope)
+  - admin_purge — success absent · refusal absent (single_entity) — SCENARIO-GAP
 
 **batch_load_image_commit_registries**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [읽기 권한이 있으면 요청 순서대로 image commit을 위한 Container Registry를 응답한다](#image_commit_registry-read-targets-in-request-order) | 성공 |
-| [읽기 권한이 있고 image commit을 위한 Container Registry가 설정되지 않았으면 빈 값을 응답한다](#image_commit_registry-read-unconfigured-targets) | 성공 |
-| [읽기 권한이 없으면 image commit을 위한 Container Registry 조회를 거부한다](#image_commit_registry-target-read-requires-permission) | 거부 |
+| [읽기 권한이 있으면 요청 순서대로 image commit을 위한 Container Registry를 응답한다](#image_commit_registry-read-targets-in-request-order) | answered |
+| [읽기 권한이 있고 image commit을 위한 Container Registry가 설정되지 않았으면 빈 값을 응답한다](#image_commit_registry-read-unconfigured-targets) | answered |
+| [읽기 권한이 없으면 image commit을 위한 Container Registry 조회를 거부한다](#image_commit_registry-target-read-requires-permission) | refused |
 
 **partial_bulk_delete**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 프로젝트 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-projects) | 성공 |
-| [활성 프로젝트 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 비활성으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | 성공 |
+| [아무 권한도 받지 않은 사용자가 프로젝트 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-projects) | answered |
+| [활성 프로젝트 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 비활성으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one) | answered |
 
 **partial_bulk_restore**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [soft delete 된 프로젝트 여럿을 한 번에 restore 하면, 모두 활성으로 온다](#partial_bulk_deleting-restoring-several-brings-them-back) | 성공 |
+| [soft delete 된 프로젝트 여럿을 한 번에 restore 하면, 모두 활성으로 온다](#partial_bulk_deleting-restoring-several-brings-them-back) | answered |
 
 **assign_users**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [프로젝트와 그 프로젝트 스코프의 역할이 있을 때 사용자를 배정하면, 그 사용자가 명부에 오른다](#project-assigning-a-user-to-a-project-puts-them-on-its-roster) | 성공 |
+| [프로젝트와 그 프로젝트 스코프의 역할이 있을 때 사용자를 배정하면, 그 사용자가 명부에 오른다](#project-assigning-a-user-to-a-project-puts-them-on-its-roster) | answered |
 
 **partial_bulk_update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [아무 권한도 받지 않은 사용자가 프로젝트 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-projects) | 성공 |
-| [활성 플래그와 설명을 섞어 프로젝트 여럿을 한 번에 고치면, 플래그를 내린 것은 soft delete 되고 올린 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-projects) | 성공 |
-| [슈퍼관리자가 프로젝트 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-projects-at-once) | 성공 |
+| [아무 권한도 받지 않은 사용자가 프로젝트 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-projects) | answered |
+| [활성 플래그와 설명을 섞어 프로젝트 여럿을 한 번에 고치면, 플래그를 내린 것은 soft delete 되고 올린 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-projects) | answered |
+| [슈퍼관리자가 프로젝트 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-projects-at-once) | answered |
 
 **update**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [활성 플래그를 내리는 수정은 프로젝트를 soft delete 하고, 답이 비활성 상태를 실어 온다](#editing-clearing-the-active-flag-soft-deletes-a-project) | 성공 |
-| [soft delete 된 프로젝트의 활성 플래그를 올리는 수정은 그 프로젝트를 restore 하고, 답이 활성 상태를 실어 온다](#editing-raising-the-active-flag-restores-a-soft-deleted-project) | 성공 |
+| [활성 플래그를 내리는 수정은 프로젝트를 soft delete 하고, 답이 비활성 상태를 실어 온다](#editing-clearing-the-active-flag-soft-deletes-a-project) | answered |
+| [soft delete 된 프로젝트의 활성 플래그를 올리는 수정은 그 프로젝트를 restore 하고, 답이 활성 상태를 실어 온다](#editing-raising-the-active-flag-restores-a-soft-deleted-project) | answered |
 
 **admin_create**
 
-| 시나리오 | 판정 |
+| scenario | verdict |
 |---|---|
-| [도메인과 프로젝트 정책이 있을 때 슈퍼관리자가 프로젝트를 만들면, 그 이름의 프로젝트가 그 도메인 아래에 생긴다](#project-the-superadmin-makes-a-project-in-a-domain) | 성공 |
-| [프로젝트 생성은 역할이 아니라 도메인 스코프의 권한이 지키므로, 아무 권한도 받지 않은 사용자는 권한 부족으로 거부된다](#project-a-user-granted-nothing-may-not-make-a-project) | 거부 |
+| [도메인과 프로젝트 정책이 있을 때 슈퍼관리자가 프로젝트를 만들면, 그 이름의 프로젝트가 그 도메인 아래에 생긴다](#project-the-superadmin-makes-a-project-in-a-domain) | answered |
+| [프로젝트 생성은 역할이 아니라 도메인 스코프의 권한이 지키므로, 아무 권한도 받지 않은 사용자는 권한 부족으로 거부된다](#project-a-user-granted-nothing-may-not-make-a-project) | refused |
 
 ### batch_load_image_commit_registries
 
