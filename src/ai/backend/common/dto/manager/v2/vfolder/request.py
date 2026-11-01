@@ -11,8 +11,16 @@ from pydantic import Field, field_validator
 from ai.backend.common.api_handlers import SENTINEL, BaseRequestModel, Sentinel
 from ai.backend.common.dto.manager.query import DateTimeFilter, StringFilter
 from ai.backend.common.dto.manager.v2.deployment.request import DeploymentStrategyInput
+<<<<<<< HEAD
 from ai.backend.common.identifier.deployment_preset import DeploymentPresetID
 from ai.backend.common.typed_validators import VFolderName
+=======
+from ai.backend.common.dto.manager.v2.entity_label.request import EntityLabelNestedFilter
+from ai.backend.common.dto.manager.v2.vfolder.types import VFolderScope, VFolderUsage
+from ai.backend.common.meta.meta import NEXT_RELEASE_VERSION
+from ai.backend.common.tristate.unset import UNSET, Unset
+from ai.backend.common.typed_validators import VFolderName, VFolderRelativePath
+>>>>>>> 1dcce1905 (fix(BA-8787): require upload destinations inside the vfolder and open staging paths without following symlinks (#16225))
 
 from .types import (
     OrderDirection,
@@ -253,7 +261,7 @@ class CreateDownloadSessionInput(BaseRequestModel):
 class CreateUploadSessionInput(BaseRequestModel):
     """Input for creating a file upload session."""
 
-    path: str = Field(description="File path to upload to")
+    path: VFolderRelativePath = Field(description="File path to upload to")
     size: int = Field(ge=0, description="File size in bytes")
 
 

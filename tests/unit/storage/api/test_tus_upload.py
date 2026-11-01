@@ -4,17 +4,46 @@ Tests for TUS upload offset validation in tus_upload_part().
 
 from __future__ import annotations
 
+import uuid
 from collections.abc import Generator
+<<<<<<< HEAD
 from pathlib import Path
+=======
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
+from pathlib import Path, PurePosixPath
+>>>>>>> 1dcce1905 (fix(BA-8787): require upload destinations inside the vfolder and open staging paths without following symlinks (#16225))
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aiohttp import web
 
+<<<<<<< HEAD
 from ai.backend.common.clients.valkey_client.valkey_tus import TusSessionId
 from ai.backend.storage.api.client import _drain_into_upload_file, tus_upload_part
 from ai.backend.storage.errors import InvalidAPIParameters, UploadOffsetMismatchError
+=======
+from ai.backend.common.clients.valkey_client.valkey_tus import (
+    TusSessionId,
+    TusSessionNotFoundError,
+)
+from ai.backend.common.clients.valkey_client.valkey_tus.client import TusUploadState
+from ai.backend.common.types import VFolderID
+from ai.backend.storage.api.client import (
+    _commit_upload,
+    _drain_into_upload_file,
+    tus_check_session,
+    tus_options,
+    tus_upload_part,
+)
+from ai.backend.storage.api.manager import create_upload_session
+from ai.backend.storage.errors import (
+    InvalidAPIParameters,
+    InvalidSubpathError,
+    UploadOffsetMismatchError,
+)
+>>>>>>> 1dcce1905 (fix(BA-8787): require upload destinations inside the vfolder and open staging paths without following symlinks (#16225))
 
 
 class TestTusUploadPartOffsetValidation:
@@ -331,3 +360,502 @@ class TestDrainOrphanBytesRecovery:
         # The orphan tail bytes are gone; the prior failure did not corrupt
         # the file as observed by future PATCHes.
         assert orphan_tail not in final_bytes[committed_offset:]
+<<<<<<< HEAD
+=======
+
+
+_NOW = datetime(2026, 10, 20, 9, 0, 0, tzinfo=UTC)
+
+
+@dataclass(frozen=True)
+class _UploadExpiresCase:
+    earlier_deadline: str
+    token_expires_in: timedelta
+    offset_ttl: timedelta
+    expected_upload_expires: str
+
+
+class TestTusUploadExpiration:
+    """``Upload-Expires`` is the earlier of the upload token's ``exp`` and the offset TTL."""
+
+    @pytest.fixture
+    def frozen_now(self) -> Generator[None, None, None]:
+        with patch("ai.backend.storage.api.client.datetime", wraps=datetime) as mock_datetime:
+            mock_datetime.now.return_value = _NOW
+            yield
+
+    @pytest.fixture
+    def volume(self, tmp_path: Path) -> MagicMock:
+        upload_parent = tmp_path / ".upload"
+        upload_parent.mkdir()
+        (upload_parent / "test-session").write_bytes(b"x" * 1024)
+        volume = MagicMock()
+        volume.mangle_vfpath.return_value = tmp_path
+        return volume
+
+    @pytest.fixture
+    def token_data(self, case: _UploadExpiresCase) -> dict[str, Any]:
+        return {
+            "volume": "test-volume",
+            "vfid": MagicMock(),
+            "session": "test-session",
+            "size": "10240",
+            "relpath": "test-file.txt",
+            "exp": int((_NOW + case.token_expires_in).timestamp()),
+        }
+
+    @pytest.fixture
+    def ctx(self, case: _UploadExpiresCase, volume: MagicMock) -> MagicMock:
+        valkey_tus_client = AsyncMock()
+        valkey_tus_client.get_upload_state = AsyncMock(
+            return_value=TusUploadState(
+                offset=1024, ttl_seconds=int(case.offset_ttl.total_seconds())
+            )
+        )
+        valkey_tus_client.try_load_offset = AsyncMock(return_value=1024)
+        valkey_tus_client.advance_offset = AsyncMock(
+            return_value=TusUploadState(
+                offset=1024, ttl_seconds=int(case.offset_ttl.total_seconds())
+            )
+        )
+        ctx = MagicMock()
+        ctx.node_id = "test-node"
+        ctx.valkey_tus_client = valkey_tus_client
+        ctx.volume_pool.get_volume_by_name = MagicMock(return_value=volume)
+        return ctx
+
+    @pytest.fixture
+    def head_request(
+        self, ctx: MagicMock, token_data: dict[str, Any]
+    ) -> Generator[MagicMock, None, None]:
+        request = MagicMock(spec=web.Request)
+        request.app = {"ctx": ctx}
+        with patch("ai.backend.storage.api.client.check_params") as mock_check_params:
+            mock_check_params.return_value.__aenter__ = AsyncMock(
+                return_value={"token": token_data, "dst_dir": None}
+            )
+            mock_check_params.return_value.__aexit__ = AsyncMock(return_value=None)
+            yield request
+
+    @pytest.fixture
+    def patch_request(
+        self, ctx: MagicMock, token_data: dict[str, Any]
+    ) -> Generator[MagicMock, None, None]:
+        """The offset entry read before the drain still has 60 seconds left;
+        ``advance_offset`` refreshes it to ``case.offset_ttl``."""
+        ctx.valkey_tus_client.get_upload_state = AsyncMock(
+            return_value=TusUploadState(offset=1024, ttl_seconds=60)
+        )
+        request = MagicMock(spec=web.Request)
+        request.app = {"ctx": ctx}
+        request.headers = {"Upload-Offset": "1024"}
+        request.content = AsyncMock()
+        request.content.at_eof = MagicMock(return_value=True)
+        with patch("ai.backend.storage.api.client.check_params") as mock_check_params:
+            mock_check_params.return_value.__aenter__ = AsyncMock(
+                return_value={"token": token_data, "dst_dir": None}
+            )
+            mock_check_params.return_value.__aexit__ = AsyncMock(return_value=None)
+            yield request
+
+    @pytest.fixture
+    def options_request(self) -> MagicMock:
+        request = MagicMock(spec=web.Request)
+        request.app = {"ctx": MagicMock()}
+        request.app["ctx"].local_config.storage_proxy.max_upload_size = "1g"
+        return request
+
+    async def test_options_advertises_expiration(self, options_request: MagicMock) -> None:
+        response = await tus_options(options_request)
+
+        assert response.headers["Tus-Extension"] == "expiration"
+        exposed = {
+            name.strip() for name in response.headers["Access-Control-Expose-Headers"].split(",")
+        }
+        assert {"Tus-Version", "Tus-Extension", "Tus-Max-Size", "Upload-Expires"} <= exposed
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _UploadExpiresCase(
+                earlier_deadline="token-exp",
+                token_expires_in=timedelta(hours=1),
+                offset_ttl=timedelta(hours=24),
+                expected_upload_expires="Tue, 20 Oct 2026 10:00:00 GMT",
+            ),
+            _UploadExpiresCase(
+                earlier_deadline="offset-ttl",
+                token_expires_in=timedelta(hours=48),
+                offset_ttl=timedelta(minutes=30),
+                expected_upload_expires="Tue, 20 Oct 2026 09:30:00 GMT",
+            ),
+        ],
+        ids=lambda case: case.earlier_deadline,
+    )
+    async def test_head_reports_upload_expires(
+        self,
+        case: _UploadExpiresCase,
+        frozen_now: None,
+        head_request: MagicMock,
+    ) -> None:
+        response = await tus_check_session(head_request)
+
+        assert response.headers["Upload-Expires"] == case.expected_upload_expires
+
+    @pytest.mark.parametrize(
+        "case",
+        [
+            _UploadExpiresCase(
+                earlier_deadline="token-exp",
+                token_expires_in=timedelta(hours=1),
+                offset_ttl=timedelta(hours=24),
+                expected_upload_expires="Tue, 20 Oct 2026 10:00:00 GMT",
+            ),
+            _UploadExpiresCase(
+                earlier_deadline="offset-ttl",
+                token_expires_in=timedelta(hours=48),
+                offset_ttl=timedelta(hours=24),
+                expected_upload_expires="Wed, 21 Oct 2026 09:00:00 GMT",
+            ),
+        ],
+        ids=lambda case: case.earlier_deadline,
+    )
+    async def test_patch_reports_refreshed_upload_expires(
+        self,
+        case: _UploadExpiresCase,
+        frozen_now: None,
+        patch_request: MagicMock,
+    ) -> None:
+        response = await tus_upload_part(patch_request)
+
+        assert response.headers["Upload-Expires"] == case.expected_upload_expires
+
+
+_SESSION = "test-session"
+_PAYLOAD = b"payload"
+
+
+@pytest.fixture
+def vfolder(tmp_path: Path) -> Path:
+    path = tmp_path / "vfolder"
+    path.mkdir()
+    return path
+
+
+@pytest.fixture
+def outside(tmp_path: Path) -> Path:
+    path = tmp_path / "outside"
+    path.mkdir()
+    return path
+
+
+@pytest.fixture
+def staging_file(vfolder: Path) -> Path:
+    upload_dir = vfolder / ".upload"
+    upload_dir.mkdir()
+    path = upload_dir / _SESSION
+    path.write_bytes(_PAYLOAD)
+    return path
+
+
+def _body() -> AsyncMock:
+    content = AsyncMock()
+    content.at_eof = MagicMock(side_effect=[False, True])
+    content.read = AsyncMock(side_effect=[_PAYLOAD])
+    return content
+
+
+def _upload_request(
+    vfolder: Path,
+    *,
+    relpath: str,
+    dst_dir: str | None = None,
+    upload_offset: int = 0,
+    size: int = len(_PAYLOAD),
+) -> tuple[MagicMock, Any]:
+    """Build a PATCH request and the ``check_params`` patcher carrying its token."""
+    volume = MagicMock()
+    volume.mangle_vfpath.return_value = vfolder
+    valkey_tus_client = AsyncMock()
+    state = TusUploadState(offset=upload_offset, ttl_seconds=60)
+    valkey_tus_client.get_upload_state = AsyncMock(return_value=state)
+    valkey_tus_client.try_load_offset = AsyncMock(return_value=upload_offset)
+    valkey_tus_client.advance_offset = AsyncMock(
+        return_value=TusUploadState(offset=upload_offset + len(_PAYLOAD), ttl_seconds=60)
+    )
+    ctx = MagicMock()
+    ctx.node_id = "test-node"
+    ctx.valkey_tus_client = valkey_tus_client
+    ctx.volume_pool.get_volume_by_name = MagicMock(return_value=volume)
+    request = MagicMock(spec=web.Request)
+    request.app = {"ctx": ctx}
+    request.headers = {"Upload-Offset": str(upload_offset)}
+    request.content = _body()
+    token = {
+        "volume": "test-volume",
+        "vfid": MagicMock(),
+        "session": _SESSION,
+        "size": size,
+        "relpath": relpath,
+        "exp": int((datetime.now(UTC) + timedelta(hours=1)).timestamp()),
+    }
+    mock_check_params = MagicMock()
+    mock_check_params.return_value.__aenter__ = AsyncMock(
+        return_value={"token": token, "dst_dir": dst_dir}
+    )
+    mock_check_params.return_value.__aexit__ = AsyncMock(return_value=None)
+    return request, patch("ai.backend.storage.api.client.check_params", mock_check_params)
+
+
+class TestUploadDestination:
+    @pytest.mark.parametrize(
+        ("relpath", "dst_dir", "expected"),
+        [
+            ("file.txt", None, "file.txt"),
+            ("a/b/file.txt", None, "a/b/file.txt"),
+            ("file.txt", "sub/dir", "sub/dir/file.txt"),
+            ("b/file.txt", "a", "a/b/file.txt"),
+            ("a/../file.txt", None, "file.txt"),
+        ],
+    )
+    async def test_upload_inside_vfolder_lands_on_destination(
+        self,
+        vfolder: Path,
+        staging_file: Path,
+        relpath: str,
+        dst_dir: str | None,
+        expected: str,
+    ) -> None:
+        request, check_params_patch = _upload_request(vfolder, relpath=relpath, dst_dir=dst_dir)
+
+        with check_params_patch:
+            response = await tus_upload_part(request)
+
+        assert response.status == 204
+        assert (vfolder / expected).read_bytes() == _PAYLOAD
+        assert not staging_file.exists()
+
+    @pytest.mark.parametrize(
+        ("relpath", "dst_dir"),
+        [
+            ("../escaped.txt", None),
+            ("a/../../escaped.txt", None),
+            ("escaped.txt", ".."),
+            ("../../escaped.txt", "a"),
+            ("x/../../escaped.txt", "a/.."),
+            (".", None),
+            ("a/..", None),
+        ],
+    )
+    async def test_upload_outside_vfolder_is_refused_before_reading_body(
+        self,
+        vfolder: Path,
+        staging_file: Path,
+        relpath: str,
+        dst_dir: str | None,
+    ) -> None:
+        request, check_params_patch = _upload_request(vfolder, relpath=relpath, dst_dir=dst_dir)
+
+        with check_params_patch, pytest.raises(InvalidSubpathError):
+            await tus_upload_part(request)
+
+        request.content.read.assert_not_awaited()
+        assert staging_file.read_bytes() == _PAYLOAD
+        assert not (vfolder.parent / "escaped.txt").exists()
+
+    async def test_absolute_dst_dir_is_refused(
+        self, vfolder: Path, staging_file: Path, outside: Path
+    ) -> None:
+        request, check_params_patch = _upload_request(
+            vfolder, relpath="escaped.txt", dst_dir=str(outside)
+        )
+
+        with check_params_patch, pytest.raises(InvalidSubpathError):
+            await tus_upload_part(request)
+
+        assert list(outside.iterdir()) == []
+
+    async def test_symlink_to_outside_in_destination_is_refused(
+        self, vfolder: Path, staging_file: Path, outside: Path
+    ) -> None:
+        (vfolder / "link").symlink_to(outside)
+        request, check_params_patch = _upload_request(vfolder, relpath="link/escaped.txt")
+
+        with check_params_patch, pytest.raises(InvalidSubpathError):
+            await tus_upload_part(request)
+
+        assert list(outside.iterdir()) == []
+
+    async def test_symlink_to_directory_inside_vfolder_is_followed(
+        self, vfolder: Path, staging_file: Path
+    ) -> None:
+        (vfolder / "real").mkdir()
+        (vfolder / "link").symlink_to(vfolder / "real")
+        request, check_params_patch = _upload_request(vfolder, relpath="link/file.txt")
+
+        with check_params_patch:
+            await tus_upload_part(request)
+
+        assert (vfolder / "real" / "file.txt").read_bytes() == _PAYLOAD
+
+    @pytest.mark.parametrize("relpath", ["real", "link"])
+    async def test_destination_that_is_a_directory_is_refused_and_staging_removed(
+        self, vfolder: Path, staging_file: Path, relpath: str
+    ) -> None:
+        (vfolder / "real").mkdir()
+        (vfolder / "real" / "kept.txt").write_bytes(b"kept")
+        (vfolder / "link").symlink_to(vfolder / "real")
+        request, check_params_patch = _upload_request(vfolder, relpath=relpath)
+
+        with check_params_patch, pytest.raises(InvalidSubpathError):
+            await tus_upload_part(request)
+
+        assert not staging_file.exists()
+        assert (vfolder / "real" / "kept.txt").read_bytes() == b"kept"
+        assert (vfolder / "link").is_symlink()
+
+    def test_directory_swapped_for_symlink_after_resolving_is_refused(
+        self, vfolder: Path, staging_file: Path, outside: Path
+    ) -> None:
+        (vfolder / "sub").symlink_to(outside)
+        resolved_before_swap = vfolder.resolve() / "sub" / "file.txt"
+
+        with (
+            patch(
+                "ai.backend.storage.api.client.resolve_upload_target",
+                return_value=resolved_before_swap,
+            ),
+            pytest.raises(InvalidSubpathError),
+        ):
+            _commit_upload(MagicMock(), vfolder, staging_file, "sub/file.txt", None)
+
+        assert list(outside.iterdir()) == []
+        assert staging_file.exists()
+
+
+class TestStagingSymlink:
+    @pytest.mark.parametrize("start_offset", [0, 3])
+    async def test_staging_file_symlink_is_not_written_through(
+        self, vfolder: Path, outside: Path, start_offset: int
+    ) -> None:
+        existing_file = outside / "existing_file"
+        existing_file.write_bytes(b"original")
+        upload_dir = vfolder / ".upload"
+        upload_dir.mkdir()
+        (upload_dir / _SESSION).symlink_to(existing_file)
+
+        with pytest.raises(TusSessionNotFoundError):
+            await _drain_into_upload_file(
+                _body(), upload_dir / _SESSION, start_offset, TusSessionId(_SESSION)
+            )
+
+        assert existing_file.read_bytes() == b"original"
+
+    @pytest.mark.parametrize("start_offset", [0, 3])
+    async def test_upload_dir_symlink_is_not_written_through(
+        self, vfolder: Path, outside: Path, start_offset: int
+    ) -> None:
+        existing_file = outside / _SESSION
+        existing_file.write_bytes(b"original")
+        (vfolder / ".upload").symlink_to(outside)
+
+        with pytest.raises(TusSessionNotFoundError):
+            await _drain_into_upload_file(
+                _body(), vfolder / ".upload" / _SESSION, start_offset, TusSessionId(_SESSION)
+            )
+
+        assert existing_file.read_bytes() == b"original"
+
+    @pytest.mark.parametrize("swap", ["file", "dir", "dangling"])
+    async def test_patch_on_symlinked_staging_reports_missing_session(
+        self, vfolder: Path, outside: Path, swap: str
+    ) -> None:
+        existing_file = outside / _SESSION
+        existing_file.write_bytes(b"original")
+        upload_dir = vfolder / ".upload"
+        match swap:
+            case "file":
+                upload_dir.mkdir()
+                (upload_dir / _SESSION).symlink_to(existing_file)
+            case "dir":
+                upload_dir.symlink_to(outside)
+            case "dangling":
+                upload_dir.symlink_to(outside / "missing")
+        request, check_params_patch = _upload_request(vfolder, relpath="file.txt")
+
+        with check_params_patch, pytest.raises(TusSessionNotFoundError):
+            await tus_upload_part(request)
+
+        assert existing_file.read_bytes() == b"original"
+        assert not (vfolder / "file.txt").exists()
+
+    def test_commit_with_symlinked_upload_dir_is_refused(
+        self, vfolder: Path, outside: Path
+    ) -> None:
+        (outside / _SESSION).write_bytes(b"original")
+        (vfolder / ".upload").symlink_to(outside)
+
+        with pytest.raises(InvalidSubpathError):
+            _commit_upload(MagicMock(), vfolder, vfolder / ".upload" / _SESSION, "file.txt", None)
+
+        assert (outside / _SESSION).read_bytes() == b"original"
+        assert not (vfolder / "file.txt").exists()
+
+
+class TestCreateUploadSessionPath:
+    @pytest.fixture
+    def manager_request(self, vfolder: Path) -> Generator[tuple[MagicMock, MagicMock], None, None]:
+        volume = MagicMock()
+        volume.mangle_vfpath.return_value = vfolder
+        volume.prepare_upload = AsyncMock(return_value=_SESSION)
+        ctx = MagicMock()
+        ctx.valkey_tus_client = AsyncMock()
+        ctx.volume_pool.get_volume_by_name = MagicMock(return_value=volume)
+        ctx.local_config.storage_proxy.secret = "test-secret"
+        ctx.local_config.storage_proxy.session_expire = timedelta(hours=1)
+        request = MagicMock(spec=web.Request)
+        request.app = {"ctx": ctx}
+        yield request, volume
+
+    def _params(self, relpath: str) -> MagicMock:
+        check_params = MagicMock()
+        check_params.return_value.__aenter__ = AsyncMock(
+            return_value={
+                "volume": "test-volume",
+                "vfid": VFolderID(None, uuid.uuid4()),
+                "relpath": PurePosixPath(relpath),
+                "size": 1,
+            }
+        )
+        check_params.return_value.__aexit__ = AsyncMock(return_value=None)
+        return check_params
+
+    @pytest.mark.parametrize("relpath", ["../escaped.txt", "a/../../escaped.txt", "."])
+    async def test_path_outside_vfolder_gets_no_session(
+        self, manager_request: tuple[MagicMock, MagicMock], relpath: str
+    ) -> None:
+        request, volume = manager_request
+
+        with (
+            patch("ai.backend.storage.api.manager.check_params", self._params(relpath)),
+            patch("ai.backend.storage.api.manager.log_manager_api_entry", AsyncMock()),
+            pytest.raises(InvalidSubpathError),
+        ):
+            await create_upload_session(request)
+
+        volume.prepare_upload.assert_not_awaited()
+
+    async def test_path_inside_vfolder_gets_a_token(
+        self, manager_request: tuple[MagicMock, MagicMock]
+    ) -> None:
+        request, volume = manager_request
+
+        with (
+            patch("ai.backend.storage.api.manager.check_params", self._params("sub/file.txt")),
+            patch("ai.backend.storage.api.manager.log_manager_api_entry", AsyncMock()),
+        ):
+            response = await create_upload_session(request)
+
+        assert response.status == 200
+        volume.prepare_upload.assert_awaited_once()
+>>>>>>> 1dcce1905 (fix(BA-8787): require upload destinations inside the vfolder and open staging paths without following symlinks (#16225))

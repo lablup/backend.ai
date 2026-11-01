@@ -5,15 +5,17 @@ Client-facing API
 from __future__ import annotations
 
 import asyncio
+import errno
 import logging
 import os
+import stat
 import urllib.parse
 import uuid
 from collections.abc import AsyncGenerator, Iterator, Mapping, MutableMapping
 from contextlib import AbstractAsyncContextManager
 from datetime import UTC, datetime
 from http import HTTPStatus
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -24,7 +26,6 @@ from typing import (
 )
 
 import aiofiles
-import aiofiles.os
 import aiohttp_cors
 import janus
 import trafaret as t
@@ -51,6 +52,7 @@ from ai.backend.storage import __version__
 from ai.backend.storage.dto.context import StorageRootCtx
 from ai.backend.storage.errors import (
     InvalidAPIParameters,
+    InvalidSubpathError,
     UploadOffsetMismatchError,
 )
 from ai.backend.storage.services.file_stream.zip import (
@@ -58,9 +60,12 @@ from ai.backend.storage.services.file_stream.zip import (
 )
 from ai.backend.storage.types import SENTINEL
 from ai.backend.storage.utils import (
+    NOFOLLOW_REFUSED_ERRNOS,
     CheckParamSource,
     build_attachment_headers,
     check_params,
+    open_dir_nofollow,
+    resolve_upload_target,
 )
 
 if TYPE_CHECKING:
@@ -78,6 +83,73 @@ log = BraceStyleAdapter(logging.getLogger(__spec__.name))
 
 DEFAULT_CHUNK_SIZE: Final = 256 * 1024  # 256 KiB
 DEFAULT_INFLIGHT_CHUNKS: Final = 8
+_STAGING_UNAVAILABLE_ERRNOS: Final = NOFOLLOW_REFUSED_ERRNOS | {errno.ENOENT}
+
+
+def _open_staging_file(path: str | Path, flags: int) -> int:
+    staging_path = Path(path)
+    with open_dir_nofollow(staging_path.parent) as dir_fd:
+        return os.open(staging_path.name, flags | os.O_NOFOLLOW, 0o666, dir_fd=dir_fd)
+
+
+def _staging_file_exists(staging_path: Path) -> bool:
+    try:
+        with open_dir_nofollow(staging_path.parent) as dir_fd:
+            st = os.stat(staging_path.name, dir_fd=dir_fd, follow_symlinks=False)
+    except OSError as e:
+        if e.errno in _STAGING_UNAVAILABLE_ERRNOS:
+            return False
+        raise
+    return stat.S_ISREG(st.st_mode)
+
+
+def _commit_upload(
+    vfid: VFolderID,
+    vfpath: Path,
+    staging_path: Path,
+    relpath: str,
+    dst_dir: str | None,
+) -> None:
+    """Move the staging file to its destination, walking the resolved path without following symlinks."""
+    root = vfpath.resolve()
+    target = resolve_upload_target(vfid, vfpath, relpath, dst_dir)
+    try:
+        with open_dir_nofollow(staging_path.parent) as src_dir_fd:
+            dst_dir_fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                for part in target.relative_to(root).parent.parts:
+                    try:
+                        os.mkdir(part, dir_fd=dst_dir_fd)
+                    except FileExistsError:
+                        pass
+                    next_fd = os.open(
+                        part,
+                        os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                        dir_fd=dst_dir_fd,
+                    )
+                    os.close(dst_dir_fd)
+                    dst_dir_fd = next_fd
+                try:
+                    os.rename(
+                        staging_path.name,
+                        target.name,
+                        src_dir_fd=src_dir_fd,
+                        dst_dir_fd=dst_dir_fd,
+                    )
+                except IsADirectoryError:
+                    os.unlink(staging_path.name, dir_fd=src_dir_fd)
+                    raise
+            finally:
+                os.close(dst_dir_fd)
+    except OSError as e:
+        if isinstance(e, IsADirectoryError) or e.errno in NOFOLLOW_REFUSED_ERRNOS:
+            raise InvalidSubpathError(vfid, PurePosixPath(dst_dir or "", relpath)) from e
+        raise
+    finally:
+        try:
+            staging_path.parent.rmdir()
+        except OSError:
+            pass
 
 
 async def _drain_into_upload_file(
@@ -92,12 +164,13 @@ async def _drain_into_upload_file(
     ``r+b`` which refuses to create. A continuation with a missing staging
     file means it was wiped out of band (NFS GC, manual ``rm``, etc.) —
     re-creating would silently zero-pad the prefix via ``truncate`` and
-    corrupt the upload. Surface it as a vanished session instead.
+    corrupt the upload. Surface it as a vanished session instead, also when
+    the staging file or its directory is a symlink.
     """
     mode: Literal["w+b", "r+b"] = "w+b" if start_offset == 0 else "r+b"
     bytes_written = 0
     try:
-        async with aiofiles.open(upload_temp_path, mode=mode) as f:
+        async with aiofiles.open(upload_temp_path, mode=mode, opener=_open_staging_file) as f:
             # Discard any orphan tail bytes left by a prior crashed holder.
             await f.truncate(start_offset)
             await f.seek(start_offset)
@@ -108,11 +181,21 @@ async def _drain_into_upload_file(
                 await f.write(chunk)
                 bytes_written += len(chunk)
             await f.flush()
+<<<<<<< HEAD
             await asyncio.get_running_loop().run_in_executor(None, os.fsync, f.fileno())
     except FileNotFoundError as e:
         raise TusSessionNotFoundError(
             f"Upload session {session_id} staging file is missing at offset {start_offset}"
         ) from e
+=======
+            await run_in_executor_with_context(None, os.fsync, f.fileno())
+    except OSError as e:
+        if e.errno in _STAGING_UNAVAILABLE_ERRNOS:
+            raise TusSessionNotFoundError(
+                f"Upload session {session_id} staging file is missing at offset {start_offset}"
+            ) from e
+        raise
+>>>>>>> 1dcce1905 (fix(BA-8787): require upload destinations inside the vfolder and open staging paths without following symlinks (#16225))
     return bytes_written
 
 
@@ -397,7 +480,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
 
     class Params(TypedDict):
         token: UploadTokenData
-        dst_dir: str
+        dst_dir: str | None
 
     async with cast(
         AbstractAsyncContextManager[Params],
@@ -416,10 +499,25 @@ async def tus_upload_part(request: web.Request) -> web.Response:
         ),
     ) as params:
         token_data = params["token"]
+<<<<<<< HEAD
         async with ctx.get_volume(token_data["volume"]) as volume:
             headers = await prepare_tus_session_headers(request, token_data, volume)
             vfpath = volume.mangle_vfpath(token_data["vfid"])
             upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
+=======
+        volume = ctx.volume_pool.get_volume_by_name(StorageVolumeName(token_data["volume"]))
+        headers = await prepare_tus_session_headers(request, token_data, volume)
+        vfpath = volume.mangle_vfpath(token_data["vfid"])
+        upload_temp_path: Path = vfpath / ".upload" / token_data["session"]
+        await run_in_executor_with_context(
+            None,
+            resolve_upload_target,
+            token_data["vfid"],
+            vfpath,
+            token_data["relpath"],
+            params["dst_dir"],
+        )
+>>>>>>> 1dcce1905 (fix(BA-8787): require upload destinations inside the vfolder and open staging paths without following symlinks (#16225))
 
             # TUS protocol requires Upload-Offset validation before appending data
             upload_offset_header = request.headers.get("Upload-Offset")
@@ -428,6 +526,40 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     "Missing required Upload-Offset header for TUS PATCH request"
                 )
 
+<<<<<<< HEAD
+=======
+        try:
+            client_offset = int(upload_offset_header)
+        except ValueError as e:
+            raise InvalidAPIParameters(
+                f"Invalid Upload-Offset header value: {upload_offset_header}"
+            ) from e
+
+        session_id = TusSessionId(token_data["session"])
+        holder_token = f"{ctx.node_id}:{uuid.uuid4().hex}"
+        actual_offset = await ctx.valkey_tus_client.try_load_offset(session_id, holder_token)
+        if client_offset != actual_offset:
+            # We hold the lease but the precondition fails — release it
+            # before bailing so the next PATCH does not have to wait for
+            # the TTL.
+            await ctx.valkey_tus_client.release_lease(session_id, holder_token)
+            raise UploadOffsetMismatchError(
+                f"Upload offset mismatch: expected {actual_offset}, got {client_offset}"
+            )
+        watcher_task = asyncio.create_task(
+            ctx.valkey_tus_client.watch_lease(session_id),
+            name=f"tus-lease-watch-{session_id}",
+        )
+        try:
+            bytes_written = await _drain_into_upload_file(
+                request.content, upload_temp_path, actual_offset, session_id
+            )
+        except BaseException:
+            await ctx.valkey_tus_client.release_lease(session_id, holder_token)
+            raise
+        finally:
+            watcher_task.cancel()
+>>>>>>> 1dcce1905 (fix(BA-8787): require upload destinations inside the vfolder and open staging paths without following symlinks (#16225))
             try:
                 client_offset = int(upload_offset_header)
             except ValueError as e:
@@ -435,6 +567,7 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     f"Invalid Upload-Offset header value: {upload_offset_header}"
                 ) from e
 
+<<<<<<< HEAD
             await aiofiles.os.makedirs(upload_temp_path.parent, exist_ok=True)
 
             session_id = TusSessionId(token_data["session"])
@@ -482,6 +615,20 @@ async def tus_upload_part(request: web.Request) -> web.Response:
                     await aiofiles.os.rmdir(upload_temp_path.parent)
                 except OSError:
                     pass
+=======
+        headers["Upload-Offset"] = str(upload_state.offset)
+        headers["Upload-Expires"] = _upload_expires_at(token_data["exp"], upload_state.ttl_seconds)
+        if upload_state.offset >= int(token_data["size"]):
+            await run_in_executor_with_context(
+                None,
+                _commit_upload,
+                token_data["vfid"],
+                vfpath,
+                upload_temp_path,
+                token_data["relpath"],
+                params["dst_dir"],
+            )
+>>>>>>> 1dcce1905 (fix(BA-8787): require upload destinations inside the vfolder and open staging paths without following symlinks (#16225))
     return web.Response(status=HTTPStatus.NO_CONTENT, headers=headers)
 
 
@@ -515,7 +662,7 @@ async def prepare_tus_session_headers(
 ) -> MutableMapping[str, str]:
     vfpath = volume.mangle_vfpath(token_data["vfid"])
     upload_temp_path = vfpath / ".upload" / token_data["session"]
-    if not Path(upload_temp_path).exists():
+    if not await run_in_executor_with_context(None, _staging_file_exists, upload_temp_path):
         raise TusSessionNotFoundError(
             f"Upload session {token_data['session']} has no on-disk staging file"
         )
