@@ -1,47 +1,47 @@
 ## fair_share
 
-[what it guarantees](/src/ai/backend/manager/api/adapters/fair_share/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/fair_share/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/fair_share/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/fair_share/adapter.py)
 
 Scenario: incomplete 13 / 15
 
 - direct implementation (15)
-  - atomic_bulk_upsert_domain — success present 1 · refusal present 2 (scope)
-  - atomic_bulk_upsert_project — success absent · refusal absent (scope) — SCENARIO-GAP
-  - atomic_bulk_upsert_user — success absent · refusal absent (scope) — SCENARIO-GAP
-  - get_domain — success absent · refusal absent (scope) — SCENARIO-GAP
-  - get_project — success absent · refusal absent (scope) — SCENARIO-GAP
-  - get_user — success absent · refusal absent (scope) — SCENARIO-GAP
-  - search_domain — success absent · refusal absent (global_scope) — SCENARIO-GAP
-  - search_project — success absent · refusal absent (global_scope) — SCENARIO-GAP
-  - search_rg_domain — success absent · refusal absent (scope) — SCENARIO-GAP
-  - search_rg_project — success absent · refusal absent (scope) — SCENARIO-GAP
-  - search_rg_user — success absent · refusal absent (scope) — SCENARIO-GAP
-  - search_user — success absent · refusal absent (global_scope) — SCENARIO-GAP
-  - upsert_domain — success present 1 · refusal present 2 (scope)
-  - upsert_project — success absent · refusal absent (scope) — SCENARIO-GAP
-  - upsert_user — success absent · refusal absent (scope) — SCENARIO-GAP
+  - atomic_bulk_upsert_domain: success present 1 · rejection present 2 (scope)
+  - atomic_bulk_upsert_project: success absent · rejection absent (scope): SCENARIO-GAP
+  - atomic_bulk_upsert_user: success absent · rejection absent (scope): SCENARIO-GAP
+  - get_domain: success absent · rejection absent (scope): SCENARIO-GAP
+  - get_project: success absent · rejection absent (scope): SCENARIO-GAP
+  - get_user: success absent · rejection absent (scope): SCENARIO-GAP
+  - search_domain: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - search_project: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - search_rg_domain: success absent · rejection absent (scope): SCENARIO-GAP
+  - search_rg_project: success absent · rejection absent (scope): SCENARIO-GAP
+  - search_rg_user: success absent · rejection absent (scope): SCENARIO-GAP
+  - search_user: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - upsert_domain: success present 1 · rejection present 2 (scope)
+  - upsert_project: success absent · rejection absent (scope): SCENARIO-GAP
+  - upsert_user: success absent · rejection absent (scope): SCENARIO-GAP
 
 **atomic_bulk_upsert_domain**
 
 | scenario | verdict |
 |---|---|
 | [슈퍼관리자가 도메인 둘의 가중치를 한 번에 정하면, 둘을 정했다는 개수가 온다](#atomic_bulk_upserting-the-superadmin-sets-several-domain-weights-at-once) | answered |
-| [아무 권한도 받지 않은 사용자가 도메인 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부된다](#atomic_bulk_upserting-a-user-granted-nothing-may-not-set-several-domain-weights) | refused |
-| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 도메인 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부된다. 가중치 쓰기는 그룹이 아니라 전역 대상으로 권한을 본다](#atomic_bulk_upserting-a-user-granted-update-on-the-group-may-not-set-several-domain-weights) | refused |
+| [아무 권한도 받지 않은 사용자가 도메인 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부된다](#atomic_bulk_upserting-a-user-granted-nothing-may-not-set-several-domain-weights) | rejected |
+| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 도메인 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부된다. 가중치 쓰기는 그룹이 아니라 전역 대상으로 권한을 본다](#atomic_bulk_upserting-a-user-granted-update-on-the-group-may-not-set-several-domain-weights) | rejected |
 
 **upsert_domain**
 
 | scenario | verdict |
 |---|---|
 | [슈퍼관리자가 그룹 안 도메인의 가중치를 정하면, 그 가중치를 실은 기록이 오고 나머지 설정은 그룹 기본값이다](#upserting-the-superadmin-sets-a-domain-weight) | answered |
-| [아무 권한도 받지 않은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 거부된다](#upserting-a-user-granted-nothing-may-not-set-a-domain-weight) | refused |
-| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 거부된다. 가중치 쓰기는 그룹이 아니라 전역 대상으로 권한을 본다](#upserting-a-user-granted-update-on-the-group-may-not-set-a-domain-weight) | refused |
+| [아무 권한도 받지 않은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 거부된다](#upserting-a-user-granted-nothing-may-not-set-a-domain-weight) | rejected |
+| [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 거부된다. 가중치 쓰기는 그룹이 아니라 전역 대상으로 권한을 본다](#upserting-a-user-granted-update-on-the-group-may-not-set-a-domain-weight) | rejected |
 
 ### atomic_bulk_upsert_domain
 
 <a id="atomic_bulk_upserting-the-superadmin-sets-several-domain-weights-at-once"></a>
 
-#### [the-superadmin-sets-several-domain-weights-at-once](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting.py) — pass
+#### [the-superadmin-sets-several-domain-weights-at-once](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting.py): pass
 
 슈퍼관리자가 도메인 둘의 가중치를 한 번에 정하면, 둘을 정했다는 개수가 온다
 
@@ -59,7 +59,7 @@ Given
 
 When
 
-- FairShareAdapter.atomic_bulk_upsert_domain — user-1이 resource-group-1 안 도메인 2개의 가중치를 한 번에 정함
+- FairShareAdapter.atomic_bulk_upsert_domain: user-1이 resource-group-1 안 도메인 2개의 가중치를 한 번에 정함
 
 Then
 
@@ -68,7 +68,7 @@ Then
 
 <a id="atomic_bulk_upserting-a-user-granted-nothing-may-not-set-several-domain-weights"></a>
 
-#### [a-user-granted-nothing-may-not-set-several-domain-weights](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting.py) — pass
+#### [a-user-granted-nothing-may-not-set-several-domain-weights](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting.py): pass
 
 아무 권한도 받지 않은 사용자가 도메인 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부된다
 
@@ -86,7 +86,7 @@ Given
 
 When
 
-- FairShareAdapter.atomic_bulk_upsert_domain — user-1이 resource-group-1 안 도메인 2개의 가중치를 한 번에 정함
+- FairShareAdapter.atomic_bulk_upsert_domain: user-1이 resource-group-1 안 도메인 2개의 가중치를 한 번에 정함
 
 Then
 
@@ -95,7 +95,7 @@ Then
 
 <a id="atomic_bulk_upserting-a-user-granted-update-on-the-group-may-not-set-several-domain-weights"></a>
 
-#### [a-user-granted-update-on-the-group-may-not-set-several-domain-weights](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting.py) — pass
+#### [a-user-granted-update-on-the-group-may-not-set-several-domain-weights](/tests/scenario/bai_scenario/manager/fair_share/test_atomic_bulk_upserting.py): pass
 
 그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 도메인 둘의 가중치를 한 번에 정하려 하면 권한 부족으로 거부된다. 가중치 쓰기는 그룹이 아니라 전역 대상으로 권한을 본다
 
@@ -117,7 +117,7 @@ Given
 
 When
 
-- FairShareAdapter.atomic_bulk_upsert_domain — user-1이 resource-group-1 안 도메인 2개의 가중치를 한 번에 정함
+- FairShareAdapter.atomic_bulk_upsert_domain: user-1이 resource-group-1 안 도메인 2개의 가중치를 한 번에 정함
 
 Then
 
@@ -128,7 +128,7 @@ Then
 
 <a id="upserting-the-superadmin-sets-a-domain-weight"></a>
 
-#### [the-superadmin-sets-a-domain-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting.py) — pass
+#### [the-superadmin-sets-a-domain-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting.py): pass
 
 슈퍼관리자가 그룹 안 도메인의 가중치를 정하면, 그 가중치를 실은 기록이 오고 나머지 설정은 그룹 기본값이다
 
@@ -145,12 +145,12 @@ Given
 
 When
 
-- FairShareAdapter.upsert_domain — user-1이 resource-group-1 안 home-1의 가중치를 정함
+- FairShareAdapter.upsert_domain: user-1이 resource-group-1 안 home-1의 가중치를 정함
 
 Then
 
 - 정한 가중치를 실은 기록이 오고, 나머지 설정은 그룹 기본값이다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - resource_group_name = 'resource-group-1'
   - domain_name = 'home-1'
   - spec.weight = Decimal('2.5')
@@ -162,15 +162,15 @@ Then
   - calculation_snapshot.fair_share_factor = Decimal('1')
   - calculation_snapshot.total_decayed_usage = []
   - calculation_snapshot.normalized_usage = Decimal('0')
-  - calculation_snapshot.lookback_start: 무시함 — 쓴 날짜에 따라 달라진다
-  - calculation_snapshot.lookback_end: 무시함 — 쓴 날짜에 따라 달라진다
+  - calculation_snapshot.lookback_start: 무시함: 쓴 날짜에 따라 달라진다
+  - calculation_snapshot.lookback_end: 무시함: 쓴 날짜에 따라 달라진다
   - calculation_snapshot.last_calculated_at: 이 실행이 쓴 시각
   - created_at: 이 실행이 쓴 시각
   - updated_at: 이 실행이 쓴 시각
 
 <a id="upserting-a-user-granted-nothing-may-not-set-a-domain-weight"></a>
 
-#### [a-user-granted-nothing-may-not-set-a-domain-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting.py) — pass
+#### [a-user-granted-nothing-may-not-set-a-domain-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting.py): pass
 
 아무 권한도 받지 않은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 거부된다
 
@@ -187,7 +187,7 @@ Given
 
 When
 
-- FairShareAdapter.upsert_domain — user-1이 resource-group-1 안 home-1의 가중치를 정함
+- FairShareAdapter.upsert_domain: user-1이 resource-group-1 안 home-1의 가중치를 정함
 
 Then
 
@@ -196,7 +196,7 @@ Then
 
 <a id="upserting-a-user-granted-update-on-the-group-may-not-set-a-domain-weight"></a>
 
-#### [a-user-granted-update-on-the-group-may-not-set-a-domain-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting.py) — pass
+#### [a-user-granted-update-on-the-group-may-not-set-a-domain-weight](/tests/scenario/bai_scenario/manager/fair_share/test_upserting.py): pass
 
 그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 도메인의 가중치를 정하려 하면 권한 부족으로 거부된다. 가중치 쓰기는 그룹이 아니라 전역 대상으로 권한을 본다
 
@@ -217,7 +217,7 @@ Given
 
 When
 
-- FairShareAdapter.upsert_domain — user-1이 resource-group-1 안 home-1의 가중치를 정함
+- FairShareAdapter.upsert_domain: user-1이 resource-group-1 안 home-1의 가중치를 정함
 
 Then
 

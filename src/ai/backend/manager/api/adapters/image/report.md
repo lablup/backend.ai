@@ -1,28 +1,28 @@
 ## image
 
-[what it guarantees](/src/ai/backend/manager/api/adapters/image/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/image/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/image/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/image/adapter.py)
 
 Scenario: incomplete 3 / 17
 
 - built from ops (12)
-  - admin_search — representative success ✓ · representative refusal ✓
-  - admin_search_images_gql — representative success ✓ · representative refusal ✓
-  - batch_load_aliases_by_ids — representative success ✓ · representative refusal ✓
-  - batch_load_by_ids — representative success ✓ · representative refusal ✓
-  - delete — representative success ✓ · representative refusal ✓
-  - partial_bulk_delete — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
-  - partial_bulk_restore — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
-  - partial_bulk_update — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
-  - restore — representative success ✓ · representative refusal ✓
-  - scoped_search — representative success ✓ · representative refusal ✓
-  - scoped_search_aliases — representative success ✓ · representative refusal ✓
-  - update — representative success ✓ · representative refusal ✓
+  - admin_search: representative success ✓ · representative rejection ✓
+  - admin_search_images_gql: representative success ✓ · representative rejection ✓
+  - batch_load_aliases_by_ids: representative success ✓ · representative rejection ✓
+  - batch_load_by_ids: representative success ✓ · representative rejection ✓
+  - delete: representative success ✓ · representative rejection ✓
+  - partial_bulk_delete: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_restore: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_update: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - restore: representative success ✓ · representative rejection ✓
+  - scoped_search: representative success ✓ · representative rejection ✓
+  - scoped_search_aliases: representative success ✓ · representative rejection ✓
+  - update: representative success ✓ · representative rejection ✓
 - direct implementation (5)
-  - admin_alias — success present 1 · refusal present 3 (global_scope)
-  - admin_dealias — success present 1 · refusal present 2 (global_scope)
-  - admin_purge — success present 3 · refusal present 3 (single_entity)
-  - admin_scan_image — success present 2 · refusal present 3 (global_scope)
-  - admin_search_image_aliases — success present 3 · refusal present 1 (global_scope)
+  - admin_alias: success present 1 · rejection present 3 (global_scope)
+  - admin_dealias: success present 1 · rejection present 2 (global_scope)
+  - admin_purge: success present 3 · rejection present 3 (single_entity)
+  - admin_scan_image: success present 2 · rejection present 3 (global_scope)
+  - admin_search_image_aliases: success present 3 · rejection present 1 (global_scope)
 
 **admin_search**
 
@@ -37,16 +37,16 @@ Scenario: incomplete 3 / 17
 | [슈퍼관리자가 페이지 크기를 생략하고 검색하면, 50개까지만 반환되고 다음 페이지가 있다고 알린다](#searching-omitting-the-page-size-answers-with-fifty-and-says-there-is-more) | answered |
 | [이름 내림차순으로 정렬하고 첫 항목을 제외하면 두 번째와 세 번째 이미지가 반환된다](#searching-ordering-by-name-and-offsetting-returns-the-middle-page) | answered |
 | [슈퍼관리자가 조건 없이 검색하면 미리 만들어 둔 이미지가 모두 반환된다](#searching-searching-without-a-filter-counts-every-image) | answered |
-| [크기와 커서를 함께 지정하면 입력이 잘못되어 거부된다](#searching-a-size-beside-a-cursor-is-refused) | refused |
-| [슈퍼관리자가 아닌 사용자가 이미지를 검색하려 하면 슈퍼관리자 권한 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-images) | refused |
+| [크기와 커서를 함께 지정하면 입력이 잘못되어 거부된다](#searching-a-size-beside-a-cursor-is-refused) | rejected |
+| [슈퍼관리자가 아닌 사용자가 이미지를 검색하려 하면 슈퍼관리자 권한 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-images) | rejected |
 
 **admin_search_images_gql**
 
 | scenario | verdict |
 |---|---|
 | [슈퍼관리자가 커서로 앞에서부터 조회하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다](#searching-a-cursor-search-answers-the-first-page-and-says-there-is-more) | answered |
-| [해석할 수 없는 커서 값을 지정하면 커서가 잘못되어 거부된다](#searching-a-cursor-that-cannot-be-read-is-refused) | refused |
-| [크기와 커서를 함께 지정하면 입력이 잘못되어 거부된다. 요청 타입이 아니라 어댑터가 페이지 방식을 고르는 과정에서 발생한다](#searching-naming-two-pagination-modes-at-once-is-refused) | refused |
+| [해석할 수 없는 커서 값을 지정하면 커서가 잘못되어 거부된다](#searching-a-cursor-that-cannot-be-read-is-refused) | rejected |
+| [크기와 커서를 함께 지정하면 입력이 잘못되어 거부된다. 요청 타입이 아니라 어댑터가 페이지 방식을 고르는 과정에서 발생한다](#searching-naming-two-pagination-modes-at-once-is-refused) | rejected |
 
 **batch_load_aliases_by_ids**
 
@@ -54,7 +54,7 @@ Scenario: incomplete 3 / 17
 |---|---|
 | [빈 별칭 ID 목록으로 조회하면 빈 목록이 반환된다](#reading-an-empty-alias-id-list-answers-with-an-empty-list) | answered |
 | [슈퍼관리자가 미리 만들어 둔 별칭 1개와 어느 별칭도 가리키지 않는 ID 1개를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 ID 위치만 비어 있다](#reading-loading-many-alias-ids-keeps-the-order-and-leaves-a-hole) | answered |
-| [아무 권한도 받지 않은 사용자가 별칭 ID 여러 개를 한 번에 조회하면, 있는 별칭 위치에는 권한 부족 거부가 반환되고 없는 ID 위치는 비어 있다](#reading-a-plain-user-loading-many-alias-ids-is-refused-per-element) | refused |
+| [아무 권한도 받지 않은 사용자가 별칭 ID 여러 개를 한 번에 조회하면, 있는 별칭 위치에는 권한 부족 거부가 반환되고 없는 ID 위치는 비어 있다](#reading-a-plain-user-loading-many-alias-ids-is-refused-per-element) | rejected |
 
 **batch_load_by_ids**
 
@@ -63,7 +63,7 @@ Scenario: incomplete 3 / 17
 | [빈 ID 목록으로 조회하면 빈 목록이 반환된다](#reading-an-empty-image-id-list-answers-with-an-empty-list) | answered |
 | [같은 이미지 ID를 두 번 조회하면 같은 이미지가 두 위치에 반환된다](#reading-duplicate-image-ids-keep-both-input-positions) | answered |
 | [슈퍼관리자가 미리 만들어 둔 이미지 2개와 어느 이미지도 가리키지 않는 ID 1개를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 ID 위치만 비어 있다](#reading-loading-many-image-ids-keeps-the-order-and-leaves-a-hole) | answered |
-| [아무 권한도 받지 않은 사용자가 ID 여러 개를 한 번에 조회하면, 요청 전체가 아니라 원소마다 권한 부족 거부가 입력 순서대로 반환된다](#reading-a-plain-user-loading-many-image-ids-is-refused-per-element) | refused |
+| [아무 권한도 받지 않은 사용자가 ID 여러 개를 한 번에 조회하면, 요청 전체가 아니라 원소마다 권한 부족 거부가 입력 순서대로 반환된다](#reading-a-plain-user-loading-many-image-ids-is-refused-per-element) | rejected |
 
 **delete**
 
@@ -72,10 +72,10 @@ Scenario: incomplete 3 / 17
 | [레지스트리에서 이미지 권한을 받은 사용자는 커스텀 이미지가 아닌 이미지도 소프트 삭제할 수 있고, 삭제됨 상태가 반환된다](#forgetting-a-granted-user-may-forget-an-image-they-did-not-customize) | answered |
 | [슈퍼관리자가 이미지를 소프트 삭제하면, 행은 남고 삭제됨 상태가 담긴 노드가 반환된다](#forgetting-forgetting-an-image-marks-it-deleted-and-keeps-the-row) | answered |
 | [자기가 커밋한 커스텀 이미지를 자기 개인 프로젝트의 권한으로 소프트 삭제하면, 이미지가 그 개인 프로젝트에 속하므로 이미지 권한 검사를 통과해 삭제됨 상태가 반환된다](#forgetting-the-maker-of-a-custom-image-may-forget-it) | answered |
-| [아무 권한도 받지 않은 사용자가 이미지를 소프트 삭제하려 하면 권한 부족으로 거부된다](#forgetting-a-user-granted-nothing-may-not-forget-an-image) | refused |
-| [다른 사용자가 커밋한 커스텀 이미지는 그 사람의 개인 프로젝트에 속하므로, 자기 개인 프로젝트에서 권한을 받은 사용자가 소프트 삭제하려 하면 권한 부족으로 거부된다](#forgetting-a-user-may-not-forget-a-custom-image-another-user-made) | refused |
-| [완전 삭제 중인 이미지를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다. 살아 있는 이미지만 소프트 삭제할 수 있다](#forgetting-an-image-a-purge-is-working-through-cannot-be-reached) | refused |
-| [어느 이미지도 가리키지 않는 ID를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다](#forgetting-forgetting-an-id-that-holds-no-image-is-refused) | refused |
+| [아무 권한도 받지 않은 사용자가 이미지를 소프트 삭제하려 하면 권한 부족으로 거부된다](#forgetting-a-user-granted-nothing-may-not-forget-an-image) | rejected |
+| [다른 사용자가 커밋한 커스텀 이미지는 그 사람의 개인 프로젝트에 속하므로, 자기 개인 프로젝트에서 권한을 받은 사용자가 소프트 삭제하려 하면 권한 부족으로 거부된다](#forgetting-a-user-may-not-forget-a-custom-image-another-user-made) | rejected |
+| [완전 삭제 중인 이미지를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다. 살아 있는 이미지만 소프트 삭제할 수 있다](#forgetting-an-image-a-purge-is-working-through-cannot-be-reached) | rejected |
+| [어느 이미지도 가리키지 않는 ID를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다](#forgetting-forgetting-an-id-that-holds-no-image-is-refused) | rejected |
 
 **partial_bulk_delete**
 
@@ -103,22 +103,22 @@ Scenario: incomplete 3 / 17
 |---|---|
 | [슈퍼관리자가 삭제된 이미지를 복원하면 살아 있는 상태가 담긴 노드가 반환된다](#forgetting-restoring-a-forgotten-image-brings-it-back-alive) | answered |
 | [살아 있는 이미지를 복원해도 살아 있는 상태 그대로다](#forgetting-restoring-an-image-that-was-never-forgotten-leaves-it-alive) | answered |
-| [아무 권한도 받지 않은 사용자가 이미지를 복원하려 하면 권한 부족으로 거부된다](#forgetting-a-user-granted-nothing-may-not-restore-an-image) | refused |
-| [어느 이미지도 가리키지 않는 ID를 복원하려 하면 대상을 찾을 수 없어 거부된다](#forgetting-restoring-an-id-that-holds-no-image-is-refused) | refused |
+| [아무 권한도 받지 않은 사용자가 이미지를 복원하려 하면 권한 부족으로 거부된다](#forgetting-a-user-granted-nothing-may-not-restore-an-image) | rejected |
+| [어느 이미지도 가리키지 않는 ID를 복원하려 하면 대상을 찾을 수 없어 거부된다](#forgetting-restoring-an-id-that-holds-no-image-is-refused) | rejected |
 
 **scoped_search**
 
 | scenario | verdict |
 |---|---|
 | [이미지가 레지스트리 2개에 나뉘어 있을 때 한쪽 레지스트리에 권한을 받은 사용자가 그 레지스트리를 스코프로 조회하면, 그 레지스트리의 이미지만 반환되고 다른 쪽은 집계되지 않는다](#searching-a-user-granted-on-a-registry-reads-the-images-it-holds) | answered |
-| [아무 권한도 받지 않은 사용자가 한 레지스트리를 스코프로 이미지를 조회하려 하면 권한 부족으로 거부된다](#searching-a-user-who-cannot-read-the-registry-is-refused-its-images) | refused |
+| [아무 권한도 받지 않은 사용자가 한 레지스트리를 스코프로 이미지를 조회하려 하면 권한 부족으로 거부된다](#searching-a-user-who-cannot-read-the-registry-is-refused-its-images) | rejected |
 
 **scoped_search_aliases**
 
 | scenario | verdict |
 |---|---|
 | [그 이미지에 권한을 받은 사용자가 그 이미지의 별칭을 검색하면 등록해 둔 별칭이 반환된다](#searching-a-user-who-can-read-the-image-gets-its-aliases) | answered |
-| [아무 권한도 받지 않은 사용자가 그 이미지의 별칭을 검색하려 하면 권한 부족으로 거부된다](#searching-a-user-who-cannot-read-the-image-is-refused-its-aliases) | refused |
+| [아무 권한도 받지 않은 사용자가 그 이미지의 별칭을 검색하려 하면 권한 부족으로 거부된다](#searching-a-user-who-cannot-read-the-image-is-refused-its-aliases) | rejected |
 
 **update**
 
@@ -130,25 +130,25 @@ Scenario: incomplete 3 / 17
 | [슈퍼관리자가 이름과 레지스트리 등의 기본 필드를 함께 수정하면 지정한 값이 반환된다](#editing-changing-the-remaining-scalar-fields-returns-the-new-values) | answered |
 | [슈퍼관리자가 가속기 목록을 비우는 수정을 하면 그 필드가 빈 채로 반환된다. 생략과 비우기를 구분할 수 있는 필드는 이것뿐이다](#editing-clearing-the-accelerator-list-empties-it) | answered |
 | [슈퍼관리자가 가속기 이름을 지정하면 그 이름이 담긴 노드가 반환된다](#editing-writing-an-accelerator-onto-an-image-that-had-none) | answered |
-| [아무 권한도 받지 않은 사용자가 이미지를 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-an-image) | refused |
-| [어느 이미지도 가리키지 않는 ID를 수정하려 하면 대상을 찾을 수 없어 거부된다](#editing-editing-an-id-that-holds-no-image-is-refused) | refused |
+| [아무 권한도 받지 않은 사용자가 이미지를 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-an-image) | rejected |
+| [어느 이미지도 가리키지 않는 ID를 수정하려 하면 대상을 찾을 수 없어 거부된다](#editing-editing-an-id-that-holds-no-image-is-refused) | rejected |
 
 **admin_alias**
 
 | scenario | verdict |
 |---|---|
 | [슈퍼관리자가 이미지에 별칭을 등록하면 그 별칭과 가리키는 이미지가 반환된다](#aliasing-aliasing-an-image-answers-with-the-alias-and-the-image-it-names) | answered |
-| [어느 이미지도 가리키지 않는 ID에 별칭을 등록하려 하면 대상을 찾을 수 없어 거부된다](#aliasing-aliasing-an-id-that-holds-no-image-is-refused) | refused |
-| [이미 사용 중인 별칭을 등록하려 하면 유니크 제약 위반으로 거부된다](#aliasing-an-alias-that-is-already-in-use-is-refused) | refused |
-| [자기가 만든 커스텀 이미지라도 별칭은 등록할 수 없다. 별칭 등록은 해당 이미지의 권한이 아니라 슈퍼관리자 검사로 보호되기 때문이다](#aliasing-the-maker-of-a-custom-image-still-may-not-alias-it) | refused |
+| [어느 이미지도 가리키지 않는 ID에 별칭을 등록하려 하면 대상을 찾을 수 없어 거부된다](#aliasing-aliasing-an-id-that-holds-no-image-is-refused) | rejected |
+| [이미 사용 중인 별칭을 등록하려 하면 유니크 제약 위반으로 거부된다](#aliasing-an-alias-that-is-already-in-use-is-refused) | rejected |
+| [자기가 만든 커스텀 이미지라도 별칭은 등록할 수 없다. 별칭 등록은 해당 이미지의 권한이 아니라 슈퍼관리자 검사로 보호되기 때문이다](#aliasing-the-maker-of-a-custom-image-still-may-not-alias-it) | rejected |
 
 **admin_dealias**
 
 | scenario | verdict |
 |---|---|
 | [슈퍼관리자가 등록된 별칭을 해제하면 해제된 별칭과 그 이미지가 반환된다](#aliasing-dealiasing-answers-with-the-alias-it-removed) | answered |
-| [슈퍼관리자가 아닌 사용자가 별칭을 해제하려 하면 슈퍼관리자 권한 부족으로 거부된다](#aliasing-a-user-who-is-not-the-superadmin-may-not-dealias) | refused |
-| [어느 이미지도 가리키지 않는 별칭을 해제하려 하면 대상을 찾을 수 없어 거부된다](#aliasing-dealiasing-a-name-no-image-holds-is-refused) | refused |
+| [슈퍼관리자가 아닌 사용자가 별칭을 해제하려 하면 슈퍼관리자 권한 부족으로 거부된다](#aliasing-a-user-who-is-not-the-superadmin-may-not-dealias) | rejected |
+| [어느 이미지도 가리키지 않는 별칭을 해제하려 하면 대상을 찾을 수 없어 거부된다](#aliasing-dealiasing-a-name-no-image-holds-is-refused) | rejected |
 
 **admin_purge**
 
@@ -157,9 +157,9 @@ Scenario: incomplete 3 / 17
 | [별칭이 등록된 이미지를 완전 삭제하면 삭제된 이미지가 반환된다](#retiring-purging-an-aliased-image-answers-with-the-image-it-removed) | answered |
 | [슈퍼관리자가 이미지를 완전 삭제하면 삭제된 이미지가 반환된다](#retiring-purging-an-image-answers-with-the-image-it-removed) | answered |
 | [자기가 커밋한 커스텀 이미지를 자기 개인 프로젝트의 권한으로 완전 삭제하면, 이미지가 그 개인 프로젝트에 속하므로 이미지 권한과 커스텀 이미지 작성자 검사를 모두 통과해 삭제된 이미지가 반환된다](#retiring-the-maker-of-a-custom-image-may-purge-it) | answered |
-| [커스텀 이미지가 아닌 이미지는 권한을 받은 사용자라도 완전 삭제할 수 없다. 이미지 권한 검사를 통과한 뒤 커스텀 이미지 작성자 검사에서 거부된다](#retiring-a-granted-user-may-not-purge-an-image-they-did-not-customize) | refused |
-| [아무 권한도 받지 않은 사용자가 이미지를 완전 삭제하려 하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-an-image) | refused |
-| [어느 이미지도 가리키지 않는 ID를 완전 삭제하려 하면 대상을 찾을 수 없어 거부된다](#retiring-purging-an-id-that-holds-no-image-is-refused) | refused |
+| [커스텀 이미지가 아닌 이미지는 권한을 받은 사용자라도 완전 삭제할 수 없다. 이미지 권한 검사를 통과한 뒤 커스텀 이미지 작성자 검사에서 거부된다](#retiring-a-granted-user-may-not-purge-an-image-they-did-not-customize) | rejected |
+| [아무 권한도 받지 않은 사용자가 이미지를 완전 삭제하려 하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-an-image) | rejected |
+| [어느 이미지도 가리키지 않는 ID를 완전 삭제하려 하면 대상을 찾을 수 없어 거부된다](#retiring-purging-an-id-that-holds-no-image-is-refused) | rejected |
 
 **admin_scan_image**
 
@@ -167,9 +167,9 @@ Scenario: incomplete 3 / 17
 |---|---|
 | [슈퍼관리자가 이미 등록된 이미지를 scan하면 새 이미지를 만들지 않고 등록된 이미지를 레지스트리 값으로 갱신해 반환한다](#scanning-scanning-a-registered-image-refreshes-it-from-the-registry) | answered |
 | [슈퍼관리자가 미등록된 이미지를 scan하면 요청한 아키텍처의 이미지 하나가 반환된다. scan은 슈퍼관리자 역할이 있어야만 실행된다](#scanning-scanning-an-unregistered-image-registers-the-requested-architecture) | answered |
-| [이미지에 맞는 registry가 없으면 scan하지 않고 거부한다. 레지스트리 이름만 주어도 레지스트리 전체를 스캔하지 않는다](#scanning-a-name-no-registry-holds-as-an-image-is-refused-without-a-scan) | refused |
-| [레지스트리에 없는 태그를 scan하면 이미지를 찾을 수 없어 거부된다](#scanning-a-tag-the-registry-does-not-hold-is-refused) | refused |
-| [일반 사용자는 scan을 실행할 수 없어 슈퍼관리자 권한 부족으로 거부된다](#scanning-a-user-who-is-not-the-superadmin-may-not-scan) | refused |
+| [이미지에 맞는 registry가 없으면 scan하지 않고 거부한다. 레지스트리 이름만 주어도 레지스트리 전체를 스캔하지 않는다](#scanning-a-name-no-registry-holds-as-an-image-is-refused-without-a-scan) | rejected |
+| [레지스트리에 없는 태그를 scan하면 이미지를 찾을 수 없어 거부된다](#scanning-a-tag-the-registry-does-not-hold-is-refused) | rejected |
+| [일반 사용자는 scan을 실행할 수 없어 슈퍼관리자 권한 부족으로 거부된다](#scanning-a-user-who-is-not-the-superadmin-may-not-scan) | rejected |
 
 **admin_search_image_aliases**
 
@@ -178,13 +178,13 @@ Scenario: incomplete 3 / 17
 | [슈퍼관리자가 한 이미지의 별칭만 이름 내림차순으로 검색하면 해당 별칭만 정렬되어 반환된다](#searching-filtering-aliases-by-image-and-ordering-by-name) | answered |
 | [별칭이 등록되어 있을 때 슈퍼관리자가 별칭을 검색하면 그 별칭이 반환된다](#searching-searching-aliases-answers-with-the-one-that-was-attached) | answered |
 | [별칭을 하나도 등록하지 않은 상태에서 슈퍼관리자가 별칭을 검색하면 응답이 비어 있다](#searching-searching-aliases-when-none-were-attached-answers-empty) | answered |
-| [슈퍼관리자가 아닌 사용자가 별칭을 검색하려 하면 슈퍼관리자 권한 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-aliases) | refused |
+| [슈퍼관리자가 아닌 사용자가 별칭을 검색하려 하면 슈퍼관리자 권한 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-aliases) | rejected |
 
 ### admin_search
 
 <a id="searching-a-cursor-alone-answers-the-first-page-and-says-there-is-more"></a>
 
-#### [a-cursor-alone-answers-the-first-page-and-says-there-is-more](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [a-cursor-alone-answers-the-first-page-and-says-there-is-more](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 슈퍼관리자가 크기와 오프셋 없이 커서만 지정해 검색하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다
 
@@ -204,7 +204,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search — user-1이 커서로 앞에서부터 검색함
+- ImageAdapter.admin_search: user-1이 커서로 앞에서부터 검색함
 
 Then
 
@@ -216,7 +216,7 @@ Then
 
 <a id="searching-filtering-images-by-creator-returns-only-images-they-committed"></a>
 
-#### [filtering-images-by-creator-returns-only-images-they-committed](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [filtering-images-by-creator-returns-only-images-they-committed](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 호출자와 다른 사용자가 각각 커밋한 커스텀 이미지 중 호출자가 커밋한 것으로 검색하면 호출자가 커밋한 이미지만 반환된다
 
@@ -238,7 +238,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search — user-1이 자신이 커밋한 이미지로 한 페이지에 50개씩 검색함
+- ImageAdapter.admin_search: user-1이 자신이 커밋한 이미지로 한 페이지에 50개씩 검색함
 
 Then
 
@@ -251,7 +251,7 @@ Then
 
 <a id="searching-filtering-images-by-customized-returns-only-customized-images"></a>
 
-#### [filtering-images-by-customized-returns-only-customized-images](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [filtering-images-by-customized-returns-only-customized-images](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지로 검색하면 커스텀 이미지만 커밋한 사용자와 함께 반환된다
 
@@ -270,7 +270,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search — user-1이 커스텀 이미지로 한 페이지에 50개씩 검색함
+- ImageAdapter.admin_search: user-1이 커스텀 이미지로 한 페이지에 50개씩 검색함
 
 Then
 
@@ -284,7 +284,7 @@ Then
 
 <a id="searching-filtering-images-by-name-returns-only-the-match"></a>
 
-#### [filtering-images-by-name-returns-only-the-match](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [filtering-images-by-name-returns-only-the-match](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 슈퍼관리자가 한 이미지의 이름으로 검색하면 그 이미지만 반환된다
 
@@ -304,7 +304,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search — user-1이 image-0-1 이름으로 한 페이지에 50개씩 검색함
+- ImageAdapter.admin_search: user-1이 image-0-1 이름으로 한 페이지에 50개씩 검색함
 
 Then
 
@@ -316,7 +316,7 @@ Then
 
 <a id="searching-filtering-images-by-not-customized-returns-only-uncustomized-images"></a>
 
-#### [filtering-images-by-not-customized-returns-only-uncustomized-images](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [filtering-images-by-not-customized-returns-only-uncustomized-images](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 커스텀 이미지와 커스텀 이미지가 아닌 이미지 중 커스텀 이미지가 아닌 것으로 검색하면 커스텀 이미지가 아닌 이미지만 반환된다
 
@@ -335,7 +335,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search — user-1이 커스텀 이미지가 아닌 것으로 한 페이지에 50개씩 검색함
+- ImageAdapter.admin_search: user-1이 커스텀 이미지가 아닌 것으로 한 페이지에 50개씩 검색함
 
 Then
 
@@ -349,7 +349,7 @@ Then
 
 <a id="searching-filtering-images-by-status-returns-only-alive-images"></a>
 
-#### [filtering-images-by-status-returns-only-alive-images](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [filtering-images-by-status-returns-only-alive-images](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 살아 있는 이미지와 삭제된 이미지 중 살아 있는 상태로 검색하면 해당 이미지만 반환된다
 
@@ -368,7 +368,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search — user-1이 ALIVE 상태로 한 페이지에 50개씩 검색함
+- ImageAdapter.admin_search: user-1이 ALIVE 상태로 한 페이지에 50개씩 검색함
 
 Then
 
@@ -380,7 +380,7 @@ Then
 
 <a id="searching-omitting-the-page-size-answers-with-fifty-and-says-there-is-more"></a>
 
-#### [omitting-the-page-size-answers-with-fifty-and-says-there-is-more](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [omitting-the-page-size-answers-with-fifty-and-says-there-is-more](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 슈퍼관리자가 페이지 크기를 생략하고 검색하면, 50개까지만 반환되고 다음 페이지가 있다고 알린다
 
@@ -448,7 +448,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search — user-1이 페이지 크기를 생략하고 검색함
+- ImageAdapter.admin_search: user-1이 페이지 크기를 생략하고 검색함
 
 Then
 
@@ -460,7 +460,7 @@ Then
 
 <a id="searching-ordering-by-name-and-offsetting-returns-the-middle-page"></a>
 
-#### [ordering-by-name-and-offsetting-returns-the-middle-page](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [ordering-by-name-and-offsetting-returns-the-middle-page](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 이름 내림차순으로 정렬하고 첫 항목을 제외하면 두 번째와 세 번째 이미지가 반환된다
 
@@ -481,7 +481,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search — user-1이 이름 내림차순으로 정렬해 앞의 1개를 건너뛰고 한 페이지에 2개씩 검색함
+- ImageAdapter.admin_search: user-1이 이름 내림차순으로 정렬해 앞의 1개를 건너뛰고 한 페이지에 2개씩 검색함
 
 Then
 
@@ -493,7 +493,7 @@ Then
 
 <a id="searching-searching-without-a-filter-counts-every-image"></a>
 
-#### [searching-without-a-filter-counts-every-image](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [searching-without-a-filter-counts-every-image](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 슈퍼관리자가 조건 없이 검색하면 미리 만들어 둔 이미지가 모두 반환된다
 
@@ -512,7 +512,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search — user-1이 한 페이지에 50개씩 검색함
+- ImageAdapter.admin_search: user-1이 한 페이지에 50개씩 검색함
 
 Then
 
@@ -524,7 +524,7 @@ Then
 
 <a id="searching-a-size-beside-a-cursor-is-refused"></a>
 
-#### [a-size-beside-a-cursor-is-refused](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [a-size-beside-a-cursor-is-refused](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 크기와 커서를 함께 지정하면 입력이 잘못되어 거부된다
 
@@ -543,7 +543,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search — user-1이 크기와 커서를 함께 지정하고 검색함
+- ImageAdapter.admin_search: user-1이 크기와 커서를 함께 지정하고 검색함
 
 Then
 
@@ -552,7 +552,7 @@ Then
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-images"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-images](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-images](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 슈퍼관리자가 아닌 사용자가 이미지를 검색하려 하면 슈퍼관리자 권한 부족으로 거부된다
 
@@ -571,7 +571,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search — user-1이 한 페이지에 50개씩 검색함
+- ImageAdapter.admin_search: user-1이 한 페이지에 50개씩 검색함
 
 Then
 
@@ -582,7 +582,7 @@ Then
 
 <a id="searching-a-cursor-search-answers-the-first-page-and-says-there-is-more"></a>
 
-#### [a-cursor-search-answers-the-first-page-and-says-there-is-more](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [a-cursor-search-answers-the-first-page-and-says-there-is-more](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 슈퍼관리자가 커서로 앞에서부터 조회하면 지정한 개수만 반환되고 다음 페이지가 있다고 알린다
 
@@ -602,7 +602,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search_images_gql — user-1이 커서로 앞에서부터 검색함
+- ImageAdapter.admin_search_images_gql: user-1이 커서로 앞에서부터 검색함
 
 Then
 
@@ -614,7 +614,7 @@ Then
 
 <a id="searching-a-cursor-that-cannot-be-read-is-refused"></a>
 
-#### [a-cursor-that-cannot-be-read-is-refused](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [a-cursor-that-cannot-be-read-is-refused](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 해석할 수 없는 커서 값을 지정하면 커서가 잘못되어 거부된다
 
@@ -633,7 +633,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search_images_gql — user-1이 잘못된 커서로 검색함
+- ImageAdapter.admin_search_images_gql: user-1이 잘못된 커서로 검색함
 
 Then
 
@@ -642,7 +642,7 @@ Then
 
 <a id="searching-naming-two-pagination-modes-at-once-is-refused"></a>
 
-#### [naming-two-pagination-modes-at-once-is-refused](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [naming-two-pagination-modes-at-once-is-refused](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 크기와 커서를 함께 지정하면 입력이 잘못되어 거부된다. 요청 타입이 아니라 어댑터가 페이지 방식을 고르는 과정에서 발생한다
 
@@ -661,7 +661,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search_images_gql — user-1이 크기와 커서를 함께 지정하고 검색함
+- ImageAdapter.admin_search_images_gql: user-1이 크기와 커서를 함께 지정하고 검색함
 
 Then
 
@@ -672,7 +672,7 @@ Then
 
 <a id="reading-an-empty-alias-id-list-answers-with-an-empty-list"></a>
 
-#### [an-empty-alias-id-list-answers-with-an-empty-list](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
+#### [an-empty-alias-id-list-answers-with-an-empty-list](/tests/scenario/bai_scenario/manager/image/test_reading.py): pass
 
 빈 별칭 ID 목록으로 조회하면 빈 목록이 반환된다
 
@@ -691,7 +691,7 @@ Given
 
 When
 
-- ImageAdapter.batch_load_aliases_by_ids — user-1이 빈 별칭 ID 목록으로 조회
+- ImageAdapter.batch_load_aliases_by_ids: user-1이 빈 별칭 ID 목록으로 조회
 
 Then
 
@@ -700,7 +700,7 @@ Then
 
 <a id="reading-loading-many-alias-ids-keeps-the-order-and-leaves-a-hole"></a>
 
-#### [loading-many-alias-ids-keeps-the-order-and-leaves-a-hole](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
+#### [loading-many-alias-ids-keeps-the-order-and-leaves-a-hole](/tests/scenario/bai_scenario/manager/image/test_reading.py): pass
 
 슈퍼관리자가 미리 만들어 둔 별칭 1개와 어느 별칭도 가리키지 않는 ID 1개를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 ID 위치만 비어 있다
 
@@ -719,7 +719,7 @@ Given
 
 When
 
-- ImageAdapter.batch_load_aliases_by_ids — user-1이 미리 만들어 둔 별칭 1개와 없는 ID 1개를 한 번에 조회
+- ImageAdapter.batch_load_aliases_by_ids: user-1이 미리 만들어 둔 별칭 1개와 없는 ID 1개를 한 번에 조회
 
 Then
 
@@ -729,7 +729,7 @@ Then
 
 <a id="reading-a-plain-user-loading-many-alias-ids-is-refused-per-element"></a>
 
-#### [a-plain-user-loading-many-alias-ids-is-refused-per-element](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
+#### [a-plain-user-loading-many-alias-ids-is-refused-per-element](/tests/scenario/bai_scenario/manager/image/test_reading.py): pass
 
 아무 권한도 받지 않은 사용자가 별칭 ID 여러 개를 한 번에 조회하면, 있는 별칭 위치에는 권한 부족 거부가 반환되고 없는 ID 위치는 비어 있다
 
@@ -748,7 +748,7 @@ Given
 
 When
 
-- ImageAdapter.batch_load_aliases_by_ids — user-1이 미리 만들어 둔 별칭 1개와 없는 ID 1개를 한 번에 조회
+- ImageAdapter.batch_load_aliases_by_ids: user-1이 미리 만들어 둔 별칭 1개와 없는 ID 1개를 한 번에 조회
 
 Then
 
@@ -761,7 +761,7 @@ Then
 
 <a id="reading-an-empty-image-id-list-answers-with-an-empty-list"></a>
 
-#### [an-empty-image-id-list-answers-with-an-empty-list](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
+#### [an-empty-image-id-list-answers-with-an-empty-list](/tests/scenario/bai_scenario/manager/image/test_reading.py): pass
 
 빈 ID 목록으로 조회하면 빈 목록이 반환된다
 
@@ -780,7 +780,7 @@ Given
 
 When
 
-- ImageAdapter.batch_load_by_ids — user-1이 빈 ID 목록으로 조회
+- ImageAdapter.batch_load_by_ids: user-1이 빈 ID 목록으로 조회
 
 Then
 
@@ -789,7 +789,7 @@ Then
 
 <a id="reading-duplicate-image-ids-keep-both-input-positions"></a>
 
-#### [duplicate-image-ids-keep-both-input-positions](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
+#### [duplicate-image-ids-keep-both-input-positions](/tests/scenario/bai_scenario/manager/image/test_reading.py): pass
 
 같은 이미지 ID를 두 번 조회하면 같은 이미지가 두 위치에 반환된다
 
@@ -807,7 +807,7 @@ Given
 
 When
 
-- ImageAdapter.batch_load_by_ids — user-1이 같은 이미지 ID를 두 번 조회
+- ImageAdapter.batch_load_by_ids: user-1이 같은 이미지 ID를 두 번 조회
 
 Then
 
@@ -817,7 +817,7 @@ Then
 
 <a id="reading-loading-many-image-ids-keeps-the-order-and-leaves-a-hole"></a>
 
-#### [loading-many-image-ids-keeps-the-order-and-leaves-a-hole](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
+#### [loading-many-image-ids-keeps-the-order-and-leaves-a-hole](/tests/scenario/bai_scenario/manager/image/test_reading.py): pass
 
 슈퍼관리자가 미리 만들어 둔 이미지 2개와 어느 이미지도 가리키지 않는 ID 1개를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 ID 위치만 비어 있다
 
@@ -836,7 +836,7 @@ Given
 
 When
 
-- ImageAdapter.batch_load_by_ids — user-1이 미리 만들어 둔 이미지 2개와 없는 ID 1개를 한 번에 조회
+- ImageAdapter.batch_load_by_ids: user-1이 미리 만들어 둔 이미지 2개와 없는 ID 1개를 한 번에 조회
 
 Then
 
@@ -848,7 +848,7 @@ Then
 
 <a id="reading-a-plain-user-loading-many-image-ids-is-refused-per-element"></a>
 
-#### [a-plain-user-loading-many-image-ids-is-refused-per-element](/tests/scenario/bai_scenario/manager/image/test_reading.py) — pass
+#### [a-plain-user-loading-many-image-ids-is-refused-per-element](/tests/scenario/bai_scenario/manager/image/test_reading.py): pass
 
 아무 권한도 받지 않은 사용자가 ID 여러 개를 한 번에 조회하면, 요청 전체가 아니라 원소마다 권한 부족 거부가 입력 순서대로 반환된다
 
@@ -867,7 +867,7 @@ Given
 
 When
 
-- ImageAdapter.batch_load_by_ids — user-1이 미리 만들어 둔 이미지 2개와 없는 ID 1개를 한 번에 조회
+- ImageAdapter.batch_load_by_ids: user-1이 미리 만들어 둔 이미지 2개와 없는 ID 1개를 한 번에 조회
 
 Then
 
@@ -881,7 +881,7 @@ Then
 
 <a id="forgetting-a-granted-user-may-forget-an-image-they-did-not-customize"></a>
 
-#### [a-granted-user-may-forget-an-image-they-did-not-customize](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+#### [a-granted-user-may-forget-an-image-they-did-not-customize](/tests/scenario/bai_scenario/manager/image/test_forgetting.py): pass
 
 레지스트리에서 이미지 권한을 받은 사용자는 커스텀 이미지가 아닌 이미지도 소프트 삭제할 수 있고, 삭제됨 상태가 반환된다
 
@@ -905,7 +905,7 @@ Given
 
 When
 
-- ImageAdapter.delete — user-1이 image-1 소프트 삭제
+- ImageAdapter.delete: user-1이 image-1 소프트 삭제
 
 Then
 
@@ -930,7 +930,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
@@ -946,7 +946,7 @@ Then
 
 <a id="forgetting-forgetting-an-image-marks-it-deleted-and-keeps-the-row"></a>
 
-#### [forgetting-an-image-marks-it-deleted-and-keeps-the-row](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+#### [forgetting-an-image-marks-it-deleted-and-keeps-the-row](/tests/scenario/bai_scenario/manager/image/test_forgetting.py): pass
 
 슈퍼관리자가 이미지를 소프트 삭제하면, 행은 남고 삭제됨 상태가 담긴 노드가 반환된다
 
@@ -964,7 +964,7 @@ Given
 
 When
 
-- ImageAdapter.delete — user-1이 image-1 소프트 삭제
+- ImageAdapter.delete: user-1이 image-1 소프트 삭제
 
 Then
 
@@ -989,7 +989,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
@@ -1005,7 +1005,7 @@ Then
 
 <a id="forgetting-the-maker-of-a-custom-image-may-forget-it"></a>
 
-#### [the-maker-of-a-custom-image-may-forget-it](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+#### [the-maker-of-a-custom-image-may-forget-it](/tests/scenario/bai_scenario/manager/image/test_forgetting.py): pass
 
 자기가 커밋한 커스텀 이미지를 자기 개인 프로젝트의 권한으로 소프트 삭제하면, 이미지가 그 개인 프로젝트에 속하므로 이미지 권한 검사를 통과해 삭제됨 상태가 반환된다
 
@@ -1029,7 +1029,7 @@ Given
 
 When
 
-- ImageAdapter.delete — user-1이 image-1 소프트 삭제
+- ImageAdapter.delete: user-1이 image-1 소프트 삭제
 
 Then
 
@@ -1054,7 +1054,7 @@ Then
   - customized = True
   - creator_id: 이미지를 커밋한 사용자의 ID와 같다
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
@@ -1070,7 +1070,7 @@ Then
 
 <a id="forgetting-a-user-granted-nothing-may-not-forget-an-image"></a>
 
-#### [a-user-granted-nothing-may-not-forget-an-image](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+#### [a-user-granted-nothing-may-not-forget-an-image](/tests/scenario/bai_scenario/manager/image/test_forgetting.py): pass
 
 아무 권한도 받지 않은 사용자가 이미지를 소프트 삭제하려 하면 권한 부족으로 거부된다
 
@@ -1088,7 +1088,7 @@ Given
 
 When
 
-- ImageAdapter.delete — user-1이 image-1 소프트 삭제
+- ImageAdapter.delete: user-1이 image-1 소프트 삭제
 
 Then
 
@@ -1097,7 +1097,7 @@ Then
 
 <a id="forgetting-a-user-may-not-forget-a-custom-image-another-user-made"></a>
 
-#### [a-user-may-not-forget-a-custom-image-another-user-made](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+#### [a-user-may-not-forget-a-custom-image-another-user-made](/tests/scenario/bai_scenario/manager/image/test_forgetting.py): pass
 
 다른 사용자가 커밋한 커스텀 이미지는 그 사람의 개인 프로젝트에 속하므로, 자기 개인 프로젝트에서 권한을 받은 사용자가 소프트 삭제하려 하면 권한 부족으로 거부된다
 
@@ -1124,7 +1124,7 @@ Given
 
 When
 
-- ImageAdapter.delete — user-2이 image-1 소프트 삭제
+- ImageAdapter.delete: user-2이 image-1 소프트 삭제
 
 Then
 
@@ -1133,7 +1133,7 @@ Then
 
 <a id="forgetting-an-image-a-purge-is-working-through-cannot-be-reached"></a>
 
-#### [an-image-a-purge-is-working-through-cannot-be-reached](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+#### [an-image-a-purge-is-working-through-cannot-be-reached](/tests/scenario/bai_scenario/manager/image/test_forgetting.py): pass
 
 완전 삭제 중인 이미지를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다. 살아 있는 이미지만 소프트 삭제할 수 있다
 
@@ -1151,7 +1151,7 @@ Given
 
 When
 
-- ImageAdapter.delete — user-1이 image-1 소프트 삭제
+- ImageAdapter.delete: user-1이 image-1 소프트 삭제
 
 Then
 
@@ -1160,7 +1160,7 @@ Then
 
 <a id="forgetting-forgetting-an-id-that-holds-no-image-is-refused"></a>
 
-#### [forgetting-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+#### [forgetting-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_forgetting.py): pass
 
 어느 이미지도 가리키지 않는 ID를 소프트 삭제하려 하면 대상을 찾을 수 없어 거부된다
 
@@ -1178,7 +1178,7 @@ Given
 
 When
 
-- ImageAdapter.delete — user-1이 어느 이미지도 가리키지 않는 ID 소프트 삭제
+- ImageAdapter.delete: user-1이 어느 이미지도 가리키지 않는 ID 소프트 삭제
 
 Then
 
@@ -1189,7 +1189,7 @@ Then
 
 <a id="partial_bulk_forgetting-a-user-granted-nothing-forgets-none-of-several-images"></a>
 
-#### [a-user-granted-nothing-forgets-none-of-several-images](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py) — pass
+#### [a-user-granted-nothing-forgets-none-of-several-images](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
 
 아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 소프트 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -1208,7 +1208,7 @@ Given
 
 When
 
-- ImageAdapter.partial_bulk_delete — user-1이 이미지 2개를 한 번에 소프트 삭제
+- ImageAdapter.partial_bulk_delete: user-1이 이미지 2개를 한 번에 소프트 삭제
 
 Then
 
@@ -1222,7 +1222,7 @@ Then
 
 <a id="partial_bulk_forgetting-forgetting-several-answers-for-the-missing-one"></a>
 
-#### [forgetting-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py) — pass
+#### [forgetting-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
 
 살아 있는 이미지 둘과 없는 id 하나를 한 번에 소프트 삭제하면, 둘은 삭제됨 상태로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -1241,7 +1241,7 @@ Given
 
 When
 
-- ImageAdapter.partial_bulk_delete — user-1이 이미지 2개 와 없는 id 하나를 한 번에 소프트 삭제
+- ImageAdapter.partial_bulk_delete: user-1이 이미지 2개 와 없는 id 하나를 한 번에 소프트 삭제
 
 Then
 
@@ -1267,7 +1267,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-0-1'
   - identity.namespace = 'image-0-1'
   - identity.architecture = 'x86_64'
@@ -1300,7 +1300,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1-1'
   - identity.namespace = 'image-1-1'
   - identity.architecture = 'x86_64'
@@ -1321,7 +1321,7 @@ Then
 
 <a id="partial_bulk_forgetting-restoring-several-brings-them-back-alive"></a>
 
-#### [restoring-several-brings-them-back-alive](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py) — pass
+#### [restoring-several-brings-them-back-alive](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_forgetting.py): pass
 
 소프트 삭제한 이미지 여럿을 한 번에 복원하면, 모두 살아 있는 상태로 온다
 
@@ -1340,7 +1340,7 @@ Given
 
 When
 
-- ImageAdapter.partial_bulk_restore — user-1이 이미지 2개를 한 번에 소프트 삭제했다가 한 번에 복원
+- ImageAdapter.partial_bulk_restore: user-1이 이미지 2개를 한 번에 소프트 삭제했다가 한 번에 복원
 
 Then
 
@@ -1366,7 +1366,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-0-1'
   - identity.namespace = 'image-0-1'
   - identity.architecture = 'x86_64'
@@ -1399,7 +1399,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1-1'
   - identity.namespace = 'image-1-1'
   - identity.architecture = 'x86_64'
@@ -1418,7 +1418,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-images"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-images](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-images](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 이미지 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -1437,7 +1437,7 @@ Given
 
 When
 
-- ImageAdapter.partial_bulk_update — user-1이 이미지 2개의 태그를 한 번에 고침
+- ImageAdapter.partial_bulk_update: user-1이 이미지 2개의 태그를 한 번에 고침
 
 Then
 
@@ -1451,7 +1451,7 @@ Then
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-images-at-once"></a>
 
-#### [the-superadmin-edits-several-images-at-once](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-edits-several-images-at-once](/tests/scenario/bai_scenario/manager/image/test_partial_bulk_editing.py): pass
 
 슈퍼관리자가 이미지 여럿의 태그를 한 번에 바꾸면, 모두 새 태그로 오고 실패한 것은 없다
 
@@ -1470,7 +1470,7 @@ Given
 
 When
 
-- ImageAdapter.partial_bulk_update — user-1이 이미지 2개의 태그를 한 번에 고침
+- ImageAdapter.partial_bulk_update: user-1이 이미지 2개의 태그를 한 번에 고침
 
 Then
 
@@ -1496,7 +1496,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-0-1'
   - identity.namespace = 'image-0-1'
   - identity.architecture = 'x86_64'
@@ -1529,7 +1529,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1-1'
   - identity.namespace = 'image-1-1'
   - identity.architecture = 'x86_64'
@@ -1548,7 +1548,7 @@ Then
 
 <a id="forgetting-restoring-a-forgotten-image-brings-it-back-alive"></a>
 
-#### [restoring-a-forgotten-image-brings-it-back-alive](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+#### [restoring-a-forgotten-image-brings-it-back-alive](/tests/scenario/bai_scenario/manager/image/test_forgetting.py): pass
 
 슈퍼관리자가 삭제된 이미지를 복원하면 살아 있는 상태가 담긴 노드가 반환된다
 
@@ -1566,7 +1566,7 @@ Given
 
 When
 
-- ImageAdapter.restore — user-1이 image-1 복원
+- ImageAdapter.restore: user-1이 image-1 복원
 
 Then
 
@@ -1591,7 +1591,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
@@ -1607,7 +1607,7 @@ Then
 
 <a id="forgetting-restoring-an-image-that-was-never-forgotten-leaves-it-alive"></a>
 
-#### [restoring-an-image-that-was-never-forgotten-leaves-it-alive](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+#### [restoring-an-image-that-was-never-forgotten-leaves-it-alive](/tests/scenario/bai_scenario/manager/image/test_forgetting.py): pass
 
 살아 있는 이미지를 복원해도 살아 있는 상태 그대로다
 
@@ -1625,7 +1625,7 @@ Given
 
 When
 
-- ImageAdapter.restore — user-1이 image-1 복원
+- ImageAdapter.restore: user-1이 image-1 복원
 
 Then
 
@@ -1650,7 +1650,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
@@ -1666,7 +1666,7 @@ Then
 
 <a id="forgetting-a-user-granted-nothing-may-not-restore-an-image"></a>
 
-#### [a-user-granted-nothing-may-not-restore-an-image](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+#### [a-user-granted-nothing-may-not-restore-an-image](/tests/scenario/bai_scenario/manager/image/test_forgetting.py): pass
 
 아무 권한도 받지 않은 사용자가 이미지를 복원하려 하면 권한 부족으로 거부된다
 
@@ -1684,7 +1684,7 @@ Given
 
 When
 
-- ImageAdapter.restore — user-1이 image-1 복원
+- ImageAdapter.restore: user-1이 image-1 복원
 
 Then
 
@@ -1693,7 +1693,7 @@ Then
 
 <a id="forgetting-restoring-an-id-that-holds-no-image-is-refused"></a>
 
-#### [restoring-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_forgetting.py) — pass
+#### [restoring-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_forgetting.py): pass
 
 어느 이미지도 가리키지 않는 ID를 복원하려 하면 대상을 찾을 수 없어 거부된다
 
@@ -1711,7 +1711,7 @@ Given
 
 When
 
-- ImageAdapter.restore — user-1이 어느 이미지도 가리키지 않는 ID 복원
+- ImageAdapter.restore: user-1이 어느 이미지도 가리키지 않는 ID 복원
 
 Then
 
@@ -1722,7 +1722,7 @@ Then
 
 <a id="searching-a-user-granted-on-a-registry-reads-the-images-it-holds"></a>
 
-#### [a-user-granted-on-a-registry-reads-the-images-it-holds](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [a-user-granted-on-a-registry-reads-the-images-it-holds](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 이미지가 레지스트리 2개에 나뉘어 있을 때 한쪽 레지스트리에 권한을 받은 사용자가 그 레지스트리를 스코프로 조회하면, 그 레지스트리의 이미지만 반환되고 다른 쪽은 집계되지 않는다
 
@@ -1750,7 +1750,7 @@ Given
 
 When
 
-- ImageAdapter.scoped_search — user-1이 한 레지스트리를 스코프로 이미지를 검색함
+- ImageAdapter.scoped_search: user-1이 한 레지스트리를 스코프로 이미지를 검색함
 
 Then
 
@@ -1762,7 +1762,7 @@ Then
 
 <a id="searching-a-user-who-cannot-read-the-registry-is-refused-its-images"></a>
 
-#### [a-user-who-cannot-read-the-registry-is-refused-its-images](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [a-user-who-cannot-read-the-registry-is-refused-its-images](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 아무 권한도 받지 않은 사용자가 한 레지스트리를 스코프로 이미지를 조회하려 하면 권한 부족으로 거부된다
 
@@ -1784,7 +1784,7 @@ Given
 
 When
 
-- ImageAdapter.scoped_search — user-1이 한 레지스트리를 스코프로 이미지를 검색함
+- ImageAdapter.scoped_search: user-1이 한 레지스트리를 스코프로 이미지를 검색함
 
 Then
 
@@ -1795,7 +1795,7 @@ Then
 
 <a id="searching-a-user-who-can-read-the-image-gets-its-aliases"></a>
 
-#### [a-user-who-can-read-the-image-gets-its-aliases](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [a-user-who-can-read-the-image-gets-its-aliases](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 그 이미지에 권한을 받은 사용자가 그 이미지의 별칭을 검색하면 등록해 둔 별칭이 반환된다
 
@@ -1820,7 +1820,7 @@ Given
 
 When
 
-- ImageAdapter.scoped_search_aliases — user-1이 image-1의 별칭을 검색함
+- ImageAdapter.scoped_search_aliases: user-1이 image-1의 별칭을 검색함
 
 Then
 
@@ -1832,7 +1832,7 @@ Then
 
 <a id="searching-a-user-who-cannot-read-the-image-is-refused-its-aliases"></a>
 
-#### [a-user-who-cannot-read-the-image-is-refused-its-aliases](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [a-user-who-cannot-read-the-image-is-refused-its-aliases](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 아무 권한도 받지 않은 사용자가 그 이미지의 별칭을 검색하려 하면 권한 부족으로 거부된다
 
@@ -1851,7 +1851,7 @@ Given
 
 When
 
-- ImageAdapter.scoped_search_aliases — user-1이 image-1의 별칭을 검색함
+- ImageAdapter.scoped_search_aliases: user-1이 image-1의 별칭을 검색함
 
 Then
 
@@ -1862,7 +1862,7 @@ Then
 
 <a id="editing-an-edit-that-names-no-value-changes-nothing"></a>
 
-#### [an-edit-that-names-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
+#### [an-edit-that-names-no-value-changes-nothing](/tests/scenario/bai_scenario/manager/image/test_editing.py): pass
 
 슈퍼관리자가 값을 하나도 지정하지 않고 수정하면 아무것도 바뀌지 않은 노드가 반환된다
 
@@ -1880,7 +1880,7 @@ Given
 
 When
 
-- ImageAdapter.update — user-1이 값을 하나도 지정하지 않고 수정
+- ImageAdapter.update: user-1이 값을 하나도 지정하지 않고 수정
 
 Then
 
@@ -1905,7 +1905,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
@@ -1921,7 +1921,7 @@ Then
 
 <a id="editing-changing-labels-and-resource-limits-returns-the-new-values"></a>
 
-#### [changing-labels-and-resource-limits-returns-the-new-values](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
+#### [changing-labels-and-resource-limits-returns-the-new-values](/tests/scenario/bai_scenario/manager/image/test_editing.py): pass
 
 슈퍼관리자가 레이블과 CPU 하한·상한을 수정하면 지정한 값이 반환된다
 
@@ -1939,7 +1939,7 @@ Given
 
 When
 
-- ImageAdapter.update — user-1이 image-1의 여러 필드를 함께 수정
+- ImageAdapter.update: user-1이 image-1의 여러 필드를 함께 수정
 
 Then
 
@@ -1964,7 +1964,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
@@ -1980,7 +1980,7 @@ Then
 
 <a id="editing-changing-only-the-tag-leaves-every-other-field-alone"></a>
 
-#### [changing-only-the-tag-leaves-every-other-field-alone](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
+#### [changing-only-the-tag-leaves-every-other-field-alone](/tests/scenario/bai_scenario/manager/image/test_editing.py): pass
 
 슈퍼관리자가 태그만 수정하면 태그만 새 값이 되고 나머지 필드는 그대로다
 
@@ -1998,7 +1998,7 @@ Given
 
 When
 
-- ImageAdapter.update — user-1이 image-1의 태그를 moved로 수정
+- ImageAdapter.update: user-1이 image-1의 태그를 moved로 수정
 
 Then
 
@@ -2023,7 +2023,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
@@ -2039,7 +2039,7 @@ Then
 
 <a id="editing-changing-the-remaining-scalar-fields-returns-the-new-values"></a>
 
-#### [changing-the-remaining-scalar-fields-returns-the-new-values](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
+#### [changing-the-remaining-scalar-fields-returns-the-new-values](/tests/scenario/bai_scenario/manager/image/test_editing.py): pass
 
 슈퍼관리자가 이름과 레지스트리 등의 기본 필드를 함께 수정하면 지정한 값이 반환된다
 
@@ -2057,7 +2057,7 @@ Given
 
 When
 
-- ImageAdapter.update — user-1이 image-1의 여러 필드를 함께 수정
+- ImageAdapter.update: user-1이 image-1의 여러 필드를 함께 수정
 
 Then
 
@@ -2082,7 +2082,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'updated-image'
   - identity.namespace = 'team/updated-image'
   - identity.architecture = 'aarch64'
@@ -2098,7 +2098,7 @@ Then
 
 <a id="editing-clearing-the-accelerator-list-empties-it"></a>
 
-#### [clearing-the-accelerator-list-empties-it](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
+#### [clearing-the-accelerator-list-empties-it](/tests/scenario/bai_scenario/manager/image/test_editing.py): pass
 
 슈퍼관리자가 가속기 목록을 비우는 수정을 하면 그 필드가 빈 채로 반환된다. 생략과 비우기를 구분할 수 있는 필드는 이것뿐이다
 
@@ -2116,7 +2116,7 @@ Given
 
 When
 
-- ImageAdapter.update — user-1이 image-1의 가속기 목록을 비움
+- ImageAdapter.update: user-1이 image-1의 가속기 목록을 비움
 
 Then
 
@@ -2141,7 +2141,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
@@ -2157,7 +2157,7 @@ Then
 
 <a id="editing-writing-an-accelerator-onto-an-image-that-had-none"></a>
 
-#### [writing-an-accelerator-onto-an-image-that-had-none](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
+#### [writing-an-accelerator-onto-an-image-that-had-none](/tests/scenario/bai_scenario/manager/image/test_editing.py): pass
 
 슈퍼관리자가 가속기 이름을 지정하면 그 이름이 담긴 노드가 반환된다
 
@@ -2175,7 +2175,7 @@ Given
 
 When
 
-- ImageAdapter.update — user-1이 image-1의 가속기 목록을 cuda로 지정
+- ImageAdapter.update: user-1이 image-1의 가속기 목록을 cuda로 지정
 
 Then
 
@@ -2200,7 +2200,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
@@ -2216,7 +2216,7 @@ Then
 
 <a id="editing-a-user-granted-nothing-may-not-edit-an-image"></a>
 
-#### [a-user-granted-nothing-may-not-edit-an-image](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-an-image](/tests/scenario/bai_scenario/manager/image/test_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 이미지를 수정하려 하면 권한 부족으로 거부된다
 
@@ -2234,7 +2234,7 @@ Given
 
 When
 
-- ImageAdapter.update — user-1이 image-1의 태그를 moved로 수정
+- ImageAdapter.update: user-1이 image-1의 태그를 moved로 수정
 
 Then
 
@@ -2243,7 +2243,7 @@ Then
 
 <a id="editing-editing-an-id-that-holds-no-image-is-refused"></a>
 
-#### [editing-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_editing.py) — pass
+#### [editing-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_editing.py): pass
 
 어느 이미지도 가리키지 않는 ID를 수정하려 하면 대상을 찾을 수 없어 거부된다
 
@@ -2261,7 +2261,7 @@ Given
 
 When
 
-- ImageAdapter.update — user-1이 어느 이미지도 가리키지 않는 ID 수정
+- ImageAdapter.update: user-1이 어느 이미지도 가리키지 않는 ID 수정
 
 Then
 
@@ -2272,7 +2272,7 @@ Then
 
 <a id="aliasing-aliasing-an-image-answers-with-the-alias-and-the-image-it-names"></a>
 
-#### [aliasing-an-image-answers-with-the-alias-and-the-image-it-names](/tests/scenario/bai_scenario/manager/image/test_aliasing.py) — pass
+#### [aliasing-an-image-answers-with-the-alias-and-the-image-it-names](/tests/scenario/bai_scenario/manager/image/test_aliasing.py): pass
 
 슈퍼관리자가 이미지에 별칭을 등록하면 그 별칭과 가리키는 이미지가 반환된다
 
@@ -2290,18 +2290,18 @@ Given
 
 When
 
-- ImageAdapter.admin_alias — user-1이 image-1에 별칭 made-alias 등록
+- ImageAdapter.admin_alias: user-1이 image-1에 별칭 made-alias 등록
 
 Then
 
 - 등록한 별칭과 그 이미지의 ID가 반환된다
   - alias = 'made-alias'
   - image_id: 미리 만들어 둔 이미지의 ID와 같다
-  - alias_id: 무시함 — 데이터베이스가 생성한다
+  - alias_id: 무시함: 데이터베이스가 생성한다
 
 <a id="aliasing-aliasing-an-id-that-holds-no-image-is-refused"></a>
 
-#### [aliasing-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_aliasing.py) — pass
+#### [aliasing-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_aliasing.py): pass
 
 어느 이미지도 가리키지 않는 ID에 별칭을 등록하려 하면 대상을 찾을 수 없어 거부된다
 
@@ -2319,7 +2319,7 @@ Given
 
 When
 
-- ImageAdapter.admin_alias — user-1이 어느 이미지도 가리키지 않는 ID에 별칭 등록
+- ImageAdapter.admin_alias: user-1이 어느 이미지도 가리키지 않는 ID에 별칭 등록
 
 Then
 
@@ -2328,7 +2328,7 @@ Then
 
 <a id="aliasing-an-alias-that-is-already-in-use-is-refused"></a>
 
-#### [an-alias-that-is-already-in-use-is-refused](/tests/scenario/bai_scenario/manager/image/test_aliasing.py) — pass
+#### [an-alias-that-is-already-in-use-is-refused](/tests/scenario/bai_scenario/manager/image/test_aliasing.py): pass
 
 이미 사용 중인 별칭을 등록하려 하면 유니크 제약 위반으로 거부된다
 
@@ -2347,7 +2347,7 @@ Given
 
 When
 
-- ImageAdapter.admin_alias — user-1이 이미 사용 중인 별칭 seeded-alias 등록
+- ImageAdapter.admin_alias: user-1이 이미 사용 중인 별칭 seeded-alias 등록
 
 Then
 
@@ -2356,7 +2356,7 @@ Then
 
 <a id="aliasing-the-maker-of-a-custom-image-still-may-not-alias-it"></a>
 
-#### [the-maker-of-a-custom-image-still-may-not-alias-it](/tests/scenario/bai_scenario/manager/image/test_aliasing.py) — pass
+#### [the-maker-of-a-custom-image-still-may-not-alias-it](/tests/scenario/bai_scenario/manager/image/test_aliasing.py): pass
 
 자기가 만든 커스텀 이미지라도 별칭은 등록할 수 없다. 별칭 등록은 해당 이미지의 권한이 아니라 슈퍼관리자 검사로 보호되기 때문이다
 
@@ -2380,7 +2380,7 @@ Given
 
 When
 
-- ImageAdapter.admin_alias — user-1이 image-1에 별칭 made-alias 등록
+- ImageAdapter.admin_alias: user-1이 image-1에 별칭 made-alias 등록
 
 Then
 
@@ -2391,7 +2391,7 @@ Then
 
 <a id="aliasing-dealiasing-answers-with-the-alias-it-removed"></a>
 
-#### [dealiasing-answers-with-the-alias-it-removed](/tests/scenario/bai_scenario/manager/image/test_aliasing.py) — pass
+#### [dealiasing-answers-with-the-alias-it-removed](/tests/scenario/bai_scenario/manager/image/test_aliasing.py): pass
 
 슈퍼관리자가 등록된 별칭을 해제하면 해제된 별칭과 그 이미지가 반환된다
 
@@ -2410,18 +2410,18 @@ Given
 
 When
 
-- ImageAdapter.admin_dealias — user-1이 별칭 seeded-alias 해제
+- ImageAdapter.admin_dealias: user-1이 별칭 seeded-alias 해제
 
 Then
 
 - 해제한 별칭과 그 이미지의 ID가 반환된다
   - alias = 'seeded-alias'
   - image_id: 미리 만들어 둔 이미지의 ID와 같다
-  - alias_id: 무시함 — 데이터베이스가 생성한다
+  - alias_id: 무시함: 데이터베이스가 생성한다
 
 <a id="aliasing-a-user-who-is-not-the-superadmin-may-not-dealias"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-dealias](/tests/scenario/bai_scenario/manager/image/test_aliasing.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-dealias](/tests/scenario/bai_scenario/manager/image/test_aliasing.py): pass
 
 슈퍼관리자가 아닌 사용자가 별칭을 해제하려 하면 슈퍼관리자 권한 부족으로 거부된다
 
@@ -2440,7 +2440,7 @@ Given
 
 When
 
-- ImageAdapter.admin_dealias — user-1이 별칭 seeded-alias 해제
+- ImageAdapter.admin_dealias: user-1이 별칭 seeded-alias 해제
 
 Then
 
@@ -2449,7 +2449,7 @@ Then
 
 <a id="aliasing-dealiasing-a-name-no-image-holds-is-refused"></a>
 
-#### [dealiasing-a-name-no-image-holds-is-refused](/tests/scenario/bai_scenario/manager/image/test_aliasing.py) — pass
+#### [dealiasing-a-name-no-image-holds-is-refused](/tests/scenario/bai_scenario/manager/image/test_aliasing.py): pass
 
 어느 이미지도 가리키지 않는 별칭을 해제하려 하면 대상을 찾을 수 없어 거부된다
 
@@ -2468,7 +2468,7 @@ Given
 
 When
 
-- ImageAdapter.admin_dealias — user-1이 어느 이미지도 가리키지 않는 별칭 해제
+- ImageAdapter.admin_dealias: user-1이 어느 이미지도 가리키지 않는 별칭 해제
 
 Then
 
@@ -2479,7 +2479,7 @@ Then
 
 <a id="retiring-purging-an-aliased-image-answers-with-the-image-it-removed"></a>
 
-#### [purging-an-aliased-image-answers-with-the-image-it-removed](/tests/scenario/bai_scenario/manager/image/test_retiring.py) — pass
+#### [purging-an-aliased-image-answers-with-the-image-it-removed](/tests/scenario/bai_scenario/manager/image/test_retiring.py): pass
 
 별칭이 등록된 이미지를 완전 삭제하면 삭제된 이미지가 반환된다
 
@@ -2498,7 +2498,7 @@ Given
 
 When
 
-- ImageAdapter.admin_purge — user-1이 별칭 seeded-alias가 등록된 이미지를 완전 삭제
+- ImageAdapter.admin_purge: user-1이 별칭 seeded-alias가 등록된 이미지를 완전 삭제
 
 Then
 
@@ -2523,7 +2523,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
@@ -2539,7 +2539,7 @@ Then
 
 <a id="retiring-purging-an-image-answers-with-the-image-it-removed"></a>
 
-#### [purging-an-image-answers-with-the-image-it-removed](/tests/scenario/bai_scenario/manager/image/test_retiring.py) — pass
+#### [purging-an-image-answers-with-the-image-it-removed](/tests/scenario/bai_scenario/manager/image/test_retiring.py): pass
 
 슈퍼관리자가 이미지를 완전 삭제하면 삭제된 이미지가 반환된다
 
@@ -2557,7 +2557,7 @@ Given
 
 When
 
-- ImageAdapter.admin_purge — user-1이 image-1 완전 삭제
+- ImageAdapter.admin_purge: user-1이 image-1 완전 삭제
 
 Then
 
@@ -2582,7 +2582,7 @@ Then
   - customized = False
   - creator_id = None
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
@@ -2598,7 +2598,7 @@ Then
 
 <a id="retiring-the-maker-of-a-custom-image-may-purge-it"></a>
 
-#### [the-maker-of-a-custom-image-may-purge-it](/tests/scenario/bai_scenario/manager/image/test_retiring.py) — pass
+#### [the-maker-of-a-custom-image-may-purge-it](/tests/scenario/bai_scenario/manager/image/test_retiring.py): pass
 
 자기가 커밋한 커스텀 이미지를 자기 개인 프로젝트의 권한으로 완전 삭제하면, 이미지가 그 개인 프로젝트에 속하므로 이미지 권한과 커스텀 이미지 작성자 검사를 모두 통과해 삭제된 이미지가 반환된다
 
@@ -2622,7 +2622,7 @@ Given
 
 When
 
-- ImageAdapter.admin_purge — user-1이 image-1 완전 삭제
+- ImageAdapter.admin_purge: user-1이 image-1 완전 삭제
 
 Then
 
@@ -2647,7 +2647,7 @@ Then
   - customized = True
   - creator_id: 이미지를 커밋한 사용자의 ID와 같다
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'image-1'
   - identity.namespace = 'image-1'
   - identity.architecture = 'x86_64'
@@ -2663,7 +2663,7 @@ Then
 
 <a id="retiring-a-granted-user-may-not-purge-an-image-they-did-not-customize"></a>
 
-#### [a-granted-user-may-not-purge-an-image-they-did-not-customize](/tests/scenario/bai_scenario/manager/image/test_retiring.py) — pass
+#### [a-granted-user-may-not-purge-an-image-they-did-not-customize](/tests/scenario/bai_scenario/manager/image/test_retiring.py): pass
 
 커스텀 이미지가 아닌 이미지는 권한을 받은 사용자라도 완전 삭제할 수 없다. 이미지 권한 검사를 통과한 뒤 커스텀 이미지 작성자 검사에서 거부된다
 
@@ -2687,7 +2687,7 @@ Given
 
 When
 
-- ImageAdapter.admin_purge — user-1이 image-1 완전 삭제
+- ImageAdapter.admin_purge: user-1이 image-1 완전 삭제
 
 Then
 
@@ -2696,7 +2696,7 @@ Then
 
 <a id="retiring-a-user-granted-nothing-may-not-purge-an-image"></a>
 
-#### [a-user-granted-nothing-may-not-purge-an-image](/tests/scenario/bai_scenario/manager/image/test_retiring.py) — pass
+#### [a-user-granted-nothing-may-not-purge-an-image](/tests/scenario/bai_scenario/manager/image/test_retiring.py): pass
 
 아무 권한도 받지 않은 사용자가 이미지를 완전 삭제하려 하면 권한 부족으로 거부된다
 
@@ -2714,7 +2714,7 @@ Given
 
 When
 
-- ImageAdapter.admin_purge — user-1이 image-1 완전 삭제
+- ImageAdapter.admin_purge: user-1이 image-1 완전 삭제
 
 Then
 
@@ -2723,7 +2723,7 @@ Then
 
 <a id="retiring-purging-an-id-that-holds-no-image-is-refused"></a>
 
-#### [purging-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_retiring.py) — pass
+#### [purging-an-id-that-holds-no-image-is-refused](/tests/scenario/bai_scenario/manager/image/test_retiring.py): pass
 
 어느 이미지도 가리키지 않는 ID를 완전 삭제하려 하면 대상을 찾을 수 없어 거부된다
 
@@ -2741,7 +2741,7 @@ Given
 
 When
 
-- ImageAdapter.admin_purge — user-1이 어느 이미지도 가리키지 않는 ID 완전 삭제
+- ImageAdapter.admin_purge: user-1이 어느 이미지도 가리키지 않는 ID 완전 삭제
 
 Then
 
@@ -2752,7 +2752,7 @@ Then
 
 <a id="scanning-scanning-a-registered-image-refreshes-it-from-the-registry"></a>
 
-#### [scanning-a-registered-image-refreshes-it-from-the-registry](/tests/scenario/bai_scenario/manager/image/test_scanning.py) — pass
+#### [scanning-a-registered-image-refreshes-it-from-the-registry](/tests/scenario/bai_scenario/manager/image/test_scanning.py): pass
 
 슈퍼관리자가 이미 등록된 이미지를 scan하면 새 이미지를 만들지 않고 등록된 이미지를 레지스트리 값으로 갱신해 반환한다
 
@@ -2770,7 +2770,7 @@ Given
 
 When
 
-- ImageAdapter.admin_scan_image — user-1이 stable/python:latest 태그를 x86_64 아키텍처로 스캔
+- ImageAdapter.admin_scan_image: user-1이 stable/python:latest 태그를 x86_64 아키텍처로 스캔
 
 Then
 
@@ -2793,7 +2793,7 @@ Then
   - config_digest = 'sha256:config-amd64'
   - is_local = False
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'host-1/stable/python:latest'
   - identity.namespace = 'stable/python'
   - identity.architecture = 'x86_64'
@@ -2809,7 +2809,7 @@ Then
 
 <a id="scanning-scanning-an-unregistered-image-registers-the-requested-architecture"></a>
 
-#### [scanning-an-unregistered-image-registers-the-requested-architecture](/tests/scenario/bai_scenario/manager/image/test_scanning.py) — pass
+#### [scanning-an-unregistered-image-registers-the-requested-architecture](/tests/scenario/bai_scenario/manager/image/test_scanning.py): pass
 
 슈퍼관리자가 미등록된 이미지를 scan하면 요청한 아키텍처의 이미지 하나가 반환된다. scan은 슈퍼관리자 역할이 있어야만 실행된다
 
@@ -2826,12 +2826,12 @@ Given
 
 When
 
-- ImageAdapter.admin_scan_image — user-1이 stable/python:latest 태그를 x86_64 아키텍처로 스캔
+- ImageAdapter.admin_scan_image: user-1이 stable/python:latest 태그를 x86_64 아키텍처로 스캔
 
 Then
 
 - 요청한 아키텍처로 등록된 이미지 노드가 반환된다
-  - id: 무시함 — 스캔이 새로 만든 행이라 데이터베이스가 정한다
+  - id: 무시함: 스캔이 새로 만든 행이라 데이터베이스가 정한다
   - name = 'host-1/stable/python:latest'
   - image = 'stable/python'
   - registry = 'host-1'
@@ -2849,7 +2849,7 @@ Then
   - config_digest = 'sha256:config-amd64'
   - is_local = False
   - created_at: 이 실행이 쓴 시각
-  - last_used_at: 무시함 — 세션이 기록하는 값이라 이 실행에서는 알 수 없다
+  - last_used_at: 무시함: 세션이 기록하는 값이라 이 실행에서는 알 수 없다
   - identity.canonical_name = 'host-1/stable/python:latest'
   - identity.namespace = 'stable/python'
   - identity.architecture = 'x86_64'
@@ -2865,7 +2865,7 @@ Then
 
 <a id="scanning-a-name-no-registry-holds-as-an-image-is-refused-without-a-scan"></a>
 
-#### [a-name-no-registry-holds-as-an-image-is-refused-without-a-scan](/tests/scenario/bai_scenario/manager/image/test_scanning.py) — pass
+#### [a-name-no-registry-holds-as-an-image-is-refused-without-a-scan](/tests/scenario/bai_scenario/manager/image/test_scanning.py): pass
 
 이미지에 맞는 registry가 없으면 scan하지 않고 거부한다. 레지스트리 이름만 주어도 레지스트리 전체를 스캔하지 않는다
 
@@ -2882,7 +2882,7 @@ Given
 
 When
 
-- ImageAdapter.admin_scan_image — user-1이 이미지 없이 레지스트리 이름만 x86_64 아키텍처로 스캔
+- ImageAdapter.admin_scan_image: user-1이 이미지 없이 레지스트리 이름만 x86_64 아키텍처로 스캔
 
 Then
 
@@ -2891,7 +2891,7 @@ Then
 
 <a id="scanning-a-tag-the-registry-does-not-hold-is-refused"></a>
 
-#### [a-tag-the-registry-does-not-hold-is-refused](/tests/scenario/bai_scenario/manager/image/test_scanning.py) — pass
+#### [a-tag-the-registry-does-not-hold-is-refused](/tests/scenario/bai_scenario/manager/image/test_scanning.py): pass
 
 레지스트리에 없는 태그를 scan하면 이미지를 찾을 수 없어 거부된다
 
@@ -2908,7 +2908,7 @@ Given
 
 When
 
-- ImageAdapter.admin_scan_image — user-1이 stable/python:removed 태그를 x86_64 아키텍처로 스캔
+- ImageAdapter.admin_scan_image: user-1이 stable/python:removed 태그를 x86_64 아키텍처로 스캔
 
 Then
 
@@ -2917,7 +2917,7 @@ Then
 
 <a id="scanning-a-user-who-is-not-the-superadmin-may-not-scan"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-scan](/tests/scenario/bai_scenario/manager/image/test_scanning.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-scan](/tests/scenario/bai_scenario/manager/image/test_scanning.py): pass
 
 일반 사용자는 scan을 실행할 수 없어 슈퍼관리자 권한 부족으로 거부된다
 
@@ -2934,7 +2934,7 @@ Given
 
 When
 
-- ImageAdapter.admin_scan_image — user-1이 stable/python:latest 태그를 x86_64 아키텍처로 스캔
+- ImageAdapter.admin_scan_image: user-1이 stable/python:latest 태그를 x86_64 아키텍처로 스캔
 
 Then
 
@@ -2945,7 +2945,7 @@ Then
 
 <a id="searching-filtering-aliases-by-image-and-ordering-by-name"></a>
 
-#### [filtering-aliases-by-image-and-ordering-by-name](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [filtering-aliases-by-image-and-ordering-by-name](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 슈퍼관리자가 한 이미지의 별칭만 이름 내림차순으로 검색하면 해당 별칭만 정렬되어 반환된다
 
@@ -2967,7 +2967,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search_image_aliases — user-1이 한 이미지의 별칭을 이름 내림차순으로 검색함
+- ImageAdapter.admin_search_image_aliases: user-1이 한 이미지의 별칭을 이름 내림차순으로 검색함
 
 Then
 
@@ -2979,7 +2979,7 @@ Then
 
 <a id="searching-searching-aliases-answers-with-the-one-that-was-attached"></a>
 
-#### [searching-aliases-answers-with-the-one-that-was-attached](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [searching-aliases-answers-with-the-one-that-was-attached](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 별칭이 등록되어 있을 때 슈퍼관리자가 별칭을 검색하면 그 별칭이 반환된다
 
@@ -2998,7 +2998,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search_image_aliases — user-1이 별칭을 검색함
+- ImageAdapter.admin_search_image_aliases: user-1이 별칭을 검색함
 
 Then
 
@@ -3010,7 +3010,7 @@ Then
 
 <a id="searching-searching-aliases-when-none-were-attached-answers-empty"></a>
 
-#### [searching-aliases-when-none-were-attached-answers-empty](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [searching-aliases-when-none-were-attached-answers-empty](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 별칭을 하나도 등록하지 않은 상태에서 슈퍼관리자가 별칭을 검색하면 응답이 비어 있다
 
@@ -3029,7 +3029,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search_image_aliases — user-1이 별칭을 검색함
+- ImageAdapter.admin_search_image_aliases: user-1이 별칭을 검색함
 
 Then
 
@@ -3041,7 +3041,7 @@ Then
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-aliases"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-aliases](/tests/scenario/bai_scenario/manager/image/test_searching.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-aliases](/tests/scenario/bai_scenario/manager/image/test_searching.py): pass
 
 슈퍼관리자가 아닌 사용자가 별칭을 검색하려 하면 슈퍼관리자 권한 부족으로 거부된다
 
@@ -3060,7 +3060,7 @@ Given
 
 When
 
-- ImageAdapter.admin_search_image_aliases — user-1이 별칭을 검색함
+- ImageAdapter.admin_search_image_aliases: user-1이 별칭을 검색함
 
 Then
 

@@ -1,21 +1,21 @@
 ## deployment_revision_preset
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/deployment_revision_preset/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/deployment_revision_preset/adapter.py)
+[배경](/src/ai/backend/manager/api/adapters/deployment_revision_preset/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/deployment_revision_preset/adapter.py)
 
 시나리오: 미완 10 / 10
 
 - ops 로 구성 (8)
-  - available_presets — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - create — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - get — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - search_resource_slots — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - available_presets: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - batch_load_by_ids: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - create: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - get: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - partial_bulk_purge: 대표 성공 ✓ · 대표 실패 ✗: SCENARIO-GAP
+  - purge: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - search: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - search_resource_slots: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
 - ops + 직접 구현 (2)
-  - partial_bulk_update — 성공 있음 2 · 실패 없음 (partial_bulk, single_get_ops) — SCENARIO-GAP
-  - update — 성공 없음 · 실패 없음 (single_entity, single_get_ops) — SCENARIO-GAP
+  - partial_bulk_update: 성공 있음 2 · 실패 없음 (partial_bulk, single_get_ops): SCENARIO-GAP
+  - update: 성공 없음 · 실패 없음 (single_entity, single_get_ops): SCENARIO-GAP
 
 **partial_bulk_purge**
 
@@ -35,7 +35,7 @@
 
 <a id="partial_bulk-a-preset-reader-purges-none-of-several-presets"></a>
 
-#### [a-preset-reader-purges-none-of-several-presets](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_partial_bulk.py) — pass
+#### [a-preset-reader-purges-none-of-several-presets](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_partial_bulk.py): pass
 
 프리셋을 읽을 수만 있는 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -58,7 +58,7 @@ Given
 
 When
 
-- DeploymentRevisionPresetAdapter.partial_bulk_purge — user-1이 프리셋 2개를 한 번에 purge 함
+- DeploymentRevisionPresetAdapter.partial_bulk_purge: user-1이 프리셋 2개를 한 번에 purge 함
 
 Then
 
@@ -72,7 +72,7 @@ Then
 
 <a id="partial_bulk-purging-several-presets-answers-for-the-missing-one"></a>
 
-#### [purging-several-presets-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_partial_bulk.py) — pass
+#### [purging-several-presets-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_partial_bulk.py): pass
 
 슈퍼관리자가 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -95,7 +95,7 @@ Given
 
 When
 
-- DeploymentRevisionPresetAdapter.partial_bulk_purge — user-1이 프리셋 2개 와 없는 id 하나를 한 번에 purge 함
+- DeploymentRevisionPresetAdapter.partial_bulk_purge: user-1이 프리셋 2개 와 없는 id 하나를 한 번에 purge 함
 
 Then
 
@@ -113,7 +113,7 @@ Then
 
 <a id="partial_bulk-a-preset-reader-edits-none-of-several-presets"></a>
 
-#### [a-preset-reader-edits-none-of-several-presets](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_partial_bulk.py) — pass
+#### [a-preset-reader-edits-none-of-several-presets](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_partial_bulk.py): pass
 
 프리셋을 읽을 수만 있는 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -136,7 +136,7 @@ Given
 
 When
 
-- DeploymentRevisionPresetAdapter.partial_bulk_update — user-1이 프리셋 2개의 설명을 한 번에 고침
+- DeploymentRevisionPresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 설명을 한 번에 고침
 
 Then
 
@@ -150,7 +150,7 @@ Then
 
 <a id="partial_bulk-the-superadmin-edits-several-presets-at-once"></a>
 
-#### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_partial_bulk.py) — pass
+#### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/deployment_revision_preset/test_partial_bulk.py): pass
 
 슈퍼관리자가 프리셋 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다
 
@@ -173,7 +173,7 @@ Given
 
 When
 
-- DeploymentRevisionPresetAdapter.partial_bulk_update — user-1이 프리셋 2개의 설명을 한 번에 고침
+- DeploymentRevisionPresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 설명을 한 번에 고침
 
 Then
 

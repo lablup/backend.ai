@@ -1,12 +1,12 @@
 ## secret
 
-[what it guarantees](/src/ai/backend/manager/api/adapters/secret/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/secret/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/secret/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/secret/adapter.py)
 
 Scenario: complete
 
 - direct implementation (2)
-  - admin_reencrypt_secrets — success present 4 · refusal present 2 (global_scope)
-  - admin_secret_status — success present 3 · refusal present 1 (global_scope)
+  - admin_reencrypt_secrets: success present 4 · rejection present 2 (global_scope)
+  - admin_secret_status: success present 3 · rejection present 1 (global_scope)
 
 **admin_reencrypt_secrets**
 
@@ -16,8 +16,8 @@ Scenario: complete
 | [설정 키가 쓰기 제공자이고 비밀 키 둘이 이미 그 키로 암호화돼 있을 때 재암호화하면, 둘을 스캔해 둘을 다시 썼다는 응답이 반환되고 상태는 그대로 그 키로 암호화된 것 둘이다](#reencrypting-reencrypting-rewrites-secrets-already-on-the-config-key) | answered |
 | [쓰기 제공자가 평문일 때 평문 비밀 키 둘을 재암호화하면, 둘을 스캔해 둘을 다시 썼다는 응답이 반환되고 상태는 그대로 평문 둘이다. 다시 쓴 수는 값이 바뀌었는지가 아니라 행을 다시 썼는지를 센다](#reencrypting-reencrypting-with-a-plain-writer-rewrites-plaintext-secrets-as-plaintext) | answered |
 | [쓰기 제공자가 평문이고 설정 키 제공자는 읽기 전용일 때 그 키로 암호화된 비밀 키를 재암호화하면, 하나를 스캔해 하나를 다시 썼다는 응답이 반환되고 상태는 평문뿐이다](#reencrypting-reencrypting-with-a-plain-writer-turns-an-encrypted-secret-back-to-plaintext) | answered |
-| [슈퍼관리자가 아닌 사용자가 재암호화를 실행하면 역할 부족으로 거부된다](#reencrypting-a-user-who-is-not-the-superadmin-may-not-reencrypt-secrets) | refused |
-| [모니터 역할이 재암호화를 실행하면 역할 부족으로 거부된다. 상태는 조회할 수 있지만 재암호화는 쓰기 연산이라 통과하지 못한다](#reencrypting-the-monitor-may-not-reencrypt-secrets) | refused |
+| [슈퍼관리자가 아닌 사용자가 재암호화를 실행하면 역할 부족으로 거부된다](#reencrypting-a-user-who-is-not-the-superadmin-may-not-reencrypt-secrets) | rejected |
+| [모니터 역할이 재암호화를 실행하면 역할 부족으로 거부된다. 상태는 조회할 수 있지만 재암호화는 쓰기 연산이라 통과하지 못한다](#reencrypting-the-monitor-may-not-reencrypt-secrets) | rejected |
 
 **admin_secret_status**
 
@@ -26,13 +26,13 @@ Scenario: complete
 | [설정 키로 암호화된 비밀 키와 평문 비밀 키가 섞여 있을 때 상태를 조회하면, 그 키로 암호화된 수와 평문인 수가 두 항목으로 따로 반환된다](#status-secrets-on-different-keys-are-counted-apart) | answered |
 | [모니터 역할이 상태를 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다](#status-the-monitor-reads-the-secret-status-like-the-superadmin) | answered |
 | [쓰기 제공자가 평문일 때 슈퍼관리자가 상태를 조회하면, 쓰기 제공자는 평문이고 집계는 호출자까지 포함해 평문 비밀 키를 가진 수 한 항목이다](#status-the-superadmin-reads-a-status-counting-the-plaintext-secrets) | answered |
-| [슈퍼관리자가 아닌 사용자가 상태를 조회하면 역할 부족으로 거부된다](#status-a-user-who-is-not-the-superadmin-may-not-read-the-secret-status) | refused |
+| [슈퍼관리자가 아닌 사용자가 상태를 조회하면 역할 부족으로 거부된다](#status-a-user-who-is-not-the-superadmin-may-not-read-the-secret-status) | rejected |
 
 ### admin_reencrypt_secrets
 
 <a id="reencrypting-reencrypting-moves-plaintext-secrets-onto-the-config-key"></a>
 
-#### [reencrypting-moves-plaintext-secrets-onto-the-config-key](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py) — pass
+#### [reencrypting-moves-plaintext-secrets-onto-the-config-key](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py): pass
 
 설정 키가 쓰기 제공자일 때 평문 비밀 키 둘을 재암호화하면, 둘을 스캔해 둘을 다시 썼다는 응답과 함께 둘 다 그 키로 암호화되고 평문은 없는 상태가 반환된다
 
@@ -51,7 +51,7 @@ Given
 
 When
 
-- SecretAdapter.admin_reencrypt_secrets — user-1이 비밀 키 전부를 재암호화
+- SecretAdapter.admin_reencrypt_secrets: user-1이 비밀 키 전부를 재암호화
 
 Then
 
@@ -63,7 +63,7 @@ Then
 
 <a id="reencrypting-reencrypting-rewrites-secrets-already-on-the-config-key"></a>
 
-#### [reencrypting-rewrites-secrets-already-on-the-config-key](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py) — pass
+#### [reencrypting-rewrites-secrets-already-on-the-config-key](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py): pass
 
 설정 키가 쓰기 제공자이고 비밀 키 둘이 이미 그 키로 암호화돼 있을 때 재암호화하면, 둘을 스캔해 둘을 다시 썼다는 응답이 반환되고 상태는 그대로 그 키로 암호화된 것 둘이다
 
@@ -82,7 +82,7 @@ Given
 
 When
 
-- SecretAdapter.admin_reencrypt_secrets — user-1이 비밀 키 전부를 재암호화
+- SecretAdapter.admin_reencrypt_secrets: user-1이 비밀 키 전부를 재암호화
 
 Then
 
@@ -94,7 +94,7 @@ Then
 
 <a id="reencrypting-reencrypting-with-a-plain-writer-rewrites-plaintext-secrets-as-plaintext"></a>
 
-#### [reencrypting-with-a-plain-writer-rewrites-plaintext-secrets-as-plaintext](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py) — pass
+#### [reencrypting-with-a-plain-writer-rewrites-plaintext-secrets-as-plaintext](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py): pass
 
 쓰기 제공자가 평문일 때 평문 비밀 키 둘을 재암호화하면, 둘을 스캔해 둘을 다시 썼다는 응답이 반환되고 상태는 그대로 평문 둘이다. 다시 쓴 수는 값이 바뀌었는지가 아니라 행을 다시 썼는지를 센다
 
@@ -113,7 +113,7 @@ Given
 
 When
 
-- SecretAdapter.admin_reencrypt_secrets — user-1이 비밀 키 전부를 재암호화
+- SecretAdapter.admin_reencrypt_secrets: user-1이 비밀 키 전부를 재암호화
 
 Then
 
@@ -125,7 +125,7 @@ Then
 
 <a id="reencrypting-reencrypting-with-a-plain-writer-turns-an-encrypted-secret-back-to-plaintext"></a>
 
-#### [reencrypting-with-a-plain-writer-turns-an-encrypted-secret-back-to-plaintext](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py) — pass
+#### [reencrypting-with-a-plain-writer-turns-an-encrypted-secret-back-to-plaintext](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py): pass
 
 쓰기 제공자가 평문이고 설정 키 제공자는 읽기 전용일 때 그 키로 암호화된 비밀 키를 재암호화하면, 하나를 스캔해 하나를 다시 썼다는 응답이 반환되고 상태는 평문뿐이다
 
@@ -141,7 +141,7 @@ Given
 
 When
 
-- SecretAdapter.admin_reencrypt_secrets — user-1이 비밀 키 전부를 재암호화
+- SecretAdapter.admin_reencrypt_secrets: user-1이 비밀 키 전부를 재암호화
 
 Then
 
@@ -153,7 +153,7 @@ Then
 
 <a id="reencrypting-a-user-who-is-not-the-superadmin-may-not-reencrypt-secrets"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-reencrypt-secrets](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-reencrypt-secrets](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py): pass
 
 슈퍼관리자가 아닌 사용자가 재암호화를 실행하면 역할 부족으로 거부된다
 
@@ -169,7 +169,7 @@ Given
 
 When
 
-- SecretAdapter.admin_reencrypt_secrets — user-1이 비밀 키 전부를 재암호화
+- SecretAdapter.admin_reencrypt_secrets: user-1이 비밀 키 전부를 재암호화
 
 Then
 
@@ -178,7 +178,7 @@ Then
 
 <a id="reencrypting-the-monitor-may-not-reencrypt-secrets"></a>
 
-#### [the-monitor-may-not-reencrypt-secrets](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py) — pass
+#### [the-monitor-may-not-reencrypt-secrets](/tests/scenario/bai_scenario/manager/secret/test_reencrypting.py): pass
 
 모니터 역할이 재암호화를 실행하면 역할 부족으로 거부된다. 상태는 조회할 수 있지만 재암호화는 쓰기 연산이라 통과하지 못한다
 
@@ -194,7 +194,7 @@ Given
 
 When
 
-- SecretAdapter.admin_reencrypt_secrets — user-1이 비밀 키 전부를 재암호화
+- SecretAdapter.admin_reencrypt_secrets: user-1이 비밀 키 전부를 재암호화
 
 Then
 
@@ -205,7 +205,7 @@ Then
 
 <a id="status-secrets-on-different-keys-are-counted-apart"></a>
 
-#### [secrets-on-different-keys-are-counted-apart](/tests/scenario/bai_scenario/manager/secret/test_status.py) — pass
+#### [secrets-on-different-keys-are-counted-apart](/tests/scenario/bai_scenario/manager/secret/test_status.py): pass
 
 설정 키로 암호화된 비밀 키와 평문 비밀 키가 섞여 있을 때 상태를 조회하면, 그 키로 암호화된 수와 평문인 수가 두 항목으로 따로 반환된다
 
@@ -225,7 +225,7 @@ Given
 
 When
 
-- SecretAdapter.admin_secret_status — user-1이 비밀 상태를 조회
+- SecretAdapter.admin_secret_status: user-1이 비밀 상태를 조회
 
 Then
 
@@ -235,7 +235,7 @@ Then
 
 <a id="status-the-monitor-reads-the-secret-status-like-the-superadmin"></a>
 
-#### [the-monitor-reads-the-secret-status-like-the-superadmin](/tests/scenario/bai_scenario/manager/secret/test_status.py) — pass
+#### [the-monitor-reads-the-secret-status-like-the-superadmin](/tests/scenario/bai_scenario/manager/secret/test_status.py): pass
 
 모니터 역할이 상태를 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다
 
@@ -254,7 +254,7 @@ Given
 
 When
 
-- SecretAdapter.admin_secret_status — user-1이 비밀 상태를 조회
+- SecretAdapter.admin_secret_status: user-1이 비밀 상태를 조회
 
 Then
 
@@ -264,7 +264,7 @@ Then
 
 <a id="status-the-superadmin-reads-a-status-counting-the-plaintext-secrets"></a>
 
-#### [the-superadmin-reads-a-status-counting-the-plaintext-secrets](/tests/scenario/bai_scenario/manager/secret/test_status.py) — pass
+#### [the-superadmin-reads-a-status-counting-the-plaintext-secrets](/tests/scenario/bai_scenario/manager/secret/test_status.py): pass
 
 쓰기 제공자가 평문일 때 슈퍼관리자가 상태를 조회하면, 쓰기 제공자는 평문이고 집계는 호출자까지 포함해 평문 비밀 키를 가진 수 한 항목이다
 
@@ -283,7 +283,7 @@ Given
 
 When
 
-- SecretAdapter.admin_secret_status — user-1이 비밀 상태를 조회
+- SecretAdapter.admin_secret_status: user-1이 비밀 상태를 조회
 
 Then
 
@@ -293,7 +293,7 @@ Then
 
 <a id="status-a-user-who-is-not-the-superadmin-may-not-read-the-secret-status"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-read-the-secret-status](/tests/scenario/bai_scenario/manager/secret/test_status.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-read-the-secret-status](/tests/scenario/bai_scenario/manager/secret/test_status.py): pass
 
 슈퍼관리자가 아닌 사용자가 상태를 조회하면 역할 부족으로 거부된다
 
@@ -309,7 +309,7 @@ Given
 
 When
 
-- SecretAdapter.admin_secret_status — user-1이 비밀 상태를 조회
+- SecretAdapter.admin_secret_status: user-1이 비밀 상태를 조회
 
 Then
 

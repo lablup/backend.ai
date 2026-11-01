@@ -1,43 +1,43 @@
 ## artifact
 
-[what it guarantees](/src/ai/backend/manager/api/adapters/artifact/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/artifact/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/artifact/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/artifact/adapter.py)
 
 Scenario: incomplete 21 / 25
 
 - built from ops (9)
-  - batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - batch_load_revisions_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - delete — representative success ✓ · representative refusal ✓
-  - get_revision — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - partial_bulk_delete — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
-  - partial_bulk_restore — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
-  - partial_bulk_update — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
-  - restore — representative success ✓ · representative refusal ✓
-  - search_revisions_of_artifact_gql — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_revisions_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - delete: representative success ✓ · representative rejection ✓
+  - get_revision: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_delete: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_restore: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_update: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - restore: representative success ✓ · representative rejection ✓
+  - search_revisions_of_artifact_gql: representative success ✗ · representative rejection ✗: SCENARIO-GAP
 - direct implementation (16)
-  - admin_search — success absent · refusal absent (global_scope) — SCENARIO-GAP
-  - admin_search_gql — success absent · refusal absent (global_scope) — SCENARIO-GAP
-  - approve_revision — success absent · refusal absent (single_field) — SCENARIO-GAP
-  - cancel_import — success absent · refusal absent (single_field) — SCENARIO-GAP
-  - cleanup_revision — success absent · refusal absent (single_field) — SCENARIO-GAP
-  - delegate_import_batch — success absent · refusal absent (global_scope) — SCENARIO-GAP
-  - delegate_scan — success absent · refusal absent (global_scope) — SCENARIO-GAP
-  - delete_artifacts — success present 1 · refusal present 1 (global_scope)
-  - get — success absent · refusal absent (single_entity) — SCENARIO-GAP
-  - import_revision — success absent · refusal absent (single_field) — SCENARIO-GAP
-  - reject_revision — success absent · refusal absent (single_field) — SCENARIO-GAP
-  - restore_artifacts — success present 1 · refusal absent (global_scope) — SCENARIO-GAP
-  - retrieve_models — success absent · refusal absent (global_scope) — SCENARIO-GAP
-  - scan — success absent · refusal absent (global_scope) — SCENARIO-GAP
-  - search_revisions_gql — success absent · refusal absent (global_scope) — SCENARIO-GAP
-  - update — success present 1 · refusal present 2 (single_entity)
+  - admin_search: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - admin_search_gql: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - approve_revision: success absent · rejection absent (single_field): SCENARIO-GAP
+  - cancel_import: success absent · rejection absent (single_field): SCENARIO-GAP
+  - cleanup_revision: success absent · rejection absent (single_field): SCENARIO-GAP
+  - delegate_import_batch: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - delegate_scan: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - delete_artifacts: success present 1 · rejection present 1 (global_scope)
+  - get: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - import_revision: success absent · rejection absent (single_field): SCENARIO-GAP
+  - reject_revision: success absent · rejection absent (single_field): SCENARIO-GAP
+  - restore_artifacts: success present 1 · rejection absent (global_scope): SCENARIO-GAP
+  - retrieve_models: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - scan: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - search_revisions_gql: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - update: success present 1 · rejection present 2 (single_entity)
 
 **delete**
 
 | scenario | verdict |
 |---|---|
 | [슈퍼관리자가 아티팩트를 soft delete 하면, 삭제됨 상태의 아티팩트가 온다](#deleting-the-superadmin-soft-deletes-an-artifact) | answered |
-| [아무 권한도 받지 않은 사용자는 아티팩트를 soft delete 할 수 없다](#deleting-a-user-granted-nothing-may-not-soft-delete-an-artifact) | refused |
+| [아무 권한도 받지 않은 사용자는 아티팩트를 soft delete 할 수 없다](#deleting-a-user-granted-nothing-may-not-soft-delete-an-artifact) | rejected |
 
 **partial_bulk_delete**
 
@@ -64,14 +64,14 @@ Scenario: incomplete 21 / 25
 | scenario | verdict |
 |---|---|
 | [soft delete 된 아티팩트를 restore 하면, 살아 있는 상태의 아티팩트가 온다](#deleting-restoring-brings-an-artifact-back) | answered |
-| [아무 권한도 받지 않은 사용자는 아티팩트를 restore 할 수 없다](#deleting-a-user-granted-nothing-may-not-restore-an-artifact) | refused |
+| [아무 권한도 받지 않은 사용자는 아티팩트를 restore 할 수 없다](#deleting-a-user-granted-nothing-may-not-restore-an-artifact) | rejected |
 
 **delete_artifacts**
 
 | scenario | verdict |
 |---|---|
 | [슈퍼관리자가 아티팩트 여럿을 id 목록으로 soft delete 하면, 모두 삭제됨 상태로 온다](#bulk_deleting-the-superadmin-soft-deletes-artifacts-by-ids) | answered |
-| [슈퍼관리자가 아닌 사용자는 아티팩트 여럿을 id 목록으로 soft delete 할 수 없고, 역할로 거부된다](#bulk_deleting-a-user-who-is-not-superadmin-may-not-soft-delete-artifacts-by-ids) | refused |
+| [슈퍼관리자가 아닌 사용자는 아티팩트 여럿을 id 목록으로 soft delete 할 수 없고, 역할로 거부된다](#bulk_deleting-a-user-who-is-not-superadmin-may-not-soft-delete-artifacts-by-ids) | rejected |
 
 **restore_artifacts**
 
@@ -84,14 +84,14 @@ Scenario: incomplete 21 / 25
 | scenario | verdict |
 |---|---|
 | [슈퍼관리자가 아티팩트의 설명을 바꾸면, 새 설명을 실은 아티팩트가 온다](#editing-the-superadmin-edits-an-artifact) | answered |
-| [soft delete 된 아티팩트는 슈퍼관리자라도 고칠 수 없고, 대상이 없다는 것으로 거부된다](#editing-a-soft-deleted-artifact-is-not-edited) | refused |
-| [아무 권한도 받지 않은 사용자는 아티팩트를 고칠 수 없다](#editing-a-user-granted-nothing-may-not-edit-an-artifact) | refused |
+| [soft delete 된 아티팩트는 슈퍼관리자라도 고칠 수 없고, 대상이 없다는 것으로 거부된다](#editing-a-soft-deleted-artifact-is-not-edited) | rejected |
+| [아무 권한도 받지 않은 사용자는 아티팩트를 고칠 수 없다](#editing-a-user-granted-nothing-may-not-edit-an-artifact) | rejected |
 
 ### delete
 
 <a id="deleting-the-superadmin-soft-deletes-an-artifact"></a>
 
-#### [the-superadmin-soft-deletes-an-artifact](/tests/scenario/bai_scenario/manager/artifact/test_deleting.py) — pass
+#### [the-superadmin-soft-deletes-an-artifact](/tests/scenario/bai_scenario/manager/artifact/test_deleting.py): pass
 
 슈퍼관리자가 아티팩트를 soft delete 하면, 삭제됨 상태의 아티팩트가 온다
 
@@ -108,7 +108,7 @@ Given
 
 When
 
-- ArtifactAdapter.delete — user-1이 artifact-1을 soft delete 함
+- ArtifactAdapter.delete: user-1이 artifact-1을 soft delete 함
 
 Then
 
@@ -131,7 +131,7 @@ Then
 
 <a id="deleting-a-user-granted-nothing-may-not-soft-delete-an-artifact"></a>
 
-#### [a-user-granted-nothing-may-not-soft-delete-an-artifact](/tests/scenario/bai_scenario/manager/artifact/test_deleting.py) — pass
+#### [a-user-granted-nothing-may-not-soft-delete-an-artifact](/tests/scenario/bai_scenario/manager/artifact/test_deleting.py): pass
 
 아무 권한도 받지 않은 사용자는 아티팩트를 soft delete 할 수 없다
 
@@ -148,7 +148,7 @@ Given
 
 When
 
-- ArtifactAdapter.delete — user-1이 artifact-1을 soft delete 함
+- ArtifactAdapter.delete: user-1이 artifact-1을 soft delete 함
 
 Then
 
@@ -159,7 +159,7 @@ Then
 
 <a id="partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-artifacts"></a>
 
-#### [a-user-granted-nothing-soft-deletes-none-of-several-artifacts](/tests/scenario/bai_scenario/manager/artifact/test_partial_bulk_deleting.py) — pass
+#### [a-user-granted-nothing-soft-deletes-none-of-several-artifacts](/tests/scenario/bai_scenario/manager/artifact/test_partial_bulk_deleting.py): pass
 
 아무 권한도 받지 않은 사용자가 아티팩트 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -177,7 +177,7 @@ Given
 
 When
 
-- ArtifactAdapter.partial_bulk_delete — user-1이 아티팩트 2개를 한 번에 soft delete 함
+- ArtifactAdapter.partial_bulk_delete: user-1이 아티팩트 2개를 한 번에 soft delete 함
 
 Then
 
@@ -191,7 +191,7 @@ Then
 
 <a id="partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one"></a>
 
-#### [soft-deleting-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/artifact/test_partial_bulk_deleting.py) — pass
+#### [soft-deleting-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/artifact/test_partial_bulk_deleting.py): pass
 
 아티팩트 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 삭제됨 상태로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -209,7 +209,7 @@ Given
 
 When
 
-- ArtifactAdapter.partial_bulk_delete — user-1이 아티팩트 2개 와 없는 id 하나를 한 번에 soft delete 함
+- ArtifactAdapter.partial_bulk_delete: user-1이 아티팩트 2개 와 없는 id 하나를 한 번에 soft delete 함
 
 Then
 
@@ -253,7 +253,7 @@ Then
 
 <a id="partial_bulk_deleting-restoring-several-brings-them-back"></a>
 
-#### [restoring-several-brings-them-back](/tests/scenario/bai_scenario/manager/artifact/test_partial_bulk_deleting.py) — pass
+#### [restoring-several-brings-them-back](/tests/scenario/bai_scenario/manager/artifact/test_partial_bulk_deleting.py): pass
 
 soft delete 된 아티팩트 여럿을 한 번에 restore 하면, 모두 살아 있는 상태로 온다
 
@@ -271,7 +271,7 @@ Given
 
 When
 
-- ArtifactAdapter.partial_bulk_restore — user-1이 아티팩트 2개를 한 번에 soft delete 했다가 한 번에 restore 함
+- ArtifactAdapter.partial_bulk_restore: user-1이 아티팩트 2개를 한 번에 soft delete 했다가 한 번에 restore 함
 
 Then
 
@@ -313,7 +313,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-artifacts"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-artifacts](/tests/scenario/bai_scenario/manager/artifact/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-artifacts](/tests/scenario/bai_scenario/manager/artifact/test_partial_bulk_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 아티팩트 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -331,7 +331,7 @@ Given
 
 When
 
-- ArtifactAdapter.partial_bulk_update — user-1이 아티팩트 2개의 설명을 한 번에 고침
+- ArtifactAdapter.partial_bulk_update: user-1이 아티팩트 2개의 설명을 한 번에 고침
 
 Then
 
@@ -345,7 +345,7 @@ Then
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-artifacts-at-once"></a>
 
-#### [the-superadmin-edits-several-artifacts-at-once](/tests/scenario/bai_scenario/manager/artifact/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-edits-several-artifacts-at-once](/tests/scenario/bai_scenario/manager/artifact/test_partial_bulk_editing.py): pass
 
 슈퍼관리자가 아티팩트 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다
 
@@ -363,7 +363,7 @@ Given
 
 When
 
-- ArtifactAdapter.partial_bulk_update — user-1이 아티팩트 2개의 설명을 한 번에 고침
+- ArtifactAdapter.partial_bulk_update: user-1이 아티팩트 2개의 설명을 한 번에 고침
 
 Then
 
@@ -405,7 +405,7 @@ Then
 
 <a id="deleting-restoring-brings-an-artifact-back"></a>
 
-#### [restoring-brings-an-artifact-back](/tests/scenario/bai_scenario/manager/artifact/test_deleting.py) — pass
+#### [restoring-brings-an-artifact-back](/tests/scenario/bai_scenario/manager/artifact/test_deleting.py): pass
 
 soft delete 된 아티팩트를 restore 하면, 살아 있는 상태의 아티팩트가 온다
 
@@ -422,7 +422,7 @@ Given
 
 When
 
-- ArtifactAdapter.restore — user-1이 artifact-1을 soft delete 했다가 restore 함
+- ArtifactAdapter.restore: user-1이 artifact-1을 soft delete 했다가 restore 함
 
 Then
 
@@ -445,7 +445,7 @@ Then
 
 <a id="deleting-a-user-granted-nothing-may-not-restore-an-artifact"></a>
 
-#### [a-user-granted-nothing-may-not-restore-an-artifact](/tests/scenario/bai_scenario/manager/artifact/test_deleting.py) — pass
+#### [a-user-granted-nothing-may-not-restore-an-artifact](/tests/scenario/bai_scenario/manager/artifact/test_deleting.py): pass
 
 아무 권한도 받지 않은 사용자는 아티팩트를 restore 할 수 없다
 
@@ -462,7 +462,7 @@ Given
 
 When
 
-- ArtifactAdapter.restore — user-1이 artifact-1을 restore 함
+- ArtifactAdapter.restore: user-1이 artifact-1을 restore 함
 
 Then
 
@@ -473,7 +473,7 @@ Then
 
 <a id="bulk_deleting-the-superadmin-soft-deletes-artifacts-by-ids"></a>
 
-#### [the-superadmin-soft-deletes-artifacts-by-ids](/tests/scenario/bai_scenario/manager/artifact/test_bulk_deleting.py) — pass
+#### [the-superadmin-soft-deletes-artifacts-by-ids](/tests/scenario/bai_scenario/manager/artifact/test_bulk_deleting.py): pass
 
 슈퍼관리자가 아티팩트 여럿을 id 목록으로 soft delete 하면, 모두 삭제됨 상태로 온다
 
@@ -491,7 +491,7 @@ Given
 
 When
 
-- ArtifactAdapter.delete_artifacts — user-1이 아티팩트 2개를 id 목록으로 soft delete 함
+- ArtifactAdapter.delete_artifacts: user-1이 아티팩트 2개를 id 목록으로 soft delete 함
 
 Then
 
@@ -530,7 +530,7 @@ Then
 
 <a id="bulk_deleting-a-user-who-is-not-superadmin-may-not-soft-delete-artifacts-by-ids"></a>
 
-#### [a-user-who-is-not-superadmin-may-not-soft-delete-artifacts-by-ids](/tests/scenario/bai_scenario/manager/artifact/test_bulk_deleting.py) — pass
+#### [a-user-who-is-not-superadmin-may-not-soft-delete-artifacts-by-ids](/tests/scenario/bai_scenario/manager/artifact/test_bulk_deleting.py): pass
 
 슈퍼관리자가 아닌 사용자는 아티팩트 여럿을 id 목록으로 soft delete 할 수 없고, 역할로 거부된다
 
@@ -548,7 +548,7 @@ Given
 
 When
 
-- ArtifactAdapter.delete_artifacts — user-1이 아티팩트 2개를 id 목록으로 soft delete 함
+- ArtifactAdapter.delete_artifacts: user-1이 아티팩트 2개를 id 목록으로 soft delete 함
 
 Then
 
@@ -559,7 +559,7 @@ Then
 
 <a id="bulk_deleting-the-superadmin-restores-artifacts-by-ids"></a>
 
-#### [the-superadmin-restores-artifacts-by-ids](/tests/scenario/bai_scenario/manager/artifact/test_bulk_deleting.py) — pass
+#### [the-superadmin-restores-artifacts-by-ids](/tests/scenario/bai_scenario/manager/artifact/test_bulk_deleting.py): pass
 
 슈퍼관리자가 soft delete 된 아티팩트 여럿을 id 목록으로 restore 하면, 모두 살아 있는 상태로 온다
 
@@ -577,7 +577,7 @@ Given
 
 When
 
-- ArtifactAdapter.restore_artifacts — user-1이 아티팩트 2개를 id 목록으로 soft delete 했다가 restore 함
+- ArtifactAdapter.restore_artifacts: user-1이 아티팩트 2개를 id 목록으로 soft delete 했다가 restore 함
 
 Then
 
@@ -618,7 +618,7 @@ Then
 
 <a id="editing-the-superadmin-edits-an-artifact"></a>
 
-#### [the-superadmin-edits-an-artifact](/tests/scenario/bai_scenario/manager/artifact/test_editing.py) — pass
+#### [the-superadmin-edits-an-artifact](/tests/scenario/bai_scenario/manager/artifact/test_editing.py): pass
 
 슈퍼관리자가 아티팩트의 설명을 바꾸면, 새 설명을 실은 아티팩트가 온다
 
@@ -635,7 +635,7 @@ Given
 
 When
 
-- ArtifactAdapter.update — user-1이 artifact-1을 설명을 고침
+- ArtifactAdapter.update: user-1이 artifact-1을 설명을 고침
 
 Then
 
@@ -658,7 +658,7 @@ Then
 
 <a id="editing-a-soft-deleted-artifact-is-not-edited"></a>
 
-#### [a-soft-deleted-artifact-is-not-edited](/tests/scenario/bai_scenario/manager/artifact/test_editing.py) — pass
+#### [a-soft-deleted-artifact-is-not-edited](/tests/scenario/bai_scenario/manager/artifact/test_editing.py): pass
 
 soft delete 된 아티팩트는 슈퍼관리자라도 고칠 수 없고, 대상이 없다는 것으로 거부된다
 
@@ -675,7 +675,7 @@ Given
 
 When
 
-- ArtifactAdapter.update — user-1이 artifact-1을 soft delete 한 뒤 설명을 고침
+- ArtifactAdapter.update: user-1이 artifact-1을 soft delete 한 뒤 설명을 고침
 
 Then
 
@@ -684,7 +684,7 @@ Then
 
 <a id="editing-a-user-granted-nothing-may-not-edit-an-artifact"></a>
 
-#### [a-user-granted-nothing-may-not-edit-an-artifact](/tests/scenario/bai_scenario/manager/artifact/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-an-artifact](/tests/scenario/bai_scenario/manager/artifact/test_editing.py): pass
 
 아무 권한도 받지 않은 사용자는 아티팩트를 고칠 수 없다
 
@@ -701,7 +701,7 @@ Given
 
 When
 
-- ArtifactAdapter.update — user-1이 artifact-1을 설명을 고침
+- ArtifactAdapter.update: user-1이 artifact-1을 설명을 고침
 
 Then
 

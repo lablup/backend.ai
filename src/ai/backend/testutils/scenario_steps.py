@@ -166,7 +166,7 @@ class Skipped(Verdict):
 
     @override
     def told(self) -> Told:
-        return Told(f"{self.called}: 무시함 — {self.why}")
+        return Told(f"{self.called}: 무시함: {self.why}")
 
 
 @dataclass(frozen=True)

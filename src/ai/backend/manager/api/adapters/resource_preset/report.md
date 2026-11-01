@@ -1,20 +1,20 @@
 ## resource_preset
 
-[what it guarantees](/src/ai/backend/manager/api/adapters/resource_preset/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/resource_preset/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/resource_preset/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/resource_preset/adapter.py)
 
 Scenario: incomplete 6 / 9
 
 - built from ops (5)
-  - batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - get — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - partial_bulk_purge — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
-  - partial_bulk_update — representative success ✓ · representative refusal ✓
-  - search — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - get: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_update: representative success ✓ · representative rejection ✓
+  - search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
 - direct implementation (4)
-  - apply_resource_group — success absent · refusal absent (membership) — SCENARIO-GAP
-  - create — success absent · refusal absent (global_scope) — SCENARIO-GAP
-  - purge — success present 1 · refusal present 2 (single_entity)
-  - update — success present 2 · refusal present 2 (membership, single_entity)
+  - apply_resource_group: success absent · rejection absent (membership): SCENARIO-GAP
+  - create: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - purge: success present 1 · rejection present 2 (single_entity)
+  - update: success present 2 · rejection present 2 (membership, single_entity)
 
 **partial_bulk_purge**
 
@@ -29,15 +29,15 @@ Scenario: incomplete 6 / 9
 |---|---|
 | [아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다](#partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets) | answered |
 | [슈퍼관리자가 프리셋 여럿의 공유 메모리를 한 번에 바꾸면, 모두 새 공유 메모리로 오고 실패한 것은 없다](#partial_bulk_editing-the-superadmin-edits-several-presets-at-once) | answered |
-| [프리셋 여럿을 고치며 하나의 자원을 필수 슬롯 없이 바꾸면, 요청 전체가 입력 오류로 거부된다](#partial_bulk_editing-editing-several-with-slots-missing-intrinsic-ones-is-refused) | refused |
+| [프리셋 여럿을 고치며 하나의 자원을 필수 슬롯 없이 바꾸면, 요청 전체가 입력 오류로 거부된다](#partial_bulk_editing-editing-several-with-slots-missing-intrinsic-ones-is-refused) | rejected |
 
 **purge**
 
 | scenario | verdict |
 |---|---|
 | [슈퍼관리자가 프리셋을 purge 하면 지운 프리셋의 id 가 온다](#purging-the-superadmin-purges-a-preset) | answered |
-| [아무 권한도 받지 않은 사용자가 프리셋을 purge 하려 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-preset) | refused |
-| [슈퍼관리자가 없는 id 의 프리셋을 purge 하려 하면 대상이 없다는 것으로 거부된다](#purging-purging-an-id-nothing-answers-to-is-not-found) | refused |
+| [아무 권한도 받지 않은 사용자가 프리셋을 purge 하려 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-preset) | rejected |
+| [슈퍼관리자가 없는 id 의 프리셋을 purge 하려 하면 대상이 없다는 것으로 거부된다](#purging-purging-an-id-nothing-answers-to-is-not-found) | rejected |
 
 **update**
 
@@ -45,14 +45,14 @@ Scenario: incomplete 6 / 9
 |---|---|
 | [public 에서 수정 권한을 받은 사용자가 프리셋의 이름을 바꾸면, 새 이름의 프리셋이 온다](#editing-a-user-granted-update-in-public-renames-a-preset) | answered |
 | [슈퍼관리자가 프리셋의 이름만 바꾸면, 이름은 새 값이 되고 나머지는 그대로 남는다](#editing-the-superadmin-renames-a-preset) | answered |
-| [아무 권한도 받지 않은 사용자가 프리셋을 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-preset) | refused |
-| [슈퍼관리자가 없는 id 의 프리셋을 수정하려 하면 대상이 없다는 것으로 거부된다](#editing-editing-an-id-nothing-answers-to-is-not-found) | refused |
+| [아무 권한도 받지 않은 사용자가 프리셋을 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-preset) | rejected |
+| [슈퍼관리자가 없는 id 의 프리셋을 수정하려 하면 대상이 없다는 것으로 거부된다](#editing-editing-an-id-nothing-answers-to-is-not-found) | rejected |
 
 ### partial_bulk_purge
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-presets"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-presets](/tests/scenario/bai_scenario/manager/resource_preset/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-presets](/tests/scenario/bai_scenario/manager/resource_preset/test_partial_bulk_purging.py): pass
 
 아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -70,7 +70,7 @@ Given
 
 When
 
-- ResourcePresetAdapter.partial_bulk_purge — user-1이 프리셋 2개를 한 번에 purge 함
+- ResourcePresetAdapter.partial_bulk_purge: user-1이 프리셋 2개를 한 번에 purge 함
 
 Then
 
@@ -84,7 +84,7 @@ Then
 
 <a id="partial_bulk_purging-purging-several-answers-for-the-missing-one"></a>
 
-#### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_preset/test_partial_bulk_purging.py) — pass
+#### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_preset/test_partial_bulk_purging.py): pass
 
 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지워진 노드로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -102,7 +102,7 @@ Given
 
 When
 
-- ResourcePresetAdapter.partial_bulk_purge — user-1이 프리셋 2개 와 없는 id 하나를 한 번에 purge 함
+- ResourcePresetAdapter.partial_bulk_purge: user-1이 프리셋 2개 와 없는 id 하나를 한 번에 purge 함
 
 Then
 
@@ -128,7 +128,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-presets](/tests/scenario/bai_scenario/manager/resource_preset/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-presets](/tests/scenario/bai_scenario/manager/resource_preset/test_partial_bulk_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -146,7 +146,7 @@ Given
 
 When
 
-- ResourcePresetAdapter.partial_bulk_update — user-1이 프리셋 2개의 공유 메모리를 한 번에 바꿈
+- ResourcePresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 공유 메모리를 한 번에 바꿈
 
 Then
 
@@ -160,7 +160,7 @@ Then
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-presets-at-once"></a>
 
-#### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/resource_preset/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/resource_preset/test_partial_bulk_editing.py): pass
 
 슈퍼관리자가 프리셋 여럿의 공유 메모리를 한 번에 바꾸면, 모두 새 공유 메모리로 오고 실패한 것은 없다
 
@@ -178,7 +178,7 @@ Given
 
 When
 
-- ResourcePresetAdapter.partial_bulk_update — user-1이 프리셋 2개의 공유 메모리를 한 번에 바꿈
+- ResourcePresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 공유 메모리를 한 번에 바꿈
 
 Then
 
@@ -200,7 +200,7 @@ Then
 
 <a id="partial_bulk_editing-editing-several-with-slots-missing-intrinsic-ones-is-refused"></a>
 
-#### [editing-several-with-slots-missing-intrinsic-ones-is-refused](/tests/scenario/bai_scenario/manager/resource_preset/test_partial_bulk_editing.py) — pass
+#### [editing-several-with-slots-missing-intrinsic-ones-is-refused](/tests/scenario/bai_scenario/manager/resource_preset/test_partial_bulk_editing.py): pass
 
 프리셋 여럿을 고치며 하나의 자원을 필수 슬롯 없이 바꾸면, 요청 전체가 입력 오류로 거부된다
 
@@ -218,7 +218,7 @@ Given
 
 When
 
-- ResourcePresetAdapter.partial_bulk_update — user-1이 프리셋 2개를 한 번에 고치며 첫째의 자원을 필수 슬롯 없이 바꿈
+- ResourcePresetAdapter.partial_bulk_update: user-1이 프리셋 2개를 한 번에 고치며 첫째의 자원을 필수 슬롯 없이 바꿈
 
 Then
 
@@ -229,7 +229,7 @@ Then
 
 <a id="purging-the-superadmin-purges-a-preset"></a>
 
-#### [the-superadmin-purges-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_purging.py) — pass
+#### [the-superadmin-purges-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_purging.py): pass
 
 슈퍼관리자가 프리셋을 purge 하면 지운 프리셋의 id 가 온다
 
@@ -246,7 +246,7 @@ Given
 
 When
 
-- ResourcePresetAdapter.purge — user-1이 preset-1을 purge 함
+- ResourcePresetAdapter.purge: user-1이 preset-1을 purge 함
 
 Then
 
@@ -255,7 +255,7 @@ Then
 
 <a id="purging-a-user-granted-nothing-may-not-purge-a-preset"></a>
 
-#### [a-user-granted-nothing-may-not-purge-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_purging.py) — pass
+#### [a-user-granted-nothing-may-not-purge-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_purging.py): pass
 
 아무 권한도 받지 않은 사용자가 프리셋을 purge 하려 하면 권한 부족으로 거부된다
 
@@ -272,7 +272,7 @@ Given
 
 When
 
-- ResourcePresetAdapter.purge — user-1이 preset-1을 purge 함
+- ResourcePresetAdapter.purge: user-1이 preset-1을 purge 함
 
 Then
 
@@ -281,7 +281,7 @@ Then
 
 <a id="purging-purging-an-id-nothing-answers-to-is-not-found"></a>
 
-#### [purging-an-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_preset/test_purging.py) — pass
+#### [purging-an-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_preset/test_purging.py): pass
 
 슈퍼관리자가 없는 id 의 프리셋을 purge 하려 하면 대상이 없다는 것으로 거부된다
 
@@ -298,7 +298,7 @@ Given
 
 When
 
-- ResourcePresetAdapter.purge — user-1이 없는 id을 purge 함
+- ResourcePresetAdapter.purge: user-1이 없는 id을 purge 함
 
 Then
 
@@ -309,7 +309,7 @@ Then
 
 <a id="editing-a-user-granted-update-in-public-renames-a-preset"></a>
 
-#### [a-user-granted-update-in-public-renames-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_editing.py) — pass
+#### [a-user-granted-update-in-public-renames-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_editing.py): pass
 
 public 에서 수정 권한을 받은 사용자가 프리셋의 이름을 바꾸면, 새 이름의 프리셋이 온다
 
@@ -330,7 +330,7 @@ Given
 
 When
 
-- ResourcePresetAdapter.update — user-1이 preset-1의 이름을 바꿈
+- ResourcePresetAdapter.update: user-1이 preset-1의 이름을 바꿈
 
 Then
 
@@ -344,7 +344,7 @@ Then
 
 <a id="editing-the-superadmin-renames-a-preset"></a>
 
-#### [the-superadmin-renames-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_editing.py) — pass
+#### [the-superadmin-renames-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_editing.py): pass
 
 슈퍼관리자가 프리셋의 이름만 바꾸면, 이름은 새 값이 되고 나머지는 그대로 남는다
 
@@ -361,7 +361,7 @@ Given
 
 When
 
-- ResourcePresetAdapter.update — user-1이 preset-1의 이름을 바꿈
+- ResourcePresetAdapter.update: user-1이 preset-1의 이름을 바꿈
 
 Then
 
@@ -375,7 +375,7 @@ Then
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-preset"></a>
 
-#### [a-user-granted-nothing-may-not-edit-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-a-preset](/tests/scenario/bai_scenario/manager/resource_preset/test_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 프리셋을 수정하려 하면 권한 부족으로 거부된다
 
@@ -392,7 +392,7 @@ Given
 
 When
 
-- ResourcePresetAdapter.update — user-1이 preset-1의 이름을 바꿈
+- ResourcePresetAdapter.update: user-1이 preset-1의 이름을 바꿈
 
 Then
 
@@ -401,7 +401,7 @@ Then
 
 <a id="editing-editing-an-id-nothing-answers-to-is-not-found"></a>
 
-#### [editing-an-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_preset/test_editing.py) — pass
+#### [editing-an-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_preset/test_editing.py): pass
 
 슈퍼관리자가 없는 id 의 프리셋을 수정하려 하면 대상이 없다는 것으로 거부된다
 
@@ -418,7 +418,7 @@ Given
 
 When
 
-- ResourcePresetAdapter.update — user-1이 없는 id의 이름을 바꿈
+- ResourcePresetAdapter.update: user-1이 없는 id의 이름을 바꿈
 
 Then
 

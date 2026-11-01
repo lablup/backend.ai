@@ -1,102 +1,102 @@
 ## user
 
-[what it guarantees](/src/ai/backend/manager/api/adapters/user/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/user/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/user/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/user/adapter.py)
 
 Scenario: incomplete 8 / 48
 
 - built from ops (23)
-  - LoginHistoryAdapter.admin_search — representative success ✓ · representative refusal ✓
-  - LoginHistoryAdapter.batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - LoginHistoryAdapter.my_search — representative success ✓ · representative refusal ✓
-  - LoginSessionAdapter.admin_search — representative success ✓ · representative refusal ✓
-  - LoginSessionAdapter.batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - LoginSessionAdapter.my_search — representative success ✓ · representative refusal ✓
-  - UserAdapter.admin_search — representative success ✓ · representative refusal ✓
-  - UserAdapter.admin_search_keypairs — representative success ✓ · representative refusal ✓
-  - UserAdapter.batch_load_by_ids — representative success ✓ · representative refusal ✓
-  - UserAdapter.batch_lookup_by_emails — representative success ✓ · representative refusal ✓
-  - UserAdapter.bulk_get_keypair_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - UserAdapter.bulk_lookup_keypair_access_keys — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - UserAdapter.domain_search — representative success ✓ · representative refusal ✓
-  - UserAdapter.gql_admin_search — representative success ✓ · representative refusal ✓
-  - UserAdapter.gql_admin_search_keypairs — representative success ✓ · representative refusal ✓
-  - UserAdapter.gql_scoped_search — representative success ✓ · representative refusal ✓
-  - UserAdapter.gql_search_by_domain — representative success ✓ · representative refusal ✓
-  - UserAdapter.gql_search_by_project — representative success ✓ · representative refusal ✓
-  - UserAdapter.project_search — representative success ✓ · representative refusal ✓
-  - UserAdapter.resolve_domain_id — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - UserAdapter.role_search — representative success ✓ · representative refusal ✓
-  - UserAdapter.scoped_search — representative success ✓ · representative refusal ✓
-  - UserAdapter.search_my_keypairs — representative success ✓ · representative refusal ✓
+  - LoginHistoryAdapter.admin_search: representative success ✓ · representative rejection ✓
+  - LoginHistoryAdapter.batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - LoginHistoryAdapter.my_search: representative success ✓ · representative rejection ✓
+  - LoginSessionAdapter.admin_search: representative success ✓ · representative rejection ✓
+  - LoginSessionAdapter.batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - LoginSessionAdapter.my_search: representative success ✓ · representative rejection ✓
+  - UserAdapter.admin_search: representative success ✓ · representative rejection ✓
+  - UserAdapter.admin_search_keypairs: representative success ✓ · representative rejection ✓
+  - UserAdapter.batch_load_by_ids: representative success ✓ · representative rejection ✓
+  - UserAdapter.batch_lookup_by_emails: representative success ✓ · representative rejection ✓
+  - UserAdapter.bulk_get_keypair_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - UserAdapter.bulk_lookup_keypair_access_keys: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - UserAdapter.domain_search: representative success ✓ · representative rejection ✓
+  - UserAdapter.gql_admin_search: representative success ✓ · representative rejection ✓
+  - UserAdapter.gql_admin_search_keypairs: representative success ✓ · representative rejection ✓
+  - UserAdapter.gql_scoped_search: representative success ✓ · representative rejection ✓
+  - UserAdapter.gql_search_by_domain: representative success ✓ · representative rejection ✓
+  - UserAdapter.gql_search_by_project: representative success ✓ · representative rejection ✓
+  - UserAdapter.project_search: representative success ✓ · representative rejection ✓
+  - UserAdapter.resolve_domain_id: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - UserAdapter.role_search: representative success ✓ · representative rejection ✓
+  - UserAdapter.scoped_search: representative success ✓ · representative rejection ✓
+  - UserAdapter.search_my_keypairs: representative success ✓ · representative rejection ✓
 - ops + direct implementation (7)
-  - UserAdapter.bulk_create_users — success absent · refusal present 1 (atomic_bulk_get_ops, global_scope) — SCENARIO-GAP
-  - UserAdapter.bulk_create_users_with_keypair — success absent · refusal present 1 (atomic_bulk_get_ops, global_scope) — SCENARIO-GAP
-  - UserAdapter.bulk_update_users — success present 3 · refusal present 1 (atomic_bulk_get_ops, global_scope, partial_bulk_get_ops, single_entity)
-  - UserAdapter.create_user — success absent · refusal present 2 (atomic_bulk_get_ops, scope) — SCENARIO-GAP
-  - UserAdapter.delete_user_by_id — success present 1 · refusal present 1 (atomic_bulk_get_ops, single_entity)
-  - UserAdapter.get — success present 1 · refusal present 1 (atomic_bulk_get_ops, single_entity)
-  - UserAdapter.update_user_by_id — success present 7 · refusal present 6 (atomic_bulk_get_ops, single_entity)
+  - UserAdapter.bulk_create_users: success absent · rejection present 1 (atomic_bulk_get_ops, global_scope): SCENARIO-GAP
+  - UserAdapter.bulk_create_users_with_keypair: success absent · rejection present 1 (atomic_bulk_get_ops, global_scope): SCENARIO-GAP
+  - UserAdapter.bulk_update_users: success present 3 · rejection present 1 (atomic_bulk_get_ops, global_scope, partial_bulk_get_ops, single_entity)
+  - UserAdapter.create_user: success absent · rejection present 2 (atomic_bulk_get_ops, scope): SCENARIO-GAP
+  - UserAdapter.delete_user_by_id: success present 1 · rejection present 1 (atomic_bulk_get_ops, single_entity)
+  - UserAdapter.get: success present 1 · rejection present 1 (atomic_bulk_get_ops, single_entity)
+  - UserAdapter.update_user_by_id: success present 7 · rejection present 6 (atomic_bulk_get_ops, single_entity)
 - direct implementation (18)
-  - LoginSessionAdapter.admin_revoke — success present 1 · refusal present 2 (global_scope)
-  - LoginSessionAdapter.admin_unblock_user — success present 2 · refusal present 1 (global_scope)
-  - LoginSessionAdapter.my_revoke — success present 1 · refusal present 3 (single_field)
-  - UserAdapter.admin_create_keypair — success present 1 · refusal present 2 (single_entity)
-  - UserAdapter.admin_delete_keypair — success present 1 · refusal present 3 (single_field)
-  - UserAdapter.admin_delete_ssh_keypair — success present 1 · refusal present 2 (single_entity)
-  - UserAdapter.admin_get_keypair — success present 1 · refusal present 1 (single_field)
-  - UserAdapter.admin_get_ssh_keypair — success present 1 · refusal present 1 (single_entity)
-  - UserAdapter.admin_register_ssh_keypair — success present 1 · refusal present 2 (single_entity)
-  - UserAdapter.admin_update_keypair — success present 1 · refusal present 3 (single_field)
-  - UserAdapter.bulk_purge_users — success present 2 · refusal present 1 (global_scope)
-  - UserAdapter.issue_my_keypair — success present 2 · refusal present 1 (single_entity)
-  - UserAdapter.purge_user_by_id — success present 1 · refusal present 2 (single_entity)
-  - UserAdapter.restore_user_by_id — success present 1 · refusal present 2 (single_entity)
-  - UserAdapter.revoke_my_keypair — success present 1 · refusal present 4 (single_field)
-  - UserAdapter.switch_default_access_key — success present 1 · refusal present 2 (single_entity)
-  - UserAdapter.update_my_keypair — success present 1 · refusal present 3 (single_field)
-  - UserAdapter.update_user — success present 1 · refusal present 1 (single_entity)
+  - LoginSessionAdapter.admin_revoke: success present 1 · rejection present 2 (global_scope)
+  - LoginSessionAdapter.admin_unblock_user: success present 2 · rejection present 1 (global_scope)
+  - LoginSessionAdapter.my_revoke: success present 1 · rejection present 3 (single_field)
+  - UserAdapter.admin_create_keypair: success present 1 · rejection present 2 (single_entity)
+  - UserAdapter.admin_delete_keypair: success present 1 · rejection present 3 (single_field)
+  - UserAdapter.admin_delete_ssh_keypair: success present 1 · rejection present 2 (single_entity)
+  - UserAdapter.admin_get_keypair: success present 1 · rejection present 1 (single_field)
+  - UserAdapter.admin_get_ssh_keypair: success present 1 · rejection present 1 (single_entity)
+  - UserAdapter.admin_register_ssh_keypair: success present 1 · rejection present 2 (single_entity)
+  - UserAdapter.admin_update_keypair: success present 1 · rejection present 3 (single_field)
+  - UserAdapter.bulk_purge_users: success present 2 · rejection present 1 (global_scope)
+  - UserAdapter.issue_my_keypair: success present 2 · rejection present 1 (single_entity)
+  - UserAdapter.purge_user_by_id: success present 1 · rejection present 2 (single_entity)
+  - UserAdapter.restore_user_by_id: success present 1 · rejection present 2 (single_entity)
+  - UserAdapter.revoke_my_keypair: success present 1 · rejection present 4 (single_field)
+  - UserAdapter.switch_default_access_key: success present 1 · rejection present 2 (single_entity)
+  - UserAdapter.update_my_keypair: success present 1 · rejection present 3 (single_field)
+  - UserAdapter.update_user: success present 1 · rejection present 1 (single_entity)
 
 **LoginHistoryAdapter.admin_search**
 
 | scenario | verdict |
 |---|---|
 | [전역 역할이 문인 이력 검색에서 슈퍼관리자가 훑으면, 사용자와 무관하게 심은 이력이 생성 시각 내림차순으로 온다](#login_history-the-superadmin-searches-every-users-login-history) | answered |
-| [권한 받은 사용자가 이력 전체 검색을 하려 하면, 전역 역할 문이 막는다](#login_history-a-user-who-is-not-the-superadmin-may-not-search-every-login-history) | refused |
+| [권한 받은 사용자가 이력 전체 검색을 하려 하면, 전역 역할 문이 막는다](#login_history-a-user-who-is-not-the-superadmin-may-not-search-every-login-history) | rejected |
 
 **LoginHistoryAdapter.my_search**
 
 | scenario | verdict |
 |---|---|
 | [자기 스코프에서 READ를 받은 사용자가 훑으면, 다른 사용자의 이력은 빠진다](#login_history-a-user-granted-read-on-themselves-searches-only-their-own-login-history) | answered |
-| [역할 없이 자기 이력을 훑으려 하면, 본인이어도 스코프 권한 문이 막는다](#login_history-a-user-granted-nothing-may-not-search-their-own-login-history) | refused |
+| [역할 없이 자기 이력을 훑으려 하면, 본인이어도 스코프 권한 문이 막는다](#login_history-a-user-granted-nothing-may-not-search-their-own-login-history) | rejected |
 
 **LoginSessionAdapter.admin_search**
 
 | scenario | verdict |
 |---|---|
 | [전역 역할이 문인 세션 검색에서 슈퍼관리자가 페이지 인자 없이 훑으면, 사용자와 무관하게 심은 세션이 생성 시각 내림차순으로 온다](#login_sessions-the-superadmin-searches-every-users-login-sessions) | answered |
-| [권한 받은 사용자가 세션 전체 검색을 하려 하면, 전역 역할 문이 막는다](#login_sessions-a-user-who-is-not-the-superadmin-may-not-search-every-login-session) | refused |
+| [권한 받은 사용자가 세션 전체 검색을 하려 하면, 전역 역할 문이 막는다](#login_sessions-a-user-who-is-not-the-superadmin-may-not-search-every-login-session) | rejected |
 
 **LoginSessionAdapter.my_search**
 
 | scenario | verdict |
 |---|---|
 | [자기 스코프에서 READ를 받은 사용자가 훑으면, 다른 사용자의 세션은 빠진다](#login_sessions-a-user-granted-read-on-themselves-searches-only-their-own-login-sessions) | answered |
-| [역할 없이 자기 세션을 훑으려 하면, 본인이어도 스코프 권한 문이 막는다](#login_sessions-a-user-granted-nothing-may-not-search-their-own-login-sessions) | refused |
+| [역할 없이 자기 세션을 훑으려 하면, 본인이어도 스코프 권한 문이 막는다](#login_sessions-a-user-granted-nothing-may-not-search-their-own-login-sessions) | rejected |
 
 **UserAdapter.admin_search**
 
 | scenario | verdict |
 |---|---|
 | [전역 역할이 문인 검색에서 슈퍼관리자가 필터 없이 훑으면, 삭제 상태 사용자를 포함해 심은 사용자가 모두 온다](#searching-the-superadmin-searching-every-user-counts-deleted-ones-too) | answered |
-| [도메인 스코프 권한을 받은 사용자라도 전체 검색을 하려 하면, 전역 역할 문이 막는다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-user) | refused |
+| [도메인 스코프 권한을 받은 사용자라도 전체 검색을 하려 하면, 전역 역할 문이 막는다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-user) | rejected |
 
 **UserAdapter.admin_search_keypairs**
 
 | scenario | verdict |
 |---|---|
 | [전역 역할이 문인 키 검색에서 슈퍼관리자가 페이지 인자 없이 훑으면, 모든 사용자의 키가 오고 limit 자리는 비어서 온다](#managing_keypairs-the-superadmin-searching-every-key-gets-every-users-key) | answered |
-| [권한 받은 사용자가 키 전체 검색을 하려 하면, 전역 역할 문이 막는다](#managing_keypairs-a-user-who-is-not-the-superadmin-may-not-search-every-key) | refused |
+| [권한 받은 사용자가 키 전체 검색을 하려 하면, 전역 역할 문이 막는다](#managing_keypairs-a-user-who-is-not-the-superadmin-may-not-search-every-key) | rejected |
 
 **UserAdapter.batch_load_by_ids**
 
@@ -104,7 +104,7 @@ Scenario: incomplete 8 / 48
 |---|---|
 | [권한 없는 사용자가 빈 id 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다](#reading-a-batch-load-of-no-ids-answers-an-empty-list) | answered |
 | [슈퍼관리자가 있는 id와 없는 id를 함께 요청하면, 권한 문을 지나 없는 원소 자리에 빈 값이 온다](#reading-the-superadmin-batch-load-leaves-a-missing-id-empty) | answered |
-| [한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 id를 한 번에 요청하면, 입력 순서대로 원소별 결과가 온다](#reading-a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order) | refused |
+| [한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 id를 한 번에 요청하면, 입력 순서대로 원소별 결과가 온다](#reading-a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order) | rejected |
 
 **UserAdapter.batch_lookup_by_emails**
 
@@ -112,57 +112,57 @@ Scenario: incomplete 8 / 48
 |---|---|
 | [대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 그 사용자의 email 을 찾으면, 그 사용자의 id 가 답으로 온다](#reading-a-user-granted-read-on-another-user-looks-up-their-id-by-email) | answered |
 | [권한 없는 사용자가 빈 email 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다](#reading-an-email-lookup-of-no-emails-answers-an-empty-list) | answered |
-| [한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 email 을 한 번에 찾으면, 첫째는 id, 나머지 둘은 같은 거부가 입력 순서대로 온다](#reading-an-unreadable-user-and-a-missing-email-are-refused-alike) | refused |
+| [한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 email 을 한 번에 찾으면, 첫째는 id, 나머지 둘은 같은 거부가 입력 순서대로 온다](#reading-an-unreadable-user-and-a-missing-email-are-refused-alike) | rejected |
 
 **UserAdapter.domain_search**
 
 | scenario | verdict |
 |---|---|
 | [도메인 스코프에서 사용자 READ를 받은 사용자가 도메인 이름으로 훑으면, 다른 도메인 사용자는 빠진다](#searching-a-user-granted-on-a-domain-searching-it-by-name-finds-only-its-users) | answered |
-| [역할을 받지 않은 사용자가 도메인 이름으로 훑으려 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-search-a-domain-by-name) | refused |
-| [권한 받은 사용자가 없는 도메인 이름으로 훑으려 하면, 스코프 검사 전에 이름 조회 단계가 대상 없음으로 막는다](#searching-searching-a-domain-name-nothing-answers-to-is-not-found) | refused |
+| [역할을 받지 않은 사용자가 도메인 이름으로 훑으려 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-search-a-domain-by-name) | rejected |
+| [권한 받은 사용자가 없는 도메인 이름으로 훑으려 하면, 스코프 검사 전에 이름 조회 단계가 대상 없음으로 막는다](#searching-searching-a-domain-name-nothing-answers-to-is-not-found) | rejected |
 
 **UserAdapter.gql_admin_search**
 
 | scenario | verdict |
 |---|---|
 | [슈퍼관리자가 커서와 페이지 인자를 모두 생략하고 훑으면, 생성 시각 내림차순으로 열 명까지 오고 다음 페이지 여부가 함께 온다](#searching-a-gql-search-without-page-arguments-answers-the-newest-ten) | answered |
-| [권한 받은 사용자가 GQL 전체 검색을 하려 하면, 전역 역할 문이 막는다](#searching-a-user-who-is-not-the-superadmin-may-not-gql-search-every-user) | refused |
+| [권한 받은 사용자가 GQL 전체 검색을 하려 하면, 전역 역할 문이 막는다](#searching-a-user-who-is-not-the-superadmin-may-not-gql-search-every-user) | rejected |
 
 **UserAdapter.gql_admin_search_keypairs**
 
 | scenario | verdict |
 |---|---|
 | [전역 역할이 문인 GQL 키 검색에서 슈퍼관리자가 정책 이름을 주면, 그 정책을 쓰는 키만 온다](#managing_keypairs-the-superadmin-gql-key-search-by-policy-name-gets-that-policys-keys-only) | answered |
-| [권한 받은 사용자가 GQL 키 검색을 하려 하면, 전역 역할 문이 막는다](#managing_keypairs-a-user-who-is-not-the-superadmin-may-not-search-every-key-over-gql) | refused |
+| [권한 받은 사용자가 GQL 키 검색을 하려 하면, 전역 역할 문이 막는다](#managing_keypairs-a-user-who-is-not-the-superadmin-may-not-search-every-key-over-gql) | rejected |
 
 **UserAdapter.gql_scoped_search**
 
 | scenario | verdict |
 |---|---|
 | [같은 권한으로 GQL 스코프 검색을 하면, 두 스코프 사용자가 커서 답으로 온다](#searching-a-gql-scoped-search-over-two-granted-scopes-joins-their-users) | answered |
-| [한 스코프에만 READ를 받고 GQL 스코프 검색에 둘을 주면, 스코프 권한 문이 전체를 막는다](#searching-one-scope-without-a-grant-refuses-the-whole-gql-scoped-search) | refused |
+| [한 스코프에만 READ를 받고 GQL 스코프 검색에 둘을 주면, 스코프 권한 문이 전체를 막는다](#searching-one-scope-without-a-grant-refuses-the-whole-gql-scoped-search) | rejected |
 
 **UserAdapter.gql_search_by_domain**
 
 | scenario | verdict |
 |---|---|
 | [같은 권한으로 GQL 도메인 검색을 하면, 그 도메인 사용자만 커서 답으로 온다](#searching-a-user-granted-on-a-domain-gql-searching-it-finds-only-its-users) | answered |
-| [역할 없이 GQL 도메인 검색을 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-gql-search-a-domain) | refused |
+| [역할 없이 GQL 도메인 검색을 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-gql-search-a-domain) | rejected |
 
 **UserAdapter.gql_search_by_project**
 
 | scenario | verdict |
 |---|---|
 | [같은 권한으로 GQL 프로젝트 검색을 하면, 명부의 사용자만 커서 답으로 온다](#searching-a-user-granted-on-a-project-gql-searching-it-finds-only-its-roster) | answered |
-| [역할 없이 GQL 프로젝트 검색을 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-gql-search-a-project) | refused |
+| [역할 없이 GQL 프로젝트 검색을 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-gql-search-a-project) | rejected |
 
 **UserAdapter.project_search**
 
 | scenario | verdict |
 |---|---|
 | [프로젝트 스코프에서 사용자 READ를 받은 사용자가 그 프로젝트로 훑으면, 명부에 오른 사용자만 온다](#searching-a-user-granted-on-a-project-searching-it-finds-only-its-roster) | answered |
-| [역할 없이 프로젝트 검색을 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-search-a-project) | refused |
+| [역할 없이 프로젝트 검색을 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-search-a-project) | rejected |
 
 **UserAdapter.role_search**
 
@@ -170,7 +170,7 @@ Scenario: incomplete 8 / 48
 |---|---|
 | [역할이 걸린 스코프의 사용자 READ를 받은 사용자가 역할 하나를 주면, 그 역할을 배정받은 사용자만 온다](#searching-a-user-granted-on-the-role-scope-searching-by-role-finds-only-its-holders) | answered |
 | [전역 역할이 문인 역할 검색에서 슈퍼관리자가 역할 하나를 주면, 그 역할을 배정받은 사용자만 온다](#searching-the-superadmin-searching-by-role-finds-only-its-holders) | answered |
-| [아무 권한도 받지 않은 사용자가 역할로 훑으려 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-search-by-role) | refused |
+| [아무 권한도 받지 않은 사용자가 역할로 훑으려 하면, 스코프 권한 문이 막는다](#searching-a-user-granted-nothing-may-not-search-by-role) | rejected |
 
 **UserAdapter.scoped_search**
 
@@ -178,7 +178,7 @@ Scenario: incomplete 8 / 48
 |---|---|
 | [도메인과 프로젝트 스코프 모두에서 READ를 받은 사용자가 두 스코프를 함께 주면, 두 스코프의 사용자가 중복 없이 합쳐진다](#searching-a-scoped-search-over-two-granted-scopes-joins-their-users) | answered |
 | [권한 받은 사용자가 페이지 인자 없이 스코프 검색을 하면, limit 50 offset 0이 답에 실린다](#searching-a-scoped-search-without-page-arguments-answers-up-to-fifty) | answered |
-| [첫 스코프에만 READ를 받은 사용자가 두 스코프를 함께 주면, 스코프 권한 문이 전체를 막는다](#searching-one-scope-without-a-grant-refuses-the-whole-scoped-search) | refused |
+| [첫 스코프에만 READ를 받은 사용자가 두 스코프를 함께 주면, 스코프 권한 문이 전체를 막는다](#searching-one-scope-without-a-grant-refuses-the-whole-scoped-search) | rejected |
 
 **UserAdapter.search_my_keypairs**
 
@@ -186,19 +186,19 @@ Scenario: incomplete 8 / 48
 |---|---|
 | [자기 스코프에서 READ를 받은 사용자가 자기 키를 훑으면, 다른 사용자의 키는 빠진다](#own_keypairs-a-user-granted-read-searching-their-keys-sees-only-their-own) | answered |
 | [권한 받은 사용자가 페이지 인자 없이 훑으면, 생성 시각 내림차순 열 개와 다음 페이지 여부가 온다](#own_keypairs-searching-own-keys-without-page-arguments-answers-the-ten-newest) | answered |
-| [역할 없이 자기 키를 훑으려 하면, 스코프 권한 문이 막는다](#own_keypairs-a-user-granted-nothing-may-not-search-their-own-keys) | refused |
+| [역할 없이 자기 키를 훑으려 하면, 스코프 권한 문이 막는다](#own_keypairs-a-user-granted-nothing-may-not-search-their-own-keys) | rejected |
 
 **UserAdapter.bulk_create_users**
 
 | scenario | verdict |
 |---|---|
-| [도메인 스코프에서 CREATE를 받은 사용자라도 일괄 생성을 하려 하면, 전역 역할 문이 막는다](#creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users) | refused |
+| [도메인 스코프에서 CREATE를 받은 사용자라도 일괄 생성을 하려 하면, 전역 역할 문이 막는다](#creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users) | rejected |
 
 **UserAdapter.bulk_create_users_with_keypair**
 
 | scenario | verdict |
 |---|---|
-| [권한 받은 사용자가 이 일괄 생성을 하려 하면, 전역 역할 문이 막는다](#creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs) | refused |
+| [권한 받은 사용자가 이 일괄 생성을 하려 하면, 전역 역할 문이 막는다](#creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs) | rejected |
 
 **UserAdapter.bulk_update_users**
 
@@ -207,28 +207,28 @@ Scenario: incomplete 8 / 48
 | [슈퍼관리자가 일괄 수정으로 활성 사용자에 DELETED, 삭제 상태 사용자에 ACTIVE, 다른 삭제 상태 사용자에 전체 이름을 주면, 둘은 물리고 되살린 뒤 수정 목록에, 하나는 실패로 담긴다](#retiring-a-bulk-edit-deletes-and-restores-per-item-and-refuses-a-deleted-user-edit) | answered |
 | [슈퍼관리자가 일괄 수정과 함께 남의 키로 기본 키 전환을 주면, 그 사용자는 수정 목록에서 빠지고 실패로 담긴다](#editing-a-bulk-edit-whose-default-key-switch-fails-reports-that-user-as-failed) | answered |
 | [전역 역할이 문인 일괄 수정에서 슈퍼관리자가 있는 사용자와 이름이 겹치게 바꾸는 사용자를 함께 주면, 하나는 수정되고 하나는 사용자 id와 함께 실패로 담긴다](#editing-the-superadmin-bulk-edit-answers-the-updated-and-the-failed-apart) | answered |
-| [도메인 스코프에서 UPDATE를 받은 사용자라도 일괄 수정을 하려 하면, 전역 역할 문이 막는다](#editing-a-user-who-is-not-the-superadmin-may-not-bulk-edit-users) | refused |
+| [도메인 스코프에서 UPDATE를 받은 사용자라도 일괄 수정을 하려 하면, 전역 역할 문이 막는다](#editing-a-user-who-is-not-the-superadmin-may-not-bulk-edit-users) | rejected |
 
 **UserAdapter.create_user**
 
 | scenario | verdict |
 |---|---|
-| [역할을 받지 않은 사용자가 만들려 하면, 도메인 스코프 권한 문이 막는다](#creating-a-user-granted-nothing-may-not-create-a-user) | refused |
-| [권한 받은 사용자가 없는 도메인 이름을 주면, 도메인 이름 조회 단계가 대상 없음으로 막는다](#creating-a-user-may-not-be-created-in-a-domain-name-nothing-answers-to) | refused |
+| [역할을 받지 않은 사용자가 만들려 하면, 도메인 스코프 권한 문이 막는다](#creating-a-user-granted-nothing-may-not-create-a-user) | rejected |
+| [권한 받은 사용자가 없는 도메인 이름을 주면, 도메인 이름 조회 단계가 대상 없음으로 막는다](#creating-a-user-may-not-be-created-in-a-domain-name-nothing-answers-to) | rejected |
 
 **UserAdapter.delete_user_by_id**
 
 | scenario | verdict |
 |---|---|
 | [대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 물리면, 성공이 오고 그 사용자 상태가 삭제로 바뀐다](#retiring-a-user-granted-soft-delete-marks-another-user-deleted) | answered |
-| [역할 없이 물리려 하면, 엔티티 권한 문이 막는다](#retiring-a-user-granted-nothing-may-not-delete-another-user) | refused |
+| [역할 없이 물리려 하면, 엔티티 권한 문이 막는다](#retiring-a-user-granted-nothing-may-not-delete-another-user) | rejected |
 
 **UserAdapter.get**
 
 | scenario | verdict |
 |---|---|
 | [대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 읽으면, 기본 키까지 채운 노드 전체가 답으로 온다](#reading-a-user-granted-read-on-another-user-reads-their-whole-node) | answered |
-| [아무 역할도 받지 않은 사용자가 다른 사용자를 읽으려 하면, 엔티티 권한 문이 막는다](#reading-a-user-granted-nothing-may-not-read-another-user) | refused |
+| [아무 역할도 받지 않은 사용자가 다른 사용자를 읽으려 하면, 엔티티 권한 문이 막는다](#reading-a-user-granted-nothing-may-not-read-another-user) | rejected |
 
 **UserAdapter.update_user_by_id**
 
@@ -241,20 +241,20 @@ Scenario: incomplete 8 / 48
 | [권한 받은 사용자가 대상 사용자의 다른 키를 기본 키로 주면, 수정이 반영된 뒤 기본 키가 옮겨간 노드가 온다](#editing-naming-a-default-key-in-an-edit-moves-the-default-to-it) | answered |
 | [권한 받은 사용자가 소속 프로젝트 자리에 빈 값을 주면, 소속을 건드리지 않고 나머지 수정만 반영된다](#editing-null-project-ids-in-an-edit-leave-the-membership-as-it-is) | answered |
 | [비밀번호 변경을 요구받는 사용자가 자기 사용자 스코프에서 UPDATE와 READ를 받고, 새 비밀번호와 요구 해제를 함께 주면, 요구가 풀린 노드가 온다](#editing-setting-ones-own-new-password-lifts-the-password-change-requirement) | answered |
-| [역할을 받지 않은 사용자가 수정하려 하면, 엔티티 권한 문이 막는다](#editing-a-user-granted-nothing-may-not-edit-another-user) | refused |
-| [권한 받은 사용자가 이미 쓰이는 사용자 이름을 주면, 입력 검증이 막는다](#editing-a-username-another-user-holds-may-not-be-taken) | refused |
-| [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 삭제 상태 사용자의 전체 이름을 고치면, 삭제된 사용자라 막힌다](#retiring-an-edit-of-another-field-on-a-deleted-user-is-refused) | refused |
-| [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 수정으로 BEFORE_VERIFICATION을 주면, 입력 검증이 막는다](#retiring-an-edit-to-a-status-other-than-active-or-inactive-is-refused) | refused |
-| [대상 사용자 스코프에서 UPDATE와 READ만 받은 사용자가 수정으로 DELETED를 주면, 물리기의 엔티티 권한 문이 막는다](#retiring-an-edit-to-deleted-is-refused-without-soft-delete) | refused |
-| [삭제 상태 사용자에 수정으로 DELETED만 주면, 아무것도 바뀌지 않고 그 사용자가 온다](#retiring-an-edit-to-deleted-on-a-deleted-user-changes-nothing) | refused |
+| [역할을 받지 않은 사용자가 수정하려 하면, 엔티티 권한 문이 막는다](#editing-a-user-granted-nothing-may-not-edit-another-user) | rejected |
+| [권한 받은 사용자가 이미 쓰이는 사용자 이름을 주면, 입력 검증이 막는다](#editing-a-username-another-user-holds-may-not-be-taken) | rejected |
+| [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 삭제 상태 사용자의 전체 이름을 고치면, 삭제된 사용자라 막힌다](#retiring-an-edit-of-another-field-on-a-deleted-user-is-refused) | rejected |
+| [대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 수정으로 BEFORE_VERIFICATION을 주면, 입력 검증이 막는다](#retiring-an-edit-to-a-status-other-than-active-or-inactive-is-refused) | rejected |
+| [대상 사용자 스코프에서 UPDATE와 READ만 받은 사용자가 수정으로 DELETED를 주면, 물리기의 엔티티 권한 문이 막는다](#retiring-an-edit-to-deleted-is-refused-without-soft-delete) | rejected |
+| [삭제 상태 사용자에 수정으로 DELETED만 주면, 아무것도 바뀌지 않고 그 사용자가 온다](#retiring-an-edit-to-deleted-on-a-deleted-user-changes-nothing) | rejected |
 
 **LoginSessionAdapter.admin_revoke**
 
 | scenario | verdict |
 |---|---|
 | [전역 역할이 문인 관리자 회수에서 슈퍼관리자가 다른 사용자의 세션을 회수하면, 성공이 오고 세션 전체 검색에서 빠지며 관리자가 회수했다는 이력이 생긴다](#login_sessions-the-superadmin-revokes-another-users-login-session) | answered |
-| [권한 받은 사용자가 관리자 회수를 하려 하면, 전역 역할 문이 막는다](#login_sessions-a-user-who-is-not-the-superadmin-may-not-revoke-a-login-session-as-admin) | refused |
-| [슈퍼관리자가 없는 세션 id를 주면, 입력 검증이 막는다](#login_sessions-even-the-superadmin-may-not-revoke-a-login-session-that-does-not-exist) | refused |
+| [권한 받은 사용자가 관리자 회수를 하려 하면, 전역 역할 문이 막는다](#login_sessions-a-user-who-is-not-the-superadmin-may-not-revoke-a-login-session-as-admin) | rejected |
+| [슈퍼관리자가 없는 세션 id를 주면, 입력 검증이 막는다](#login_sessions-even-the-superadmin-may-not-revoke-a-login-session-that-does-not-exist) | rejected |
 
 **LoginSessionAdapter.admin_unblock_user**
 
@@ -262,72 +262,72 @@ Scenario: incomplete 8 / 48
 |---|---|
 | [전역 역할이 문인 차단 해제에서 슈퍼관리자가 사용자 이름을 주면, 성공이 오고 그 이름의 차단 기록이 사라진다](#login_sessions-the-superadmin-unblocks-a-user) | answered |
 | [슈퍼관리자가 어떤 사용자도 아닌 이름을 주면, 존재를 확인하지 않고 성공이 온다](#login_sessions-unblocking-a-username-nobody-holds-still-succeeds) | answered |
-| [권한 받은 사용자가 차단을 풀려 하면, 전역 역할 문이 막는다](#login_sessions-a-user-who-is-not-the-superadmin-may-not-unblock-a-user) | refused |
+| [권한 받은 사용자가 차단을 풀려 하면, 전역 역할 문이 막는다](#login_sessions-a-user-who-is-not-the-superadmin-may-not-unblock-a-user) | rejected |
 
 **LoginSessionAdapter.my_revoke**
 
 | scenario | verdict |
 |---|---|
 | [자기 스코프에서 READ와 UPDATE를 받은 사용자가 자기 세션을 회수하면, 성공이 오고 그 세션은 더 조회되지 않으며 사용자가 회수했다는 이력이 생긴다](#login_sessions-a-user-granted-update-on-themselves-revokes-their-own-login-session) | answered |
-| [역할 없이 회수하려 하면, 소유자 조회 단계가 막는다](#login_sessions-a-user-granted-nothing-may-not-revoke-their-own-login-session) | refused |
-| [자기 스코프에서만 READ와 UPDATE를 받은 사용자가 다른 사용자의 세션을 주면, 그 소유자에 대한 조회 단계가 막는다](#login_sessions-a-user-granted-only-on-themselves-may-not-revoke-another-users-login-session) | refused |
-| [READ만 받고 회수하려 하면, 엔티티 권한 문이 막는다](#login_sessions-a-user-granted-only-read-may-not-revoke-their-own-login-session) | refused |
+| [역할 없이 회수하려 하면, 소유자 조회 단계가 막는다](#login_sessions-a-user-granted-nothing-may-not-revoke-their-own-login-session) | rejected |
+| [자기 스코프에서만 READ와 UPDATE를 받은 사용자가 다른 사용자의 세션을 주면, 그 소유자에 대한 조회 단계가 막는다](#login_sessions-a-user-granted-only-on-themselves-may-not-revoke-another-users-login-session) | rejected |
+| [READ만 받고 회수하려 하면, 엔티티 권한 문이 막는다](#login_sessions-a-user-granted-only-read-may-not-revoke-their-own-login-session) | rejected |
 
 **UserAdapter.admin_create_keypair**
 
 | scenario | verdict |
 |---|---|
 | [슈퍼관리자가 아니어도 대상 사용자 스코프에서 UPDATE를 받은 사용자가 정책을 주고 키를 만들면, 기본 아닌 새 키와 secret이 온다](#managing_keypairs-a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy) | answered |
-| [권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막는다](#managing_keypairs-a-key-may-not-be-made-under-a-policy-that-does-not-exist) | refused |
-| [역할 없이 키를 만들려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-nothing-may-not-make-a-key-for-another) | refused |
+| [권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막는다](#managing_keypairs-a-key-may-not-be-made-under-a-policy-that-does-not-exist) | rejected |
+| [역할 없이 키를 만들려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-nothing-may-not-make-a-key-for-another) | rejected |
 
 **UserAdapter.admin_delete_keypair**
 
 | scenario | verdict |
 |---|---|
 | [대상 스코프에서 READ와 UPDATE를 받은 사용자가 지우면, 지운 키의 access key가 답으로 온다](#managing_keypairs-a-granted-user-deleting-another-users-extra-key-gets-its-access-key) | answered |
-| [역할 없이 지우려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-delete-another-users-key) | refused |
-| [READ만 받고 지우려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-only-read-may-not-delete-another-users-key) | refused |
-| [권한 받은 사용자가 대상의 기본 키를 지우려 하면, 입력 검증이 막는다](#managing_keypairs-another-users-default-key-may-not-be-deleted) | refused |
+| [역할 없이 지우려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-delete-another-users-key) | rejected |
+| [READ만 받고 지우려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-only-read-may-not-delete-another-users-key) | rejected |
+| [권한 받은 사용자가 대상의 기본 키를 지우려 하면, 입력 검증이 막는다](#managing_keypairs-another-users-default-key-may-not-be-deleted) | rejected |
 
 **UserAdapter.admin_delete_ssh_keypair**
 
 | scenario | verdict |
 |---|---|
 | [대상 스코프에서 READ와 UPDATE를 받은 사용자가 지우면, access key가 오고 공개키가 비워진다](#managing_keypairs-a-granted-user-clearing-another-users-ssh-key-empties-the-public-key) | answered |
-| [역할 없이 지우려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-clear-another-users-ssh-key) | refused |
-| [READ만 받고 지우려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-only-read-may-not-clear-another-users-ssh-key) | refused |
+| [역할 없이 지우려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-clear-another-users-ssh-key) | rejected |
+| [READ만 받고 지우려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-only-read-may-not-clear-another-users-ssh-key) | rejected |
 
 **UserAdapter.admin_get_keypair**
 
 | scenario | verdict |
 |---|---|
 | [대상 스코프에서 READ를 받은 사용자가 읽으면, 그 키 노드 전체가 온다](#managing_keypairs-a-granted-user-reads-another-users-key-by-access-key) | answered |
-| [역할 없이 읽으려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-read-another-users-key) | refused |
+| [역할 없이 읽으려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-read-another-users-key) | rejected |
 
 **UserAdapter.admin_get_ssh_keypair**
 
 | scenario | verdict |
 |---|---|
 | [대상 스코프에서 READ를 받은 사용자가 읽으면, access key와 공개키만 오고 개인키는 오지 않는다](#managing_keypairs-a-granted-user-reads-another-users-ssh-public-key-only) | answered |
-| [역할 없이 읽으려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-read-another-users-ssh-public-key) | refused |
+| [역할 없이 읽으려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-read-another-users-ssh-public-key) | rejected |
 
 **UserAdapter.admin_register_ssh_keypair**
 
 | scenario | verdict |
 |---|---|
 | [대상 스코프에서 READ와 UPDATE를 받은 사용자가 공개키와 개인키를 주면, 형식 검사 없이 덮어쓰고 access key가 답으로 온다](#managing_keypairs-a-granted-user-registering-another-users-ssh-key-gets-the-access-key) | answered |
-| [역할 없이 등록하려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-register-another-users-ssh-key) | refused |
-| [READ만 받고 등록하려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-only-read-may-not-register-another-users-ssh-key) | refused |
+| [역할 없이 등록하려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-register-another-users-ssh-key) | rejected |
+| [READ만 받고 등록하려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-only-read-may-not-register-another-users-ssh-key) | rejected |
 
 **UserAdapter.admin_update_keypair**
 
 | scenario | verdict |
 |---|---|
 | [대상 스코프에서 READ와 UPDATE를 받은 사용자가 요청 한도만 주면, 나머지는 그대로이고 한도만 바뀐 키 노드가 온다](#managing_keypairs-a-granted-user-changing-another-users-rate-limit-changes-only-that) | answered |
-| [역할 없이 바꾸려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-change-another-users-key) | refused |
-| [READ만 받고 바꾸려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-only-read-may-not-change-another-users-key) | refused |
-| [권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막는다](#managing_keypairs-another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist) | refused |
+| [역할 없이 바꾸려 하면, 소유자 조회 단계가 막는다](#managing_keypairs-a-user-granted-nothing-may-not-change-another-users-key) | rejected |
+| [READ만 받고 바꾸려 하면, 엔티티 권한 문이 막는다](#managing_keypairs-a-user-granted-only-read-may-not-change-another-users-key) | rejected |
+| [권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막는다](#managing_keypairs-another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist) | rejected |
 
 **UserAdapter.bulk_purge_users**
 
@@ -335,7 +335,7 @@ Scenario: incomplete 8 / 48
 |---|---|
 | [슈퍼관리자가 있는 사용자와 없는 id를 함께 주면, 하나는 지워지고 없는 id는 실패로 담긴다](#retiring-a-bulk-purge-records-a-missing-id-as-a-failure) | answered |
 | [전역 역할이 문인 일괄 지우기에서 슈퍼관리자가 사용자 둘을 주면, 두 id와 개수 둘이 온다](#retiring-the-superadmin-bulk-purge-answers-the-purged-ids-and-count) | answered |
-| [도메인 스코프에서 HARD_DELETE를 받은 사용자라도 일괄 지우기를 하려 하면, 전역 역할 문이 막는다](#retiring-a-user-who-is-not-the-superadmin-may-not-purge-in-bulk) | refused |
+| [도메인 스코프에서 HARD_DELETE를 받은 사용자라도 일괄 지우기를 하려 하면, 전역 역할 문이 막는다](#retiring-a-user-who-is-not-the-superadmin-may-not-purge-in-bulk) | rejected |
 
 **UserAdapter.issue_my_keypair**
 
@@ -343,63 +343,63 @@ Scenario: incomplete 8 / 48
 |---|---|
 | [자기 사용자 스코프에서 UPDATE를 받은 사용자가 발급하면, 기본 키의 관리자 표시, 정책, 요청 한도를 따르고 기본 표시는 없는 키와 secret이 온다](#own_keypairs-a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key) | answered |
 | [권한 받은 사용자가 키를 발급하고 그 키로 기본 키를 옮긴 다음 원래 기본 키를 회수하면, 세 호출이 차례로 통과하고 발급한 키 하나만 남는다](#own_keypairs-an-issued-key-made-default-lets-the-original-default-key-be-revoked) | answered |
-| [역할을 받지 않은 사용자가 자기 키를 발급하려 하면, 본인이어도 엔티티 권한 문이 막는다](#own_keypairs-a-user-granted-nothing-may-not-issue-their-own-key) | refused |
+| [역할을 받지 않은 사용자가 자기 키를 발급하려 하면, 본인이어도 엔티티 권한 문이 막는다](#own_keypairs-a-user-granted-nothing-may-not-issue-their-own-key) | rejected |
 
 **UserAdapter.purge_user_by_id**
 
 | scenario | verdict |
 |---|---|
 | [대상 사용자 스코프에서 HARD_DELETE를 받은 사용자가 물리지 않은 사용자를 지워도, 성공이 오고 그 사용자를 더 찾을 수 없다](#retiring-a-user-granted-hard-delete-purges-a-user-with-no-folders-or-sessions) | answered |
-| [역할 없이 지우려 하면, 엔티티 권한 문이 막는다](#retiring-a-user-granted-nothing-may-not-purge-another-user) | refused |
-| [권한 받은 사용자가 넘겨받을 관리자로 없는 id를 주면, 입력 검증이 막는다](#retiring-purging-a-user-to-an-admin-who-does-not-exist-is-refused) | refused |
+| [역할 없이 지우려 하면, 엔티티 권한 문이 막는다](#retiring-a-user-granted-nothing-may-not-purge-another-user) | rejected |
+| [권한 받은 사용자가 넘겨받을 관리자로 없는 id를 주면, 입력 검증이 막는다](#retiring-purging-a-user-to-an-admin-who-does-not-exist-is-refused) | rejected |
 
 **UserAdapter.restore_user_by_id**
 
 | scenario | verdict |
 |---|---|
 | [대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 삭제 상태 사용자를 되살리면, 성공이 오고 상태가 활성으로 바뀐다](#retiring-a-user-granted-soft-delete-restores-a-deleted-user-to-active) | answered |
-| [역할 없이 되살리려 하면, 엔티티 권한 문이 막는다](#retiring-a-user-granted-nothing-may-not-restore-another-user) | refused |
-| [권한 받은 사용자가 물리지 않은 비활성 사용자를 되살리려 하면, 삭제 상태가 아니라 막힌다](#retiring-restoring-a-user-who-was-not-deleted-is-refused) | refused |
+| [역할 없이 되살리려 하면, 엔티티 권한 문이 막는다](#retiring-a-user-granted-nothing-may-not-restore-another-user) | rejected |
+| [권한 받은 사용자가 물리지 않은 비활성 사용자를 되살리려 하면, 삭제 상태가 아니라 막힌다](#retiring-restoring-a-user-who-was-not-deleted-is-refused) | rejected |
 
 **UserAdapter.revoke_my_keypair**
 
 | scenario | verdict |
 |---|---|
 | [권한 받은 사용자가 자기의 기본 아닌 키를 회수하면, 성공이 오고 자기 키 검색에서 그 키가 빠진다](#own_keypairs-a-user-granted-read-and-update-revokes-a-non-default-key) | answered |
-| [역할을 받지 않은 사용자가 회수하려 하면, 소유자 조회 단계가 없는 키와 같은 예외로 막는다](#own_keypairs-a-user-granted-nothing-may-not-revoke-their-own-key) | refused |
-| [자기 스코프에서 READ만 받은 사용자가 회수하려 하면, 소유자 조회는 지나고 엔티티 권한 문이 막는다](#own_keypairs-a-user-granted-only-read-may-not-revoke-their-own-key) | refused |
-| [권한 받은 사용자가 어떤 키도 아닌 값을 주면, 소유자 조회 단계가 권한 없음과 같은 예외로 막는다](#own_keypairs-an-access-key-nobody-holds-may-not-be-revoked) | refused |
-| [권한 받은 사용자가 자기 기본 키를 회수하려 하면, 입력 검증이 막는다](#own_keypairs-the-default-key-may-not-be-revoked) | refused |
+| [역할을 받지 않은 사용자가 회수하려 하면, 소유자 조회 단계가 없는 키와 같은 예외로 막는다](#own_keypairs-a-user-granted-nothing-may-not-revoke-their-own-key) | rejected |
+| [자기 스코프에서 READ만 받은 사용자가 회수하려 하면, 소유자 조회는 지나고 엔티티 권한 문이 막는다](#own_keypairs-a-user-granted-only-read-may-not-revoke-their-own-key) | rejected |
+| [권한 받은 사용자가 어떤 키도 아닌 값을 주면, 소유자 조회 단계가 권한 없음과 같은 예외로 막는다](#own_keypairs-an-access-key-nobody-holds-may-not-be-revoked) | rejected |
+| [권한 받은 사용자가 자기 기본 키를 회수하려 하면, 입력 검증이 막는다](#own_keypairs-the-default-key-may-not-be-revoked) | rejected |
 
 **UserAdapter.switch_default_access_key**
 
 | scenario | verdict |
 |---|---|
 | [자기 스코프에서 UPDATE를 받은 사용자가 기본 아닌 활성 키로 기본 키를 옮기면, 성공이 오고 사용자 노드의 기본 키가 그 키가 된다](#own_keypairs-a-user-granted-read-and-update-moves-their-default-key) | answered |
-| [역할 없이 기본 키를 옮기려 하면, 엔티티 권한 문이 막는다](#own_keypairs-a-user-granted-nothing-may-not-move-their-default-key) | refused |
-| [권한 받은 사용자가 다른 사용자의 키를 주면, 입력 검증이 막는다](#own_keypairs-someone-elses-key-may-not-become-the-default-key) | refused |
+| [역할 없이 기본 키를 옮기려 하면, 엔티티 권한 문이 막는다](#own_keypairs-a-user-granted-nothing-may-not-move-their-default-key) | rejected |
+| [권한 받은 사용자가 다른 사용자의 키를 주면, 입력 검증이 막는다](#own_keypairs-someone-elses-key-may-not-become-the-default-key) | rejected |
 
 **UserAdapter.update_my_keypair**
 
 | scenario | verdict |
 |---|---|
 | [자기 스코프에서 READ와 UPDATE를 받은 사용자가 기본 아닌 키를 비활성으로 바꾸면, 활성만 바뀐 키 노드가 온다](#own_keypairs-a-user-granted-read-and-update-turns-off-a-non-default-key) | answered |
-| [역할 없이 키를 끄려 하면, 소유자 조회 단계가 막는다](#own_keypairs-a-user-granted-nothing-may-not-turn-off-their-own-key) | refused |
-| [READ만 받고 키를 끄려 하면, 엔티티 권한 문이 막는다](#own_keypairs-a-user-granted-only-read-may-not-turn-off-their-own-key) | refused |
-| [권한 받은 사용자가 자기 기본 키를 비활성으로 바꾸려 하면, 입력 검증이 막는다](#own_keypairs-the-default-key-may-not-be-turned-off) | refused |
+| [역할 없이 키를 끄려 하면, 소유자 조회 단계가 막는다](#own_keypairs-a-user-granted-nothing-may-not-turn-off-their-own-key) | rejected |
+| [READ만 받고 키를 끄려 하면, 엔티티 권한 문이 막는다](#own_keypairs-a-user-granted-only-read-may-not-turn-off-their-own-key) | rejected |
+| [권한 받은 사용자가 자기 기본 키를 비활성으로 바꾸려 하면, 입력 검증이 막는다](#own_keypairs-the-default-key-may-not-be-turned-off) | rejected |
 
 **UserAdapter.update_user**
 
 | scenario | verdict |
 |---|---|
 | [대상 사용자 스코프에서 UPDATE를 받은 사용자가 허용 IP만 담은 수정을 보내면, 성공 표시가 오고 그 사용자의 허용 IP가 바뀐다](#editing-a-user-granted-update-changes-the-allowed-client-ip) | answered |
-| [역할 없이 허용 IP 수정을 보내면, 엔티티 권한 문이 막는다](#editing-a-user-granted-nothing-may-not-change-the-allowed-client-ip) | refused |
+| [역할 없이 허용 IP 수정을 보내면, 엔티티 권한 문이 막는다](#editing-a-user-granted-nothing-may-not-change-the-allowed-client-ip) | rejected |
 
 ### LoginHistoryAdapter.admin_search
 
 <a id="login_history-the-superadmin-searches-every-users-login-history"></a>
 
-#### [the-superadmin-searches-every-users-login-history](/tests/scenario/bai_scenario/manager/user/test_login_history.py) — pass
+#### [the-superadmin-searches-every-users-login-history](/tests/scenario/bai_scenario/manager/user/test_login_history.py): pass
 
 전역 역할이 문인 이력 검색에서 슈퍼관리자가 훑으면, 사용자와 무관하게 심은 이력이 생성 시각 내림차순으로 온다
 
@@ -423,7 +423,7 @@ Given
 
 When
 
-- LoginHistoryAdapter.admin_search — user-3이 로그인 기록 전체를 훑음
+- LoginHistoryAdapter.admin_search: user-3이 로그인 기록 전체를 훑음
 
 Then
 
@@ -449,7 +449,7 @@ Then
 
 <a id="login_history-a-user-who-is-not-the-superadmin-may-not-search-every-login-history"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-every-login-history](/tests/scenario/bai_scenario/manager/user/test_login_history.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-every-login-history](/tests/scenario/bai_scenario/manager/user/test_login_history.py): pass
 
 권한 받은 사용자가 이력 전체 검색을 하려 하면, 전역 역할 문이 막는다
 
@@ -469,7 +469,7 @@ Given
 
 When
 
-- LoginHistoryAdapter.admin_search — user-1이 로그인 기록 전체를 훑음
+- LoginHistoryAdapter.admin_search: user-1이 로그인 기록 전체를 훑음
 
 Then
 
@@ -480,7 +480,7 @@ Then
 
 <a id="login_history-a-user-granted-read-on-themselves-searches-only-their-own-login-history"></a>
 
-#### [a-user-granted-read-on-themselves-searches-only-their-own-login-history](/tests/scenario/bai_scenario/manager/user/test_login_history.py) — pass
+#### [a-user-granted-read-on-themselves-searches-only-their-own-login-history](/tests/scenario/bai_scenario/manager/user/test_login_history.py): pass
 
 자기 스코프에서 READ를 받은 사용자가 훑으면, 다른 사용자의 이력은 빠진다
 
@@ -505,7 +505,7 @@ Given
 
 When
 
-- LoginHistoryAdapter.my_search — user-1이 자기 로그인 기록을 훑음
+- LoginHistoryAdapter.my_search: user-1이 자기 로그인 기록을 훑음
 
 Then
 
@@ -524,7 +524,7 @@ Then
 
 <a id="login_history-a-user-granted-nothing-may-not-search-their-own-login-history"></a>
 
-#### [a-user-granted-nothing-may-not-search-their-own-login-history](/tests/scenario/bai_scenario/manager/user/test_login_history.py) — pass
+#### [a-user-granted-nothing-may-not-search-their-own-login-history](/tests/scenario/bai_scenario/manager/user/test_login_history.py): pass
 
 역할 없이 자기 이력을 훑으려 하면, 본인이어도 스코프 권한 문이 막는다
 
@@ -544,7 +544,7 @@ Given
 
 When
 
-- LoginHistoryAdapter.my_search — user-1이 자기 로그인 기록을 훑음
+- LoginHistoryAdapter.my_search: user-1이 자기 로그인 기록을 훑음
 
 Then
 
@@ -555,7 +555,7 @@ Then
 
 <a id="login_sessions-the-superadmin-searches-every-users-login-sessions"></a>
 
-#### [the-superadmin-searches-every-users-login-sessions](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+#### [the-superadmin-searches-every-users-login-sessions](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
 
 전역 역할이 문인 세션 검색에서 슈퍼관리자가 페이지 인자 없이 훑으면, 사용자와 무관하게 심은 세션이 생성 시각 내림차순으로 온다
 
@@ -583,7 +583,7 @@ Given
 
 When
 
-- LoginSessionAdapter.admin_search — user-3이 세션 전체를 훑음
+- LoginSessionAdapter.admin_search: user-3이 세션 전체를 훑음
 
 Then
 
@@ -609,7 +609,7 @@ Then
 
 <a id="login_sessions-a-user-who-is-not-the-superadmin-may-not-search-every-login-session"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-every-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-every-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
 
 권한 받은 사용자가 세션 전체 검색을 하려 하면, 전역 역할 문이 막는다
 
@@ -635,7 +635,7 @@ Given
 
 When
 
-- LoginSessionAdapter.admin_search — user-2이 세션 전체를 훑음
+- LoginSessionAdapter.admin_search: user-2이 세션 전체를 훑음
 
 Then
 
@@ -646,7 +646,7 @@ Then
 
 <a id="login_sessions-a-user-granted-read-on-themselves-searches-only-their-own-login-sessions"></a>
 
-#### [a-user-granted-read-on-themselves-searches-only-their-own-login-sessions](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+#### [a-user-granted-read-on-themselves-searches-only-their-own-login-sessions](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
 
 자기 스코프에서 READ를 받은 사용자가 훑으면, 다른 사용자의 세션은 빠진다
 
@@ -675,7 +675,7 @@ Given
 
 When
 
-- LoginSessionAdapter.my_search — user-1이 자기 세션을 훑음
+- LoginSessionAdapter.my_search: user-1이 자기 세션을 훑음
 
 Then
 
@@ -694,7 +694,7 @@ Then
 
 <a id="login_sessions-a-user-granted-nothing-may-not-search-their-own-login-sessions"></a>
 
-#### [a-user-granted-nothing-may-not-search-their-own-login-sessions](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+#### [a-user-granted-nothing-may-not-search-their-own-login-sessions](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
 
 역할 없이 자기 세션을 훑으려 하면, 본인이어도 스코프 권한 문이 막는다
 
@@ -716,7 +716,7 @@ Given
 
 When
 
-- LoginSessionAdapter.my_search — user-1이 자기 세션을 훑음
+- LoginSessionAdapter.my_search: user-1이 자기 세션을 훑음
 
 Then
 
@@ -727,7 +727,7 @@ Then
 
 <a id="searching-the-superadmin-searching-every-user-counts-deleted-ones-too"></a>
 
-#### [the-superadmin-searching-every-user-counts-deleted-ones-too](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [the-superadmin-searching-every-user-counts-deleted-ones-too](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 전역 역할이 문인 검색에서 슈퍼관리자가 필터 없이 훑으면, 삭제 상태 사용자를 포함해 심은 사용자가 모두 온다
 
@@ -750,7 +750,7 @@ Given
 
 When
 
-- UserAdapter.admin_search — user-3이 필터 없이 전체 조회
+- UserAdapter.admin_search: user-3이 필터 없이 전체 조회
 
 Then
 
@@ -762,7 +762,7 @@ Then
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-every-user"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-every-user](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-every-user](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 도메인 스코프 권한을 받은 사용자라도 전체 검색을 하려 하면, 전역 역할 문이 막는다
 
@@ -782,7 +782,7 @@ Given
 
 When
 
-- UserAdapter.admin_search — user-1이 필터 없이 전체 조회
+- UserAdapter.admin_search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -793,7 +793,7 @@ Then
 
 <a id="managing_keypairs-the-superadmin-searching-every-key-gets-every-users-key"></a>
 
-#### [the-superadmin-searching-every-key-gets-every-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [the-superadmin-searching-every-key-gets-every-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 전역 역할이 문인 키 검색에서 슈퍼관리자가 페이지 인자 없이 훑으면, 모든 사용자의 키가 오고 limit 자리는 비어서 온다
 
@@ -815,14 +815,14 @@ Given
 
 When
 
-- UserAdapter.admin_search_keypairs — user-3이 페이지 인자 없이 모든 키를 훑음
+- UserAdapter.admin_search_keypairs: user-3이 페이지 인자 없이 모든 키를 훑음
 
 Then
 
 - 모든 사용자의 키가 주인 순으로 온다
   - items.length = 3
-  - items[0].id: 무시함 — 시드가 만든 난수 키다
-  - items[0].access_key: 무시함 — 시드가 만든 난수 키다
+  - items[0].id: 무시함: 시드가 만든 난수 키다
+  - items[0].access_key: 무시함: 시드가 만든 난수 키다
   - items[0].is_active = True
   - items[0].is_admin = False
   - items[0].is_default = True
@@ -834,8 +834,8 @@ Then
   - items[0].user_id: 키의 주인와 같다
   - items[0].created_at: 이 실행이 쓴 시각
   - items[0].modified_at: 이 실행이 쓴 시각
-  - items[1].id: 무시함 — 시드가 만든 난수 키다
-  - items[1].access_key: 무시함 — 시드가 만든 난수 키다
+  - items[1].id: 무시함: 시드가 만든 난수 키다
+  - items[1].access_key: 무시함: 시드가 만든 난수 키다
   - items[1].is_active = True
   - items[1].is_admin = False
   - items[1].is_default = True
@@ -847,8 +847,8 @@ Then
   - items[1].user_id: 키의 주인와 같다
   - items[1].created_at: 이 실행이 쓴 시각
   - items[1].modified_at: 이 실행이 쓴 시각
-  - items[2].id: 무시함 — 시드가 만든 난수 키다
-  - items[2].access_key: 무시함 — 시드가 만든 난수 키다
+  - items[2].id: 무시함: 시드가 만든 난수 키다
+  - items[2].access_key: 무시함: 시드가 만든 난수 키다
   - items[2].is_active = True
   - items[2].is_admin = True
   - items[2].is_default = True
@@ -866,7 +866,7 @@ Then
 
 <a id="managing_keypairs-a-user-who-is-not-the-superadmin-may-not-search-every-key"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-every-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-every-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 권한 받은 사용자가 키 전체 검색을 하려 하면, 전역 역할 문이 막는다
 
@@ -886,7 +886,7 @@ Given
 
 When
 
-- UserAdapter.admin_search_keypairs — user-1이 페이지 인자 없이 모든 키를 훑음
+- UserAdapter.admin_search_keypairs: user-1이 페이지 인자 없이 모든 키를 훑음
 
 Then
 
@@ -897,7 +897,7 @@ Then
 
 <a id="reading-a-batch-load-of-no-ids-answers-an-empty-list"></a>
 
-#### [a-batch-load-of-no-ids-answers-an-empty-list](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
+#### [a-batch-load-of-no-ids-answers-an-empty-list](/tests/scenario/bai_scenario/manager/user/test_reading.py): pass
 
 권한 없는 사용자가 빈 id 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다
 
@@ -916,7 +916,7 @@ Given
 
 When
 
-- UserAdapter.batch_load_by_ids — user-2이 빈 목록으로 일괄 읽음
+- UserAdapter.batch_load_by_ids: user-2이 빈 목록으로 일괄 읽음
 
 Then
 
@@ -925,7 +925,7 @@ Then
 
 <a id="reading-the-superadmin-batch-load-leaves-a-missing-id-empty"></a>
 
-#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
+#### [the-superadmin-batch-load-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/user/test_reading.py): pass
 
 슈퍼관리자가 있는 id와 없는 id를 함께 요청하면, 권한 문을 지나 없는 원소 자리에 빈 값이 온다
 
@@ -944,7 +944,7 @@ Given
 
 When
 
-- UserAdapter.batch_load_by_ids — user-2이 user-1과 없는 id를 일괄 읽음
+- UserAdapter.batch_load_by_ids: user-2이 user-1과 없는 id를 일괄 읽음
 
 Then
 
@@ -976,7 +976,7 @@ Then
 
 <a id="reading-a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order"></a>
 
-#### [a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
+#### [a-batch-load-answers-a-node-or-a-refusal-for-each-id-in-order](/tests/scenario/bai_scenario/manager/user/test_reading.py): pass
 
 한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 id를 한 번에 요청하면, 입력 순서대로 원소별 결과가 온다
 
@@ -1002,7 +1002,7 @@ Given
 
 When
 
-- UserAdapter.batch_load_by_ids — user-3이 user-1, user-2, 없는 id 순으로 일괄 읽음
+- UserAdapter.batch_load_by_ids: user-3이 user-1, user-2, 없는 id 순으로 일괄 읽음
 
 Then
 
@@ -1037,7 +1037,7 @@ Then
 
 <a id="reading-a-user-granted-read-on-another-user-looks-up-their-id-by-email"></a>
 
-#### [a-user-granted-read-on-another-user-looks-up-their-id-by-email](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
+#### [a-user-granted-read-on-another-user-looks-up-their-id-by-email](/tests/scenario/bai_scenario/manager/user/test_reading.py): pass
 
 대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 그 사용자의 email 을 찾으면, 그 사용자의 id 가 답으로 온다
 
@@ -1060,7 +1060,7 @@ Given
 
 When
 
-- UserAdapter.batch_lookup_by_emails — user-2이 user-1의 email 로 찾음
+- UserAdapter.batch_lookup_by_emails: user-2이 user-1의 email 로 찾음
 
 Then
 
@@ -1070,7 +1070,7 @@ Then
 
 <a id="reading-an-email-lookup-of-no-emails-answers-an-empty-list"></a>
 
-#### [an-email-lookup-of-no-emails-answers-an-empty-list](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
+#### [an-email-lookup-of-no-emails-answers-an-empty-list](/tests/scenario/bai_scenario/manager/user/test_reading.py): pass
 
 권한 없는 사용자가 빈 email 목록을 주면, 어떤 액션도 부르지 않고 빈 목록이 답으로 온다
 
@@ -1089,7 +1089,7 @@ Given
 
 When
 
-- UserAdapter.batch_lookup_by_emails — user-2이 빈 목록으로 email 을 찾음
+- UserAdapter.batch_lookup_by_emails: user-2이 빈 목록으로 email 을 찾음
 
 Then
 
@@ -1098,7 +1098,7 @@ Then
 
 <a id="reading-an-unreadable-user-and-a-missing-email-are-refused-alike"></a>
 
-#### [an-unreadable-user-and-a-missing-email-are-refused-alike](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
+#### [an-unreadable-user-and-a-missing-email-are-refused-alike](/tests/scenario/bai_scenario/manager/user/test_reading.py): pass
 
 한 사용자에게만 읽기 권한을 받은 사용자가 읽을 수 있는 사용자, 읽을 수 없는 사용자, 없는 email 을 한 번에 찾으면, 첫째는 id, 나머지 둘은 같은 거부가 입력 순서대로 온다
 
@@ -1124,7 +1124,7 @@ Given
 
 When
 
-- UserAdapter.batch_lookup_by_emails — user-3이 user-1, user-2, 없는 email 순으로 email 을 찾음
+- UserAdapter.batch_lookup_by_emails: user-3이 user-1, user-2, 없는 email 순으로 email 을 찾음
 
 Then
 
@@ -1138,7 +1138,7 @@ Then
 
 <a id="searching-a-user-granted-on-a-domain-searching-it-by-name-finds-only-its-users"></a>
 
-#### [a-user-granted-on-a-domain-searching-it-by-name-finds-only-its-users](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [a-user-granted-on-a-domain-searching-it-by-name-finds-only-its-users](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 도메인 스코프에서 사용자 READ를 받은 사용자가 도메인 이름으로 훑으면, 다른 도메인 사용자는 빠진다
 
@@ -1165,7 +1165,7 @@ Given
 
 When
 
-- UserAdapter.domain_search — user-3이 home-1으로 조회
+- UserAdapter.domain_search: user-3이 home-1으로 조회
 
 Then
 
@@ -1177,7 +1177,7 @@ Then
 
 <a id="searching-a-user-granted-nothing-may-not-search-a-domain-by-name"></a>
 
-#### [a-user-granted-nothing-may-not-search-a-domain-by-name](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [a-user-granted-nothing-may-not-search-a-domain-by-name](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 역할을 받지 않은 사용자가 도메인 이름으로 훑으려 하면, 스코프 권한 문이 막는다
 
@@ -1193,7 +1193,7 @@ Given
 
 When
 
-- UserAdapter.domain_search — user-1이 home-1으로 조회
+- UserAdapter.domain_search: user-1이 home-1으로 조회
 
 Then
 
@@ -1202,7 +1202,7 @@ Then
 
 <a id="searching-searching-a-domain-name-nothing-answers-to-is-not-found"></a>
 
-#### [searching-a-domain-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [searching-a-domain-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 권한 받은 사용자가 없는 도메인 이름으로 훑으려 하면, 스코프 검사 전에 이름 조회 단계가 대상 없음으로 막는다
 
@@ -1222,7 +1222,7 @@ Given
 
 When
 
-- UserAdapter.domain_search — user-1이 no-such-domain으로 조회
+- UserAdapter.domain_search: user-1이 no-such-domain으로 조회
 
 Then
 
@@ -1233,7 +1233,7 @@ Then
 
 <a id="searching-a-gql-search-without-page-arguments-answers-the-newest-ten"></a>
 
-#### [a-gql-search-without-page-arguments-answers-the-newest-ten](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [a-gql-search-without-page-arguments-answers-the-newest-ten](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 슈퍼관리자가 커서와 페이지 인자를 모두 생략하고 훑으면, 생성 시각 내림차순으로 열 명까지 오고 다음 페이지 여부가 함께 온다
 
@@ -1282,7 +1282,7 @@ Given
 
 When
 
-- UserAdapter.gql_admin_search — user-12이 페이지 인자 없이 GQL 전체 조회
+- UserAdapter.gql_admin_search: user-12이 페이지 인자 없이 GQL 전체 조회
 
 Then
 
@@ -1296,7 +1296,7 @@ Then
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-gql-search-every-user"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-gql-search-every-user](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-gql-search-every-user](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 권한 받은 사용자가 GQL 전체 검색을 하려 하면, 전역 역할 문이 막는다
 
@@ -1316,7 +1316,7 @@ Given
 
 When
 
-- UserAdapter.gql_admin_search — user-1이 페이지 인자 없이 GQL 전체 조회
+- UserAdapter.gql_admin_search: user-1이 페이지 인자 없이 GQL 전체 조회
 
 Then
 
@@ -1327,7 +1327,7 @@ Then
 
 <a id="managing_keypairs-the-superadmin-gql-key-search-by-policy-name-gets-that-policys-keys-only"></a>
 
-#### [the-superadmin-gql-key-search-by-policy-name-gets-that-policys-keys-only](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [the-superadmin-gql-key-search-by-policy-name-gets-that-policys-keys-only](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 전역 역할이 문인 GQL 키 검색에서 슈퍼관리자가 정책 이름을 주면, 그 정책을 쓰는 키만 온다
 
@@ -1349,14 +1349,14 @@ Given
 
 When
 
-- UserAdapter.gql_admin_search_keypairs — user-3이 keypair-policy-1으로 걸러 GQL 키 검색
+- UserAdapter.gql_admin_search_keypairs: user-3이 keypair-policy-1으로 걸러 GQL 키 검색
 
 Then
 
 - 그 정책을 쓰는 키 하나만 온다
   - items.length = 1
-  - items[0].id: 무시함 — 시드가 만든 난수 키다
-  - items[0].access_key: 무시함 — 시드가 만든 난수 키다
+  - items[0].id: 무시함: 시드가 만든 난수 키다
+  - items[0].access_key: 무시함: 시드가 만든 난수 키다
   - items[0].is_active = True
   - items[0].is_admin = False
   - items[0].is_default = True
@@ -1374,7 +1374,7 @@ Then
 
 <a id="managing_keypairs-a-user-who-is-not-the-superadmin-may-not-search-every-key-over-gql"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-every-key-over-gql](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-every-key-over-gql](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 권한 받은 사용자가 GQL 키 검색을 하려 하면, 전역 역할 문이 막는다
 
@@ -1394,7 +1394,7 @@ Given
 
 When
 
-- UserAdapter.gql_admin_search_keypairs — user-1이 GQL로 모든 키를 훑음
+- UserAdapter.gql_admin_search_keypairs: user-1이 GQL로 모든 키를 훑음
 
 Then
 
@@ -1405,7 +1405,7 @@ Then
 
 <a id="searching-a-gql-scoped-search-over-two-granted-scopes-joins-their-users"></a>
 
-#### [a-gql-scoped-search-over-two-granted-scopes-joins-their-users](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [a-gql-scoped-search-over-two-granted-scopes-joins-their-users](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 같은 권한으로 GQL 스코프 검색을 하면, 두 스코프 사용자가 커서 답으로 온다
 
@@ -1434,7 +1434,7 @@ Given
 
 When
 
-- UserAdapter.gql_scoped_search — user-2이 home-1과 research-1 두 스코프로 GQL 조회
+- UserAdapter.gql_scoped_search: user-2이 home-1과 research-1 두 스코프로 GQL 조회
 
 Then
 
@@ -1446,7 +1446,7 @@ Then
 
 <a id="searching-one-scope-without-a-grant-refuses-the-whole-gql-scoped-search"></a>
 
-#### [one-scope-without-a-grant-refuses-the-whole-gql-scoped-search](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [one-scope-without-a-grant-refuses-the-whole-gql-scoped-search](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 한 스코프에만 READ를 받고 GQL 스코프 검색에 둘을 주면, 스코프 권한 문이 전체를 막는다
 
@@ -1472,7 +1472,7 @@ Given
 
 When
 
-- UserAdapter.gql_scoped_search — user-2이 home-1과 research-1 두 스코프로 GQL 조회
+- UserAdapter.gql_scoped_search: user-2이 home-1과 research-1 두 스코프로 GQL 조회
 
 Then
 
@@ -1483,7 +1483,7 @@ Then
 
 <a id="searching-a-user-granted-on-a-domain-gql-searching-it-finds-only-its-users"></a>
 
-#### [a-user-granted-on-a-domain-gql-searching-it-finds-only-its-users](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [a-user-granted-on-a-domain-gql-searching-it-finds-only-its-users](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 같은 권한으로 GQL 도메인 검색을 하면, 그 도메인 사용자만 커서 답으로 온다
 
@@ -1510,7 +1510,7 @@ Given
 
 When
 
-- UserAdapter.gql_search_by_domain — user-3이 home-1으로 GQL 조회
+- UserAdapter.gql_search_by_domain: user-3이 home-1으로 GQL 조회
 
 Then
 
@@ -1522,7 +1522,7 @@ Then
 
 <a id="searching-a-user-granted-nothing-may-not-gql-search-a-domain"></a>
 
-#### [a-user-granted-nothing-may-not-gql-search-a-domain](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [a-user-granted-nothing-may-not-gql-search-a-domain](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 역할 없이 GQL 도메인 검색을 하면, 스코프 권한 문이 막는다
 
@@ -1538,7 +1538,7 @@ Given
 
 When
 
-- UserAdapter.gql_search_by_domain — user-1이 home-1으로 GQL 조회
+- UserAdapter.gql_search_by_domain: user-1이 home-1으로 GQL 조회
 
 Then
 
@@ -1549,7 +1549,7 @@ Then
 
 <a id="searching-a-user-granted-on-a-project-gql-searching-it-finds-only-its-roster"></a>
 
-#### [a-user-granted-on-a-project-gql-searching-it-finds-only-its-roster](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [a-user-granted-on-a-project-gql-searching-it-finds-only-its-roster](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 같은 권한으로 GQL 프로젝트 검색을 하면, 명부의 사용자만 커서 답으로 온다
 
@@ -1577,7 +1577,7 @@ Given
 
 When
 
-- UserAdapter.gql_search_by_project — user-3이 research-1으로 GQL 조회
+- UserAdapter.gql_search_by_project: user-3이 research-1으로 GQL 조회
 
 Then
 
@@ -1589,7 +1589,7 @@ Then
 
 <a id="searching-a-user-granted-nothing-may-not-gql-search-a-project"></a>
 
-#### [a-user-granted-nothing-may-not-gql-search-a-project](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [a-user-granted-nothing-may-not-gql-search-a-project](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 역할 없이 GQL 프로젝트 검색을 하면, 스코프 권한 문이 막는다
 
@@ -1606,7 +1606,7 @@ Given
 
 When
 
-- UserAdapter.gql_search_by_project — user-1이 research-1으로 GQL 조회
+- UserAdapter.gql_search_by_project: user-1이 research-1으로 GQL 조회
 
 Then
 
@@ -1617,7 +1617,7 @@ Then
 
 <a id="searching-a-user-granted-on-a-project-searching-it-finds-only-its-roster"></a>
 
-#### [a-user-granted-on-a-project-searching-it-finds-only-its-roster](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [a-user-granted-on-a-project-searching-it-finds-only-its-roster](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 프로젝트 스코프에서 사용자 READ를 받은 사용자가 그 프로젝트로 훑으면, 명부에 오른 사용자만 온다
 
@@ -1645,7 +1645,7 @@ Given
 
 When
 
-- UserAdapter.project_search — user-3이 research-1으로 조회
+- UserAdapter.project_search: user-3이 research-1으로 조회
 
 Then
 
@@ -1657,7 +1657,7 @@ Then
 
 <a id="searching-a-user-granted-nothing-may-not-search-a-project"></a>
 
-#### [a-user-granted-nothing-may-not-search-a-project](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [a-user-granted-nothing-may-not-search-a-project](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 역할 없이 프로젝트 검색을 하면, 스코프 권한 문이 막는다
 
@@ -1674,7 +1674,7 @@ Given
 
 When
 
-- UserAdapter.project_search — user-1이 research-1으로 조회
+- UserAdapter.project_search: user-1이 research-1으로 조회
 
 Then
 
@@ -1685,7 +1685,7 @@ Then
 
 <a id="searching-a-user-granted-on-the-role-scope-searching-by-role-finds-only-its-holders"></a>
 
-#### [a-user-granted-on-the-role-scope-searching-by-role-finds-only-its-holders](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [a-user-granted-on-the-role-scope-searching-by-role-finds-only-its-holders](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 역할이 걸린 스코프의 사용자 READ를 받은 사용자가 역할 하나를 주면, 그 역할을 배정받은 사용자만 온다
 
@@ -1713,7 +1713,7 @@ Given
 
 When
 
-- UserAdapter.role_search — user-3이 역할로 걸러 조회
+- UserAdapter.role_search: user-3이 역할로 걸러 조회
 
 Then
 
@@ -1725,7 +1725,7 @@ Then
 
 <a id="searching-the-superadmin-searching-by-role-finds-only-its-holders"></a>
 
-#### [the-superadmin-searching-by-role-finds-only-its-holders](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [the-superadmin-searching-by-role-finds-only-its-holders](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 전역 역할이 문인 역할 검색에서 슈퍼관리자가 역할 하나를 주면, 그 역할을 배정받은 사용자만 온다
 
@@ -1749,7 +1749,7 @@ Given
 
 When
 
-- UserAdapter.role_search — user-3이 역할로 걸러 조회
+- UserAdapter.role_search: user-3이 역할로 걸러 조회
 
 Then
 
@@ -1761,7 +1761,7 @@ Then
 
 <a id="searching-a-user-granted-nothing-may-not-search-by-role"></a>
 
-#### [a-user-granted-nothing-may-not-search-by-role](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [a-user-granted-nothing-may-not-search-by-role](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 아무 권한도 받지 않은 사용자가 역할로 훑으려 하면, 스코프 권한 문이 막는다
 
@@ -1785,7 +1785,7 @@ Given
 
 When
 
-- UserAdapter.role_search — user-3이 역할로 걸러 조회
+- UserAdapter.role_search: user-3이 역할로 걸러 조회
 
 Then
 
@@ -1796,7 +1796,7 @@ Then
 
 <a id="searching-a-scoped-search-over-two-granted-scopes-joins-their-users"></a>
 
-#### [a-scoped-search-over-two-granted-scopes-joins-their-users](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [a-scoped-search-over-two-granted-scopes-joins-their-users](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 도메인과 프로젝트 스코프 모두에서 READ를 받은 사용자가 두 스코프를 함께 주면, 두 스코프의 사용자가 중복 없이 합쳐진다
 
@@ -1825,7 +1825,7 @@ Given
 
 When
 
-- UserAdapter.scoped_search — user-2이 home-1과 research-1 두 스코프로 조회
+- UserAdapter.scoped_search: user-2이 home-1과 research-1 두 스코프로 조회
 
 Then
 
@@ -1837,7 +1837,7 @@ Then
 
 <a id="searching-a-scoped-search-without-page-arguments-answers-up-to-fifty"></a>
 
-#### [a-scoped-search-without-page-arguments-answers-up-to-fifty](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [a-scoped-search-without-page-arguments-answers-up-to-fifty](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 권한 받은 사용자가 페이지 인자 없이 스코프 검색을 하면, limit 50 offset 0이 답에 실린다
 
@@ -1857,7 +1857,7 @@ Given
 
 When
 
-- UserAdapter.scoped_search — user-1이 페이지 인자 없이 home-1 스코프로 조회
+- UserAdapter.scoped_search: user-1이 페이지 인자 없이 home-1 스코프로 조회
 
 Then
 
@@ -1869,7 +1869,7 @@ Then
 
 <a id="searching-one-scope-without-a-grant-refuses-the-whole-scoped-search"></a>
 
-#### [one-scope-without-a-grant-refuses-the-whole-scoped-search](/tests/scenario/bai_scenario/manager/user/test_searching.py) — pass
+#### [one-scope-without-a-grant-refuses-the-whole-scoped-search](/tests/scenario/bai_scenario/manager/user/test_searching.py): pass
 
 첫 스코프에만 READ를 받은 사용자가 두 스코프를 함께 주면, 스코프 권한 문이 전체를 막는다
 
@@ -1895,7 +1895,7 @@ Given
 
 When
 
-- UserAdapter.scoped_search — user-2이 home-1과 research-1 두 스코프로 조회
+- UserAdapter.scoped_search: user-2이 home-1과 research-1 두 스코프로 조회
 
 Then
 
@@ -1906,7 +1906,7 @@ Then
 
 <a id="own_keypairs-a-user-granted-read-searching-their-keys-sees-only-their-own"></a>
 
-#### [a-user-granted-read-searching-their-keys-sees-only-their-own](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [a-user-granted-read-searching-their-keys-sees-only-their-own](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 자기 스코프에서 READ를 받은 사용자가 자기 키를 훑으면, 다른 사용자의 키는 빠진다
 
@@ -1931,7 +1931,7 @@ Given
 
 When
 
-- UserAdapter.search_my_keypairs — user-1이 페이지 인자 없이 자기 키를 훑음
+- UserAdapter.search_my_keypairs: user-1이 페이지 인자 없이 자기 키를 훑음
 
 Then
 
@@ -1953,8 +1953,8 @@ Then
   - items[추가한 키].user_id: 키의 주인와 같다
   - items[추가한 키].created_at: 이 실행이 쓴 시각
   - items[추가한 키].modified_at: 이 실행이 쓴 시각
-  - items[기본 키].id: 무시함 — 시드가 매번 새로 만든 access key다
-  - items[기본 키].access_key: 무시함 — 시드가 매번 새로 만든다
+  - items[기본 키].id: 무시함: 시드가 매번 새로 만든 access key다
+  - items[기본 키].access_key: 무시함: 시드가 매번 새로 만든다
   - items[기본 키].is_active = True
   - items[기본 키].is_admin = False
   - items[기본 키].is_default = True
@@ -1969,7 +1969,7 @@ Then
 
 <a id="own_keypairs-searching-own-keys-without-page-arguments-answers-the-ten-newest"></a>
 
-#### [searching-own-keys-without-page-arguments-answers-the-ten-newest](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [searching-own-keys-without-page-arguments-answers-the-ten-newest](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 권한 받은 사용자가 페이지 인자 없이 훑으면, 생성 시각 내림차순 열 개와 다음 페이지 여부가 온다
 
@@ -1999,7 +1999,7 @@ Given
 
 When
 
-- UserAdapter.search_my_keypairs — user-1이 페이지 인자 없이 자기 키를 훑음
+- UserAdapter.search_my_keypairs: user-1이 페이지 인자 없이 자기 키를 훑음
 
 Then
 
@@ -2011,11 +2011,11 @@ Then
   - items(created_at, field_id): 생성 시각 내림차순, 같은 시각이면 field id 오름차순
   - items.user_id: 모두 부른 사람와 같다
   - items.created_at: 이 실행이 쓴 시각
-  - items의 나머지 자리: 무시함 — 순서와 개수를 보는 행이다. 키 노드 전체는 다른 행이 본다
+  - items의 나머지 자리: 무시함: 순서와 개수를 보는 행이다. 키 노드 전체는 다른 행이 본다
 
 <a id="own_keypairs-a-user-granted-nothing-may-not-search-their-own-keys"></a>
 
-#### [a-user-granted-nothing-may-not-search-their-own-keys](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [a-user-granted-nothing-may-not-search-their-own-keys](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 역할 없이 자기 키를 훑으려 하면, 스코프 권한 문이 막는다
 
@@ -2031,7 +2031,7 @@ Given
 
 When
 
-- UserAdapter.search_my_keypairs — user-1이 페이지 인자 없이 자기 키를 훑음
+- UserAdapter.search_my_keypairs: user-1이 페이지 인자 없이 자기 키를 훑음
 
 Then
 
@@ -2042,7 +2042,7 @@ Then
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-bulk-create-users](/tests/scenario/bai_scenario/manager/user/test_creating.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-bulk-create-users](/tests/scenario/bai_scenario/manager/user/test_creating.py): pass
 
 도메인 스코프에서 CREATE를 받은 사용자라도 일괄 생성을 하려 하면, 전역 역할 문이 막는다
 
@@ -2062,7 +2062,7 @@ Given
 
 When
 
-- UserAdapter.bulk_create_users — user-1이 home-1에 made을 일괄 생성
+- UserAdapter.bulk_create_users: user-1이 home-1에 made을 일괄 생성
 
 Then
 
@@ -2073,7 +2073,7 @@ Then
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs](/tests/scenario/bai_scenario/manager/user/test_creating.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-bulk-create-users-with-keypairs](/tests/scenario/bai_scenario/manager/user/test_creating.py): pass
 
 권한 받은 사용자가 이 일괄 생성을 하려 하면, 전역 역할 문이 막는다
 
@@ -2093,7 +2093,7 @@ Given
 
 When
 
-- UserAdapter.bulk_create_users_with_keypair — user-1이 home-1에 made을 일괄 생성
+- UserAdapter.bulk_create_users_with_keypair: user-1이 home-1에 made을 일괄 생성
 
 Then
 
@@ -2104,7 +2104,7 @@ Then
 
 <a id="retiring-a-bulk-edit-deletes-and-restores-per-item-and-refuses-a-deleted-user-edit"></a>
 
-#### [a-bulk-edit-deletes-and-restores-per-item-and-refuses-a-deleted-user-edit](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [a-bulk-edit-deletes-and-restores-per-item-and-refuses-a-deleted-user-edit](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 슈퍼관리자가 일괄 수정으로 활성 사용자에 DELETED, 삭제 상태 사용자에 ACTIVE, 다른 삭제 상태 사용자에 전체 이름을 주면, 둘은 물리고 되살린 뒤 수정 목록에, 하나는 실패로 담긴다
 
@@ -2130,14 +2130,14 @@ Given
 
 When
 
-- UserAdapter.bulk_update_users — user-4이 user-1에 DELETED, user-2에 ACTIVE, user-3에 전체 이름을 일괄 수정으로 줌
+- UserAdapter.bulk_update_users: user-4이 user-1에 DELETED, user-2에 ACTIVE, user-3에 전체 이름을 일괄 수정으로 줌
 
 Then
 
 - 물린 사용자와 되살린 사용자가 수정 목록에, 나머지 하나가 실패 목록에 온다
   - updated_users.id: DELETED와 ACTIVE를 준 사용자와 같다
   - failed.user_id: 삭제 상태에서 전체 이름만 고친 사용자와 같다
-  - failed.message: 무시함 — 예외 문장은 바뀌어도 되는 값이다
+  - failed.message: 무시함: 예외 문장은 바뀌어도 되는 값이다
   - updated_users[물린 사용자].id: 심은 사용자와 같다
   - updated_users[물린 사용자].basic_info.username = 'user-1'
   - updated_users[물린 사용자].basic_info.email = 'user-1@scenario.local'
@@ -2185,7 +2185,7 @@ Then
 
 <a id="editing-a-bulk-edit-whose-default-key-switch-fails-reports-that-user-as-failed"></a>
 
-#### [a-bulk-edit-whose-default-key-switch-fails-reports-that-user-as-failed](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+#### [a-bulk-edit-whose-default-key-switch-fails-reports-that-user-as-failed](/tests/scenario/bai_scenario/manager/user/test_editing.py): pass
 
 슈퍼관리자가 일괄 수정과 함께 남의 키로 기본 키 전환을 주면, 그 사용자는 수정 목록에서 빠지고 실패로 담긴다
 
@@ -2212,7 +2212,7 @@ Given
 
 When
 
-- UserAdapter.bulk_update_users — user-3이 user-1을 일괄 수정하며 user-2의 키로 기본 키를 옮김
+- UserAdapter.bulk_update_users: user-3이 user-1을 일괄 수정하며 user-2의 키로 기본 키를 옮김
 
 Then
 
@@ -2220,11 +2220,11 @@ Then
   - updated_users = []
   - failed.length = 1
   - failed[0].user_id: 기본 키를 옮기려던 사용자와 같다
-  - failed[0].message: 무시함 — 예외 메시지는 바뀌어도 되는 값이다
+  - failed[0].message: 무시함: 예외 메시지는 바뀌어도 되는 값이다
 
 <a id="editing-the-superadmin-bulk-edit-answers-the-updated-and-the-failed-apart"></a>
 
-#### [the-superadmin-bulk-edit-answers-the-updated-and-the-failed-apart](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+#### [the-superadmin-bulk-edit-answers-the-updated-and-the-failed-apart](/tests/scenario/bai_scenario/manager/user/test_editing.py): pass
 
 전역 역할이 문인 일괄 수정에서 슈퍼관리자가 있는 사용자와 이름이 겹치게 바꾸는 사용자를 함께 주면, 하나는 수정되고 하나는 사용자 id와 함께 실패로 담긴다
 
@@ -2252,7 +2252,7 @@ Given
 
 When
 
-- UserAdapter.bulk_update_users — user-4이 user-1의 전체 이름을 바꾸고 user-3의 이름을 user-2로 일괄 수정
+- UserAdapter.bulk_update_users: user-4이 user-1의 전체 이름을 바꾸고 user-3의 이름을 user-2로 일괄 수정
 
 Then
 
@@ -2282,11 +2282,11 @@ Then
   - updated_users[0].timestamps.created_at: 이 실행이 쓴 시각
   - updated_users[0].timestamps.modified_at: 이 실행이 쓴 시각
   - failed[0].user_id: 이름이 겹치게 바꾼 사용자와 같다
-  - failed[0].message: 무시함 — 예외 메시지는 바뀌어도 되는 값이다
+  - failed[0].message: 무시함: 예외 메시지는 바뀌어도 되는 값이다
 
 <a id="editing-a-user-who-is-not-the-superadmin-may-not-bulk-edit-users"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-bulk-edit-users](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-bulk-edit-users](/tests/scenario/bai_scenario/manager/user/test_editing.py): pass
 
 도메인 스코프에서 UPDATE를 받은 사용자라도 일괄 수정을 하려 하면, 전역 역할 문이 막는다
 
@@ -2318,7 +2318,7 @@ Given
 
 When
 
-- UserAdapter.bulk_update_users — user-4이 user-1의 전체 이름을 바꾸고 user-3의 이름을 user-2로 일괄 수정
+- UserAdapter.bulk_update_users: user-4이 user-1의 전체 이름을 바꾸고 user-3의 이름을 user-2로 일괄 수정
 
 Then
 
@@ -2329,7 +2329,7 @@ Then
 
 <a id="creating-a-user-granted-nothing-may-not-create-a-user"></a>
 
-#### [a-user-granted-nothing-may-not-create-a-user](/tests/scenario/bai_scenario/manager/user/test_creating.py) — pass
+#### [a-user-granted-nothing-may-not-create-a-user](/tests/scenario/bai_scenario/manager/user/test_creating.py): pass
 
 역할을 받지 않은 사용자가 만들려 하면, 도메인 스코프 권한 문이 막는다
 
@@ -2345,7 +2345,7 @@ Given
 
 When
 
-- UserAdapter.create_user — user-1이 home-1에 made을 만듦
+- UserAdapter.create_user: user-1이 home-1에 made을 만듦
 
 Then
 
@@ -2354,7 +2354,7 @@ Then
 
 <a id="creating-a-user-may-not-be-created-in-a-domain-name-nothing-answers-to"></a>
 
-#### [a-user-may-not-be-created-in-a-domain-name-nothing-answers-to](/tests/scenario/bai_scenario/manager/user/test_creating.py) — pass
+#### [a-user-may-not-be-created-in-a-domain-name-nothing-answers-to](/tests/scenario/bai_scenario/manager/user/test_creating.py): pass
 
 권한 받은 사용자가 없는 도메인 이름을 주면, 도메인 이름 조회 단계가 대상 없음으로 막는다
 
@@ -2374,7 +2374,7 @@ Given
 
 When
 
-- UserAdapter.create_user — user-1이 no-such-domain에 made을 만듦
+- UserAdapter.create_user: user-1이 no-such-domain에 made을 만듦
 
 Then
 
@@ -2385,7 +2385,7 @@ Then
 
 <a id="retiring-a-user-granted-soft-delete-marks-another-user-deleted"></a>
 
-#### [a-user-granted-soft-delete-marks-another-user-deleted](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [a-user-granted-soft-delete-marks-another-user-deleted](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 물리면, 성공이 오고 그 사용자 상태가 삭제로 바뀐다
 
@@ -2409,7 +2409,7 @@ Given
 
 When
 
-- UserAdapter.delete_user_by_id — user-2이 user-1을 물림 뒤 다시 읽음
+- UserAdapter.delete_user_by_id: user-2이 user-1을 물림 뒤 다시 읽음
 
 Then
 
@@ -2440,7 +2440,7 @@ Then
 
 <a id="retiring-a-user-granted-nothing-may-not-delete-another-user"></a>
 
-#### [a-user-granted-nothing-may-not-delete-another-user](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [a-user-granted-nothing-may-not-delete-another-user](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 역할 없이 물리려 하면, 엔티티 권한 문이 막는다
 
@@ -2459,7 +2459,7 @@ Given
 
 When
 
-- UserAdapter.delete_user_by_id — user-2이 user-1을 물림
+- UserAdapter.delete_user_by_id: user-2이 user-1을 물림
 
 Then
 
@@ -2470,7 +2470,7 @@ Then
 
 <a id="reading-a-user-granted-read-on-another-user-reads-their-whole-node"></a>
 
-#### [a-user-granted-read-on-another-user-reads-their-whole-node](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
+#### [a-user-granted-read-on-another-user-reads-their-whole-node](/tests/scenario/bai_scenario/manager/user/test_reading.py): pass
 
 대상 사용자 스코프에서 사용자 읽기 권한을 받은 사용자가 읽으면, 기본 키까지 채운 노드 전체가 답으로 온다
 
@@ -2493,7 +2493,7 @@ Given
 
 When
 
-- UserAdapter.get — user-2이 user-1을 읽음
+- UserAdapter.get: user-2이 user-1을 읽음
 
 Then
 
@@ -2523,7 +2523,7 @@ Then
 
 <a id="reading-a-user-granted-nothing-may-not-read-another-user"></a>
 
-#### [a-user-granted-nothing-may-not-read-another-user](/tests/scenario/bai_scenario/manager/user/test_reading.py) — pass
+#### [a-user-granted-nothing-may-not-read-another-user](/tests/scenario/bai_scenario/manager/user/test_reading.py): pass
 
 아무 역할도 받지 않은 사용자가 다른 사용자를 읽으려 하면, 엔티티 권한 문이 막는다
 
@@ -2542,7 +2542,7 @@ Given
 
 When
 
-- UserAdapter.get — user-2이 user-1을 읽음
+- UserAdapter.get: user-2이 user-1을 읽음
 
 Then
 
@@ -2553,7 +2553,7 @@ Then
 
 <a id="editing-a-user-granted-update-changing-only-the-full-name-leaves-the-rest"></a>
 
-#### [a-user-granted-update-changing-only-the-full-name-leaves-the-rest](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+#### [a-user-granted-update-changing-only-the-full-name-leaves-the-rest](/tests/scenario/bai_scenario/manager/user/test_editing.py): pass
 
 대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 전체 이름만 주면, 전체 이름만 바뀐 노드가 온다
 
@@ -2580,7 +2580,7 @@ Given
 
 When
 
-- UserAdapter.update_user_by_id — user-2이 user-1의 전체 이름을 renamed로 바꿈
+- UserAdapter.update_user_by_id: user-2이 user-1의 전체 이름을 renamed로 바꿈
 
 Then
 
@@ -2610,7 +2610,7 @@ Then
 
 <a id="retiring-an-edit-to-active-on-a-deleted-user-restores-the-user"></a>
 
-#### [an-edit-to-active-on-a-deleted-user-restores-the-user](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [an-edit-to-active-on-a-deleted-user-restores-the-user](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 삭제 상태 사용자에 수정으로 ACTIVE를 주면, 되살리기와 같이 활성이 된다
 
@@ -2635,7 +2635,7 @@ Given
 
 When
 
-- UserAdapter.update_user_by_id — user-2이 user-1의 상태에 ACTIVE를 줌
+- UserAdapter.update_user_by_id: user-2이 user-1의 상태에 ACTIVE를 줌
 
 Then
 
@@ -2665,7 +2665,7 @@ Then
 
 <a id="retiring-an-edit-to-deleted-soft-deletes-the-user"></a>
 
-#### [an-edit-to-deleted-soft-deletes-the-user](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [an-edit-to-deleted-soft-deletes-the-user](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 대상 사용자 스코프에서 SOFT_DELETE와 READ를 받은 사용자가 수정으로 DELETED를 주면, 물리기와 같이 삭제 상태가 된다
 
@@ -2689,7 +2689,7 @@ Given
 
 When
 
-- UserAdapter.update_user_by_id — user-2이 user-1의 상태에 DELETED를 줌
+- UserAdapter.update_user_by_id: user-2이 user-1의 상태에 DELETED를 줌
 
 Then
 
@@ -2719,7 +2719,7 @@ Then
 
 <a id="editing-another-users-new-password-leaves-the-password-change-requirement"></a>
 
-#### [another-users-new-password-leaves-the-password-change-requirement](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+#### [another-users-new-password-leaves-the-password-change-requirement](/tests/scenario/bai_scenario/manager/user/test_editing.py): pass
 
 대상 사용자 스코프에서 UPDATE와 READ를 받은 다른 사용자가 비밀번호 변경을 요구받는 사용자에게 새 비밀번호만 주면, 요구가 남은 노드가 온다
 
@@ -2746,7 +2746,7 @@ Given
 
 When
 
-- UserAdapter.update_user_by_id — user-2이 user-1의 비밀번호만 바꿈
+- UserAdapter.update_user_by_id: user-2이 user-1의 비밀번호만 바꿈
 
 Then
 
@@ -2776,7 +2776,7 @@ Then
 
 <a id="editing-naming-a-default-key-in-an-edit-moves-the-default-to-it"></a>
 
-#### [naming-a-default-key-in-an-edit-moves-the-default-to-it](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+#### [naming-a-default-key-in-an-edit-moves-the-default-to-it](/tests/scenario/bai_scenario/manager/user/test_editing.py): pass
 
 권한 받은 사용자가 대상 사용자의 다른 키를 기본 키로 주면, 수정이 반영된 뒤 기본 키가 옮겨간 노드가 온다
 
@@ -2805,7 +2805,7 @@ Given
 
 When
 
-- UserAdapter.update_user_by_id — user-2이 user-1의 추가한 키를 기본 키로 줌
+- UserAdapter.update_user_by_id: user-2이 user-1의 추가한 키를 기본 키로 줌
 
 Then
 
@@ -2835,7 +2835,7 @@ Then
 
 <a id="editing-null-project-ids-in-an-edit-leave-the-membership-as-it-is"></a>
 
-#### [null-project-ids-in-an-edit-leave-the-membership-as-it-is](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+#### [null-project-ids-in-an-edit-leave-the-membership-as-it-is](/tests/scenario/bai_scenario/manager/user/test_editing.py): pass
 
 권한 받은 사용자가 소속 프로젝트 자리에 빈 값을 주면, 소속을 건드리지 않고 나머지 수정만 반영된다
 
@@ -2864,7 +2864,7 @@ Given
 
 When
 
-- UserAdapter.update_user_by_id — user-2이 user-1의 소속 프로젝트에 빈 값을 주고, user-3이 team-1으로 훑음
+- UserAdapter.update_user_by_id: user-2이 user-1의 소속 프로젝트에 빈 값을 주고, user-3이 team-1으로 훑음
 
 Then
 
@@ -2898,7 +2898,7 @@ Then
 
 <a id="editing-setting-ones-own-new-password-lifts-the-password-change-requirement"></a>
 
-#### [setting-ones-own-new-password-lifts-the-password-change-requirement](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+#### [setting-ones-own-new-password-lifts-the-password-change-requirement](/tests/scenario/bai_scenario/manager/user/test_editing.py): pass
 
 비밀번호 변경을 요구받는 사용자가 자기 사용자 스코프에서 UPDATE와 READ를 받고, 새 비밀번호와 요구 해제를 함께 주면, 요구가 풀린 노드가 온다
 
@@ -2922,7 +2922,7 @@ Given
 
 When
 
-- UserAdapter.update_user_by_id — user-1이 자기 비밀번호를 바꾸며 비밀번호 변경 요구를 풂
+- UserAdapter.update_user_by_id: user-1이 자기 비밀번호를 바꾸며 비밀번호 변경 요구를 풂
 
 Then
 
@@ -2952,7 +2952,7 @@ Then
 
 <a id="editing-a-user-granted-nothing-may-not-edit-another-user"></a>
 
-#### [a-user-granted-nothing-may-not-edit-another-user](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-another-user](/tests/scenario/bai_scenario/manager/user/test_editing.py): pass
 
 역할을 받지 않은 사용자가 수정하려 하면, 엔티티 권한 문이 막는다
 
@@ -2974,7 +2974,7 @@ Given
 
 When
 
-- UserAdapter.update_user_by_id — user-2이 user-1의 전체 이름을 renamed로 바꿈
+- UserAdapter.update_user_by_id: user-2이 user-1의 전체 이름을 renamed로 바꿈
 
 Then
 
@@ -2983,7 +2983,7 @@ Then
 
 <a id="editing-a-username-another-user-holds-may-not-be-taken"></a>
 
-#### [a-username-another-user-holds-may-not-be-taken](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+#### [a-username-another-user-holds-may-not-be-taken](/tests/scenario/bai_scenario/manager/user/test_editing.py): pass
 
 권한 받은 사용자가 이미 쓰이는 사용자 이름을 주면, 입력 검증이 막는다
 
@@ -3012,7 +3012,7 @@ Given
 
 When
 
-- UserAdapter.update_user_by_id — user-3이 user-1의 이름을 user-2로 바꿈
+- UserAdapter.update_user_by_id: user-3이 user-1의 이름을 user-2로 바꿈
 
 Then
 
@@ -3021,7 +3021,7 @@ Then
 
 <a id="retiring-an-edit-of-another-field-on-a-deleted-user-is-refused"></a>
 
-#### [an-edit-of-another-field-on-a-deleted-user-is-refused](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [an-edit-of-another-field-on-a-deleted-user-is-refused](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 삭제 상태 사용자의 전체 이름을 고치면, 삭제된 사용자라 막힌다
 
@@ -3046,7 +3046,7 @@ Given
 
 When
 
-- UserAdapter.update_user_by_id — user-2이 user-1의 전체 이름을 바꿈
+- UserAdapter.update_user_by_id: user-2이 user-1의 전체 이름을 바꿈
 
 Then
 
@@ -3055,7 +3055,7 @@ Then
 
 <a id="retiring-an-edit-to-a-status-other-than-active-or-inactive-is-refused"></a>
 
-#### [an-edit-to-a-status-other-than-active-or-inactive-is-refused](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [an-edit-to-a-status-other-than-active-or-inactive-is-refused](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 대상 사용자 스코프에서 UPDATE와 READ를 받은 사용자가 수정으로 BEFORE_VERIFICATION을 주면, 입력 검증이 막는다
 
@@ -3079,7 +3079,7 @@ Given
 
 When
 
-- UserAdapter.update_user_by_id — user-2이 user-1의 상태에 BEFORE_VERIFICATION을 줌
+- UserAdapter.update_user_by_id: user-2이 user-1의 상태에 BEFORE_VERIFICATION을 줌
 
 Then
 
@@ -3088,7 +3088,7 @@ Then
 
 <a id="retiring-an-edit-to-deleted-is-refused-without-soft-delete"></a>
 
-#### [an-edit-to-deleted-is-refused-without-soft-delete](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [an-edit-to-deleted-is-refused-without-soft-delete](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 대상 사용자 스코프에서 UPDATE와 READ만 받은 사용자가 수정으로 DELETED를 주면, 물리기의 엔티티 권한 문이 막는다
 
@@ -3112,7 +3112,7 @@ Given
 
 When
 
-- UserAdapter.update_user_by_id — user-2이 user-1의 상태에 DELETED를 줌
+- UserAdapter.update_user_by_id: user-2이 user-1의 상태에 DELETED를 줌
 
 Then
 
@@ -3121,7 +3121,7 @@ Then
 
 <a id="retiring-an-edit-to-deleted-on-a-deleted-user-changes-nothing"></a>
 
-#### [an-edit-to-deleted-on-a-deleted-user-changes-nothing](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [an-edit-to-deleted-on-a-deleted-user-changes-nothing](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 삭제 상태 사용자에 수정으로 DELETED만 주면, 아무것도 바뀌지 않고 그 사용자가 온다
 
@@ -3146,7 +3146,7 @@ Given
 
 When
 
-- UserAdapter.update_user_by_id — user-2이 user-1의 상태에 DELETED를 줌
+- UserAdapter.update_user_by_id: user-2이 user-1의 상태에 DELETED를 줌
 
 Then
 
@@ -3157,7 +3157,7 @@ Then
 
 <a id="login_sessions-the-superadmin-revokes-another-users-login-session"></a>
 
-#### [the-superadmin-revokes-another-users-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+#### [the-superadmin-revokes-another-users-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
 
 전역 역할이 문인 관리자 회수에서 슈퍼관리자가 다른 사용자의 세션을 회수하면, 성공이 오고 세션 전체 검색에서 빠지며 관리자가 회수했다는 이력이 생긴다
 
@@ -3179,7 +3179,7 @@ Given
 
 When
 
-- LoginSessionAdapter.admin_revoke — user-2이 관리자 경로로 user-1의 세션을 회수
+- LoginSessionAdapter.admin_revoke: user-2이 관리자 경로로 user-1의 세션을 회수
 
 Then
 
@@ -3192,7 +3192,7 @@ Then
 
 <a id="login_sessions-a-user-who-is-not-the-superadmin-may-not-revoke-a-login-session-as-admin"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-revoke-a-login-session-as-admin](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-revoke-a-login-session-as-admin](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
 
 권한 받은 사용자가 관리자 회수를 하려 하면, 전역 역할 문이 막는다
 
@@ -3218,7 +3218,7 @@ Given
 
 When
 
-- LoginSessionAdapter.admin_revoke — user-2이 관리자 경로로 user-1의 세션을 회수
+- LoginSessionAdapter.admin_revoke: user-2이 관리자 경로로 user-1의 세션을 회수
 
 Then
 
@@ -3227,7 +3227,7 @@ Then
 
 <a id="login_sessions-even-the-superadmin-may-not-revoke-a-login-session-that-does-not-exist"></a>
 
-#### [even-the-superadmin-may-not-revoke-a-login-session-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+#### [even-the-superadmin-may-not-revoke-a-login-session-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
 
 슈퍼관리자가 없는 세션 id를 주면, 입력 검증이 막는다
 
@@ -3249,7 +3249,7 @@ Given
 
 When
 
-- LoginSessionAdapter.admin_revoke — user-2이 관리자 경로로 없는 세션을 회수
+- LoginSessionAdapter.admin_revoke: user-2이 관리자 경로로 없는 세션을 회수
 
 Then
 
@@ -3260,7 +3260,7 @@ Then
 
 <a id="login_sessions-the-superadmin-unblocks-a-user"></a>
 
-#### [the-superadmin-unblocks-a-user](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+#### [the-superadmin-unblocks-a-user](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
 
 전역 역할이 문인 차단 해제에서 슈퍼관리자가 사용자 이름을 주면, 성공이 오고 그 이름의 차단 기록이 사라진다
 
@@ -3282,7 +3282,7 @@ Given
 
 When
 
-- LoginSessionAdapter.admin_unblock_user — user-2이 user-1의 차단을 풂
+- LoginSessionAdapter.admin_unblock_user: user-2이 user-1의 차단을 풂
 
 Then
 
@@ -3291,7 +3291,7 @@ Then
 
 <a id="login_sessions-unblocking-a-username-nobody-holds-still-succeeds"></a>
 
-#### [unblocking-a-username-nobody-holds-still-succeeds](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+#### [unblocking-a-username-nobody-holds-still-succeeds](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
 
 슈퍼관리자가 어떤 사용자도 아닌 이름을 주면, 존재를 확인하지 않고 성공이 온다
 
@@ -3313,7 +3313,7 @@ Given
 
 When
 
-- LoginSessionAdapter.admin_unblock_user — user-2이 없는 이름의 차단을 풂
+- LoginSessionAdapter.admin_unblock_user: user-2이 없는 이름의 차단을 풂
 
 Then
 
@@ -3322,7 +3322,7 @@ Then
 
 <a id="login_sessions-a-user-who-is-not-the-superadmin-may-not-unblock-a-user"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-unblock-a-user](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-unblock-a-user](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
 
 권한 받은 사용자가 차단을 풀려 하면, 전역 역할 문이 막는다
 
@@ -3348,7 +3348,7 @@ Given
 
 When
 
-- LoginSessionAdapter.admin_unblock_user — user-2이 user-1의 차단을 풂
+- LoginSessionAdapter.admin_unblock_user: user-2이 user-1의 차단을 풂
 
 Then
 
@@ -3359,7 +3359,7 @@ Then
 
 <a id="login_sessions-a-user-granted-update-on-themselves-revokes-their-own-login-session"></a>
 
-#### [a-user-granted-update-on-themselves-revokes-their-own-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+#### [a-user-granted-update-on-themselves-revokes-their-own-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
 
 자기 스코프에서 READ와 UPDATE를 받은 사용자가 자기 세션을 회수하면, 성공이 오고 그 세션은 더 조회되지 않으며 사용자가 회수했다는 이력이 생긴다
 
@@ -3386,7 +3386,7 @@ Given
 
 When
 
-- LoginSessionAdapter.my_revoke — user-1이 자기 세션을 회수
+- LoginSessionAdapter.my_revoke: user-1이 자기 세션을 회수
 
 Then
 
@@ -3399,7 +3399,7 @@ Then
 
 <a id="login_sessions-a-user-granted-nothing-may-not-revoke-their-own-login-session"></a>
 
-#### [a-user-granted-nothing-may-not-revoke-their-own-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+#### [a-user-granted-nothing-may-not-revoke-their-own-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
 
 역할 없이 회수하려 하면, 소유자 조회 단계가 막는다
 
@@ -3421,7 +3421,7 @@ Given
 
 When
 
-- LoginSessionAdapter.my_revoke — user-1이 자기 세션을 회수
+- LoginSessionAdapter.my_revoke: user-1이 자기 세션을 회수
 
 Then
 
@@ -3430,7 +3430,7 @@ Then
 
 <a id="login_sessions-a-user-granted-only-on-themselves-may-not-revoke-another-users-login-session"></a>
 
-#### [a-user-granted-only-on-themselves-may-not-revoke-another-users-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+#### [a-user-granted-only-on-themselves-may-not-revoke-another-users-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
 
 자기 스코프에서만 READ와 UPDATE를 받은 사용자가 다른 사용자의 세션을 주면, 그 소유자에 대한 조회 단계가 막는다
 
@@ -3457,7 +3457,7 @@ Given
 
 When
 
-- LoginSessionAdapter.my_revoke — user-1이 user-2 세션을 회수
+- LoginSessionAdapter.my_revoke: user-1이 user-2 세션을 회수
 
 Then
 
@@ -3466,7 +3466,7 @@ Then
 
 <a id="login_sessions-a-user-granted-only-read-may-not-revoke-their-own-login-session"></a>
 
-#### [a-user-granted-only-read-may-not-revoke-their-own-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py) — pass
+#### [a-user-granted-only-read-may-not-revoke-their-own-login-session](/tests/scenario/bai_scenario/manager/user/test_login_sessions.py): pass
 
 READ만 받고 회수하려 하면, 엔티티 권한 문이 막는다
 
@@ -3492,7 +3492,7 @@ Given
 
 When
 
-- LoginSessionAdapter.my_revoke — user-1이 자기 세션을 회수
+- LoginSessionAdapter.my_revoke: user-1이 자기 세션을 회수
 
 Then
 
@@ -3503,7 +3503,7 @@ Then
 
 <a id="managing_keypairs-a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy"></a>
 
-#### [a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-user-granted-update-on-another-makes-them-a-key-of-the-given-policy](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 슈퍼관리자가 아니어도 대상 사용자 스코프에서 UPDATE를 받은 사용자가 정책을 주고 키를 만들면, 기본 아닌 새 키와 secret이 온다
 
@@ -3527,29 +3527,29 @@ Given
 
 When
 
-- UserAdapter.admin_create_keypair — user-2이 user-1에게 granted-policy-1으로 키를 만듦
+- UserAdapter.admin_create_keypair: user-2이 user-1에게 granted-policy-1으로 키를 만듦
 
 Then
 
 - 만든 키 전체와 secret이 온다
-  - id: 무시함 — 매니저가 만든 access key다
-  - access_key: 무시함 — 매니저가 만든다
+  - id: 무시함: 매니저가 만든 access key다
+  - access_key: 무시함: 매니저가 만든다
   - is_active = True
   - is_admin = False
   - is_default = False
   - rate_limit = 30000
   - resource_policy = 'granted-policy-1'
-  - ssh_public_key: 무시함 — 매니저가 만든 RSA 키다
+  - ssh_public_key: 무시함: 매니저가 만든 RSA 키다
   - num_queries = 0
   - last_used = None
   - user_id: 키의 주인와 같다
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
-  - secret_key: 무시함 — 매니저가 만든다
+  - secret_key: 무시함: 매니저가 만든다
 
 <a id="managing_keypairs-a-key-may-not-be-made-under-a-policy-that-does-not-exist"></a>
 
-#### [a-key-may-not-be-made-under-a-policy-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-key-may-not-be-made-under-a-policy-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막는다
 
@@ -3573,7 +3573,7 @@ Given
 
 When
 
-- UserAdapter.admin_create_keypair — user-2이 user-1에게 없는 정책으로 키를 만듦
+- UserAdapter.admin_create_keypair: user-2이 user-1에게 없는 정책으로 키를 만듦
 
 Then
 
@@ -3582,7 +3582,7 @@ Then
 
 <a id="managing_keypairs-a-user-granted-nothing-may-not-make-a-key-for-another"></a>
 
-#### [a-user-granted-nothing-may-not-make-a-key-for-another](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-user-granted-nothing-may-not-make-a-key-for-another](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 역할 없이 키를 만들려 하면, 엔티티 권한 문이 막는다
 
@@ -3602,7 +3602,7 @@ Given
 
 When
 
-- UserAdapter.admin_create_keypair — user-2이 user-1에게 granted-policy-1으로 키를 만듦
+- UserAdapter.admin_create_keypair: user-2이 user-1에게 granted-policy-1으로 키를 만듦
 
 Then
 
@@ -3613,7 +3613,7 @@ Then
 
 <a id="managing_keypairs-a-granted-user-deleting-another-users-extra-key-gets-its-access-key"></a>
 
-#### [a-granted-user-deleting-another-users-extra-key-gets-its-access-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-granted-user-deleting-another-users-extra-key-gets-its-access-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 대상 스코프에서 READ와 UPDATE를 받은 사용자가 지우면, 지운 키의 access key가 답으로 온다
 
@@ -3639,7 +3639,7 @@ Given
 
 When
 
-- UserAdapter.admin_delete_keypair — user-2이 user-1의 기본 아닌 키를 지움
+- UserAdapter.admin_delete_keypair: user-2이 user-1의 기본 아닌 키를 지움
 
 Then
 
@@ -3648,7 +3648,7 @@ Then
 
 <a id="managing_keypairs-a-user-granted-nothing-may-not-delete-another-users-key"></a>
 
-#### [a-user-granted-nothing-may-not-delete-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-user-granted-nothing-may-not-delete-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 역할 없이 지우려 하면, 소유자 조회 단계가 막는다
 
@@ -3669,7 +3669,7 @@ Given
 
 When
 
-- UserAdapter.admin_delete_keypair — user-2이 user-1의 기본 아닌 키를 지움
+- UserAdapter.admin_delete_keypair: user-2이 user-1의 기본 아닌 키를 지움
 
 Then
 
@@ -3678,7 +3678,7 @@ Then
 
 <a id="managing_keypairs-a-user-granted-only-read-may-not-delete-another-users-key"></a>
 
-#### [a-user-granted-only-read-may-not-delete-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-user-granted-only-read-may-not-delete-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 READ만 받고 지우려 하면, 엔티티 권한 문이 막는다
 
@@ -3703,7 +3703,7 @@ Given
 
 When
 
-- UserAdapter.admin_delete_keypair — user-2이 user-1의 기본 아닌 키를 지움
+- UserAdapter.admin_delete_keypair: user-2이 user-1의 기본 아닌 키를 지움
 
 Then
 
@@ -3712,7 +3712,7 @@ Then
 
 <a id="managing_keypairs-another-users-default-key-may-not-be-deleted"></a>
 
-#### [another-users-default-key-may-not-be-deleted](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [another-users-default-key-may-not-be-deleted](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 권한 받은 사용자가 대상의 기본 키를 지우려 하면, 입력 검증이 막는다
 
@@ -3740,7 +3740,7 @@ Given
 
 When
 
-- UserAdapter.admin_delete_keypair — user-2이 user-1의 기본 키를 지움
+- UserAdapter.admin_delete_keypair: user-2이 user-1의 기본 키를 지움
 
 Then
 
@@ -3751,7 +3751,7 @@ Then
 
 <a id="managing_keypairs-a-granted-user-clearing-another-users-ssh-key-empties-the-public-key"></a>
 
-#### [a-granted-user-clearing-another-users-ssh-key-empties-the-public-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-granted-user-clearing-another-users-ssh-key-empties-the-public-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 대상 스코프에서 READ와 UPDATE를 받은 사용자가 지우면, access key가 오고 공개키가 비워진다
 
@@ -3779,7 +3779,7 @@ Given
 
 When
 
-- UserAdapter.admin_delete_ssh_keypair — user-2이 user-1의 기본 키에서 SSH 키를 지우고 읽음
+- UserAdapter.admin_delete_ssh_keypair: user-2이 user-1의 기본 키에서 SSH 키를 지우고 읽음
 
 Then
 
@@ -3789,7 +3789,7 @@ Then
 
 <a id="managing_keypairs-a-user-granted-nothing-may-not-clear-another-users-ssh-key"></a>
 
-#### [a-user-granted-nothing-may-not-clear-another-users-ssh-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-user-granted-nothing-may-not-clear-another-users-ssh-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 역할 없이 지우려 하면, 소유자 조회 단계가 막는다
 
@@ -3812,7 +3812,7 @@ Given
 
 When
 
-- UserAdapter.admin_delete_ssh_keypair — user-2이 user-1의 기본 키에서 SSH 키를 지우고 읽음
+- UserAdapter.admin_delete_ssh_keypair: user-2이 user-1의 기본 키에서 SSH 키를 지우고 읽음
 
 Then
 
@@ -3821,7 +3821,7 @@ Then
 
 <a id="managing_keypairs-a-user-granted-only-read-may-not-clear-another-users-ssh-key"></a>
 
-#### [a-user-granted-only-read-may-not-clear-another-users-ssh-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-user-granted-only-read-may-not-clear-another-users-ssh-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 READ만 받고 지우려 하면, 엔티티 권한 문이 막는다
 
@@ -3848,7 +3848,7 @@ Given
 
 When
 
-- UserAdapter.admin_delete_ssh_keypair — user-2이 user-1의 기본 키에서 SSH 키를 지우고 읽음
+- UserAdapter.admin_delete_ssh_keypair: user-2이 user-1의 기본 키에서 SSH 키를 지우고 읽음
 
 Then
 
@@ -3859,7 +3859,7 @@ Then
 
 <a id="managing_keypairs-a-granted-user-reads-another-users-key-by-access-key"></a>
 
-#### [a-granted-user-reads-another-users-key-by-access-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-granted-user-reads-another-users-key-by-access-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 대상 스코프에서 READ를 받은 사용자가 읽으면, 그 키 노드 전체가 온다
 
@@ -3884,7 +3884,7 @@ Given
 
 When
 
-- UserAdapter.admin_get_keypair — user-2이 user-1의 키를 access key로 읽음
+- UserAdapter.admin_get_keypair: user-2이 user-1의 키를 access key로 읽음
 
 Then
 
@@ -3905,7 +3905,7 @@ Then
 
 <a id="managing_keypairs-a-user-granted-nothing-may-not-read-another-users-key"></a>
 
-#### [a-user-granted-nothing-may-not-read-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-user-granted-nothing-may-not-read-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 역할 없이 읽으려 하면, 소유자 조회 단계가 막는다
 
@@ -3926,7 +3926,7 @@ Given
 
 When
 
-- UserAdapter.admin_get_keypair — user-2이 user-1의 키를 access key로 읽음
+- UserAdapter.admin_get_keypair: user-2이 user-1의 키를 access key로 읽음
 
 Then
 
@@ -3937,7 +3937,7 @@ Then
 
 <a id="managing_keypairs-a-granted-user-reads-another-users-ssh-public-key-only"></a>
 
-#### [a-granted-user-reads-another-users-ssh-public-key-only](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-granted-user-reads-another-users-ssh-public-key-only](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 대상 스코프에서 READ를 받은 사용자가 읽으면, access key와 공개키만 오고 개인키는 오지 않는다
 
@@ -3964,7 +3964,7 @@ Given
 
 When
 
-- UserAdapter.admin_get_ssh_keypair — user-2이 user-1의 SSH 공개키를 읽음
+- UserAdapter.admin_get_ssh_keypair: user-2이 user-1의 SSH 공개키를 읽음
 
 Then
 
@@ -3974,7 +3974,7 @@ Then
 
 <a id="managing_keypairs-a-user-granted-nothing-may-not-read-another-users-ssh-public-key"></a>
 
-#### [a-user-granted-nothing-may-not-read-another-users-ssh-public-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-user-granted-nothing-may-not-read-another-users-ssh-public-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 역할 없이 읽으려 하면, 소유자 조회 단계가 막는다
 
@@ -3997,7 +3997,7 @@ Given
 
 When
 
-- UserAdapter.admin_get_ssh_keypair — user-2이 user-1의 SSH 공개키를 읽음
+- UserAdapter.admin_get_ssh_keypair: user-2이 user-1의 SSH 공개키를 읽음
 
 Then
 
@@ -4008,7 +4008,7 @@ Then
 
 <a id="managing_keypairs-a-granted-user-registering-another-users-ssh-key-gets-the-access-key"></a>
 
-#### [a-granted-user-registering-another-users-ssh-key-gets-the-access-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-granted-user-registering-another-users-ssh-key-gets-the-access-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 대상 스코프에서 READ와 UPDATE를 받은 사용자가 공개키와 개인키를 주면, 형식 검사 없이 덮어쓰고 access key가 답으로 온다
 
@@ -4036,7 +4036,7 @@ Given
 
 When
 
-- UserAdapter.admin_register_ssh_keypair — user-2이 user-1의 기본 키에 SSH 키를 등록하고 읽음
+- UserAdapter.admin_register_ssh_keypair: user-2이 user-1의 기본 키에 SSH 키를 등록하고 읽음
 
 Then
 
@@ -4046,7 +4046,7 @@ Then
 
 <a id="managing_keypairs-a-user-granted-nothing-may-not-register-another-users-ssh-key"></a>
 
-#### [a-user-granted-nothing-may-not-register-another-users-ssh-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-user-granted-nothing-may-not-register-another-users-ssh-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 역할 없이 등록하려 하면, 소유자 조회 단계가 막는다
 
@@ -4069,7 +4069,7 @@ Given
 
 When
 
-- UserAdapter.admin_register_ssh_keypair — user-2이 user-1의 기본 키에 SSH 키를 등록하고 읽음
+- UserAdapter.admin_register_ssh_keypair: user-2이 user-1의 기본 키에 SSH 키를 등록하고 읽음
 
 Then
 
@@ -4078,7 +4078,7 @@ Then
 
 <a id="managing_keypairs-a-user-granted-only-read-may-not-register-another-users-ssh-key"></a>
 
-#### [a-user-granted-only-read-may-not-register-another-users-ssh-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-user-granted-only-read-may-not-register-another-users-ssh-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 READ만 받고 등록하려 하면, 엔티티 권한 문이 막는다
 
@@ -4105,7 +4105,7 @@ Given
 
 When
 
-- UserAdapter.admin_register_ssh_keypair — user-2이 user-1의 기본 키에 SSH 키를 등록하고 읽음
+- UserAdapter.admin_register_ssh_keypair: user-2이 user-1의 기본 키에 SSH 키를 등록하고 읽음
 
 Then
 
@@ -4116,7 +4116,7 @@ Then
 
 <a id="managing_keypairs-a-granted-user-changing-another-users-rate-limit-changes-only-that"></a>
 
-#### [a-granted-user-changing-another-users-rate-limit-changes-only-that](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-granted-user-changing-another-users-rate-limit-changes-only-that](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 대상 스코프에서 READ와 UPDATE를 받은 사용자가 요청 한도만 주면, 나머지는 그대로이고 한도만 바뀐 키 노드가 온다
 
@@ -4142,7 +4142,7 @@ Given
 
 When
 
-- UserAdapter.admin_update_keypair — user-2이 user-1의 키에 요청 한도를 줌
+- UserAdapter.admin_update_keypair: user-2이 user-1의 키에 요청 한도를 줌
 
 Then
 
@@ -4163,7 +4163,7 @@ Then
 
 <a id="managing_keypairs-a-user-granted-nothing-may-not-change-another-users-key"></a>
 
-#### [a-user-granted-nothing-may-not-change-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-user-granted-nothing-may-not-change-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 역할 없이 바꾸려 하면, 소유자 조회 단계가 막는다
 
@@ -4184,7 +4184,7 @@ Given
 
 When
 
-- UserAdapter.admin_update_keypair — user-2이 user-1의 키에 요청 한도를 줌
+- UserAdapter.admin_update_keypair: user-2이 user-1의 키에 요청 한도를 줌
 
 Then
 
@@ -4193,7 +4193,7 @@ Then
 
 <a id="managing_keypairs-a-user-granted-only-read-may-not-change-another-users-key"></a>
 
-#### [a-user-granted-only-read-may-not-change-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [a-user-granted-only-read-may-not-change-another-users-key](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 READ만 받고 바꾸려 하면, 엔티티 권한 문이 막는다
 
@@ -4218,7 +4218,7 @@ Given
 
 When
 
-- UserAdapter.admin_update_keypair — user-2이 user-1의 키에 요청 한도를 줌
+- UserAdapter.admin_update_keypair: user-2이 user-1의 키에 요청 한도를 줌
 
 Then
 
@@ -4227,7 +4227,7 @@ Then
 
 <a id="managing_keypairs-another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist"></a>
 
-#### [another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py) — pass
+#### [another-users-key-may-not-be-moved-to-a-policy-that-does-not-exist](/tests/scenario/bai_scenario/manager/user/test_managing_keypairs.py): pass
 
 권한 받은 사용자가 없는 정책 이름을 주면, 입력 검증이 막는다
 
@@ -4253,7 +4253,7 @@ Given
 
 When
 
-- UserAdapter.admin_update_keypair — user-2이 user-1의 키에 요청 한도와 없는 정책를 줌
+- UserAdapter.admin_update_keypair: user-2이 user-1의 키에 요청 한도와 없는 정책를 줌
 
 Then
 
@@ -4264,7 +4264,7 @@ Then
 
 <a id="retiring-a-bulk-purge-records-a-missing-id-as-a-failure"></a>
 
-#### [a-bulk-purge-records-a-missing-id-as-a-failure](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [a-bulk-purge-records-a-missing-id-as-a-failure](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 슈퍼관리자가 있는 사용자와 없는 id를 함께 주면, 하나는 지워지고 없는 id는 실패로 담긴다
 
@@ -4283,7 +4283,7 @@ Given
 
 When
 
-- UserAdapter.bulk_purge_users — user-2이 user-1와 없는 id를 일괄로 지움
+- UserAdapter.bulk_purge_users: user-2이 user-1와 없는 id를 일괄로 지움
 
 Then
 
@@ -4291,11 +4291,11 @@ Then
   - successes: 심은 사용자 전부와 같다
   - purged_count = 1
   - failed.user_id: 없는 id와 같다
-  - failed.message: 무시함 — 예외 문장은 바뀌어도 되는 값이다
+  - failed.message: 무시함: 예외 문장은 바뀌어도 되는 값이다
 
 <a id="retiring-the-superadmin-bulk-purge-answers-the-purged-ids-and-count"></a>
 
-#### [the-superadmin-bulk-purge-answers-the-purged-ids-and-count](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [the-superadmin-bulk-purge-answers-the-purged-ids-and-count](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 전역 역할이 문인 일괄 지우기에서 슈퍼관리자가 사용자 둘을 주면, 두 id와 개수 둘이 온다
 
@@ -4317,7 +4317,7 @@ Given
 
 When
 
-- UserAdapter.bulk_purge_users — user-3이 user-1, user-2를 일괄로 지움
+- UserAdapter.bulk_purge_users: user-3이 user-1, user-2를 일괄로 지움
 
 Then
 
@@ -4328,7 +4328,7 @@ Then
 
 <a id="retiring-a-user-who-is-not-the-superadmin-may-not-purge-in-bulk"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-purge-in-bulk](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-purge-in-bulk](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 도메인 스코프에서 HARD_DELETE를 받은 사용자라도 일괄 지우기를 하려 하면, 전역 역할 문이 막는다
 
@@ -4351,7 +4351,7 @@ Given
 
 When
 
-- UserAdapter.bulk_purge_users — user-2이 user-1를 일괄로 지움
+- UserAdapter.bulk_purge_users: user-2이 user-1를 일괄로 지움
 
 Then
 
@@ -4362,7 +4362,7 @@ Then
 
 <a id="own_keypairs-a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key"></a>
 
-#### [a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [a-user-granted-update-on-themself-issues-a-key-that-follows-their-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 자기 사용자 스코프에서 UPDATE를 받은 사용자가 발급하면, 기본 키의 관리자 표시, 정책, 요청 한도를 따르고 기본 표시는 없는 키와 secret이 온다
 
@@ -4382,29 +4382,29 @@ Given
 
 When
 
-- UserAdapter.issue_my_keypair — user-1이 자기 키를 발급
+- UserAdapter.issue_my_keypair: user-1이 자기 키를 발급
 
 Then
 
 - 기본 키를 따르는 기본 아닌 새 키와 secret이 온다
-  - id: 무시함 — 매니저가 만든 access key다
-  - access_key: 무시함 — 매니저가 만든다
+  - id: 무시함: 매니저가 만든 access key다
+  - access_key: 무시함: 매니저가 만든다
   - is_active = True
   - is_admin = False
   - is_default = False
   - rate_limit = 10000
   - resource_policy = 'keypair-policy-1'
-  - ssh_public_key: 무시함 — 매니저가 만든 RSA 키다
+  - ssh_public_key: 무시함: 매니저가 만든 RSA 키다
   - num_queries = 0
   - last_used = None
   - user_id: 키의 주인와 같다
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
-  - secret_key: 무시함 — 매번 새로 만든다
+  - secret_key: 무시함: 매번 새로 만든다
 
 <a id="own_keypairs-an-issued-key-made-default-lets-the-original-default-key-be-revoked"></a>
 
-#### [an-issued-key-made-default-lets-the-original-default-key-be-revoked](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [an-issued-key-made-default-lets-the-original-default-key-be-revoked](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 권한 받은 사용자가 키를 발급하고 그 키로 기본 키를 옮긴 다음 원래 기본 키를 회수하면, 세 호출이 차례로 통과하고 발급한 키 하나만 남는다
 
@@ -4425,25 +4425,25 @@ Given
 
 When
 
-- UserAdapter.issue_my_keypair — user-1이 자기 키 검색으로 기본 키를 찾고, 키를 발급해 그 키로 기본 키를 옮긴 다음 원래 기본 키를 회수하고 자기 키를 다시 훑음
+- UserAdapter.issue_my_keypair: user-1이 자기 키 검색으로 기본 키를 찾고, 키를 발급해 그 키로 기본 키를 옮긴 다음 원래 기본 키를 회수하고 자기 키를 다시 훑음
 
 Then
 
 - 세 호출이 통과하고 발급한 키 하나만 남는다
-  - issued.id: 무시함 — 매니저가 만든 access key다
-  - issued.access_key: 무시함 — 매니저가 만든다
+  - issued.id: 무시함: 매니저가 만든 access key다
+  - issued.access_key: 무시함: 매니저가 만든다
   - issued.is_active = True
   - issued.is_admin = False
   - issued.is_default = False
   - issued.rate_limit = 10000
   - issued.resource_policy = 'keypair-policy-1'
-  - issued.ssh_public_key: 무시함 — 매니저가 만든 RSA 키다
+  - issued.ssh_public_key: 무시함: 매니저가 만든 RSA 키다
   - issued.num_queries = 0
   - issued.last_used = None
   - issued.user_id: 키의 주인와 같다
   - issued.created_at: 이 실행이 쓴 시각
   - issued.modified_at: 이 실행이 쓴 시각
-  - issued.secret_key: 무시함 — 매번 새로 만든다
+  - issued.secret_key: 무시함: 매번 새로 만든다
   - switched = True
   - revoked = True
   - after.total_count = 1
@@ -4455,7 +4455,7 @@ Then
   - after.items[0].is_default = True
   - after.items[0].rate_limit = 10000
   - after.items[0].resource_policy = 'keypair-policy-1'
-  - after.items[0].ssh_public_key: 무시함 — 매니저가 만든 RSA 키다
+  - after.items[0].ssh_public_key: 무시함: 매니저가 만든 RSA 키다
   - after.items[0].num_queries = 0
   - after.items[0].last_used = None
   - after.items[0].user_id: 키의 주인와 같다
@@ -4464,7 +4464,7 @@ Then
 
 <a id="own_keypairs-a-user-granted-nothing-may-not-issue-their-own-key"></a>
 
-#### [a-user-granted-nothing-may-not-issue-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [a-user-granted-nothing-may-not-issue-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 역할을 받지 않은 사용자가 자기 키를 발급하려 하면, 본인이어도 엔티티 권한 문이 막는다
 
@@ -4480,7 +4480,7 @@ Given
 
 When
 
-- UserAdapter.issue_my_keypair — user-1이 자기 키를 발급
+- UserAdapter.issue_my_keypair: user-1이 자기 키를 발급
 
 Then
 
@@ -4491,7 +4491,7 @@ Then
 
 <a id="retiring-a-user-granted-hard-delete-purges-a-user-with-no-folders-or-sessions"></a>
 
-#### [a-user-granted-hard-delete-purges-a-user-with-no-folders-or-sessions](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [a-user-granted-hard-delete-purges-a-user-with-no-folders-or-sessions](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 대상 사용자 스코프에서 HARD_DELETE를 받은 사용자가 물리지 않은 사용자를 지워도, 성공이 오고 그 사용자를 더 찾을 수 없다
 
@@ -4517,17 +4517,17 @@ Given
 
 When
 
-- UserAdapter.purge_user_by_id — user-2이 자기에게 넘기며 user-1을 지움, 뒤이어 user-3이 일괄 읽음
+- UserAdapter.purge_user_by_id: user-2이 자기에게 넘기며 user-1을 지움, 뒤이어 user-3이 일괄 읽음
 
 Then
 
 - 성공이 오고, 그 사용자를 더 찾을 수 없다
   - success = True
-  - 뒤이은 일괄 읽기: 무시함 — 없는 id에 superadmin이 받는 답은 아직 정해지지 않았다
+  - 뒤이은 일괄 읽기: 무시함: 없는 id에 superadmin이 받는 답은 아직 정해지지 않았다
 
 <a id="retiring-a-user-granted-nothing-may-not-purge-another-user"></a>
 
-#### [a-user-granted-nothing-may-not-purge-another-user](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [a-user-granted-nothing-may-not-purge-another-user](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 역할 없이 지우려 하면, 엔티티 권한 문이 막는다
 
@@ -4546,7 +4546,7 @@ Given
 
 When
 
-- UserAdapter.purge_user_by_id — user-2이 자기에게 넘기며 user-1을 지움
+- UserAdapter.purge_user_by_id: user-2이 자기에게 넘기며 user-1을 지움
 
 Then
 
@@ -4555,7 +4555,7 @@ Then
 
 <a id="retiring-purging-a-user-to-an-admin-who-does-not-exist-is-refused"></a>
 
-#### [purging-a-user-to-an-admin-who-does-not-exist-is-refused](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [purging-a-user-to-an-admin-who-does-not-exist-is-refused](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 권한 받은 사용자가 넘겨받을 관리자로 없는 id를 주면, 입력 검증이 막는다
 
@@ -4578,7 +4578,7 @@ Given
 
 When
 
-- UserAdapter.purge_user_by_id — user-2이 없는 관리자 id에게 넘기며 user-1을 지움
+- UserAdapter.purge_user_by_id: user-2이 없는 관리자 id에게 넘기며 user-1을 지움
 
 Then
 
@@ -4589,7 +4589,7 @@ Then
 
 <a id="retiring-a-user-granted-soft-delete-restores-a-deleted-user-to-active"></a>
 
-#### [a-user-granted-soft-delete-restores-a-deleted-user-to-active](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [a-user-granted-soft-delete-restores-a-deleted-user-to-active](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 대상 사용자 스코프에서 SOFT_DELETE를 받은 사용자가 삭제 상태 사용자를 되살리면, 성공이 오고 상태가 활성으로 바뀐다
 
@@ -4614,7 +4614,7 @@ Given
 
 When
 
-- UserAdapter.restore_user_by_id — user-2이 user-1을 되살림 뒤 다시 읽음
+- UserAdapter.restore_user_by_id: user-2이 user-1을 되살림 뒤 다시 읽음
 
 Then
 
@@ -4645,7 +4645,7 @@ Then
 
 <a id="retiring-a-user-granted-nothing-may-not-restore-another-user"></a>
 
-#### [a-user-granted-nothing-may-not-restore-another-user](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [a-user-granted-nothing-may-not-restore-another-user](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 역할 없이 되살리려 하면, 엔티티 권한 문이 막는다
 
@@ -4665,7 +4665,7 @@ Given
 
 When
 
-- UserAdapter.restore_user_by_id — user-2이 user-1을 되살림
+- UserAdapter.restore_user_by_id: user-2이 user-1을 되살림
 
 Then
 
@@ -4674,7 +4674,7 @@ Then
 
 <a id="retiring-restoring-a-user-who-was-not-deleted-is-refused"></a>
 
-#### [restoring-a-user-who-was-not-deleted-is-refused](/tests/scenario/bai_scenario/manager/user/test_retiring.py) — pass
+#### [restoring-a-user-who-was-not-deleted-is-refused](/tests/scenario/bai_scenario/manager/user/test_retiring.py): pass
 
 권한 받은 사용자가 물리지 않은 비활성 사용자를 되살리려 하면, 삭제 상태가 아니라 막힌다
 
@@ -4699,7 +4699,7 @@ Given
 
 When
 
-- UserAdapter.restore_user_by_id — user-2이 user-1을 되살림
+- UserAdapter.restore_user_by_id: user-2이 user-1을 되살림
 
 Then
 
@@ -4710,7 +4710,7 @@ Then
 
 <a id="own_keypairs-a-user-granted-read-and-update-revokes-a-non-default-key"></a>
 
-#### [a-user-granted-read-and-update-revokes-a-non-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [a-user-granted-read-and-update-revokes-a-non-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 권한 받은 사용자가 자기의 기본 아닌 키를 회수하면, 성공이 오고 자기 키 검색에서 그 키가 빠진다
 
@@ -4732,7 +4732,7 @@ Given
 
 When
 
-- UserAdapter.revoke_my_keypair — user-1이 기본 아닌 자기 키를 회수하고 자기 키를 다시 훑음
+- UserAdapter.revoke_my_keypair: user-1이 기본 아닌 자기 키를 회수하고 자기 키를 다시 훑음
 
 Then
 
@@ -4742,8 +4742,8 @@ Then
   - after.has_next_page = False
   - after.has_previous_page = False
   - after.items.length = 1
-  - after.items[0].id: 무시함 — 시드가 매번 새로 만든 access key다
-  - after.items[0].access_key: 무시함 — 시드가 매번 새로 만든다
+  - after.items[0].id: 무시함: 시드가 매번 새로 만든 access key다
+  - after.items[0].access_key: 무시함: 시드가 매번 새로 만든다
   - after.items[0].is_active = True
   - after.items[0].is_admin = False
   - after.items[0].is_default = True
@@ -4758,7 +4758,7 @@ Then
 
 <a id="own_keypairs-a-user-granted-nothing-may-not-revoke-their-own-key"></a>
 
-#### [a-user-granted-nothing-may-not-revoke-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [a-user-granted-nothing-may-not-revoke-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 역할을 받지 않은 사용자가 회수하려 하면, 소유자 조회 단계가 없는 키와 같은 예외로 막는다
 
@@ -4775,7 +4775,7 @@ Given
 
 When
 
-- UserAdapter.revoke_my_keypair — user-1이 기본 아닌 자기 키를 회수하고 자기 키를 다시 훑음
+- UserAdapter.revoke_my_keypair: user-1이 기본 아닌 자기 키를 회수하고 자기 키를 다시 훑음
 
 Then
 
@@ -4784,7 +4784,7 @@ Then
 
 <a id="own_keypairs-a-user-granted-only-read-may-not-revoke-their-own-key"></a>
 
-#### [a-user-granted-only-read-may-not-revoke-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [a-user-granted-only-read-may-not-revoke-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 자기 스코프에서 READ만 받은 사용자가 회수하려 하면, 소유자 조회는 지나고 엔티티 권한 문이 막는다
 
@@ -4805,7 +4805,7 @@ Given
 
 When
 
-- UserAdapter.revoke_my_keypair — user-1이 기본 아닌 자기 키를 회수하고 자기 키를 다시 훑음
+- UserAdapter.revoke_my_keypair: user-1이 기본 아닌 자기 키를 회수하고 자기 키를 다시 훑음
 
 Then
 
@@ -4814,7 +4814,7 @@ Then
 
 <a id="own_keypairs-an-access-key-nobody-holds-may-not-be-revoked"></a>
 
-#### [an-access-key-nobody-holds-may-not-be-revoked](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [an-access-key-nobody-holds-may-not-be-revoked](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 권한 받은 사용자가 어떤 키도 아닌 값을 주면, 소유자 조회 단계가 권한 없음과 같은 예외로 막는다
 
@@ -4835,7 +4835,7 @@ Given
 
 When
 
-- UserAdapter.revoke_my_keypair — user-1이 어떤 키도 아닌 값으로 회수
+- UserAdapter.revoke_my_keypair: user-1이 어떤 키도 아닌 값으로 회수
 
 Then
 
@@ -4844,7 +4844,7 @@ Then
 
 <a id="own_keypairs-the-default-key-may-not-be-revoked"></a>
 
-#### [the-default-key-may-not-be-revoked](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [the-default-key-may-not-be-revoked](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 권한 받은 사용자가 자기 기본 키를 회수하려 하면, 입력 검증이 막는다
 
@@ -4865,7 +4865,7 @@ Given
 
 When
 
-- UserAdapter.revoke_my_keypair — user-1이 자기 키 검색으로 기본 키를 찾아 그 키를 회수
+- UserAdapter.revoke_my_keypair: user-1이 자기 키 검색으로 기본 키를 찾아 그 키를 회수
 
 Then
 
@@ -4876,7 +4876,7 @@ Then
 
 <a id="own_keypairs-a-user-granted-read-and-update-moves-their-default-key"></a>
 
-#### [a-user-granted-read-and-update-moves-their-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [a-user-granted-read-and-update-moves-their-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 자기 스코프에서 UPDATE를 받은 사용자가 기본 아닌 활성 키로 기본 키를 옮기면, 성공이 오고 사용자 노드의 기본 키가 그 키가 된다
 
@@ -4898,7 +4898,7 @@ Given
 
 When
 
-- UserAdapter.switch_default_access_key — user-1이 기본 아닌 자기 키로 기본 키를 옮기고 자기 사용자를 다시 읽음
+- UserAdapter.switch_default_access_key: user-1이 기본 아닌 자기 키로 기본 키를 옮기고 자기 사용자를 다시 읽음
 
 Then
 
@@ -4929,7 +4929,7 @@ Then
 
 <a id="own_keypairs-a-user-granted-nothing-may-not-move-their-default-key"></a>
 
-#### [a-user-granted-nothing-may-not-move-their-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [a-user-granted-nothing-may-not-move-their-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 역할 없이 기본 키를 옮기려 하면, 엔티티 권한 문이 막는다
 
@@ -4946,7 +4946,7 @@ Given
 
 When
 
-- UserAdapter.switch_default_access_key — user-1이 기본 아닌 자기 키로 기본 키를 옮김
+- UserAdapter.switch_default_access_key: user-1이 기본 아닌 자기 키로 기본 키를 옮김
 
 Then
 
@@ -4955,7 +4955,7 @@ Then
 
 <a id="own_keypairs-someone-elses-key-may-not-become-the-default-key"></a>
 
-#### [someone-elses-key-may-not-become-the-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [someone-elses-key-may-not-become-the-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 권한 받은 사용자가 다른 사용자의 키를 주면, 입력 검증이 막는다
 
@@ -4979,7 +4979,7 @@ Given
 
 When
 
-- UserAdapter.switch_default_access_key — user-1이 다른 사용자의 키로 기본 키를 옮김
+- UserAdapter.switch_default_access_key: user-1이 다른 사용자의 키로 기본 키를 옮김
 
 Then
 
@@ -4990,7 +4990,7 @@ Then
 
 <a id="own_keypairs-a-user-granted-read-and-update-turns-off-a-non-default-key"></a>
 
-#### [a-user-granted-read-and-update-turns-off-a-non-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [a-user-granted-read-and-update-turns-off-a-non-default-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 자기 스코프에서 READ와 UPDATE를 받은 사용자가 기본 아닌 키를 비활성으로 바꾸면, 활성만 바뀐 키 노드가 온다
 
@@ -5012,7 +5012,7 @@ Given
 
 When
 
-- UserAdapter.update_my_keypair — user-1이 기본 아닌 자기 키를 비활성으로 바꿈
+- UserAdapter.update_my_keypair: user-1이 기본 아닌 자기 키를 비활성으로 바꿈
 
 Then
 
@@ -5033,7 +5033,7 @@ Then
 
 <a id="own_keypairs-a-user-granted-nothing-may-not-turn-off-their-own-key"></a>
 
-#### [a-user-granted-nothing-may-not-turn-off-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [a-user-granted-nothing-may-not-turn-off-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 역할 없이 키를 끄려 하면, 소유자 조회 단계가 막는다
 
@@ -5050,7 +5050,7 @@ Given
 
 When
 
-- UserAdapter.update_my_keypair — user-1이 기본 아닌 자기 키를 비활성으로 바꿈
+- UserAdapter.update_my_keypair: user-1이 기본 아닌 자기 키를 비활성으로 바꿈
 
 Then
 
@@ -5059,7 +5059,7 @@ Then
 
 <a id="own_keypairs-a-user-granted-only-read-may-not-turn-off-their-own-key"></a>
 
-#### [a-user-granted-only-read-may-not-turn-off-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [a-user-granted-only-read-may-not-turn-off-their-own-key](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 READ만 받고 키를 끄려 하면, 엔티티 권한 문이 막는다
 
@@ -5080,7 +5080,7 @@ Given
 
 When
 
-- UserAdapter.update_my_keypair — user-1이 기본 아닌 자기 키를 비활성으로 바꿈
+- UserAdapter.update_my_keypair: user-1이 기본 아닌 자기 키를 비활성으로 바꿈
 
 Then
 
@@ -5089,7 +5089,7 @@ Then
 
 <a id="own_keypairs-the-default-key-may-not-be-turned-off"></a>
 
-#### [the-default-key-may-not-be-turned-off](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py) — pass
+#### [the-default-key-may-not-be-turned-off](/tests/scenario/bai_scenario/manager/user/test_own_keypairs.py): pass
 
 권한 받은 사용자가 자기 기본 키를 비활성으로 바꾸려 하면, 입력 검증이 막는다
 
@@ -5110,7 +5110,7 @@ Given
 
 When
 
-- UserAdapter.update_my_keypair — user-1이 자기 키 검색으로 기본 키를 찾아 비활성으로 바꿈
+- UserAdapter.update_my_keypair: user-1이 자기 키 검색으로 기본 키를 찾아 비활성으로 바꿈
 
 Then
 
@@ -5121,7 +5121,7 @@ Then
 
 <a id="editing-a-user-granted-update-changes-the-allowed-client-ip"></a>
 
-#### [a-user-granted-update-changes-the-allowed-client-ip](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+#### [a-user-granted-update-changes-the-allowed-client-ip](/tests/scenario/bai_scenario/manager/user/test_editing.py): pass
 
 대상 사용자 스코프에서 UPDATE를 받은 사용자가 허용 IP만 담은 수정을 보내면, 성공 표시가 오고 그 사용자의 허용 IP가 바뀐다
 
@@ -5147,7 +5147,7 @@ Given
 
 When
 
-- UserAdapter.update_user — user-2이 user-1의 허용 IP를 바꾸고, user-3이 다시 읽음
+- UserAdapter.update_user: user-2이 user-1의 허용 IP를 바꾸고, user-3이 다시 읽음
 
 Then
 
@@ -5178,7 +5178,7 @@ Then
 
 <a id="editing-a-user-granted-nothing-may-not-change-the-allowed-client-ip"></a>
 
-#### [a-user-granted-nothing-may-not-change-the-allowed-client-ip](/tests/scenario/bai_scenario/manager/user/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-change-the-allowed-client-ip](/tests/scenario/bai_scenario/manager/user/test_editing.py): pass
 
 역할 없이 허용 IP 수정을 보내면, 엔티티 권한 문이 막는다
 
@@ -5200,7 +5200,7 @@ Given
 
 When
 
-- UserAdapter.update_user — user-2이 user-1의 허용 IP를 바꾸고, user-3이 다시 읽음
+- UserAdapter.update_user: user-2이 user-1의 허용 IP를 바꾸고, user-3이 다시 읽음
 
 Then
 

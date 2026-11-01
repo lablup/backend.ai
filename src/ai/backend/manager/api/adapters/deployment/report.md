@@ -1,73 +1,73 @@
 ## deployment
 
-[what it guarantees](/src/ai/backend/manager/api/adapters/deployment/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/deployment/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/deployment/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/deployment/adapter.py)
 
 Scenario: incomplete 33 / 47
 
 - built from ops (22)
-  - admin_search — representative success ✓ · representative refusal ✓
-  - admin_search_replicas — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - admin_search_revisions — representative success ✓ · representative refusal ✓
-  - batch_load_access_tokens_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - batch_load_auto_scaling_rules_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - batch_load_policies_by_endpoint_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - batch_load_policies_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - batch_load_replicas_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - batch_load_revisions_by_ids — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
-  - batch_load_routes_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - get_access_token — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - get_replica — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - get_revision — representative success ✓ · representative refusal ✓
-  - project_search — representative success ✓ · representative refusal ✓
-  - scoped_search — representative success ✓ · representative refusal ✓
-  - search_access_tokens — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - search_policies — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - search_replicas — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - search_revisions — representative success ✓ · representative refusal ✓
-  - search_routes — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - search_rules — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - admin_search: representative success ✓ · representative rejection ✓
+  - admin_search_replicas: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - admin_search_revisions: representative success ✓ · representative rejection ✓
+  - batch_load_access_tokens_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_auto_scaling_rules_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_policies_by_endpoint_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_policies_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_replicas_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_revisions_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_routes_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - get_access_token: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - get_replica: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - get_revision: representative success ✓ · representative rejection ✓
+  - project_search: representative success ✓ · representative rejection ✓
+  - scoped_search: representative success ✓ · representative rejection ✓
+  - search_access_tokens: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - search_policies: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - search_replicas: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - search_revisions: representative success ✓ · representative rejection ✓
+  - search_routes: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - search_rules: representative success ✗ · representative rejection ✗: SCENARIO-GAP
 - ops + direct implementation (1)
-  - get_current_revision — success absent · refusal present 1 (get_ops, single_entity) — SCENARIO-GAP
+  - get_current_revision: success absent · rejection present 1 (get_ops, single_entity): SCENARIO-GAP
 - direct implementation (24)
-  - activate_revision — success absent · refusal absent (single_entity) — SCENARIO-GAP
-  - add_revision — success present 4 · refusal present 7 (single_entity)
-  - admin_refresh_deployment_revisions — success absent · refusal absent (global_scope) — SCENARIO-GAP
-  - bulk_delete_access_tokens — success absent · refusal absent (partial_bulk_field) — SCENARIO-GAP
-  - bulk_delete_rules — success absent · refusal absent (partial_bulk) — SCENARIO-GAP
-  - create — success present 3 · refusal present 2 (scope)
-  - create_access_token — success absent · refusal absent (single_entity) — SCENARIO-GAP
-  - create_rule — success absent · refusal absent (single_entity) — SCENARIO-GAP
-  - delete — success present 2 · refusal present 2 (single_entity)
-  - get — success present 2 · refusal present 3 (single_entity)
-  - get_policy — success absent · refusal absent (single_entity) — SCENARIO-GAP
-  - get_rule — success absent · refusal absent (single_entity) — SCENARIO-GAP
-  - partial_bulk_purge_access_tokens — success present 2 · refusal absent (partial_bulk_field) — SCENARIO-GAP
-  - partial_bulk_purge_rules — success present 3 · refusal absent (partial_bulk_field) — SCENARIO-GAP
-  - partial_bulk_update_rules — success present 2 · refusal absent (partial_bulk_field) — SCENARIO-GAP
-  - purge_access_token — success absent · refusal absent (single_field) — SCENARIO-GAP
-  - purge_rule — success absent · refusal absent (single_entity) — SCENARIO-GAP
-  - replace_options — success present 2 · refusal present 3 (single_entity)
-  - search_revision_resource_slots — success present 1 · refusal present 1 (single_field)
-  - sync_replicas — success present 1 · refusal present 1 (single_entity)
-  - update — success present 5 · refusal present 2 (single_entity)
-  - update_route_traffic — success absent · refusal absent (single_field) — SCENARIO-GAP
-  - update_rule — success absent · refusal absent (single_entity) — SCENARIO-GAP
-  - upsert_policy — success absent · refusal absent (single_entity) — SCENARIO-GAP
+  - activate_revision: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - add_revision: success present 4 · rejection present 7 (single_entity)
+  - admin_refresh_deployment_revisions: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - bulk_delete_access_tokens: success absent · rejection absent (partial_bulk_field): SCENARIO-GAP
+  - bulk_delete_rules: success absent · rejection absent (partial_bulk): SCENARIO-GAP
+  - create: success present 3 · rejection present 2 (scope)
+  - create_access_token: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - create_rule: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - delete: success present 2 · rejection present 2 (single_entity)
+  - get: success present 2 · rejection present 3 (single_entity)
+  - get_policy: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - get_rule: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - partial_bulk_purge_access_tokens: success present 2 · rejection absent (partial_bulk_field): SCENARIO-GAP
+  - partial_bulk_purge_rules: success present 3 · rejection absent (partial_bulk_field): SCENARIO-GAP
+  - partial_bulk_update_rules: success present 2 · rejection absent (partial_bulk_field): SCENARIO-GAP
+  - purge_access_token: success absent · rejection absent (single_field): SCENARIO-GAP
+  - purge_rule: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - replace_options: success present 2 · rejection present 3 (single_entity)
+  - search_revision_resource_slots: success present 1 · rejection present 1 (single_field)
+  - sync_replicas: success present 1 · rejection present 1 (single_entity)
+  - update: success present 5 · rejection present 2 (single_entity)
+  - update_route_traffic: success absent · rejection absent (single_field): SCENARIO-GAP
+  - update_rule: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - upsert_policy: success absent · rejection absent (single_entity): SCENARIO-GAP
 
 **admin_search**
 
 | scenario | verdict |
 |---|---|
 | [배포 셋이 있고 슈퍼관리자가 필터 없이 전체를 훑으면, 셋을 모두 센다](#searching-the-superadmin-counts-every-deployment) | answered |
-| [배포 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체를 훑으면, 역할로 거부된다. 이 문은 권한 그래프가 아니라 역할이 지킨다](#searching-a-user-granted-read-may-not-search-every-deployment) | refused |
+| [배포 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체를 훑으면, 역할로 거부된다. 이 문은 권한 그래프가 아니라 역할이 지킨다](#searching-a-user-granted-read-may-not-search-every-deployment) | rejected |
 
 **admin_search_revisions**
 
 | scenario | verdict |
 |---|---|
 | [두 프로젝트의 배포에 리비전이 나뉘어 있고 슈퍼관리자가 필터 없이 전체를 훑으면, 둘의 것을 모두 센다. 이 문은 역할이 지킨다](#searching_revisions-the-superadmin-counts-every-revision) | answered |
-| [모든 배포에 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체 리비전을 훑으면, 역할로 거부된다](#searching_revisions-a-user-granted-read-may-not-search-every-revision) | refused |
+| [모든 배포에 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체 리비전을 훑으면, 역할로 거부된다](#searching_revisions-a-user-granted-read-may-not-search-every-revision) | rejected |
 
 **batch_load_revisions_by_ids**
 
@@ -80,23 +80,23 @@ Scenario: incomplete 33 / 47
 | scenario | verdict |
 |---|---|
 | [배포 읽기 권한을 받은 사용자가 그 배포의 리비전을 id로 조회하면, 그 리비전이 온다](#reading_revisions-a-user-granted-read-reads-a-revision-by-id) | answered |
-| [슈퍼관리자가 아무것도 갖지 않은 id로 리비전을 조회하면, 대상이 없다는 것으로 거부된다. 모든 검사를 지나가는 사람에게는 감출 것이 없다](#reading_revisions-a-revision-id-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
-| [배포 읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 리비전을 조회하면, 볼 수 없는 id와 같은 이유로 거부된다](#reading_revisions-a-revision-id-nothing-answers-to-is-refused-as-unresolvable) | refused |
-| [아무 배포 권한도 받지 않은 사용자가 리비전을 id로 조회하면, 키를 풀 수 없다는 이유로 거부된다](#reading_revisions-a-user-granted-nothing-may-not-read-a-revision) | refused |
+| [슈퍼관리자가 아무것도 갖지 않은 id로 리비전을 조회하면, 대상이 없다는 것으로 거부된다. 모든 검사를 지나가는 사람에게는 감출 것이 없다](#reading_revisions-a-revision-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
+| [배포 읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 리비전을 조회하면, 볼 수 없는 id와 같은 이유로 거부된다](#reading_revisions-a-revision-id-nothing-answers-to-is-refused-as-unresolvable) | rejected |
+| [아무 배포 권한도 받지 않은 사용자가 리비전을 id로 조회하면, 키를 풀 수 없다는 이유로 거부된다](#reading_revisions-a-user-granted-nothing-may-not-read-a-revision) | rejected |
 
 **project_search**
 
 | scenario | verdict |
 |---|---|
 | [두 프로젝트에 배포가 나뉘어 있고 한쪽에만 읽기 권한을 받은 사용자가 그 프로젝트를 훑으면, 그 프로젝트의 것만 나온다](#searching-searching-a-project-finds-only-its-own-deployments) | answered |
-| [그 프로젝트에 읽기 권한이 없는 사용자가 프로젝트를 훑으면, 권한 부족으로 거부된다](#searching-a-user-granted-nothing-may-not-search-a-project) | refused |
+| [그 프로젝트에 읽기 권한이 없는 사용자가 프로젝트를 훑으면, 권한 부족으로 거부된다](#searching-a-user-granted-nothing-may-not-search-a-project) | rejected |
 
 **scoped_search**
 
 | scenario | verdict |
 |---|---|
 | [같은 프로젝트에 두 사람이 각자 배포를 만들었고 자기 스코프에서 읽기 권한을 받은 사람이 자기 것을 훑으면, 자기가 만든 것만 나온다](#searching-searching-my-own-finds-only-what-i-made) | answered |
-| [자기 스코프에서 읽기 권한을 받지 않은 사람이 자기 것을 훑으면, 권한 부족으로 거부된다. 이 문도 범위를 좁히기만 하지 않고 권한이 지킨다](#searching-a-user-granted-nothing-may-not-search-even-their-own) | refused |
+| [자기 스코프에서 읽기 권한을 받지 않은 사람이 자기 것을 훑으면, 권한 부족으로 거부된다. 이 문도 범위를 좁히기만 하지 않고 권한이 지킨다](#searching-a-user-granted-nothing-may-not-search-even-their-own) | rejected |
 
 **search_revisions**
 
@@ -105,13 +105,13 @@ Scenario: incomplete 33 / 47
 | [리비전 셋이 딸린 배포에 읽기 권한을 받은 사용자가 그 배포의 리비전을 훑으면, 셋을 모두 센다](#searching_revisions-a-user-granted-read-counts-every-revision-of-a-deployment) | answered |
 | [두 프로젝트의 배포에 리비전이 나뉘어 있고 한쪽에만 읽기 권한을 받은 사용자가 그쪽 배포의 리비전을 훑으면, 그쪽 것만 나온다](#searching_revisions-another-deployments-revisions-stay-out-of-a-deployment-search) | answered |
 | [리비전 셋이 딸린 배포의 리비전을 번호로 걸러 훑으면, 그 번호의 것만 남는다](#searching_revisions-filtering-revisions-by-number-leaves-only-that-one) | answered |
-| [아무 배포 권한도 받지 않은 사용자가 배포의 리비전을 훑으면, 권한 부족으로 거부된다](#searching_revisions-a-user-granted-nothing-may-not-search-a-deployments-revisions) | refused |
+| [아무 배포 권한도 받지 않은 사용자가 배포의 리비전을 훑으면, 권한 부족으로 거부된다](#searching_revisions-a-user-granted-nothing-may-not-search-a-deployments-revisions) | rejected |
 
 **get_current_revision**
 
 | scenario | verdict |
 |---|---|
-| [리비전이 딸리지 않은 배포의 현재 리비전을 조회하면, 현재 리비전이 없다는 이유로 거부된다](#reading-a-deployment-holding-no-revision-answers-nothing-as-its-current-one) | refused |
+| [리비전이 딸리지 않은 배포의 현재 리비전을 조회하면, 현재 리비전이 없다는 이유로 거부된다](#reading-a-deployment-holding-no-revision-answers-nothing-as-its-current-one) | rejected |
 
 **add_revision**
 
@@ -121,13 +121,13 @@ Scenario: incomplete 33 / 47
 | [리비전 없는 배포에 생성 권한을 받은 사용자가 모든 설정을 주고 리비전을 더하면, 번호 1을 단 리비전이 준 설정 그대로 온다](#adding_revisions-a-user-granted-create-adds-the-first-revision) | answered |
 | [리비전 하나가 딸린 배포에 리비전을 더하면, 번호 2를 단 리비전이 온다](#adding_revisions-the-next-revision-is-numbered-one-past-the-last) | answered |
 | [배포에도 자기 모델 폴더에도 권한을 받지 않은 슈퍼관리자가 남의 배포에 리비전을 더하면, 리비전이 더해진다. 역할이 배포 권한과 폴더 권한을 함께 지나간다](#adding_revisions-the-superadmin-adds-a-revision-to-anothers-deployment-without-a-grant) | answered |
-| [배포 생성 권한은 받았지만 모델 폴더를 읽을 권한이 없는 사용자가 그 폴더로 리비전을 더하면, 폴더를 찾을 수 없다는 이유로 거부된다](#adding_revisions-a-model-folder-the-caller-may-not-read-is-not-found) | refused |
-| [남의 모델 폴더를 읽기 전용으로 빌린 사용자가 읽고 쓰기로 마운트하는 리비전을 더하면, 폴더 권한을 넘는다는 이유로 거부된다](#adding_revisions-a-mount-beyond-what-the-caller-holds-on-the-folder-is-refused) | refused |
-| [모든 리비전이 채워야 하는 슬롯이 정해져 있고 그 슬롯을 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다](#adding_revisions-a-revision-missing-a-required-slot-is-refused) | refused |
-| [프리셋 없이 이미지를 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다](#adding_revisions-a-revision-with-no-image-from-any-layer-is-refused) | refused |
-| [폴더 파일을 읽지 않는 런타임 변형으로 프리셋 없이 모델 정의를 빼고 리비전을 더하면, 이름 없는 모델이 모델 정의 검증에서 거부된다](#adding_revisions-a-revision-with-no-model-definition-from-any-layer-is-refused) | refused |
-| [프리셋 없이 런타임 변형을 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다](#adding_revisions-a-revision-with-no-runtime-variant-from-any-layer-is-refused) | refused |
-| [배포 읽기 권한만 받은 사용자가 리비전을 더하면, 권한 부족으로 거부된다](#adding_revisions-a-user-granted-only-read-may-not-add-a-revision) | refused |
+| [배포 생성 권한은 받았지만 모델 폴더를 읽을 권한이 없는 사용자가 그 폴더로 리비전을 더하면, 폴더를 찾을 수 없다는 이유로 거부된다](#adding_revisions-a-model-folder-the-caller-may-not-read-is-not-found) | rejected |
+| [남의 모델 폴더를 읽기 전용으로 빌린 사용자가 읽고 쓰기로 마운트하는 리비전을 더하면, 폴더 권한을 넘는다는 이유로 거부된다](#adding_revisions-a-mount-beyond-what-the-caller-holds-on-the-folder-is-refused) | rejected |
+| [모든 리비전이 채워야 하는 슬롯이 정해져 있고 그 슬롯을 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다](#adding_revisions-a-revision-missing-a-required-slot-is-refused) | rejected |
+| [프리셋 없이 이미지를 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다](#adding_revisions-a-revision-with-no-image-from-any-layer-is-refused) | rejected |
+| [폴더 파일을 읽지 않는 런타임 변형으로 프리셋 없이 모델 정의를 빼고 리비전을 더하면, 이름 없는 모델이 모델 정의 검증에서 거부된다](#adding_revisions-a-revision-with-no-model-definition-from-any-layer-is-refused) | rejected |
+| [프리셋 없이 런타임 변형을 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다](#adding_revisions-a-revision-with-no-runtime-variant-from-any-layer-is-refused) | rejected |
+| [배포 읽기 권한만 받은 사용자가 리비전을 더하면, 권한 부족으로 거부된다](#adding_revisions-a-user-granted-only-read-may-not-add-a-revision) | rejected |
 
 **create**
 
@@ -136,8 +136,8 @@ Scenario: incomplete 33 / 47
 | [이름을 대지 않고 배포를 만들면, 만든 사람에게서 이름이 지어진다](#creating-a-deployment-made-without-a-name-is-named-after-its-maker) | answered |
 | [프로젝트에서 배포 생성 권한을 받은 사용자가 배포를 만들면, 그 프로젝트에 속하고 부른 사람이 소유하는 배포가 리비전 없이 만들어진다](#creating-a-user-granted-create-in-a-project-makes-a-deployment-there) | answered |
 | [엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 배포를 만든다. 이 문은 역할이 아니라 권한 그래프가 지키기 때문이다](#creating-turning-enforcement-off-lets-a-user-create-a-deployment) | answered |
-| [생성 권한을 받은 프로젝트가 아닌 다른 프로젝트에 배포를 만들면, 권한 부족으로 거부된다](#creating-a-create-grant-in-another-project-does-not-reach-this-one) | refused |
-| [아무 배포 권한도 받지 않은 사용자가 배포를 만들면, 권한 부족으로 거부된다](#creating-a-user-granted-nothing-may-not-create-a-deployment) | refused |
+| [생성 권한을 받은 프로젝트가 아닌 다른 프로젝트에 배포를 만들면, 권한 부족으로 거부된다](#creating-a-create-grant-in-another-project-does-not-reach-this-one) | rejected |
+| [아무 배포 권한도 받지 않은 사용자가 배포를 만들면, 권한 부족으로 거부된다](#creating-a-user-granted-nothing-may-not-create-a-deployment) | rejected |
 
 **delete**
 
@@ -145,8 +145,8 @@ Scenario: incomplete 33 / 47
 |---|---|
 | [soft-delete 권한을 받은 사용자가 배포를 지우면, 그 배포를 지우기 시작했다고 답한다](#retiring-a-user-granted-soft-delete-retires-a-deployment) | answered |
 | [다른 사람이 만든 배포를 아무 권한도 받지 않은 슈퍼관리자가 지우면, 그 배포를 지우기 시작했다고 답한다. 역할이 권한 그래프를 지나간다](#retiring-the-superadmin-retires-anothers-deployment-without-a-grant) | answered |
-| [수정 권한만 받고 soft-delete 권한은 받지 않은 사용자가 배포를 지우면, 권한 부족으로 거부된다. 지우기는 수정과 다른 문이다](#retiring-a-user-granted-only-update-may-not-retire-a-deployment) | refused |
-| [슈퍼관리자가 아무것도 갖지 않은 id를 지우면, 대상이 없다는 것으로 거부된다](#retiring-retiring-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
+| [수정 권한만 받고 soft-delete 권한은 받지 않은 사용자가 배포를 지우면, 권한 부족으로 거부된다. 지우기는 수정과 다른 문이다](#retiring-a-user-granted-only-update-may-not-retire-a-deployment) | rejected |
+| [슈퍼관리자가 아무것도 갖지 않은 id를 지우면, 대상이 없다는 것으로 거부된다](#retiring-retiring-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
 
 **get**
 
@@ -154,9 +154,9 @@ Scenario: incomplete 33 / 47
 |---|---|
 | [배포 하나가 있고 읽기 권한을 받은 사용자가 id로 조회하면, 그 배포가 답으로 온다](#reading-a-user-granted-read-reads-a-deployment-by-id) | answered |
 | [다른 사람이 만든 배포를 아무 권한도 받지 않은 슈퍼관리자가 id로 조회하면, 그 배포가 답으로 온다. 역할이 권한 그래프를 지나간다](#reading-the-superadmin-reads-anothers-deployment-without-a-grant) | answered |
-| [같은 배포가 있고 아무 권한도 받지 않은 사용자가 조회하면, 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-a-deployment) | refused |
-| [슈퍼관리자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것으로 거부된다. 권한 검사를 지나가는 사람만 이 답을 본다](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
-| [읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것이 아니라 권한 부족으로 거부된다. 없는 행에는 걸린 권한도 없기 때문이다](#reading-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | refused |
+| [같은 배포가 있고 아무 권한도 받지 않은 사용자가 조회하면, 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-a-deployment) | rejected |
+| [슈퍼관리자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것으로 거부된다. 권한 검사를 지나가는 사람만 이 답을 본다](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
+| [읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것이 아니라 권한 부족으로 거부된다. 없는 행에는 걸린 권한도 없기 때문이다](#reading-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | rejected |
 
 **partial_bulk_purge_access_tokens**
 
@@ -186,23 +186,23 @@ Scenario: incomplete 33 / 47
 |---|---|
 | [수정 권한을 받은 사용자가 기본값과 처리기별 설정을 담아 옵션을 갈아끼우면, 준 것이 통째로 새 옵션이 되고 답은 그 옵션만 싣는다](#options-a-user-granted-update-replaces-the-options-whole) | answered |
 | [물려받은 처리기별 설정이 있는 배포에 기본값만 담아 옵션을 갈아끼우면, 물려받은 설정이 하나도 남지 않는다](#options-replacing-with-no-handler-entry-drops-the-inherited-ones) | answered |
-| [읽기 권한만 받은 사용자가 옵션을 갈아끼우면, 권한 부족으로 거부된다](#options-a-user-granted-only-read-may-not-replace-the-options) | refused |
-| [같은 처리기 이름을 두 번 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다](#options-naming-a-handler-twice-is-refused) | refused |
-| [등록되지 않은 처리기 이름을 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다](#options-naming-an-unregistered-handler-is-refused) | refused |
+| [읽기 권한만 받은 사용자가 옵션을 갈아끼우면, 권한 부족으로 거부된다](#options-a-user-granted-only-read-may-not-replace-the-options) | rejected |
+| [같은 처리기 이름을 두 번 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다](#options-naming-a-handler-twice-is-refused) | rejected |
+| [등록되지 않은 처리기 이름을 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다](#options-naming-an-unregistered-handler-is-refused) | rejected |
 
 **search_revision_resource_slots**
 
 | scenario | verdict |
 |---|---|
 | [슬롯 둘을 잡은 리비전이 딸린 배포에 읽기 권한을 받은 사용자가 그 리비전의 슬롯을 훑으면, 둘을 모두 센다](#searching_revisions-a-user-granted-read-counts-every-slot-a-revision-allocates) | answered |
-| [아무 배포 권한도 받지 않은 사용자가 배포의 리비전의 슬롯을 훑으면, 리비전을 찾을 수 없다는 답으로 거부된다](#searching_revisions-a-user-granted-nothing-may-not-search-a-revisions-slots) | refused |
+| [아무 배포 권한도 받지 않은 사용자가 배포의 리비전의 슬롯을 훑으면, 리비전을 찾을 수 없다는 답으로 거부된다](#searching_revisions-a-user-granted-nothing-may-not-search-a-revisions-slots) | rejected |
 
 **sync_replicas**
 
 | scenario | verdict |
 |---|---|
 | [수정 권한을 받은 사용자가 복제 맞추기를 요청하면, 맞추기를 시작했다고 답한다](#syncing-a-user-granted-update-starts-syncing-the-replicas) | answered |
-| [읽기 권한만 받은 사용자가 복제 맞추기를 요청하면, 권한 부족으로 거부된다](#syncing-a-user-granted-only-read-may-not-sync-the-replicas) | refused |
+| [읽기 권한만 받은 사용자가 복제 맞추기를 요청하면, 권한 부족으로 거부된다](#syncing-a-user-granted-only-read-may-not-sync-the-replicas) | rejected |
 
 **update**
 
@@ -213,14 +213,14 @@ Scenario: incomplete 33 / 47
 | [수정 권한을 받은 사용자가 이름을 바꾸면, 이름만 새 값이 되고 나머지는 그대로다](#editing-a-user-granted-update-renames-a-deployment) | answered |
 | [태그가 붙은 배포의 태그를 비우면, 태그가 하나도 남지 않는다](#editing-clearing-the-tags-of-a-deployment-leaves-none) | answered |
 | [다른 사람이 만든 배포의 이름을 아무 권한도 받지 않은 슈퍼관리자가 바꾸면, 이름만 새 값이 된다. 역할이 권한 그래프를 지나간다](#editing-the-superadmin-renames-anothers-deployment-without-a-grant) | answered |
-| [읽기 권한만 받은 사용자가 배포를 수정하면, 권한 부족으로 거부된다](#editing-a-user-granted-only-read-may-not-update-a-deployment) | refused |
-| [슈퍼관리자가 아무것도 갖지 않은 id를 수정하면, 대상이 없다는 것으로 거부된다](#editing-updating-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
+| [읽기 권한만 받은 사용자가 배포를 수정하면, 권한 부족으로 거부된다](#editing-a-user-granted-only-read-may-not-update-a-deployment) | rejected |
+| [슈퍼관리자가 아무것도 갖지 않은 id를 수정하면, 대상이 없다는 것으로 거부된다](#editing-updating-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
 
 ### admin_search
 
 <a id="searching-the-superadmin-counts-every-deployment"></a>
 
-#### [the-superadmin-counts-every-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching.py) — pass
+#### [the-superadmin-counts-every-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
 
 배포 셋이 있고 슈퍼관리자가 필터 없이 전체를 훑으면, 셋을 모두 센다
 
@@ -242,7 +242,7 @@ Given
 
 When
 
-- DeploymentAdapter.admin_search — user-1이 필터 없이 전체 조회
+- DeploymentAdapter.admin_search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -254,7 +254,7 @@ Then
 
 <a id="searching-a-user-granted-read-may-not-search-every-deployment"></a>
 
-#### [a-user-granted-read-may-not-search-every-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching.py) — pass
+#### [a-user-granted-read-may-not-search-every-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
 
 배포 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체를 훑으면, 역할로 거부된다. 이 문은 권한 그래프가 아니라 역할이 지킨다
 
@@ -279,7 +279,7 @@ Given
 
 When
 
-- DeploymentAdapter.admin_search — user-1이 필터 없이 전체 조회
+- DeploymentAdapter.admin_search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -290,7 +290,7 @@ Then
 
 <a id="searching_revisions-the-superadmin-counts-every-revision"></a>
 
-#### [the-superadmin-counts-every-revision](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+#### [the-superadmin-counts-every-revision](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py): pass
 
 두 프로젝트의 배포에 리비전이 나뉘어 있고 슈퍼관리자가 필터 없이 전체를 훑으면, 둘의 것을 모두 센다. 이 문은 역할이 지킨다
 
@@ -326,7 +326,7 @@ Given
 
 When
 
-- DeploymentAdapter.admin_search_revisions — user-1이 필터 없이 모든 리비전을 조회
+- DeploymentAdapter.admin_search_revisions: user-1이 필터 없이 모든 리비전을 조회
 
 Then
 
@@ -339,7 +339,7 @@ Then
 
 <a id="searching_revisions-a-user-granted-read-may-not-search-every-revision"></a>
 
-#### [a-user-granted-read-may-not-search-every-revision](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+#### [a-user-granted-read-may-not-search-every-revision](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py): pass
 
 모든 배포에 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체 리비전을 훑으면, 역할로 거부된다
 
@@ -374,7 +374,7 @@ Given
 
 When
 
-- DeploymentAdapter.admin_search_revisions — user-1이 필터 없이 모든 리비전을 조회
+- DeploymentAdapter.admin_search_revisions: user-1이 필터 없이 모든 리비전을 조회
 
 Then
 
@@ -385,7 +385,7 @@ Then
 
 <a id="reading_revisions-loading-revisions-by-id-answers-each-id-on-its-own"></a>
 
-#### [loading-revisions-by-id-answers-each-id-on-its-own](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py) — pass
+#### [loading-revisions-by-id-answers-each-id-on-its-own](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py): pass
 
 한 프로젝트에서만 배포 읽기 권한을 받은 사용자가 읽을 수 있는 리비전, 다른 프로젝트의 리비전, 아무것도 갖지 않은 id를 한 번에 집으면, 이름 댄 순서대로 리비전, 거부, 빈 자리가 온다
 
@@ -423,7 +423,7 @@ Given
 
 When
 
-- DeploymentAdapter.batch_load_revisions_by_ids — user-1이 wanted-1의 리비전, 다른 프로젝트 배포의 리비전, 아무것도 갖지 않은 id를 차례로 집음
+- DeploymentAdapter.batch_load_revisions_by_ids: user-1이 wanted-1의 리비전, 다른 프로젝트 배포의 리비전, 아무것도 갖지 않은 id를 차례로 집음
 
 Then
 
@@ -456,7 +456,7 @@ Then
 
 <a id="reading_revisions-a-user-granted-read-reads-a-revision-by-id"></a>
 
-#### [a-user-granted-read-reads-a-revision-by-id](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py) — pass
+#### [a-user-granted-read-reads-a-revision-by-id](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py): pass
 
 배포 읽기 권한을 받은 사용자가 그 배포의 리비전을 id로 조회하면, 그 리비전이 온다
 
@@ -491,7 +491,7 @@ Given
 
 When
 
-- DeploymentAdapter.get_revision — user-1이 deployment-1의 첫 리비전 id로 리비전을 조회
+- DeploymentAdapter.get_revision: user-1이 deployment-1의 첫 리비전 id로 리비전을 조회
 
 Then
 
@@ -519,7 +519,7 @@ Then
 
 <a id="reading_revisions-a-revision-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
-#### [a-revision-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py) — pass
+#### [a-revision-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py): pass
 
 슈퍼관리자가 아무것도 갖지 않은 id로 리비전을 조회하면, 대상이 없다는 것으로 거부된다. 모든 검사를 지나가는 사람에게는 감출 것이 없다
 
@@ -551,7 +551,7 @@ Given
 
 When
 
-- DeploymentAdapter.get_revision — user-1이 아무것도 갖지 않은 id로 리비전을 조회
+- DeploymentAdapter.get_revision: user-1이 아무것도 갖지 않은 id로 리비전을 조회
 
 Then
 
@@ -560,7 +560,7 @@ Then
 
 <a id="reading_revisions-a-revision-id-nothing-answers-to-is-refused-as-unresolvable"></a>
 
-#### [a-revision-id-nothing-answers-to-is-refused-as-unresolvable](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py) — pass
+#### [a-revision-id-nothing-answers-to-is-refused-as-unresolvable](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py): pass
 
 배포 읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 리비전을 조회하면, 볼 수 없는 id와 같은 이유로 거부된다
 
@@ -595,7 +595,7 @@ Given
 
 When
 
-- DeploymentAdapter.get_revision — user-1이 아무것도 갖지 않은 id로 리비전을 조회
+- DeploymentAdapter.get_revision: user-1이 아무것도 갖지 않은 id로 리비전을 조회
 
 Then
 
@@ -604,7 +604,7 @@ Then
 
 <a id="reading_revisions-a-user-granted-nothing-may-not-read-a-revision"></a>
 
-#### [a-user-granted-nothing-may-not-read-a-revision](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py) — pass
+#### [a-user-granted-nothing-may-not-read-a-revision](/tests/scenario/bai_scenario/manager/deployment/test_reading_revisions.py): pass
 
 아무 배포 권한도 받지 않은 사용자가 리비전을 id로 조회하면, 키를 풀 수 없다는 이유로 거부된다
 
@@ -636,7 +636,7 @@ Given
 
 When
 
-- DeploymentAdapter.get_revision — user-1이 deployment-1의 첫 리비전 id로 리비전을 조회
+- DeploymentAdapter.get_revision: user-1이 deployment-1의 첫 리비전 id로 리비전을 조회
 
 Then
 
@@ -647,7 +647,7 @@ Then
 
 <a id="searching-searching-a-project-finds-only-its-own-deployments"></a>
 
-#### [searching-a-project-finds-only-its-own-deployments](/tests/scenario/bai_scenario/manager/deployment/test_searching.py) — pass
+#### [searching-a-project-finds-only-its-own-deployments](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
 
 두 프로젝트에 배포가 나뉘어 있고 한쪽에만 읽기 권한을 받은 사용자가 그 프로젝트를 훑으면, 그 프로젝트의 것만 나온다
 
@@ -673,7 +673,7 @@ Given
 
 When
 
-- DeploymentAdapter.project_search — user-1이 team-1 안을 조회
+- DeploymentAdapter.project_search: user-1이 team-1 안을 조회
 
 Then
 
@@ -685,7 +685,7 @@ Then
 
 <a id="searching-a-user-granted-nothing-may-not-search-a-project"></a>
 
-#### [a-user-granted-nothing-may-not-search-a-project](/tests/scenario/bai_scenario/manager/deployment/test_searching.py) — pass
+#### [a-user-granted-nothing-may-not-search-a-project](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
 
 그 프로젝트에 읽기 권한이 없는 사용자가 프로젝트를 훑으면, 권한 부족으로 거부된다
 
@@ -707,7 +707,7 @@ Given
 
 When
 
-- DeploymentAdapter.project_search — user-1이 team-1 안을 조회
+- DeploymentAdapter.project_search: user-1이 team-1 안을 조회
 
 Then
 
@@ -718,7 +718,7 @@ Then
 
 <a id="searching-searching-my-own-finds-only-what-i-made"></a>
 
-#### [searching-my-own-finds-only-what-i-made](/tests/scenario/bai_scenario/manager/deployment/test_searching.py) — pass
+#### [searching-my-own-finds-only-what-i-made](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
 
 같은 프로젝트에 두 사람이 각자 배포를 만들었고 자기 스코프에서 읽기 권한을 받은 사람이 자기 것을 훑으면, 자기가 만든 것만 나온다
 
@@ -746,7 +746,7 @@ Given
 
 When
 
-- DeploymentAdapter.scoped_search — user-1이 자기 것을 조회
+- DeploymentAdapter.scoped_search: user-1이 자기 것을 조회
 
 Then
 
@@ -758,7 +758,7 @@ Then
 
 <a id="searching-a-user-granted-nothing-may-not-search-even-their-own"></a>
 
-#### [a-user-granted-nothing-may-not-search-even-their-own](/tests/scenario/bai_scenario/manager/deployment/test_searching.py) — pass
+#### [a-user-granted-nothing-may-not-search-even-their-own](/tests/scenario/bai_scenario/manager/deployment/test_searching.py): pass
 
 자기 스코프에서 읽기 권한을 받지 않은 사람이 자기 것을 훑으면, 권한 부족으로 거부된다. 이 문도 범위를 좁히기만 하지 않고 권한이 지킨다
 
@@ -781,7 +781,7 @@ Given
 
 When
 
-- DeploymentAdapter.scoped_search — user-1이 자기 것을 조회
+- DeploymentAdapter.scoped_search: user-1이 자기 것을 조회
 
 Then
 
@@ -792,7 +792,7 @@ Then
 
 <a id="searching_revisions-a-user-granted-read-counts-every-revision-of-a-deployment"></a>
 
-#### [a-user-granted-read-counts-every-revision-of-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+#### [a-user-granted-read-counts-every-revision-of-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py): pass
 
 리비전 셋이 딸린 배포에 읽기 권한을 받은 사용자가 그 배포의 리비전을 훑으면, 셋을 모두 센다
 
@@ -829,7 +829,7 @@ Given
 
 When
 
-- DeploymentAdapter.search_revisions — user-1이 deployment-1의 리비전을 조회
+- DeploymentAdapter.search_revisions: user-1이 deployment-1의 리비전을 조회
 
 Then
 
@@ -842,7 +842,7 @@ Then
 
 <a id="searching_revisions-another-deployments-revisions-stay-out-of-a-deployment-search"></a>
 
-#### [another-deployments-revisions-stay-out-of-a-deployment-search](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+#### [another-deployments-revisions-stay-out-of-a-deployment-search](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py): pass
 
 두 프로젝트의 배포에 리비전이 나뉘어 있고 한쪽에만 읽기 권한을 받은 사용자가 그쪽 배포의 리비전을 훑으면, 그쪽 것만 나온다
 
@@ -881,7 +881,7 @@ Given
 
 When
 
-- DeploymentAdapter.search_revisions — user-1이 wanted-1의 리비전을 조회
+- DeploymentAdapter.search_revisions: user-1이 wanted-1의 리비전을 조회
 
 Then
 
@@ -894,7 +894,7 @@ Then
 
 <a id="searching_revisions-filtering-revisions-by-number-leaves-only-that-one"></a>
 
-#### [filtering-revisions-by-number-leaves-only-that-one](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+#### [filtering-revisions-by-number-leaves-only-that-one](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py): pass
 
 리비전 셋이 딸린 배포의 리비전을 번호로 걸러 훑으면, 그 번호의 것만 남는다
 
@@ -931,7 +931,7 @@ Given
 
 When
 
-- DeploymentAdapter.search_revisions — user-1이 deployment-1의 리비전을 번호 2로 걸러 조회
+- DeploymentAdapter.search_revisions: user-1이 deployment-1의 리비전을 번호 2로 걸러 조회
 
 Then
 
@@ -944,7 +944,7 @@ Then
 
 <a id="searching_revisions-a-user-granted-nothing-may-not-search-a-deployments-revisions"></a>
 
-#### [a-user-granted-nothing-may-not-search-a-deployments-revisions](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+#### [a-user-granted-nothing-may-not-search-a-deployments-revisions](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py): pass
 
 아무 배포 권한도 받지 않은 사용자가 배포의 리비전을 훑으면, 권한 부족으로 거부된다
 
@@ -976,7 +976,7 @@ Given
 
 When
 
-- DeploymentAdapter.search_revisions — user-1이 deployment-1의 리비전을 조회
+- DeploymentAdapter.search_revisions: user-1이 deployment-1의 리비전을 조회
 
 Then
 
@@ -987,7 +987,7 @@ Then
 
 <a id="reading-a-deployment-holding-no-revision-answers-nothing-as-its-current-one"></a>
 
-#### [a-deployment-holding-no-revision-answers-nothing-as-its-current-one](/tests/scenario/bai_scenario/manager/deployment/test_reading.py) — pass
+#### [a-deployment-holding-no-revision-answers-nothing-as-its-current-one](/tests/scenario/bai_scenario/manager/deployment/test_reading.py): pass
 
 리비전이 딸리지 않은 배포의 현재 리비전을 조회하면, 현재 리비전이 없다는 이유로 거부된다
 
@@ -1010,7 +1010,7 @@ Given
 
 When
 
-- DeploymentAdapter.get_current_revision — user-1이 deployment-1의 현재 리비전을 조회
+- DeploymentAdapter.get_current_revision: user-1이 deployment-1의 현재 리비전을 조회
 
 Then
 
@@ -1021,7 +1021,7 @@ Then
 
 <a id="adding_revisions-a-revision-added-without-resources-runs-on-one-node-with-no-slot"></a>
 
-#### [a-revision-added-without-resources-runs-on-one-node-with-no-slot](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+#### [a-revision-added-without-resources-runs-on-one-node-with-no-slot](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
 프리셋도 필수 슬롯도 없이 자원과 클러스터를 빼고 리비전을 더하면, 노드 하나에 크기 1이고 자원 슬롯이 빈 리비전이 온다
 
@@ -1055,12 +1055,12 @@ Given
 
 When
 
-- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함 (자원과 클러스터 없이)
+- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함 (자원과 클러스터 없이)
 
 Then
 
 - 리비전 전체가 온다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - deployment_id: 심은 배포와 같다
   - revision_number = 1
   - image_id: 심은 이미지와 같다
@@ -1083,7 +1083,7 @@ Then
 
 <a id="adding_revisions-a-user-granted-create-adds-the-first-revision"></a>
 
-#### [a-user-granted-create-adds-the-first-revision](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+#### [a-user-granted-create-adds-the-first-revision](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
 리비전 없는 배포에 생성 권한을 받은 사용자가 모든 설정을 주고 리비전을 더하면, 번호 1을 단 리비전이 준 설정 그대로 온다
 
@@ -1117,12 +1117,12 @@ Given
 
 When
 
-- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함
+- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함
 
 Then
 
 - 리비전 전체가 온다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - deployment_id: 심은 배포와 같다
   - revision_number = 1
   - image_id: 심은 이미지와 같다
@@ -1145,7 +1145,7 @@ Then
 
 <a id="adding_revisions-the-next-revision-is-numbered-one-past-the-last"></a>
 
-#### [the-next-revision-is-numbered-one-past-the-last](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+#### [the-next-revision-is-numbered-one-past-the-last](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
 리비전 하나가 딸린 배포에 리비전을 더하면, 번호 2를 단 리비전이 온다
 
@@ -1180,12 +1180,12 @@ Given
 
 When
 
-- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함
+- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함
 
 Then
 
 - 리비전 전체가 온다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - deployment_id: 심은 배포와 같다
   - revision_number = 2
   - image_id: 심은 이미지와 같다
@@ -1208,7 +1208,7 @@ Then
 
 <a id="adding_revisions-the-superadmin-adds-a-revision-to-anothers-deployment-without-a-grant"></a>
 
-#### [the-superadmin-adds-a-revision-to-anothers-deployment-without-a-grant](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+#### [the-superadmin-adds-a-revision-to-anothers-deployment-without-a-grant](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
 배포에도 자기 모델 폴더에도 권한을 받지 않은 슈퍼관리자가 남의 배포에 리비전을 더하면, 리비전이 더해진다. 역할이 배포 권한과 폴더 권한을 함께 지나간다
 
@@ -1239,12 +1239,12 @@ Given
 
 When
 
-- DeploymentAdapter.add_revision — user-1이 theirs-1에 리비전을 더함
+- DeploymentAdapter.add_revision: user-1이 theirs-1에 리비전을 더함
 
 Then
 
 - 리비전 전체가 온다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - deployment_id: 심은 배포와 같다
   - revision_number = 1
   - image_id: 심은 이미지와 같다
@@ -1267,7 +1267,7 @@ Then
 
 <a id="adding_revisions-a-model-folder-the-caller-may-not-read-is-not-found"></a>
 
-#### [a-model-folder-the-caller-may-not-read-is-not-found](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+#### [a-model-folder-the-caller-may-not-read-is-not-found](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
 배포 생성 권한은 받았지만 모델 폴더를 읽을 권한이 없는 사용자가 그 폴더로 리비전을 더하면, 폴더를 찾을 수 없다는 이유로 거부된다
 
@@ -1297,7 +1297,7 @@ Given
 
 When
 
-- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함
+- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함
 
 Then
 
@@ -1306,7 +1306,7 @@ Then
 
 <a id="adding_revisions-a-mount-beyond-what-the-caller-holds-on-the-folder-is-refused"></a>
 
-#### [a-mount-beyond-what-the-caller-holds-on-the-folder-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+#### [a-mount-beyond-what-the-caller-holds-on-the-folder-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
 남의 모델 폴더를 읽기 전용으로 빌린 사용자가 읽고 쓰기로 마운트하는 리비전을 더하면, 폴더 권한을 넘는다는 이유로 거부된다
 
@@ -1346,7 +1346,7 @@ Given
 
 When
 
-- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함
+- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함
 
 Then
 
@@ -1355,7 +1355,7 @@ Then
 
 <a id="adding_revisions-a-revision-missing-a-required-slot-is-refused"></a>
 
-#### [a-revision-missing-a-required-slot-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+#### [a-revision-missing-a-required-slot-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
 모든 리비전이 채워야 하는 슬롯이 정해져 있고 그 슬롯을 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다
 
@@ -1389,7 +1389,7 @@ Given
 
 When
 
-- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함
+- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함
 
 Then
 
@@ -1398,7 +1398,7 @@ Then
 
 <a id="adding_revisions-a-revision-with-no-image-from-any-layer-is-refused"></a>
 
-#### [a-revision-with-no-image-from-any-layer-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+#### [a-revision-with-no-image-from-any-layer-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
 프리셋 없이 이미지를 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다
 
@@ -1432,7 +1432,7 @@ Given
 
 When
 
-- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함 (이미지 없이)
+- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함 (이미지 없이)
 
 Then
 
@@ -1441,7 +1441,7 @@ Then
 
 <a id="adding_revisions-a-revision-with-no-model-definition-from-any-layer-is-refused"></a>
 
-#### [a-revision-with-no-model-definition-from-any-layer-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+#### [a-revision-with-no-model-definition-from-any-layer-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
 폴더 파일을 읽지 않는 런타임 변형으로 프리셋 없이 모델 정의를 빼고 리비전을 더하면, 이름 없는 모델이 모델 정의 검증에서 거부된다
 
@@ -1475,7 +1475,7 @@ Given
 
 When
 
-- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함 (모델 정의 없이)
+- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함 (모델 정의 없이)
 
 Then
 
@@ -1484,7 +1484,7 @@ Then
 
 <a id="adding_revisions-a-revision-with-no-runtime-variant-from-any-layer-is-refused"></a>
 
-#### [a-revision-with-no-runtime-variant-from-any-layer-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+#### [a-revision-with-no-runtime-variant-from-any-layer-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
 프리셋 없이 런타임 변형을 빼고 리비전을 더하면, 입력이 틀렸다는 이유로 거부된다
 
@@ -1518,7 +1518,7 @@ Given
 
 When
 
-- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함 (런타임 변형 없이)
+- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함 (런타임 변형 없이)
 
 Then
 
@@ -1527,7 +1527,7 @@ Then
 
 <a id="adding_revisions-a-user-granted-only-read-may-not-add-a-revision"></a>
 
-#### [a-user-granted-only-read-may-not-add-a-revision](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py) — pass
+#### [a-user-granted-only-read-may-not-add-a-revision](/tests/scenario/bai_scenario/manager/deployment/test_adding_revisions.py): pass
 
 배포 읽기 권한만 받은 사용자가 리비전을 더하면, 권한 부족으로 거부된다
 
@@ -1561,7 +1561,7 @@ Given
 
 When
 
-- DeploymentAdapter.add_revision — user-1이 deployment-1에 리비전을 더함
+- DeploymentAdapter.add_revision: user-1이 deployment-1에 리비전을 더함
 
 Then
 
@@ -1572,7 +1572,7 @@ Then
 
 <a id="creating-a-deployment-made-without-a-name-is-named-after-its-maker"></a>
 
-#### [a-deployment-made-without-a-name-is-named-after-its-maker](/tests/scenario/bai_scenario/manager/deployment/test_creating.py) — pass
+#### [a-deployment-made-without-a-name-is-named-after-its-maker](/tests/scenario/bai_scenario/manager/deployment/test_creating.py): pass
 
 이름을 대지 않고 배포를 만들면, 만든 사람에게서 이름이 지어진다
 
@@ -1594,12 +1594,12 @@ Given
 
 When
 
-- DeploymentAdapter.create — user-1이 team-1에 이름 없이 배포를 만듦
+- DeploymentAdapter.create: user-1이 team-1에 이름 없이 배포를 만듦
 
 Then
 
 - 만든 배포 전체가 온다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - metadata.project_id: 심은 프로젝트와 같다
   - metadata.domain_name = 'home-1'
   - metadata.name: 만든 사람에게서 지어진 이름
@@ -1623,7 +1623,7 @@ Then
 
 <a id="creating-a-user-granted-create-in-a-project-makes-a-deployment-there"></a>
 
-#### [a-user-granted-create-in-a-project-makes-a-deployment-there](/tests/scenario/bai_scenario/manager/deployment/test_creating.py) — pass
+#### [a-user-granted-create-in-a-project-makes-a-deployment-there](/tests/scenario/bai_scenario/manager/deployment/test_creating.py): pass
 
 프로젝트에서 배포 생성 권한을 받은 사용자가 배포를 만들면, 그 프로젝트에 속하고 부른 사람이 소유하는 배포가 리비전 없이 만들어진다
 
@@ -1645,12 +1645,12 @@ Given
 
 When
 
-- DeploymentAdapter.create — user-1이 team-1에 serving 배포를 만듦
+- DeploymentAdapter.create: user-1이 team-1에 serving 배포를 만듦
 
 Then
 
 - 만든 배포 전체가 온다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - metadata.project_id: 심은 프로젝트와 같다
   - metadata.domain_name = 'home-1'
   - metadata.name = 'serving'
@@ -1674,7 +1674,7 @@ Then
 
 <a id="creating-turning-enforcement-off-lets-a-user-create-a-deployment"></a>
 
-#### [turning-enforcement-off-lets-a-user-create-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_creating.py) — pass
+#### [turning-enforcement-off-lets-a-user-create-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_creating.py): pass
 
 엔티티 권한 집행을 끄면 아무 권한도 받지 않은 사용자도 배포를 만든다. 이 문은 역할이 아니라 권한 그래프가 지키기 때문이다
 
@@ -1693,12 +1693,12 @@ Given
 
 When
 
-- DeploymentAdapter.create — user-1이 team-1에 serving 배포를 만듦
+- DeploymentAdapter.create: user-1이 team-1에 serving 배포를 만듦
 
 Then
 
 - 만든 배포 전체가 온다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - metadata.project_id: 심은 프로젝트와 같다
   - metadata.domain_name = 'home-1'
   - metadata.name = 'serving'
@@ -1722,7 +1722,7 @@ Then
 
 <a id="creating-a-create-grant-in-another-project-does-not-reach-this-one"></a>
 
-#### [a-create-grant-in-another-project-does-not-reach-this-one](/tests/scenario/bai_scenario/manager/deployment/test_creating.py) — pass
+#### [a-create-grant-in-another-project-does-not-reach-this-one](/tests/scenario/bai_scenario/manager/deployment/test_creating.py): pass
 
 생성 권한을 받은 프로젝트가 아닌 다른 프로젝트에 배포를 만들면, 권한 부족으로 거부된다
 
@@ -1745,7 +1745,7 @@ Given
 
 When
 
-- DeploymentAdapter.create — user-1이 team-1에 serving 배포를 만듦
+- DeploymentAdapter.create: user-1이 team-1에 serving 배포를 만듦
 
 Then
 
@@ -1754,7 +1754,7 @@ Then
 
 <a id="creating-a-user-granted-nothing-may-not-create-a-deployment"></a>
 
-#### [a-user-granted-nothing-may-not-create-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_creating.py) — pass
+#### [a-user-granted-nothing-may-not-create-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_creating.py): pass
 
 아무 배포 권한도 받지 않은 사용자가 배포를 만들면, 권한 부족으로 거부된다
 
@@ -1773,7 +1773,7 @@ Given
 
 When
 
-- DeploymentAdapter.create — user-1이 team-1에 serving 배포를 만듦
+- DeploymentAdapter.create: user-1이 team-1에 serving 배포를 만듦
 
 Then
 
@@ -1784,7 +1784,7 @@ Then
 
 <a id="retiring-a-user-granted-soft-delete-retires-a-deployment"></a>
 
-#### [a-user-granted-soft-delete-retires-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_retiring.py) — pass
+#### [a-user-granted-soft-delete-retires-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_retiring.py): pass
 
 soft-delete 권한을 받은 사용자가 배포를 지우면, 그 배포를 지우기 시작했다고 답한다
 
@@ -1807,7 +1807,7 @@ Given
 
 When
 
-- DeploymentAdapter.delete — user-1이 deployment-1를 지움
+- DeploymentAdapter.delete: user-1이 deployment-1를 지움
 
 Then
 
@@ -1816,7 +1816,7 @@ Then
 
 <a id="retiring-the-superadmin-retires-anothers-deployment-without-a-grant"></a>
 
-#### [the-superadmin-retires-anothers-deployment-without-a-grant](/tests/scenario/bai_scenario/manager/deployment/test_retiring.py) — pass
+#### [the-superadmin-retires-anothers-deployment-without-a-grant](/tests/scenario/bai_scenario/manager/deployment/test_retiring.py): pass
 
 다른 사람이 만든 배포를 아무 권한도 받지 않은 슈퍼관리자가 지우면, 그 배포를 지우기 시작했다고 답한다. 역할이 권한 그래프를 지나간다
 
@@ -1840,7 +1840,7 @@ Given
 
 When
 
-- DeploymentAdapter.delete — user-1이 theirs-1를 지움
+- DeploymentAdapter.delete: user-1이 theirs-1를 지움
 
 Then
 
@@ -1849,7 +1849,7 @@ Then
 
 <a id="retiring-a-user-granted-only-update-may-not-retire-a-deployment"></a>
 
-#### [a-user-granted-only-update-may-not-retire-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_retiring.py) — pass
+#### [a-user-granted-only-update-may-not-retire-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_retiring.py): pass
 
 수정 권한만 받고 soft-delete 권한은 받지 않은 사용자가 배포를 지우면, 권한 부족으로 거부된다. 지우기는 수정과 다른 문이다
 
@@ -1872,7 +1872,7 @@ Given
 
 When
 
-- DeploymentAdapter.delete — user-1이 deployment-1를 지움
+- DeploymentAdapter.delete: user-1이 deployment-1를 지움
 
 Then
 
@@ -1881,7 +1881,7 @@ Then
 
 <a id="retiring-retiring-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
-#### [retiring-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/deployment/test_retiring.py) — pass
+#### [retiring-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/deployment/test_retiring.py): pass
 
 슈퍼관리자가 아무것도 갖지 않은 id를 지우면, 대상이 없다는 것으로 거부된다
 
@@ -1901,7 +1901,7 @@ Given
 
 When
 
-- DeploymentAdapter.delete — user-1이 아무것도 갖지 않은 id를 지움
+- DeploymentAdapter.delete: user-1이 아무것도 갖지 않은 id를 지움
 
 Then
 
@@ -1912,7 +1912,7 @@ Then
 
 <a id="reading-a-user-granted-read-reads-a-deployment-by-id"></a>
 
-#### [a-user-granted-read-reads-a-deployment-by-id](/tests/scenario/bai_scenario/manager/deployment/test_reading.py) — pass
+#### [a-user-granted-read-reads-a-deployment-by-id](/tests/scenario/bai_scenario/manager/deployment/test_reading.py): pass
 
 배포 하나가 있고 읽기 권한을 받은 사용자가 id로 조회하면, 그 배포가 답으로 온다
 
@@ -1935,7 +1935,7 @@ Given
 
 When
 
-- DeploymentAdapter.get — user-1이 deployment-1로 조회
+- DeploymentAdapter.get: user-1이 deployment-1로 조회
 
 Then
 
@@ -1964,7 +1964,7 @@ Then
 
 <a id="reading-the-superadmin-reads-anothers-deployment-without-a-grant"></a>
 
-#### [the-superadmin-reads-anothers-deployment-without-a-grant](/tests/scenario/bai_scenario/manager/deployment/test_reading.py) — pass
+#### [the-superadmin-reads-anothers-deployment-without-a-grant](/tests/scenario/bai_scenario/manager/deployment/test_reading.py): pass
 
 다른 사람이 만든 배포를 아무 권한도 받지 않은 슈퍼관리자가 id로 조회하면, 그 배포가 답으로 온다. 역할이 권한 그래프를 지나간다
 
@@ -1988,7 +1988,7 @@ Given
 
 When
 
-- DeploymentAdapter.get — user-1이 theirs-1로 조회
+- DeploymentAdapter.get: user-1이 theirs-1로 조회
 
 Then
 
@@ -2017,7 +2017,7 @@ Then
 
 <a id="reading-a-user-granted-nothing-may-not-read-a-deployment"></a>
 
-#### [a-user-granted-nothing-may-not-read-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_reading.py) — pass
+#### [a-user-granted-nothing-may-not-read-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_reading.py): pass
 
 같은 배포가 있고 아무 권한도 받지 않은 사용자가 조회하면, 권한 부족으로 거부된다
 
@@ -2037,7 +2037,7 @@ Given
 
 When
 
-- DeploymentAdapter.get — user-1이 deployment-1로 조회
+- DeploymentAdapter.get: user-1이 deployment-1로 조회
 
 Then
 
@@ -2046,7 +2046,7 @@ Then
 
 <a id="reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
-#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/deployment/test_reading.py) — pass
+#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/deployment/test_reading.py): pass
 
 슈퍼관리자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것으로 거부된다. 권한 검사를 지나가는 사람만 이 답을 본다
 
@@ -2066,7 +2066,7 @@ Given
 
 When
 
-- DeploymentAdapter.get — user-1이 아무것도 갖지 않은 id로 조회
+- DeploymentAdapter.get: user-1이 아무것도 갖지 않은 id로 조회
 
 Then
 
@@ -2075,7 +2075,7 @@ Then
 
 <a id="reading-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user"></a>
 
-#### [an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user](/tests/scenario/bai_scenario/manager/deployment/test_reading.py) — pass
+#### [an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user](/tests/scenario/bai_scenario/manager/deployment/test_reading.py): pass
 
 읽기 권한을 받은 사용자가 아무것도 갖지 않은 id로 조회하면, 대상이 없다는 것이 아니라 권한 부족으로 거부된다. 없는 행에는 걸린 권한도 없기 때문이다
 
@@ -2098,7 +2098,7 @@ Given
 
 When
 
-- DeploymentAdapter.get — user-1이 아무것도 갖지 않은 id로 조회
+- DeploymentAdapter.get: user-1이 아무것도 갖지 않은 id로 조회
 
 Then
 
@@ -2109,7 +2109,7 @@ Then
 
 <a id="partial_bulk_access_tokens-a-user-granted-nothing-purges-none-of-several-tokens"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-tokens](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_access_tokens.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-tokens](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_access_tokens.py): pass
 
 아무 권한도 받지 않은 사용자가 토큰 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -2131,7 +2131,7 @@ Given
 
 When
 
-- DeploymentAdapter.partial_bulk_purge_access_tokens — user-1이 토큰 2개를 한 번에 purge 함
+- DeploymentAdapter.partial_bulk_purge_access_tokens: user-1이 토큰 2개를 한 번에 purge 함
 
 Then
 
@@ -2145,7 +2145,7 @@ Then
 
 <a id="partial_bulk_access_tokens-purging-several-tokens-answers-for-the-missing-one"></a>
 
-#### [purging-several-tokens-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_access_tokens.py) — pass
+#### [purging-several-tokens-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_access_tokens.py): pass
 
 배포 영구 삭제 권한을 받은 사용자가 토큰 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -2170,7 +2170,7 @@ Given
 
 When
 
-- DeploymentAdapter.partial_bulk_purge_access_tokens — user-1이 토큰 2개 와 없는 id 하나를 한 번에 purge 함
+- DeploymentAdapter.partial_bulk_purge_access_tokens: user-1이 토큰 2개 와 없는 id 하나를 한 번에 purge 함
 
 Then
 
@@ -2186,7 +2186,7 @@ Then
 
 <a id="partial_bulk_auto_scaling_rules-a-deployment-editor-purges-none-of-several-rules"></a>
 
-#### [a-deployment-editor-purges-none-of-several-rules](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py) — pass
+#### [a-deployment-editor-purges-none-of-several-rules](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py): pass
 
 배포 수정 권한만 받은 사용자가 규칙 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -2211,7 +2211,7 @@ Given
 
 When
 
-- DeploymentAdapter.partial_bulk_purge_rules — user-1이 규칙 2개를 한 번에 purge 함
+- DeploymentAdapter.partial_bulk_purge_rules: user-1이 규칙 2개를 한 번에 purge 함
 
 Then
 
@@ -2225,7 +2225,7 @@ Then
 
 <a id="partial_bulk_auto_scaling_rules-a-user-granted-nothing-purges-none-of-several-rules"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-rules](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-rules](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py): pass
 
 아무 권한도 받지 않은 사용자가 규칙 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -2247,7 +2247,7 @@ Given
 
 When
 
-- DeploymentAdapter.partial_bulk_purge_rules — user-1이 규칙 2개를 한 번에 purge 함
+- DeploymentAdapter.partial_bulk_purge_rules: user-1이 규칙 2개를 한 번에 purge 함
 
 Then
 
@@ -2261,7 +2261,7 @@ Then
 
 <a id="partial_bulk_auto_scaling_rules-purging-several-rules-answers-for-the-missing-one"></a>
 
-#### [purging-several-rules-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py) — pass
+#### [purging-several-rules-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py): pass
 
 배포 영구 삭제 권한을 받은 사용자가 규칙 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 되기 전 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -2286,7 +2286,7 @@ Given
 
 When
 
-- DeploymentAdapter.partial_bulk_purge_rules — user-1이 규칙 2개 와 없는 id 하나를 한 번에 purge 함
+- DeploymentAdapter.partial_bulk_purge_rules: user-1이 규칙 2개 와 없는 id 하나를 한 번에 purge 함
 
 Then
 
@@ -2304,7 +2304,7 @@ Then
 
 <a id="partial_bulk_auto_scaling_rules-a-deployment-editor-edits-several-rules-at-once"></a>
 
-#### [a-deployment-editor-edits-several-rules-at-once](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py) — pass
+#### [a-deployment-editor-edits-several-rules-at-once](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py): pass
 
 배포 수정 권한을 받은 사용자가 규칙 여럿의 지표 이름을 한 번에 바꾸면, 모두 새 이름으로 오고 실패한 것은 없다
 
@@ -2329,7 +2329,7 @@ Given
 
 When
 
-- DeploymentAdapter.partial_bulk_update_rules — user-1이 규칙 2개의 지표 이름을 한 번에 고침
+- DeploymentAdapter.partial_bulk_update_rules: user-1이 규칙 2개의 지표 이름을 한 번에 고침
 
 Then
 
@@ -2343,7 +2343,7 @@ Then
 
 <a id="partial_bulk_auto_scaling_rules-a-user-granted-nothing-edits-none-of-several-rules"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-rules](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-rules](/tests/scenario/bai_scenario/manager/deployment/test_partial_bulk_auto_scaling_rules.py): pass
 
 아무 권한도 받지 않은 사용자가 규칙 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -2365,7 +2365,7 @@ Given
 
 When
 
-- DeploymentAdapter.partial_bulk_update_rules — user-1이 규칙 2개의 지표 이름을 한 번에 고침
+- DeploymentAdapter.partial_bulk_update_rules: user-1이 규칙 2개의 지표 이름을 한 번에 고침
 
 Then
 
@@ -2381,7 +2381,7 @@ Then
 
 <a id="options-a-user-granted-update-replaces-the-options-whole"></a>
 
-#### [a-user-granted-update-replaces-the-options-whole](/tests/scenario/bai_scenario/manager/deployment/test_options.py) — pass
+#### [a-user-granted-update-replaces-the-options-whole](/tests/scenario/bai_scenario/manager/deployment/test_options.py): pass
 
 수정 권한을 받은 사용자가 기본값과 처리기별 설정을 담아 옵션을 갈아끼우면, 준 것이 통째로 새 옵션이 되고 답은 그 옵션만 싣는다
 
@@ -2404,7 +2404,7 @@ Given
 
 When
 
-- DeploymentAdapter.replace_options — user-1이 deployment-1의 옵션을 처리기별 설정 check-replica-deployments을 담아 갈아끼움
+- DeploymentAdapter.replace_options: user-1이 deployment-1의 옵션을 처리기별 설정 check-replica-deployments을 담아 갈아끼움
 
 Then
 
@@ -2416,7 +2416,7 @@ Then
 
 <a id="options-replacing-with-no-handler-entry-drops-the-inherited-ones"></a>
 
-#### [replacing-with-no-handler-entry-drops-the-inherited-ones](/tests/scenario/bai_scenario/manager/deployment/test_options.py) — pass
+#### [replacing-with-no-handler-entry-drops-the-inherited-ones](/tests/scenario/bai_scenario/manager/deployment/test_options.py): pass
 
 물려받은 처리기별 설정이 있는 배포에 기본값만 담아 옵션을 갈아끼우면, 물려받은 설정이 하나도 남지 않는다
 
@@ -2439,7 +2439,7 @@ Given
 
 When
 
-- DeploymentAdapter.replace_options — user-1이 deployment-1의 옵션을 기본값만 담아 갈아끼움
+- DeploymentAdapter.replace_options: user-1이 deployment-1의 옵션을 기본값만 담아 갈아끼움
 
 Then
 
@@ -2451,7 +2451,7 @@ Then
 
 <a id="options-a-user-granted-only-read-may-not-replace-the-options"></a>
 
-#### [a-user-granted-only-read-may-not-replace-the-options](/tests/scenario/bai_scenario/manager/deployment/test_options.py) — pass
+#### [a-user-granted-only-read-may-not-replace-the-options](/tests/scenario/bai_scenario/manager/deployment/test_options.py): pass
 
 읽기 권한만 받은 사용자가 옵션을 갈아끼우면, 권한 부족으로 거부된다
 
@@ -2474,7 +2474,7 @@ Given
 
 When
 
-- DeploymentAdapter.replace_options — user-1이 deployment-1의 옵션을 처리기별 설정 check-replica-deployments을 담아 갈아끼움
+- DeploymentAdapter.replace_options: user-1이 deployment-1의 옵션을 처리기별 설정 check-replica-deployments을 담아 갈아끼움
 
 Then
 
@@ -2483,7 +2483,7 @@ Then
 
 <a id="options-naming-a-handler-twice-is-refused"></a>
 
-#### [naming-a-handler-twice-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_options.py) — pass
+#### [naming-a-handler-twice-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_options.py): pass
 
 같은 처리기 이름을 두 번 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다
 
@@ -2506,7 +2506,7 @@ Given
 
 When
 
-- DeploymentAdapter.replace_options — user-1이 deployment-1의 옵션을 처리기별 설정 check-replica-deployments, check-replica-deployments을 담아 갈아끼움
+- DeploymentAdapter.replace_options: user-1이 deployment-1의 옵션을 처리기별 설정 check-replica-deployments, check-replica-deployments을 담아 갈아끼움
 
 Then
 
@@ -2515,7 +2515,7 @@ Then
 
 <a id="options-naming-an-unregistered-handler-is-refused"></a>
 
-#### [naming-an-unregistered-handler-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_options.py) — pass
+#### [naming-an-unregistered-handler-is-refused](/tests/scenario/bai_scenario/manager/deployment/test_options.py): pass
 
 등록되지 않은 처리기 이름을 담아 옵션을 갈아끼우면, 입력이 틀렸다는 이유로 거부된다
 
@@ -2538,7 +2538,7 @@ Given
 
 When
 
-- DeploymentAdapter.replace_options — user-1이 deployment-1의 옵션을 처리기별 설정 no-such-handler을 담아 갈아끼움
+- DeploymentAdapter.replace_options: user-1이 deployment-1의 옵션을 처리기별 설정 no-such-handler을 담아 갈아끼움
 
 Then
 
@@ -2549,7 +2549,7 @@ Then
 
 <a id="searching_revisions-a-user-granted-read-counts-every-slot-a-revision-allocates"></a>
 
-#### [a-user-granted-read-counts-every-slot-a-revision-allocates](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+#### [a-user-granted-read-counts-every-slot-a-revision-allocates](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py): pass
 
 슬롯 둘을 잡은 리비전이 딸린 배포에 읽기 권한을 받은 사용자가 그 리비전의 슬롯을 훑으면, 둘을 모두 센다
 
@@ -2584,7 +2584,7 @@ Given
 
 When
 
-- DeploymentAdapter.search_revision_resource_slots — user-1이 deployment-1의 첫 리비전의 슬롯을 조회
+- DeploymentAdapter.search_revision_resource_slots: user-1이 deployment-1의 첫 리비전의 슬롯을 조회
 
 Then
 
@@ -2596,7 +2596,7 @@ Then
 
 <a id="searching_revisions-a-user-granted-nothing-may-not-search-a-revisions-slots"></a>
 
-#### [a-user-granted-nothing-may-not-search-a-revisions-slots](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py) — pass
+#### [a-user-granted-nothing-may-not-search-a-revisions-slots](/tests/scenario/bai_scenario/manager/deployment/test_searching_revisions.py): pass
 
 아무 배포 권한도 받지 않은 사용자가 배포의 리비전의 슬롯을 훑으면, 리비전을 찾을 수 없다는 답으로 거부된다
 
@@ -2628,7 +2628,7 @@ Given
 
 When
 
-- DeploymentAdapter.search_revision_resource_slots — user-1이 deployment-1의 첫 리비전의 슬롯을 조회
+- DeploymentAdapter.search_revision_resource_slots: user-1이 deployment-1의 첫 리비전의 슬롯을 조회
 
 Then
 
@@ -2639,7 +2639,7 @@ Then
 
 <a id="syncing-a-user-granted-update-starts-syncing-the-replicas"></a>
 
-#### [a-user-granted-update-starts-syncing-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_syncing.py) — pass
+#### [a-user-granted-update-starts-syncing-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_syncing.py): pass
 
 수정 권한을 받은 사용자가 복제 맞추기를 요청하면, 맞추기를 시작했다고 답한다
 
@@ -2662,7 +2662,7 @@ Given
 
 When
 
-- DeploymentAdapter.sync_replicas — user-1이 deployment-1의 복제 맞추기를 요청
+- DeploymentAdapter.sync_replicas: user-1이 deployment-1의 복제 맞추기를 요청
 
 Then
 
@@ -2671,7 +2671,7 @@ Then
 
 <a id="syncing-a-user-granted-only-read-may-not-sync-the-replicas"></a>
 
-#### [a-user-granted-only-read-may-not-sync-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_syncing.py) — pass
+#### [a-user-granted-only-read-may-not-sync-the-replicas](/tests/scenario/bai_scenario/manager/deployment/test_syncing.py): pass
 
 읽기 권한만 받은 사용자가 복제 맞추기를 요청하면, 권한 부족으로 거부된다
 
@@ -2694,7 +2694,7 @@ Given
 
 When
 
-- DeploymentAdapter.sync_replicas — user-1이 deployment-1의 복제 맞추기를 요청
+- DeploymentAdapter.sync_replicas: user-1이 deployment-1의 복제 맞추기를 요청
 
 Then
 
@@ -2705,7 +2705,7 @@ Then
 
 <a id="editing-a-user-granted-update-opens-a-deployment-to-the-public"></a>
 
-#### [a-user-granted-update-opens-a-deployment-to-the-public](/tests/scenario/bai_scenario/manager/deployment/test_editing.py) — pass
+#### [a-user-granted-update-opens-a-deployment-to-the-public](/tests/scenario/bai_scenario/manager/deployment/test_editing.py): pass
 
 공개가 아닌 배포를 수정 권한을 받은 사용자가 공개로 바꾸면, 공개로 바뀐 상태가 온다
 
@@ -2728,7 +2728,7 @@ Given
 
 When
 
-- DeploymentAdapter.update — user-1이 deployment-1를 바깥에 열도록 수정
+- DeploymentAdapter.update: user-1이 deployment-1를 바깥에 열도록 수정
 
 Then
 
@@ -2757,7 +2757,7 @@ Then
 
 <a id="editing-a-user-granted-update-raises-the-replica-count"></a>
 
-#### [a-user-granted-update-raises-the-replica-count](/tests/scenario/bai_scenario/manager/deployment/test_editing.py) — pass
+#### [a-user-granted-update-raises-the-replica-count](/tests/scenario/bai_scenario/manager/deployment/test_editing.py): pass
 
 수정 권한을 받은 사용자가 복제 수를 올리면, 두려는 복제 수가 새 값이 된다
 
@@ -2780,7 +2780,7 @@ Given
 
 When
 
-- DeploymentAdapter.update — user-1이 deployment-1를 복제 수를 3으로 수정
+- DeploymentAdapter.update: user-1이 deployment-1를 복제 수를 3으로 수정
 
 Then
 
@@ -2809,7 +2809,7 @@ Then
 
 <a id="editing-a-user-granted-update-renames-a-deployment"></a>
 
-#### [a-user-granted-update-renames-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_editing.py) — pass
+#### [a-user-granted-update-renames-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_editing.py): pass
 
 수정 권한을 받은 사용자가 이름을 바꾸면, 이름만 새 값이 되고 나머지는 그대로다
 
@@ -2832,7 +2832,7 @@ Given
 
 When
 
-- DeploymentAdapter.update — user-1이 deployment-1를 이름을 renamed으로 수정
+- DeploymentAdapter.update: user-1이 deployment-1를 이름을 renamed으로 수정
 
 Then
 
@@ -2861,7 +2861,7 @@ Then
 
 <a id="editing-clearing-the-tags-of-a-deployment-leaves-none"></a>
 
-#### [clearing-the-tags-of-a-deployment-leaves-none](/tests/scenario/bai_scenario/manager/deployment/test_editing.py) — pass
+#### [clearing-the-tags-of-a-deployment-leaves-none](/tests/scenario/bai_scenario/manager/deployment/test_editing.py): pass
 
 태그가 붙은 배포의 태그를 비우면, 태그가 하나도 남지 않는다
 
@@ -2884,7 +2884,7 @@ Given
 
 When
 
-- DeploymentAdapter.update — user-1이 deployment-1를 태그를 비우도록 수정
+- DeploymentAdapter.update: user-1이 deployment-1를 태그를 비우도록 수정
 
 Then
 
@@ -2913,7 +2913,7 @@ Then
 
 <a id="editing-the-superadmin-renames-anothers-deployment-without-a-grant"></a>
 
-#### [the-superadmin-renames-anothers-deployment-without-a-grant](/tests/scenario/bai_scenario/manager/deployment/test_editing.py) — pass
+#### [the-superadmin-renames-anothers-deployment-without-a-grant](/tests/scenario/bai_scenario/manager/deployment/test_editing.py): pass
 
 다른 사람이 만든 배포의 이름을 아무 권한도 받지 않은 슈퍼관리자가 바꾸면, 이름만 새 값이 된다. 역할이 권한 그래프를 지나간다
 
@@ -2937,7 +2937,7 @@ Given
 
 When
 
-- DeploymentAdapter.update — user-1이 theirs-1를 이름을 renamed으로 수정
+- DeploymentAdapter.update: user-1이 theirs-1를 이름을 renamed으로 수정
 
 Then
 
@@ -2966,7 +2966,7 @@ Then
 
 <a id="editing-a-user-granted-only-read-may-not-update-a-deployment"></a>
 
-#### [a-user-granted-only-read-may-not-update-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_editing.py) — pass
+#### [a-user-granted-only-read-may-not-update-a-deployment](/tests/scenario/bai_scenario/manager/deployment/test_editing.py): pass
 
 읽기 권한만 받은 사용자가 배포를 수정하면, 권한 부족으로 거부된다
 
@@ -2989,7 +2989,7 @@ Given
 
 When
 
-- DeploymentAdapter.update — user-1이 deployment-1를 이름을 renamed으로 수정
+- DeploymentAdapter.update: user-1이 deployment-1를 이름을 renamed으로 수정
 
 Then
 
@@ -2998,7 +2998,7 @@ Then
 
 <a id="editing-updating-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
-#### [updating-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/deployment/test_editing.py) — pass
+#### [updating-an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/deployment/test_editing.py): pass
 
 슈퍼관리자가 아무것도 갖지 않은 id를 수정하면, 대상이 없다는 것으로 거부된다
 
@@ -3018,7 +3018,7 @@ Given
 
 When
 
-- DeploymentAdapter.update — user-1이 아무것도 갖지 않은 id를 이름을 renamed으로 수정
+- DeploymentAdapter.update: user-1이 아무것도 갖지 않은 id를 이름을 renamed으로 수정
 
 Then
 

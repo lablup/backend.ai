@@ -1,42 +1,42 @@
 ## session
 
-[what it guarantees](/src/ai/backend/manager/api/adapters/session/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/session/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/session/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/session/adapter.py)
 
 Scenario: incomplete 28 / 30
 
 - built from ops (7)
-  - batch_load_kernel_group_environs_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - batch_load_kernel_group_resource_slots_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - batch_load_kernel_groups_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - batch_load_main_kernel_groups — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - scoped_search_kernel_group_environs — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - scoped_search_kernel_group_resource_slots — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - scoped_search_kernel_groups — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_kernel_group_environs_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_kernel_group_resource_slots_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_kernel_groups_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_main_kernel_groups: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - scoped_search_kernel_group_environs: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - scoped_search_kernel_group_resource_slots: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - scoped_search_kernel_groups: representative success ✗ · representative rejection ✗: SCENARIO-GAP
 - ops + direct implementation (10)
-  - admin_search — success present 3 · refusal present 1 (global_searcher_ops, partial_bulk)
-  - admin_search_kernels — success absent · refusal absent (atomic_bulk_field, global_searcher_ops) — SCENARIO-GAP
-  - batch_load_by_ids — success absent · refusal absent (partial_bulk, partial_bulk_get_ops) — SCENARIO-GAP
-  - batch_load_kernels_by_ids — success absent · refusal absent (atomic_bulk_field, partial_bulk_get_ops) — SCENARIO-GAP
-  - gql_search_by_project — success absent · refusal absent (partial_bulk, scoped_search_ops) — SCENARIO-GAP
-  - project_search — success absent · refusal absent (partial_bulk, scoped_search_ops) — SCENARIO-GAP
-  - scoped_search — success absent · refusal absent (partial_bulk, scoped_search_ops) — SCENARIO-GAP
-  - search_kernels_by_agent — success absent · refusal absent (atomic_bulk_field, global_searcher_ops) — SCENARIO-GAP
-  - search_kernels_by_session — success absent · refusal absent (atomic_bulk_field, atomic_bulk_scoped_search_ops) — SCENARIO-GAP
-  - search_sessions_by_agent — success absent · refusal absent (global_searcher_ops, partial_bulk) — SCENARIO-GAP
+  - admin_search: success present 3 · rejection present 1 (global_searcher_ops, partial_bulk)
+  - admin_search_kernels: success absent · rejection absent (atomic_bulk_field, global_searcher_ops): SCENARIO-GAP
+  - batch_load_by_ids: success absent · rejection absent (partial_bulk, partial_bulk_get_ops): SCENARIO-GAP
+  - batch_load_kernels_by_ids: success absent · rejection absent (atomic_bulk_field, partial_bulk_get_ops): SCENARIO-GAP
+  - gql_search_by_project: success absent · rejection absent (partial_bulk, scoped_search_ops): SCENARIO-GAP
+  - project_search: success absent · rejection absent (partial_bulk, scoped_search_ops): SCENARIO-GAP
+  - scoped_search: success absent · rejection absent (partial_bulk, scoped_search_ops): SCENARIO-GAP
+  - search_kernels_by_agent: success absent · rejection absent (atomic_bulk_field, global_searcher_ops): SCENARIO-GAP
+  - search_kernels_by_session: success absent · rejection absent (atomic_bulk_field, atomic_bulk_scoped_search_ops): SCENARIO-GAP
+  - search_sessions_by_agent: success absent · rejection absent (global_searcher_ops, partial_bulk): SCENARIO-GAP
 - direct implementation (13)
-  - batch_resource_allocation_by_kernel — success absent · refusal absent (atomic_bulk_field) — SCENARIO-GAP
-  - batch_resource_allocation_by_session — success absent · refusal absent (partial_bulk) — SCENARIO-GAP
-  - compute_schedule — success absent · refusal absent (single_entity) — SCENARIO-GAP
-  - enqueue — success absent · refusal absent (partial_bulk, scope) — SCENARIO-GAP
-  - exclude_idle_checks — success absent · refusal absent (legacy_partial_bulk) — SCENARIO-GAP
-  - get — success absent · refusal absent (partial_bulk, single_entity) — SCENARIO-GAP
-  - get_logs — success absent · refusal absent (single_entity) — SCENARIO-GAP
-  - include_idle_checks — success absent · refusal absent (legacy_partial_bulk) — SCENARIO-GAP
-  - partial_bulk_terminate — success present 3 · refusal absent (partial_bulk) — SCENARIO-GAP
-  - shutdown_service — success absent · refusal absent (single_entity) — SCENARIO-GAP
-  - start_service — success absent · refusal absent (single_entity) — SCENARIO-GAP
-  - terminate — success present 1 · refusal present 1 (partial_bulk)
-  - update — success absent · refusal absent (partial_bulk, single_entity) — SCENARIO-GAP
+  - batch_resource_allocation_by_kernel: success absent · rejection absent (atomic_bulk_field): SCENARIO-GAP
+  - batch_resource_allocation_by_session: success absent · rejection absent (partial_bulk): SCENARIO-GAP
+  - compute_schedule: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - enqueue: success absent · rejection absent (partial_bulk, scope): SCENARIO-GAP
+  - exclude_idle_checks: success absent · rejection absent (legacy_partial_bulk): SCENARIO-GAP
+  - get: success absent · rejection absent (partial_bulk, single_entity): SCENARIO-GAP
+  - get_logs: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - include_idle_checks: success absent · rejection absent (legacy_partial_bulk): SCENARIO-GAP
+  - partial_bulk_terminate: success present 3 · rejection absent (partial_bulk): SCENARIO-GAP
+  - shutdown_service: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - start_service: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - terminate: success present 1 · rejection present 1 (partial_bulk)
+  - update: success absent · rejection absent (partial_bulk, single_entity): SCENARIO-GAP
 
 **admin_search**
 
@@ -45,7 +45,7 @@ Scenario: incomplete 28 / 30
 | [세션을 하나도 심지 않은 상태에서 슈퍼관리자가 조회하면, 답은 비어 있다](#session-a-scenario-that-laid-no-session-finds-none) | answered |
 | [슈퍼관리자가 지정된 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-scheduling-conditions-are-preserved-when-configured) | answered |
 | [슈퍼관리자가 미설정인 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다](#searching_details-session-scheduling-conditions-are-preserved-when-unset) | answered |
-| [필터 없는 전체 조회는 슈퍼관리자 역할로만 열리므로, 아무 권한도 받지 않은 사용자는 역할 부족으로 거부된다](#session-a-user-granted-nothing-may-not-search-sessions) | refused |
+| [필터 없는 전체 조회는 슈퍼관리자 역할로만 열리므로, 아무 권한도 받지 않은 사용자는 역할 부족으로 거부된다](#session-a-user-granted-nothing-may-not-search-sessions) | rejected |
 
 **partial_bulk_terminate**
 
@@ -60,13 +60,13 @@ Scenario: incomplete 28 / 30
 | scenario | verdict |
 |---|---|
 | [슈퍼관리자가 대기 세션을 종료하면, 취소된 목록에 온다](#terminating-a-superadmin-terminates-a-pending-session) | answered |
-| [아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 호출 전체가 거부된다](#terminating-a-user-granted-nothing-may-not-terminate) | refused |
+| [아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 호출 전체가 거부된다](#terminating-a-user-granted-nothing-may-not-terminate) | rejected |
 
 ### admin_search
 
 <a id="session-a-scenario-that-laid-no-session-finds-none"></a>
 
-#### [a-scenario-that-laid-no-session-finds-none](/tests/scenario/bai_scenario/manager/session/test_session.py) — pass
+#### [a-scenario-that-laid-no-session-finds-none](/tests/scenario/bai_scenario/manager/session/test_session.py): pass
 
 세션을 하나도 심지 않은 상태에서 슈퍼관리자가 조회하면, 답은 비어 있다
 
@@ -82,7 +82,7 @@ Given
 
 When
 
-- SessionAdapter.admin_search — user-1이 필터 없이 전체 조회
+- SessionAdapter.admin_search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -94,7 +94,7 @@ Then
 
 <a id="searching_details-session-scheduling-conditions-are-preserved-when-configured"></a>
 
-#### [session-scheduling-conditions-are-preserved-when-configured](/tests/scenario/bai_scenario/manager/session/test_searching_details.py) — pass
+#### [session-scheduling-conditions-are-preserved-when-configured](/tests/scenario/bai_scenario/manager/session/test_searching_details.py): pass
 
 슈퍼관리자가 지정된 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다
 
@@ -125,7 +125,7 @@ Given
 
 When
 
-- SessionAdapter.admin_search — user-2이 필터 없이 전체 조회
+- SessionAdapter.admin_search: user-2이 필터 없이 전체 조회
 
 Then
 
@@ -137,7 +137,7 @@ Then
 
 <a id="searching_details-session-scheduling-conditions-are-preserved-when-unset"></a>
 
-#### [session-scheduling-conditions-are-preserved-when-unset](/tests/scenario/bai_scenario/manager/session/test_searching_details.py) — pass
+#### [session-scheduling-conditions-are-preserved-when-unset](/tests/scenario/bai_scenario/manager/session/test_searching_details.py): pass
 
 슈퍼관리자가 미설정인 세션 스케줄링 조건을 읽으면 기존 세션 정보와 함께 유지된다
 
@@ -163,7 +163,7 @@ Given
 
 When
 
-- SessionAdapter.admin_search — user-2이 필터 없이 전체 조회
+- SessionAdapter.admin_search: user-2이 필터 없이 전체 조회
 
 Then
 
@@ -175,7 +175,7 @@ Then
 
 <a id="session-a-user-granted-nothing-may-not-search-sessions"></a>
 
-#### [a-user-granted-nothing-may-not-search-sessions](/tests/scenario/bai_scenario/manager/session/test_session.py) — pass
+#### [a-user-granted-nothing-may-not-search-sessions](/tests/scenario/bai_scenario/manager/session/test_session.py): pass
 
 필터 없는 전체 조회는 슈퍼관리자 역할로만 열리므로, 아무 권한도 받지 않은 사용자는 역할 부족으로 거부된다
 
@@ -191,7 +191,7 @@ Given
 
 When
 
-- SessionAdapter.admin_search — user-1이 필터 없이 전체 조회
+- SessionAdapter.admin_search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -202,7 +202,7 @@ Then
 
 <a id="partial_bulk_terminating-a-user-granted-nothing-terminates-none"></a>
 
-#### [a-user-granted-nothing-terminates-none](/tests/scenario/bai_scenario/manager/session/test_partial_bulk_terminating.py) — pass
+#### [a-user-granted-nothing-terminates-none](/tests/scenario/bai_scenario/manager/session/test_partial_bulk_terminating.py): pass
 
 아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 종료된 것 없이 권한이 없다는 이유로 실패 목록에 온다
 
@@ -228,7 +228,7 @@ Given
 
 When
 
-- SessionAdapter.partial_bulk_terminate — user-2이 대기 세션를 한 번에 종료함
+- SessionAdapter.partial_bulk_terminate: user-2이 대기 세션를 한 번에 종료함
 
 Then
 
@@ -240,7 +240,7 @@ Then
 
 <a id="partial_bulk_terminating-a-user-granted-session-soft-delete-in-the-project-terminates-its-session"></a>
 
-#### [a-user-granted-session-soft-delete-in-the-project-terminates-its-session](/tests/scenario/bai_scenario/manager/session/test_partial_bulk_terminating.py) — pass
+#### [a-user-granted-session-soft-delete-in-the-project-terminates-its-session](/tests/scenario/bai_scenario/manager/session/test_partial_bulk_terminating.py): pass
 
 프로젝트 범위에서 세션 soft delete 권한을 받은 사용자가 그 프로젝트의 대기 세션을 종료하면, 취소됨으로 처리된 목록에 온다
 
@@ -271,7 +271,7 @@ Given
 
 When
 
-- SessionAdapter.partial_bulk_terminate — user-2이 대기 세션를 한 번에 종료함
+- SessionAdapter.partial_bulk_terminate: user-2이 대기 세션를 한 번에 종료함
 
 Then
 
@@ -283,7 +283,7 @@ Then
 
 <a id="partial_bulk_terminating-terminating-several-skips-the-missing-one"></a>
 
-#### [terminating-several-skips-the-missing-one](/tests/scenario/bai_scenario/manager/session/test_partial_bulk_terminating.py) — pass
+#### [terminating-several-skips-the-missing-one](/tests/scenario/bai_scenario/manager/session/test_partial_bulk_terminating.py): pass
 
 슈퍼관리자가 대기 세션과 없는 id 하나를 한 번에 종료하면, 대기 세션은 취소됨, 없는 id 는 건너뜀으로 처리된 목록에 온다
 
@@ -309,7 +309,7 @@ Given
 
 When
 
-- SessionAdapter.partial_bulk_terminate — user-2이 대기 세션와 없는 id 하나를 한 번에 종료함
+- SessionAdapter.partial_bulk_terminate: user-2이 대기 세션와 없는 id 하나를 한 번에 종료함
 
 Then
 
@@ -325,7 +325,7 @@ Then
 
 <a id="terminating-a-superadmin-terminates-a-pending-session"></a>
 
-#### [a-superadmin-terminates-a-pending-session](/tests/scenario/bai_scenario/manager/session/test_terminating.py) — pass
+#### [a-superadmin-terminates-a-pending-session](/tests/scenario/bai_scenario/manager/session/test_terminating.py): pass
 
 슈퍼관리자가 대기 세션을 종료하면, 취소된 목록에 온다
 
@@ -351,7 +351,7 @@ Given
 
 When
 
-- SessionAdapter.terminate — user-2이 대기 세션을 종료함
+- SessionAdapter.terminate: user-2이 대기 세션을 종료함
 
 Then
 
@@ -364,7 +364,7 @@ Then
 
 <a id="terminating-a-user-granted-nothing-may-not-terminate"></a>
 
-#### [a-user-granted-nothing-may-not-terminate](/tests/scenario/bai_scenario/manager/session/test_terminating.py) — pass
+#### [a-user-granted-nothing-may-not-terminate](/tests/scenario/bai_scenario/manager/session/test_terminating.py): pass
 
 아무 권한도 받지 않은 사용자가 대기 세션을 종료하려 하면, 호출 전체가 거부된다
 
@@ -390,7 +390,7 @@ Given
 
 When
 
-- SessionAdapter.terminate — user-2이 대기 세션을 종료함
+- SessionAdapter.terminate: user-2이 대기 세션을 종료함
 
 Then
 

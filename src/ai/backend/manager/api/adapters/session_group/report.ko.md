@@ -1,18 +1,18 @@
 ## session_group
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/session_group/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/session_group/adapter.py)
+[배경](/src/ai/backend/manager/api/adapters/session_group/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/session_group/adapter.py)
 
 시나리오: 완성
 
 - ops 로 구성 (5)
-  - create — 대표 성공 ✓ · 대표 실패 ✓
-  - global_search — 대표 성공 ✓ · 대표 실패 ✓
-  - purge — 대표 성공 ✓ · 대표 실패 ✓
-  - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
-  - update — 대표 성공 ✓ · 대표 실패 ✓
+  - create: 대표 성공 ✓ · 대표 실패 ✓
+  - global_search: 대표 성공 ✓ · 대표 실패 ✓
+  - purge: 대표 성공 ✓ · 대표 실패 ✓
+  - scoped_search: 대표 성공 ✓ · 대표 실패 ✓
+  - update: 대표 성공 ✓ · 대표 실패 ✓
 - 직접 구현 (2)
-  - bulk_get_ids — 성공 있음 2 · 실패 있음 1 (partial_bulk)
-  - get — 성공 있음 1 · 실패 있음 2 (single_entity)
+  - bulk_get_ids: 성공 있음 2 · 실패 있음 1 (partial_bulk)
+  - get: 성공 있음 1 · 실패 있음 2 (single_entity)
 
 **create**
 
@@ -77,7 +77,7 @@
 
 <a id="creating-a-user-granted-create-in-a-project-creates-a-session-group-there"></a>
 
-#### [a-user-granted-create-in-a-project-creates-a-session-group-there](/tests/scenario/bai_scenario/manager/session_group/test_creating.py) — pass
+#### [a-user-granted-create-in-a-project-creates-a-session-group-there](/tests/scenario/bai_scenario/manager/session_group/test_creating.py): pass
 
 프로젝트에서 세션 그룹 생성 권한을 받은 사용자가 그 프로젝트에 세션 그룹을 만들면, 그 사용자가 소유자이고 입력한 배치 정책을 가진 세션 그룹이 온다
 
@@ -99,12 +99,12 @@ Given
 
 When
 
-- SessionGroupAdapter.create — user-1이 그 프로젝트에 방향은 퍼뜨리기, 강제 수준은 선호인 세션 그룹을 만든다
+- SessionGroupAdapter.create: user-1이 그 프로젝트에 방향은 퍼뜨리기, 강제 수준은 선호인 세션 그룹을 만든다
 
 Then
 
 - 만든 사람이 소유자이고 입력한 배치 정책을 가진 세션 그룹 전체가 온다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - entity_id: id와 같다
   - domain_id: 그 도메인의 id와 같다
   - project_id: 그 프로젝트의 id와 같다
@@ -116,7 +116,7 @@ Then
 
 <a id="creating-a-user-granted-create-only-in-another-project-may-not-create-a-session-group"></a>
 
-#### [a-user-granted-create-only-in-another-project-may-not-create-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_creating.py) — pass
+#### [a-user-granted-create-only-in-another-project-may-not-create-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_creating.py): pass
 
 다른 프로젝트에서만 세션 그룹 생성 권한을 받은 사용자가 그 프로젝트에 세션 그룹을 만들면, 권한 부족으로 거부되고 세션 그룹은 생기지 않는다
 
@@ -138,7 +138,7 @@ Given
 
 When
 
-- SessionGroupAdapter.create — user-1이 그 프로젝트에 방향은 퍼뜨리기, 강제 수준은 선호인 세션 그룹을 만든다
+- SessionGroupAdapter.create: user-1이 그 프로젝트에 방향은 퍼뜨리기, 강제 수준은 선호인 세션 그룹을 만든다
 
 Then
 
@@ -147,7 +147,7 @@ Then
 
 <a id="creating-a-user-granted-only-read-in-a-project-may-not-create-a-session-group"></a>
 
-#### [a-user-granted-only-read-in-a-project-may-not-create-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_creating.py) — pass
+#### [a-user-granted-only-read-in-a-project-may-not-create-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_creating.py): pass
 
 프로젝트에서 세션 그룹 읽기 권한만 받은 사용자가 그 프로젝트에 세션 그룹을 만들면, 권한 부족으로 거부되고 세션 그룹은 생기지 않는다
 
@@ -169,7 +169,7 @@ Given
 
 When
 
-- SessionGroupAdapter.create — user-1이 그 프로젝트에 방향은 퍼뜨리기, 강제 수준은 선호인 세션 그룹을 만든다
+- SessionGroupAdapter.create: user-1이 그 프로젝트에 방향은 퍼뜨리기, 강제 수준은 선호인 세션 그룹을 만든다
 
 Then
 
@@ -180,7 +180,7 @@ Then
 
 <a id="searching-the-superadmin-finds-a-users-group-and-a-deployments-group"></a>
 
-#### [the-superadmin-finds-a-users-group-and-a-deployments-group](/tests/scenario/bai_scenario/manager/session_group/test_searching.py) — pass
+#### [the-superadmin-finds-a-users-group-and-a-deployments-group](/tests/scenario/bai_scenario/manager/session_group/test_searching.py): pass
 
 아무 권한도 받지 않은 슈퍼관리자가 한 프로젝트로 걸러 전체 검색하면, 그 프로젝트의 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹이 모두 온다. 이 문은 역할이라 행위자가 슈퍼관리자다
 
@@ -211,7 +211,7 @@ Given
 
 When
 
-- SessionGroupAdapter.global_search — user-3이 team-1 프로젝트로 걸러 전체 검색
+- SessionGroupAdapter.global_search: user-3이 team-1 프로젝트로 걸러 전체 검색
 
 Then
 
@@ -223,7 +223,7 @@ Then
 
 <a id="searching-a-user-who-is-not-a-superadmin-may-not-search-every-session-group"></a>
 
-#### [a-user-who-is-not-a-superadmin-may-not-search-every-session-group](/tests/scenario/bai_scenario/manager/session_group/test_searching.py) — pass
+#### [a-user-who-is-not-a-superadmin-may-not-search-every-session-group](/tests/scenario/bai_scenario/manager/session_group/test_searching.py): pass
 
 그 프로젝트에서 세션 그룹 읽기 권한을 받았어도 슈퍼관리자가 아닌 사용자가 전체 검색하면, 역할로 거부된다
 
@@ -259,7 +259,7 @@ Given
 
 When
 
-- SessionGroupAdapter.global_search — user-3이 team-1 프로젝트로 걸러 전체 검색
+- SessionGroupAdapter.global_search: user-3이 team-1 프로젝트로 걸러 전체 검색
 
 Then
 
@@ -270,7 +270,7 @@ Then
 
 <a id="purging-the-owner-purges-a-users-session-group-keeping-its-members"></a>
 
-#### [the-owner-purges-a-users-session-group-keeping-its-members](/tests/scenario/bai_scenario/manager/session_group/test_purging.py) — pass
+#### [the-owner-purges-a-users-session-group-keeping-its-members](/tests/scenario/bai_scenario/manager/session_group/test_purging.py): pass
 
 자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 자기가 만든 세션 그룹을 지우면, 그 세션 그룹의 id가 오고 멤버 세션은 세션 그룹이 비워진 채 남는다
 
@@ -300,7 +300,7 @@ Given
 
 When
 
-- SessionGroupAdapter.purge — user-1이 사용자가 만든 세션 그룹을 영구 삭제
+- SessionGroupAdapter.purge: user-1이 사용자가 만든 세션 그룹을 영구 삭제
 
 Then
 
@@ -309,7 +309,7 @@ Then
 
 <a id="purging-a-deployments-session-group-is-refused-as-in-use"></a>
 
-#### [a-deployments-session-group-is-refused-as-in-use](/tests/scenario/bai_scenario/manager/session_group/test_purging.py) — pass
+#### [a-deployments-session-group-is-refused-as-in-use](/tests/scenario/bai_scenario/manager/session_group/test_purging.py): pass
 
 자기 스코프에서 세션 그룹 영구 삭제 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 지우면, replica group이 사용 중이라는 것으로 거부되고 세션 그룹은 남는다
 
@@ -339,7 +339,7 @@ Given
 
 When
 
-- SessionGroupAdapter.purge — user-1이 배포의 replica group이 가진 세션 그룹을 영구 삭제
+- SessionGroupAdapter.purge: user-1이 배포의 replica group이 가진 세션 그룹을 영구 삭제
 
 Then
 
@@ -348,7 +348,7 @@ Then
 
 <a id="purging-a-user-granted-nothing-may-not-purge-a-session-group"></a>
 
-#### [a-user-granted-nothing-may-not-purge-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_purging.py) — pass
+#### [a-user-granted-nothing-may-not-purge-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_purging.py): pass
 
 아무 권한도 받지 않은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 세션 그룹은 남는다
 
@@ -374,7 +374,7 @@ Given
 
 When
 
-- SessionGroupAdapter.purge — user-1이 사용자가 만든 세션 그룹을 영구 삭제
+- SessionGroupAdapter.purge: user-1이 사용자가 만든 세션 그룹을 영구 삭제
 
 Then
 
@@ -383,7 +383,7 @@ Then
 
 <a id="purging-a-user-granted-only-read-may-not-purge-a-session-group"></a>
 
-#### [a-user-granted-only-read-may-not-purge-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_purging.py) — pass
+#### [a-user-granted-only-read-may-not-purge-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_purging.py): pass
 
 자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹을 지우면, 권한 부족으로 거부되고 세션 그룹은 남는다
 
@@ -413,7 +413,7 @@ Given
 
 When
 
-- SessionGroupAdapter.purge — user-1이 사용자가 만든 세션 그룹을 영구 삭제
+- SessionGroupAdapter.purge: user-1이 사용자가 만든 세션 그룹을 영구 삭제
 
 Then
 
@@ -424,7 +424,7 @@ Then
 
 <a id="scoped_searching-a-granted-user-finds-only-the-users-group-of-the-project"></a>
 
-#### [a-granted-user-finds-only-the-users-group-of-the-project](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py) — pass
+#### [a-granted-user-finds-only-the-users-group-of-the-project](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py): pass
 
 그 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 그 프로젝트 범위로 검색하면, 배포의 replica group이 가진 세션 그룹과 다른 프로젝트의 세션 그룹은 빠지고 그 프로젝트의 사용자가 만든 세션 그룹만 온다
 
@@ -460,7 +460,7 @@ Given
 
 When
 
-- SessionGroupAdapter.scoped_search — user-3이 team-1 프로젝트 범위에서 조회
+- SessionGroupAdapter.scoped_search: user-3이 team-1 프로젝트 범위에서 조회
 
 Then
 
@@ -472,7 +472,7 @@ Then
 
 <a id="scoped_searching-a-user-scope-and-a-project-scope-are-joined"></a>
 
-#### [a-user-scope-and-a-project-scope-are-joined](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py) — pass
+#### [a-user-scope-and-a-project-scope-are-joined](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py): pass
 
 자기 스코프와 다른 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 두 스코프를 함께 넘겨 검색하면, 자기가 만든 세션 그룹과 그 프로젝트에서 다른 사용자가 만든 세션 그룹이 합쳐져 오고 배포의 replica group이 가진 세션 그룹은 빠진다
 
@@ -508,7 +508,7 @@ Given
 
 When
 
-- SessionGroupAdapter.scoped_search — user-1이 자기 스코프와 other-1 프로젝트 범위를 함께 조회
+- SessionGroupAdapter.scoped_search: user-1이 자기 스코프와 other-1 프로젝트 범위를 함께 조회
 
 Then
 
@@ -520,7 +520,7 @@ Then
 
 <a id="scoped_searching-an-owner-finds-the-groups-they-made-in-their-own-scope"></a>
 
-#### [an-owner-finds-the-groups-they-made-in-their-own-scope](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py) — pass
+#### [an-owner-finds-the-groups-they-made-in-their-own-scope](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py): pass
 
 자기 스코프에서 세션 그룹 읽기 권한을 받은 사용자가 자기 스코프로 검색하면, 두 프로젝트에 자기가 만든 세션 그룹이 오고 배포의 replica group이 가진 세션 그룹과 다른 사용자가 만든 세션 그룹은 빠진다
 
@@ -553,7 +553,7 @@ Given
 
 When
 
-- SessionGroupAdapter.scoped_search — user-1이 자기 스코프에서 조회
+- SessionGroupAdapter.scoped_search: user-1이 자기 스코프에서 조회
 
 Then
 
@@ -565,7 +565,7 @@ Then
 
 <a id="scoped_searching-searching-a-project-not-granted-is-refused"></a>
 
-#### [searching-a-project-not-granted-is-refused](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py) — pass
+#### [searching-a-project-not-granted-is-refused](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py): pass
 
 다른 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들이 있는 프로젝트 범위로 검색하면, 권한 부족으로 거부된다
 
@@ -601,7 +601,7 @@ Given
 
 When
 
-- SessionGroupAdapter.scoped_search — user-3이 team-1 프로젝트 범위에서 조회
+- SessionGroupAdapter.scoped_search: user-3이 team-1 프로젝트 범위에서 조회
 
 Then
 
@@ -610,7 +610,7 @@ Then
 
 <a id="scoped_searching-searching-another-users-scope-is-refused"></a>
 
-#### [searching-another-users-scope-is-refused](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py) — pass
+#### [searching-another-users-scope-is-refused](/tests/scenario/bai_scenario/manager/session_group/test_scoped_searching.py): pass
 
 세션 그룹들이 있는 프로젝트에서만 세션 그룹 읽기 권한을 받은 사용자가 세션 그룹들을 만든 사용자의 스코프로 검색하면, 권한 부족으로 거부된다
 
@@ -646,7 +646,7 @@ Given
 
 When
 
-- SessionGroupAdapter.scoped_search — user-3이 user-1의 스코프에서 조회
+- SessionGroupAdapter.scoped_search: user-3이 user-1의 스코프에서 조회
 
 Then
 
@@ -657,7 +657,7 @@ Then
 
 <a id="updating-an-owner-changes-only-the-direction"></a>
 
-#### [an-owner-changes-only-the-direction](/tests/scenario/bai_scenario/manager/session_group/test_updating.py) — pass
+#### [an-owner-changes-only-the-direction](/tests/scenario/bai_scenario/manager/session_group/test_updating.py): pass
 
 자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향만 바꾸면, 강제 수준은 그대로인 그 세션 그룹이 온다
 
@@ -690,12 +690,12 @@ Given
 
 When
 
-- SessionGroupAdapter.update — user-1이 사용자가 만든 세션 그룹의 방향만 퍼뜨리기로 바꾼다
+- SessionGroupAdapter.update: user-1이 사용자가 만든 세션 그룹의 방향만 퍼뜨리기로 바꾼다
 
 Then
 
 - 방향만 바뀌고 강제 수준은 그대로인 세션 그룹 전체가 온다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - entity_id: 사용자가 만든 세션 그룹의 id와 같다
   - domain_id: 그 도메인의 id와 같다
   - project_id: 그 프로젝트의 id와 같다
@@ -707,7 +707,7 @@ Then
 
 <a id="updating-an-owner-changes-the-direction-and-the-enforcement"></a>
 
-#### [an-owner-changes-the-direction-and-the-enforcement](/tests/scenario/bai_scenario/manager/session_group/test_updating.py) — pass
+#### [an-owner-changes-the-direction-and-the-enforcement](/tests/scenario/bai_scenario/manager/session_group/test_updating.py): pass
 
 자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기가 만든 세션 그룹의 방향과 강제 수준을 바꾸면, 두 항목이 바뀐 그 세션 그룹이 온다
 
@@ -740,12 +740,12 @@ Given
 
 When
 
-- SessionGroupAdapter.update — user-1이 사용자가 만든 세션 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
+- SessionGroupAdapter.update: user-1이 사용자가 만든 세션 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
 
 Then
 
 - 두 항목이 바뀐 세션 그룹 전체가 온다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - entity_id: 사용자가 만든 세션 그룹의 id와 같다
   - domain_id: 그 도메인의 id와 같다
   - project_id: 그 프로젝트의 id와 같다
@@ -757,7 +757,7 @@ Then
 
 <a id="updating-a-deployments-session-group-is-refused-as-in-use"></a>
 
-#### [a-deployments-session-group-is-refused-as-in-use](/tests/scenario/bai_scenario/manager/session_group/test_updating.py) — pass
+#### [a-deployments-session-group-is-refused-as-in-use](/tests/scenario/bai_scenario/manager/session_group/test_updating.py): pass
 
 자기 스코프에서 세션 그룹 수정 권한을 받은 사용자가 자기 배포의 replica group이 가진 세션 그룹 정책을 바꾸면, 권한이 아니라 사용 중이라는 것으로 거부된다
 
@@ -790,7 +790,7 @@ Given
 
 When
 
-- SessionGroupAdapter.update — user-1이 배포의 replica group이 가진 세션 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
+- SessionGroupAdapter.update: user-1이 배포의 replica group이 가진 세션 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
 
 Then
 
@@ -799,7 +799,7 @@ Then
 
 <a id="updating-an-owner-granted-only-read-may-not-update"></a>
 
-#### [an-owner-granted-only-read-may-not-update](/tests/scenario/bai_scenario/manager/session_group/test_updating.py) — pass
+#### [an-owner-granted-only-read-may-not-update](/tests/scenario/bai_scenario/manager/session_group/test_updating.py): pass
 
 자기 스코프에서 세션 그룹 읽기 권한만 받은 사용자가 자기가 만든 세션 그룹의 정책을 바꾸면, 권한 부족으로 거부된다
 
@@ -832,7 +832,7 @@ Given
 
 When
 
-- SessionGroupAdapter.update — user-1이 사용자가 만든 세션 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
+- SessionGroupAdapter.update: user-1이 사용자가 만든 세션 그룹의 방향을 퍼뜨리기로, 강제 수준을 선호로 바꾼다
 
 Then
 
@@ -843,7 +843,7 @@ Then
 
 <a id="bulk_reading-a-granted-user-bulk-reads-a-users-group-and-a-deployments-group"></a>
 
-#### [a-granted-user-bulk-reads-a-users-group-and-a-deployments-group](/tests/scenario/bai_scenario/manager/session_group/test_bulk_reading.py) — pass
+#### [a-granted-user-bulk-reads-a-users-group-and-a-deployments-group](/tests/scenario/bai_scenario/manager/session_group/test_bulk_reading.py): pass
 
 그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹과 배포의 replica group이 가진 세션 그룹을 함께 읽으면, 요청한 순서대로 그 세션 그룹과 빈 값이 온다
 
@@ -879,12 +879,12 @@ Given
 
 When
 
-- SessionGroupAdapter.bulk_get_ids — user-3이 사용자가 만든 세션 그룹, 배포의 replica group이 가진 세션 그룹 순으로 여럿 읽기
+- SessionGroupAdapter.bulk_get_ids: user-3이 사용자가 만든 세션 그룹, 배포의 replica group이 가진 세션 그룹 순으로 여럿 읽기
 
 Then
 
 - 첫 자리에 사용자가 만든 세션 그룹 전체가 오고, 배포의 replica group이 가진 세션 그룹 자리는 빈 값이다
-  - [0].id: 무시함 — 데이터베이스가 만든다
+  - [0].id: 무시함: 데이터베이스가 만든다
   - [0].entity_id: 사용자가 만든 세션 그룹의 id와 같다
   - [0].domain_id: 그 도메인의 id와 같다
   - [0].project_id: 그 프로젝트의 id와 같다
@@ -896,7 +896,7 @@ Then
 
 <a id="bulk_reading-the-superadmin-bulk-reads-a-missing-id-as-empty"></a>
 
-#### [the-superadmin-bulk-reads-a-missing-id-as-empty](/tests/scenario/bai_scenario/manager/session_group/test_bulk_reading.py) — pass
+#### [the-superadmin-bulk-reads-a-missing-id-as-empty](/tests/scenario/bai_scenario/manager/session_group/test_bulk_reading.py): pass
 
 슈퍼관리자가 아무 세션 그룹도 갖지 않은 id로 여럿 읽으면, 그 자리가 빈 값으로 온다. 권한 검사를 통과하는 사람이어야 읽기의 답을 볼 수 있어 행위자가 슈퍼관리자다
 
@@ -927,7 +927,7 @@ Given
 
 When
 
-- SessionGroupAdapter.bulk_get_ids — user-3이 아무 세션 그룹도 갖지 않은 id로 여럿 읽기
+- SessionGroupAdapter.bulk_get_ids: user-3이 아무 세션 그룹도 갖지 않은 id로 여럿 읽기
 
 Then
 
@@ -936,7 +936,7 @@ Then
 
 <a id="bulk_reading-a-user-granted-nothing-may-not-bulk-read-a-session-group"></a>
 
-#### [a-user-granted-nothing-may-not-bulk-read-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_bulk_reading.py) — pass
+#### [a-user-granted-nothing-may-not-bulk-read-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_bulk_reading.py): pass
 
 아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 여럿 읽으면, 그 자리가 권한 부족으로 거부된다
 
@@ -967,7 +967,7 @@ Given
 
 When
 
-- SessionGroupAdapter.bulk_get_ids — user-3이 사용자가 만든 세션 그룹의 id로 여럿 읽기
+- SessionGroupAdapter.bulk_get_ids: user-3이 사용자가 만든 세션 그룹의 id로 여럿 읽기
 
 Then
 
@@ -978,7 +978,7 @@ Then
 
 <a id="reading-a-granted-user-reads-a-users-session-group"></a>
 
-#### [a-granted-user-reads-a-users-session-group](/tests/scenario/bai_scenario/manager/session_group/test_reading.py) — pass
+#### [a-granted-user-reads-a-users-session-group](/tests/scenario/bai_scenario/manager/session_group/test_reading.py): pass
 
 그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 사용자가 만든 세션 그룹을 id로 조회하면, 그 세션 그룹이 온다
 
@@ -1014,12 +1014,12 @@ Given
 
 When
 
-- SessionGroupAdapter.get — user-3이 사용자가 만든 세션 그룹을 id로 조회
+- SessionGroupAdapter.get: user-3이 사용자가 만든 세션 그룹을 id로 조회
 
 Then
 
 - 사용자가 만든 세션 그룹 전체가 온다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - entity_id: 사용자가 만든 세션 그룹의 id와 같다
   - domain_id: 그 도메인의 id와 같다
   - project_id: 그 프로젝트의 id와 같다
@@ -1031,7 +1031,7 @@ Then
 
 <a id="reading-a-deployments-session-group-is-not-found-even-when-granted"></a>
 
-#### [a-deployments-session-group-is-not-found-even-when-granted](/tests/scenario/bai_scenario/manager/session_group/test_reading.py) — pass
+#### [a-deployments-session-group-is-not-found-even-when-granted](/tests/scenario/bai_scenario/manager/session_group/test_reading.py): pass
 
 그 프로젝트에서 세션 그룹 읽기 권한을 받은 사용자가 배포의 replica group이 가진 세션 그룹을 id로 조회하면, 권한이 아니라 대상이 없다는 것으로 거부된다
 
@@ -1067,7 +1067,7 @@ Given
 
 When
 
-- SessionGroupAdapter.get — user-3이 배포의 replica group이 가진 세션 그룹을 id로 조회
+- SessionGroupAdapter.get: user-3이 배포의 replica group이 가진 세션 그룹을 id로 조회
 
 Then
 
@@ -1076,7 +1076,7 @@ Then
 
 <a id="reading-a-user-granted-nothing-may-not-read-a-session-group"></a>
 
-#### [a-user-granted-nothing-may-not-read-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_reading.py) — pass
+#### [a-user-granted-nothing-may-not-read-a-session-group](/tests/scenario/bai_scenario/manager/session_group/test_reading.py): pass
 
 아무 권한도 받지 않은 사용자가 사용자가 만든 세션 그룹을 id로 조회하면, 권한 부족으로 거부된다
 
@@ -1107,7 +1107,7 @@ Given
 
 When
 
-- SessionGroupAdapter.get — user-3이 사용자가 만든 세션 그룹을 id로 조회
+- SessionGroupAdapter.get: user-3이 사용자가 만든 세션 그룹을 id로 조회
 
 Then
 

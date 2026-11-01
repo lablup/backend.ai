@@ -1,32 +1,32 @@
 ## role_preset
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/role_preset/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/role_preset/adapter.py)
+[배경](/src/ai/backend/manager/api/adapters/role_preset/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/role_preset/adapter.py)
 
 시나리오: 미완 16 / 21
 
 - ops 로 구성 (14)
-  - batch_load_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - batch_load_permissions_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - bulk_delete — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - bulk_purge — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - bulk_restore — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - delete — 대표 성공 ✓ · 대표 실패 ✓
-  - get — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_delete — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_purge — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_restore — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge — 대표 성공 ✓ · 대표 실패 ✓
-  - restore — 대표 성공 ✓ · 대표 실패 ✓
-  - search — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - search_permission_presets — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
+  - batch_load_by_ids: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - batch_load_permissions_by_ids: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - bulk_delete: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - bulk_purge: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - bulk_restore: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - delete: 대표 성공 ✓ · 대표 실패 ✓
+  - get: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - partial_bulk_delete: 대표 성공 ✓ · 대표 실패 ✗: SCENARIO-GAP
+  - partial_bulk_purge: 대표 성공 ✓ · 대표 실패 ✗: SCENARIO-GAP
+  - partial_bulk_restore: 대표 성공 ✓ · 대표 실패 ✗: SCENARIO-GAP
+  - purge: 대표 성공 ✓ · 대표 실패 ✓
+  - restore: 대표 성공 ✓ · 대표 실패 ✓
+  - search: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - search_permission_presets: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
 - 직접 구현 (7)
-  - atomic_bulk_add_permissions — 성공 있음 1 · 실패 있음 1 (single_entity)
-  - bulk_add_permissions — 성공 없음 · 실패 없음 (single_entity) — SCENARIO-GAP
-  - bulk_remove_permissions — 성공 없음 · 실패 없음 (partial_bulk_field) — SCENARIO-GAP
-  - create — 성공 없음 · 실패 없음 (scope) — SCENARIO-GAP
-  - partial_bulk_remove_permissions — 성공 있음 2 · 실패 없음 (partial_bulk_field) — SCENARIO-GAP
-  - partial_bulk_update — 성공 있음 2 · 실패 없음 (partial_bulk) — SCENARIO-GAP
-  - update — 성공 있음 1 · 실패 있음 1 (single_entity)
+  - atomic_bulk_add_permissions: 성공 있음 1 · 실패 있음 1 (single_entity)
+  - bulk_add_permissions: 성공 없음 · 실패 없음 (single_entity): SCENARIO-GAP
+  - bulk_remove_permissions: 성공 없음 · 실패 없음 (partial_bulk_field): SCENARIO-GAP
+  - create: 성공 없음 · 실패 없음 (scope): SCENARIO-GAP
+  - partial_bulk_remove_permissions: 성공 있음 2 · 실패 없음 (partial_bulk_field): SCENARIO-GAP
+  - partial_bulk_update: 성공 있음 2 · 실패 없음 (partial_bulk): SCENARIO-GAP
+  - update: 성공 있음 1 · 실패 있음 1 (single_entity)
 
 **delete**
 
@@ -101,7 +101,7 @@
 
 <a id="deleting-the-superadmin-soft-deletes-a-preset"></a>
 
-#### [the-superadmin-soft-deletes-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py) — pass
+#### [the-superadmin-soft-deletes-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py): pass
 
 슈퍼관리자가 프리셋을 soft delete 하면, 삭제 표시가 켜진 프리셋 전체가 온다
 
@@ -118,7 +118,7 @@ Given
 
 When
 
-- RolePresetAdapter.delete — user-1이 preset-1을 soft delete 함
+- RolePresetAdapter.delete: user-1이 preset-1을 soft delete 함
 
 Then
 
@@ -134,7 +134,7 @@ Then
 
 <a id="deleting-a-user-granted-nothing-may-not-soft-delete-a-preset"></a>
 
-#### [a-user-granted-nothing-may-not-soft-delete-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py) — pass
+#### [a-user-granted-nothing-may-not-soft-delete-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py): pass
 
 아무 권한도 받지 않은 사용자가 프리셋을 soft delete 하려 하면, 권한 부족으로 거부된다
 
@@ -151,7 +151,7 @@ Given
 
 When
 
-- RolePresetAdapter.delete — user-1이 preset-1을 soft delete 함
+- RolePresetAdapter.delete: user-1이 preset-1을 soft delete 함
 
 Then
 
@@ -162,7 +162,7 @@ Then
 
 <a id="partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-presets"></a>
 
-#### [a-user-granted-nothing-soft-deletes-none-of-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_deleting.py) — pass
+#### [a-user-granted-nothing-soft-deletes-none-of-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_deleting.py): pass
 
 아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -180,7 +180,7 @@ Given
 
 When
 
-- RolePresetAdapter.partial_bulk_delete — user-1이 프리셋 2개를 한 번에 soft delete 함
+- RolePresetAdapter.partial_bulk_delete: user-1이 프리셋 2개를 한 번에 soft delete 함
 
 Then
 
@@ -194,7 +194,7 @@ Then
 
 <a id="partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one"></a>
 
-#### [soft-deleting-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_deleting.py) — pass
+#### [soft-deleting-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_deleting.py): pass
 
 프리셋 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 삭제 표시가 켜진 채 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -212,7 +212,7 @@ Given
 
 When
 
-- RolePresetAdapter.partial_bulk_delete — user-1이 프리셋 2개 와 없는 id 하나를 한 번에 soft delete 함
+- RolePresetAdapter.partial_bulk_delete: user-1이 프리셋 2개 와 없는 id 하나를 한 번에 soft delete 함
 
 Then
 
@@ -242,7 +242,7 @@ Then
 
 <a id="partial_bulk_deleting-a-user-granted-nothing-purges-none-of-several-presets"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_deleting.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_deleting.py): pass
 
 아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -260,7 +260,7 @@ Given
 
 When
 
-- RolePresetAdapter.partial_bulk_purge — user-1이 프리셋 2개를 한 번에 purge 함
+- RolePresetAdapter.partial_bulk_purge: user-1이 프리셋 2개를 한 번에 purge 함
 
 Then
 
@@ -274,7 +274,7 @@ Then
 
 <a id="partial_bulk_deleting-purging-several-answers-for-the-missing-one"></a>
 
-#### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_deleting.py) — pass
+#### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_deleting.py): pass
 
 프리셋 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 purge 하기 전의 모습으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -292,7 +292,7 @@ Given
 
 When
 
-- RolePresetAdapter.partial_bulk_purge — user-1이 프리셋 2개 와 없는 id 하나를 한 번에 purge 함
+- RolePresetAdapter.partial_bulk_purge: user-1이 프리셋 2개 와 없는 id 하나를 한 번에 purge 함
 
 Then
 
@@ -322,7 +322,7 @@ Then
 
 <a id="partial_bulk_deleting-restoring-several-brings-them-back"></a>
 
-#### [restoring-several-brings-them-back](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_deleting.py) — pass
+#### [restoring-several-brings-them-back](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_deleting.py): pass
 
 soft delete 된 프리셋 여럿을 한 번에 restore 하면, 모두 삭제 표시가 꺼진 채 온다
 
@@ -340,7 +340,7 @@ Given
 
 When
 
-- RolePresetAdapter.partial_bulk_restore — user-1이 프리셋 2개를 한 번에 soft delete 했다가 한 번에 restore 함
+- RolePresetAdapter.partial_bulk_restore: user-1이 프리셋 2개를 한 번에 soft delete 했다가 한 번에 restore 함
 
 Then
 
@@ -368,7 +368,7 @@ Then
 
 <a id="deleting-the-superadmin-purges-a-preset"></a>
 
-#### [the-superadmin-purges-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py) — pass
+#### [the-superadmin-purges-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py): pass
 
 슈퍼관리자가 프리셋을 purge 하면, purge 하기 전의 프리셋 전체가 온다
 
@@ -385,7 +385,7 @@ Given
 
 When
 
-- RolePresetAdapter.purge — user-1이 preset-1을 purge 함
+- RolePresetAdapter.purge: user-1이 preset-1을 purge 함
 
 Then
 
@@ -401,7 +401,7 @@ Then
 
 <a id="deleting-a-user-granted-nothing-may-not-purge-a-preset"></a>
 
-#### [a-user-granted-nothing-may-not-purge-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py) — pass
+#### [a-user-granted-nothing-may-not-purge-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py): pass
 
 아무 권한도 받지 않은 사용자가 프리셋을 purge 하려 하면, 권한 부족으로 거부된다
 
@@ -418,7 +418,7 @@ Given
 
 When
 
-- RolePresetAdapter.purge — user-1이 preset-1을 purge 함
+- RolePresetAdapter.purge: user-1이 preset-1을 purge 함
 
 Then
 
@@ -429,7 +429,7 @@ Then
 
 <a id="deleting-restoring-a-soft-deleted-preset-brings-it-back"></a>
 
-#### [restoring-a-soft-deleted-preset-brings-it-back](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py) — pass
+#### [restoring-a-soft-deleted-preset-brings-it-back](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py): pass
 
 soft delete 된 프리셋을 restore 하면, 삭제 표시가 꺼진 프리셋 전체가 온다
 
@@ -446,7 +446,7 @@ Given
 
 When
 
-- RolePresetAdapter.restore — user-1이 preset-1을 soft delete 했다가 restore 함
+- RolePresetAdapter.restore: user-1이 preset-1을 soft delete 했다가 restore 함
 
 Then
 
@@ -462,7 +462,7 @@ Then
 
 <a id="deleting-a-user-granted-nothing-may-not-restore-a-preset"></a>
 
-#### [a-user-granted-nothing-may-not-restore-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py) — pass
+#### [a-user-granted-nothing-may-not-restore-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_deleting.py): pass
 
 아무 권한도 받지 않은 사용자가 프리셋을 restore 하려 하면, 권한 부족으로 거부된다
 
@@ -479,7 +479,7 @@ Given
 
 When
 
-- RolePresetAdapter.restore — user-1이 preset-1을 restore 함
+- RolePresetAdapter.restore: user-1이 preset-1을 restore 함
 
 Then
 
@@ -490,7 +490,7 @@ Then
 
 <a id="permission_editing-the-superadmin-adds-entries-to-a-preset"></a>
 
-#### [the-superadmin-adds-entries-to-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_permission_editing.py) — pass
+#### [the-superadmin-adds-entries-to-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_permission_editing.py): pass
 
 슈퍼관리자가 항목 없는 프리셋에 권한 항목 둘을 넣으면, 넣은 두 항목이 그 프리셋 아래에 온다
 
@@ -507,20 +507,20 @@ Given
 
 When
 
-- RolePresetAdapter.atomic_bulk_add_permissions — user-1이 preset-1에 권한 항목 2개를 넣음
+- RolePresetAdapter.atomic_bulk_add_permissions: user-1이 preset-1에 권한 항목 2개를 넣음
 
 Then
 
 - 넣은 두 항목이 프리셋 아래에 온다
   - items count = 2
-  - items[0].id: 무시함 — 데이터베이스가 만든다
-  - items[0].field_id: 무시함 — 데이터베이스가 만든다
+  - items[0].id: 무시함: 데이터베이스가 만든다
+  - items[0].field_id: 무시함: 데이터베이스가 만든다
   - items[0].role_preset_id: 미리 만든 프리셋의 id와 같다
   - items[0].entity_type = 'domain'
   - items[0].permission = <PermissionBitDTO.READ: 'read'>
   - items[0].created_at: 이 실행이 쓴 시각
-  - items[1].id: 무시함 — 데이터베이스가 만든다
-  - items[1].field_id: 무시함 — 데이터베이스가 만든다
+  - items[1].id: 무시함: 데이터베이스가 만든다
+  - items[1].field_id: 무시함: 데이터베이스가 만든다
   - items[1].role_preset_id: 미리 만든 프리셋의 id와 같다
   - items[1].entity_type = 'project'
   - items[1].permission = <PermissionBitDTO.UPDATE: 'update'>
@@ -528,7 +528,7 @@ Then
 
 <a id="permission_editing-a-user-granted-nothing-may-not-add-entries"></a>
 
-#### [a-user-granted-nothing-may-not-add-entries](/tests/scenario/bai_scenario/manager/role_preset/test_permission_editing.py) — pass
+#### [a-user-granted-nothing-may-not-add-entries](/tests/scenario/bai_scenario/manager/role_preset/test_permission_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 프리셋에 권한 항목을 넣으려 하면, 권한 부족으로 거부된다
 
@@ -545,7 +545,7 @@ Given
 
 When
 
-- RolePresetAdapter.atomic_bulk_add_permissions — user-1이 preset-1에 권한 항목 2개를 넣음
+- RolePresetAdapter.atomic_bulk_add_permissions: user-1이 preset-1에 권한 항목 2개를 넣음
 
 Then
 
@@ -556,7 +556,7 @@ Then
 
 <a id="permission_editing-a-user-granted-nothing-removes-none-of-the-entries"></a>
 
-#### [a-user-granted-nothing-removes-none-of-the-entries](/tests/scenario/bai_scenario/manager/role_preset/test_permission_editing.py) — pass
+#### [a-user-granted-nothing-removes-none-of-the-entries](/tests/scenario/bai_scenario/manager/role_preset/test_permission_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 권한 항목 여럿을 한 번에 빼려 하면, 뺀 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -575,7 +575,7 @@ Given
 
 When
 
-- RolePresetAdapter.partial_bulk_remove_permissions — user-1이 preset-1의 권한 항목 2개를 한 번에 뺌
+- RolePresetAdapter.partial_bulk_remove_permissions: user-1이 preset-1의 권한 항목 2개를 한 번에 뺌
 
 Then
 
@@ -589,7 +589,7 @@ Then
 
 <a id="permission_editing-removing-entries-answers-for-the-missing-one"></a>
 
-#### [removing-entries-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/role_preset/test_permission_editing.py) — pass
+#### [removing-entries-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/role_preset/test_permission_editing.py): pass
 
 슈퍼관리자가 권한 항목 둘과 없는 id 하나를 한 번에 빼면, 둘은 처리된 목록에 오고 없는 id 는 실패 목록에 온다
 
@@ -608,7 +608,7 @@ Given
 
 When
 
-- RolePresetAdapter.partial_bulk_remove_permissions — user-1이 preset-1의 권한 항목 2개 와 없는 id 하나를 한 번에 뺌
+- RolePresetAdapter.partial_bulk_remove_permissions: user-1이 preset-1의 권한 항목 2개 와 없는 id 하나를 한 번에 뺌
 
 Then
 
@@ -634,7 +634,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-presets"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-presets](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 프리셋 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -652,7 +652,7 @@ Given
 
 When
 
-- RolePresetAdapter.partial_bulk_update — user-1이 프리셋 2개의 자동 부여를 한 번에 켬
+- RolePresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 자동 부여를 한 번에 켬
 
 Then
 
@@ -666,7 +666,7 @@ Then
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-presets-at-once"></a>
 
-#### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-edits-several-presets-at-once](/tests/scenario/bai_scenario/manager/role_preset/test_partial_bulk_editing.py): pass
 
 슈퍼관리자가 프리셋 여럿의 자동 부여를 한 번에 켜면, 모두 새 값으로 오고 실패한 것은 없다
 
@@ -684,7 +684,7 @@ Given
 
 When
 
-- RolePresetAdapter.partial_bulk_update — user-1이 프리셋 2개의 자동 부여를 한 번에 켬
+- RolePresetAdapter.partial_bulk_update: user-1이 프리셋 2개의 자동 부여를 한 번에 켬
 
 Then
 
@@ -712,7 +712,7 @@ Then
 
 <a id="editing-the-superadmin-renames-a-preset"></a>
 
-#### [the-superadmin-renames-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_editing.py) — pass
+#### [the-superadmin-renames-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_editing.py): pass
 
 슈퍼관리자가 프리셋 이름을 바꾸면, 새 이름을 실은 프리셋 전체가 온다
 
@@ -729,7 +729,7 @@ Given
 
 When
 
-- RolePresetAdapter.update — user-1이 preset-1의 이름을 renamed-preset(으)로 바꿈
+- RolePresetAdapter.update: user-1이 preset-1의 이름을 renamed-preset(으)로 바꿈
 
 Then
 
@@ -745,7 +745,7 @@ Then
 
 <a id="editing-a-user-granted-nothing-may-not-rename-a-preset"></a>
 
-#### [a-user-granted-nothing-may-not-rename-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-rename-a-preset](/tests/scenario/bai_scenario/manager/role_preset/test_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 프리셋 이름을 바꾸려 하면, 권한 부족으로 거부된다
 
@@ -762,7 +762,7 @@ Given
 
 When
 
-- RolePresetAdapter.update — user-1이 preset-1의 이름을 renamed-preset(으)로 바꿈
+- RolePresetAdapter.update: user-1이 preset-1의 이름을 renamed-preset(으)로 바꿈
 
 Then
 

@@ -1,36 +1,36 @@
 ## model_card
 
-[what it guarantees](/src/ai/backend/manager/api/adapters/model_card/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/model_card/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/model_card/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/model_card/adapter.py)
 
 Scenario: incomplete 13 / 16
 
 - built from ops (8)
-  - admin_search — representative success ✓ · representative refusal ✓
-  - batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - create — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - get — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - min_resources — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - ownership_search — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - project_search — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - scoped_search — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - admin_search: representative success ✓ · representative rejection ✓
+  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - create: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - get: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - min_resources: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - ownership_search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - project_search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - scoped_search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
 - ops + direct implementation (3)
-  - deploy — success absent · refusal absent (scope, single_get_ops) — SCENARIO-GAP
-  - partial_bulk_update — success present 2 · refusal absent (atomic_bulk_scoped_search_ops, partial_bulk) — SCENARIO-GAP
-  - update — success present 1 · refusal present 1 (atomic_bulk_scoped_search_ops, single_entity)
+  - deploy: success absent · rejection absent (scope, single_get_ops): SCENARIO-GAP
+  - partial_bulk_update: success present 2 · rejection absent (atomic_bulk_scoped_search_ops, partial_bulk): SCENARIO-GAP
+  - update: success present 1 · rejection present 1 (atomic_bulk_scoped_search_ops, single_entity)
 - direct implementation (4)
-  - admin_bulk_delete — success absent · refusal absent (partial_bulk) — SCENARIO-GAP
-  - partial_bulk_purge — success present 3 · refusal absent (partial_bulk) — SCENARIO-GAP
-  - purge — success present 1 · refusal present 1 (single_entity)
-  - scan_project — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - admin_bulk_delete: success absent · rejection absent (partial_bulk): SCENARIO-GAP
+  - partial_bulk_purge: success present 3 · rejection absent (partial_bulk): SCENARIO-GAP
+  - purge: success present 1 · rejection present 1 (single_entity)
+  - scan_project: success absent · rejection absent (global_scope): SCENARIO-GAP
 - no Action (1)
-  - available_presets — success absent · refusal absent — SCENARIO-GAP
+  - available_presets: success absent · rejection absent: SCENARIO-GAP
 
 **admin_search**
 
 | scenario | verdict |
 |---|---|
 | [모델 카드를 하나도 심지 않은 상태에서 슈퍼관리자가 전체 조회를 하면, 답은 비어 있다](#model_card-a-scenario-that-laid-no-model-card-finds-none) | answered |
-| [슈퍼관리자가 아닌 사용자가 전체 모델 카드 조회를 요청하면 역할로 막힌다](#model_card-a-user-who-is-not-the-superadmin-may-not-search-every-model-card) | refused |
+| [슈퍼관리자가 아닌 사용자가 전체 모델 카드 조회를 요청하면 역할로 막힌다](#model_card-a-user-who-is-not-the-superadmin-may-not-search-every-model-card) | rejected |
 
 **partial_bulk_update**
 
@@ -44,7 +44,7 @@ Scenario: incomplete 13 / 16
 | scenario | verdict |
 |---|---|
 | [프로젝트에서 모델 카드 읽기와 수정 권한을 받은 사용자가 카드의 제목을 바꾸면, 제목은 새 값이 되고 나머지는 그대로 남는다](#editing-a-user-granted-update-in-the-project-edits-a-model-card) | answered |
-| [아무 권한도 받지 않은 사용자가 모델 카드를 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-model-card) | refused |
+| [아무 권한도 받지 않은 사용자가 모델 카드를 수정하려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-model-card) | rejected |
 
 **partial_bulk_purge**
 
@@ -59,13 +59,13 @@ Scenario: incomplete 13 / 16
 | scenario | verdict |
 |---|---|
 | [프로젝트에서 모델 카드 purge 권한을 받은 사용자가 카드를 purge 하면, 그 카드의 id 가 온다](#purging-a-user-granted-purge-in-the-project-purges-a-model-card) | answered |
-| [아무 권한도 받지 않은 사용자가 모델 카드를 purge 하려 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-model-card) | refused |
+| [아무 권한도 받지 않은 사용자가 모델 카드를 purge 하려 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-model-card) | rejected |
 
 ### admin_search
 
 <a id="model_card-a-scenario-that-laid-no-model-card-finds-none"></a>
 
-#### [a-scenario-that-laid-no-model-card-finds-none](/tests/scenario/bai_scenario/manager/model_card/test_model_card.py) — pass
+#### [a-scenario-that-laid-no-model-card-finds-none](/tests/scenario/bai_scenario/manager/model_card/test_model_card.py): pass
 
 모델 카드를 하나도 심지 않은 상태에서 슈퍼관리자가 전체 조회를 하면, 답은 비어 있다
 
@@ -81,7 +81,7 @@ Given
 
 When
 
-- ModelCardAdapter.admin_search — user-1이 필터 없이 전체 조회
+- ModelCardAdapter.admin_search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -93,7 +93,7 @@ Then
 
 <a id="model_card-a-user-who-is-not-the-superadmin-may-not-search-every-model-card"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-every-model-card](/tests/scenario/bai_scenario/manager/model_card/test_model_card.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-every-model-card](/tests/scenario/bai_scenario/manager/model_card/test_model_card.py): pass
 
 슈퍼관리자가 아닌 사용자가 전체 모델 카드 조회를 요청하면 역할로 막힌다
 
@@ -109,7 +109,7 @@ Given
 
 When
 
-- ModelCardAdapter.admin_search — user-1이 필터 없이 전체 조회
+- ModelCardAdapter.admin_search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -120,7 +120,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-model-cards"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-model-cards](/tests/scenario/bai_scenario/manager/model_card/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-model-cards](/tests/scenario/bai_scenario/manager/model_card/test_partial_bulk_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 카드 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -144,7 +144,7 @@ Given
 
 When
 
-- ModelCardAdapter.partial_bulk_update — user-2이 카드 2개의 제목을 한 번에 고침
+- ModelCardAdapter.partial_bulk_update: user-2이 카드 2개의 제목을 한 번에 고침
 
 Then
 
@@ -158,7 +158,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-update-edits-several-model-cards"></a>
 
-#### [a-user-granted-update-edits-several-model-cards](/tests/scenario/bai_scenario/manager/model_card/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-update-edits-several-model-cards](/tests/scenario/bai_scenario/manager/model_card/test_partial_bulk_editing.py): pass
 
 프로젝트에서 모델 카드 읽기와 수정 권한을 받은 사용자가 카드 여럿의 제목을 한 번에 바꾸면, 모두 새 제목으로 오고 실패한 것은 없다
 
@@ -187,7 +187,7 @@ Given
 
 When
 
-- ModelCardAdapter.partial_bulk_update — user-2이 카드 2개의 제목을 한 번에 고침
+- ModelCardAdapter.partial_bulk_update: user-2이 카드 2개의 제목을 한 번에 고침
 
 Then
 
@@ -243,7 +243,7 @@ Then
 
 <a id="editing-a-user-granted-update-in-the-project-edits-a-model-card"></a>
 
-#### [a-user-granted-update-in-the-project-edits-a-model-card](/tests/scenario/bai_scenario/manager/model_card/test_editing.py) — pass
+#### [a-user-granted-update-in-the-project-edits-a-model-card](/tests/scenario/bai_scenario/manager/model_card/test_editing.py): pass
 
 프로젝트에서 모델 카드 읽기와 수정 권한을 받은 사용자가 카드의 제목을 바꾸면, 제목은 새 값이 되고 나머지는 그대로 남는다
 
@@ -270,7 +270,7 @@ Given
 
 When
 
-- ModelCardAdapter.update — user-2이 card-1의 제목을 고침
+- ModelCardAdapter.update: user-2이 card-1의 제목을 고침
 
 Then
 
@@ -300,7 +300,7 @@ Then
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-model-card"></a>
 
-#### [a-user-granted-nothing-may-not-edit-a-model-card](/tests/scenario/bai_scenario/manager/model_card/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-a-model-card](/tests/scenario/bai_scenario/manager/model_card/test_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 모델 카드를 수정하려 하면 권한 부족으로 거부된다
 
@@ -322,7 +322,7 @@ Given
 
 When
 
-- ModelCardAdapter.update — user-2이 card-1의 제목을 고침
+- ModelCardAdapter.update: user-2이 card-1의 제목을 고침
 
 Then
 
@@ -333,7 +333,7 @@ Then
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-model-cards"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-model-cards](/tests/scenario/bai_scenario/manager/model_card/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-model-cards](/tests/scenario/bai_scenario/manager/model_card/test_partial_bulk_purging.py): pass
 
 아무 권한도 받지 않은 사용자가 카드 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -357,7 +357,7 @@ Given
 
 When
 
-- ModelCardAdapter.partial_bulk_purge — user-2이 카드 2개를 한 번에 purge 함
+- ModelCardAdapter.partial_bulk_purge: user-2이 카드 2개를 한 번에 purge 함
 
 Then
 
@@ -371,7 +371,7 @@ Then
 
 <a id="partial_bulk_purging-a-user-granted-purge-purges-several-model-cards"></a>
 
-#### [a-user-granted-purge-purges-several-model-cards](/tests/scenario/bai_scenario/manager/model_card/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-purge-purges-several-model-cards](/tests/scenario/bai_scenario/manager/model_card/test_partial_bulk_purging.py): pass
 
 프로젝트에서 모델 카드 purge 권한을 받은 사용자가 카드 둘을 한 번에 purge 하면, 둘 다 처리된 목록에 오고 실패한 것은 없다
 
@@ -399,7 +399,7 @@ Given
 
 When
 
-- ModelCardAdapter.partial_bulk_purge — user-2이 카드 2개를 한 번에 purge 함
+- ModelCardAdapter.partial_bulk_purge: user-2이 카드 2개를 한 번에 purge 함
 
 Then
 
@@ -453,7 +453,7 @@ Then
 
 <a id="partial_bulk_purging-purging-several-answers-for-the-missing-one"></a>
 
-#### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/model_card/test_partial_bulk_purging.py) — pass
+#### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/model_card/test_partial_bulk_purging.py): pass
 
 슈퍼관리자가 카드 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다. 권한 검사는 슈퍼관리자를 먼저 통과시키므로 없는 id 가 purge 까지 간다
 
@@ -477,7 +477,7 @@ Given
 
 When
 
-- ModelCardAdapter.partial_bulk_purge — user-2이 카드 2개 와 없는 id 하나를 한 번에 purge 함
+- ModelCardAdapter.partial_bulk_purge: user-2이 카드 2개 와 없는 id 하나를 한 번에 purge 함
 
 Then
 
@@ -535,7 +535,7 @@ Then
 
 <a id="purging-a-user-granted-purge-in-the-project-purges-a-model-card"></a>
 
-#### [a-user-granted-purge-in-the-project-purges-a-model-card](/tests/scenario/bai_scenario/manager/model_card/test_purging.py) — pass
+#### [a-user-granted-purge-in-the-project-purges-a-model-card](/tests/scenario/bai_scenario/manager/model_card/test_purging.py): pass
 
 프로젝트에서 모델 카드 purge 권한을 받은 사용자가 카드를 purge 하면, 그 카드의 id 가 온다
 
@@ -561,7 +561,7 @@ Given
 
 When
 
-- ModelCardAdapter.purge — user-2이 card-1을 purge 함, 폴더는 그대로 둠
+- ModelCardAdapter.purge: user-2이 card-1을 purge 함, 폴더는 그대로 둠
 
 Then
 
@@ -570,7 +570,7 @@ Then
 
 <a id="purging-a-user-granted-nothing-may-not-purge-a-model-card"></a>
 
-#### [a-user-granted-nothing-may-not-purge-a-model-card](/tests/scenario/bai_scenario/manager/model_card/test_purging.py) — pass
+#### [a-user-granted-nothing-may-not-purge-a-model-card](/tests/scenario/bai_scenario/manager/model_card/test_purging.py): pass
 
 아무 권한도 받지 않은 사용자가 모델 카드를 purge 하려 하면 권한 부족으로 거부된다
 
@@ -592,7 +592,7 @@ Given
 
 When
 
-- ModelCardAdapter.purge — user-2이 card-1을 purge 함, 폴더는 그대로 둠
+- ModelCardAdapter.purge: user-2이 card-1을 purge 함, 폴더는 그대로 둠
 
 Then
 

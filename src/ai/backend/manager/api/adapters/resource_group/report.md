@@ -1,37 +1,37 @@
 ## resource_group
 
-[what it guarantees](/src/ai/backend/manager/api/adapters/resource_group/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/resource_group/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/resource_group/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/resource_group/adapter.py)
 
 Scenario: incomplete 4 / 25
 
 - built from ops (10)
-  - batch_load_by_ids — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
-  - batch_load_by_names — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
-  - get — representative success ✓ · representative refusal ✓
-  - get_allowed_resource_groups_for_domain — representative success ✓ · representative refusal ✓
-  - get_allowed_resource_groups_for_project — representative success ✓ · representative refusal ✓
-  - lookup_name — representative success ✓ · representative refusal ✓
-  - partial_bulk_purge — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
-  - partial_bulk_update — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
-  - scoped_search — representative success ✓ · representative refusal ✓
-  - search — representative success ✓ · representative refusal ✓
+  - batch_load_by_ids: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_by_names: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - get: representative success ✓ · representative rejection ✓
+  - get_allowed_resource_groups_for_domain: representative success ✓ · representative rejection ✓
+  - get_allowed_resource_groups_for_project: representative success ✓ · representative rejection ✓
+  - lookup_name: representative success ✓ · representative rejection ✓
+  - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_update: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - scoped_search: representative success ✓ · representative rejection ✓
+  - search: representative success ✓ · representative rejection ✓
 - ops + direct implementation (1)
-  - get_fair_share_spec — success present 2 · refusal present 2 (partial_bulk_get_ops, single_entity)
+  - get_fair_share_spec: success present 2 · rejection present 2 (partial_bulk_get_ops, single_entity)
 - direct implementation (14)
-  - admin_replace_default_deployment_options — success present 2 · refusal present 2 (single_entity)
-  - admin_replace_default_session_options — success present 1 · refusal present 2 (single_entity)
-  - create — success present 2 · refusal present 3 (global_scope)
-  - get_allowed_domains_for_resource_group — success present 2 · refusal present 1 (single_entity)
-  - get_allowed_projects_for_resource_group — success present 1 · refusal present 1 (single_entity)
-  - get_resource_info — success present 2 · refusal present 2 (single_entity)
-  - purge — success present 2 · refusal present 2 (single_entity)
-  - update — success present 5 · refusal present 3 (single_entity)
-  - update_allowed_domains_for_resource_group — success present 1 · refusal present 3 (relation, single_entity)
-  - update_allowed_projects_for_resource_group — success present 1 · refusal present 1 (relation, single_entity)
-  - update_allowed_resource_groups_for_domain — success present 3 · refusal present 2 (global_scope, relation, single_entity)
-  - update_allowed_resource_groups_for_project — success present 1 · refusal present 1 (global_scope, relation, single_entity)
-  - update_config — success present 2 · refusal present 1 (single_entity)
-  - update_fair_share_spec — success present 2 · refusal present 2 (single_entity)
+  - admin_replace_default_deployment_options: success present 2 · rejection present 2 (single_entity)
+  - admin_replace_default_session_options: success present 1 · rejection present 2 (single_entity)
+  - create: success present 2 · rejection present 3 (global_scope)
+  - get_allowed_domains_for_resource_group: success present 2 · rejection present 1 (single_entity)
+  - get_allowed_projects_for_resource_group: success present 1 · rejection present 1 (single_entity)
+  - get_resource_info: success present 2 · rejection present 2 (single_entity)
+  - purge: success present 2 · rejection present 2 (single_entity)
+  - update: success present 5 · rejection present 3 (single_entity)
+  - update_allowed_domains_for_resource_group: success present 1 · rejection present 3 (relation, single_entity)
+  - update_allowed_projects_for_resource_group: success present 1 · rejection present 1 (relation, single_entity)
+  - update_allowed_resource_groups_for_domain: success present 3 · rejection present 2 (global_scope, relation, single_entity)
+  - update_allowed_resource_groups_for_project: success present 1 · rejection present 1 (global_scope, relation, single_entity)
+  - update_config: success present 2 · rejection present 1 (single_entity)
+  - update_fair_share_spec: success present 2 · rejection present 2 (single_entity)
 
 **batch_load_by_ids**
 
@@ -55,9 +55,9 @@ Scenario: incomplete 4 / 25
 |---|---|
 | [그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 이름으로 조회하면 그 그룹 전체가 반환된다. 그룹이 자기 스코프이므로 그룹에 앉힌 역할이 닿는다](#reading-a-user-granted-read-on-the-group-reads-it-by-name) | answered |
 | [리소스 그룹 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 그룹 전체가 반환된다](#reading-the-superadmin-reads-a-resource-group-by-name) | answered |
-| [아무 권한도 없는 사용자가 이름으로 조회하면 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-a-resource-group) | refused |
-| [아무 권한도 없는 사용자가 존재하지 않는 이름으로 조회해도 권한 부족이 아니라 대상을 찾을 수 없다는 이유로 거부된다. 이름으로 id를 찾는 자리는 인증만 확인하고 권한 검사는 찾은 뒤에 온다](#reading-a-user-granted-nothing-reading-a-name-nothing-answers-to-is-not-found-too) | refused |
-| [슈퍼관리자가 존재하지 않는 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-the-superadmin-reading-a-name-nothing-answers-to-is-not-found) | refused |
+| [아무 권한도 없는 사용자가 이름으로 조회하면 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-a-resource-group) | rejected |
+| [아무 권한도 없는 사용자가 존재하지 않는 이름으로 조회해도 권한 부족이 아니라 대상을 찾을 수 없다는 이유로 거부된다. 이름으로 id를 찾는 자리는 인증만 확인하고 권한 검사는 찾은 뒤에 온다](#reading-a-user-granted-nothing-reading-a-name-nothing-answers-to-is-not-found-too) | rejected |
+| [슈퍼관리자가 존재하지 않는 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-the-superadmin-reading-a-name-nothing-answers-to-is-not-found) | rejected |
 
 **get_allowed_resource_groups_for_domain**
 
@@ -65,15 +65,15 @@ Scenario: incomplete 4 / 25
 |---|---|
 | [도메인 범위에서 리소스 그룹 읽기 역할을 받은 사용자가 그 도메인의 허용 목록을 읽으면 건 그룹 이름만 담긴다](#allowing-a-user-granted-read-in-the-domain-reads-the-groups-allowed-for-it) | answered |
 | [도메인에 건 그룹과 걸지 않은 그룹이 있을 때 슈퍼관리자가 도메인의 허용 목록을 읽으면 건 그룹 이름만 담긴다](#allowing-the-superadmin-reads-the-groups-allowed-for-a-domain) | answered |
-| [아무 권한도 없는 사용자가 자기 도메인의 허용 목록을 읽으려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-domain) | refused |
-| [존재하지 않는 도메인 이름의 허용 목록을 읽으려 하면 대상을 찾을 수 없다는 이유로 거부된다](#allowing-reading-the-groups-allowed-for-a-domain-nothing-answers-to-is-not-found) | refused |
+| [아무 권한도 없는 사용자가 자기 도메인의 허용 목록을 읽으려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-domain) | rejected |
+| [존재하지 않는 도메인 이름의 허용 목록을 읽으려 하면 대상을 찾을 수 없다는 이유로 거부된다](#allowing-reading-the-groups-allowed-for-a-domain-nothing-answers-to-is-not-found) | rejected |
 
 **get_allowed_resource_groups_for_project**
 
 | scenario | verdict |
 |---|---|
 | [프로젝트에 건 그룹이 있을 때 슈퍼관리자가 프로젝트의 허용 목록을 읽으면 건 그룹 이름이 담긴다](#allowing-the-superadmin-reads-the-groups-allowed-for-a-project) | answered |
-| [아무 권한도 없는 사용자가 프로젝트의 허용 목록을 읽으려 하면 권한 부족으로 거부된다. 자기 도메인, 그 프로젝트, 자기 자신 세 스코프 모두에서 읽을 수 있어야 한다](#allowing-a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-project) | refused |
+| [아무 권한도 없는 사용자가 프로젝트의 허용 목록을 읽으려 하면 권한 부족으로 거부된다. 자기 도메인, 그 프로젝트, 자기 자신 세 스코프 모두에서 읽을 수 있어야 한다](#allowing-a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-project) | rejected |
 
 **lookup_name**
 
@@ -81,7 +81,7 @@ Scenario: incomplete 4 / 25
 |---|---|
 | [아무 권한도 받지 않은 사용자도 리소스 그룹 이름으로 id를 찾을 수 있다. 이 호출은 인증만 보고, 권한은 그 id를 받는 호출이 본다](#looking_up-a-user-granted-nothing-still-looks-up-a-resource-group-by-name) | answered |
 | [슈퍼관리자가 리소스 그룹 이름으로 id를 찾으면, 그 리소스 그룹의 id가 온다](#looking_up-the-superadmin-looks-up-a-resource-group-by-name) | answered |
-| [아무 리소스 그룹도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다](#looking_up-looking-up-a-resource-group-name-nothing-answers-to-is-not-found) | refused |
+| [아무 리소스 그룹도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다](#looking_up-looking-up-a-resource-group-name-nothing-answers-to-is-not-found) | rejected |
 
 **partial_bulk_purge**
 
@@ -103,7 +103,7 @@ Scenario: incomplete 4 / 25
 |---|---|
 | [도메인 범위에서 리소스 그룹 읽기 역할을 받은 사용자가 그 도메인 스코프로 조회하면, 도메인에 건 그룹 하나만 반환되고 걸지 않은 그룹은 나오지 않는다](#searching-a-user-granted-read-in-the-domain-searches-the-groups-linked-to-it) | answered |
 | [슈퍼관리자가 도메인 스코프로 조회해도 그 도메인에 건 그룹 하나만 반환된다](#searching-the-superadmin-searching-a-domain-scope-sees-only-the-groups-linked-to-it) | answered |
-| [아무 권한도 없는 사용자가 자기 도메인 스코프로 조회하면 권한 부족으로 거부된다](#searching-a-user-granted-nothing-may-not-search-a-domain-scope) | refused |
+| [아무 권한도 없는 사용자가 자기 도메인 스코프로 조회하면 권한 부족으로 거부된다](#searching-a-user-granted-nothing-may-not-search-a-domain-scope) | rejected |
 
 **search**
 
@@ -114,7 +114,7 @@ Scenario: incomplete 4 / 25
 | [리소스 그룹 둘이 있을 때 앞에서 한 건만 요청하면 한 건이 반환되고 다음 페이지가 있다고 응답한다](#searching-asking-for-the-first-resource-group-only-says-there-is-a-next-page) | answered |
 | [모니터가 필터 없이 조회하면 슈퍼관리자와 같은 응답을 받는다](#searching-the-monitor-searches-resource-groups-like-the-superadmin) | answered |
 | [리소스 그룹 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 반환된다](#searching-the-superadmin-counts-every-resource-group-laid) | answered |
-| [슈퍼관리자가 아닌 사용자가 필터 없이 전체를 조회하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-resource-group) | refused |
+| [슈퍼관리자가 아닌 사용자가 필터 없이 전체를 조회하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-every-resource-group) | rejected |
 
 **get_fair_share_spec**
 
@@ -122,8 +122,8 @@ Scenario: incomplete 4 / 25
 |---|---|
 | [그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 에이전트 없는 그룹의 fair share 설정을 읽으면 코드가 정한 기본값이 반환되고 가중치 목록은 비어 있다](#fair_share-a-user-granted-read-on-the-group-reads-its-fair-share-spec) | answered |
 | [에이전트가 없는 그룹의 fair share 설정을 슈퍼관리자가 읽으면 코드가 정한 기본값이 반환되고 가중치 목록은 비어 있다](#fair_share-the-superadmin-reads-the-default-fair-share-spec) | answered |
-| [아무 권한도 없는 사용자가 fair share 설정을 읽으려 하면 권한 부족으로 거부된다](#fair_share-a-user-granted-nothing-may-not-read-the-fair-share-spec) | refused |
-| [슈퍼관리자가 존재하지 않는 이름의 fair share 설정을 읽으면 대상을 찾을 수 없다는 이유로 거부된다](#fair_share-reading-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found) | refused |
+| [아무 권한도 없는 사용자가 fair share 설정을 읽으려 하면 권한 부족으로 거부된다](#fair_share-a-user-granted-nothing-may-not-read-the-fair-share-spec) | rejected |
+| [슈퍼관리자가 존재하지 않는 이름의 fair share 설정을 읽으면 대상을 찾을 수 없다는 이유로 거부된다](#fair_share-reading-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found) | rejected |
 
 **admin_replace_default_deployment_options**
 
@@ -131,16 +131,16 @@ Scenario: incomplete 4 / 25
 |---|---|
 | [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 기본 배포 옵션을 갈아끼우면 준 옵션이 통째로 반환된다](#options-a-user-granted-update-on-the-group-replaces-the-default-deployment-options) | answered |
 | [슈퍼관리자가 등록된 처리기 하나의 설정을 담아 기본 배포 옵션을 갈아끼우면 준 옵션이 통째로 반환된다](#options-the-superadmin-replaces-the-default-deployment-options-whole) | answered |
-| [아무 권한도 없는 사용자가 기본 배포 옵션을 갈아끼우려 하면 권한 부족으로 거부된다](#options-a-user-granted-nothing-may-not-replace-the-default-deployment-options) | refused |
-| [등록되지 않은 배포 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다](#options-naming-an-unregistered-deployment-handler-is-refused) | refused |
+| [아무 권한도 없는 사용자가 기본 배포 옵션을 갈아끼우려 하면 권한 부족으로 거부된다](#options-a-user-granted-nothing-may-not-replace-the-default-deployment-options) | rejected |
+| [등록되지 않은 배포 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다](#options-naming-an-unregistered-deployment-handler-is-refused) | rejected |
 
 **admin_replace_default_session_options**
 
 | scenario | verdict |
 |---|---|
 | [슈퍼관리자가 우선순위와 등록된 처리기 하나의 설정을 담아 기본 세션 옵션을 갈아끼우면 준 옵션이 통째로 반환되고 주지 않은 자리는 코드의 기본값이다](#options-the-superadmin-replaces-the-default-session-options-whole) | answered |
-| [아무 권한도 없는 사용자가 기본 세션 옵션을 갈아끼우려 하면 권한 부족으로 거부된다](#options-a-user-granted-nothing-may-not-replace-the-default-session-options) | refused |
-| [등록되지 않은 세션 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다](#options-naming-an-unregistered-session-handler-is-refused) | refused |
+| [아무 권한도 없는 사용자가 기본 세션 옵션을 갈아끼우려 하면 권한 부족으로 거부된다](#options-a-user-granted-nothing-may-not-replace-the-default-session-options) | rejected |
+| [등록되지 않은 세션 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다](#options-naming-an-unregistered-session-handler-is-refused) | rejected |
 
 **create**
 
@@ -148,9 +148,9 @@ Scenario: incomplete 4 / 25
 |---|---|
 | [기본 그룹이 없을 때 슈퍼관리자가 기본으로 지정해 만들면 기본인 그룹이 반환된다](#creating-a-resource-group-made-as-the-default-answers-default) | answered |
 | [슈퍼관리자가 이름만 주고 리소스 그룹을 만들면, 활성이고 공개이며 기본이 아닌 그룹 전체가 코드의 기본값으로 채워져 반환된다](#creating-the-superadmin-makes-a-resource-group) | answered |
-| [이미 어떤 그룹이 쓰고 있는 이름으로 만들려 하면 이름 중복으로 거부된다](#creating-a-name-another-resource-group-already-holds-is-refused) | refused |
-| [슈퍼관리자가 아닌 사용자가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-make-a-resource-group) | refused |
-| [모니터가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다](#creating-the-monitor-may-not-make-a-resource-group) | refused |
+| [이미 어떤 그룹이 쓰고 있는 이름으로 만들려 하면 이름 중복으로 거부된다](#creating-a-name-another-resource-group-already-holds-is-refused) | rejected |
+| [슈퍼관리자가 아닌 사용자가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다](#creating-a-user-who-is-not-the-superadmin-may-not-make-a-resource-group) | rejected |
+| [모니터가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다](#creating-the-monitor-may-not-make-a-resource-group) | rejected |
 
 **get_allowed_domains_for_resource_group**
 
@@ -158,14 +158,14 @@ Scenario: incomplete 4 / 25
 |---|---|
 | [그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 그룹의 허용 도메인을 읽으면 걸린 도메인이 없어 빈 목록이 반환된다](#allowing-a-user-granted-read-on-the-group-reads-the-domains-allowed-for-it) | answered |
 | [도메인에 건 그룹의 허용 도메인을 슈퍼관리자가 읽으면 그 도메인 이름이 담긴다](#allowing-the-superadmin-reads-the-domains-allowed-for-a-resource-group) | answered |
-| [아무 권한도 없는 사용자가 그룹의 허용 도메인을 읽으려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-read-the-domains-allowed-for-a-resource-group) | refused |
+| [아무 권한도 없는 사용자가 그룹의 허용 도메인을 읽으려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-read-the-domains-allowed-for-a-resource-group) | rejected |
 
 **get_allowed_projects_for_resource_group**
 
 | scenario | verdict |
 |---|---|
 | [프로젝트에 건 그룹의 허용 프로젝트를 슈퍼관리자가 읽으면 그 프로젝트 id가 담긴다](#allowing-the-superadmin-reads-the-projects-allowed-for-a-resource-group) | answered |
-| [아무 권한도 없는 사용자가 그룹의 허용 프로젝트를 읽으려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-read-the-projects-allowed-for-a-resource-group) | refused |
+| [아무 권한도 없는 사용자가 그룹의 허용 프로젝트를 읽으려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-read-the-projects-allowed-for-a-resource-group) | rejected |
 
 **get_resource_info**
 
@@ -173,8 +173,8 @@ Scenario: incomplete 4 / 25
 |---|---|
 | [그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 리소스 현황을 조회하면 슈퍼관리자와 같은 응답을 받는다](#reading-a-user-granted-read-on-the-group-reads-its-resource-info) | answered |
 | [에이전트가 없는 그룹의 리소스 현황을 슈퍼관리자가 조회하면 용량·사용량·여유가 모두 비어 있다](#reading-the-superadmin-reads-an-empty-resource-info-of-a-group-without-agents) | answered |
-| [아무 권한도 없는 사용자가 리소스 현황을 조회하면 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-the-resource-info) | refused |
-| [슈퍼관리자가 존재하지 않는 이름의 리소스 현황을 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-the-resource-info-of-a-name-nothing-answers-to-is-not-found) | refused |
+| [아무 권한도 없는 사용자가 리소스 현황을 조회하면 권한 부족으로 거부된다](#reading-a-user-granted-nothing-may-not-read-the-resource-info) | rejected |
+| [슈퍼관리자가 존재하지 않는 이름의 리소스 현황을 조회하면 대상을 찾을 수 없다는 이유로 거부된다](#reading-the-resource-info-of-a-name-nothing-answers-to-is-not-found) | rejected |
 
 **purge**
 
@@ -182,8 +182,8 @@ Scenario: incomplete 4 / 25
 |---|---|
 | [그 그룹에 앉힌 역할로 완전 삭제 권한을 받은 사용자가 완전 삭제하면 지운 그룹 전체가 반환된다](#retiring-a-user-granted-hard-delete-on-the-group-purges-it) | answered |
 | [리소스 그룹 하나가 있고 슈퍼관리자가 완전 삭제하면 지운 그룹 전체가 반환된다](#retiring-the-superadmin-purges-a-resource-group) | answered |
-| [아무 권한도 없는 사용자가 완전 삭제하려 하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-resource-group) | refused |
-| [슈퍼관리자가 존재하지 않는 이름을 완전 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-the-superadmin-purging-a-name-nothing-answers-to-is-not-found) | refused |
+| [아무 권한도 없는 사용자가 완전 삭제하려 하면 권한 부족으로 거부된다](#retiring-a-user-granted-nothing-may-not-purge-a-resource-group) | rejected |
+| [슈퍼관리자가 존재하지 않는 이름을 완전 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-the-superadmin-purging-a-name-nothing-answers-to-is-not-found) | rejected |
 
 **update**
 
@@ -194,25 +194,25 @@ Scenario: incomplete 4 / 25
 | [활성 그룹을 비활성으로 바꾸면 비활성인 그룹이 반환된다](#editing-deactivating-a-resource-group-answers-it-inactive) | answered |
 | [기본 그룹이 없을 때 그룹을 기본으로 바꾸면 기본인 그룹이 반환된다](#editing-making-a-resource-group-the-default-answers-it-default) | answered |
 | [슈퍼관리자가 설명만 바꾸면 설명은 새 값이고 나머지는 그대로인 그룹 전체가 반환된다](#editing-the-superadmin-changing-the-description-leaves-the-rest) | answered |
-| [아무 권한도 없는 사용자가 설명을 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-resource-group) | refused |
-| [기본 그룹이 따로 있을 때 다른 그룹을 기본으로 바꾸려 하면 기본 그룹이 이미 있다는 이유로 거부된다](#editing-making-a-second-resource-group-the-default-is-refused) | refused |
-| [슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-name-nothing-answers-to-is-not-found) | refused |
+| [아무 권한도 없는 사용자가 설명을 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-resource-group) | rejected |
+| [기본 그룹이 따로 있을 때 다른 그룹을 기본으로 바꾸려 하면 기본 그룹이 이미 있다는 이유로 거부된다](#editing-making-a-second-resource-group-the-default-is-refused) | rejected |
+| [슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다](#editing-the-superadmin-editing-a-name-nothing-answers-to-is-not-found) | rejected |
 
 **update_allowed_domains_for_resource_group**
 
 | scenario | verdict |
 |---|---|
 | [슈퍼관리자가 그룹의 허용 도메인에 도메인을 더하면 그 도메인 이름이 담긴 목록이 반환된다](#allowing-the-superadmin-allows-a-domain-for-a-resource-group) | answered |
-| [아무 권한도 없는 사용자가 그룹의 허용 도메인에 도메인을 더하려 하면 권한 부족으로 거부된다. 관계를 쓰는 자리가 양쪽 스코프의 권한을 검사한다](#allowing-a-user-granted-nothing-may-not-allow-a-domain-for-a-resource-group) | refused |
-| [존재하지 않는 도메인 이름을 그룹의 허용 도메인에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다](#allowing-allowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found) | refused |
-| [존재하지 않는 도메인 이름을 그룹의 허용 도메인에서 빼려 하면 건너뛰지 않고 대상을 찾을 수 없다는 이유로 거부된다. 도메인 쪽에서 없는 그룹 이름을 빼는 것은 건너뛴다](#allowing-disallowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found) | refused |
+| [아무 권한도 없는 사용자가 그룹의 허용 도메인에 도메인을 더하려 하면 권한 부족으로 거부된다. 관계를 쓰는 자리가 양쪽 스코프의 권한을 검사한다](#allowing-a-user-granted-nothing-may-not-allow-a-domain-for-a-resource-group) | rejected |
+| [존재하지 않는 도메인 이름을 그룹의 허용 도메인에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다](#allowing-allowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found) | rejected |
+| [존재하지 않는 도메인 이름을 그룹의 허용 도메인에서 빼려 하면 건너뛰지 않고 대상을 찾을 수 없다는 이유로 거부된다. 도메인 쪽에서 없는 그룹 이름을 빼는 것은 건너뛴다](#allowing-disallowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found) | rejected |
 
 **update_allowed_projects_for_resource_group**
 
 | scenario | verdict |
 |---|---|
 | [슈퍼관리자가 그룹의 허용 프로젝트에 프로젝트를 더하면 그 프로젝트 id가 담긴 목록이 반환된다](#allowing-the-superadmin-allows-a-project-for-a-resource-group) | answered |
-| [아무 권한도 없는 사용자가 그룹의 허용 프로젝트에 프로젝트를 더하려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-allow-a-project-for-a-resource-group) | refused |
+| [아무 권한도 없는 사용자가 그룹의 허용 프로젝트에 프로젝트를 더하려 하면 권한 부족으로 거부된다](#allowing-a-user-granted-nothing-may-not-allow-a-project-for-a-resource-group) | rejected |
 
 **update_allowed_resource_groups_for_domain**
 
@@ -221,15 +221,15 @@ Scenario: incomplete 4 / 25
 | [존재하지 않는 그룹 이름을 도메인의 허용 목록에서 빼려 하면 그 이름은 건너뛰고 빈 목록이 반환된다](#allowing-disallowing-a-group-name-nothing-answers-to-for-a-domain-is-skipped) | answered |
 | [슈퍼관리자가 도메인의 허용 목록에 그룹을 더하면 그 그룹 이름이 담긴 목록이 반환된다](#allowing-the-superadmin-allows-a-resource-group-for-a-domain) | answered |
 | [도메인에 건 그룹을 슈퍼관리자가 허용 목록에서 빼면 빈 목록이 반환된다](#allowing-the-superadmin-disallows-a-resource-group-for-a-domain) | answered |
-| [슈퍼관리자가 아닌 사용자가 도메인의 허용 목록에 그룹을 더하려 하면 역할 부족으로 거부된다. 그룹 이름을 id로 바꾸는 자리가 슈퍼관리자 검사를 거친다](#allowing-a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-domain) | refused |
-| [존재하지 않는 그룹 이름을 도메인의 허용 목록에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다](#allowing-allowing-a-group-name-nothing-answers-to-for-a-domain-is-not-found) | refused |
+| [슈퍼관리자가 아닌 사용자가 도메인의 허용 목록에 그룹을 더하려 하면 역할 부족으로 거부된다. 그룹 이름을 id로 바꾸는 자리가 슈퍼관리자 검사를 거친다](#allowing-a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-domain) | rejected |
+| [존재하지 않는 그룹 이름을 도메인의 허용 목록에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다](#allowing-allowing-a-group-name-nothing-answers-to-for-a-domain-is-not-found) | rejected |
 
 **update_allowed_resource_groups_for_project**
 
 | scenario | verdict |
 |---|---|
 | [슈퍼관리자가 프로젝트의 허용 목록에 그룹을 더하면 그 그룹 이름이 담긴 목록이 반환된다](#allowing-the-superadmin-allows-a-resource-group-for-a-project) | answered |
-| [슈퍼관리자가 아닌 사용자가 프로젝트의 허용 목록에 그룹을 더하려 하면 역할 부족으로 거부된다](#allowing-a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-project) | refused |
+| [슈퍼관리자가 아닌 사용자가 프로젝트의 허용 목록에 그룹을 더하려 하면 역할 부족으로 거부된다](#allowing-a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-project) | rejected |
 
 **update_config**
 
@@ -237,7 +237,7 @@ Scenario: incomplete 4 / 25
 |---|---|
 | [슈퍼관리자가 선점 설정을 바꾸면 선점 설정이 새 값인 그룹 전체가 반환된다](#editing-the-superadmin-changes-the-preemption-config) | answered |
 | [슈퍼관리자가 스케줄러를 후입선출로, 비공개로, 호스트 네트워크로, 프록시 주소를 지정해 설정을 바꾸면 그 값들이 새 값인 그룹 전체가 반환된다](#editing-the-superadmin-changes-the-scheduler-visibility-and-network-config) | answered |
-| [아무 권한도 없는 사용자가 설정을 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-the-config) | refused |
+| [아무 권한도 없는 사용자가 설정을 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-the-config) | rejected |
 
 **update_fair_share_spec**
 
@@ -245,14 +245,14 @@ Scenario: incomplete 4 / 25
 |---|---|
 | [그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 반감기를 바꾸면 그룹 전체가 반환된다](#fair_share-a-user-granted-update-on-the-group-changes-its-fair-share-spec) | answered |
 | [슈퍼관리자가 반감기를 바꾸면 그룹 전체가 반환된다. 반환되는 노드에는 이 설정이 실리지 않는다](#fair_share-the-superadmin-changes-the-fair-share-half-life) | answered |
-| [아무 권한도 없는 사용자가 반감기를 바꾸려 하면 권한 부족으로 거부된다](#fair_share-a-user-granted-nothing-may-not-change-the-fair-share-spec) | refused |
-| [슈퍼관리자가 존재하지 않는 이름의 반감기를 바꾸면 대상을 찾을 수 없다는 이유로 거부된다](#fair_share-changing-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found) | refused |
+| [아무 권한도 없는 사용자가 반감기를 바꾸려 하면 권한 부족으로 거부된다](#fair_share-a-user-granted-nothing-may-not-change-the-fair-share-spec) | rejected |
+| [슈퍼관리자가 존재하지 않는 이름의 반감기를 바꾸면 대상을 찾을 수 없다는 이유로 거부된다](#fair_share-changing-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found) | rejected |
 
 ### batch_load_by_ids
 
 <a id="reading-a-batch-load-of-no-ids-answers-an-empty-list"></a>
 
-#### [a-batch-load-of-no-ids-answers-an-empty-list](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [a-batch-load-of-no-ids-answers-an-empty-list](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
 빈 id 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다
 
@@ -270,7 +270,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.batch_load_by_ids — user-1이 빈 id 목록으로 조회
+- ResourceGroupAdapter.batch_load_by_ids: user-1이 빈 id 목록으로 조회
 
 Then
 
@@ -279,7 +279,7 @@ Then
 
 <a id="reading-a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item"></a>
 
-#### [a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [a-user-granted-nothing-batch-loading-by-ids-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
 아무 권한도 없는 사용자가 그룹 둘을 id로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다
 
@@ -297,7 +297,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.batch_load_by_ids — user-1이 미리 만들어 둔 2개를 id로 한 번에 조회
+- ResourceGroupAdapter.batch_load_by_ids: user-1이 미리 만들어 둔 2개를 id로 한 번에 조회
 
 Then
 
@@ -308,7 +308,7 @@ Then
 
 <a id="reading-the-superadmin-batch-load-by-ids-leaves-a-missing-id-empty"></a>
 
-#### [the-superadmin-batch-load-by-ids-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [the-superadmin-batch-load-by-ids-leaves-a-missing-id-empty](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
 슈퍼관리자가 미리 만들어 둔 그룹 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다
 
@@ -326,13 +326,13 @@ Given
 
 When
 
-- ResourceGroupAdapter.batch_load_by_ids — user-1이 미리 만들어 둔 2개와 없는 id 하나를 한 번에 조회
+- ResourceGroupAdapter.batch_load_by_ids: user-1이 미리 만들어 둔 2개와 없는 id 하나를 한 번에 조회
 
 Then
 
 - 요청한 순서대로 반환되고, 없는 것에 해당하는 항목은 비어 있다
   - len(items) = 3
-  - items[0].id: 무시함 — 데이터베이스가 만든다
+  - items[0].id: 무시함: 데이터베이스가 만든다
   - items[0].name = 'wanted-1'
   - items[0].status.is_active = True
   - items[0].status.is_public = True
@@ -348,9 +348,9 @@ Then
   - items[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[0].scheduler.preemption.preemption_min_runtime = 0.0
   - items[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - items[0].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - items[0].default_session_options: 무시함 — 설치본이 정한 기본값이다
-  - items[1].id: 무시함 — 데이터베이스가 만든다
+  - items[0].default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - items[0].default_session_options: 무시함: 설치본이 정한 기본값이다
+  - items[1].id: 무시함: 데이터베이스가 만든다
   - items[1].name = 'other-1'
   - items[1].status.is_active = True
   - items[1].status.is_public = True
@@ -366,15 +366,15 @@ Then
   - items[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[1].scheduler.preemption.preemption_min_runtime = 0.0
   - items[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - items[1].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - items[1].default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - items[1].default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - items[1].default_session_options: 무시함: 설치본이 정한 기본값이다
   - items[2] = None
 
 ### batch_load_by_names
 
 <a id="reading-a-batch-load-of-no-names-answers-an-empty-list"></a>
 
-#### [a-batch-load-of-no-names-answers-an-empty-list](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [a-batch-load-of-no-names-answers-an-empty-list](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
 빈 이름 목록으로 조회하면 하위 계층을 부르지 않고 빈 응답이 반환된다
 
@@ -392,7 +392,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.batch_load_by_names — user-1이 빈 이름 목록으로 조회
+- ResourceGroupAdapter.batch_load_by_names: user-1이 빈 이름 목록으로 조회
 
 Then
 
@@ -401,7 +401,7 @@ Then
 
 <a id="reading-a-user-granted-nothing-batch-loading-by-names-is-refused-per-item"></a>
 
-#### [a-user-granted-nothing-batch-loading-by-names-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [a-user-granted-nothing-batch-loading-by-names-is-refused-per-item](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
 아무 권한도 없는 사용자가 그룹 둘을 이름으로 한 번에 조회하면, 호출은 거부되지 않고 항목마다 권한 부족 거부가 담긴다
 
@@ -419,7 +419,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.batch_load_by_names — user-1이 미리 만들어 둔 2개를 이름으로 한 번에 조회
+- ResourceGroupAdapter.batch_load_by_names: user-1이 미리 만들어 둔 2개를 이름으로 한 번에 조회
 
 Then
 
@@ -430,7 +430,7 @@ Then
 
 <a id="reading-the-superadmin-batch-load-by-names-leaves-a-missing-name-empty"></a>
 
-#### [the-superadmin-batch-load-by-names-leaves-a-missing-name-empty](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [the-superadmin-batch-load-by-names-leaves-a-missing-name-empty](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
 슈퍼관리자가 미리 만들어 둔 그룹 둘과 없는 이름 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 이름에 해당하는 항목은 비어 있다
 
@@ -448,13 +448,13 @@ Given
 
 When
 
-- ResourceGroupAdapter.batch_load_by_names — user-1이 미리 만들어 둔 2개와 없는 이름 하나를 한 번에 조회
+- ResourceGroupAdapter.batch_load_by_names: user-1이 미리 만들어 둔 2개와 없는 이름 하나를 한 번에 조회
 
 Then
 
 - 요청한 순서대로 반환되고, 없는 것에 해당하는 항목은 비어 있다
   - len(items) = 3
-  - items[0].id: 무시함 — 데이터베이스가 만든다
+  - items[0].id: 무시함: 데이터베이스가 만든다
   - items[0].name = 'wanted-1'
   - items[0].status.is_active = True
   - items[0].status.is_public = True
@@ -470,9 +470,9 @@ Then
   - items[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[0].scheduler.preemption.preemption_min_runtime = 0.0
   - items[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - items[0].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - items[0].default_session_options: 무시함 — 설치본이 정한 기본값이다
-  - items[1].id: 무시함 — 데이터베이스가 만든다
+  - items[0].default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - items[0].default_session_options: 무시함: 설치본이 정한 기본값이다
+  - items[1].id: 무시함: 데이터베이스가 만든다
   - items[1].name = 'other-1'
   - items[1].status.is_active = True
   - items[1].status.is_public = True
@@ -488,15 +488,15 @@ Then
   - items[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - items[1].scheduler.preemption.preemption_min_runtime = 0.0
   - items[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - items[1].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - items[1].default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - items[1].default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - items[1].default_session_options: 무시함: 설치본이 정한 기본값이다
   - items[2] = None
 
 ### get
 
 <a id="reading-a-user-granted-read-on-the-group-reads-it-by-name"></a>
 
-#### [a-user-granted-read-on-the-group-reads-it-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [a-user-granted-read-on-the-group-reads-it-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
 그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 이름으로 조회하면 그 그룹 전체가 반환된다. 그룹이 자기 스코프이므로 그룹에 앉힌 역할이 닿는다
 
@@ -517,12 +517,12 @@ Given
 
 When
 
-- ResourceGroupAdapter.get — user-1이 resource-group-1으로 조회
+- ResourceGroupAdapter.get: user-1이 resource-group-1으로 조회
 
 Then
 
 - 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
@@ -538,12 +538,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
 
 <a id="reading-the-superadmin-reads-a-resource-group-by-name"></a>
 
-#### [the-superadmin-reads-a-resource-group-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [the-superadmin-reads-a-resource-group-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
 리소스 그룹 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 그룹 전체가 반환된다
 
@@ -560,12 +560,12 @@ Given
 
 When
 
-- ResourceGroupAdapter.get — user-1이 resource-group-1으로 조회
+- ResourceGroupAdapter.get: user-1이 resource-group-1으로 조회
 
 Then
 
 - 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
@@ -581,12 +581,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
 
 <a id="reading-a-user-granted-nothing-may-not-read-a-resource-group"></a>
 
-#### [a-user-granted-nothing-may-not-read-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [a-user-granted-nothing-may-not-read-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
 아무 권한도 없는 사용자가 이름으로 조회하면 권한 부족으로 거부된다
 
@@ -603,7 +603,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get — user-1이 resource-group-1으로 조회
+- ResourceGroupAdapter.get: user-1이 resource-group-1으로 조회
 
 Then
 
@@ -612,7 +612,7 @@ Then
 
 <a id="reading-a-user-granted-nothing-reading-a-name-nothing-answers-to-is-not-found-too"></a>
 
-#### [a-user-granted-nothing-reading-a-name-nothing-answers-to-is-not-found-too](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [a-user-granted-nothing-reading-a-name-nothing-answers-to-is-not-found-too](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
 아무 권한도 없는 사용자가 존재하지 않는 이름으로 조회해도 권한 부족이 아니라 대상을 찾을 수 없다는 이유로 거부된다. 이름으로 id를 찾는 자리는 인증만 확인하고 권한 검사는 찾은 뒤에 온다
 
@@ -629,7 +629,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get — user-1이 존재하지 않는 이름으로 조회
+- ResourceGroupAdapter.get: user-1이 존재하지 않는 이름으로 조회
 
 Then
 
@@ -638,7 +638,7 @@ Then
 
 <a id="reading-the-superadmin-reading-a-name-nothing-answers-to-is-not-found"></a>
 
-#### [the-superadmin-reading-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [the-superadmin-reading-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
 슈퍼관리자가 존재하지 않는 이름으로 조회하면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -655,7 +655,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get — user-1이 존재하지 않는 이름으로 조회
+- ResourceGroupAdapter.get: user-1이 존재하지 않는 이름으로 조회
 
 Then
 
@@ -666,7 +666,7 @@ Then
 
 <a id="allowing-a-user-granted-read-in-the-domain-reads-the-groups-allowed-for-it"></a>
 
-#### [a-user-granted-read-in-the-domain-reads-the-groups-allowed-for-it](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-granted-read-in-the-domain-reads-the-groups-allowed-for-it](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 도메인 범위에서 리소스 그룹 읽기 역할을 받은 사용자가 그 도메인의 허용 목록을 읽으면 건 그룹 이름만 담긴다
 
@@ -689,7 +689,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_allowed_resource_groups_for_domain — user-1이 도메인 home-1의 허용 목록 조회
+- ResourceGroupAdapter.get_allowed_resource_groups_for_domain: user-1이 도메인 home-1의 허용 목록 조회
 
 Then
 
@@ -698,7 +698,7 @@ Then
 
 <a id="allowing-the-superadmin-reads-the-groups-allowed-for-a-domain"></a>
 
-#### [the-superadmin-reads-the-groups-allowed-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-reads-the-groups-allowed-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 도메인에 건 그룹과 걸지 않은 그룹이 있을 때 슈퍼관리자가 도메인의 허용 목록을 읽으면 건 그룹 이름만 담긴다
 
@@ -717,7 +717,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_allowed_resource_groups_for_domain — user-1이 도메인 home-1의 허용 목록 조회
+- ResourceGroupAdapter.get_allowed_resource_groups_for_domain: user-1이 도메인 home-1의 허용 목록 조회
 
 Then
 
@@ -726,7 +726,7 @@ Then
 
 <a id="allowing-a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-domain"></a>
 
-#### [a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 아무 권한도 없는 사용자가 자기 도메인의 허용 목록을 읽으려 하면 권한 부족으로 거부된다
 
@@ -745,7 +745,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_allowed_resource_groups_for_domain — user-1이 도메인 home-1의 허용 목록 조회
+- ResourceGroupAdapter.get_allowed_resource_groups_for_domain: user-1이 도메인 home-1의 허용 목록 조회
 
 Then
 
@@ -754,7 +754,7 @@ Then
 
 <a id="allowing-reading-the-groups-allowed-for-a-domain-nothing-answers-to-is-not-found"></a>
 
-#### [reading-the-groups-allowed-for-a-domain-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [reading-the-groups-allowed-for-a-domain-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 존재하지 않는 도메인 이름의 허용 목록을 읽으려 하면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -773,7 +773,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_allowed_resource_groups_for_domain — user-1이 존재하지 않는 도메인의 허용 목록 조회
+- ResourceGroupAdapter.get_allowed_resource_groups_for_domain: user-1이 존재하지 않는 도메인의 허용 목록 조회
 
 Then
 
@@ -784,7 +784,7 @@ Then
 
 <a id="allowing-the-superadmin-reads-the-groups-allowed-for-a-project"></a>
 
-#### [the-superadmin-reads-the-groups-allowed-for-a-project](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-reads-the-groups-allowed-for-a-project](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 프로젝트에 건 그룹이 있을 때 슈퍼관리자가 프로젝트의 허용 목록을 읽으면 건 그룹 이름이 담긴다
 
@@ -803,7 +803,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_allowed_resource_groups_for_project — user-1이 프로젝트 team-1의 허용 목록 조회
+- ResourceGroupAdapter.get_allowed_resource_groups_for_project: user-1이 프로젝트 team-1의 허용 목록 조회
 
 Then
 
@@ -812,7 +812,7 @@ Then
 
 <a id="allowing-a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-project"></a>
 
-#### [a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-project](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-granted-nothing-may-not-read-the-groups-allowed-for-a-project](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 아무 권한도 없는 사용자가 프로젝트의 허용 목록을 읽으려 하면 권한 부족으로 거부된다. 자기 도메인, 그 프로젝트, 자기 자신 세 스코프 모두에서 읽을 수 있어야 한다
 
@@ -831,7 +831,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_allowed_resource_groups_for_project — user-1이 프로젝트 team-1의 허용 목록 조회
+- ResourceGroupAdapter.get_allowed_resource_groups_for_project: user-1이 프로젝트 team-1의 허용 목록 조회
 
 Then
 
@@ -842,7 +842,7 @@ Then
 
 <a id="looking_up-a-user-granted-nothing-still-looks-up-a-resource-group-by-name"></a>
 
-#### [a-user-granted-nothing-still-looks-up-a-resource-group-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_looking_up.py) — pass
+#### [a-user-granted-nothing-still-looks-up-a-resource-group-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_looking_up.py): pass
 
 아무 권한도 받지 않은 사용자도 리소스 그룹 이름으로 id를 찾을 수 있다. 이 호출은 인증만 보고, 권한은 그 id를 받는 호출이 본다
 
@@ -859,7 +859,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.lookup_name — user-1이 resource-group-1의 id를 찾음
+- ResourceGroupAdapter.lookup_name: user-1이 resource-group-1의 id를 찾음
 
 Then
 
@@ -868,7 +868,7 @@ Then
 
 <a id="looking_up-the-superadmin-looks-up-a-resource-group-by-name"></a>
 
-#### [the-superadmin-looks-up-a-resource-group-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_looking_up.py) — pass
+#### [the-superadmin-looks-up-a-resource-group-by-name](/tests/scenario/bai_scenario/manager/resource_group/test_looking_up.py): pass
 
 슈퍼관리자가 리소스 그룹 이름으로 id를 찾으면, 그 리소스 그룹의 id가 온다
 
@@ -885,7 +885,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.lookup_name — user-1이 resource-group-1의 id를 찾음
+- ResourceGroupAdapter.lookup_name: user-1이 resource-group-1의 id를 찾음
 
 Then
 
@@ -894,7 +894,7 @@ Then
 
 <a id="looking_up-looking-up-a-resource-group-name-nothing-answers-to-is-not-found"></a>
 
-#### [looking-up-a-resource-group-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_looking_up.py) — pass
+#### [looking-up-a-resource-group-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_looking_up.py): pass
 
 아무 리소스 그룹도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다
 
@@ -911,7 +911,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.lookup_name — user-1이 no-such-group의 id를 찾음
+- ResourceGroupAdapter.lookup_name: user-1이 no-such-group의 id를 찾음
 
 Then
 
@@ -922,7 +922,7 @@ Then
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-resource-groups"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-resource-groups](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-resource-groups](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_purging.py): pass
 
 아무 권한도 받지 않은 사용자가 그룹 여럿을 한 번에 완전 삭제하려 하면, 지워진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -940,7 +940,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.partial_bulk_purge — user-1이 그룹 2개를 한 번에 완전 삭제함
+- ResourceGroupAdapter.partial_bulk_purge: user-1이 그룹 2개를 한 번에 완전 삭제함
 
 Then
 
@@ -954,7 +954,7 @@ Then
 
 <a id="partial_bulk_purging-purging-several-resource-groups-answers-for-the-missing-one"></a>
 
-#### [purging-several-resource-groups-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_purging.py) — pass
+#### [purging-several-resource-groups-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_purging.py): pass
 
 슈퍼관리자가 그룹 둘과 없는 id 하나를 한 번에 완전 삭제하면, 둘은 지운 그대로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -972,13 +972,13 @@ Given
 
 When
 
-- ResourceGroupAdapter.partial_bulk_purge — user-1이 그룹 2개 와 없는 id 하나를 한 번에 완전 삭제함
+- ResourceGroupAdapter.partial_bulk_purge: user-1이 그룹 2개 와 없는 id 하나를 한 번에 완전 삭제함
 
 Then
 
 - 그룹이 모두 처리된 목록에 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
   - successes count = 2
-  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].id: 무시함: 데이터베이스가 만든다
   - successes[0].name = 'wanted-1'
   - successes[0].status.is_active = True
   - successes[0].status.is_public = True
@@ -994,9 +994,9 @@ Then
   - successes[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[0].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - successes[0].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - successes[0].default_session_options: 무시함 — 설치본이 정한 기본값이다
-  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - successes[0].default_session_options: 무시함: 설치본이 정한 기본값이다
+  - successes[1].id: 무시함: 데이터베이스가 만든다
   - successes[1].name = 'other-1'
   - successes[1].status.is_active = True
   - successes[1].status.is_public = True
@@ -1012,8 +1012,8 @@ Then
   - successes[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[1].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - successes[1].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - successes[1].default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - successes[1].default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - successes[1].default_session_options: 무시함: 설치본이 정한 기본값이다
   - failed count = 1
   - failed[0].id: 요청에 넣은 없는 id와 같다
   - failed[0].message: 'not found'를 담은 이유
@@ -1022,7 +1022,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-resource-groups"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-resource-groups](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-resource-groups](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 그룹 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -1040,7 +1040,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.partial_bulk_update — user-1이 그룹 2개의 설명을 한 번에 고침
+- ResourceGroupAdapter.partial_bulk_update: user-1이 그룹 2개의 설명을 한 번에 고침
 
 Then
 
@@ -1054,7 +1054,7 @@ Then
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-resource-groups-at-once"></a>
 
-#### [the-superadmin-edits-several-resource-groups-at-once](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-edits-several-resource-groups-at-once](/tests/scenario/bai_scenario/manager/resource_group/test_partial_bulk_editing.py): pass
 
 슈퍼관리자가 그룹 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다
 
@@ -1072,13 +1072,13 @@ Given
 
 When
 
-- ResourceGroupAdapter.partial_bulk_update — user-1이 그룹 2개의 설명을 한 번에 고침
+- ResourceGroupAdapter.partial_bulk_update: user-1이 그룹 2개의 설명을 한 번에 고침
 
 Then
 
 - 그룹이 모두 처리된 목록에 오고, 실패한 것은 없다
   - successes count = 2
-  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].id: 무시함: 데이터베이스가 만든다
   - successes[0].name = 'wanted-1'
   - successes[0].status.is_active = True
   - successes[0].status.is_public = True
@@ -1094,9 +1094,9 @@ Then
   - successes[0].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[0].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[0].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - successes[0].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - successes[0].default_session_options: 무시함 — 설치본이 정한 기본값이다
-  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - successes[0].default_session_options: 무시함: 설치본이 정한 기본값이다
+  - successes[1].id: 무시함: 데이터베이스가 만든다
   - successes[1].name = 'other-1'
   - successes[1].status.is_active = True
   - successes[1].status.is_public = True
@@ -1112,15 +1112,15 @@ Then
   - successes[1].scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - successes[1].scheduler.preemption.preemption_min_runtime = 0.0
   - successes[1].scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - successes[1].default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - successes[1].default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - successes[1].default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - successes[1].default_session_options: 무시함: 설치본이 정한 기본값이다
   - failed = []
 
 ### scoped_search
 
 <a id="searching-a-user-granted-read-in-the-domain-searches-the-groups-linked-to-it"></a>
 
-#### [a-user-granted-read-in-the-domain-searches-the-groups-linked-to-it](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [a-user-granted-read-in-the-domain-searches-the-groups-linked-to-it](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
 도메인 범위에서 리소스 그룹 읽기 역할을 받은 사용자가 그 도메인 스코프로 조회하면, 도메인에 건 그룹 하나만 반환되고 걸지 않은 그룹은 나오지 않는다
 
@@ -1143,7 +1143,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.scoped_search — user-1이 도메인 home-1 스코프로 조회
+- ResourceGroupAdapter.scoped_search: user-1이 도메인 home-1 스코프로 조회
 
 Then
 
@@ -1155,7 +1155,7 @@ Then
 
 <a id="searching-the-superadmin-searching-a-domain-scope-sees-only-the-groups-linked-to-it"></a>
 
-#### [the-superadmin-searching-a-domain-scope-sees-only-the-groups-linked-to-it](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [the-superadmin-searching-a-domain-scope-sees-only-the-groups-linked-to-it](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
 슈퍼관리자가 도메인 스코프로 조회해도 그 도메인에 건 그룹 하나만 반환된다
 
@@ -1174,7 +1174,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.scoped_search — user-1이 도메인 home-1 스코프로 조회
+- ResourceGroupAdapter.scoped_search: user-1이 도메인 home-1 스코프로 조회
 
 Then
 
@@ -1186,7 +1186,7 @@ Then
 
 <a id="searching-a-user-granted-nothing-may-not-search-a-domain-scope"></a>
 
-#### [a-user-granted-nothing-may-not-search-a-domain-scope](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [a-user-granted-nothing-may-not-search-a-domain-scope](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
 아무 권한도 없는 사용자가 자기 도메인 스코프로 조회하면 권한 부족으로 거부된다
 
@@ -1205,7 +1205,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.scoped_search — user-1이 도메인 home-1 스코프로 조회
+- ResourceGroupAdapter.scoped_search: user-1이 도메인 home-1 스코프로 조회
 
 Then
 
@@ -1216,7 +1216,7 @@ Then
 
 <a id="searching-a-name-filter-narrows-the-answer-to-that-resource-group"></a>
 
-#### [a-name-filter-narrows-the-answer-to-that-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [a-name-filter-narrows-the-answer-to-that-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
 리소스 그룹 둘 중 한쪽 이름을 필터로 조회하면 그 그룹 하나만 반환된다
 
@@ -1234,7 +1234,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.search — user-1이 이름 wanted-1 필터로 조회
+- ResourceGroupAdapter.search: user-1이 이름 wanted-1 필터로 조회
 
 Then
 
@@ -1246,7 +1246,7 @@ Then
 
 <a id="searching-an-active-filter-leaves-only-the-active-resource-groups"></a>
 
-#### [an-active-filter-leaves-only-the-active-resource-groups](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [an-active-filter-leaves-only-the-active-resource-groups](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
 활성 그룹과 비활성 그룹이 섞여 있을 때 활성 필터로 조회하면 활성인 것만 반환된다
 
@@ -1264,7 +1264,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.search — user-1이 활성 필터로 조회
+- ResourceGroupAdapter.search: user-1이 활성 필터로 조회
 
 Then
 
@@ -1276,7 +1276,7 @@ Then
 
 <a id="searching-asking-for-the-first-resource-group-only-says-there-is-a-next-page"></a>
 
-#### [asking-for-the-first-resource-group-only-says-there-is-a-next-page](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [asking-for-the-first-resource-group-only-says-there-is-a-next-page](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
 리소스 그룹 둘이 있을 때 앞에서 한 건만 요청하면 한 건이 반환되고 다음 페이지가 있다고 응답한다
 
@@ -1294,7 +1294,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.search — user-1이 앞에서 한 건만 조회
+- ResourceGroupAdapter.search: user-1이 앞에서 한 건만 조회
 
 Then
 
@@ -1306,7 +1306,7 @@ Then
 
 <a id="searching-the-monitor-searches-resource-groups-like-the-superadmin"></a>
 
-#### [the-monitor-searches-resource-groups-like-the-superadmin](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [the-monitor-searches-resource-groups-like-the-superadmin](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
 모니터가 필터 없이 조회하면 슈퍼관리자와 같은 응답을 받는다
 
@@ -1324,7 +1324,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.search — user-1이 필터 없이 전체 조회
+- ResourceGroupAdapter.search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -1336,7 +1336,7 @@ Then
 
 <a id="searching-the-superadmin-counts-every-resource-group-laid"></a>
 
-#### [the-superadmin-counts-every-resource-group-laid](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [the-superadmin-counts-every-resource-group-laid](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
 리소스 그룹 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 반환된다
 
@@ -1354,7 +1354,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.search — user-1이 필터 없이 전체 조회
+- ResourceGroupAdapter.search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -1366,7 +1366,7 @@ Then
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-every-resource-group"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-every-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-every-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_searching.py): pass
 
 슈퍼관리자가 아닌 사용자가 필터 없이 전체를 조회하면 역할 부족으로 거부된다
 
@@ -1384,7 +1384,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.search — user-1이 필터 없이 전체 조회
+- ResourceGroupAdapter.search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -1395,7 +1395,7 @@ Then
 
 <a id="fair_share-a-user-granted-read-on-the-group-reads-its-fair-share-spec"></a>
 
-#### [a-user-granted-read-on-the-group-reads-its-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+#### [a-user-granted-read-on-the-group-reads-its-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
 
 그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 에이전트 없는 그룹의 fair share 설정을 읽으면 코드가 정한 기본값이 반환되고 가중치 목록은 비어 있다
 
@@ -1416,7 +1416,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_fair_share_spec — user-1이 resource-group-1의 fair share 설정 조회
+- ResourceGroupAdapter.get_fair_share_spec: user-1이 resource-group-1의 fair share 설정 조회
 
 Then
 
@@ -1429,7 +1429,7 @@ Then
 
 <a id="fair_share-the-superadmin-reads-the-default-fair-share-spec"></a>
 
-#### [the-superadmin-reads-the-default-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+#### [the-superadmin-reads-the-default-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
 
 에이전트가 없는 그룹의 fair share 설정을 슈퍼관리자가 읽으면 코드가 정한 기본값이 반환되고 가중치 목록은 비어 있다
 
@@ -1446,7 +1446,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_fair_share_spec — user-1이 resource-group-1의 fair share 설정 조회
+- ResourceGroupAdapter.get_fair_share_spec: user-1이 resource-group-1의 fair share 설정 조회
 
 Then
 
@@ -1459,7 +1459,7 @@ Then
 
 <a id="fair_share-a-user-granted-nothing-may-not-read-the-fair-share-spec"></a>
 
-#### [a-user-granted-nothing-may-not-read-the-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+#### [a-user-granted-nothing-may-not-read-the-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
 
 아무 권한도 없는 사용자가 fair share 설정을 읽으려 하면 권한 부족으로 거부된다
 
@@ -1476,7 +1476,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_fair_share_spec — user-1이 resource-group-1의 fair share 설정 조회
+- ResourceGroupAdapter.get_fair_share_spec: user-1이 resource-group-1의 fair share 설정 조회
 
 Then
 
@@ -1485,7 +1485,7 @@ Then
 
 <a id="fair_share-reading-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found"></a>
 
-#### [reading-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+#### [reading-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
 
 슈퍼관리자가 존재하지 않는 이름의 fair share 설정을 읽으면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -1502,7 +1502,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_fair_share_spec — user-1이 존재하지 않는 이름의 fair share 설정 조회
+- ResourceGroupAdapter.get_fair_share_spec: user-1이 존재하지 않는 이름의 fair share 설정 조회
 
 Then
 
@@ -1513,7 +1513,7 @@ Then
 
 <a id="options-a-user-granted-update-on-the-group-replaces-the-default-deployment-options"></a>
 
-#### [a-user-granted-update-on-the-group-replaces-the-default-deployment-options](/tests/scenario/bai_scenario/manager/resource_group/test_options.py) — pass
+#### [a-user-granted-update-on-the-group-replaces-the-default-deployment-options](/tests/scenario/bai_scenario/manager/resource_group/test_options.py): pass
 
 그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 기본 배포 옵션을 갈아끼우면 준 옵션이 통째로 반환된다
 
@@ -1534,7 +1534,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_deployment_options — user-1이 resource-group-1의 기본 배포 옵션을 처리기 check-replica-deployments의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_deployment_options: user-1이 resource-group-1의 기본 배포 옵션을 처리기 check-replica-deployments의 설정을 담아 갈아끼움
 
 Then
 
@@ -1546,7 +1546,7 @@ Then
 
 <a id="options-the-superadmin-replaces-the-default-deployment-options-whole"></a>
 
-#### [the-superadmin-replaces-the-default-deployment-options-whole](/tests/scenario/bai_scenario/manager/resource_group/test_options.py) — pass
+#### [the-superadmin-replaces-the-default-deployment-options-whole](/tests/scenario/bai_scenario/manager/resource_group/test_options.py): pass
 
 슈퍼관리자가 등록된 처리기 하나의 설정을 담아 기본 배포 옵션을 갈아끼우면 준 옵션이 통째로 반환된다
 
@@ -1563,7 +1563,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_deployment_options — user-1이 resource-group-1의 기본 배포 옵션을 처리기 check-replica-deployments의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_deployment_options: user-1이 resource-group-1의 기본 배포 옵션을 처리기 check-replica-deployments의 설정을 담아 갈아끼움
 
 Then
 
@@ -1575,7 +1575,7 @@ Then
 
 <a id="options-a-user-granted-nothing-may-not-replace-the-default-deployment-options"></a>
 
-#### [a-user-granted-nothing-may-not-replace-the-default-deployment-options](/tests/scenario/bai_scenario/manager/resource_group/test_options.py) — pass
+#### [a-user-granted-nothing-may-not-replace-the-default-deployment-options](/tests/scenario/bai_scenario/manager/resource_group/test_options.py): pass
 
 아무 권한도 없는 사용자가 기본 배포 옵션을 갈아끼우려 하면 권한 부족으로 거부된다
 
@@ -1592,7 +1592,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_deployment_options — user-1이 resource-group-1의 기본 배포 옵션을 처리기 check-replica-deployments의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_deployment_options: user-1이 resource-group-1의 기본 배포 옵션을 처리기 check-replica-deployments의 설정을 담아 갈아끼움
 
 Then
 
@@ -1601,7 +1601,7 @@ Then
 
 <a id="options-naming-an-unregistered-deployment-handler-is-refused"></a>
 
-#### [naming-an-unregistered-deployment-handler-is-refused](/tests/scenario/bai_scenario/manager/resource_group/test_options.py) — pass
+#### [naming-an-unregistered-deployment-handler-is-refused](/tests/scenario/bai_scenario/manager/resource_group/test_options.py): pass
 
 등록되지 않은 배포 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다
 
@@ -1618,7 +1618,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_deployment_options — user-1이 resource-group-1의 기본 배포 옵션을 처리기 no-such-handler의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_deployment_options: user-1이 resource-group-1의 기본 배포 옵션을 처리기 no-such-handler의 설정을 담아 갈아끼움
 
 Then
 
@@ -1629,7 +1629,7 @@ Then
 
 <a id="options-the-superadmin-replaces-the-default-session-options-whole"></a>
 
-#### [the-superadmin-replaces-the-default-session-options-whole](/tests/scenario/bai_scenario/manager/resource_group/test_options.py) — pass
+#### [the-superadmin-replaces-the-default-session-options-whole](/tests/scenario/bai_scenario/manager/resource_group/test_options.py): pass
 
 슈퍼관리자가 우선순위와 등록된 처리기 하나의 설정을 담아 기본 세션 옵션을 갈아끼우면 준 옵션이 통째로 반환되고 주지 않은 자리는 코드의 기본값이다
 
@@ -1646,7 +1646,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_session_options — user-1이 resource-group-1의 기본 세션 옵션을 우선순위와 처리기 terminate-sessions의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_session_options: user-1이 resource-group-1의 기본 세션 옵션을 우선순위와 처리기 terminate-sessions의 설정을 담아 갈아끼움
 
 Then
 
@@ -1664,7 +1664,7 @@ Then
 
 <a id="options-a-user-granted-nothing-may-not-replace-the-default-session-options"></a>
 
-#### [a-user-granted-nothing-may-not-replace-the-default-session-options](/tests/scenario/bai_scenario/manager/resource_group/test_options.py) — pass
+#### [a-user-granted-nothing-may-not-replace-the-default-session-options](/tests/scenario/bai_scenario/manager/resource_group/test_options.py): pass
 
 아무 권한도 없는 사용자가 기본 세션 옵션을 갈아끼우려 하면 권한 부족으로 거부된다
 
@@ -1681,7 +1681,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_session_options — user-1이 resource-group-1의 기본 세션 옵션을 우선순위와 처리기 terminate-sessions의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_session_options: user-1이 resource-group-1의 기본 세션 옵션을 우선순위와 처리기 terminate-sessions의 설정을 담아 갈아끼움
 
 Then
 
@@ -1690,7 +1690,7 @@ Then
 
 <a id="options-naming-an-unregistered-session-handler-is-refused"></a>
 
-#### [naming-an-unregistered-session-handler-is-refused](/tests/scenario/bai_scenario/manager/resource_group/test_options.py) — pass
+#### [naming-an-unregistered-session-handler-is-refused](/tests/scenario/bai_scenario/manager/resource_group/test_options.py): pass
 
 등록되지 않은 세션 처리기 이름을 담아 갈아끼우려 하면 잘못된 입력으로 거부된다
 
@@ -1707,7 +1707,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.admin_replace_default_session_options — user-1이 resource-group-1의 기본 세션 옵션을 우선순위와 처리기 no-such-handler의 설정을 담아 갈아끼움
+- ResourceGroupAdapter.admin_replace_default_session_options: user-1이 resource-group-1의 기본 세션 옵션을 우선순위와 처리기 no-such-handler의 설정을 담아 갈아끼움
 
 Then
 
@@ -1718,7 +1718,7 @@ Then
 
 <a id="creating-a-resource-group-made-as-the-default-answers-default"></a>
 
-#### [a-resource-group-made-as-the-default-answers-default](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py) — pass
+#### [a-resource-group-made-as-the-default-answers-default](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
 
 기본 그룹이 없을 때 슈퍼관리자가 기본으로 지정해 만들면 기본인 그룹이 반환된다
 
@@ -1734,12 +1734,12 @@ Given
 
 When
 
-- ResourceGroupAdapter.create — user-1이 primary을 기본 그룹으로 생성
+- ResourceGroupAdapter.create: user-1이 primary을 기본 그룹으로 생성
 
 Then
 
 - 만든 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'primary'
   - status.is_active = True
   - status.is_public = True
@@ -1755,12 +1755,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
 
 <a id="creating-the-superadmin-makes-a-resource-group"></a>
 
-#### [the-superadmin-makes-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py) — pass
+#### [the-superadmin-makes-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
 
 슈퍼관리자가 이름만 주고 리소스 그룹을 만들면, 활성이고 공개이며 기본이 아닌 그룹 전체가 코드의 기본값으로 채워져 반환된다
 
@@ -1776,12 +1776,12 @@ Given
 
 When
 
-- ResourceGroupAdapter.create — user-1이 compute을 생성
+- ResourceGroupAdapter.create: user-1이 compute을 생성
 
 Then
 
 - 만든 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'compute'
   - status.is_active = True
   - status.is_public = True
@@ -1797,12 +1797,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
 
 <a id="creating-a-name-another-resource-group-already-holds-is-refused"></a>
 
-#### [a-name-another-resource-group-already-holds-is-refused](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py) — pass
+#### [a-name-another-resource-group-already-holds-is-refused](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
 
 이미 어떤 그룹이 쓰고 있는 이름으로 만들려 하면 이름 중복으로 거부된다
 
@@ -1819,7 +1819,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.create — user-1이 resource-group-1을 생성
+- ResourceGroupAdapter.create: user-1이 resource-group-1을 생성
 
 Then
 
@@ -1828,7 +1828,7 @@ Then
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-make-a-resource-group"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-make-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-make-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
 
 슈퍼관리자가 아닌 사용자가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다
 
@@ -1844,7 +1844,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.create — user-1이 by-a-user을 생성
+- ResourceGroupAdapter.create: user-1이 by-a-user을 생성
 
 Then
 
@@ -1853,7 +1853,7 @@ Then
 
 <a id="creating-the-monitor-may-not-make-a-resource-group"></a>
 
-#### [the-monitor-may-not-make-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py) — pass
+#### [the-monitor-may-not-make-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_creating.py): pass
 
 모니터가 리소스 그룹을 만들려 하면 역할 부족으로 거부된다. 모니터는 읽기만 통과한다
 
@@ -1869,7 +1869,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.create — user-1이 by-the-monitor을 생성
+- ResourceGroupAdapter.create: user-1이 by-the-monitor을 생성
 
 Then
 
@@ -1880,7 +1880,7 @@ Then
 
 <a id="allowing-a-user-granted-read-on-the-group-reads-the-domains-allowed-for-it"></a>
 
-#### [a-user-granted-read-on-the-group-reads-the-domains-allowed-for-it](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-granted-read-on-the-group-reads-the-domains-allowed-for-it](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 그룹의 허용 도메인을 읽으면 걸린 도메인이 없어 빈 목록이 반환된다
 
@@ -1901,7 +1901,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_allowed_domains_for_resource_group — user-1이 resource-group-1의 허용 도메인 조회
+- ResourceGroupAdapter.get_allowed_domains_for_resource_group: user-1이 resource-group-1의 허용 도메인 조회
 
 Then
 
@@ -1910,7 +1910,7 @@ Then
 
 <a id="allowing-the-superadmin-reads-the-domains-allowed-for-a-resource-group"></a>
 
-#### [the-superadmin-reads-the-domains-allowed-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-reads-the-domains-allowed-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 도메인에 건 그룹의 허용 도메인을 슈퍼관리자가 읽으면 그 도메인 이름이 담긴다
 
@@ -1929,7 +1929,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_allowed_domains_for_resource_group — user-1이 linked-1의 허용 도메인 조회
+- ResourceGroupAdapter.get_allowed_domains_for_resource_group: user-1이 linked-1의 허용 도메인 조회
 
 Then
 
@@ -1938,7 +1938,7 @@ Then
 
 <a id="allowing-a-user-granted-nothing-may-not-read-the-domains-allowed-for-a-resource-group"></a>
 
-#### [a-user-granted-nothing-may-not-read-the-domains-allowed-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-granted-nothing-may-not-read-the-domains-allowed-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 아무 권한도 없는 사용자가 그룹의 허용 도메인을 읽으려 하면 권한 부족으로 거부된다
 
@@ -1955,7 +1955,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_allowed_domains_for_resource_group — user-1이 resource-group-1의 허용 도메인 조회
+- ResourceGroupAdapter.get_allowed_domains_for_resource_group: user-1이 resource-group-1의 허용 도메인 조회
 
 Then
 
@@ -1966,7 +1966,7 @@ Then
 
 <a id="allowing-the-superadmin-reads-the-projects-allowed-for-a-resource-group"></a>
 
-#### [the-superadmin-reads-the-projects-allowed-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-reads-the-projects-allowed-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 프로젝트에 건 그룹의 허용 프로젝트를 슈퍼관리자가 읽으면 그 프로젝트 id가 담긴다
 
@@ -1985,7 +1985,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_allowed_projects_for_resource_group — user-1이 resource-group-1의 허용 프로젝트 조회
+- ResourceGroupAdapter.get_allowed_projects_for_resource_group: user-1이 resource-group-1의 허용 프로젝트 조회
 
 Then
 
@@ -1994,7 +1994,7 @@ Then
 
 <a id="allowing-a-user-granted-nothing-may-not-read-the-projects-allowed-for-a-resource-group"></a>
 
-#### [a-user-granted-nothing-may-not-read-the-projects-allowed-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-granted-nothing-may-not-read-the-projects-allowed-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 아무 권한도 없는 사용자가 그룹의 허용 프로젝트를 읽으려 하면 권한 부족으로 거부된다
 
@@ -2013,7 +2013,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_allowed_projects_for_resource_group — user-1이 resource-group-1의 허용 프로젝트 조회
+- ResourceGroupAdapter.get_allowed_projects_for_resource_group: user-1이 resource-group-1의 허용 프로젝트 조회
 
 Then
 
@@ -2024,7 +2024,7 @@ Then
 
 <a id="reading-a-user-granted-read-on-the-group-reads-its-resource-info"></a>
 
-#### [a-user-granted-read-on-the-group-reads-its-resource-info](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [a-user-granted-read-on-the-group-reads-its-resource-info](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
 그 그룹에 앉힌 역할로 읽기 권한을 받은 사용자가 리소스 현황을 조회하면 슈퍼관리자와 같은 응답을 받는다
 
@@ -2045,7 +2045,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_resource_info — user-1이 resource-group-1의 리소스 현황 조회
+- ResourceGroupAdapter.get_resource_info: user-1이 resource-group-1의 리소스 현황 조회
 
 Then
 
@@ -2056,7 +2056,7 @@ Then
 
 <a id="reading-the-superadmin-reads-an-empty-resource-info-of-a-group-without-agents"></a>
 
-#### [the-superadmin-reads-an-empty-resource-info-of-a-group-without-agents](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [the-superadmin-reads-an-empty-resource-info-of-a-group-without-agents](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
 에이전트가 없는 그룹의 리소스 현황을 슈퍼관리자가 조회하면 용량·사용량·여유가 모두 비어 있다
 
@@ -2073,7 +2073,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_resource_info — user-1이 resource-group-1의 리소스 현황 조회
+- ResourceGroupAdapter.get_resource_info: user-1이 resource-group-1의 리소스 현황 조회
 
 Then
 
@@ -2084,7 +2084,7 @@ Then
 
 <a id="reading-a-user-granted-nothing-may-not-read-the-resource-info"></a>
 
-#### [a-user-granted-nothing-may-not-read-the-resource-info](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [a-user-granted-nothing-may-not-read-the-resource-info](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
 아무 권한도 없는 사용자가 리소스 현황을 조회하면 권한 부족으로 거부된다
 
@@ -2101,7 +2101,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_resource_info — user-1이 resource-group-1의 리소스 현황 조회
+- ResourceGroupAdapter.get_resource_info: user-1이 resource-group-1의 리소스 현황 조회
 
 Then
 
@@ -2110,7 +2110,7 @@ Then
 
 <a id="reading-the-resource-info-of-a-name-nothing-answers-to-is-not-found"></a>
 
-#### [the-resource-info-of-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py) — pass
+#### [the-resource-info-of-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_reading.py): pass
 
 슈퍼관리자가 존재하지 않는 이름의 리소스 현황을 조회하면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -2127,7 +2127,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.get_resource_info — user-1이 존재하지 않는 이름의 리소스 현황 조회
+- ResourceGroupAdapter.get_resource_info: user-1이 존재하지 않는 이름의 리소스 현황 조회
 
 Then
 
@@ -2138,7 +2138,7 @@ Then
 
 <a id="retiring-a-user-granted-hard-delete-on-the-group-purges-it"></a>
 
-#### [a-user-granted-hard-delete-on-the-group-purges-it](/tests/scenario/bai_scenario/manager/resource_group/test_retiring.py) — pass
+#### [a-user-granted-hard-delete-on-the-group-purges-it](/tests/scenario/bai_scenario/manager/resource_group/test_retiring.py): pass
 
 그 그룹에 앉힌 역할로 완전 삭제 권한을 받은 사용자가 완전 삭제하면 지운 그룹 전체가 반환된다
 
@@ -2159,12 +2159,12 @@ Given
 
 When
 
-- ResourceGroupAdapter.purge — user-1이 resource-group-1 완전 삭제
+- ResourceGroupAdapter.purge: user-1이 resource-group-1 완전 삭제
 
 Then
 
 - 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
@@ -2180,12 +2180,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
 
 <a id="retiring-the-superadmin-purges-a-resource-group"></a>
 
-#### [the-superadmin-purges-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_retiring.py) — pass
+#### [the-superadmin-purges-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_retiring.py): pass
 
 리소스 그룹 하나가 있고 슈퍼관리자가 완전 삭제하면 지운 그룹 전체가 반환된다
 
@@ -2202,12 +2202,12 @@ Given
 
 When
 
-- ResourceGroupAdapter.purge — user-1이 resource-group-1 완전 삭제
+- ResourceGroupAdapter.purge: user-1이 resource-group-1 완전 삭제
 
 Then
 
 - 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
@@ -2223,12 +2223,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
 
 <a id="retiring-a-user-granted-nothing-may-not-purge-a-resource-group"></a>
 
-#### [a-user-granted-nothing-may-not-purge-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_retiring.py) — pass
+#### [a-user-granted-nothing-may-not-purge-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_retiring.py): pass
 
 아무 권한도 없는 사용자가 완전 삭제하려 하면 권한 부족으로 거부된다
 
@@ -2245,7 +2245,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.purge — user-1이 resource-group-1 완전 삭제
+- ResourceGroupAdapter.purge: user-1이 resource-group-1 완전 삭제
 
 Then
 
@@ -2254,7 +2254,7 @@ Then
 
 <a id="retiring-the-superadmin-purging-a-name-nothing-answers-to-is-not-found"></a>
 
-#### [the-superadmin-purging-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_retiring.py) — pass
+#### [the-superadmin-purging-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_retiring.py): pass
 
 슈퍼관리자가 존재하지 않는 이름을 완전 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -2271,7 +2271,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.purge — user-1이 존재하지 않는 이름 완전 삭제
+- ResourceGroupAdapter.purge: user-1이 존재하지 않는 이름 완전 삭제
 
 Then
 
@@ -2282,7 +2282,7 @@ Then
 
 <a id="editing-a-user-granted-update-on-the-group-changes-its-description"></a>
 
-#### [a-user-granted-update-on-the-group-changes-its-description](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [a-user-granted-update-on-the-group-changes-its-description](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
 그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 설명을 바꾸면 설명이 새 값인 그룹이 반환된다
 
@@ -2303,12 +2303,12 @@ Given
 
 When
 
-- ResourceGroupAdapter.update — user-1이 resource-group-1을 설명을 새것으로 수정
+- ResourceGroupAdapter.update: user-1이 resource-group-1을 설명을 새것으로 수정
 
 Then
 
 - 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
@@ -2324,12 +2324,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
 
 <a id="editing-an-edit-naming-no-field-changes-nothing"></a>
 
-#### [an-edit-naming-no-field-changes-nothing](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [an-edit-naming-no-field-changes-nothing](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
 아무 필드도 지정하지 않고 수정하면 아무것도 바뀌지 않은 그룹이 반환된다
 
@@ -2346,12 +2346,12 @@ Given
 
 When
 
-- ResourceGroupAdapter.update — user-1이 resource-group-1을 아무것도 지정하지 않고 수정
+- ResourceGroupAdapter.update: user-1이 resource-group-1을 아무것도 지정하지 않고 수정
 
 Then
 
 - 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
@@ -2367,12 +2367,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
 
 <a id="editing-deactivating-a-resource-group-answers-it-inactive"></a>
 
-#### [deactivating-a-resource-group-answers-it-inactive](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [deactivating-a-resource-group-answers-it-inactive](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
 활성 그룹을 비활성으로 바꾸면 비활성인 그룹이 반환된다
 
@@ -2389,12 +2389,12 @@ Given
 
 When
 
-- ResourceGroupAdapter.update — user-1이 resource-group-1을 활성을 False로 수정
+- ResourceGroupAdapter.update: user-1이 resource-group-1을 활성을 False로 수정
 
 Then
 
 - 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'resource-group-1'
   - status.is_active = False
   - status.is_public = True
@@ -2410,12 +2410,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
 
 <a id="editing-making-a-resource-group-the-default-answers-it-default"></a>
 
-#### [making-a-resource-group-the-default-answers-it-default](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [making-a-resource-group-the-default-answers-it-default](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
 기본 그룹이 없을 때 그룹을 기본으로 바꾸면 기본인 그룹이 반환된다
 
@@ -2432,12 +2432,12 @@ Given
 
 When
 
-- ResourceGroupAdapter.update — user-1이 resource-group-1을 기본을 True로 수정
+- ResourceGroupAdapter.update: user-1이 resource-group-1을 기본을 True로 수정
 
 Then
 
 - 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
@@ -2453,12 +2453,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
 
 <a id="editing-the-superadmin-changing-the-description-leaves-the-rest"></a>
 
-#### [the-superadmin-changing-the-description-leaves-the-rest](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [the-superadmin-changing-the-description-leaves-the-rest](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
 슈퍼관리자가 설명만 바꾸면 설명은 새 값이고 나머지는 그대로인 그룹 전체가 반환된다
 
@@ -2475,12 +2475,12 @@ Given
 
 When
 
-- ResourceGroupAdapter.update — user-1이 resource-group-1을 설명을 새것으로 수정
+- ResourceGroupAdapter.update: user-1이 resource-group-1을 설명을 새것으로 수정
 
 Then
 
 - 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
@@ -2496,12 +2496,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-resource-group"></a>
 
-#### [a-user-granted-nothing-may-not-edit-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
 아무 권한도 없는 사용자가 설명을 바꾸려 하면 권한 부족으로 거부된다
 
@@ -2518,7 +2518,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update — user-1이 resource-group-1을 설명을 새것으로 수정
+- ResourceGroupAdapter.update: user-1이 resource-group-1을 설명을 새것으로 수정
 
 Then
 
@@ -2527,7 +2527,7 @@ Then
 
 <a id="editing-making-a-second-resource-group-the-default-is-refused"></a>
 
-#### [making-a-second-resource-group-the-default-is-refused](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [making-a-second-resource-group-the-default-is-refused](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
 기본 그룹이 따로 있을 때 다른 그룹을 기본으로 바꾸려 하면 기본 그룹이 이미 있다는 이유로 거부된다
 
@@ -2545,7 +2545,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update — user-1이 resource-group-1을 기본을 True로 수정
+- ResourceGroupAdapter.update: user-1이 resource-group-1을 기본을 True로 수정
 
 Then
 
@@ -2554,7 +2554,7 @@ Then
 
 <a id="editing-the-superadmin-editing-a-name-nothing-answers-to-is-not-found"></a>
 
-#### [the-superadmin-editing-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [the-superadmin-editing-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
 슈퍼관리자가 존재하지 않는 이름을 수정하면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -2571,7 +2571,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update — user-1이 존재하지 않는 이름을 설명을 새것으로 수정
+- ResourceGroupAdapter.update: user-1이 존재하지 않는 이름을 설명을 새것으로 수정
 
 Then
 
@@ -2582,7 +2582,7 @@ Then
 
 <a id="allowing-the-superadmin-allows-a-domain-for-a-resource-group"></a>
 
-#### [the-superadmin-allows-a-domain-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-allows-a-domain-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 슈퍼관리자가 그룹의 허용 도메인에 도메인을 더하면 그 도메인 이름이 담긴 목록이 반환된다
 
@@ -2600,7 +2600,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_allowed_domains_for_resource_group — user-1이 other-1의 허용 도메인에 home-1 추가
+- ResourceGroupAdapter.update_allowed_domains_for_resource_group: user-1이 other-1의 허용 도메인에 home-1 추가
 
 Then
 
@@ -2609,7 +2609,7 @@ Then
 
 <a id="allowing-a-user-granted-nothing-may-not-allow-a-domain-for-a-resource-group"></a>
 
-#### [a-user-granted-nothing-may-not-allow-a-domain-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-granted-nothing-may-not-allow-a-domain-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 아무 권한도 없는 사용자가 그룹의 허용 도메인에 도메인을 더하려 하면 권한 부족으로 거부된다. 관계를 쓰는 자리가 양쪽 스코프의 권한을 검사한다
 
@@ -2627,7 +2627,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_allowed_domains_for_resource_group — user-1이 other-1의 허용 도메인에 home-1 추가
+- ResourceGroupAdapter.update_allowed_domains_for_resource_group: user-1이 other-1의 허용 도메인에 home-1 추가
 
 Then
 
@@ -2636,7 +2636,7 @@ Then
 
 <a id="allowing-allowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found"></a>
 
-#### [allowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [allowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 존재하지 않는 도메인 이름을 그룹의 허용 도메인에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -2654,7 +2654,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_allowed_domains_for_resource_group — user-1이 other-1의 허용 도메인에 없는 도메인 이름 추가
+- ResourceGroupAdapter.update_allowed_domains_for_resource_group: user-1이 other-1의 허용 도메인에 없는 도메인 이름 추가
 
 Then
 
@@ -2663,7 +2663,7 @@ Then
 
 <a id="allowing-disallowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found"></a>
 
-#### [disallowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [disallowing-a-domain-name-nothing-answers-to-for-a-group-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 존재하지 않는 도메인 이름을 그룹의 허용 도메인에서 빼려 하면 건너뛰지 않고 대상을 찾을 수 없다는 이유로 거부된다. 도메인 쪽에서 없는 그룹 이름을 빼는 것은 건너뛴다
 
@@ -2681,7 +2681,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_allowed_domains_for_resource_group — user-1이 other-1의 허용 도메인에 없는 도메인 이름 제거
+- ResourceGroupAdapter.update_allowed_domains_for_resource_group: user-1이 other-1의 허용 도메인에 없는 도메인 이름 제거
 
 Then
 
@@ -2692,7 +2692,7 @@ Then
 
 <a id="allowing-the-superadmin-allows-a-project-for-a-resource-group"></a>
 
-#### [the-superadmin-allows-a-project-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-allows-a-project-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 슈퍼관리자가 그룹의 허용 프로젝트에 프로젝트를 더하면 그 프로젝트 id가 담긴 목록이 반환된다
 
@@ -2710,7 +2710,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_allowed_projects_for_resource_group — user-1이 resource-group-1의 허용 프로젝트에 team-1 추가
+- ResourceGroupAdapter.update_allowed_projects_for_resource_group: user-1이 resource-group-1의 허용 프로젝트에 team-1 추가
 
 Then
 
@@ -2719,7 +2719,7 @@ Then
 
 <a id="allowing-a-user-granted-nothing-may-not-allow-a-project-for-a-resource-group"></a>
 
-#### [a-user-granted-nothing-may-not-allow-a-project-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-granted-nothing-may-not-allow-a-project-for-a-resource-group](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 아무 권한도 없는 사용자가 그룹의 허용 프로젝트에 프로젝트를 더하려 하면 권한 부족으로 거부된다
 
@@ -2737,7 +2737,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_allowed_projects_for_resource_group — user-1이 resource-group-1의 허용 프로젝트에 team-1 추가
+- ResourceGroupAdapter.update_allowed_projects_for_resource_group: user-1이 resource-group-1의 허용 프로젝트에 team-1 추가
 
 Then
 
@@ -2748,7 +2748,7 @@ Then
 
 <a id="allowing-disallowing-a-group-name-nothing-answers-to-for-a-domain-is-skipped"></a>
 
-#### [disallowing-a-group-name-nothing-answers-to-for-a-domain-is-skipped](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [disallowing-a-group-name-nothing-answers-to-for-a-domain-is-skipped](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 존재하지 않는 그룹 이름을 도메인의 허용 목록에서 빼려 하면 그 이름은 건너뛰고 빈 목록이 반환된다
 
@@ -2766,7 +2766,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_allowed_resource_groups_for_domain — user-1이 도메인 home-1의 허용 목록에 없는 그룹 이름 제거
+- ResourceGroupAdapter.update_allowed_resource_groups_for_domain: user-1이 도메인 home-1의 허용 목록에 없는 그룹 이름 제거
 
 Then
 
@@ -2775,7 +2775,7 @@ Then
 
 <a id="allowing-the-superadmin-allows-a-resource-group-for-a-domain"></a>
 
-#### [the-superadmin-allows-a-resource-group-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-allows-a-resource-group-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 슈퍼관리자가 도메인의 허용 목록에 그룹을 더하면 그 그룹 이름이 담긴 목록이 반환된다
 
@@ -2793,7 +2793,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_allowed_resource_groups_for_domain — user-1이 도메인 home-1의 허용 목록에 other-1 추가
+- ResourceGroupAdapter.update_allowed_resource_groups_for_domain: user-1이 도메인 home-1의 허용 목록에 other-1 추가
 
 Then
 
@@ -2802,7 +2802,7 @@ Then
 
 <a id="allowing-the-superadmin-disallows-a-resource-group-for-a-domain"></a>
 
-#### [the-superadmin-disallows-a-resource-group-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-disallows-a-resource-group-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 도메인에 건 그룹을 슈퍼관리자가 허용 목록에서 빼면 빈 목록이 반환된다
 
@@ -2821,7 +2821,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_allowed_resource_groups_for_domain — user-1이 도메인 home-1의 허용 목록에 linked-1 제거
+- ResourceGroupAdapter.update_allowed_resource_groups_for_domain: user-1이 도메인 home-1의 허용 목록에 linked-1 제거
 
 Then
 
@@ -2830,7 +2830,7 @@ Then
 
 <a id="allowing-a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-domain"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-domain](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 슈퍼관리자가 아닌 사용자가 도메인의 허용 목록에 그룹을 더하려 하면 역할 부족으로 거부된다. 그룹 이름을 id로 바꾸는 자리가 슈퍼관리자 검사를 거친다
 
@@ -2848,7 +2848,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_allowed_resource_groups_for_domain — user-1이 도메인 home-1의 허용 목록에 other-1 추가
+- ResourceGroupAdapter.update_allowed_resource_groups_for_domain: user-1이 도메인 home-1의 허용 목록에 other-1 추가
 
 Then
 
@@ -2857,7 +2857,7 @@ Then
 
 <a id="allowing-allowing-a-group-name-nothing-answers-to-for-a-domain-is-not-found"></a>
 
-#### [allowing-a-group-name-nothing-answers-to-for-a-domain-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [allowing-a-group-name-nothing-answers-to-for-a-domain-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 존재하지 않는 그룹 이름을 도메인의 허용 목록에 더하려 하면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -2875,7 +2875,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_allowed_resource_groups_for_domain — user-1이 도메인 home-1의 허용 목록에 없는 그룹 이름 추가
+- ResourceGroupAdapter.update_allowed_resource_groups_for_domain: user-1이 도메인 home-1의 허용 목록에 없는 그룹 이름 추가
 
 Then
 
@@ -2886,7 +2886,7 @@ Then
 
 <a id="allowing-the-superadmin-allows-a-resource-group-for-a-project"></a>
 
-#### [the-superadmin-allows-a-resource-group-for-a-project](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [the-superadmin-allows-a-resource-group-for-a-project](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 슈퍼관리자가 프로젝트의 허용 목록에 그룹을 더하면 그 그룹 이름이 담긴 목록이 반환된다
 
@@ -2904,7 +2904,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_allowed_resource_groups_for_project — user-1이 프로젝트 team-1의 허용 목록에 resource-group-1 추가
+- ResourceGroupAdapter.update_allowed_resource_groups_for_project: user-1이 프로젝트 team-1의 허용 목록에 resource-group-1 추가
 
 Then
 
@@ -2913,7 +2913,7 @@ Then
 
 <a id="allowing-a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-project"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-project](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-allow-a-group-for-a-project](/tests/scenario/bai_scenario/manager/resource_group/test_allowing.py): pass
 
 슈퍼관리자가 아닌 사용자가 프로젝트의 허용 목록에 그룹을 더하려 하면 역할 부족으로 거부된다
 
@@ -2931,7 +2931,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_allowed_resource_groups_for_project — user-1이 프로젝트 team-1의 허용 목록에 resource-group-1 추가
+- ResourceGroupAdapter.update_allowed_resource_groups_for_project: user-1이 프로젝트 team-1의 허용 목록에 resource-group-1 추가
 
 Then
 
@@ -2942,7 +2942,7 @@ Then
 
 <a id="editing-the-superadmin-changes-the-preemption-config"></a>
 
-#### [the-superadmin-changes-the-preemption-config](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [the-superadmin-changes-the-preemption-config](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
 슈퍼관리자가 선점 설정을 바꾸면 선점 설정이 새 값인 그룹 전체가 반환된다
 
@@ -2959,12 +2959,12 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_config — user-1이 resource-group-1의 선점 설정을 수정
+- ResourceGroupAdapter.update_config: user-1이 resource-group-1의 선점 설정을 수정
 
 Then
 
 - 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
@@ -2980,12 +2980,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.RESCHEDULE: 'reschedule'>
   - scheduler.preemption.preemption_min_runtime = 60.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.PROJECT: 'project'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
 
 <a id="editing-the-superadmin-changes-the-scheduler-visibility-and-network-config"></a>
 
-#### [the-superadmin-changes-the-scheduler-visibility-and-network-config](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [the-superadmin-changes-the-scheduler-visibility-and-network-config](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
 슈퍼관리자가 스케줄러를 후입선출로, 비공개로, 호스트 네트워크로, 프록시 주소를 지정해 설정을 바꾸면 그 값들이 새 값인 그룹 전체가 반환된다
 
@@ -3002,12 +3002,12 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_config — user-1이 resource-group-1의 스케줄러·공개·네트워크 설정을 수정
+- ResourceGroupAdapter.update_config: user-1이 resource-group-1의 스케줄러·공개·네트워크 설정을 수정
 
 Then
 
 - 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = False
@@ -3023,12 +3023,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
 
 <a id="editing-a-user-granted-nothing-may-not-edit-the-config"></a>
 
-#### [a-user-granted-nothing-may-not-edit-the-config](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-the-config](/tests/scenario/bai_scenario/manager/resource_group/test_editing.py): pass
 
 아무 권한도 없는 사용자가 설정을 바꾸려 하면 권한 부족으로 거부된다
 
@@ -3045,7 +3045,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_config — user-1이 resource-group-1의 스케줄러·공개·네트워크 설정을 수정
+- ResourceGroupAdapter.update_config: user-1이 resource-group-1의 스케줄러·공개·네트워크 설정을 수정
 
 Then
 
@@ -3056,7 +3056,7 @@ Then
 
 <a id="fair_share-a-user-granted-update-on-the-group-changes-its-fair-share-spec"></a>
 
-#### [a-user-granted-update-on-the-group-changes-its-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+#### [a-user-granted-update-on-the-group-changes-its-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
 
 그 그룹에 앉힌 역할로 수정 권한을 받은 사용자가 반감기를 바꾸면 그룹 전체가 반환된다
 
@@ -3077,12 +3077,12 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_fair_share_spec — user-1이 resource-group-1의 fair share 설정에서 반감기를 수정
+- ResourceGroupAdapter.update_fair_share_spec: user-1이 resource-group-1의 fair share 설정에서 반감기를 수정
 
 Then
 
 - 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
@@ -3098,12 +3098,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
 
 <a id="fair_share-the-superadmin-changes-the-fair-share-half-life"></a>
 
-#### [the-superadmin-changes-the-fair-share-half-life](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+#### [the-superadmin-changes-the-fair-share-half-life](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
 
 슈퍼관리자가 반감기를 바꾸면 그룹 전체가 반환된다. 반환되는 노드에는 이 설정이 실리지 않는다
 
@@ -3120,12 +3120,12 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_fair_share_spec — user-1이 resource-group-1의 fair share 설정에서 반감기를 수정
+- ResourceGroupAdapter.update_fair_share_spec: user-1이 resource-group-1의 fair share 설정에서 반감기를 수정
 
 Then
 
 - 미리 만들어 둔 리소스 그룹 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - name = 'resource-group-1'
   - status.is_active = True
   - status.is_public = True
@@ -3141,12 +3141,12 @@ Then
   - scheduler.preemption.mode = <PreemptionModeDTO.TERMINATE: 'terminate'>
   - scheduler.preemption.preemption_min_runtime = 0.0
   - scheduler.preemption.victim_scope = <PreemptionVictimScope.USER: 'user'>
-  - default_deployment_options: 무시함 — 설치본이 정한 기본값이다
-  - default_session_options: 무시함 — 설치본이 정한 기본값이다
+  - default_deployment_options: 무시함: 설치본이 정한 기본값이다
+  - default_session_options: 무시함: 설치본이 정한 기본값이다
 
 <a id="fair_share-a-user-granted-nothing-may-not-change-the-fair-share-spec"></a>
 
-#### [a-user-granted-nothing-may-not-change-the-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+#### [a-user-granted-nothing-may-not-change-the-fair-share-spec](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
 
 아무 권한도 없는 사용자가 반감기를 바꾸려 하면 권한 부족으로 거부된다
 
@@ -3163,7 +3163,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_fair_share_spec — user-1이 resource-group-1의 fair share 설정에서 반감기를 수정
+- ResourceGroupAdapter.update_fair_share_spec: user-1이 resource-group-1의 fair share 설정에서 반감기를 수정
 
 Then
 
@@ -3172,7 +3172,7 @@ Then
 
 <a id="fair_share-changing-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found"></a>
 
-#### [changing-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py) — pass
+#### [changing-the-fair-share-spec-of-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_group/test_fair_share.py): pass
 
 슈퍼관리자가 존재하지 않는 이름의 반감기를 바꾸면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -3189,7 +3189,7 @@ Given
 
 When
 
-- ResourceGroupAdapter.update_fair_share_spec — user-1이 존재하지 않는 이름의 fair share 설정에서 반감기를 수정
+- ResourceGroupAdapter.update_fair_share_spec: user-1이 존재하지 않는 이름의 fair share 설정에서 반감기를 수정
 
 Then
 

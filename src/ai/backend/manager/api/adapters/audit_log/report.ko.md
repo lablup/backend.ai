@@ -1,15 +1,15 @@
 ## audit_log
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/audit_log/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/audit_log/adapter.py)
+[배경](/src/ai/backend/manager/api/adapters/audit_log/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/audit_log/adapter.py)
 
 시나리오: 미완 1 / 5
 
 - ops 로 구성 (5)
-  - admin_search — 대표 성공 ✓ · 대표 실패 ✓
-  - batch_load_by_ids — 대표 성공 ✓ · 대표 실패 ✓
-  - batch_load_scopes_by_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
-  - search_scopes — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_search: 대표 성공 ✓ · 대표 실패 ✓
+  - batch_load_by_ids: 대표 성공 ✓ · 대표 실패 ✓
+  - batch_load_scopes_by_ids: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - scoped_search: 대표 성공 ✓ · 대표 실패 ✓
+  - search_scopes: 대표 성공 ✓ · 대표 실패 ✓
 
 **admin_search**
 
@@ -78,7 +78,7 @@
 
 <a id="searching-a-run-filter-answers-every-record-the-run-left-and-only-those"></a>
 
-#### [a-run-filter-answers-every-record-the-run-left-and-only-those](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
+#### [a-run-filter-answers-every-record-the-run-left-and-only-those](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py): pass
 
 한 실행이 여러 엔티티에 기록을 남겼을 때 그 실행 필터로 검색하면, 그 실행이 남긴 기록이 모두, 그리고 그것만 반환된다
 
@@ -103,7 +103,7 @@ Given
 
 When
 
-- AuditLogAdapter.admin_search — user-3이 실행 필터로 검색
+- AuditLogAdapter.admin_search: user-3이 실행 필터로 검색
 
 Then
 
@@ -112,8 +112,8 @@ Then
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
+  - id: 무시함: 데이터베이스가 만든다
+  - action_id: 무시함: 실행마다 새로 생성된다
   - operation = 'edited'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -126,8 +126,8 @@ Then
   - duration = None
   - client_ip = None
   - triggered_by = None
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
+  - id: 무시함: 데이터베이스가 만든다
+  - action_id: 무시함: 실행마다 새로 생성된다
   - operation = 'created'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -143,7 +143,7 @@ Then
 
 <a id="searching-a-status-filter-narrows-the-answer-to-the-status-it-names"></a>
 
-#### [a-status-filter-narrows-the-answer-to-the-status-it-names](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
+#### [a-status-filter-narrows-the-answer-to-the-status-it-names](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py): pass
 
 성공 기록과 거부 기록이 섞여 있을 때 성공 상태 필터로 검색하면, 성공한 기록만 반환된다
 
@@ -161,7 +161,7 @@ Given
 
 When
 
-- AuditLogAdapter.admin_search — user-1이 성공 상태 필터로 검색
+- AuditLogAdapter.admin_search: user-1이 성공 상태 필터로 검색
 
 Then
 
@@ -170,8 +170,8 @@ Then
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
+  - id: 무시함: 데이터베이스가 만든다
+  - action_id: 무시함: 실행마다 새로 생성된다
   - operation = 'succeeded'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -187,7 +187,7 @@ Then
 
 <a id="searching-an-actor-filter-narrows-the-answer-to-the-user-who-triggered-it"></a>
 
-#### [an-actor-filter-narrows-the-answer-to-the-user-who-triggered-it](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
+#### [an-actor-filter-narrows-the-answer-to-the-user-who-triggered-it](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py): pass
 
 두 사용자가 각각 기록을 남겼을 때 한 사용자 필터로 검색하면, 그 사용자가 실행한 기록만 반환된다
 
@@ -211,7 +211,7 @@ Given
 
 When
 
-- AuditLogAdapter.admin_search — user-3이 실행한 사용자 필터로 검색
+- AuditLogAdapter.admin_search: user-3이 실행한 사용자 필터로 검색
 
 Then
 
@@ -220,8 +220,8 @@ Then
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
+  - id: 무시함: 데이터베이스가 만든다
+  - action_id: 무시함: 실행마다 새로 생성된다
   - operation = 'acted-by-me'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -237,7 +237,7 @@ Then
 
 <a id="searching-omitting-the-page-size-caps-the-page-and-says-more-follow"></a>
 
-#### [omitting-the-page-size-caps-the-page-and-says-more-follow](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
+#### [omitting-the-page-size-caps-the-page-and-says-more-follow](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py): pass
 
 페이지 크기를 지정하지 않고 검색하면, 10건까지 반환되고 다음 페이지가 있다고 응답한다
 
@@ -264,7 +264,7 @@ Given
 
 When
 
-- AuditLogAdapter.admin_search — user-1이 크기 없이 검색
+- AuditLogAdapter.admin_search: user-1이 크기 없이 검색
 
 Then
 
@@ -276,7 +276,7 @@ Then
 
 <a id="searching-the-monitor-role-searching-sees-the-same-records-as-the-superadmin"></a>
 
-#### [the-monitor-role-searching-sees-the-same-records-as-the-superadmin](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
+#### [the-monitor-role-searching-sees-the-same-records-as-the-superadmin](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py): pass
 
 검색은 읽기 연산이므로 모니터 역할 사용자도 슈퍼관리자 검사를 통과해 슈퍼관리자와 같은 응답을 받는다
 
@@ -294,7 +294,7 @@ Given
 
 When
 
-- AuditLogAdapter.admin_search — user-1이 필터 없이 전체 검색
+- AuditLogAdapter.admin_search: user-1이 필터 없이 전체 검색
 
 Then
 
@@ -303,8 +303,8 @@ Then
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
+  - id: 무시함: 데이터베이스가 만든다
+  - action_id: 무시함: 실행마다 새로 생성된다
   - operation = 'edited'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -317,8 +317,8 @@ Then
   - duration = None
   - client_ip = None
   - triggered_by = None
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
+  - id: 무시함: 데이터베이스가 만든다
+  - action_id: 무시함: 실행마다 새로 생성된다
   - operation = 'created'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -334,7 +334,7 @@ Then
 
 <a id="searching-the-superadmin-searching-without-a-filter-sees-every-record-newest-first"></a>
 
-#### [the-superadmin-searching-without-a-filter-sees-every-record-newest-first](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
+#### [the-superadmin-searching-without-a-filter-sees-every-record-newest-first](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py): pass
 
 기록 둘이 있고 슈퍼관리자가 필터 없이 검색하면, 둘 다 반환되고 최근 것이 먼저다
 
@@ -352,7 +352,7 @@ Given
 
 When
 
-- AuditLogAdapter.admin_search — user-1이 필터 없이 전체 검색
+- AuditLogAdapter.admin_search: user-1이 필터 없이 전체 검색
 
 Then
 
@@ -361,8 +361,8 @@ Then
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
+  - id: 무시함: 데이터베이스가 만든다
+  - action_id: 무시함: 실행마다 새로 생성된다
   - operation = 'edited'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -375,8 +375,8 @@ Then
   - duration = None
   - client_ip = None
   - triggered_by = None
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
+  - id: 무시함: 데이터베이스가 만든다
+  - action_id: 무시함: 실행마다 새로 생성된다
   - operation = 'created'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -392,7 +392,7 @@ Then
 
 <a id="searching-a-cursor-that-cannot-be-decoded-is-refused"></a>
 
-#### [a-cursor-that-cannot-be-decoded-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
+#### [a-cursor-that-cannot-be-decoded-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py): pass
 
 해석할 수 없는 커서로 검색하면, 잘못된 커서로 거부된다
 
@@ -410,7 +410,7 @@ Given
 
 When
 
-- AuditLogAdapter.admin_search — user-1이 손상된 커서로 검색
+- AuditLogAdapter.admin_search: user-1이 손상된 커서로 검색
 
 Then
 
@@ -419,7 +419,7 @@ Then
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-every-record"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-every-record](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-every-record](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py): pass
 
 슈퍼관리자도 모니터도 아닌 사용자가 전체를 검색하면, 역할 부족으로 거부된다
 
@@ -437,7 +437,7 @@ Given
 
 When
 
-- AuditLogAdapter.admin_search — user-1이 필터 없이 전체 검색
+- AuditLogAdapter.admin_search: user-1이 필터 없이 전체 검색
 
 Then
 
@@ -446,7 +446,7 @@ Then
 
 <a id="searching-naming-two-pagination-modes-at-once-is-refused"></a>
 
-#### [naming-two-pagination-modes-at-once-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
+#### [naming-two-pagination-modes-at-once-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py): pass
 
 오프셋 방식과 커서 방식을 함께 지정해 검색하면, 잘못된 입력으로 거부된다
 
@@ -464,7 +464,7 @@ Given
 
 When
 
-- AuditLogAdapter.admin_search — user-1이 두 페이지 방식을 함께 지정해 검색
+- AuditLogAdapter.admin_search: user-1이 두 페이지 방식을 함께 지정해 검색
 
 Then
 
@@ -473,7 +473,7 @@ Then
 
 <a id="searching-turning-enforcement-off-does-not-let-a-plain-user-search-every-record"></a>
 
-#### [turning-enforcement-off-does-not-let-a-plain-user-search-every-record](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py) — pass
+#### [turning-enforcement-off-does-not-let-a-plain-user-search-every-record](/tests/scenario/bai_scenario/manager/audit_log/test_searching.py): pass
 
 권한 검사를 꺼도 슈퍼관리자가 아닌 사용자는 전체를 검색할 수 없다
 
@@ -491,7 +491,7 @@ Given
 
 When
 
-- AuditLogAdapter.admin_search — user-1이 필터 없이 전체 검색
+- AuditLogAdapter.admin_search: user-1이 필터 없이 전체 검색
 
 Then
 
@@ -502,7 +502,7 @@ Then
 
 <a id="batch_loading-reading-an-empty-list-answers-empty-without-passing-the-gate"></a>
 
-#### [reading-an-empty-list-answers-empty-without-passing-the-gate](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
+#### [reading-an-empty-list-answers-empty-without-passing-the-gate](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py): pass
 
 빈 id 목록으로 조회하면, 권한 검사도 거치지 않고 빈 응답이 반환된다
 
@@ -520,7 +520,7 @@ Given
 
 When
 
-- AuditLogAdapter.batch_load_by_ids — user-1이 빈 id 목록으로 조회
+- AuditLogAdapter.batch_load_by_ids: user-1이 빈 id 목록으로 조회
 
 Then
 
@@ -529,7 +529,7 @@ Then
 
 <a id="batch_loading-the-superadmin-reading-present-and-absent-ids-is-answered-in-order-with-a-gap"></a>
 
-#### [the-superadmin-reading-present-and-absent-ids-is-answered-in-order-with-a-gap](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
+#### [the-superadmin-reading-present-and-absent-ids-is-answered-in-order-with-a-gap](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py): pass
 
 슈퍼관리자가 있는 id 둘과 없는 id 하나를 한 번에 조회하면, 요청한 순서대로 반환되고 없는 id에 해당하는 항목은 비어 있다
 
@@ -547,14 +547,14 @@ Given
 
 When
 
-- AuditLogAdapter.batch_load_by_ids — user-1이 있는 id 둘과 없는 id 하나를 한 번에 조회
+- AuditLogAdapter.batch_load_by_ids: user-1이 있는 id 둘과 없는 id 하나를 한 번에 조회
 
 Then
 
 - 요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환된다
   - length = 3
-  - [0].id: 무시함 — 데이터베이스가 만든다
-  - [0].action_id: 무시함 — 실행마다 새로 생성된다
+  - [0].id: 무시함: 데이터베이스가 만든다
+  - [0].action_id: 무시함: 실행마다 새로 생성된다
   - [0].operation = 'edited'
   - [0].entity_type = 'user'
   - [0].entity_id: 기록의 대상 엔티티와 같다
@@ -568,8 +568,8 @@ Then
   - [0].client_ip = None
   - [0].triggered_by = None
   - [1] = None
-  - [2].id: 무시함 — 데이터베이스가 만든다
-  - [2].action_id: 무시함 — 실행마다 새로 생성된다
+  - [2].id: 무시함: 데이터베이스가 만든다
+  - [2].action_id: 무시함: 실행마다 새로 생성된다
   - [2].operation = 'created'
   - [2].entity_type = 'user'
   - [2].entity_id: 기록의 대상 엔티티와 같다
@@ -585,7 +585,7 @@ Then
 
 <a id="batch_loading-a-granted-reader-gets-a-node-a-refusal-and-a-gap-in-order"></a>
 
-#### [a-granted-reader-gets-a-node-a-refusal-and-a-gap-in-order](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
+#### [a-granted-reader-gets-a-node-a-refusal-and-a-gap-in-order](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py): pass
 
 한쪽 프로젝트에만 읽기 권한을 받은 사용자가 읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id를 한 번에 조회하면, 요청한 순서대로 기록 전체, 권한 부족, 빈 항목이 반환된다
 
@@ -608,14 +608,14 @@ Given
 
 When
 
-- AuditLogAdapter.batch_load_by_ids — user-1이 읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id 순으로 조회
+- AuditLogAdapter.batch_load_by_ids: user-1이 읽을 수 있는 기록, 읽을 수 없는 기록, 없는 id 순으로 조회
 
 Then
 
 - 요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환된다
   - length = 3
-  - [0].id: 무시함 — 데이터베이스가 만든다
-  - [0].action_id: 무시함 — 실행마다 새로 생성된다
+  - [0].id: 무시함: 데이터베이스가 만든다
+  - [0].action_id: 무시함: 실행마다 새로 생성된다
   - [0].operation = 'edited'
   - [0].entity_type = 'project'
   - [0].entity_id: 기록의 대상 엔티티와 같다
@@ -633,7 +633,7 @@ Then
 
 <a id="batch_loading-a-record-is-read-through-a-scope-it-recorded"></a>
 
-#### [a-record-is-read-through-a-scope-it-recorded](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
+#### [a-record-is-read-through-a-scope-it-recorded](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py): pass
 
 기록이 남긴 범위에만 읽기 권한을 받은 사용자가 그 기록과 다른 프로젝트의 기록을 조회하면, 범위로 닿은 기록은 반환되고 다른 기록은 권한 부족으로 응답한다
 
@@ -659,14 +659,14 @@ Given
 
 When
 
-- AuditLogAdapter.batch_load_by_ids — user-2이 있는 id 둘을 한 번에 조회
+- AuditLogAdapter.batch_load_by_ids: user-2이 있는 id 둘을 한 번에 조회
 
 Then
 
 - 요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환된다
   - length = 2
-  - [0].id: 무시함 — 데이터베이스가 만든다
-  - [0].action_id: 무시함 — 실행마다 새로 생성된다
+  - [0].id: 무시함: 데이터베이스가 만든다
+  - [0].action_id: 무시함: 실행마다 새로 생성된다
   - [0].operation = 'linked'
   - [0].entity_type = 'user'
   - [0].entity_id: 기록의 대상 엔티티와 같다
@@ -683,7 +683,7 @@ Then
 
 <a id="batch_loading-a-record-is-read-through-the-user-who-triggered-it"></a>
 
-#### [a-record-is-read-through-the-user-who-triggered-it](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
+#### [a-record-is-read-through-the-user-who-triggered-it](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py): pass
 
 기록을 실행한 사용자에만 읽기 권한을 받은 사용자가 그 기록과 다른 프로젝트의 기록을 조회하면, 실행한 사용자로 닿은 기록은 반환되고 다른 기록은 권한 부족으로 응답한다
 
@@ -709,14 +709,14 @@ Given
 
 When
 
-- AuditLogAdapter.batch_load_by_ids — user-2이 있는 id 둘을 한 번에 조회
+- AuditLogAdapter.batch_load_by_ids: user-2이 있는 id 둘을 한 번에 조회
 
 Then
 
 - 요청한 순서대로 항목마다 노드, 거부, 또는 빈 항목이 반환된다
   - length = 2
-  - [0].id: 무시함 — 데이터베이스가 만든다
-  - [0].action_id: 무시함 — 실행마다 새로 생성된다
+  - [0].id: 무시함: 데이터베이스가 만든다
+  - [0].action_id: 무시함: 실행마다 새로 생성된다
   - [0].operation = 'acted-on-a-project'
   - [0].entity_type = 'project'
   - [0].entity_id: 기록의 대상 엔티티와 같다
@@ -733,7 +733,7 @@ Then
 
 <a id="batch_loading-a-user-granted-nothing-is-refused-in-every-slot-even-for-records-about-themselves"></a>
 
-#### [a-user-granted-nothing-is-refused-in-every-slot-even-for-records-about-themselves](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
+#### [a-user-granted-nothing-is-refused-in-every-slot-even-for-records-about-themselves](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py): pass
 
 읽기 권한이 없는 사용자가 자기에 대한 기록 둘을 id로 조회하면, 항목마다 권한 부족으로 응답한다
 
@@ -751,7 +751,7 @@ Given
 
 When
 
-- AuditLogAdapter.batch_load_by_ids — user-1이 있는 id 둘을 한 번에 조회
+- AuditLogAdapter.batch_load_by_ids: user-1이 있는 id 둘을 한 번에 조회
 
 Then
 
@@ -762,7 +762,7 @@ Then
 
 <a id="batch_loading-the-monitor-role-without-a-grant-is-refused-in-every-slot"></a>
 
-#### [the-monitor-role-without-a-grant-is-refused-in-every-slot](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py) — pass
+#### [the-monitor-role-without-a-grant-is-refused-in-every-slot](/tests/scenario/bai_scenario/manager/audit_log/test_batch_loading.py): pass
 
 아무 권한도 받지 않은 모니터 역할 사용자가 id 둘을 조회하면, 항목마다 권한 부족으로 응답한다
 
@@ -780,7 +780,7 @@ Given
 
 When
 
-- AuditLogAdapter.batch_load_by_ids — user-1이 있는 id 둘을 한 번에 조회
+- AuditLogAdapter.batch_load_by_ids: user-1이 있는 id 둘을 한 번에 조회
 
 Then
 
@@ -793,7 +793,7 @@ Then
 
 <a id="scoped_searching-a-record-tagged-with-a-scope-is-found-by-searching-that-scope"></a>
 
-#### [a-record-tagged-with-a-scope-is-found-by-searching-that-scope](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [a-record-tagged-with-a-scope-is-found-by-searching-that-scope](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py): pass
 
 다른 엔티티에 대한 기록이 한 프로젝트를 스코프로 달고 있을 때 그 프로젝트를 지정해 검색하면, 대상 엔티티가 그 프로젝트가 아니어도 그 기록이 반환된다
 
@@ -817,7 +817,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-2이 엔티티를 지정해 검색
+- AuditLogAdapter.scoped_search: user-2이 엔티티를 지정해 검색
 
 Then
 
@@ -826,8 +826,8 @@ Then
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
+  - id: 무시함: 데이터베이스가 만든다
+  - action_id: 무시함: 실행마다 새로 생성된다
   - operation = 'linked'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -843,7 +843,7 @@ Then
 
 <a id="scoped_searching-a-run-filter-narrows-within-the-named-scope"></a>
 
-#### [a-run-filter-narrows-within-the-named-scope](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [a-run-filter-narrows-within-the-named-scope](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py): pass
 
 한 엔티티에 두 실행이 남긴 기록이 있을 때 그것을 지정하고 한 실행 필터로 검색하면, 그 실행이 남긴 기록만 모두 반환된다
 
@@ -866,7 +866,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정하고 실행 필터로 검색
+- AuditLogAdapter.scoped_search: user-1이 엔티티를 지정하고 실행 필터로 검색
 
 Then
 
@@ -875,8 +875,8 @@ Then
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
+  - id: 무시함: 데이터베이스가 만든다
+  - action_id: 무시함: 실행마다 새로 생성된다
   - operation = 'edited'
   - entity_type = 'project'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -889,8 +889,8 @@ Then
   - duration = None
   - client_ip = None
   - triggered_by = None
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
+  - id: 무시함: 데이터베이스가 만든다
+  - action_id: 무시함: 실행마다 새로 생성된다
   - operation = 'created'
   - entity_type = 'project'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -906,7 +906,7 @@ Then
 
 <a id="scoped_searching-a-status-filter-narrows-within-the-named-scope"></a>
 
-#### [a-status-filter-narrows-within-the-named-scope](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [a-status-filter-narrows-within-the-named-scope](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py): pass
 
 한 엔티티에 성공 기록과 거부 기록이 있을 때 그것을 지정하고 성공 상태 필터로 검색하면, 성공한 기록만 반환된다
 
@@ -928,7 +928,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정하고 성공 상태 필터로 검색
+- AuditLogAdapter.scoped_search: user-1이 엔티티를 지정하고 성공 상태 필터로 검색
 
 Then
 
@@ -937,8 +937,8 @@ Then
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
+  - id: 무시함: 데이터베이스가 만든다
+  - action_id: 무시함: 실행마다 새로 생성된다
   - operation = 'succeeded'
   - entity_type = 'project'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -954,7 +954,7 @@ Then
 
 <a id="scoped_searching-a-user-granted-read-on-an-actor-reads-only-what-that-actor-triggered"></a>
 
-#### [a-user-granted-read-on-an-actor-reads-only-what-that-actor-triggered](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [a-user-granted-read-on-an-actor-reads-only-what-that-actor-triggered](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py): pass
 
 두 사용자가 각각 기록을 남겼고 한 사용자에 읽기 권한을 받은 사용자가 그 사용자를 실행한 사용자로 지정해 검색하면, 그 사용자가 실행한 기록만 반환된다
 
@@ -981,7 +981,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-3이 실행한 사용자를 지정해 검색
+- AuditLogAdapter.scoped_search: user-3이 실행한 사용자를 지정해 검색
 
 Then
 
@@ -990,8 +990,8 @@ Then
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
+  - id: 무시함: 데이터베이스가 만든다
+  - action_id: 무시함: 실행마다 새로 생성된다
   - operation = 'acted-by-me'
   - entity_type = 'user'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -1007,7 +1007,7 @@ Then
 
 <a id="scoped_searching-a-user-granted-read-on-an-entity-reads-only-that-entitys-records"></a>
 
-#### [a-user-granted-read-on-an-entity-reads-only-that-entitys-records](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [a-user-granted-read-on-an-entity-reads-only-that-entitys-records](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py): pass
 
 두 엔티티에 기록이 하나씩 있고 한쪽에만 읽기 권한을 받은 사용자가 그 엔티티를 지정해 검색하면, 그 엔티티의 기록만 반환된다
 
@@ -1030,7 +1030,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
+- AuditLogAdapter.scoped_search: user-1이 엔티티를 지정해 검색
 
 Then
 
@@ -1039,8 +1039,8 @@ Then
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
+  - id: 무시함: 데이터베이스가 만든다
+  - action_id: 무시함: 실행마다 새로 생성된다
   - operation = 'edited'
   - entity_type = 'project'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -1056,7 +1056,7 @@ Then
 
 <a id="scoped_searching-naming-several-readable-entities-merges-their-records-newest-first"></a>
 
-#### [naming-several-readable-entities-merges-their-records-newest-first](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [naming-several-readable-entities-merges-their-records-newest-first](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py): pass
 
 두 엔티티에 모두 읽기 권한을 받은 사용자가 둘을 함께 지정해 검색하면, 두 기록이 다 반환되고 최근 것이 먼저다
 
@@ -1082,7 +1082,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
+- AuditLogAdapter.scoped_search: user-1이 엔티티를 지정해 검색
 
 Then
 
@@ -1091,8 +1091,8 @@ Then
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
+  - id: 무시함: 데이터베이스가 만든다
+  - action_id: 무시함: 실행마다 새로 생성된다
   - operation = 'edited'
   - entity_type = 'project'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -1105,8 +1105,8 @@ Then
   - duration = None
   - client_ip = None
   - triggered_by = None
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
+  - id: 무시함: 데이터베이스가 만든다
+  - action_id: 무시함: 실행마다 새로 생성된다
   - operation = 'created'
   - entity_type = 'project'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -1122,7 +1122,7 @@ Then
 
 <a id="scoped_searching-omitting-the-page-size-caps-a-scoped-page-and-says-more-follow"></a>
 
-#### [omitting-the-page-size-caps-a-scoped-page-and-says-more-follow](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [omitting-the-page-size-caps-a-scoped-page-and-says-more-follow](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py): pass
 
 지정한 엔티티에 기록이 많고 페이지 크기를 지정하지 않으면, 10건까지 반환되고 다음 페이지가 있다고 응답한다
 
@@ -1153,7 +1153,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
+- AuditLogAdapter.scoped_search: user-1이 엔티티를 지정해 검색
 
 Then
 
@@ -1165,7 +1165,7 @@ Then
 
 <a id="scoped_searching-the-superadmin-naming-an-entity-nothing-answers-to-finds-nothing"></a>
 
-#### [the-superadmin-naming-an-entity-nothing-answers-to-finds-nothing](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [the-superadmin-naming-an-entity-nothing-answers-to-finds-nothing](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py): pass
 
 슈퍼관리자가 어느 엔티티도 아닌 id를 지정해 검색하면, 권한 검사를 지나가므로 거부되지 않고 빈 페이지가 온다
 
@@ -1185,7 +1185,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
+- AuditLogAdapter.scoped_search: user-1이 엔티티를 지정해 검색
 
 Then
 
@@ -1197,7 +1197,7 @@ Then
 
 <a id="scoped_searching-turning-enforcement-off-reads-a-named-entitys-records-without-a-grant"></a>
 
-#### [turning-enforcement-off-reads-a-named-entitys-records-without-a-grant](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [turning-enforcement-off-reads-a-named-entitys-records-without-a-grant](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py): pass
 
 권한 검사를 끄면 아무 권한도 없는 사용자도 엔티티를 지정해 그 기록을 검색할 수 있다
 
@@ -1217,7 +1217,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
+- AuditLogAdapter.scoped_search: user-1이 엔티티를 지정해 검색
 
 Then
 
@@ -1226,8 +1226,8 @@ Then
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
-  - id: 무시함 — 데이터베이스가 만든다
-  - action_id: 무시함 — 실행마다 새로 생성된다
+  - id: 무시함: 데이터베이스가 만든다
+  - action_id: 무시함: 실행마다 새로 생성된다
   - operation = 'edited'
   - entity_type = 'project'
   - entity_id: 기록의 대상 엔티티와 같다
@@ -1243,7 +1243,7 @@ Then
 
 <a id="scoped_searching-a-scope-id-that-is-not-an-entity-id-is-refused"></a>
 
-#### [a-scope-id-that-is-not-an-entity-id-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [a-scope-id-that-is-not-an-entity-id-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py): pass
 
 지정한 id가 id 형식이 아니면, 잘못된 입력으로 거부된다
 
@@ -1266,7 +1266,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 id 형식이 아닌 값을 지정해 검색
+- AuditLogAdapter.scoped_search: user-1이 id 형식이 아닌 값을 지정해 검색
 
 Then
 
@@ -1275,7 +1275,7 @@ Then
 
 <a id="scoped_searching-a-user-granted-nothing-may-not-read-even-the-records-they-triggered"></a>
 
-#### [a-user-granted-nothing-may-not-read-even-the-records-they-triggered](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [a-user-granted-nothing-may-not-read-even-the-records-they-triggered](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py): pass
 
 자기 자신에 읽기 권한을 받지 않은 사용자가 자기를 실행한 사용자로 지정해 검색하면, 권한 부족으로 거부된다. 자기 기록을 조회하는 호출이 따로 없기 때문이다
 
@@ -1296,7 +1296,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 실행한 사용자를 지정해 검색
+- AuditLogAdapter.scoped_search: user-1이 실행한 사용자를 지정해 검색
 
 Then
 
@@ -1305,7 +1305,7 @@ Then
 
 <a id="scoped_searching-a-user-granted-nothing-may-not-scope-search-an-entity"></a>
 
-#### [a-user-granted-nothing-may-not-scope-search-an-entity](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [a-user-granted-nothing-may-not-scope-search-an-entity](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py): pass
 
 아무 권한도 없는 사용자가 엔티티를 지정해 검색하면, 권한 부족으로 거부된다
 
@@ -1325,7 +1325,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
+- AuditLogAdapter.scoped_search: user-1이 엔티티를 지정해 검색
 
 Then
 
@@ -1334,7 +1334,7 @@ Then
 
 <a id="scoped_searching-naming-an-entity-nothing-answers-to-is-refused-as-permission"></a>
 
-#### [naming-an-entity-nothing-answers-to-is-refused-as-permission](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [naming-an-entity-nothing-answers-to-is-refused-as-permission](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py): pass
 
 다른 엔티티에 읽기 권한을 받은 사용자가 어느 엔티티도 아닌 id를 지정해 검색하면, 그 id에 부여된 권한이 없어 권한 부족으로 거부된다
 
@@ -1357,7 +1357,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
+- AuditLogAdapter.scoped_search: user-1이 엔티티를 지정해 검색
 
 Then
 
@@ -1366,7 +1366,7 @@ Then
 
 <a id="scoped_searching-one-unreadable-entity-among-those-named-refuses-the-whole-read"></a>
 
-#### [one-unreadable-entity-among-those-named-refuses-the-whole-read](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [one-unreadable-entity-among-those-named-refuses-the-whole-read](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py): pass
 
 한쪽에만 읽기 권한을 받은 사용자가 두 엔티티를 함께 지정해 검색하면, 볼 수 있는 것만 주는 대신 요청 전체가 권한 부족으로 거부된다
 
@@ -1389,7 +1389,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
+- AuditLogAdapter.scoped_search: user-1이 엔티티를 지정해 검색
 
 Then
 
@@ -1398,7 +1398,7 @@ Then
 
 <a id="scoped_searching-the-monitor-role-without-a-grant-may-not-scope-search"></a>
 
-#### [the-monitor-role-without-a-grant-may-not-scope-search](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py) — pass
+#### [the-monitor-role-without-a-grant-may-not-scope-search](/tests/scenario/bai_scenario/manager/audit_log/test_scoped_searching.py): pass
 
 모니터 역할 사용자라도 권한 없이 엔티티를 지정해 검색하면, 권한 부족으로 거부된다. 모니터가 통과하는 것은 슈퍼관리자 검사뿐이고 이 검색은 권한 그래프로 보호된다
 
@@ -1418,7 +1418,7 @@ Given
 
 When
 
-- AuditLogAdapter.scoped_search — user-1이 엔티티를 지정해 검색
+- AuditLogAdapter.scoped_search: user-1이 엔티티를 지정해 검색
 
 Then
 
@@ -1429,7 +1429,7 @@ Then
 
 <a id="scope_searching-a-reader-of-one-scope-reads-every-scope-of-the-record"></a>
 
-#### [a-reader-of-one-scope-reads-every-scope-of-the-record](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+#### [a-reader-of-one-scope-reads-every-scope-of-the-record](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py): pass
 
 기록이 남긴 범위 하나에만 읽기 권한을 받은 사용자가 검색하면, 그 기록이 남긴 범위가 모두 반환된다
 
@@ -1457,7 +1457,7 @@ Given
 
 When
 
-- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 검색
+- AuditLogAdapter.search_scopes: user-3이 기록 하나의 범위를 검색
 
 Then
 
@@ -1466,20 +1466,20 @@ Then
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
-  - [0].id: 무시함 — 데이터베이스가 만든다
-  - [0].field_id: 무시함 — 데이터베이스가 만든다
+  - [0].id: 무시함: 데이터베이스가 만든다
+  - [0].field_id: 무시함: 데이터베이스가 만든다
   - [0].audit_log_id: 검색한 기록와 같다
   - [0].scope_type = 'project'
   - [0].scope_id: 기록이 남긴 범위와 같다
-  - [1].id: 무시함 — 데이터베이스가 만든다
-  - [1].field_id: 무시함 — 데이터베이스가 만든다
+  - [1].id: 무시함: 데이터베이스가 만든다
+  - [1].field_id: 무시함: 데이터베이스가 만든다
   - [1].audit_log_id: 검색한 기록와 같다
   - [1].scope_type = 'user'
   - [1].scope_id: 기록이 남긴 범위와 같다
 
 <a id="scope_searching-a-reader-of-the-entity-a-record-is-about-reads-its-scopes"></a>
 
-#### [a-reader-of-the-entity-a-record-is-about-reads-its-scopes](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+#### [a-reader-of-the-entity-a-record-is-about-reads-its-scopes](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py): pass
 
 기록의 대상 엔티티에만 읽기 권한을 받은 사용자가 검색하면, 그 기록의 범위가 반환된다
 
@@ -1507,7 +1507,7 @@ Given
 
 When
 
-- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 검색
+- AuditLogAdapter.search_scopes: user-3이 기록 하나의 범위를 검색
 
 Then
 
@@ -1516,20 +1516,20 @@ Then
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
-  - [0].id: 무시함 — 데이터베이스가 만든다
-  - [0].field_id: 무시함 — 데이터베이스가 만든다
+  - [0].id: 무시함: 데이터베이스가 만든다
+  - [0].field_id: 무시함: 데이터베이스가 만든다
   - [0].audit_log_id: 검색한 기록와 같다
   - [0].scope_type = 'project'
   - [0].scope_id: 기록이 남긴 범위와 같다
-  - [1].id: 무시함 — 데이터베이스가 만든다
-  - [1].field_id: 무시함 — 데이터베이스가 만든다
+  - [1].id: 무시함: 데이터베이스가 만든다
+  - [1].field_id: 무시함: 데이터베이스가 만든다
   - [1].audit_log_id: 검색한 기록와 같다
   - [1].scope_type = 'user'
   - [1].scope_id: 기록이 남긴 범위와 같다
 
 <a id="scope_searching-a-reader-of-the-user-who-triggered-a-record-reads-its-scopes"></a>
 
-#### [a-reader-of-the-user-who-triggered-a-record-reads-its-scopes](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+#### [a-reader-of-the-user-who-triggered-a-record-reads-its-scopes](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py): pass
 
 기록을 실행한 사용자에만 읽기 권한을 받은 사용자가 검색하면, 그 기록의 범위가 반환된다
 
@@ -1557,7 +1557,7 @@ Given
 
 When
 
-- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 검색
+- AuditLogAdapter.search_scopes: user-3이 기록 하나의 범위를 검색
 
 Then
 
@@ -1566,20 +1566,20 @@ Then
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
-  - [0].id: 무시함 — 데이터베이스가 만든다
-  - [0].field_id: 무시함 — 데이터베이스가 만든다
+  - [0].id: 무시함: 데이터베이스가 만든다
+  - [0].field_id: 무시함: 데이터베이스가 만든다
   - [0].audit_log_id: 검색한 기록와 같다
   - [0].scope_type = 'project'
   - [0].scope_id: 기록이 남긴 범위와 같다
-  - [1].id: 무시함 — 데이터베이스가 만든다
-  - [1].field_id: 무시함 — 데이터베이스가 만든다
+  - [1].id: 무시함: 데이터베이스가 만든다
+  - [1].field_id: 무시함: 데이터베이스가 만든다
   - [1].audit_log_id: 검색한 기록와 같다
   - [1].scope_type = 'user'
   - [1].scope_id: 기록이 남긴 범위와 같다
 
 <a id="scope_searching-a-record-that-recorded-no-scope-answers-an-empty-page"></a>
 
-#### [a-record-that-recorded-no-scope-answers-an-empty-page](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+#### [a-record-that-recorded-no-scope-answers-an-empty-page](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py): pass
 
 범위를 남기지 않은 기록을 그 대상에 읽기 권한을 받은 사용자가 검색하면, 빈 페이지가 반환된다
 
@@ -1600,7 +1600,7 @@ Given
 
 When
 
-- AuditLogAdapter.search_scopes — user-1이 기록 하나의 범위를 검색
+- AuditLogAdapter.search_scopes: user-1이 기록 하나의 범위를 검색
 
 Then
 
@@ -1612,7 +1612,7 @@ Then
 
 <a id="scope_searching-a-scope-id-filter-narrows-the-answer-to-that-scope"></a>
 
-#### [a-scope-id-filter-narrows-the-answer-to-that-scope](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+#### [a-scope-id-filter-narrows-the-answer-to-that-scope](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py): pass
 
 범위 둘을 남긴 기록을 범위 하나의 식별자를 지정해 검색하면, 그 범위만 반환된다
 
@@ -1637,7 +1637,7 @@ Given
 
 When
 
-- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 범위 하나의 식별자를 지정해 검색
+- AuditLogAdapter.search_scopes: user-3이 기록 하나의 범위를 범위 하나의 식별자를 지정해 검색
 
 Then
 
@@ -1646,15 +1646,15 @@ Then
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
-  - [0].id: 무시함 — 데이터베이스가 만든다
-  - [0].field_id: 무시함 — 데이터베이스가 만든다
+  - [0].id: 무시함: 데이터베이스가 만든다
+  - [0].field_id: 무시함: 데이터베이스가 만든다
   - [0].audit_log_id: 검색한 기록와 같다
   - [0].scope_type = 'user'
   - [0].scope_id: 기록이 남긴 범위와 같다
 
 <a id="scope_searching-a-scope-type-filter-narrows-the-answer-to-that-type"></a>
 
-#### [a-scope-type-filter-narrows-the-answer-to-that-type](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+#### [a-scope-type-filter-narrows-the-answer-to-that-type](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py): pass
 
 범위 둘을 남긴 기록을 프로젝트 종류만 지정해 검색하면, 프로젝트 범위만 반환된다
 
@@ -1679,7 +1679,7 @@ Given
 
 When
 
-- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 프로젝트 종류만 지정해 검색
+- AuditLogAdapter.search_scopes: user-3이 기록 하나의 범위를 프로젝트 종류만 지정해 검색
 
 Then
 
@@ -1688,15 +1688,15 @@ Then
   - total_count = 1
   - has_next_page = False
   - has_previous_page = False
-  - [0].id: 무시함 — 데이터베이스가 만든다
-  - [0].field_id: 무시함 — 데이터베이스가 만든다
+  - [0].id: 무시함: 데이터베이스가 만든다
+  - [0].field_id: 무시함: 데이터베이스가 만든다
   - [0].audit_log_id: 검색한 기록와 같다
   - [0].scope_type = 'project'
   - [0].scope_id: 기록이 남긴 범위와 같다
 
 <a id="scope_searching-the-superadmin-reads-every-scope-a-record-recorded"></a>
 
-#### [the-superadmin-reads-every-scope-a-record-recorded](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+#### [the-superadmin-reads-every-scope-a-record-recorded](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py): pass
 
 범위 둘을 남긴 기록을 슈퍼관리자가 검색하면, 범위 둘이 반환된다
 
@@ -1721,7 +1721,7 @@ Given
 
 When
 
-- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 검색
+- AuditLogAdapter.search_scopes: user-3이 기록 하나의 범위를 검색
 
 Then
 
@@ -1730,20 +1730,20 @@ Then
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
-  - [0].id: 무시함 — 데이터베이스가 만든다
-  - [0].field_id: 무시함 — 데이터베이스가 만든다
+  - [0].id: 무시함: 데이터베이스가 만든다
+  - [0].field_id: 무시함: 데이터베이스가 만든다
   - [0].audit_log_id: 검색한 기록와 같다
   - [0].scope_type = 'project'
   - [0].scope_id: 기록이 남긴 범위와 같다
-  - [1].id: 무시함 — 데이터베이스가 만든다
-  - [1].field_id: 무시함 — 데이터베이스가 만든다
+  - [1].id: 무시함: 데이터베이스가 만든다
+  - [1].field_id: 무시함: 데이터베이스가 만든다
   - [1].audit_log_id: 검색한 기록와 같다
   - [1].scope_type = 'user'
   - [1].scope_id: 기록이 남긴 범위와 같다
 
 <a id="scope_searching-turning-enforcement-off-reads-the-scopes-without-a-grant"></a>
 
-#### [turning-enforcement-off-reads-the-scopes-without-a-grant](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+#### [turning-enforcement-off-reads-the-scopes-without-a-grant](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py): pass
 
 권한 검사를 끄면 아무 권한도 없는 사용자도 기록의 범위를 검색할 수 있다
 
@@ -1768,7 +1768,7 @@ Given
 
 When
 
-- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 검색
+- AuditLogAdapter.search_scopes: user-3이 기록 하나의 범위를 검색
 
 Then
 
@@ -1777,20 +1777,20 @@ Then
   - total_count = 2
   - has_next_page = False
   - has_previous_page = False
-  - [0].id: 무시함 — 데이터베이스가 만든다
-  - [0].field_id: 무시함 — 데이터베이스가 만든다
+  - [0].id: 무시함: 데이터베이스가 만든다
+  - [0].field_id: 무시함: 데이터베이스가 만든다
   - [0].audit_log_id: 검색한 기록와 같다
   - [0].scope_type = 'project'
   - [0].scope_id: 기록이 남긴 범위와 같다
-  - [1].id: 무시함 — 데이터베이스가 만든다
-  - [1].field_id: 무시함 — 데이터베이스가 만든다
+  - [1].id: 무시함: 데이터베이스가 만든다
+  - [1].field_id: 무시함: 데이터베이스가 만든다
   - [1].audit_log_id: 검색한 기록와 같다
   - [1].scope_type = 'user'
   - [1].scope_id: 기록이 남긴 범위와 같다
 
 <a id="scope_searching-a-user-who-can-read-no-owner-is-refused"></a>
 
-#### [a-user-who-can-read-no-owner-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+#### [a-user-who-can-read-no-owner-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py): pass
 
 기록의 소유자를 하나도 읽을 수 없는 사용자가 검색하면, 권한 부족으로 거부된다
 
@@ -1815,7 +1815,7 @@ Given
 
 When
 
-- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 검색
+- AuditLogAdapter.search_scopes: user-3이 기록 하나의 범위를 검색
 
 Then
 
@@ -1824,7 +1824,7 @@ Then
 
 <a id="scope_searching-searching-a-record-that-does-not-exist-is-not-found"></a>
 
-#### [searching-a-record-that-does-not-exist-is-not-found](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+#### [searching-a-record-that-does-not-exist-is-not-found](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py): pass
 
 어느 기록에도 해당하지 않는 id로 슈퍼관리자가 검색하면, 찾을 수 없음으로 거부된다
 
@@ -1840,7 +1840,7 @@ Given
 
 When
 
-- AuditLogAdapter.search_scopes — user-1이 기록 하나의 범위를 검색
+- AuditLogAdapter.search_scopes: user-1이 기록 하나의 범위를 검색
 
 Then
 
@@ -1849,7 +1849,7 @@ Then
 
 <a id="scope_searching-the-monitor-role-without-a-grant-is-refused"></a>
 
-#### [the-monitor-role-without-a-grant-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py) — pass
+#### [the-monitor-role-without-a-grant-is-refused](/tests/scenario/bai_scenario/manager/audit_log/test_scope_searching.py): pass
 
 아무 권한도 받지 않은 모니터 역할 사용자가 검색하면, 권한 부족으로 거부된다. 이 검색은 권한 그래프로 보호된다
 
@@ -1874,7 +1874,7 @@ Given
 
 When
 
-- AuditLogAdapter.search_scopes — user-3이 기록 하나의 범위를 검색
+- AuditLogAdapter.search_scopes: user-3이 기록 하나의 범위를 검색
 
 Then
 

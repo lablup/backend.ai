@@ -1,25 +1,25 @@
 ## domain
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/domain/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/domain/adapter.py)
+[배경](/src/ai/backend/manager/api/adapters/domain/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/domain/adapter.py)
 
 시나리오: 미완 3 / 14
 
 - ops 로 구성 (12)
-  - bulk_get_ids — 대표 성공 ✓ · 대표 실패 ✓
-  - bulk_lookup_names — 대표 성공 ✓ · 대표 실패 ✓
-  - delete — 대표 성공 ✓ · 대표 실패 ✓
-  - get — 대표 성공 ✓ · 대표 실패 ✓
-  - global_search — 대표 성공 ✓ · 대표 실패 ✓
-  - lookup_name — 대표 성공 ✓ · 대표 실패 ✓
-  - partial_bulk_delete — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_restore — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - restore — 대표 성공 ✓ · 대표 실패 ✓
-  - scoped_search — 대표 성공 ✓ · 대표 실패 ✓
-  - update — 대표 성공 ✓ · 대표 실패 ✓
+  - bulk_get_ids: 대표 성공 ✓ · 대표 실패 ✓
+  - bulk_lookup_names: 대표 성공 ✓ · 대표 실패 ✓
+  - delete: 대표 성공 ✓ · 대표 실패 ✓
+  - get: 대표 성공 ✓ · 대표 실패 ✓
+  - global_search: 대표 성공 ✓ · 대표 실패 ✓
+  - lookup_name: 대표 성공 ✓ · 대표 실패 ✓
+  - partial_bulk_delete: 대표 성공 ✓ · 대표 실패 ✗: SCENARIO-GAP
+  - partial_bulk_restore: 대표 성공 ✓ · 대표 실패 ✗: SCENARIO-GAP
+  - partial_bulk_update: 대표 성공 ✓ · 대표 실패 ✗: SCENARIO-GAP
+  - restore: 대표 성공 ✓ · 대표 실패 ✓
+  - scoped_search: 대표 성공 ✓ · 대표 실패 ✓
+  - update: 대표 성공 ✓ · 대표 실패 ✓
 - 직접 구현 (2)
-  - create — 성공 있음 2 · 실패 있음 4 (global_scope)
-  - purge — 성공 있음 1 · 실패 있음 4 (single_entity)
+  - create: 성공 있음 2 · 실패 있음 4 (global_scope)
+  - purge: 성공 있음 1 · 실패 있음 4 (single_entity)
 
 **bulk_get_ids**
 
@@ -144,7 +144,7 @@
 
 <a id="bulk_reading-the-superadmin-reads-domains-by-id"></a>
 
-#### [the-superadmin-reads-domains-by-id](/tests/scenario/bai_scenario/manager/domain/test_bulk_reading.py) — pass
+#### [the-superadmin-reads-domains-by-id](/tests/scenario/bai_scenario/manager/domain/test_bulk_reading.py): pass
 
 슈퍼관리자가 id로 도메인 여럿을 읽으면, 그 자리에 도메인이 온다
 
@@ -161,7 +161,7 @@ Given
 
 When
 
-- DomainAdapter.bulk_get_ids — user-1이 target-1의 id로 여럿 읽기
+- DomainAdapter.bulk_get_ids: user-1이 target-1의 id로 여럿 읽기
 
 Then
 
@@ -172,14 +172,14 @@ Then
   - [0].allowed_docker_registries = []
   - [0].is_active = True
   - [0].is_default = False
-  - [0].id: 무시함 — 데이터베이스가 만든다
+  - [0].id: 무시함: 데이터베이스가 만든다
   - [0].entity_id: 미리 만든 도메인의 id와 같다
   - [0].created_at: 이 실행이 쓴 시각
   - [0].modified_at: 이 실행이 쓴 시각
 
 <a id="bulk_reading-a-user-granted-nothing-may-not-read-domains-by-id"></a>
 
-#### [a-user-granted-nothing-may-not-read-domains-by-id](/tests/scenario/bai_scenario/manager/domain/test_bulk_reading.py) — pass
+#### [a-user-granted-nothing-may-not-read-domains-by-id](/tests/scenario/bai_scenario/manager/domain/test_bulk_reading.py): pass
 
 아무 권한도 받지 않은 사용자가 id로 도메인 여럿을 읽으면, 그 자리가 권한 부족으로 거부된다
 
@@ -196,7 +196,7 @@ Given
 
 When
 
-- DomainAdapter.bulk_get_ids — user-1이 target-1의 id로 여럿 읽기
+- DomainAdapter.bulk_get_ids: user-1이 target-1의 id로 여럿 읽기
 
 Then
 
@@ -207,7 +207,7 @@ Then
 
 <a id="looking_up-a-user-granted-nothing-gets-the-same-ids-by-name"></a>
 
-#### [a-user-granted-nothing-gets-the-same-ids-by-name](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py) — pass
+#### [a-user-granted-nothing-gets-the-same-ids-by-name](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py): pass
 
 아무 권한도 받지 않은 사용자가 찾아도 슈퍼관리자와 같은 답이 온다. 이 호출은 인증만 보므로 이름이 있는지는 누구에게나 드러난다
 
@@ -224,7 +224,7 @@ Given
 
 When
 
-- DomainAdapter.bulk_lookup_names — user-1이 target-1과 no-such-domain의 id를 여럿 찾음
+- DomainAdapter.bulk_lookup_names: user-1이 target-1과 no-such-domain의 id를 여럿 찾음
 
 Then
 
@@ -234,7 +234,7 @@ Then
 
 <a id="looking_up-the-superadmin-looks-up-domains-by-name"></a>
 
-#### [the-superadmin-looks-up-domains-by-name](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py) — pass
+#### [the-superadmin-looks-up-domains-by-name](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py): pass
 
 슈퍼관리자가 있는 이름과 없는 이름으로 id를 여럿 찾으면, 있는 이름에는 그 도메인의 id, 없는 이름에는 빈 값이 온다
 
@@ -251,7 +251,7 @@ Given
 
 When
 
-- DomainAdapter.bulk_lookup_names — user-1이 target-1과 no-such-domain의 id를 여럿 찾음
+- DomainAdapter.bulk_lookup_names: user-1이 target-1과 no-such-domain의 id를 여럿 찾음
 
 Then
 
@@ -261,7 +261,7 @@ Then
 
 <a id="looking_up-looking-up-domains-by-name-without-login-is-refused"></a>
 
-#### [looking-up-domains-by-name-without-login-is-refused](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py) — pass
+#### [looking-up-domains-by-name-without-login-is-refused](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py): pass
 
 로그인 문맥 없이 이름으로 id를 여럿 찾으면, 사용자를 찾을 수 없다는 것으로 거부된다
 
@@ -278,7 +278,7 @@ Given
 
 When
 
-- DomainAdapter.bulk_lookup_names — 로그인 문맥 없이 target-1의 id를 여럿 찾음
+- DomainAdapter.bulk_lookup_names: 로그인 문맥 없이 target-1의 id를 여럿 찾음
 
 Then
 
@@ -289,7 +289,7 @@ Then
 
 <a id="deleting-soft-deleting-a-domain-already-soft-deleted"></a>
 
-#### [soft-deleting-a-domain-already-soft-deleted](/tests/scenario/bai_scenario/manager/domain/test_deleting.py) — pass
+#### [soft-deleting-a-domain-already-soft-deleted](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
 이미 soft delete 된 도메인을 슈퍼관리자가 다시 soft delete 하면, soft delete 했다는 답이 온다
 
@@ -306,7 +306,7 @@ Given
 
 When
 
-- DomainAdapter.delete — user-1이 twice-1을 두 번 soft delete 함
+- DomainAdapter.delete: user-1이 twice-1을 두 번 soft delete 함
 
 Then
 
@@ -315,7 +315,7 @@ Then
 
 <a id="deleting-the-superadmin-soft-deletes-a-domain"></a>
 
-#### [the-superadmin-soft-deletes-a-domain](/tests/scenario/bai_scenario/manager/domain/test_deleting.py) — pass
+#### [the-superadmin-soft-deletes-a-domain](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
 슈퍼관리자가 도메인을 soft delete 하면, soft delete 했다는 답이 온다
 
@@ -332,7 +332,7 @@ Given
 
 When
 
-- DomainAdapter.delete — user-1이 to-delete-1을 soft delete 함
+- DomainAdapter.delete: user-1이 to-delete-1을 soft delete 함
 
 Then
 
@@ -341,7 +341,7 @@ Then
 
 <a id="deleting-a-user-granted-nothing-may-not-soft-delete-a-domain"></a>
 
-#### [a-user-granted-nothing-may-not-soft-delete-a-domain](/tests/scenario/bai_scenario/manager/domain/test_deleting.py) — pass
+#### [a-user-granted-nothing-may-not-soft-delete-a-domain](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
 아무 권한도 받지 않은 사용자는 도메인을 soft delete 할 수 없다
 
@@ -358,7 +358,7 @@ Given
 
 When
 
-- DomainAdapter.delete — user-1이 untouchable-1을 soft delete 함
+- DomainAdapter.delete: user-1이 untouchable-1을 soft delete 함
 
 Then
 
@@ -367,7 +367,7 @@ Then
 
 <a id="deleting-soft-deleting-a-name-nothing-answers-to-is-not-found"></a>
 
-#### [soft-deleting-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/domain/test_deleting.py) — pass
+#### [soft-deleting-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
 아무 도메인도 갖지 않은 이름을 soft delete 하려 하면 대상이 없다는 것으로 거부된다
 
@@ -384,7 +384,7 @@ Given
 
 When
 
-- DomainAdapter.delete — user-1이 no-such-domain을 soft delete 함
+- DomainAdapter.delete: user-1이 no-such-domain을 soft delete 함
 
 Then
 
@@ -395,7 +395,7 @@ Then
 
 <a id="reading-the-superadmin-reads-a-domain-by-name"></a>
 
-#### [the-superadmin-reads-a-domain-by-name](/tests/scenario/bai_scenario/manager/domain/test_reading.py) — pass
+#### [the-superadmin-reads-a-domain-by-name](/tests/scenario/bai_scenario/manager/domain/test_reading.py): pass
 
 도메인 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 도메인이 답으로 온다
 
@@ -411,7 +411,7 @@ Given
 
 When
 
-- DomainAdapter.get — user-1이 host-1으로 조회
+- DomainAdapter.get: user-1이 host-1으로 조회
 
 Then
 
@@ -422,14 +422,14 @@ Then
   - allowed_docker_registries = []
   - is_active = True
   - is_default = False
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - entity_id: 미리 만든 도메인의 id와 같다
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
 
 <a id="reading-the-superadmin-reads-a-soft-deleted-domain-by-name"></a>
 
-#### [the-superadmin-reads-a-soft-deleted-domain-by-name](/tests/scenario/bai_scenario/manager/domain/test_reading.py) — pass
+#### [the-superadmin-reads-a-soft-deleted-domain-by-name](/tests/scenario/bai_scenario/manager/domain/test_reading.py): pass
 
 슈퍼관리자가 도메인을 soft delete 한 뒤 이름으로 조회하면, 비활성 상태를 실은 그 도메인이 온다
 
@@ -446,7 +446,7 @@ Given
 
 When
 
-- DomainAdapter.get — user-1이 soft-deleted-1을 soft delete 한 뒤 이름으로 조회
+- DomainAdapter.get: user-1이 soft-deleted-1을 soft delete 한 뒤 이름으로 조회
 
 Then
 
@@ -457,14 +457,14 @@ Then
   - allowed_docker_registries = []
   - is_active = False
   - is_default = False
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - entity_id: 미리 만든 도메인의 id와 같다
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
 
 <a id="reading-a-user-granted-nothing-may-not-read-a-domain"></a>
 
-#### [a-user-granted-nothing-may-not-read-a-domain](/tests/scenario/bai_scenario/manager/domain/test_reading.py) — pass
+#### [a-user-granted-nothing-may-not-read-a-domain](/tests/scenario/bai_scenario/manager/domain/test_reading.py): pass
 
 같은 도메인이 있고 사용자가 아무 권한도 받지 않았을 때, 이름으로 조회하면 권한 부족으로 거부된다
 
@@ -480,7 +480,7 @@ Given
 
 When
 
-- DomainAdapter.get — user-1이 host-1으로 조회
+- DomainAdapter.get: user-1이 host-1으로 조회
 
 Then
 
@@ -489,7 +489,7 @@ Then
 
 <a id="reading-reading-a-name-nothing-answers-to-is-not-found"></a>
 
-#### [reading-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/domain/test_reading.py) — pass
+#### [reading-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/domain/test_reading.py): pass
 
 슈퍼관리자가 존재하지 않는 이름으로 조회하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
 
@@ -505,7 +505,7 @@ Given
 
 When
 
-- DomainAdapter.get — user-1이 no-such-domain으로 조회
+- DomainAdapter.get: user-1이 no-such-domain으로 조회
 
 Then
 
@@ -516,7 +516,7 @@ Then
 
 <a id="searching-a-name-filter-narrows-the-answer-to-the-domain-it-names"></a>
 
-#### [a-name-filter-narrows-the-answer-to-the-domain-it-names](/tests/scenario/bai_scenario/manager/domain/test_searching.py) — pass
+#### [a-name-filter-narrows-the-answer-to-the-domain-it-names](/tests/scenario/bai_scenario/manager/domain/test_searching.py): pass
 
 도메인 여럿 중 하나의 이름으로 걸러 조회하면, 답에는 그 이름의 도메인만 남는다
 
@@ -535,7 +535,7 @@ Given
 
 When
 
-- DomainAdapter.global_search — user-1이 wanted-1으로 걸러 조회
+- DomainAdapter.global_search: user-1이 wanted-1으로 걸러 조회
 
 Then
 
@@ -547,7 +547,7 @@ Then
 
 <a id="searching-the-answer-counts-every-domain-the-scenario-laid"></a>
 
-#### [the-answer-counts-every-domain-the-scenario-laid](/tests/scenario/bai_scenario/manager/domain/test_searching.py) — pass
+#### [the-answer-counts-every-domain-the-scenario-laid](/tests/scenario/bai_scenario/manager/domain/test_searching.py): pass
 
 이 시나리오가 미리 만든 도메인이 넷일 때, 필터 없는 조회는 그 넷이 모두 나온다
 
@@ -566,7 +566,7 @@ Given
 
 When
 
-- DomainAdapter.global_search — user-1이 필터 없이 전체 조회
+- DomainAdapter.global_search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -578,7 +578,7 @@ Then
 
 <a id="searching-the-answer-includes-soft-deleted-domains-too"></a>
 
-#### [the-answer-includes-soft-deleted-domains-too](/tests/scenario/bai_scenario/manager/domain/test_searching.py) — pass
+#### [the-answer-includes-soft-deleted-domains-too](/tests/scenario/bai_scenario/manager/domain/test_searching.py): pass
 
 미리 만든 도메인 중 하나를 soft delete 한 뒤 필터 없이 search 하면, 그것까지 모두 나온다
 
@@ -597,7 +597,7 @@ Given
 
 When
 
-- DomainAdapter.global_search — user-1이 wanted-1을 soft delete 한 뒤 필터 없이 전체 조회
+- DomainAdapter.global_search: user-1이 wanted-1을 soft delete 한 뒤 필터 없이 전체 조회
 
 Then
 
@@ -609,7 +609,7 @@ Then
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-every-domain"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-every-domain](/tests/scenario/bai_scenario/manager/domain/test_searching.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-every-domain](/tests/scenario/bai_scenario/manager/domain/test_searching.py): pass
 
 슈퍼관리자가 아닌 사용자가 전체 도메인 조회를 요청하면 역할로 막힌다
 
@@ -628,7 +628,7 @@ Given
 
 When
 
-- DomainAdapter.global_search — user-1이 필터 없이 전체 조회
+- DomainAdapter.global_search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -639,7 +639,7 @@ Then
 
 <a id="looking_up-a-user-granted-nothing-still-looks-up-a-domain-by-name"></a>
 
-#### [a-user-granted-nothing-still-looks-up-a-domain-by-name](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py) — pass
+#### [a-user-granted-nothing-still-looks-up-a-domain-by-name](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py): pass
 
 아무 권한도 받지 않은 사용자도 도메인 이름으로 id를 찾을 수 있다. 이 호출은 인증만 보고, 권한은 그 id를 받는 호출이 본다
 
@@ -656,7 +656,7 @@ Given
 
 When
 
-- DomainAdapter.lookup_name — user-1이 target-1의 id를 찾음
+- DomainAdapter.lookup_name: user-1이 target-1의 id를 찾음
 
 Then
 
@@ -665,7 +665,7 @@ Then
 
 <a id="looking_up-the-superadmin-looks-up-a-domain-by-name"></a>
 
-#### [the-superadmin-looks-up-a-domain-by-name](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py) — pass
+#### [the-superadmin-looks-up-a-domain-by-name](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py): pass
 
 슈퍼관리자가 도메인 이름으로 id를 찾으면, 그 도메인의 id가 온다
 
@@ -682,7 +682,7 @@ Given
 
 When
 
-- DomainAdapter.lookup_name — user-1이 target-1의 id를 찾음
+- DomainAdapter.lookup_name: user-1이 target-1의 id를 찾음
 
 Then
 
@@ -691,7 +691,7 @@ Then
 
 <a id="looking_up-looking-up-a-name-nothing-answers-to-is-not-found"></a>
 
-#### [looking-up-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py) — pass
+#### [looking-up-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/domain/test_looking_up.py): pass
 
 아무 도메인도 갖지 않은 이름으로 id를 찾으면 대상이 없다는 것으로 거부된다
 
@@ -708,7 +708,7 @@ Given
 
 When
 
-- DomainAdapter.lookup_name — user-1이 no-such-domain의 id를 찾음
+- DomainAdapter.lookup_name: user-1이 no-such-domain의 id를 찾음
 
 Then
 
@@ -719,7 +719,7 @@ Then
 
 <a id="partial_bulk_deleting-a-user-granted-nothing-soft-deletes-none-of-several-domains"></a>
 
-#### [a-user-granted-nothing-soft-deletes-none-of-several-domains](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py) — pass
+#### [a-user-granted-nothing-soft-deletes-none-of-several-domains](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py): pass
 
 아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 soft delete 하려 하면, soft delete 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -737,7 +737,7 @@ Given
 
 When
 
-- DomainAdapter.partial_bulk_delete — user-1이 도메인 2개를 한 번에 soft delete 함
+- DomainAdapter.partial_bulk_delete: user-1이 도메인 2개를 한 번에 soft delete 함
 
 Then
 
@@ -751,7 +751,7 @@ Then
 
 <a id="partial_bulk_deleting-soft-deleting-several-answers-for-the-missing-one"></a>
 
-#### [soft-deleting-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py) — pass
+#### [soft-deleting-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py): pass
 
 활성 도메인 둘과 없는 id 하나를 한 번에 soft delete 하면, 둘은 비활성으로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -769,7 +769,7 @@ Given
 
 When
 
-- DomainAdapter.partial_bulk_delete — user-1이 도메인 2개 와 없는 id 하나를 한 번에 soft delete 함
+- DomainAdapter.partial_bulk_delete: user-1이 도메인 2개 와 없는 id 하나를 한 번에 soft delete 함
 
 Then
 
@@ -781,7 +781,7 @@ Then
   - successes[0].allowed_docker_registries = []
   - successes[0].is_active = False
   - successes[0].is_default = False
-  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].id: 무시함: 데이터베이스가 만든다
   - successes[0].entity_id: 미리 만든 도메인의 id와 같다
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].modified_at: 이 실행이 쓴 시각
@@ -791,7 +791,7 @@ Then
   - successes[1].allowed_docker_registries = []
   - successes[1].is_active = False
   - successes[1].is_default = False
-  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].id: 무시함: 데이터베이스가 만든다
   - successes[1].entity_id: 미리 만든 도메인의 id와 같다
   - successes[1].created_at: 이 실행이 쓴 시각
   - successes[1].modified_at: 이 실행이 쓴 시각
@@ -803,7 +803,7 @@ Then
 
 <a id="partial_bulk_deleting-restoring-several-brings-them-back"></a>
 
-#### [restoring-several-brings-them-back](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py) — pass
+#### [restoring-several-brings-them-back](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_deleting.py): pass
 
 soft delete 된 도메인 여럿을 한 번에 restore 하면, 모두 활성으로 온다
 
@@ -821,7 +821,7 @@ Given
 
 When
 
-- DomainAdapter.partial_bulk_restore — user-1이 도메인 2개를 한 번에 soft delete 했다가 한 번에 restore 함
+- DomainAdapter.partial_bulk_restore: user-1이 도메인 2개를 한 번에 soft delete 했다가 한 번에 restore 함
 
 Then
 
@@ -833,7 +833,7 @@ Then
   - successes[0].allowed_docker_registries = []
   - successes[0].is_active = True
   - successes[0].is_default = False
-  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].id: 무시함: 데이터베이스가 만든다
   - successes[0].entity_id: 미리 만든 도메인의 id와 같다
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].modified_at: 이 실행이 쓴 시각
@@ -843,7 +843,7 @@ Then
   - successes[1].allowed_docker_registries = []
   - successes[1].is_active = True
   - successes[1].is_default = False
-  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].id: 무시함: 데이터베이스가 만든다
   - successes[1].entity_id: 미리 만든 도메인의 id와 같다
   - successes[1].created_at: 이 실행이 쓴 시각
   - successes[1].modified_at: 이 실행이 쓴 시각
@@ -853,7 +853,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-domains"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-domains](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-domains](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 도메인 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -871,7 +871,7 @@ Given
 
 When
 
-- DomainAdapter.partial_bulk_update — user-1이 도메인 2개의 설명을 한 번에 고침
+- DomainAdapter.partial_bulk_update: user-1이 도메인 2개의 설명을 한 번에 고침
 
 Then
 
@@ -885,7 +885,7 @@ Then
 
 <a id="partial_bulk_editing-the-active-flag-soft-deletes-or-restores-each-of-several-domains"></a>
 
-#### [the-active-flag-soft-deletes-or-restores-each-of-several-domains](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_editing.py) — pass
+#### [the-active-flag-soft-deletes-or-restores-each-of-several-domains](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_editing.py): pass
 
 활성 플래그와 설명을 섞어 도메인 여럿을 한 번에 고치면, 플래그를 내린 것은 soft delete 되고 올린 것은 restore 되며 둘 다 새 설명으로 오고, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -903,7 +903,7 @@ Given
 
 When
 
-- DomainAdapter.partial_bulk_update — user-1이 둘째 도메인을 soft delete 한 뒤, 첫째는 활성 플래그를 내리고 둘째는 올리며 둘의 설명을 바꾸고, 없는 id 하나의 활성 플래그를 내림
+- DomainAdapter.partial_bulk_update: user-1이 둘째 도메인을 soft delete 한 뒤, 첫째는 활성 플래그를 내리고 둘째는 올리며 둘의 설명을 바꾸고, 없는 id 하나의 활성 플래그를 내림
 
 Then
 
@@ -915,7 +915,7 @@ Then
   - successes[0].allowed_docker_registries = []
   - successes[0].is_active = False
   - successes[0].is_default = False
-  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].id: 무시함: 데이터베이스가 만든다
   - successes[0].entity_id: 미리 만든 도메인의 id와 같다
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].modified_at: 이 실행이 쓴 시각
@@ -925,7 +925,7 @@ Then
   - successes[1].allowed_docker_registries = []
   - successes[1].is_active = True
   - successes[1].is_default = False
-  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].id: 무시함: 데이터베이스가 만든다
   - successes[1].entity_id: 미리 만든 도메인의 id와 같다
   - successes[1].created_at: 이 실행이 쓴 시각
   - successes[1].modified_at: 이 실행이 쓴 시각
@@ -935,7 +935,7 @@ Then
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-domains-at-once"></a>
 
-#### [the-superadmin-edits-several-domains-at-once](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-edits-several-domains-at-once](/tests/scenario/bai_scenario/manager/domain/test_partial_bulk_editing.py): pass
 
 슈퍼관리자가 도메인 여럿의 설명을 한 번에 바꾸면, 모두 새 설명으로 오고 실패한 것은 없다
 
@@ -953,7 +953,7 @@ Given
 
 When
 
-- DomainAdapter.partial_bulk_update — user-1이 도메인 2개의 설명을 한 번에 고침
+- DomainAdapter.partial_bulk_update: user-1이 도메인 2개의 설명을 한 번에 고침
 
 Then
 
@@ -966,7 +966,7 @@ Then
   - successes[0].allowed_docker_registries = []
   - successes[0].is_active = True
   - successes[0].is_default = False
-  - successes[0].id: 무시함 — 데이터베이스가 만든다
+  - successes[0].id: 무시함: 데이터베이스가 만든다
   - successes[0].entity_id: 미리 만든 도메인의 id와 같다
   - successes[0].created_at: 이 실행이 쓴 시각
   - successes[0].modified_at: 이 실행이 쓴 시각
@@ -976,7 +976,7 @@ Then
   - successes[1].allowed_docker_registries = []
   - successes[1].is_active = True
   - successes[1].is_default = False
-  - successes[1].id: 무시함 — 데이터베이스가 만든다
+  - successes[1].id: 무시함: 데이터베이스가 만든다
   - successes[1].entity_id: 미리 만든 도메인의 id와 같다
   - successes[1].created_at: 이 실행이 쓴 시각
   - successes[1].modified_at: 이 실행이 쓴 시각
@@ -985,7 +985,7 @@ Then
 
 <a id="deleting-restoring-a-domain-that-is-not-soft-deleted"></a>
 
-#### [restoring-a-domain-that-is-not-soft-deleted](/tests/scenario/bai_scenario/manager/domain/test_deleting.py) — pass
+#### [restoring-a-domain-that-is-not-soft-deleted](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
 soft delete 되지 않은 도메인을 슈퍼관리자가 restore 하면, restore 했다는 답이 온다
 
@@ -1002,7 +1002,7 @@ Given
 
 When
 
-- DomainAdapter.restore — user-1이 active-1을 restore 함
+- DomainAdapter.restore: user-1이 active-1을 restore 함
 
 Then
 
@@ -1011,7 +1011,7 @@ Then
 
 <a id="deleting-restoring-answers-that-it-restored"></a>
 
-#### [restoring-answers-that-it-restored](/tests/scenario/bai_scenario/manager/domain/test_deleting.py) — pass
+#### [restoring-answers-that-it-restored](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
 soft delete 된 도메인을 restore 하면, restore 했다는 답이 온다
 
@@ -1028,7 +1028,7 @@ Given
 
 When
 
-- DomainAdapter.restore — user-1이 to-restore-1을 soft delete 했다가 restore 함
+- DomainAdapter.restore: user-1이 to-restore-1을 soft delete 했다가 restore 함
 
 Then
 
@@ -1037,7 +1037,7 @@ Then
 
 <a id="deleting-a-user-granted-nothing-may-not-restore-a-domain"></a>
 
-#### [a-user-granted-nothing-may-not-restore-a-domain](/tests/scenario/bai_scenario/manager/domain/test_deleting.py) — pass
+#### [a-user-granted-nothing-may-not-restore-a-domain](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
 아무 권한도 받지 않은 사용자는 도메인을 restore 할 수 없다
 
@@ -1054,7 +1054,7 @@ Given
 
 When
 
-- DomainAdapter.restore — user-1이 untouchable-1을 restore 함
+- DomainAdapter.restore: user-1이 untouchable-1을 restore 함
 
 Then
 
@@ -1065,7 +1065,7 @@ Then
 
 <a id="scoped_searching-a-user-granted-read-in-the-group-searches-its-domains"></a>
 
-#### [a-user-granted-read-in-the-group-searches-its-domains](/tests/scenario/bai_scenario/manager/domain/test_scoped_searching.py) — pass
+#### [a-user-granted-read-in-the-group-searches-its-domains](/tests/scenario/bai_scenario/manager/domain/test_scoped_searching.py): pass
 
 리소스 그룹 범위에서 도메인 읽기 역할을 받은 사용자가 그 범위에서 search 하면, 슈퍼관리자와 같은 도메인들이 온다
 
@@ -1090,7 +1090,7 @@ Given
 
 When
 
-- DomainAdapter.scoped_search — user-1이 리소스 그룹 resource-group-1 범위에서 조회
+- DomainAdapter.scoped_search: user-1이 리소스 그룹 resource-group-1 범위에서 조회
 
 Then
 
@@ -1102,7 +1102,7 @@ Then
 
 <a id="scoped_searching-the-superadmin-searches-the-domains-of-a-resource-group"></a>
 
-#### [the-superadmin-searches-the-domains-of-a-resource-group](/tests/scenario/bai_scenario/manager/domain/test_scoped_searching.py) — pass
+#### [the-superadmin-searches-the-domains-of-a-resource-group](/tests/scenario/bai_scenario/manager/domain/test_scoped_searching.py): pass
 
 슈퍼관리자가 리소스 그룹 범위에서 search 하면, 그 그룹을 쓸 수 있는 도메인만 온다
 
@@ -1123,7 +1123,7 @@ Given
 
 When
 
-- DomainAdapter.scoped_search — user-1이 리소스 그룹 resource-group-1 범위에서 조회
+- DomainAdapter.scoped_search: user-1이 리소스 그룹 resource-group-1 범위에서 조회
 
 Then
 
@@ -1135,7 +1135,7 @@ Then
 
 <a id="scoped_searching-a-user-granted-nothing-may-not-search-the-domains-of-a-resource-group"></a>
 
-#### [a-user-granted-nothing-may-not-search-the-domains-of-a-resource-group](/tests/scenario/bai_scenario/manager/domain/test_scoped_searching.py) — pass
+#### [a-user-granted-nothing-may-not-search-the-domains-of-a-resource-group](/tests/scenario/bai_scenario/manager/domain/test_scoped_searching.py): pass
 
 아무 권한도 받지 않은 사용자가 리소스 그룹 범위에서 search 하면 권한 부족으로 거부된다
 
@@ -1156,7 +1156,7 @@ Given
 
 When
 
-- DomainAdapter.scoped_search — user-1이 리소스 그룹 resource-group-1 범위에서 조회
+- DomainAdapter.scoped_search: user-1이 리소스 그룹 resource-group-1 범위에서 조회
 
 Then
 
@@ -1167,7 +1167,7 @@ Then
 
 <a id="editing-clearing-the-active-flag-soft-deletes-a-domain"></a>
 
-#### [clearing-the-active-flag-soft-deletes-a-domain](/tests/scenario/bai_scenario/manager/domain/test_editing.py) — pass
+#### [clearing-the-active-flag-soft-deletes-a-domain](/tests/scenario/bai_scenario/manager/domain/test_editing.py): pass
 
 활성 플래그를 내리는 수정은 도메인을 soft delete 하고, 답이 비활성 상태를 실어 온다
 
@@ -1183,7 +1183,7 @@ Given
 
 When
 
-- DomainAdapter.update — user-1이 to-deactivate-1의 활성 플래그을 고침
+- DomainAdapter.update: user-1이 to-deactivate-1의 활성 플래그을 고침
 
 Then
 
@@ -1194,14 +1194,14 @@ Then
   - allowed_docker_registries = []
   - is_active = False
   - is_default = False
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - entity_id: 미리 만든 도메인의 id와 같다
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
 
 <a id="editing-editing-a-description-leaves-the-name-alone"></a>
 
-#### [editing-a-description-leaves-the-name-alone](/tests/scenario/bai_scenario/manager/domain/test_editing.py) — pass
+#### [editing-a-description-leaves-the-name-alone](/tests/scenario/bai_scenario/manager/domain/test_editing.py): pass
 
 슈퍼관리자가 도메인의 설명만 바꾸면, 설명은 새 값이 되고 이름은 그대로 남는다
 
@@ -1217,7 +1217,7 @@ Given
 
 When
 
-- DomainAdapter.update — user-1이 editable-1의 설명을 고침
+- DomainAdapter.update: user-1이 editable-1의 설명을 고침
 
 Then
 
@@ -1228,14 +1228,14 @@ Then
   - allowed_docker_registries = []
   - is_active = True
   - is_default = False
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - entity_id: 미리 만든 도메인의 id와 같다
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
 
 <a id="editing-lowering-the-active-flag-of-a-soft-deleted-domain-edits-only-the-rest"></a>
 
-#### [lowering-the-active-flag-of-a-soft-deleted-domain-edits-only-the-rest](/tests/scenario/bai_scenario/manager/domain/test_editing.py) — pass
+#### [lowering-the-active-flag-of-a-soft-deleted-domain-edits-only-the-rest](/tests/scenario/bai_scenario/manager/domain/test_editing.py): pass
 
 soft delete 된 도메인의 활성 플래그를 내리며 설명을 바꾸면, 설명은 새 값이 되고 비활성 상태는 그대로다
 
@@ -1251,7 +1251,7 @@ Given
 
 When
 
-- DomainAdapter.update — user-1이 already-deleted-1을 soft delete 한 뒤 활성 플래그와 설명을 고침
+- DomainAdapter.update: user-1이 already-deleted-1을 soft delete 한 뒤 활성 플래그와 설명을 고침
 
 Then
 
@@ -1262,14 +1262,14 @@ Then
   - allowed_docker_registries = []
   - is_active = False
   - is_default = False
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - entity_id: 미리 만든 도메인의 id와 같다
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
 
 <a id="editing-raising-the-active-flag-restores-a-soft-deleted-domain"></a>
 
-#### [raising-the-active-flag-restores-a-soft-deleted-domain](/tests/scenario/bai_scenario/manager/domain/test_editing.py) — pass
+#### [raising-the-active-flag-restores-a-soft-deleted-domain](/tests/scenario/bai_scenario/manager/domain/test_editing.py): pass
 
 soft delete 된 도메인의 활성 플래그를 올리는 수정은 그 도메인을 restore 하고, 답이 활성 상태를 실어 온다
 
@@ -1285,7 +1285,7 @@ Given
 
 When
 
-- DomainAdapter.update — user-1이 to-restore-1을 soft delete 한 뒤 활성 플래그을 고침
+- DomainAdapter.update: user-1이 to-restore-1을 soft delete 한 뒤 활성 플래그을 고침
 
 Then
 
@@ -1296,14 +1296,14 @@ Then
   - allowed_docker_registries = []
   - is_active = True
   - is_default = False
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - entity_id: 미리 만든 도메인의 id와 같다
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-domain"></a>
 
-#### [a-user-granted-nothing-may-not-edit-a-domain](/tests/scenario/bai_scenario/manager/domain/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-a-domain](/tests/scenario/bai_scenario/manager/domain/test_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 도메인을 수정하려 하면 권한 부족으로 거부된다
 
@@ -1319,7 +1319,7 @@ Given
 
 When
 
-- DomainAdapter.update — user-1이 host-1의 설명을 고침
+- DomainAdapter.update: user-1이 host-1의 설명을 고침
 
 Then
 
@@ -1328,7 +1328,7 @@ Then
 
 <a id="editing-editing-a-name-nothing-answers-to-is-not-found"></a>
 
-#### [editing-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/domain/test_editing.py) — pass
+#### [editing-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/domain/test_editing.py): pass
 
 아무 도메인도 갖지 않은 이름을 수정하려 하면 대상이 없다는 것으로 거부된다
 
@@ -1344,7 +1344,7 @@ Given
 
 When
 
-- DomainAdapter.update — user-1이 no-such-domain의 설명을 고침
+- DomainAdapter.update: user-1이 no-such-domain의 설명을 고침
 
 Then
 
@@ -1355,7 +1355,7 @@ Then
 
 <a id="creating-creating-a-domain-also-creates-its-model-store-project"></a>
 
-#### [creating-a-domain-also-creates-its-model-store-project](/tests/scenario/bai_scenario/manager/domain/test_creating.py) — pass
+#### [creating-a-domain-also-creates-its-model-store-project](/tests/scenario/bai_scenario/manager/domain/test_creating.py): pass
 
 슈퍼관리자가 도메인을 만들면 model-store 프로젝트가 함께 생겨, 그 프로젝트를 가진 도메인으로 걸러 찾을 때 만든 도메인이 온다
 
@@ -1371,7 +1371,7 @@ Given
 
 When
 
-- DomainAdapter.create — user-1이 with-model-store으로 만든 뒤, model-store 프로젝트를 가진 도메인으로 걸러 찾음
+- DomainAdapter.create: user-1이 with-model-store으로 만든 뒤, model-store 프로젝트를 가진 도메인으로 걸러 찾음
 
 Then
 
@@ -1382,13 +1382,13 @@ Then
   - allowed_docker_registries = []
   - is_active = True
   - is_default = False
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
 
 <a id="creating-creating-a-domain-answers-with-the-whole-node"></a>
 
-#### [creating-a-domain-answers-with-the-whole-node](/tests/scenario/bai_scenario/manager/domain/test_creating.py) — pass
+#### [creating-a-domain-answers-with-the-whole-node](/tests/scenario/bai_scenario/manager/domain/test_creating.py): pass
 
 슈퍼관리자가 이름과 설명만 주고 도메인을 만들면, 요청에 없던 값들은 기본값으로 채워진 노드 전체가 답으로 온다
 
@@ -1404,7 +1404,7 @@ Given
 
 When
 
-- DomainAdapter.create — user-1이 new-domain으로 만듦
+- DomainAdapter.create: user-1이 new-domain으로 만듦
 
 Then
 
@@ -1415,13 +1415,13 @@ Then
   - allowed_docker_registries = []
   - is_active = True
   - is_default = False
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - created_at: 이 실행이 쓴 시각
   - modified_at: 이 실행이 쓴 시각
 
 <a id="creating-a-blank-name-is-refused"></a>
 
-#### [a-blank-name-is-refused](/tests/scenario/bai_scenario/manager/domain/test_creating.py) — pass
+#### [a-blank-name-is-refused](/tests/scenario/bai_scenario/manager/domain/test_creating.py): pass
 
 이름이 공백뿐이면 도메인을 만들 수 없다
 
@@ -1437,7 +1437,7 @@ Given
 
 When
 
-- DomainAdapter.create — user-1이    으로 만듦
+- DomainAdapter.create: user-1이    으로 만듦
 
 Then
 
@@ -1446,7 +1446,7 @@ Then
 
 <a id="creating-a-name-another-domain-already-holds-is-refused"></a>
 
-#### [a-name-another-domain-already-holds-is-refused](/tests/scenario/bai_scenario/manager/domain/test_creating.py) — pass
+#### [a-name-another-domain-already-holds-is-refused](/tests/scenario/bai_scenario/manager/domain/test_creating.py): pass
 
 이미 어떤 도메인이 쓰고 있는 이름으로 만들려 하면, 권한이 있어도 이름이 겹친다는 이유로 거부된다
 
@@ -1462,7 +1462,7 @@ Given
 
 When
 
-- DomainAdapter.create — user-1이 taken-1으로 만듦
+- DomainAdapter.create: user-1이 taken-1으로 만듦
 
 Then
 
@@ -1471,7 +1471,7 @@ Then
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-create-a-domain"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-create-a-domain](/tests/scenario/bai_scenario/manager/domain/test_creating.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-create-a-domain](/tests/scenario/bai_scenario/manager/domain/test_creating.py): pass
 
 슈퍼관리자가 아닌 사용자가 도메인을 만들려 하면, 권한을 얼마나 받았는지와 무관하게 역할로 막힌다
 
@@ -1487,7 +1487,7 @@ Given
 
 When
 
-- DomainAdapter.create — user-1이 by-a-user으로 만듦
+- DomainAdapter.create: user-1이 by-a-user으로 만듦
 
 Then
 
@@ -1496,7 +1496,7 @@ Then
 
 <a id="creating-turning-enforcement-off-still-does-not-let-a-user-create-a-domain"></a>
 
-#### [turning-enforcement-off-still-does-not-let-a-user-create-a-domain](/tests/scenario/bai_scenario/manager/domain/test_creating.py) — pass
+#### [turning-enforcement-off-still-does-not-let-a-user-create-a-domain](/tests/scenario/bai_scenario/manager/domain/test_creating.py): pass
 
 엔티티 권한 집행을 꺼도 도메인 생성은 여전히 막힌다. 이 문은 권한 그래프가 아니라 역할이 지키기 때문이다
 
@@ -1512,7 +1512,7 @@ Given
 
 When
 
-- DomainAdapter.create — user-1이 by-a-user-again으로 만듦
+- DomainAdapter.create: user-1이 by-a-user-again으로 만듦
 
 Then
 
@@ -1523,7 +1523,7 @@ Then
 
 <a id="deleting-purging-a-domain-nothing-else-refers-to-succeeds"></a>
 
-#### [purging-a-domain-nothing-else-refers-to-succeeds](/tests/scenario/bai_scenario/manager/domain/test_deleting.py) — pass
+#### [purging-a-domain-nothing-else-refers-to-succeeds](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
 아무것도 딸려 있지 않은 도메인은 purge 할 수 있다
 
@@ -1540,7 +1540,7 @@ Given
 
 When
 
-- DomainAdapter.purge — user-1이 to-purge-1을 purge 함
+- DomainAdapter.purge: user-1이 to-purge-1을 purge 함
 
 Then
 
@@ -1549,7 +1549,7 @@ Then
 
 <a id="deleting-a-domain-holding-a-project-is-not-purged"></a>
 
-#### [a-domain-holding-a-project-is-not-purged](/tests/scenario/bai_scenario/manager/domain/test_deleting.py) — pass
+#### [a-domain-holding-a-project-is-not-purged](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
 프로젝트가 딸린 도메인은 슈퍼관리자라도 purge 할 수 없다
 
@@ -1567,7 +1567,7 @@ Given
 
 When
 
-- DomainAdapter.purge — user-1이 target-1을 purge 함
+- DomainAdapter.purge: user-1이 target-1을 purge 함
 
 Then
 
@@ -1576,7 +1576,7 @@ Then
 
 <a id="deleting-a-domain-holding-a-user-is-not-purged"></a>
 
-#### [a-domain-holding-a-user-is-not-purged](/tests/scenario/bai_scenario/manager/domain/test_deleting.py) — pass
+#### [a-domain-holding-a-user-is-not-purged](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
 사용자가 딸린 도메인은 슈퍼관리자라도 purge 할 수 없다
 
@@ -1596,7 +1596,7 @@ Given
 
 When
 
-- DomainAdapter.purge — user-2이 target-1을 purge 함
+- DomainAdapter.purge: user-2이 target-1을 purge 함
 
 Then
 
@@ -1605,7 +1605,7 @@ Then
 
 <a id="deleting-a-user-granted-nothing-may-not-purge-a-domain"></a>
 
-#### [a-user-granted-nothing-may-not-purge-a-domain](/tests/scenario/bai_scenario/manager/domain/test_deleting.py) — pass
+#### [a-user-granted-nothing-may-not-purge-a-domain](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
 아무 권한도 받지 않은 사용자는 아무것도 딸리지 않은 도메인이라도 purge 할 수 없다
 
@@ -1622,7 +1622,7 @@ Given
 
 When
 
-- DomainAdapter.purge — user-1이 untouchable-1을 purge 함
+- DomainAdapter.purge: user-1이 untouchable-1을 purge 함
 
 Then
 
@@ -1631,7 +1631,7 @@ Then
 
 <a id="deleting-purging-a-name-nothing-answers-to-is-not-found"></a>
 
-#### [purging-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/domain/test_deleting.py) — pass
+#### [purging-a-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/domain/test_deleting.py): pass
 
 아무 도메인도 갖지 않은 이름을 purge 하려 하면 대상이 없다는 것으로 거부된다
 
@@ -1648,7 +1648,7 @@ Given
 
 When
 
-- DomainAdapter.purge — user-1이 no-such-domain을 purge 함
+- DomainAdapter.purge: user-1이 no-such-domain을 purge 함
 
 Then
 

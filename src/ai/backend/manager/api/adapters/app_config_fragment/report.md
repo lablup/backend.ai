@@ -1,27 +1,27 @@
 ## app_config_fragment
 
-[what it guarantees](/src/ai/backend/manager/api/adapters/app_config_fragment/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/app_config_fragment/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/app_config_fragment/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/app_config_fragment/adapter.py)
 
 Scenario: incomplete 1 / 10
 
 - built from ops (10)
-  - admin_search — representative success ✓ · representative refusal ✓
-  - batch_load_by_ids — representative success ✓ · representative refusal ✓
-  - get — representative success ✓ · representative refusal ✓
-  - my_app_config_fragments_by_names — representative success ✓ · representative refusal ✓
-  - my_atomic_bulk_upsert — representative success ✓ · representative refusal ✓
-  - partial_bulk_purge — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
-  - purge — representative success ✓ · representative refusal ✓
-  - scoped_app_config_fragments_by_names — representative success ✓ · representative refusal ✓
-  - scoped_atomic_bulk_upsert — representative success ✓ · representative refusal ✓
-  - scoped_search — representative success ✓ · representative refusal ✓
+  - admin_search: representative success ✓ · representative rejection ✓
+  - batch_load_by_ids: representative success ✓ · representative rejection ✓
+  - get: representative success ✓ · representative rejection ✓
+  - my_app_config_fragments_by_names: representative success ✓ · representative rejection ✓
+  - my_atomic_bulk_upsert: representative success ✓ · representative rejection ✓
+  - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - purge: representative success ✓ · representative rejection ✓
+  - scoped_app_config_fragments_by_names: representative success ✓ · representative rejection ✓
+  - scoped_atomic_bulk_upsert: representative success ✓ · representative rejection ✓
+  - scoped_search: representative success ✓ · representative rejection ✓
 
 **admin_search**
 
 | scenario | verdict |
 |---|---|
 | [공개·도메인·사용자 스코프에 조각 넷이 있고 슈퍼관리자가 전체를 검색하면, 넷 다 집계된다. 전체 검색은 슈퍼관리자인지 검사한다](#searching-the-superadmin-counts-every-fragment-across-scopes) | answered |
-| [자기 도메인 스코프에 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체를 검색하면, 역할 부족으로 거부된다. 한 스코프를 검색하는 경로와 전체를 검색하는 경로가 다르다](#searching-a-user-granted-read-may-not-search-every-fragment) | refused |
+| [자기 도메인 스코프에 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체를 검색하면, 역할 부족으로 거부된다. 한 스코프를 검색하는 경로와 전체를 검색하는 경로가 다르다](#searching-a-user-granted-read-may-not-search-every-fragment) | rejected |
 
 **batch_load_by_ids**
 
@@ -29,16 +29,16 @@ Scenario: incomplete 1 / 10
 |---|---|
 | [빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다](#reading_many-an-empty-id-list-answers-empty-without-calling-anything) | answered |
 | [슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 id에 해당하는 항목은 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다](#reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty) | answered |
-| [자기 스코프에만 읽기 권한을 받은 사용자가 자기 조각, 다른 사용자의 조각, 없는 id를 한 번에 조회하면, 목록 순서대로 자기 것은 노드, 남의 것과 없는 id는 그 항목만 권한 부족으로 거부된다](#reading_many-mine-anothers-and-a-missing-id-are-each-answered-in-order-for-a-plain-user) | refused |
+| [자기 스코프에만 읽기 권한을 받은 사용자가 자기 조각, 다른 사용자의 조각, 없는 id를 한 번에 조회하면, 목록 순서대로 자기 것은 노드, 남의 것과 없는 id는 그 항목만 권한 부족으로 거부된다](#reading_many-mine-anothers-and-a-missing-id-are-each-answered-in-order-for-a-plain-user) | rejected |
 
 **get**
 
 | scenario | verdict |
 |---|---|
 | [자기 조각 하나가 있고 자기 스코프에 읽기 권한을 받은 사용자가 id로 조회하면, 그 조각 전체가 반환된다](#reading-a-user-granted-read-on-their-own-scope-reads-their-fragment-by-id) | answered |
-| [다른 사용자의 조각을 자기 스코프에만 읽기 권한을 받은 사용자가 id로 조회하면, 권한 부족으로 거부된다](#reading-a-user-granted-read-on-their-own-scope-may-not-read-another-users-fragment) | refused |
-| [슈퍼관리자가 존재하지 않는 id로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
-| [자기 스코프에 읽기 권한을 받은 사용자가 존재하지 않는 id로 조회하면, 대상 없음이 아니라 권한 부족으로 거부된다. 없는 행에는 부여된 권한도 없기 때문이다](#reading-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | refused |
+| [다른 사용자의 조각을 자기 스코프에만 읽기 권한을 받은 사용자가 id로 조회하면, 권한 부족으로 거부된다](#reading-a-user-granted-read-on-their-own-scope-may-not-read-another-users-fragment) | rejected |
+| [슈퍼관리자가 존재하지 않는 id로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다](#reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
+| [자기 스코프에 읽기 권한을 받은 사용자가 존재하지 않는 id로 조회하면, 대상 없음이 아니라 권한 부족으로 거부된다. 없는 행에는 부여된 권한도 없기 때문이다](#reading-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | rejected |
 
 **my_app_config_fragments_by_names**
 
@@ -47,7 +47,7 @@ Scenario: incomplete 1 / 10
 | [같은 이름에 다른 사용자의 조각이 있어도, 자기 조각을 조회하면 자기 것만 반환된다](#reading_by_names-another-users-fragment-under-the-same-name-is-not-answered) | answered |
 | [같은 이름에 자기 도메인의 조각이 있어도, 자기 조각을 조회하면 자기 것만 반환된다. 이 조회는 사용자 스코프 하나만 본다](#reading_by_names-the-domains-fragment-under-the-same-name-is-not-answered) | answered |
 | [사용자 스코프에 허용된 이름 셋 중 둘에 자기 조각이 있고 읽기 권한을 받은 사용자가 셋을 조회하면, 세 항목이 요청 순서대로 반환되고 조각이 없는 항목은 비어 있다](#reading_by_names-three-names-answer-a-fragment-or-an-empty-slot-each-in-request-order) | answered |
-| [자기 조각이 있어도 아무 권한도 없는 사용자가 이름으로 조회하면, 권한 부족으로 거부된다](#reading_by_names-a-user-granted-nothing-may-not-read-their-own-fragments) | refused |
+| [자기 조각이 있어도 아무 권한도 없는 사용자가 이름으로 조회하면, 권한 부족으로 거부된다](#reading_by_names-a-user-granted-nothing-may-not-read-their-own-fragments) | rejected |
 
 **my_atomic_bulk_upsert**
 
@@ -57,11 +57,11 @@ Scenario: incomplete 1 / 10
 | [사용자 스코프에 허용된 이름 둘에 한 번에 쓰면, 둘 다 쓰이고 요청 순서대로 반환된다](#writing-several-names-are-written-at-once-in-request-order) | answered |
 | [권한 검사를 끄면 아무 권한도 없는 사용자도 자기 조각을 쓸 수 있다](#writing-turning-enforcement-off-lets-a-user-granted-nothing-write) | answered |
 | [이미 자기 조각이 있는 이름에 다른 키를 담아 다시 쓰면, id는 그대로인 채 값은 새 값뿐이다. 이전 키가 남지 않는다](#writing-writing-the-same-name-again-replaces-the-value-whole) | answered |
-| [등록되지 않은 이름에 쓰기 권한을 받은 사용자가 쓰면, 쓰기 허용 안 됨으로 거부된다](#writing-a-name-nothing-registers-cannot-be-written) | refused |
-| [도메인 종류에만 허용된 이름에 쓰기 권한을 받은 사용자가 자기 조각을 쓰면, 쓰기 허용 안 됨으로 거부된다. 등록되지 않은 이름과 같은 검사다](#writing-a-name-opened-only-to-the-domain-kind-cannot-be-written-by-a-user) | refused |
-| [자기 스코프에 생성 권한만 있고 수정 권한이 없는 사용자가 쓰면, 권한 부족으로 거부된다. 쓰기는 생성과 수정 권한 둘 다를 요구한다](#writing-a-user-granted-create-alone-may-not-write) | refused |
-| [사용자 종류에 허용된 이름에 아무 권한도 없는 사용자가 쓰면, 권한 부족으로 거부된다](#writing-a-user-granted-nothing-may-not-write-their-own-fragment) | refused |
-| [허용된 이름과 허용되지 않은 이름을 함께 쓰면, 쓰기 허용 안 됨으로 거부된다. 쓰기는 전부 아니면 전무다](#writing-one-name-not-opened-to-the-user-kind-refuses-the-whole-write) | refused |
+| [등록되지 않은 이름에 쓰기 권한을 받은 사용자가 쓰면, 쓰기 허용 안 됨으로 거부된다](#writing-a-name-nothing-registers-cannot-be-written) | rejected |
+| [도메인 종류에만 허용된 이름에 쓰기 권한을 받은 사용자가 자기 조각을 쓰면, 쓰기 허용 안 됨으로 거부된다. 등록되지 않은 이름과 같은 검사다](#writing-a-name-opened-only-to-the-domain-kind-cannot-be-written-by-a-user) | rejected |
+| [자기 스코프에 생성 권한만 있고 수정 권한이 없는 사용자가 쓰면, 권한 부족으로 거부된다. 쓰기는 생성과 수정 권한 둘 다를 요구한다](#writing-a-user-granted-create-alone-may-not-write) | rejected |
+| [사용자 종류에 허용된 이름에 아무 권한도 없는 사용자가 쓰면, 권한 부족으로 거부된다](#writing-a-user-granted-nothing-may-not-write-their-own-fragment) | rejected |
+| [허용된 이름과 허용되지 않은 이름을 함께 쓰면, 쓰기 허용 안 됨으로 거부된다. 쓰기는 전부 아니면 전무다](#writing-one-name-not-opened-to-the-user-kind-refuses-the-whole-write) | rejected |
 
 **partial_bulk_purge**
 
@@ -75,9 +75,9 @@ Scenario: incomplete 1 / 10
 | scenario | verdict |
 |---|---|
 | [자기 조각 하나가 있고 자기 스코프에 삭제 권한을 받은 사용자가 삭제하면, 삭제한 id를 담은 응답이 반환된다](#purging-a-user-granted-hard-delete-on-their-own-scope-purges-their-fragment) | answered |
-| [다른 사용자의 조각을 자기 스코프에만 삭제 권한을 받은 사용자가 삭제하면, 권한 부족으로 거부된다](#purging-a-user-granted-hard-delete-on-their-own-scope-may-not-purge-another-users-fragment) | refused |
-| [자기 조각에 읽기 권한만 받은 사용자가 삭제하면, 권한 부족으로 거부된다. 삭제는 읽기와 다른 권한을 검사한다](#purging-a-user-granted-read-alone-may-not-purge-their-fragment) | refused |
-| [슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
+| [다른 사용자의 조각을 자기 스코프에만 삭제 권한을 받은 사용자가 삭제하면, 권한 부족으로 거부된다](#purging-a-user-granted-hard-delete-on-their-own-scope-may-not-purge-another-users-fragment) | rejected |
+| [자기 조각에 읽기 권한만 받은 사용자가 삭제하면, 권한 부족으로 거부된다. 삭제는 읽기와 다른 권한을 검사한다](#purging-a-user-granted-read-alone-may-not-purge-their-fragment) | rejected |
+| [슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다](#purging-an-id-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
 
 **scoped_app_config_fragments_by_names**
 
@@ -85,9 +85,9 @@ Scenario: incomplete 1 / 10
 |---|---|
 | [도메인 조각이 있고 그 도메인 스코프에 읽기 권한을 받은 사용자가 도메인을 지정해 조회하면, 그 조각이 반환된다](#reading_by_names-a-user-granted-read-on-the-domain-reads-its-fragment-by-name) | answered |
 | [공개 조각이 있고 아무 권한도 없는 사용자가 공개 스코프를 지정해 조회하면, 그 조각이 반환된다. 공개 조각에는 보호할 스코프가 없다](#reading_by_names-anyone-signed-in-reads-a-public-fragment-by-name) | answered |
-| [슈퍼관리자가 어느 도메인도 아닌 id를 지정해 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다](#reading_by_names-a-domain-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
-| [자기 도메인에 읽기 권한을 받은 사용자가 어느 도메인도 아닌 id를 지정해 조회하면, 대상 없음이 아니라 권한 부족으로 거부된다](#reading_by_names-a-domain-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | refused |
-| [자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 조회하면, 권한 부족으로 거부된다](#reading_by_names-a-user-granted-read-on-their-own-scope-may-not-read-another-users) | refused |
+| [슈퍼관리자가 어느 도메인도 아닌 id를 지정해 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다](#reading_by_names-a-domain-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
+| [자기 도메인에 읽기 권한을 받은 사용자가 어느 도메인도 아닌 id를 지정해 조회하면, 대상 없음이 아니라 권한 부족으로 거부된다](#reading_by_names-a-domain-nothing-answers-to-is-refused-as-permission-for-a-plain-user) | rejected |
+| [자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 조회하면, 권한 부족으로 거부된다](#reading_by_names-a-user-granted-read-on-their-own-scope-may-not-read-another-users) | rejected |
 
 **scoped_atomic_bulk_upsert**
 
@@ -95,10 +95,10 @@ Scenario: incomplete 1 / 10
 |---|---|
 | [자기 도메인 스코프에 쓰기 권한을 받은 사용자가 도메인을 지정해 쓰면, 스코프 종류는 도메인이고 소유자는 그 도메인이다](#writing-a-user-granted-write-on-the-domain-writes-a-domain-fragment) | answered |
 | [슈퍼관리자가 공개 스코프를 지정해 쓰면, 스코프 종류는 공개이고 소유자 필드는 비어 있다. 공개 쓰기는 슈퍼관리자인지 검사한다](#writing-the-superadmin-writes-a-public-fragment-owned-by-no-one) | answered |
-| [자기 스코프에만 쓰기 권한을 받은 사용자가 다른 사용자를 지정해 쓰면, 권한 부족으로 거부된다](#writing-a-user-granted-write-on-their-own-scope-may-not-write-at-another-users) | refused |
-| [자기 도메인 스코프에 쓰기 권한을 받았어도 슈퍼관리자가 아닌 사용자가 공개 스코프를 지정해 쓰면, 역할 부족으로 거부된다. 공개 조각에는 대응하는 스코프가 없다](#writing-a-user-who-is-not-the-superadmin-may-not-write-a-public-fragment) | refused |
-| [슈퍼관리자가 어느 사용자도 아닌 id를 소유자로 지정해 쓰면, 소유자 없음으로 거부된다. 소유자가 있는지는 권한 그래프에서 확인한다](#writing-the-superadmin-naming-an-owner-nothing-answers-to-is-refused) | refused |
-| [권한 검사를 꺼도 슈퍼관리자가 아니면 공개 조각을 쓸 수 없다](#writing-turning-enforcement-off-still-does-not-let-a-user-write-a-public-fragment) | refused |
+| [자기 스코프에만 쓰기 권한을 받은 사용자가 다른 사용자를 지정해 쓰면, 권한 부족으로 거부된다](#writing-a-user-granted-write-on-their-own-scope-may-not-write-at-another-users) | rejected |
+| [자기 도메인 스코프에 쓰기 권한을 받았어도 슈퍼관리자가 아닌 사용자가 공개 스코프를 지정해 쓰면, 역할 부족으로 거부된다. 공개 조각에는 대응하는 스코프가 없다](#writing-a-user-who-is-not-the-superadmin-may-not-write-a-public-fragment) | rejected |
+| [슈퍼관리자가 어느 사용자도 아닌 id를 소유자로 지정해 쓰면, 소유자 없음으로 거부된다. 소유자가 있는지는 권한 그래프에서 확인한다](#writing-the-superadmin-naming-an-owner-nothing-answers-to-is-refused) | rejected |
+| [권한 검사를 꺼도 슈퍼관리자가 아니면 공개 조각을 쓸 수 없다](#writing-turning-enforcement-off-still-does-not-let-a-user-write-a-public-fragment) | rejected |
 
 **scoped_search**
 
@@ -106,15 +106,15 @@ Scenario: incomplete 1 / 10
 |---|---|
 | [공개 조각 둘이 있고 아무 권한도 없는 사용자가 공개 스코프를 지정해 검색하면, 둘 다 집계된다. 공개 조각에는 보호할 스코프가 없다](#searching-anyone-signed-in-searches-the-public-scope) | answered |
 | [자기 조각 둘과 다른 사용자의 조각 하나가 있고 자기 스코프에 읽기 권한을 받은 사용자가 자기 스코프를 검색하면, 자기 조각 둘만 집계된다](#searching-searching-my-own-scope-counts-only-my-fragments) | answered |
-| [슈퍼관리자가 어느 도메인도 아닌 id를 지정해 검색하면, 대상을 찾을 수 없다는 이유로 거부된다](#searching-a-domain-nothing-answers-to-is-not-found-for-a-superadmin) | refused |
-| [자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 검색하면, 권한 부족으로 거부된다](#searching-a-user-granted-read-on-their-own-scope-may-not-search-another-users) | refused |
-| [읽기 권한을 받은 사용자가 도메인과 사용자를 함께 지정해 검색하면, 잘못된 입력으로 거부된다. 이 검색은 한 스코프에서만 실행된다](#searching-naming-two-scopes-at-once-is-refused-as-bad-input) | refused |
+| [슈퍼관리자가 어느 도메인도 아닌 id를 지정해 검색하면, 대상을 찾을 수 없다는 이유로 거부된다](#searching-a-domain-nothing-answers-to-is-not-found-for-a-superadmin) | rejected |
+| [자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 검색하면, 권한 부족으로 거부된다](#searching-a-user-granted-read-on-their-own-scope-may-not-search-another-users) | rejected |
+| [읽기 권한을 받은 사용자가 도메인과 사용자를 함께 지정해 검색하면, 잘못된 입력으로 거부된다. 이 검색은 한 스코프에서만 실행된다](#searching-naming-two-scopes-at-once-is-refused-as-bad-input) | rejected |
 
 ### admin_search
 
 <a id="searching-the-superadmin-counts-every-fragment-across-scopes"></a>
 
-#### [the-superadmin-counts-every-fragment-across-scopes](/tests/scenario/bai_scenario/manager/app_config_fragment/test_searching.py) — pass
+#### [the-superadmin-counts-every-fragment-across-scopes](/tests/scenario/bai_scenario/manager/app_config_fragment/test_searching.py): pass
 
 공개·도메인·사용자 스코프에 조각 넷이 있고 슈퍼관리자가 전체를 검색하면, 넷 다 집계된다. 전체 검색은 슈퍼관리자인지 검사한다
 
@@ -146,7 +146,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.admin_search — user-1이 필터 없이 전체 조회
+- AppConfigFragmentAdapter.admin_search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -158,7 +158,7 @@ Then
 
 <a id="searching-a-user-granted-read-may-not-search-every-fragment"></a>
 
-#### [a-user-granted-read-may-not-search-every-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_searching.py) — pass
+#### [a-user-granted-read-may-not-search-every-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_searching.py): pass
 
 자기 도메인 스코프에 읽기 권한을 받았지만 슈퍼관리자가 아닌 사용자가 전체를 검색하면, 역할 부족으로 거부된다. 한 스코프를 검색하는 경로와 전체를 검색하는 경로가 다르다
 
@@ -182,7 +182,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.admin_search — user-1이 필터 없이 전체 조회
+- AppConfigFragmentAdapter.admin_search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -193,7 +193,7 @@ Then
 
 <a id="reading_many-an-empty-id-list-answers-empty-without-calling-anything"></a>
 
-#### [an-empty-id-list-answers-empty-without-calling-anything](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_many.py) — pass
+#### [an-empty-id-list-answers-empty-without-calling-anything](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_many.py): pass
 
 빈 id 목록을 주면 빈 응답이 반환된다. 하위 계층을 호출하지 않는다
 
@@ -221,7 +221,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.batch_load_by_ids — user-1이 빈 id 목록으로 조회
+- AppConfigFragmentAdapter.batch_load_by_ids: user-1이 빈 id 목록으로 조회
 
 Then
 
@@ -230,7 +230,7 @@ Then
 
 <a id="reading_many-the-superadmin-reads-both-and-a-missing-id-comes-back-empty"></a>
 
-#### [the-superadmin-reads-both-and-a-missing-id-comes-back-empty](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_many.py) — pass
+#### [the-superadmin-reads-both-and-a-missing-id-comes-back-empty](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_many.py): pass
 
 슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 조회하면, 둘은 노드로 반환되고 없는 id에 해당하는 항목은 비어 있다. 권한 검사를 통과하는 사용자만 빈 항목을 본다
 
@@ -258,7 +258,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.batch_load_by_ids — user-1이 자기 조각, 다른 사용자의 조각, 존재하지 않는 id를 한 번에 조회
+- AppConfigFragmentAdapter.batch_load_by_ids: user-1이 자기 조각, 다른 사용자의 조각, 존재하지 않는 id를 한 번에 조회
 
 Then
 
@@ -270,7 +270,7 @@ Then
 
 <a id="reading_many-mine-anothers-and-a-missing-id-are-each-answered-in-order-for-a-plain-user"></a>
 
-#### [mine-anothers-and-a-missing-id-are-each-answered-in-order-for-a-plain-user](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_many.py) — pass
+#### [mine-anothers-and-a-missing-id-are-each-answered-in-order-for-a-plain-user](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_many.py): pass
 
 자기 스코프에만 읽기 권한을 받은 사용자가 자기 조각, 다른 사용자의 조각, 없는 id를 한 번에 조회하면, 목록 순서대로 자기 것은 노드, 남의 것과 없는 id는 그 항목만 권한 부족으로 거부된다
 
@@ -301,7 +301,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.batch_load_by_ids — user-1이 자기 조각, 다른 사용자의 조각, 존재하지 않는 id를 한 번에 조회
+- AppConfigFragmentAdapter.batch_load_by_ids: user-1이 자기 조각, 다른 사용자의 조각, 존재하지 않는 id를 한 번에 조회
 
 Then
 
@@ -315,7 +315,7 @@ Then
 
 <a id="reading-a-user-granted-read-on-their-own-scope-reads-their-fragment-by-id"></a>
 
-#### [a-user-granted-read-on-their-own-scope-reads-their-fragment-by-id](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading.py) — pass
+#### [a-user-granted-read-on-their-own-scope-reads-their-fragment-by-id](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading.py): pass
 
 자기 조각 하나가 있고 자기 스코프에 읽기 권한을 받은 사용자가 id로 조회하면, 그 조각 전체가 반환된다
 
@@ -339,7 +339,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.get — user-1이 config-1의 조각 조회
+- AppConfigFragmentAdapter.get: user-1이 config-1의 조각 조회
 
 Then
 
@@ -354,7 +354,7 @@ Then
 
 <a id="reading-a-user-granted-read-on-their-own-scope-may-not-read-another-users-fragment"></a>
 
-#### [a-user-granted-read-on-their-own-scope-may-not-read-another-users-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading.py) — pass
+#### [a-user-granted-read-on-their-own-scope-may-not-read-another-users-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading.py): pass
 
 다른 사용자의 조각을 자기 스코프에만 읽기 권한을 받은 사용자가 id로 조회하면, 권한 부족으로 거부된다
 
@@ -382,7 +382,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.get — user-1이 config-1의 조각 조회
+- AppConfigFragmentAdapter.get: user-1이 config-1의 조각 조회
 
 Then
 
@@ -391,7 +391,7 @@ Then
 
 <a id="reading-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
-#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading.py) — pass
+#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading.py): pass
 
 슈퍼관리자가 존재하지 않는 id로 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다
 
@@ -412,7 +412,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.get — user-1이 존재하지 않는 id 조회
+- AppConfigFragmentAdapter.get: user-1이 존재하지 않는 id 조회
 
 Then
 
@@ -421,7 +421,7 @@ Then
 
 <a id="reading-an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user"></a>
 
-#### [an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading.py) — pass
+#### [an-id-nothing-answers-to-is-refused-as-permission-for-a-plain-user](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading.py): pass
 
 자기 스코프에 읽기 권한을 받은 사용자가 존재하지 않는 id로 조회하면, 대상 없음이 아니라 권한 부족으로 거부된다. 없는 행에는 부여된 권한도 없기 때문이다
 
@@ -445,7 +445,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.get — user-1이 존재하지 않는 id 조회
+- AppConfigFragmentAdapter.get: user-1이 존재하지 않는 id 조회
 
 Then
 
@@ -456,7 +456,7 @@ Then
 
 <a id="reading_by_names-another-users-fragment-under-the-same-name-is-not-answered"></a>
 
-#### [another-users-fragment-under-the-same-name-is-not-answered](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py) — pass
+#### [another-users-fragment-under-the-same-name-is-not-answered](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py): pass
 
 같은 이름에 다른 사용자의 조각이 있어도, 자기 조각을 조회하면 자기 것만 반환된다
 
@@ -485,7 +485,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_app_config_fragments_by_names — user-1이 config-1의 자기 조각을 조회
+- AppConfigFragmentAdapter.my_app_config_fragments_by_names: user-1이 config-1의 자기 조각을 조회
 
 Then
 
@@ -496,7 +496,7 @@ Then
 
 <a id="reading_by_names-the-domains-fragment-under-the-same-name-is-not-answered"></a>
 
-#### [the-domains-fragment-under-the-same-name-is-not-answered](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py) — pass
+#### [the-domains-fragment-under-the-same-name-is-not-answered](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py): pass
 
 같은 이름에 자기 도메인의 조각이 있어도, 자기 조각을 조회하면 자기 것만 반환된다. 이 조회는 사용자 스코프 하나만 본다
 
@@ -522,7 +522,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_app_config_fragments_by_names — user-1이 config-1의 자기 조각을 조회
+- AppConfigFragmentAdapter.my_app_config_fragments_by_names: user-1이 config-1의 자기 조각을 조회
 
 Then
 
@@ -533,7 +533,7 @@ Then
 
 <a id="reading_by_names-three-names-answer-a-fragment-or-an-empty-slot-each-in-request-order"></a>
 
-#### [three-names-answer-a-fragment-or-an-empty-slot-each-in-request-order](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py) — pass
+#### [three-names-answer-a-fragment-or-an-empty-slot-each-in-request-order](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py): pass
 
 사용자 스코프에 허용된 이름 셋 중 둘에 자기 조각이 있고 읽기 권한을 받은 사용자가 셋을 조회하면, 세 항목이 요청 순서대로 반환되고 조각이 없는 항목은 비어 있다
 
@@ -562,7 +562,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_app_config_fragments_by_names — user-1이 config-1, config-2, config-3의 자기 조각을 조회
+- AppConfigFragmentAdapter.my_app_config_fragments_by_names: user-1이 config-1, config-2, config-3의 자기 조각을 조회
 
 Then
 
@@ -576,7 +576,7 @@ Then
 
 <a id="reading_by_names-a-user-granted-nothing-may-not-read-their-own-fragments"></a>
 
-#### [a-user-granted-nothing-may-not-read-their-own-fragments](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py) — pass
+#### [a-user-granted-nothing-may-not-read-their-own-fragments](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py): pass
 
 자기 조각이 있어도 아무 권한도 없는 사용자가 이름으로 조회하면, 권한 부족으로 거부된다
 
@@ -597,7 +597,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_app_config_fragments_by_names — user-1이 config-1의 자기 조각을 조회
+- AppConfigFragmentAdapter.my_app_config_fragments_by_names: user-1이 config-1의 자기 조각을 조회
 
 Then
 
@@ -608,7 +608,7 @@ Then
 
 <a id="writing-a-user-granted-write-writes-their-first-own-fragment"></a>
 
-#### [a-user-granted-write-writes-their-first-own-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+#### [a-user-granted-write-writes-their-first-own-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
 
 쓰기 권한을 받은 사용자가 자기 조각을 처음 쓰면, 요청이 지정하지 않은 소유자와 스코프 종류가 호출자 정보로 채워진 노드가 반환된다
 
@@ -632,13 +632,13 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 config-1에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert: user-1이 config-1에 자기 조각 쓰기
 
 Then
 
 - 쓴 설정 조각 전체가 요청 순서대로 반환된다
   - items = 1
-  - items[0].id: 무시함 — 데이터베이스가 만든다
+  - items[0].id: 무시함: 데이터베이스가 만든다
   - items[0].config_name: 요청한 이름와 같다
   - items[0].scope_type = <AppConfigScopeType.USER: 'user'>
   - items[0].scope_id: 지정한 소유자와 같다
@@ -648,7 +648,7 @@ Then
 
 <a id="writing-several-names-are-written-at-once-in-request-order"></a>
 
-#### [several-names-are-written-at-once-in-request-order](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+#### [several-names-are-written-at-once-in-request-order](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
 
 사용자 스코프에 허용된 이름 둘에 한 번에 쓰면, 둘 다 쓰이고 요청 순서대로 반환된다
 
@@ -674,20 +674,20 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 config-1, opened-1에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert: user-1이 config-1, opened-1에 자기 조각 쓰기
 
 Then
 
 - 쓴 설정 조각 전체가 요청 순서대로 반환된다
   - items = 2
-  - items[0].id: 무시함 — 데이터베이스가 만든다
+  - items[0].id: 무시함: 데이터베이스가 만든다
   - items[0].config_name: 요청한 이름와 같다
   - items[0].scope_type = <AppConfigScopeType.USER: 'user'>
   - items[0].scope_id: 지정한 소유자와 같다
   - items[0].config = {'theme': 'light', 'menu': {'home': True}}
   - items[0].created_at: 이 실행이 쓴 시각
   - items[0].updated_at: 이 실행이 쓴 시각
-  - items[1].id: 무시함 — 데이터베이스가 만든다
+  - items[1].id: 무시함: 데이터베이스가 만든다
   - items[1].config_name: 요청한 이름와 같다
   - items[1].scope_type = <AppConfigScopeType.USER: 'user'>
   - items[1].scope_id: 지정한 소유자와 같다
@@ -697,7 +697,7 @@ Then
 
 <a id="writing-turning-enforcement-off-lets-a-user-granted-nothing-write"></a>
 
-#### [turning-enforcement-off-lets-a-user-granted-nothing-write](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+#### [turning-enforcement-off-lets-a-user-granted-nothing-write](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
 
 권한 검사를 끄면 아무 권한도 없는 사용자도 자기 조각을 쓸 수 있다
 
@@ -717,13 +717,13 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 config-1에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert: user-1이 config-1에 자기 조각 쓰기
 
 Then
 
 - 쓴 설정 조각 전체가 요청 순서대로 반환된다
   - items = 1
-  - items[0].id: 무시함 — 데이터베이스가 만든다
+  - items[0].id: 무시함: 데이터베이스가 만든다
   - items[0].config_name: 요청한 이름와 같다
   - items[0].scope_type = <AppConfigScopeType.USER: 'user'>
   - items[0].scope_id: 지정한 소유자와 같다
@@ -733,7 +733,7 @@ Then
 
 <a id="writing-writing-the-same-name-again-replaces-the-value-whole"></a>
 
-#### [writing-the-same-name-again-replaces-the-value-whole](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+#### [writing-the-same-name-again-replaces-the-value-whole](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
 
 이미 자기 조각이 있는 이름에 다른 키를 담아 다시 쓰면, id는 그대로인 채 값은 새 값뿐이다. 이전 키가 남지 않는다
 
@@ -758,7 +758,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 config-1에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert: user-1이 config-1에 자기 조각 쓰기
 
 Then
 
@@ -774,7 +774,7 @@ Then
 
 <a id="writing-a-name-nothing-registers-cannot-be-written"></a>
 
-#### [a-name-nothing-registers-cannot-be-written](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+#### [a-name-nothing-registers-cannot-be-written](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
 
 등록되지 않은 이름에 쓰기 권한을 받은 사용자가 쓰면, 쓰기 허용 안 됨으로 거부된다
 
@@ -795,7 +795,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 unregistered에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert: user-1이 unregistered에 자기 조각 쓰기
 
 Then
 
@@ -804,7 +804,7 @@ Then
 
 <a id="writing-a-name-opened-only-to-the-domain-kind-cannot-be-written-by-a-user"></a>
 
-#### [a-name-opened-only-to-the-domain-kind-cannot-be-written-by-a-user](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+#### [a-name-opened-only-to-the-domain-kind-cannot-be-written-by-a-user](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
 
 도메인 종류에만 허용된 이름에 쓰기 권한을 받은 사용자가 자기 조각을 쓰면, 쓰기 허용 안 됨으로 거부된다. 등록되지 않은 이름과 같은 검사다
 
@@ -828,7 +828,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 config-1에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert: user-1이 config-1에 자기 조각 쓰기
 
 Then
 
@@ -837,7 +837,7 @@ Then
 
 <a id="writing-a-user-granted-create-alone-may-not-write"></a>
 
-#### [a-user-granted-create-alone-may-not-write](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+#### [a-user-granted-create-alone-may-not-write](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
 
 자기 스코프에 생성 권한만 있고 수정 권한이 없는 사용자가 쓰면, 권한 부족으로 거부된다. 쓰기는 생성과 수정 권한 둘 다를 요구한다
 
@@ -860,7 +860,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 config-1에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert: user-1이 config-1에 자기 조각 쓰기
 
 Then
 
@@ -869,7 +869,7 @@ Then
 
 <a id="writing-a-user-granted-nothing-may-not-write-their-own-fragment"></a>
 
-#### [a-user-granted-nothing-may-not-write-their-own-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+#### [a-user-granted-nothing-may-not-write-their-own-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
 
 사용자 종류에 허용된 이름에 아무 권한도 없는 사용자가 쓰면, 권한 부족으로 거부된다
 
@@ -889,7 +889,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 config-1에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert: user-1이 config-1에 자기 조각 쓰기
 
 Then
 
@@ -898,7 +898,7 @@ Then
 
 <a id="writing-one-name-not-opened-to-the-user-kind-refuses-the-whole-write"></a>
 
-#### [one-name-not-opened-to-the-user-kind-refuses-the-whole-write](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+#### [one-name-not-opened-to-the-user-kind-refuses-the-whole-write](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
 
 허용된 이름과 허용되지 않은 이름을 함께 쓰면, 쓰기 허용 안 됨으로 거부된다. 쓰기는 전부 아니면 전무다
 
@@ -924,7 +924,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.my_atomic_bulk_upsert — user-1이 config-1, unopened-1에 자기 조각 쓰기
+- AppConfigFragmentAdapter.my_atomic_bulk_upsert: user-1이 config-1, unopened-1에 자기 조각 쓰기
 
 Then
 
@@ -935,7 +935,7 @@ Then
 
 <a id="purging-mine-anothers-and-a-missing-id-are-each-answered-for-a-plain-user"></a>
 
-#### [mine-anothers-and-a-missing-id-are-each-answered-for-a-plain-user](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py) — pass
+#### [mine-anothers-and-a-missing-id-are-each-answered-for-a-plain-user](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py): pass
 
 자기 스코프에만 삭제 권한을 받은 사용자가 자기 조각 둘, 다른 사용자의 조각, 없는 id를 한 번에 삭제하면, 자기 둘은 삭제된 목록에, 남의 것과 없는 id는 실패 목록에 이유와 함께 반환된다
 
@@ -969,7 +969,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.partial_bulk_purge — user-1이 자기 조각 2개, 다른 사용자의 조각, 존재하지 않는 id를 한 번에 삭제
+- AppConfigFragmentAdapter.partial_bulk_purge: user-1이 자기 조각 2개, 다른 사용자의 조각, 존재하지 않는 id를 한 번에 삭제
 
 Then
 
@@ -977,11 +977,11 @@ Then
   - successes: 미리 만들어 둔 자기 조각들와 같다
   - failed = 2
   - failed[0].id: 미리 만들어 둔 남의 조각와 같다
-  - failed[*].message: 무시함 — 이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다
+  - failed[*].message: 무시함: 이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다
 
 <a id="purging-the-superadmin-purges-both-and-a-missing-id-fails-alone"></a>
 
-#### [the-superadmin-purges-both-and-a-missing-id-fails-alone](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py) — pass
+#### [the-superadmin-purges-both-and-a-missing-id-fails-alone](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py): pass
 
 슈퍼관리자가 조각 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다
 
@@ -1009,20 +1009,20 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.partial_bulk_purge — user-1이 자기 조각 1개, 다른 사용자의 조각, 존재하지 않는 id를 한 번에 삭제
+- AppConfigFragmentAdapter.partial_bulk_purge: user-1이 자기 조각 1개, 다른 사용자의 조각, 존재하지 않는 id를 한 번에 삭제
 
 Then
 
 - 있는 둘은 삭제된 목록에, 없는 id는 실패 목록에 반환된다
   - successes: 미리 만들어 둔 조각들와 같다
   - failed = 1
-  - failed[*].message: 무시함 — 이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다
+  - failed[*].message: 무시함: 이유는 문자열로 오고, 문자열은 바뀌어도 되는 값이다
 
 ### purge
 
 <a id="purging-a-user-granted-hard-delete-on-their-own-scope-purges-their-fragment"></a>
 
-#### [a-user-granted-hard-delete-on-their-own-scope-purges-their-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py) — pass
+#### [a-user-granted-hard-delete-on-their-own-scope-purges-their-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py): pass
 
 자기 조각 하나가 있고 자기 스코프에 삭제 권한을 받은 사용자가 삭제하면, 삭제한 id를 담은 응답이 반환된다
 
@@ -1046,7 +1046,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.purge — user-1이 config-1의 조각 삭제
+- AppConfigFragmentAdapter.purge: user-1이 config-1의 조각 삭제
 
 Then
 
@@ -1055,7 +1055,7 @@ Then
 
 <a id="purging-a-user-granted-hard-delete-on-their-own-scope-may-not-purge-another-users-fragment"></a>
 
-#### [a-user-granted-hard-delete-on-their-own-scope-may-not-purge-another-users-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py) — pass
+#### [a-user-granted-hard-delete-on-their-own-scope-may-not-purge-another-users-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py): pass
 
 다른 사용자의 조각을 자기 스코프에만 삭제 권한을 받은 사용자가 삭제하면, 권한 부족으로 거부된다
 
@@ -1083,7 +1083,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.purge — user-1이 config-1의 조각 삭제
+- AppConfigFragmentAdapter.purge: user-1이 config-1의 조각 삭제
 
 Then
 
@@ -1092,7 +1092,7 @@ Then
 
 <a id="purging-a-user-granted-read-alone-may-not-purge-their-fragment"></a>
 
-#### [a-user-granted-read-alone-may-not-purge-their-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py) — pass
+#### [a-user-granted-read-alone-may-not-purge-their-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py): pass
 
 자기 조각에 읽기 권한만 받은 사용자가 삭제하면, 권한 부족으로 거부된다. 삭제는 읽기와 다른 권한을 검사한다
 
@@ -1116,7 +1116,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.purge — user-1이 config-1의 조각 삭제
+- AppConfigFragmentAdapter.purge: user-1이 config-1의 조각 삭제
 
 Then
 
@@ -1125,7 +1125,7 @@ Then
 
 <a id="purging-an-id-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
-#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py) — pass
+#### [an-id-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_fragment/test_purging.py): pass
 
 슈퍼관리자가 존재하지 않는 id를 삭제하면, 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -1146,7 +1146,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.purge — user-1이 존재하지 않는 id 삭제
+- AppConfigFragmentAdapter.purge: user-1이 존재하지 않는 id 삭제
 
 Then
 
@@ -1157,7 +1157,7 @@ Then
 
 <a id="reading_by_names-a-user-granted-read-on-the-domain-reads-its-fragment-by-name"></a>
 
-#### [a-user-granted-read-on-the-domain-reads-its-fragment-by-name](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py) — pass
+#### [a-user-granted-read-on-the-domain-reads-its-fragment-by-name](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py): pass
 
 도메인 조각이 있고 그 도메인 스코프에 읽기 권한을 받은 사용자가 도메인을 지정해 조회하면, 그 조각이 반환된다
 
@@ -1181,7 +1181,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.scoped_app_config_fragments_by_names — user-1이 도메인 스코프를 지정해 config-1의 조각을 조회
+- AppConfigFragmentAdapter.scoped_app_config_fragments_by_names: user-1이 도메인 스코프를 지정해 config-1의 조각을 조회
 
 Then
 
@@ -1194,7 +1194,7 @@ Then
 
 <a id="reading_by_names-anyone-signed-in-reads-a-public-fragment-by-name"></a>
 
-#### [anyone-signed-in-reads-a-public-fragment-by-name](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py) — pass
+#### [anyone-signed-in-reads-a-public-fragment-by-name](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py): pass
 
 공개 조각이 있고 아무 권한도 없는 사용자가 공개 스코프를 지정해 조회하면, 그 조각이 반환된다. 공개 조각에는 보호할 스코프가 없다
 
@@ -1215,7 +1215,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.scoped_app_config_fragments_by_names — user-1이 공개 스코프를 지정해 config-1의 조각을 조회
+- AppConfigFragmentAdapter.scoped_app_config_fragments_by_names: user-1이 공개 스코프를 지정해 config-1의 조각을 조회
 
 Then
 
@@ -1228,7 +1228,7 @@ Then
 
 <a id="reading_by_names-a-domain-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
-#### [a-domain-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py) — pass
+#### [a-domain-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py): pass
 
 슈퍼관리자가 어느 도메인도 아닌 id를 지정해 조회하면, 대상을 찾을 수 없다는 이유로 거부된다. 권한 검사를 통과하는 사용자만 이 응답을 본다
 
@@ -1248,7 +1248,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.scoped_app_config_fragments_by_names — user-1이 어느 도메인도 아닌 id를 지정해 config-1의 조각을 조회
+- AppConfigFragmentAdapter.scoped_app_config_fragments_by_names: user-1이 어느 도메인도 아닌 id를 지정해 config-1의 조각을 조회
 
 Then
 
@@ -1257,7 +1257,7 @@ Then
 
 <a id="reading_by_names-a-domain-nothing-answers-to-is-refused-as-permission-for-a-plain-user"></a>
 
-#### [a-domain-nothing-answers-to-is-refused-as-permission-for-a-plain-user](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py) — pass
+#### [a-domain-nothing-answers-to-is-refused-as-permission-for-a-plain-user](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py): pass
 
 자기 도메인에 읽기 권한을 받은 사용자가 어느 도메인도 아닌 id를 지정해 조회하면, 대상 없음이 아니라 권한 부족으로 거부된다
 
@@ -1280,7 +1280,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.scoped_app_config_fragments_by_names — user-1이 어느 도메인도 아닌 id를 지정해 config-1의 조각을 조회
+- AppConfigFragmentAdapter.scoped_app_config_fragments_by_names: user-1이 어느 도메인도 아닌 id를 지정해 config-1의 조각을 조회
 
 Then
 
@@ -1289,7 +1289,7 @@ Then
 
 <a id="reading_by_names-a-user-granted-read-on-their-own-scope-may-not-read-another-users"></a>
 
-#### [a-user-granted-read-on-their-own-scope-may-not-read-another-users](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py) — pass
+#### [a-user-granted-read-on-their-own-scope-may-not-read-another-users](/tests/scenario/bai_scenario/manager/app_config_fragment/test_reading_by_names.py): pass
 
 자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 조회하면, 권한 부족으로 거부된다
 
@@ -1317,7 +1317,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.scoped_app_config_fragments_by_names — user-1이 사용자 스코프를 지정해 config-1의 조각을 조회
+- AppConfigFragmentAdapter.scoped_app_config_fragments_by_names: user-1이 사용자 스코프를 지정해 config-1의 조각을 조회
 
 Then
 
@@ -1328,7 +1328,7 @@ Then
 
 <a id="writing-a-user-granted-write-on-the-domain-writes-a-domain-fragment"></a>
 
-#### [a-user-granted-write-on-the-domain-writes-a-domain-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+#### [a-user-granted-write-on-the-domain-writes-a-domain-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
 
 자기 도메인 스코프에 쓰기 권한을 받은 사용자가 도메인을 지정해 쓰면, 스코프 종류는 도메인이고 소유자는 그 도메인이다
 
@@ -1352,13 +1352,13 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert — user-1이 도메인 스코프를 지정해 config-1에 조각 쓰기
+- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert: user-1이 도메인 스코프를 지정해 config-1에 조각 쓰기
 
 Then
 
 - 쓴 설정 조각 전체가 요청 순서대로 반환된다
   - items = 1
-  - items[0].id: 무시함 — 데이터베이스가 만든다
+  - items[0].id: 무시함: 데이터베이스가 만든다
   - items[0].config_name: 요청한 이름와 같다
   - items[0].scope_type = <AppConfigScopeType.DOMAIN: 'domain'>
   - items[0].scope_id: 지정한 소유자와 같다
@@ -1368,7 +1368,7 @@ Then
 
 <a id="writing-the-superadmin-writes-a-public-fragment-owned-by-no-one"></a>
 
-#### [the-superadmin-writes-a-public-fragment-owned-by-no-one](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+#### [the-superadmin-writes-a-public-fragment-owned-by-no-one](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
 
 슈퍼관리자가 공개 스코프를 지정해 쓰면, 스코프 종류는 공개이고 소유자 필드는 비어 있다. 공개 쓰기는 슈퍼관리자인지 검사한다
 
@@ -1388,13 +1388,13 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert — user-1이 공개 스코프를 지정해 config-1에 조각 쓰기
+- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert: user-1이 공개 스코프를 지정해 config-1에 조각 쓰기
 
 Then
 
 - 쓴 설정 조각 전체가 요청 순서대로 반환된다
   - items = 1
-  - items[0].id: 무시함 — 데이터베이스가 만든다
+  - items[0].id: 무시함: 데이터베이스가 만든다
   - items[0].config_name: 요청한 이름와 같다
   - items[0].scope_type = <AppConfigScopeType.PUBLIC: 'public'>
   - items[0].scope_id: 소유자 없음와 같다
@@ -1404,7 +1404,7 @@ Then
 
 <a id="writing-a-user-granted-write-on-their-own-scope-may-not-write-at-another-users"></a>
 
-#### [a-user-granted-write-on-their-own-scope-may-not-write-at-another-users](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+#### [a-user-granted-write-on-their-own-scope-may-not-write-at-another-users](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
 
 자기 스코프에만 쓰기 권한을 받은 사용자가 다른 사용자를 지정해 쓰면, 권한 부족으로 거부된다
 
@@ -1432,7 +1432,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert — user-1이 사용자 스코프를 지정해 config-1에 조각 쓰기
+- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert: user-1이 사용자 스코프를 지정해 config-1에 조각 쓰기
 
 Then
 
@@ -1441,7 +1441,7 @@ Then
 
 <a id="writing-a-user-who-is-not-the-superadmin-may-not-write-a-public-fragment"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-write-a-public-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-write-a-public-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
 
 자기 도메인 스코프에 쓰기 권한을 받았어도 슈퍼관리자가 아닌 사용자가 공개 스코프를 지정해 쓰면, 역할 부족으로 거부된다. 공개 조각에는 대응하는 스코프가 없다
 
@@ -1465,7 +1465,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert — user-1이 공개 스코프를 지정해 config-1에 조각 쓰기
+- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert: user-1이 공개 스코프를 지정해 config-1에 조각 쓰기
 
 Then
 
@@ -1474,7 +1474,7 @@ Then
 
 <a id="writing-the-superadmin-naming-an-owner-nothing-answers-to-is-refused"></a>
 
-#### [the-superadmin-naming-an-owner-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+#### [the-superadmin-naming-an-owner-nothing-answers-to-is-refused](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
 
 슈퍼관리자가 어느 사용자도 아닌 id를 소유자로 지정해 쓰면, 소유자 없음으로 거부된다. 소유자가 있는지는 권한 그래프에서 확인한다
 
@@ -1494,7 +1494,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert — user-1이 사용자 스코프를 지정해 config-1에 조각 쓰기
+- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert: user-1이 사용자 스코프를 지정해 config-1에 조각 쓰기
 
 Then
 
@@ -1503,7 +1503,7 @@ Then
 
 <a id="writing-turning-enforcement-off-still-does-not-let-a-user-write-a-public-fragment"></a>
 
-#### [turning-enforcement-off-still-does-not-let-a-user-write-a-public-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py) — pass
+#### [turning-enforcement-off-still-does-not-let-a-user-write-a-public-fragment](/tests/scenario/bai_scenario/manager/app_config_fragment/test_writing.py): pass
 
 권한 검사를 꺼도 슈퍼관리자가 아니면 공개 조각을 쓸 수 없다
 
@@ -1523,7 +1523,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert — user-1이 공개 스코프를 지정해 config-1에 조각 쓰기
+- AppConfigFragmentAdapter.scoped_atomic_bulk_upsert: user-1이 공개 스코프를 지정해 config-1에 조각 쓰기
 
 Then
 
@@ -1534,7 +1534,7 @@ Then
 
 <a id="searching-anyone-signed-in-searches-the-public-scope"></a>
 
-#### [anyone-signed-in-searches-the-public-scope](/tests/scenario/bai_scenario/manager/app_config_fragment/test_searching.py) — pass
+#### [anyone-signed-in-searches-the-public-scope](/tests/scenario/bai_scenario/manager/app_config_fragment/test_searching.py): pass
 
 공개 조각 둘이 있고 아무 권한도 없는 사용자가 공개 스코프를 지정해 검색하면, 둘 다 집계된다. 공개 조각에는 보호할 스코프가 없다
 
@@ -1558,7 +1558,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.scoped_search — user-1이 공개 스코프를 지정해 필터 없이 조회
+- AppConfigFragmentAdapter.scoped_search: user-1이 공개 스코프를 지정해 필터 없이 조회
 
 Then
 
@@ -1570,7 +1570,7 @@ Then
 
 <a id="searching-searching-my-own-scope-counts-only-my-fragments"></a>
 
-#### [searching-my-own-scope-counts-only-my-fragments](/tests/scenario/bai_scenario/manager/app_config_fragment/test_searching.py) — pass
+#### [searching-my-own-scope-counts-only-my-fragments](/tests/scenario/bai_scenario/manager/app_config_fragment/test_searching.py): pass
 
 자기 조각 둘과 다른 사용자의 조각 하나가 있고 자기 스코프에 읽기 권한을 받은 사용자가 자기 스코프를 검색하면, 자기 조각 둘만 집계된다
 
@@ -1604,7 +1604,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.scoped_search — user-1이 사용자 스코프를 지정해 필터 없이 조회
+- AppConfigFragmentAdapter.scoped_search: user-1이 사용자 스코프를 지정해 필터 없이 조회
 
 Then
 
@@ -1616,7 +1616,7 @@ Then
 
 <a id="searching-a-domain-nothing-answers-to-is-not-found-for-a-superadmin"></a>
 
-#### [a-domain-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_fragment/test_searching.py) — pass
+#### [a-domain-nothing-answers-to-is-not-found-for-a-superadmin](/tests/scenario/bai_scenario/manager/app_config_fragment/test_searching.py): pass
 
 슈퍼관리자가 어느 도메인도 아닌 id를 지정해 검색하면, 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -1633,7 +1633,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.scoped_search — user-1이 도메인 스코프를 지정해 필터 없이 조회
+- AppConfigFragmentAdapter.scoped_search: user-1이 도메인 스코프를 지정해 필터 없이 조회
 
 Then
 
@@ -1642,7 +1642,7 @@ Then
 
 <a id="searching-a-user-granted-read-on-their-own-scope-may-not-search-another-users"></a>
 
-#### [a-user-granted-read-on-their-own-scope-may-not-search-another-users](/tests/scenario/bai_scenario/manager/app_config_fragment/test_searching.py) — pass
+#### [a-user-granted-read-on-their-own-scope-may-not-search-another-users](/tests/scenario/bai_scenario/manager/app_config_fragment/test_searching.py): pass
 
 자기 스코프에만 읽기 권한을 받은 사용자가 다른 사용자를 지정해 검색하면, 권한 부족으로 거부된다
 
@@ -1673,7 +1673,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.scoped_search — user-1이 다른 사용자를 지정해 조회
+- AppConfigFragmentAdapter.scoped_search: user-1이 다른 사용자를 지정해 조회
 
 Then
 
@@ -1682,7 +1682,7 @@ Then
 
 <a id="searching-naming-two-scopes-at-once-is-refused-as-bad-input"></a>
 
-#### [naming-two-scopes-at-once-is-refused-as-bad-input](/tests/scenario/bai_scenario/manager/app_config_fragment/test_searching.py) — pass
+#### [naming-two-scopes-at-once-is-refused-as-bad-input](/tests/scenario/bai_scenario/manager/app_config_fragment/test_searching.py): pass
 
 읽기 권한을 받은 사용자가 도메인과 사용자를 함께 지정해 검색하면, 잘못된 입력으로 거부된다. 이 검색은 한 스코프에서만 실행된다
 
@@ -1706,7 +1706,7 @@ Given
 
 When
 
-- AppConfigFragmentAdapter.scoped_search — user-1이 도메인과 사용자를 함께 지정해 조회
+- AppConfigFragmentAdapter.scoped_search: user-1이 도메인과 사용자를 함께 지정해 조회
 
 Then
 

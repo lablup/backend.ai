@@ -1,13 +1,13 @@
 ## service_catalog
 
-[what it guarantees](/src/ai/backend/manager/api/adapters/service_catalog/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/service_catalog/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/service_catalog/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/service_catalog/adapter.py)
 
 Scenario: incomplete 1 / 2
 
 - built from ops (1)
-  - admin_search — representative success ✓ · representative refusal ✓
+  - admin_search: representative success ✓ · representative rejection ✓
 - direct implementation (1)
-  - batch_load_by_ids — success absent · refusal absent (partial_bulk) — SCENARIO-GAP
+  - batch_load_by_ids: success absent · rejection absent (partial_bulk): SCENARIO-GAP
 
 **admin_search**
 
@@ -21,13 +21,13 @@ Scenario: incomplete 1 / 2
 | [서비스 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다](#searching-omitting-the-page-size-answers-ten-services-and-a-next-page) | answered |
 | [모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 답을 받는다. 이 검색은 읽기 연산이라 모니터 역할이 전역 역할 검사를 통과한다](#searching-the-monitor-role-counts-every-service-as-the-superadmin-does) | answered |
 | [서비스 둘 중 하나가 엔드포인트를 가질 때 슈퍼관리자가 필터 없이 조회하면, 둘 다 한 번씩 집계된다](#searching-the-superadmin-counts-every-service-laid-once) | answered |
-| [슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-services) | refused |
+| [슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-services) | rejected |
 
 ### admin_search
 
 <a id="searching-a-group-filter-narrows-the-answer-to-the-services-of-that-group"></a>
 
-#### [a-group-filter-narrows-the-answer-to-the-services-of-that-group](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py) — pass
+#### [a-group-filter-narrows-the-answer-to-the-services-of-that-group](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
 그룹이 다른 서비스 둘 중 한 그룹으로 걸러 조회하면, 답에는 그 그룹의 서비스만 남는다
 
@@ -45,7 +45,7 @@ Given
 
 When
 
-- ServiceCatalogAdapter.admin_search — user-1이 manager 그룹으로 걸러 조회
+- ServiceCatalogAdapter.admin_search: user-1이 manager 그룹으로 걸러 조회
 
 Then
 
@@ -58,7 +58,7 @@ Then
 
 <a id="searching-a-status-equals-filter-keeps-the-services-of-that-status"></a>
 
-#### [a-status-equals-filter-keeps-the-services-of-that-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py) — pass
+#### [a-status-equals-filter-keeps-the-services-of-that-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
 상태마다 하나씩 있는 서비스를 비정상과 같은 것으로 걸러 조회하면 비정상 서비스만 반환된다
 
@@ -77,7 +77,7 @@ Given
 
 When
 
-- ServiceCatalogAdapter.admin_search — user-1이 상태가 unhealthy인 것으로 걸러 조회
+- ServiceCatalogAdapter.admin_search: user-1이 상태가 unhealthy인 것으로 걸러 조회
 
 Then
 
@@ -91,7 +91,7 @@ Then
 
 <a id="searching-a-status-in-filter-keeps-the-services-of-a-listed-status"></a>
 
-#### [a-status-in-filter-keeps-the-services-of-a-listed-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py) — pass
+#### [a-status-in-filter-keeps-the-services-of-a-listed-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
 상태마다 하나씩 있는 서비스를 비정상·등록 해제 목록에 든 것으로 걸러 조회하면 비정상과 등록 해제 서비스만 반환된다
 
@@ -110,7 +110,7 @@ Given
 
 When
 
-- ServiceCatalogAdapter.admin_search — user-1이 상태가 unhealthy, deregistered 중 하나인 것으로 걸러 조회
+- ServiceCatalogAdapter.admin_search: user-1이 상태가 unhealthy, deregistered 중 하나인 것으로 걸러 조회
 
 Then
 
@@ -124,7 +124,7 @@ Then
 
 <a id="searching-a-status-not-equals-filter-drops-the-services-of-that-status"></a>
 
-#### [a-status-not-equals-filter-drops-the-services-of-that-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py) — pass
+#### [a-status-not-equals-filter-drops-the-services-of-that-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
 상태마다 하나씩 있는 서비스를 비정상과 다른 것으로 걸러 조회하면 정상과 등록 해제 서비스만 반환된다
 
@@ -143,7 +143,7 @@ Given
 
 When
 
-- ServiceCatalogAdapter.admin_search — user-1이 상태가 unhealthy이 아닌 것으로 걸러 조회
+- ServiceCatalogAdapter.admin_search: user-1이 상태가 unhealthy이 아닌 것으로 걸러 조회
 
 Then
 
@@ -157,7 +157,7 @@ Then
 
 <a id="searching-a-status-not-in-filter-drops-the-services-of-a-listed-status"></a>
 
-#### [a-status-not-in-filter-drops-the-services-of-a-listed-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py) — pass
+#### [a-status-not-in-filter-drops-the-services-of-a-listed-status](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
 상태마다 하나씩 있는 서비스를 비정상·등록 해제 목록에 들지 않은 것으로 걸러 조회하면 정상 서비스만 반환된다
 
@@ -176,7 +176,7 @@ Given
 
 When
 
-- ServiceCatalogAdapter.admin_search — user-1이 상태가 unhealthy, deregistered 중 어느 것도 아닌 것으로 걸러 조회
+- ServiceCatalogAdapter.admin_search: user-1이 상태가 unhealthy, deregistered 중 어느 것도 아닌 것으로 걸러 조회
 
 Then
 
@@ -190,7 +190,7 @@ Then
 
 <a id="searching-omitting-the-page-size-answers-ten-services-and-a-next-page"></a>
 
-#### [omitting-the-page-size-answers-ten-services-and-a-next-page](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py) — pass
+#### [omitting-the-page-size-answers-ten-services-and-a-next-page](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
 서비스 11개가 있을 때 크기 없이 조회하면 10건까지 반환되고 다음 페이지가 있다고 응답한다
 
@@ -218,7 +218,7 @@ Given
 
 When
 
-- ServiceCatalogAdapter.admin_search — user-1이 필터 없이 전체 조회
+- ServiceCatalogAdapter.admin_search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -230,7 +230,7 @@ Then
 
 <a id="searching-the-monitor-role-counts-every-service-as-the-superadmin-does"></a>
 
-#### [the-monitor-role-counts-every-service-as-the-superadmin-does](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py) — pass
+#### [the-monitor-role-counts-every-service-as-the-superadmin-does](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
 모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 답을 받는다. 이 검색은 읽기 연산이라 모니터 역할이 전역 역할 검사를 통과한다
 
@@ -249,7 +249,7 @@ Given
 
 When
 
-- ServiceCatalogAdapter.admin_search — user-1이 필터 없이 전체 조회
+- ServiceCatalogAdapter.admin_search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -283,7 +283,7 @@ Then
 
 <a id="searching-the-superadmin-counts-every-service-laid-once"></a>
 
-#### [the-superadmin-counts-every-service-laid-once](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py) — pass
+#### [the-superadmin-counts-every-service-laid-once](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
 서비스 둘 중 하나가 엔드포인트를 가질 때 슈퍼관리자가 필터 없이 조회하면, 둘 다 한 번씩 집계된다
 
@@ -302,7 +302,7 @@ Given
 
 When
 
-- ServiceCatalogAdapter.admin_search — user-1이 필터 없이 전체 조회
+- ServiceCatalogAdapter.admin_search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -336,7 +336,7 @@ Then
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-services"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-services](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-services](/tests/scenario/bai_scenario/manager/service_catalog/test_searching.py): pass
 
 슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다
 
@@ -355,7 +355,7 @@ Given
 
 When
 
-- ServiceCatalogAdapter.admin_search — user-1이 필터 없이 전체 조회
+- ServiceCatalogAdapter.admin_search: user-1이 필터 없이 전체 조회
 
 Then
 

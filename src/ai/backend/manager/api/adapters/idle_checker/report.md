@@ -1,17 +1,17 @@
 ## idle_checker
 
-[what it guarantees](/src/ai/backend/manager/api/adapters/idle_checker/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/idle_checker/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/idle_checker/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/idle_checker/adapter.py)
 
 Scenario: incomplete 6 / 6
 
 - built from ops (4)
-  - admin_partial_bulk_purge — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
-  - admin_purge — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - admin_search — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - admin_partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - admin_purge: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - admin_search: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
 - direct implementation (2)
-  - admin_create — success absent · refusal absent (global_scope) — SCENARIO-GAP
-  - admin_update — success absent · refusal absent (global_scope) — SCENARIO-GAP
+  - admin_create: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - admin_update: success absent · rejection absent (global_scope): SCENARIO-GAP
 
 **admin_partial_bulk_purge**
 
@@ -24,7 +24,7 @@ Scenario: incomplete 6 / 6
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-checkers"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-checkers](/tests/scenario/bai_scenario/manager/idle_checker/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-checkers](/tests/scenario/bai_scenario/manager/idle_checker/test_partial_bulk_purging.py): pass
 
 아무 권한도 받지 않은 사용자가 검사기 여럿을 한 번에 purge 하려 하면, 지운 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -42,7 +42,7 @@ Given
 
 When
 
-- IdleCheckerAdapter.admin_partial_bulk_purge — user-1이 검사기 2개를 한 번에 purge 함
+- IdleCheckerAdapter.admin_partial_bulk_purge: user-1이 검사기 2개를 한 번에 purge 함
 
 Then
 
@@ -56,7 +56,7 @@ Then
 
 <a id="partial_bulk_purging-the-superadmin-purges-several-and-is-answered-for-the-missing-one"></a>
 
-#### [the-superadmin-purges-several-and-is-answered-for-the-missing-one](/tests/scenario/bai_scenario/manager/idle_checker/test_partial_bulk_purging.py) — pass
+#### [the-superadmin-purges-several-and-is-answered-for-the-missing-one](/tests/scenario/bai_scenario/manager/idle_checker/test_partial_bulk_purging.py): pass
 
 슈퍼관리자가 검사기 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 지운 검사기로 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -74,7 +74,7 @@ Given
 
 When
 
-- IdleCheckerAdapter.admin_partial_bulk_purge — user-1이 검사기 2개 와 없는 id 하나를 한 번에 purge 함
+- IdleCheckerAdapter.admin_partial_bulk_purge: user-1이 검사기 2개 와 없는 id 하나를 한 번에 purge 함
 
 Then
 

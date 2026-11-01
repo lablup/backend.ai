@@ -1,43 +1,43 @@
 ## resource_policy
 
-[무엇을 보장하는가](/src/ai/backend/manager/api/adapters/resource_policy/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_policy/adapter.py)
+[배경](/src/ai/backend/manager/api/adapters/resource_policy/KNOWLEDGE.md) · [어댑터](/src/ai/backend/manager/api/adapters/resource_policy/adapter.py)
 
 시나리오: 미완 16 / 33
 
 - ops 로 구성 (33)
-  - admin_create_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_create_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_create_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_get_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_get_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_get_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_search_keypair_resource_policies — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_search_project_resource_policies — 대표 성공 ✓ · 대표 실패 ✓
-  - admin_search_user_resource_policies — 대표 성공 ✓ · 대표 실패 ✓
-  - bulk_get_keypair_resource_policy_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - bulk_get_project_resource_policy_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - bulk_get_user_resource_policy_ids — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - bulk_lookup_keypair_resource_policy_names — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - bulk_lookup_project_resource_policy_names — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - bulk_lookup_user_resource_policy_names — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - get_my_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - get_my_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - get_project_resource_policy — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - lookup_keypair_resource_policy — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - lookup_project_resource_policy — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - lookup_user_resource_policy — 대표 성공 ✗ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_purge_keypair_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_purge_project_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_purge_user_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update_keypair_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update_project_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - partial_bulk_update_user_resource_policies — 대표 성공 ✓ · 대표 실패 ✗ — SCENARIO-GAP
-  - purge_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - purge_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - purge_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - update_keypair_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - update_project_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
-  - update_user_resource_policy — 대표 성공 ✓ · 대표 실패 ✓
+  - admin_create_keypair_resource_policy: 대표 성공 ✓ · 대표 실패 ✓
+  - admin_create_project_resource_policy: 대표 성공 ✓ · 대표 실패 ✓
+  - admin_create_user_resource_policy: 대표 성공 ✓ · 대표 실패 ✓
+  - admin_get_keypair_resource_policy: 대표 성공 ✓ · 대표 실패 ✓
+  - admin_get_project_resource_policy: 대표 성공 ✓ · 대표 실패 ✓
+  - admin_get_user_resource_policy: 대표 성공 ✓ · 대표 실패 ✓
+  - admin_search_keypair_resource_policies: 대표 성공 ✓ · 대표 실패 ✓
+  - admin_search_project_resource_policies: 대표 성공 ✓ · 대표 실패 ✓
+  - admin_search_user_resource_policies: 대표 성공 ✓ · 대표 실패 ✓
+  - bulk_get_keypair_resource_policy_ids: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - bulk_get_project_resource_policy_ids: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - bulk_get_user_resource_policy_ids: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - bulk_lookup_keypair_resource_policy_names: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - bulk_lookup_project_resource_policy_names: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - bulk_lookup_user_resource_policy_names: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - get_my_keypair_resource_policy: 대표 성공 ✓ · 대표 실패 ✓
+  - get_my_user_resource_policy: 대표 성공 ✓ · 대표 실패 ✓
+  - get_project_resource_policy: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - lookup_keypair_resource_policy: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - lookup_project_resource_policy: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - lookup_user_resource_policy: 대표 성공 ✗ · 대표 실패 ✗: SCENARIO-GAP
+  - partial_bulk_purge_keypair_resource_policies: 대표 성공 ✓ · 대표 실패 ✗: SCENARIO-GAP
+  - partial_bulk_purge_project_resource_policies: 대표 성공 ✓ · 대표 실패 ✗: SCENARIO-GAP
+  - partial_bulk_purge_user_resource_policies: 대표 성공 ✓ · 대표 실패 ✗: SCENARIO-GAP
+  - partial_bulk_update_keypair_resource_policies: 대표 성공 ✓ · 대표 실패 ✗: SCENARIO-GAP
+  - partial_bulk_update_project_resource_policies: 대표 성공 ✓ · 대표 실패 ✗: SCENARIO-GAP
+  - partial_bulk_update_user_resource_policies: 대표 성공 ✓ · 대표 실패 ✗: SCENARIO-GAP
+  - purge_keypair_resource_policy: 대표 성공 ✓ · 대표 실패 ✓
+  - purge_project_resource_policy: 대표 성공 ✓ · 대표 실패 ✓
+  - purge_user_resource_policy: 대표 성공 ✓ · 대표 실패 ✓
+  - update_keypair_resource_policy: 대표 성공 ✓ · 대표 실패 ✓
+  - update_project_resource_policy: 대표 성공 ✓ · 대표 실패 ✓
+  - update_user_resource_policy: 대표 성공 ✓ · 대표 실패 ✓
 
 **admin_create_keypair_resource_policy**
 
@@ -256,7 +256,7 @@
 
 <a id="creating-an-unlimited-slot-of-a-keypair-policy-comes-back-marked-unlimited"></a>
 
-#### [an-unlimited-slot-of-a-keypair-policy-comes-back-marked-unlimited](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [an-unlimited-slot-of-a-keypair-policy-comes-back-marked-unlimited](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 슈퍼관리자가 한 자원의 전체 슬롯을 무제한으로 지정해 키페어 정책을 생성하면, 그 자원은 무제한으로 표시되고 수량은 비어 있다
 
@@ -273,7 +273,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_keypair_resource_policy — user-1이 cpu 슬롯을 무제한으로 지정해 키페어 정책을 생성
+- ResourcePolicyAdapter.admin_create_keypair_resource_policy: user-1이 cpu 슬롯을 무제한으로 지정해 키페어 정책을 생성
 
 Then
 
@@ -295,7 +295,7 @@ Then
 
 <a id="creating-leaving-the-optional-values-out-of-a-keypair-policy-leaves-them-empty"></a>
 
-#### [leaving-the-optional-values-out-of-a-keypair-policy-leaves-them-empty](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [leaving-the-optional-values-out-of-a-keypair-policy-leaves-them-empty](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 슈퍼관리자가 생략할 수 있는 항목을 모두 생략하고 키페어 정책을 생성하면, 생략한 필드가 비어 있는 노드 전체가 반환된다
 
@@ -312,7 +312,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_keypair_resource_policy — user-1이 대기 세션 수·우선순위 상한·대기 자원 슬롯을 생략하고 키페어 정책을 생성
+- ResourcePolicyAdapter.admin_create_keypair_resource_policy: user-1이 대기 세션 수·우선순위 상한·대기 자원 슬롯을 생략하고 키페어 정책을 생성
 
 Then
 
@@ -334,7 +334,7 @@ Then
 
 <a id="creating-the-superadmin-creates-a-keypair-policy-giving-every-value"></a>
 
-#### [the-superadmin-creates-a-keypair-policy-giving-every-value](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [the-superadmin-creates-a-keypair-policy-giving-every-value](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 슈퍼관리자가 모든 값을 지정해 키페어 정책을 생성하면, 지정한 값이 그대로 담긴 노드 전체가 반환된다
 
@@ -351,7 +351,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_keypair_resource_policy — user-1이 모든 값을 지정해 키페어 정책을 생성
+- ResourcePolicyAdapter.admin_create_keypair_resource_policy: user-1이 모든 값을 지정해 키페어 정책을 생성
 
 Then
 
@@ -373,7 +373,7 @@ Then
 
 <a id="creating-a-monitor-may-not-create-a-keypair-policy"></a>
 
-#### [a-monitor-may-not-create-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [a-monitor-may-not-create-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 모니터 역할 사용자가 키페어 정책을 생성하려 하면 역할 부족으로 거부된다. 슈퍼관리자 검사는 모니터에게 읽기만 허용한다
 
@@ -390,7 +390,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_keypair_resource_policy — user-1이 모든 값을 지정해 키페어 정책을 생성
+- ResourcePolicyAdapter.admin_create_keypair_resource_policy: user-1이 모든 값을 지정해 키페어 정책을 생성
 
 Then
 
@@ -399,7 +399,7 @@ Then
 
 <a id="creating-a-name-another-keypair-policy-already-holds-is-refused"></a>
 
-#### [a-name-another-keypair-policy-already-holds-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [a-name-another-keypair-policy-already-holds-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 이미 다른 키페어 정책이 사용 중인 이름으로 생성하려 하면, 이름 중복으로 거부된다
 
@@ -416,7 +416,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_keypair_resource_policy — user-1이 이미 있는 이름으로 키페어 정책을 생성
+- ResourcePolicyAdapter.admin_create_keypair_resource_policy: user-1이 이미 있는 이름으로 키페어 정책을 생성
 
 Then
 
@@ -425,7 +425,7 @@ Then
 
 <a id="creating-a-priority-cap-outside-the-session-range-is-refused"></a>
 
-#### [a-priority-cap-outside-the-session-range-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [a-priority-cap-outside-the-session-range-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 슈퍼관리자가 우선순위 상한을 세션 우선순위 범위 밖 값으로 지정해 키페어 정책을 생성하려 하면, 제약 위반으로 거부된다
 
@@ -442,7 +442,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_keypair_resource_policy — user-1이 우선순위 상한을 세션 우선순위 범위 밖 값으로 지정해 키페어 정책을 생성
+- ResourcePolicyAdapter.admin_create_keypair_resource_policy: user-1이 우선순위 상한을 세션 우선순위 범위 밖 값으로 지정해 키페어 정책을 생성
 
 Then
 
@@ -451,7 +451,7 @@ Then
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-create-a-keypair-policy"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-create-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-create-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 슈퍼관리자가 아닌 사용자가 키페어 정책을 생성하려 하면, 어떤 권한을 받았는지와 무관하게 역할 부족으로 거부된다
 
@@ -468,7 +468,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_keypair_resource_policy — user-1이 모든 값을 지정해 키페어 정책을 생성
+- ResourcePolicyAdapter.admin_create_keypair_resource_policy: user-1이 모든 값을 지정해 키페어 정책을 생성
 
 Then
 
@@ -477,7 +477,7 @@ Then
 
 <a id="creating-turning-enforcement-off-still-does-not-let-a-user-create-a-keypair-policy"></a>
 
-#### [turning-enforcement-off-still-does-not-let-a-user-create-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [turning-enforcement-off-still-does-not-let-a-user-create-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 권한 검사를 꺼도 키페어 정책 생성은 여전히 거부된다
 
@@ -494,7 +494,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_keypair_resource_policy — user-1이 모든 값을 지정해 키페어 정책을 생성
+- ResourcePolicyAdapter.admin_create_keypair_resource_policy: user-1이 모든 값을 지정해 키페어 정책을 생성
 
 Then
 
@@ -505,7 +505,7 @@ Then
 
 <a id="creating-the-superadmin-creates-a-project-policy-giving-every-value"></a>
 
-#### [the-superadmin-creates-a-project-policy-giving-every-value](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [the-superadmin-creates-a-project-policy-giving-every-value](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 슈퍼관리자가 모든 값을 지정해 프로젝트 정책을 생성하면, 지정한 값이 그대로 담긴 노드 전체가 반환된다
 
@@ -522,7 +522,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_project_resource_policy — user-1이 모든 값을 지정해 프로젝트 정책을 생성
+- ResourcePolicyAdapter.admin_create_project_resource_policy: user-1이 모든 값을 지정해 프로젝트 정책을 생성
 
 Then
 
@@ -536,7 +536,7 @@ Then
 
 <a id="creating-a-monitor-may-not-create-a-project-policy"></a>
 
-#### [a-monitor-may-not-create-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [a-monitor-may-not-create-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 모니터 역할 사용자가 프로젝트 정책을 생성하려 하면 역할 부족으로 거부된다. 슈퍼관리자 검사는 모니터에게 읽기만 허용한다
 
@@ -553,7 +553,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_project_resource_policy — user-1이 모든 값을 지정해 프로젝트 정책을 생성
+- ResourcePolicyAdapter.admin_create_project_resource_policy: user-1이 모든 값을 지정해 프로젝트 정책을 생성
 
 Then
 
@@ -562,7 +562,7 @@ Then
 
 <a id="creating-a-name-another-project-policy-already-holds-is-refused"></a>
 
-#### [a-name-another-project-policy-already-holds-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [a-name-another-project-policy-already-holds-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 이미 다른 프로젝트 정책이 사용 중인 이름으로 생성하려 하면, 이름 중복으로 거부된다
 
@@ -579,7 +579,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_project_resource_policy — user-1이 이미 있는 이름으로 프로젝트 정책을 생성
+- ResourcePolicyAdapter.admin_create_project_resource_policy: user-1이 이미 있는 이름으로 프로젝트 정책을 생성
 
 Then
 
@@ -588,7 +588,7 @@ Then
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-create-a-project-policy"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-create-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-create-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 슈퍼관리자가 아닌 사용자가 프로젝트 정책을 생성하려 하면, 어떤 권한을 받았는지와 무관하게 역할 부족으로 거부된다
 
@@ -605,7 +605,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_project_resource_policy — user-1이 모든 값을 지정해 프로젝트 정책을 생성
+- ResourcePolicyAdapter.admin_create_project_resource_policy: user-1이 모든 값을 지정해 프로젝트 정책을 생성
 
 Then
 
@@ -614,7 +614,7 @@ Then
 
 <a id="creating-turning-enforcement-off-still-does-not-let-a-user-create-a-project-policy"></a>
 
-#### [turning-enforcement-off-still-does-not-let-a-user-create-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [turning-enforcement-off-still-does-not-let-a-user-create-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 권한 검사를 꺼도 프로젝트 정책 생성은 여전히 거부된다
 
@@ -631,7 +631,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_project_resource_policy — user-1이 모든 값을 지정해 프로젝트 정책을 생성
+- ResourcePolicyAdapter.admin_create_project_resource_policy: user-1이 모든 값을 지정해 프로젝트 정책을 생성
 
 Then
 
@@ -642,7 +642,7 @@ Then
 
 <a id="creating-leaving-the-optional-values-out-of-a-user-policy-leaves-them-empty"></a>
 
-#### [leaving-the-optional-values-out-of-a-user-policy-leaves-them-empty](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [leaving-the-optional-values-out-of-a-user-policy-leaves-them-empty](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 슈퍼관리자가 생략할 수 있는 항목을 모두 생략하고 사용자 정책을 생성하면, 생략한 필드가 비어 있는 노드 전체가 반환된다
 
@@ -659,7 +659,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_user_resource_policy — user-1이 동시 로그인 수를 생략하고 사용자 정책을 생성
+- ResourcePolicyAdapter.admin_create_user_resource_policy: user-1이 동시 로그인 수를 생략하고 사용자 정책을 생성
 
 Then
 
@@ -675,7 +675,7 @@ Then
 
 <a id="creating-the-superadmin-creates-a-user-policy-giving-every-value"></a>
 
-#### [the-superadmin-creates-a-user-policy-giving-every-value](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [the-superadmin-creates-a-user-policy-giving-every-value](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 슈퍼관리자가 모든 값을 지정해 사용자 정책을 생성하면, 지정한 값이 그대로 담긴 노드 전체가 반환된다
 
@@ -692,7 +692,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_user_resource_policy — user-1이 모든 값을 지정해 사용자 정책을 생성
+- ResourcePolicyAdapter.admin_create_user_resource_policy: user-1이 모든 값을 지정해 사용자 정책을 생성
 
 Then
 
@@ -708,7 +708,7 @@ Then
 
 <a id="creating-a-monitor-may-not-create-a-user-policy"></a>
 
-#### [a-monitor-may-not-create-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [a-monitor-may-not-create-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 모니터 역할 사용자가 사용자 정책을 생성하려 하면 역할 부족으로 거부된다. 슈퍼관리자 검사는 모니터에게 읽기만 허용한다
 
@@ -725,7 +725,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_user_resource_policy — user-1이 모든 값을 지정해 사용자 정책을 생성
+- ResourcePolicyAdapter.admin_create_user_resource_policy: user-1이 모든 값을 지정해 사용자 정책을 생성
 
 Then
 
@@ -734,7 +734,7 @@ Then
 
 <a id="creating-a-name-another-user-policy-already-holds-is-refused"></a>
 
-#### [a-name-another-user-policy-already-holds-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [a-name-another-user-policy-already-holds-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 이미 다른 사용자 정책이 사용 중인 이름으로 생성하려 하면, 이름 중복으로 거부된다
 
@@ -751,7 +751,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_user_resource_policy — user-1이 이미 있는 이름으로 사용자 정책을 생성
+- ResourcePolicyAdapter.admin_create_user_resource_policy: user-1이 이미 있는 이름으로 사용자 정책을 생성
 
 Then
 
@@ -760,7 +760,7 @@ Then
 
 <a id="creating-a-user-who-is-not-the-superadmin-may-not-create-a-user-policy"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-create-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-create-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 슈퍼관리자가 아닌 사용자가 사용자 정책을 생성하려 하면, 어떤 권한을 받았는지와 무관하게 역할 부족으로 거부된다
 
@@ -777,7 +777,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_user_resource_policy — user-1이 모든 값을 지정해 사용자 정책을 생성
+- ResourcePolicyAdapter.admin_create_user_resource_policy: user-1이 모든 값을 지정해 사용자 정책을 생성
 
 Then
 
@@ -786,7 +786,7 @@ Then
 
 <a id="creating-turning-enforcement-off-still-does-not-let-a-user-create-a-user-policy"></a>
 
-#### [turning-enforcement-off-still-does-not-let-a-user-create-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py) — pass
+#### [turning-enforcement-off-still-does-not-let-a-user-create-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_creating.py): pass
 
 권한 검사를 꺼도 사용자 정책 생성은 여전히 거부된다
 
@@ -803,7 +803,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_create_user_resource_policy — user-1이 모든 값을 지정해 사용자 정책을 생성
+- ResourcePolicyAdapter.admin_create_user_resource_policy: user-1이 모든 값을 지정해 사용자 정책을 생성
 
 Then
 
@@ -814,7 +814,7 @@ Then
 
 <a id="reading-the-superadmin-reads-a-keypair-policy-by-name"></a>
 
-#### [the-superadmin-reads-a-keypair-policy-by-name](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
+#### [the-superadmin-reads-a-keypair-policy-by-name](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py): pass
 
 키페어 정책 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 정책 전체가 반환된다
 
@@ -831,7 +831,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_get_keypair_resource_policy — user-1이 keypair-policy-2 이름으로 조회
+- ResourcePolicyAdapter.admin_get_keypair_resource_policy: user-1이 keypair-policy-2 이름으로 조회
 
 Then
 
@@ -853,7 +853,7 @@ Then
 
 <a id="reading-turning-enforcement-off-lets-a-user-granted-nothing-read-a-keypair-policy"></a>
 
-#### [turning-enforcement-off-lets-a-user-granted-nothing-read-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
+#### [turning-enforcement-off-lets-a-user-granted-nothing-read-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py): pass
 
 권한 검사를 끄면 아무 권한도 없는 사용자도 키페어 정책을 이름으로 조회할 수 있다
 
@@ -870,7 +870,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_get_keypair_resource_policy — user-1이 keypair-policy-2 이름으로 조회
+- ResourcePolicyAdapter.admin_get_keypair_resource_policy: user-1이 keypair-policy-2 이름으로 조회
 
 Then
 
@@ -892,7 +892,7 @@ Then
 
 <a id="reading-a-user-granted-nothing-cannot-resolve-a-keypair-policy-name"></a>
 
-#### [a-user-granted-nothing-cannot-resolve-a-keypair-policy-name](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
+#### [a-user-granted-nothing-cannot-resolve-a-keypair-policy-name](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py): pass
 
 같은 키페어 정책이 있고 아무 권한도 없는 사용자가 이름으로 조회하면, 정책을 찾을 수 없다는 이유로 거부된다
 
@@ -909,7 +909,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_get_keypair_resource_policy — user-1이 keypair-policy-2 이름으로 조회
+- ResourcePolicyAdapter.admin_get_keypair_resource_policy: user-1이 keypair-policy-2 이름으로 조회
 
 Then
 
@@ -918,7 +918,7 @@ Then
 
 <a id="reading-reading-a-keypair-policy-name-nothing-answers-to-is-not-found"></a>
 
-#### [reading-a-keypair-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
+#### [reading-a-keypair-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py): pass
 
 슈퍼관리자가 어느 키페어 정책에도 없는 이름으로 조회하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
 
@@ -935,7 +935,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_get_keypair_resource_policy — user-1이 nobody 이름으로 조회
+- ResourcePolicyAdapter.admin_get_keypair_resource_policy: user-1이 nobody 이름으로 조회
 
 Then
 
@@ -946,7 +946,7 @@ Then
 
 <a id="reading-the-superadmin-reads-a-project-policy-by-name"></a>
 
-#### [the-superadmin-reads-a-project-policy-by-name](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
+#### [the-superadmin-reads-a-project-policy-by-name](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py): pass
 
 프로젝트 정책 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 정책 전체가 반환된다
 
@@ -963,7 +963,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_get_project_resource_policy — user-1이 project-policy-1 이름으로 조회
+- ResourcePolicyAdapter.admin_get_project_resource_policy: user-1이 project-policy-1 이름으로 조회
 
 Then
 
@@ -977,7 +977,7 @@ Then
 
 <a id="reading-turning-enforcement-off-lets-a-user-granted-nothing-read-a-project-policy"></a>
 
-#### [turning-enforcement-off-lets-a-user-granted-nothing-read-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
+#### [turning-enforcement-off-lets-a-user-granted-nothing-read-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py): pass
 
 권한 검사를 끄면 아무 권한도 없는 사용자도 프로젝트 정책을 이름으로 조회할 수 있다
 
@@ -994,7 +994,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_get_project_resource_policy — user-1이 project-policy-1 이름으로 조회
+- ResourcePolicyAdapter.admin_get_project_resource_policy: user-1이 project-policy-1 이름으로 조회
 
 Then
 
@@ -1008,7 +1008,7 @@ Then
 
 <a id="reading-a-user-granted-nothing-cannot-resolve-a-project-policy-name"></a>
 
-#### [a-user-granted-nothing-cannot-resolve-a-project-policy-name](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
+#### [a-user-granted-nothing-cannot-resolve-a-project-policy-name](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py): pass
 
 같은 프로젝트 정책이 있고 아무 권한도 없는 사용자가 이름으로 조회하면, 정책을 찾을 수 없다는 이유로 거부된다
 
@@ -1025,7 +1025,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_get_project_resource_policy — user-1이 project-policy-1 이름으로 조회
+- ResourcePolicyAdapter.admin_get_project_resource_policy: user-1이 project-policy-1 이름으로 조회
 
 Then
 
@@ -1034,7 +1034,7 @@ Then
 
 <a id="reading-reading-a-project-policy-name-nothing-answers-to-is-not-found"></a>
 
-#### [reading-a-project-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
+#### [reading-a-project-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py): pass
 
 슈퍼관리자가 어느 프로젝트 정책에도 없는 이름으로 조회하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
 
@@ -1051,7 +1051,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_get_project_resource_policy — user-1이 nobody 이름으로 조회
+- ResourcePolicyAdapter.admin_get_project_resource_policy: user-1이 nobody 이름으로 조회
 
 Then
 
@@ -1062,7 +1062,7 @@ Then
 
 <a id="reading-the-superadmin-reads-a-user-policy-by-name"></a>
 
-#### [the-superadmin-reads-a-user-policy-by-name](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
+#### [the-superadmin-reads-a-user-policy-by-name](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py): pass
 
 사용자 정책 하나가 있고 슈퍼관리자가 이름으로 조회하면, 그 정책 전체가 반환된다
 
@@ -1079,7 +1079,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_get_user_resource_policy — user-1이 user-policy-2 이름으로 조회
+- ResourcePolicyAdapter.admin_get_user_resource_policy: user-1이 user-policy-2 이름으로 조회
 
 Then
 
@@ -1095,7 +1095,7 @@ Then
 
 <a id="reading-turning-enforcement-off-lets-a-user-granted-nothing-read-a-user-policy"></a>
 
-#### [turning-enforcement-off-lets-a-user-granted-nothing-read-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
+#### [turning-enforcement-off-lets-a-user-granted-nothing-read-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py): pass
 
 권한 검사를 끄면 아무 권한도 없는 사용자도 사용자 정책을 이름으로 조회할 수 있다
 
@@ -1112,7 +1112,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_get_user_resource_policy — user-1이 user-policy-2 이름으로 조회
+- ResourcePolicyAdapter.admin_get_user_resource_policy: user-1이 user-policy-2 이름으로 조회
 
 Then
 
@@ -1128,7 +1128,7 @@ Then
 
 <a id="reading-a-user-granted-nothing-cannot-resolve-a-user-policy-name"></a>
 
-#### [a-user-granted-nothing-cannot-resolve-a-user-policy-name](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
+#### [a-user-granted-nothing-cannot-resolve-a-user-policy-name](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py): pass
 
 같은 사용자 정책이 있고 아무 권한도 없는 사용자가 이름으로 조회하면, 정책을 찾을 수 없다는 이유로 거부된다
 
@@ -1145,7 +1145,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_get_user_resource_policy — user-1이 user-policy-2 이름으로 조회
+- ResourcePolicyAdapter.admin_get_user_resource_policy: user-1이 user-policy-2 이름으로 조회
 
 Then
 
@@ -1154,7 +1154,7 @@ Then
 
 <a id="reading-reading-a-user-policy-name-nothing-answers-to-is-not-found"></a>
 
-#### [reading-a-user-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py) — pass
+#### [reading-a-user-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_reading.py): pass
 
 슈퍼관리자가 어느 사용자 정책에도 없는 이름으로 조회하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
 
@@ -1171,7 +1171,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_get_user_resource_policy — user-1이 nobody 이름으로 조회
+- ResourcePolicyAdapter.admin_get_user_resource_policy: user-1이 nobody 이름으로 조회
 
 Then
 
@@ -1182,7 +1182,7 @@ Then
 
 <a id="searching-a-monitor-finds-every-keypair-policy-like-the-superadmin"></a>
 
-#### [a-monitor-finds-every-keypair-policy-like-the-superadmin](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py) — pass
+#### [a-monitor-finds-every-keypair-policy-like-the-superadmin](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py): pass
 
 모니터 역할 사용자가 키페어 정책 전체를 검색하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사가 읽기는 모니터에게도 허용하기 때문이다
 
@@ -1200,7 +1200,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_search_keypair_resource_policies — user-1이 필터 없이 전체 검색
+- ResourcePolicyAdapter.admin_search_keypair_resource_policies: user-1이 필터 없이 전체 검색
 
 Then
 
@@ -1210,7 +1210,7 @@ Then
 
 <a id="searching-filtering-keypair-policy-search-by-a-user-leaves-the-one-their-keypair-holds"></a>
 
-#### [filtering-keypair-policy-search-by-a-user-leaves-the-one-their-keypair-holds](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py) — pass
+#### [filtering-keypair-policy-search-by-a-user-leaves-the-one-their-keypair-holds](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py): pass
 
 키페어 정책 여럿이 있고 슈퍼관리자가 특정 사용자의 키페어를 필터로 검색하면, 그 사용자의 키페어에 할당된 정책만 반환된다
 
@@ -1228,7 +1228,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_search_keypair_resource_policies — user-1이 자기 키페어 필터로 검색
+- ResourcePolicyAdapter.admin_search_keypair_resource_policies: user-1이 자기 키페어 필터로 검색
 
 Then
 
@@ -1238,7 +1238,7 @@ Then
 
 <a id="searching-filtering-keypair-policy-search-by-name-leaves-that-one"></a>
 
-#### [filtering-keypair-policy-search-by-name-leaves-that-one](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py) — pass
+#### [filtering-keypair-policy-search-by-name-leaves-that-one](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py): pass
 
 이름이 다른 키페어 정책 여럿이 있고 슈퍼관리자가 그중 한 이름을 필터로 검색하면, 그 이름의 정책만 반환된다
 
@@ -1256,7 +1256,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_search_keypair_resource_policies — user-1이 wanted-1 이름 필터로 검색
+- ResourcePolicyAdapter.admin_search_keypair_resource_policies: user-1이 wanted-1 이름 필터로 검색
 
 Then
 
@@ -1266,7 +1266,7 @@ Then
 
 <a id="searching-the-superadmin-finds-every-keypair-policy"></a>
 
-#### [the-superadmin-finds-every-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py) — pass
+#### [the-superadmin-finds-every-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py): pass
 
 키페어 정책 여럿이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 미리 만들어 둔 정책이 모두, 그리고 그것만 반환된다
 
@@ -1284,7 +1284,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_search_keypair_resource_policies — user-1이 필터 없이 전체 검색
+- ResourcePolicyAdapter.admin_search_keypair_resource_policies: user-1이 필터 없이 전체 검색
 
 Then
 
@@ -1294,7 +1294,7 @@ Then
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-keypair-policy"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py): pass
 
 슈퍼관리자가 아닌 사용자가 키페어 정책 전체를 검색하려 하면 역할 부족으로 거부된다
 
@@ -1312,7 +1312,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_search_keypair_resource_policies — user-1이 필터 없이 전체 검색
+- ResourcePolicyAdapter.admin_search_keypair_resource_policies: user-1이 필터 없이 전체 검색
 
 Then
 
@@ -1323,7 +1323,7 @@ Then
 
 <a id="searching-a-monitor-finds-every-project-policy-like-the-superadmin"></a>
 
-#### [a-monitor-finds-every-project-policy-like-the-superadmin](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py) — pass
+#### [a-monitor-finds-every-project-policy-like-the-superadmin](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py): pass
 
 모니터 역할 사용자가 프로젝트 정책 전체를 검색하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사가 읽기는 모니터에게도 허용하기 때문이다
 
@@ -1341,7 +1341,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_search_project_resource_policies — user-1이 필터 없이 전체 검색
+- ResourcePolicyAdapter.admin_search_project_resource_policies: user-1이 필터 없이 전체 검색
 
 Then
 
@@ -1351,7 +1351,7 @@ Then
 
 <a id="searching-filtering-project-policy-search-by-name-leaves-that-one"></a>
 
-#### [filtering-project-policy-search-by-name-leaves-that-one](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py) — pass
+#### [filtering-project-policy-search-by-name-leaves-that-one](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py): pass
 
 이름이 다른 프로젝트 정책 여럿이 있고 슈퍼관리자가 그중 한 이름을 필터로 검색하면, 그 이름의 정책만 반환된다
 
@@ -1369,7 +1369,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_search_project_resource_policies — user-1이 wanted-1 이름 필터로 검색
+- ResourcePolicyAdapter.admin_search_project_resource_policies: user-1이 wanted-1 이름 필터로 검색
 
 Then
 
@@ -1379,7 +1379,7 @@ Then
 
 <a id="searching-the-superadmin-finds-every-project-policy"></a>
 
-#### [the-superadmin-finds-every-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py) — pass
+#### [the-superadmin-finds-every-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py): pass
 
 프로젝트 정책 여럿이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 미리 만들어 둔 정책이 모두, 그리고 그것만 반환된다
 
@@ -1397,7 +1397,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_search_project_resource_policies — user-1이 필터 없이 전체 검색
+- ResourcePolicyAdapter.admin_search_project_resource_policies: user-1이 필터 없이 전체 검색
 
 Then
 
@@ -1407,7 +1407,7 @@ Then
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-project-policy"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py): pass
 
 슈퍼관리자가 아닌 사용자가 프로젝트 정책 전체를 검색하려 하면 역할 부족으로 거부된다
 
@@ -1425,7 +1425,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_search_project_resource_policies — user-1이 필터 없이 전체 검색
+- ResourcePolicyAdapter.admin_search_project_resource_policies: user-1이 필터 없이 전체 검색
 
 Then
 
@@ -1436,7 +1436,7 @@ Then
 
 <a id="searching-a-monitor-finds-every-user-policy-like-the-superadmin"></a>
 
-#### [a-monitor-finds-every-user-policy-like-the-superadmin](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py) — pass
+#### [a-monitor-finds-every-user-policy-like-the-superadmin](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py): pass
 
 모니터 역할 사용자가 사용자 정책 전체를 검색하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사가 읽기는 모니터에게도 허용하기 때문이다
 
@@ -1454,7 +1454,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_search_user_resource_policies — user-1이 필터 없이 전체 검색
+- ResourcePolicyAdapter.admin_search_user_resource_policies: user-1이 필터 없이 전체 검색
 
 Then
 
@@ -1464,7 +1464,7 @@ Then
 
 <a id="searching-filtering-user-policy-search-by-name-leaves-that-one"></a>
 
-#### [filtering-user-policy-search-by-name-leaves-that-one](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py) — pass
+#### [filtering-user-policy-search-by-name-leaves-that-one](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py): pass
 
 이름이 다른 사용자 정책 여럿이 있고 슈퍼관리자가 그중 한 이름을 필터로 검색하면, 그 이름의 정책만 반환된다
 
@@ -1482,7 +1482,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_search_user_resource_policies — user-1이 wanted-1 이름 필터로 검색
+- ResourcePolicyAdapter.admin_search_user_resource_policies: user-1이 wanted-1 이름 필터로 검색
 
 Then
 
@@ -1492,7 +1492,7 @@ Then
 
 <a id="searching-the-superadmin-finds-every-user-policy"></a>
 
-#### [the-superadmin-finds-every-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py) — pass
+#### [the-superadmin-finds-every-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py): pass
 
 사용자 정책 여럿이 있고 슈퍼관리자가 필터 없이 전체를 검색하면, 미리 만들어 둔 정책이 모두, 그리고 그것만 반환된다
 
@@ -1510,7 +1510,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_search_user_resource_policies — user-1이 필터 없이 전체 검색
+- ResourcePolicyAdapter.admin_search_user_resource_policies: user-1이 필터 없이 전체 검색
 
 Then
 
@@ -1520,7 +1520,7 @@ Then
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-user-policy"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_searching.py): pass
 
 슈퍼관리자가 아닌 사용자가 사용자 정책 전체를 검색하려 하면 역할 부족으로 거부된다
 
@@ -1538,7 +1538,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.admin_search_user_resource_policies — user-1이 필터 없이 전체 검색
+- ResourcePolicyAdapter.admin_search_user_resource_policies: user-1이 필터 없이 전체 검색
 
 Then
 
@@ -1549,7 +1549,7 @@ Then
 
 <a id="reading_own-a-user-granted-read-in-their-own-scope-reads-their-keypair-policy"></a>
 
-#### [a-user-granted-read-in-their-own-scope-reads-their-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py) — pass
+#### [a-user-granted-read-in-their-own-scope-reads-their-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py): pass
 
 자기 스코프에서 키페어 정책을 읽을 권한을 받은 사용자가 자기 정책을 조회하면, 그 사용자에게 할당된 정책 전체가 반환된다
 
@@ -1569,7 +1569,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.get_my_keypair_resource_policy — user-1이 자기 키페어 정책을 조회
+- ResourcePolicyAdapter.get_my_keypair_resource_policy: user-1이 자기 키페어 정책을 조회
 
 Then
 
@@ -1591,7 +1591,7 @@ Then
 
 <a id="reading_own-among-several-keys-the-default-one-names-the-keypair-policy"></a>
 
-#### [among-several-keys-the-default-one-names-the-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py) — pass
+#### [among-several-keys-the-default-one-names-the-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py): pass
 
 기본 키페어 외에 다른 키페어 정책이 할당된 활성 키페어를 하나 더 가진 사용자가 자기 키페어 정책을 조회하면, 기본 키페어에 할당된 정책이 반환된다
 
@@ -1613,7 +1613,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.get_my_keypair_resource_policy — user-1이 자기 키페어 정책을 조회
+- ResourcePolicyAdapter.get_my_keypair_resource_policy: user-1이 자기 키페어 정책을 조회
 
 Then
 
@@ -1635,7 +1635,7 @@ Then
 
 <a id="reading_own-an-inactive-default-key-yields-to-the-active-one"></a>
 
-#### [an-inactive-default-key-yields-to-the-active-one](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py) — pass
+#### [an-inactive-default-key-yields-to-the-active-one](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py): pass
 
 기본 키페어는 비활성이고 다른 키페어 정책이 할당된 활성 키페어를 하나 더 가진 사용자가 자기 키페어 정책을 조회하면, 그 활성 키페어에 할당된 정책이 반환된다
 
@@ -1657,7 +1657,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.get_my_keypair_resource_policy — user-1이 자기 키페어 정책을 조회
+- ResourcePolicyAdapter.get_my_keypair_resource_policy: user-1이 자기 키페어 정책을 조회
 
 Then
 
@@ -1679,7 +1679,7 @@ Then
 
 <a id="reading_own-turning-enforcement-off-lets-a-user-granted-nothing-read-their-own-keypair-policy"></a>
 
-#### [turning-enforcement-off-lets-a-user-granted-nothing-read-their-own-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py) — pass
+#### [turning-enforcement-off-lets-a-user-granted-nothing-read-their-own-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py): pass
 
 권한 검사를 끄면 아무 권한도 없는 사용자도 자기 키페어 정책을 조회할 수 있다
 
@@ -1695,7 +1695,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.get_my_keypair_resource_policy — user-1이 자기 키페어 정책을 조회
+- ResourcePolicyAdapter.get_my_keypair_resource_policy: user-1이 자기 키페어 정책을 조회
 
 Then
 
@@ -1717,7 +1717,7 @@ Then
 
 <a id="reading_own-a-user-granted-nothing-may-not-read-their-own-keypair-policy"></a>
 
-#### [a-user-granted-nothing-may-not-read-their-own-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py) — pass
+#### [a-user-granted-nothing-may-not-read-their-own-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py): pass
 
 아무 권한도 없는 사용자가 자기 키페어 정책을 조회하면 권한 부족으로 거부된다. 자기 정책을 읽는 호출도 범위만 좁히는 것이 아니라 권한을 검사한다
 
@@ -1733,7 +1733,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.get_my_keypair_resource_policy — user-1이 자기 키페어 정책을 조회
+- ResourcePolicyAdapter.get_my_keypair_resource_policy: user-1이 자기 키페어 정책을 조회
 
 Then
 
@@ -1742,7 +1742,7 @@ Then
 
 <a id="reading_own-a-user-with-no-active-key-finds-no-keypair-policy-of-their-own"></a>
 
-#### [a-user-with-no-active-key-finds-no-keypair-policy-of-their-own](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py) — pass
+#### [a-user-with-no-active-key-finds-no-keypair-policy-of-their-own](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py): pass
 
 활성 키페어가 없는 사용자가 자기 키페어 정책을 조회하면, 권한이 있어도 정책에 도달할 키페어가 없어 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -1762,7 +1762,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.get_my_keypair_resource_policy — user-1이 자기 키페어 정책을 조회
+- ResourcePolicyAdapter.get_my_keypair_resource_policy: user-1이 자기 키페어 정책을 조회
 
 Then
 
@@ -1773,7 +1773,7 @@ Then
 
 <a id="reading_own-a-user-granted-read-in-their-own-scope-reads-their-user-policy"></a>
 
-#### [a-user-granted-read-in-their-own-scope-reads-their-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py) — pass
+#### [a-user-granted-read-in-their-own-scope-reads-their-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py): pass
 
 자기 스코프에서 사용자 정책을 읽을 권한을 받은 사용자가 자기 정책을 조회하면, 그 사용자에게 할당된 정책 전체가 반환된다
 
@@ -1793,7 +1793,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.get_my_user_resource_policy — user-1이 자기 사용자 정책을 조회
+- ResourcePolicyAdapter.get_my_user_resource_policy: user-1이 자기 사용자 정책을 조회
 
 Then
 
@@ -1809,7 +1809,7 @@ Then
 
 <a id="reading_own-turning-enforcement-off-lets-a-user-granted-nothing-read-their-own-user-policy"></a>
 
-#### [turning-enforcement-off-lets-a-user-granted-nothing-read-their-own-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py) — pass
+#### [turning-enforcement-off-lets-a-user-granted-nothing-read-their-own-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py): pass
 
 권한 검사를 끄면 아무 권한도 없는 사용자도 자기 사용자 정책을 조회할 수 있다
 
@@ -1825,7 +1825,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.get_my_user_resource_policy — user-1이 자기 사용자 정책을 조회
+- ResourcePolicyAdapter.get_my_user_resource_policy: user-1이 자기 사용자 정책을 조회
 
 Then
 
@@ -1841,7 +1841,7 @@ Then
 
 <a id="reading_own-a-user-granted-nothing-may-not-read-their-own-user-policy"></a>
 
-#### [a-user-granted-nothing-may-not-read-their-own-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py) — pass
+#### [a-user-granted-nothing-may-not-read-their-own-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_reading_own.py): pass
 
 아무 권한도 없는 사용자가 자기 사용자 정책을 조회하면 권한 부족으로 거부된다. 자기 정책을 읽는 호출도 범위만 좁히는 것이 아니라 권한을 검사한다
 
@@ -1857,7 +1857,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.get_my_user_resource_policy — user-1이 자기 사용자 정책을 조회
+- ResourcePolicyAdapter.get_my_user_resource_policy: user-1이 자기 사용자 정책을 조회
 
 Then
 
@@ -1868,7 +1868,7 @@ Then
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-keypair-policys"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-keypair-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-keypair-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py): pass
 
 아무 권한도 받지 않은 사용자가 키페어 정책 여럿을 한 번에 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -1886,7 +1886,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.partial_bulk_purge_keypair_resource_policies — user-1이 키페어 정책 2개를 한 번에 삭제
+- ResourcePolicyAdapter.partial_bulk_purge_keypair_resource_policies: user-1이 키페어 정책 2개를 한 번에 삭제
 
 Then
 
@@ -1900,7 +1900,7 @@ Then
 
 <a id="partial_bulk_purging-purging-several-keypair-policys-answers-for-the-missing-one"></a>
 
-#### [purging-several-keypair-policys-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+#### [purging-several-keypair-policys-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py): pass
 
 슈퍼관리자가 아무도 사용하지 않는 키페어 정책 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -1918,7 +1918,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.partial_bulk_purge_keypair_resource_policies — user-1이 키페어 정책 2개 와 없는 id 하나를 한 번에 삭제
+- ResourcePolicyAdapter.partial_bulk_purge_keypair_resource_policies: user-1이 키페어 정책 2개 와 없는 id 하나를 한 번에 삭제
 
 Then
 
@@ -1958,7 +1958,7 @@ Then
 
 <a id="partial_bulk_purging-purging-several-keypair-policys-answers-for-the-one-still-held"></a>
 
-#### [purging-several-keypair-policys-answers-for-the-one-still-held](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+#### [purging-several-keypair-policys-answers-for-the-one-still-held](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py): pass
 
 슈퍼관리자가 아직 할당된 키페어 정책과 아무도 사용하지 않는 것을 한 번에 삭제하면, 사용하지 않는 것은 처리된 목록에 오고 할당된 것은 아직 참조 중이라는 이유로 실패 목록에 온다
 
@@ -1975,7 +1975,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.partial_bulk_purge_keypair_resource_policies — user-1이 키페어 정책 2개를 한 번에 삭제
+- ResourcePolicyAdapter.partial_bulk_purge_keypair_resource_policies: user-1이 키페어 정책 2개를 한 번에 삭제
 
 Then
 
@@ -2003,7 +2003,7 @@ Then
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-project-policys"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-project-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-project-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py): pass
 
 아무 권한도 받지 않은 사용자가 프로젝트 정책 여럿을 한 번에 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -2021,7 +2021,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.partial_bulk_purge_project_resource_policies — user-1이 프로젝트 정책 2개를 한 번에 삭제
+- ResourcePolicyAdapter.partial_bulk_purge_project_resource_policies: user-1이 프로젝트 정책 2개를 한 번에 삭제
 
 Then
 
@@ -2035,7 +2035,7 @@ Then
 
 <a id="partial_bulk_purging-purging-several-project-policys-answers-for-the-missing-one"></a>
 
-#### [purging-several-project-policys-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+#### [purging-several-project-policys-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py): pass
 
 슈퍼관리자가 아무도 사용하지 않는 프로젝트 정책 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -2053,7 +2053,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.partial_bulk_purge_project_resource_policies — user-1이 프로젝트 정책 2개 와 없는 id 하나를 한 번에 삭제
+- ResourcePolicyAdapter.partial_bulk_purge_project_resource_policies: user-1이 프로젝트 정책 2개 와 없는 id 하나를 한 번에 삭제
 
 Then
 
@@ -2077,7 +2077,7 @@ Then
 
 <a id="partial_bulk_purging-purging-several-project-policys-answers-for-the-one-still-held"></a>
 
-#### [purging-several-project-policys-answers-for-the-one-still-held](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+#### [purging-several-project-policys-answers-for-the-one-still-held](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py): pass
 
 슈퍼관리자가 아직 할당된 프로젝트 정책과 아무도 사용하지 않는 것을 한 번에 삭제하면, 사용하지 않는 것은 처리된 목록에 오고 할당된 것은 아직 참조 중이라는 이유로 실패 목록에 온다
 
@@ -2094,7 +2094,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.partial_bulk_purge_project_resource_policies — user-1이 프로젝트 정책 2개를 한 번에 삭제
+- ResourcePolicyAdapter.partial_bulk_purge_project_resource_policies: user-1이 프로젝트 정책 2개를 한 번에 삭제
 
 Then
 
@@ -2114,7 +2114,7 @@ Then
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-user-policys"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-user-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-user-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py): pass
 
 아무 권한도 받지 않은 사용자가 사용자 정책 여럿을 한 번에 삭제하려 하면, 삭제된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -2132,7 +2132,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.partial_bulk_purge_user_resource_policies — user-1이 사용자 정책 2개를 한 번에 삭제
+- ResourcePolicyAdapter.partial_bulk_purge_user_resource_policies: user-1이 사용자 정책 2개를 한 번에 삭제
 
 Then
 
@@ -2146,7 +2146,7 @@ Then
 
 <a id="partial_bulk_purging-purging-several-user-policys-answers-for-the-missing-one"></a>
 
-#### [purging-several-user-policys-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+#### [purging-several-user-policys-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py): pass
 
 슈퍼관리자가 아무도 사용하지 않는 사용자 정책 둘과 없는 id 하나를 한 번에 삭제하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -2164,7 +2164,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.partial_bulk_purge_user_resource_policies — user-1이 사용자 정책 2개 와 없는 id 하나를 한 번에 삭제
+- ResourcePolicyAdapter.partial_bulk_purge_user_resource_policies: user-1이 사용자 정책 2개 와 없는 id 하나를 한 번에 삭제
 
 Then
 
@@ -2192,7 +2192,7 @@ Then
 
 <a id="partial_bulk_purging-purging-several-user-policys-answers-for-the-one-still-held"></a>
 
-#### [purging-several-user-policys-answers-for-the-one-still-held](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py) — pass
+#### [purging-several-user-policys-answers-for-the-one-still-held](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_purging.py): pass
 
 슈퍼관리자가 아직 할당된 사용자 정책과 아무도 사용하지 않는 것을 한 번에 삭제하면, 사용하지 않는 것은 처리된 목록에 오고 할당된 것은 아직 참조 중이라는 이유로 실패 목록에 온다
 
@@ -2209,7 +2209,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.partial_bulk_purge_user_resource_policies — user-1이 사용자 정책 2개를 한 번에 삭제
+- ResourcePolicyAdapter.partial_bulk_purge_user_resource_policies: user-1이 사용자 정책 2개를 한 번에 삭제
 
 Then
 
@@ -2231,7 +2231,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-keypair-policys"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-keypair-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-keypair-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 키페어 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -2249,7 +2249,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.partial_bulk_update_keypair_resource_policies — user-1이 키페어 정책 2개를 한 번에 수정 (동시 세션 수 7로 변경)
+- ResourcePolicyAdapter.partial_bulk_update_keypair_resource_policies: user-1이 키페어 정책 2개를 한 번에 수정 (동시 세션 수 7로 변경)
 
 Then
 
@@ -2263,7 +2263,7 @@ Then
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-keypair-policys-at-once"></a>
 
-#### [the-superadmin-edits-several-keypair-policys-at-once](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-edits-several-keypair-policys-at-once](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py): pass
 
 슈퍼관리자가 키페어 정책 여럿의 한도 하나를 한 번에 바꾸면, 모두 그 한도만 새 값으로 오고 실패한 것은 없다
 
@@ -2281,7 +2281,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.partial_bulk_update_keypair_resource_policies — user-1이 키페어 정책 2개를 한 번에 수정 (동시 세션 수 7로 변경)
+- ResourcePolicyAdapter.partial_bulk_update_keypair_resource_policies: user-1이 키페어 정책 2개를 한 번에 수정 (동시 세션 수 7로 변경)
 
 Then
 
@@ -2321,7 +2321,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-project-policys"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-project-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-project-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 프로젝트 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -2339,7 +2339,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.partial_bulk_update_project_resource_policies — user-1이 프로젝트 정책 2개를 한 번에 수정 (폴더 수 20으로 변경)
+- ResourcePolicyAdapter.partial_bulk_update_project_resource_policies: user-1이 프로젝트 정책 2개를 한 번에 수정 (폴더 수 20으로 변경)
 
 Then
 
@@ -2353,7 +2353,7 @@ Then
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-project-policys-at-once"></a>
 
-#### [the-superadmin-edits-several-project-policys-at-once](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-edits-several-project-policys-at-once](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py): pass
 
 슈퍼관리자가 프로젝트 정책 여럿의 한도 하나를 한 번에 바꾸면, 모두 그 한도만 새 값으로 오고 실패한 것은 없다
 
@@ -2371,7 +2371,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.partial_bulk_update_project_resource_policies — user-1이 프로젝트 정책 2개를 한 번에 수정 (폴더 수 20으로 변경)
+- ResourcePolicyAdapter.partial_bulk_update_project_resource_policies: user-1이 프로젝트 정책 2개를 한 번에 수정 (폴더 수 20으로 변경)
 
 Then
 
@@ -2395,7 +2395,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-user-policys"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-user-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-user-policys](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 사용자 정책 여럿을 한 번에 수정하려 하면, 수정된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -2413,7 +2413,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.partial_bulk_update_user_resource_policies — user-1이 사용자 정책 2개를 한 번에 수정 (폴더 수 20으로 변경)
+- ResourcePolicyAdapter.partial_bulk_update_user_resource_policies: user-1이 사용자 정책 2개를 한 번에 수정 (폴더 수 20으로 변경)
 
 Then
 
@@ -2427,7 +2427,7 @@ Then
 
 <a id="partial_bulk_editing-the-superadmin-edits-several-user-policys-at-once"></a>
 
-#### [the-superadmin-edits-several-user-policys-at-once](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py) — pass
+#### [the-superadmin-edits-several-user-policys-at-once](/tests/scenario/bai_scenario/manager/resource_policy/test_partial_bulk_editing.py): pass
 
 슈퍼관리자가 사용자 정책 여럿의 한도 하나를 한 번에 바꾸면, 모두 그 한도만 새 값으로 오고 실패한 것은 없다
 
@@ -2445,7 +2445,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.partial_bulk_update_user_resource_policies — user-1이 사용자 정책 2개를 한 번에 수정 (폴더 수 20으로 변경)
+- ResourcePolicyAdapter.partial_bulk_update_user_resource_policies: user-1이 사용자 정책 2개를 한 번에 수정 (폴더 수 20으로 변경)
 
 Then
 
@@ -2473,7 +2473,7 @@ Then
 
 <a id="retiring-the-superadmin-purges-a-keypair-policy-nobody-holds"></a>
 
-#### [the-superadmin-purges-a-keypair-policy-nobody-holds](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+#### [the-superadmin-purges-a-keypair-policy-nobody-holds](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py): pass
 
 아무도 사용하지 않는 키페어 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다
 
@@ -2490,7 +2490,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.purge_keypair_resource_policy — user-1이 keypair-policy-2 삭제 후 같은 이름으로 다시 검색
+- ResourcePolicyAdapter.purge_keypair_resource_policy: user-1이 keypair-policy-2 삭제 후 같은 이름으로 다시 검색
 
 Then
 
@@ -2500,7 +2500,7 @@ Then
 
 <a id="retiring-a-user-granted-nothing-may-not-purge-a-keypair-policy"></a>
 
-#### [a-user-granted-nothing-may-not-purge-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+#### [a-user-granted-nothing-may-not-purge-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py): pass
 
 같은 키페어 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
 
@@ -2517,7 +2517,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.purge_keypair_resource_policy — user-1이 keypair-policy-2 삭제 후 같은 이름으로 다시 검색
+- ResourcePolicyAdapter.purge_keypair_resource_policy: user-1이 keypair-policy-2 삭제 후 같은 이름으로 다시 검색
 
 Then
 
@@ -2526,7 +2526,7 @@ Then
 
 <a id="retiring-purging-a-keypair-policy-name-nothing-answers-to-is-not-found"></a>
 
-#### [purging-a-keypair-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+#### [purging-a-keypair-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py): pass
 
 슈퍼관리자가 어느 키페어 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
 
@@ -2543,7 +2543,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.purge_keypair_resource_policy — user-1이 nobody 삭제 후 같은 이름으로 다시 검색
+- ResourcePolicyAdapter.purge_keypair_resource_policy: user-1이 nobody 삭제 후 같은 이름으로 다시 검색
 
 Then
 
@@ -2552,7 +2552,7 @@ Then
 
 <a id="retiring-purging-a-keypair-policy-still-held-is-refused"></a>
 
-#### [purging-a-keypair-policy-still-held-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+#### [purging-a-keypair-policy-still-held-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py): pass
 
 아직 누군가에게 할당된 키페어 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다
 
@@ -2568,7 +2568,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.purge_keypair_resource_policy — user-1이 keypair-policy-1 삭제 후 같은 이름으로 다시 검색
+- ResourcePolicyAdapter.purge_keypair_resource_policy: user-1이 keypair-policy-1 삭제 후 같은 이름으로 다시 검색
 
 Then
 
@@ -2579,7 +2579,7 @@ Then
 
 <a id="retiring-the-superadmin-purges-a-project-policy-nobody-holds"></a>
 
-#### [the-superadmin-purges-a-project-policy-nobody-holds](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+#### [the-superadmin-purges-a-project-policy-nobody-holds](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py): pass
 
 아무도 사용하지 않는 프로젝트 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다
 
@@ -2596,7 +2596,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.purge_project_resource_policy — user-1이 project-policy-1 삭제 후 같은 이름으로 다시 검색
+- ResourcePolicyAdapter.purge_project_resource_policy: user-1이 project-policy-1 삭제 후 같은 이름으로 다시 검색
 
 Then
 
@@ -2606,7 +2606,7 @@ Then
 
 <a id="retiring-a-user-granted-nothing-may-not-purge-a-project-policy"></a>
 
-#### [a-user-granted-nothing-may-not-purge-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+#### [a-user-granted-nothing-may-not-purge-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py): pass
 
 같은 프로젝트 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
 
@@ -2623,7 +2623,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.purge_project_resource_policy — user-1이 project-policy-1 삭제 후 같은 이름으로 다시 검색
+- ResourcePolicyAdapter.purge_project_resource_policy: user-1이 project-policy-1 삭제 후 같은 이름으로 다시 검색
 
 Then
 
@@ -2632,7 +2632,7 @@ Then
 
 <a id="retiring-purging-a-project-policy-name-nothing-answers-to-is-not-found"></a>
 
-#### [purging-a-project-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+#### [purging-a-project-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py): pass
 
 슈퍼관리자가 어느 프로젝트 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
 
@@ -2649,7 +2649,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.purge_project_resource_policy — user-1이 nobody 삭제 후 같은 이름으로 다시 검색
+- ResourcePolicyAdapter.purge_project_resource_policy: user-1이 nobody 삭제 후 같은 이름으로 다시 검색
 
 Then
 
@@ -2658,7 +2658,7 @@ Then
 
 <a id="retiring-purging-a-project-policy-still-held-is-refused"></a>
 
-#### [purging-a-project-policy-still-held-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+#### [purging-a-project-policy-still-held-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py): pass
 
 아직 누군가에게 할당된 프로젝트 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다
 
@@ -2674,7 +2674,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.purge_project_resource_policy — user-1이 default 삭제 후 같은 이름으로 다시 검색
+- ResourcePolicyAdapter.purge_project_resource_policy: user-1이 default 삭제 후 같은 이름으로 다시 검색
 
 Then
 
@@ -2685,7 +2685,7 @@ Then
 
 <a id="retiring-the-superadmin-purges-a-user-policy-nobody-holds"></a>
 
-#### [the-superadmin-purges-a-user-policy-nobody-holds](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+#### [the-superadmin-purges-a-user-policy-nobody-holds](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py): pass
 
 아무도 사용하지 않는 사용자 정책을 슈퍼관리자가 삭제하면, 삭제한 이름이 반환되고 이어서 검색하면 없다
 
@@ -2702,7 +2702,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.purge_user_resource_policy — user-1이 user-policy-2 삭제 후 같은 이름으로 다시 검색
+- ResourcePolicyAdapter.purge_user_resource_policy: user-1이 user-policy-2 삭제 후 같은 이름으로 다시 검색
 
 Then
 
@@ -2712,7 +2712,7 @@ Then
 
 <a id="retiring-a-user-granted-nothing-may-not-purge-a-user-policy"></a>
 
-#### [a-user-granted-nothing-may-not-purge-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+#### [a-user-granted-nothing-may-not-purge-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py): pass
 
 같은 사용자 정책이 있고 아무 권한도 없는 사용자가 삭제하려 하면, 삭제 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
 
@@ -2729,7 +2729,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.purge_user_resource_policy — user-1이 user-policy-2 삭제 후 같은 이름으로 다시 검색
+- ResourcePolicyAdapter.purge_user_resource_policy: user-1이 user-policy-2 삭제 후 같은 이름으로 다시 검색
 
 Then
 
@@ -2738,7 +2738,7 @@ Then
 
 <a id="retiring-purging-a-user-policy-name-nothing-answers-to-is-not-found"></a>
 
-#### [purging-a-user-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+#### [purging-a-user-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py): pass
 
 슈퍼관리자가 어느 사용자 정책에도 없는 이름을 삭제하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
 
@@ -2755,7 +2755,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.purge_user_resource_policy — user-1이 nobody 삭제 후 같은 이름으로 다시 검색
+- ResourcePolicyAdapter.purge_user_resource_policy: user-1이 nobody 삭제 후 같은 이름으로 다시 검색
 
 Then
 
@@ -2764,7 +2764,7 @@ Then
 
 <a id="retiring-purging-a-user-policy-still-held-is-refused"></a>
 
-#### [purging-a-user-policy-still-held-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py) — pass
+#### [purging-a-user-policy-still-held-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_retiring.py): pass
 
 아직 누군가에게 할당된 사용자 정책을 슈퍼관리자가 삭제하려 하면, 아직 참조 중이라는 이유로 거부된다. 막는 것은 삭제 spec이 아니라 외래 키다
 
@@ -2780,7 +2780,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.purge_user_resource_policy — user-1이 user-policy-1 삭제 후 같은 이름으로 다시 검색
+- ResourcePolicyAdapter.purge_user_resource_policy: user-1이 user-policy-1 삭제 후 같은 이름으로 다시 검색
 
 Then
 
@@ -2791,7 +2791,7 @@ Then
 
 <a id="editing-clearing-a-non-nullable-value-of-a-keypair-policy-leaves-it-as-it-was"></a>
 
-#### [clearing-a-non-nullable-value-of-a-keypair-policy-leaves-it-as-it-was](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [clearing-a-non-nullable-value-of-a-keypair-policy-leaves-it-as-it-was](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 슈퍼관리자가 키페어 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다
 
@@ -2808,7 +2808,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (동시 세션 수 비우기)
+- ResourcePolicyAdapter.update_keypair_resource_policy: user-1이 keypair-policy-2 수정 (동시 세션 수 비우기)
 
 Then
 
@@ -2830,7 +2830,7 @@ Then
 
 <a id="editing-clearing-a-nullable-value-of-a-keypair-policy-empties-it"></a>
 
-#### [clearing-a-nullable-value-of-a-keypair-policy-empties-it](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [clearing-a-nullable-value-of-a-keypair-policy-empties-it](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 비울 수 있는 항목에 값이 설정된 키페어 정책을 슈퍼관리자가 그 항목을 비우도록 수정하면, 그 항목이 비어 있는 노드가 반환된다
 
@@ -2847,7 +2847,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (대기 세션 수 비우기)
+- ResourcePolicyAdapter.update_keypair_resource_policy: user-1이 keypair-policy-2 수정 (대기 세션 수 비우기)
 
 Then
 
@@ -2869,7 +2869,7 @@ Then
 
 <a id="editing-giving-no-value-changes-nothing-of-a-keypair-policy"></a>
 
-#### [giving-no-value-changes-nothing-of-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [giving-no-value-changes-nothing-of-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 슈퍼관리자가 키페어 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다
 
@@ -2886,7 +2886,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (빈 요청)
+- ResourcePolicyAdapter.update_keypair_resource_policy: user-1이 keypair-policy-2 수정 (빈 요청)
 
 Then
 
@@ -2908,7 +2908,7 @@ Then
 
 <a id="editing-the-superadmin-changes-one-limit-of-a-keypair-policy"></a>
 
-#### [the-superadmin-changes-one-limit-of-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [the-superadmin-changes-one-limit-of-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 키페어 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다
 
@@ -2925,7 +2925,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (동시 세션 수 7로 변경)
+- ResourcePolicyAdapter.update_keypair_resource_policy: user-1이 keypair-policy-2 수정 (동시 세션 수 7로 변경)
 
 Then
 
@@ -2947,7 +2947,7 @@ Then
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-keypair-policy"></a>
 
-#### [a-user-granted-nothing-may-not-edit-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-a-keypair-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 같은 키페어 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
 
@@ -2964,7 +2964,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (동시 세션 수 7로 변경)
+- ResourcePolicyAdapter.update_keypair_resource_policy: user-1이 keypair-policy-2 수정 (동시 세션 수 7로 변경)
 
 Then
 
@@ -2973,7 +2973,7 @@ Then
 
 <a id="editing-editing-a-keypair-policy-name-nothing-answers-to-is-not-found"></a>
 
-#### [editing-a-keypair-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [editing-a-keypair-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 슈퍼관리자가 어느 키페어 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
 
@@ -2990,7 +2990,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_keypair_resource_policy — user-1이 nobody 수정 (동시 세션 수 7로 변경)
+- ResourcePolicyAdapter.update_keypair_resource_policy: user-1이 nobody 수정 (동시 세션 수 7로 변경)
 
 Then
 
@@ -2999,7 +2999,7 @@ Then
 
 <a id="editing-moving-the-priority-cap-outside-the-session-range-is-refused"></a>
 
-#### [moving-the-priority-cap-outside-the-session-range-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [moving-the-priority-cap-outside-the-session-range-is-refused](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 슈퍼관리자가 키페어 정책의 우선순위 상한을 세션 우선순위 범위 밖으로 수정하려 하면, 제약 위반으로 거부된다
 
@@ -3016,7 +3016,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_keypair_resource_policy — user-1이 keypair-policy-2 수정 (우선순위 상한을 세션 우선순위 범위 밖으로 변경)
+- ResourcePolicyAdapter.update_keypair_resource_policy: user-1이 keypair-policy-2 수정 (우선순위 상한을 세션 우선순위 범위 밖으로 변경)
 
 Then
 
@@ -3027,7 +3027,7 @@ Then
 
 <a id="editing-clearing-a-non-nullable-value-of-a-project-policy-leaves-it-as-it-was"></a>
 
-#### [clearing-a-non-nullable-value-of-a-project-policy-leaves-it-as-it-was](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [clearing-a-non-nullable-value-of-a-project-policy-leaves-it-as-it-was](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 슈퍼관리자가 프로젝트 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다
 
@@ -3044,7 +3044,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_project_resource_policy — user-1이 project-policy-1 수정 (폴더 수 비우기)
+- ResourcePolicyAdapter.update_project_resource_policy: user-1이 project-policy-1 수정 (폴더 수 비우기)
 
 Then
 
@@ -3058,7 +3058,7 @@ Then
 
 <a id="editing-giving-no-value-changes-nothing-of-a-project-policy"></a>
 
-#### [giving-no-value-changes-nothing-of-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [giving-no-value-changes-nothing-of-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 슈퍼관리자가 프로젝트 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다
 
@@ -3075,7 +3075,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_project_resource_policy — user-1이 project-policy-1 수정 (빈 요청)
+- ResourcePolicyAdapter.update_project_resource_policy: user-1이 project-policy-1 수정 (빈 요청)
 
 Then
 
@@ -3089,7 +3089,7 @@ Then
 
 <a id="editing-the-superadmin-changes-one-limit-of-a-project-policy"></a>
 
-#### [the-superadmin-changes-one-limit-of-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [the-superadmin-changes-one-limit-of-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 프로젝트 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다
 
@@ -3106,7 +3106,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_project_resource_policy — user-1이 project-policy-1 수정 (폴더 수 20으로 변경)
+- ResourcePolicyAdapter.update_project_resource_policy: user-1이 project-policy-1 수정 (폴더 수 20으로 변경)
 
 Then
 
@@ -3120,7 +3120,7 @@ Then
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-project-policy"></a>
 
-#### [a-user-granted-nothing-may-not-edit-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-a-project-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 같은 프로젝트 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
 
@@ -3137,7 +3137,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_project_resource_policy — user-1이 project-policy-1 수정 (폴더 수 20으로 변경)
+- ResourcePolicyAdapter.update_project_resource_policy: user-1이 project-policy-1 수정 (폴더 수 20으로 변경)
 
 Then
 
@@ -3146,7 +3146,7 @@ Then
 
 <a id="editing-editing-a-project-policy-name-nothing-answers-to-is-not-found"></a>
 
-#### [editing-a-project-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [editing-a-project-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 슈퍼관리자가 어느 프로젝트 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
 
@@ -3163,7 +3163,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_project_resource_policy — user-1이 nobody 수정 (폴더 수 20으로 변경)
+- ResourcePolicyAdapter.update_project_resource_policy: user-1이 nobody 수정 (폴더 수 20으로 변경)
 
 Then
 
@@ -3174,7 +3174,7 @@ Then
 
 <a id="editing-clearing-a-non-nullable-value-of-a-user-policy-leaves-it-as-it-was"></a>
 
-#### [clearing-a-non-nullable-value-of-a-user-policy-leaves-it-as-it-was](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [clearing-a-non-nullable-value-of-a-user-policy-leaves-it-as-it-was](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 슈퍼관리자가 사용자 정책의 비울 수 없는 항목을 비우도록 수정하면, 그 요청은 무시되어 아무것도 바뀌지 않은 노드가 반환된다
 
@@ -3191,7 +3191,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_user_resource_policy — user-1이 user-policy-2 수정 (폴더 수 비우기)
+- ResourcePolicyAdapter.update_user_resource_policy: user-1이 user-policy-2 수정 (폴더 수 비우기)
 
 Then
 
@@ -3207,7 +3207,7 @@ Then
 
 <a id="editing-clearing-a-nullable-value-of-a-user-policy-empties-it"></a>
 
-#### [clearing-a-nullable-value-of-a-user-policy-empties-it](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [clearing-a-nullable-value-of-a-user-policy-empties-it](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 비울 수 있는 항목에 값이 설정된 사용자 정책을 슈퍼관리자가 그 항목을 비우도록 수정하면, 그 항목이 비어 있는 노드가 반환된다
 
@@ -3224,7 +3224,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_user_resource_policy — user-1이 user-policy-2 수정 (동시 로그인 수 비우기)
+- ResourcePolicyAdapter.update_user_resource_policy: user-1이 user-policy-2 수정 (동시 로그인 수 비우기)
 
 Then
 
@@ -3240,7 +3240,7 @@ Then
 
 <a id="editing-giving-no-value-changes-nothing-of-a-user-policy"></a>
 
-#### [giving-no-value-changes-nothing-of-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [giving-no-value-changes-nothing-of-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 슈퍼관리자가 사용자 정책을 지정만 하고 아무 값도 주지 않으면, 아무것도 바뀌지 않은 노드가 반환된다
 
@@ -3257,7 +3257,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_user_resource_policy — user-1이 user-policy-2 수정 (빈 요청)
+- ResourcePolicyAdapter.update_user_resource_policy: user-1이 user-policy-2 수정 (빈 요청)
 
 Then
 
@@ -3273,7 +3273,7 @@ Then
 
 <a id="editing-the-superadmin-changes-one-limit-of-a-user-policy"></a>
 
-#### [the-superadmin-changes-one-limit-of-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [the-superadmin-changes-one-limit-of-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 사용자 정책 하나가 있고 슈퍼관리자가 한도 하나만 수정하면, 그 한도만 새 값이 되고 나머지는 그대로 유지된다
 
@@ -3290,7 +3290,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_user_resource_policy — user-1이 user-policy-2 수정 (폴더 수 20으로 변경)
+- ResourcePolicyAdapter.update_user_resource_policy: user-1이 user-policy-2 수정 (폴더 수 20으로 변경)
 
 Then
 
@@ -3306,7 +3306,7 @@ Then
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-user-policy"></a>
 
-#### [a-user-granted-nothing-may-not-edit-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-a-user-policy](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 같은 사용자 정책이 있고 아무 권한도 없는 사용자가 수정하려 하면, 수정 로직에 이르기 전에 정책을 찾을 수 없다는 이유로 거부된다
 
@@ -3323,7 +3323,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_user_resource_policy — user-1이 user-policy-2 수정 (폴더 수 20으로 변경)
+- ResourcePolicyAdapter.update_user_resource_policy: user-1이 user-policy-2 수정 (폴더 수 20으로 변경)
 
 Then
 
@@ -3332,7 +3332,7 @@ Then
 
 <a id="editing-editing-a-user-policy-name-nothing-answers-to-is-not-found"></a>
 
-#### [editing-a-user-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py) — pass
+#### [editing-a-user-policy-name-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/resource_policy/test_editing.py): pass
 
 슈퍼관리자가 어느 사용자 정책에도 없는 이름을 수정하려 하면, 권한 문제가 아니라 대상이 없다는 것으로 거부된다
 
@@ -3349,7 +3349,7 @@ Given
 
 When
 
-- ResourcePolicyAdapter.update_user_resource_policy — user-1이 nobody 수정 (폴더 수 20으로 변경)
+- ResourcePolicyAdapter.update_user_resource_policy: user-1이 nobody 수정 (폴더 수 20으로 변경)
 
 Then
 

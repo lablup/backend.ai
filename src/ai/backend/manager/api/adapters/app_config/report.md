@@ -1,12 +1,12 @@
 ## app_config
 
-[what it guarantees](/src/ai/backend/manager/api/adapters/app_config/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/app_config/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/app_config/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/app_config/adapter.py)
 
 Scenario: incomplete 1 / 2
 
 - direct implementation (2)
-  - my_app_configs — success present 11 · refusal present 1 (scope)
-  - public_app_configs — success present 5 · refusal absent (anonymous_scope) — SCENARIO-GAP
+  - my_app_configs: success present 11 · rejection present 1 (scope)
+  - public_app_configs: success present 5 · rejection absent (anonymous_scope): SCENARIO-GAP
 
 **my_app_configs**
 
@@ -23,7 +23,7 @@ Scenario: incomplete 1 / 2
 | [이름 셋을 한 번에 조회하면, 각각의 병합 결과가 요청한 순서대로 반환된다](#reading_mine-several-names-answer-one-each-in-request-order) | answered |
 | [같은 이름에 공개 조각과 도메인 조각이 모두 있고 허용 목록 항목이 기본 순위이면, 겹치는 키는 도메인 값이 남는다](#reading_mine-the-domains-fragment-overrides-the-public-one) | answered |
 | [권한 검사를 끄면 아무 권한도 없는 사용자도 자기 설정을 조회할 수 있다](#reading_mine-turning-enforcement-off-lets-a-user-granted-nothing-read) | answered |
-| [아무 권한도 없는 사용자가 자기 설정을 조회하면, 스코프 권한 검사에서 권한 부족으로 거부된다](#reading_mine-a-user-granted-nothing-may-not-read-their-own-config) | refused |
+| [아무 권한도 없는 사용자가 자기 설정을 조회하면, 스코프 권한 검사에서 권한 부족으로 거부된다](#reading_mine-a-user-granted-nothing-may-not-read-their-own-config) | rejected |
 
 **public_app_configs**
 
@@ -39,7 +39,7 @@ Scenario: incomplete 1 / 2
 
 <a id="reading_mine-a-name-asked-twice-is-answered-twice"></a>
 
-#### [a-name-asked-twice-is-answered-twice](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
+#### [a-name-asked-twice-is-answered-twice](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
 같은 이름을 두 번 지정해 조회하면, 같은 값이 두 번 반환된다
 
@@ -63,7 +63,7 @@ Given
 
 When
 
-- AppConfigAdapter.my_app_configs — user-1이 config-1, config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1, config-1의 자기 설정을 조회
 
 Then
 
@@ -76,7 +76,7 @@ Then
 
 <a id="reading_mine-a-name-holding-no-fragment-answers-an-empty-config"></a>
 
-#### [a-name-holding-no-fragment-answers-an-empty-config](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
+#### [a-name-holding-no-fragment-answers-an-empty-config](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
 정의만 있고 허용 목록 항목도 조각도 없는 이름을 읽기 권한을 받은 사용자가 조회하면, 그 이름이 응답에서 빠지지 않고 빈 설정으로 반환된다
 
@@ -98,7 +98,7 @@ Given
 
 When
 
-- AppConfigAdapter.my_app_configs — user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
 
 Then
 
@@ -109,7 +109,7 @@ Then
 
 <a id="reading_mine-a-name-nothing-registers-answers-an-empty-config"></a>
 
-#### [a-name-nothing-registers-answers-an-empty-config](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
+#### [a-name-nothing-registers-answers-an-empty-config](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
 정의조차 없는 이름을 읽기 권한을 받은 사용자가 조회하면, 정의가 없다고 거부되지 않고 빈 설정으로 반환된다. 이 조회는 정의를 확인하지 않고 조각만 본다
 
@@ -129,7 +129,7 @@ Given
 
 When
 
-- AppConfigAdapter.my_app_configs — user-1이 unregistered의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 unregistered의 자기 설정을 조회
 
 Then
 
@@ -140,7 +140,7 @@ Then
 
 <a id="reading_mine-a-public-fragment-alone-answers-its-own-value"></a>
 
-#### [a-public-fragment-alone-answers-its-own-value](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
+#### [a-public-fragment-alone-answers-its-own-value](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
 공개 스코프에만 조각이 있는 이름을 조회하면, 그 조각의 값이 그대로 반환된다
 
@@ -164,7 +164,7 @@ Given
 
 When
 
-- AppConfigAdapter.my_app_configs — user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
 
 Then
 
@@ -175,7 +175,7 @@ Then
 
 <a id="reading_mine-a-rank-the-admin-flipped-lets-the-domains-fragment-override-mine"></a>
 
-#### [a-rank-the-admin-flipped-lets-the-domains-fragment-override-mine](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
+#### [a-rank-the-admin-flipped-lets-the-domains-fragment-override-mine](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
 도메인 허용 목록 항목의 순위를 사용자 항목보다 크게 두면, 같은 조각들에서 겹치는 키의 우선순위가 도메인으로 뒤바뀐다. 순위는 허용 목록 항목에 있고 값의 소유자는 바꿀 수 없다
 
@@ -201,7 +201,7 @@ Given
 
 When
 
-- AppConfigAdapter.my_app_configs — user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
 
 Then
 
@@ -212,7 +212,7 @@ Then
 
 <a id="reading_mine-another-domains-fragment-does-not-merge-into-mine"></a>
 
-#### [another-domains-fragment-does-not-merge-into-mine](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
+#### [another-domains-fragment-does-not-merge-into-mine](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
 다른 도메인이 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 자기 도메인 조각의 값만 반환된다
 
@@ -238,7 +238,7 @@ Given
 
 When
 
-- AppConfigAdapter.my_app_configs — user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
 
 Then
 
@@ -249,7 +249,7 @@ Then
 
 <a id="reading_mine-another-users-fragment-does-not-merge-into-mine"></a>
 
-#### [another-users-fragment-does-not-merge-into-mine](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
+#### [another-users-fragment-does-not-merge-into-mine](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
 같은 도메인의 다른 사용자가 같은 이름에 조각을 두었어도, 자기 설정을 조회하면 자기 조각의 값만 반환된다
 
@@ -278,7 +278,7 @@ Given
 
 When
 
-- AppConfigAdapter.my_app_configs — user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
 
 Then
 
@@ -289,7 +289,7 @@ Then
 
 <a id="reading_mine-my-own-fragment-overrides-the-domains"></a>
 
-#### [my-own-fragment-overrides-the-domains](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
+#### [my-own-fragment-overrides-the-domains](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
 같은 이름에 도메인 조각과 자기 조각이 모두 있고 허용 목록 항목이 기본 순위이면, 겹치는 키는 자기 값이 남고 겹치지 않는 키는 양쪽 모두 남는다
 
@@ -315,7 +315,7 @@ Given
 
 When
 
-- AppConfigAdapter.my_app_configs — user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
 
 Then
 
@@ -326,7 +326,7 @@ Then
 
 <a id="reading_mine-several-names-answer-one-each-in-request-order"></a>
 
-#### [several-names-answer-one-each-in-request-order](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
+#### [several-names-answer-one-each-in-request-order](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
 이름 셋을 한 번에 조회하면, 각각의 병합 결과가 요청한 순서대로 반환된다
 
@@ -356,7 +356,7 @@ Given
 
 When
 
-- AppConfigAdapter.my_app_configs — user-1이 config-1, config-2, config-3의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1, config-2, config-3의 자기 설정을 조회
 
 Then
 
@@ -371,7 +371,7 @@ Then
 
 <a id="reading_mine-the-domains-fragment-overrides-the-public-one"></a>
 
-#### [the-domains-fragment-overrides-the-public-one](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
+#### [the-domains-fragment-overrides-the-public-one](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
 같은 이름에 공개 조각과 도메인 조각이 모두 있고 허용 목록 항목이 기본 순위이면, 겹치는 키는 도메인 값이 남는다
 
@@ -397,7 +397,7 @@ Given
 
 When
 
-- AppConfigAdapter.my_app_configs — user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
 
 Then
 
@@ -408,7 +408,7 @@ Then
 
 <a id="reading_mine-turning-enforcement-off-lets-a-user-granted-nothing-read"></a>
 
-#### [turning-enforcement-off-lets-a-user-granted-nothing-read](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
+#### [turning-enforcement-off-lets-a-user-granted-nothing-read](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
 권한 검사를 끄면 아무 권한도 없는 사용자도 자기 설정을 조회할 수 있다
 
@@ -429,7 +429,7 @@ Given
 
 When
 
-- AppConfigAdapter.my_app_configs — user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
 
 Then
 
@@ -440,7 +440,7 @@ Then
 
 <a id="reading_mine-a-user-granted-nothing-may-not-read-their-own-config"></a>
 
-#### [a-user-granted-nothing-may-not-read-their-own-config](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py) — pass
+#### [a-user-granted-nothing-may-not-read-their-own-config](/tests/scenario/bai_scenario/manager/app_config/test_reading_mine.py): pass
 
 아무 권한도 없는 사용자가 자기 설정을 조회하면, 스코프 권한 검사에서 권한 부족으로 거부된다
 
@@ -461,7 +461,7 @@ Given
 
 When
 
-- AppConfigAdapter.my_app_configs — user-1이 config-1의 자기 설정을 조회
+- AppConfigAdapter.my_app_configs: user-1이 config-1의 자기 설정을 조회
 
 Then
 
@@ -472,7 +472,7 @@ Then
 
 <a id="reading_public-a-caller-not-signed-in-reads-the-public-value-only"></a>
 
-#### [a-caller-not-signed-in-reads-the-public-value-only](/tests/scenario/bai_scenario/manager/app_config/test_reading_public.py) — pass
+#### [a-caller-not-signed-in-reads-the-public-value-only](/tests/scenario/bai_scenario/manager/app_config/test_reading_public.py): pass
 
 공개·도메인·사용자 조각이 모두 있는 이름을 로그인 없이 조회하면, 공개 조각의 값만 반환된다. 도메인과 사용자 조각은 섞이지 않는다
 
@@ -497,7 +497,7 @@ Given
 
 When
 
-- AppConfigAdapter.public_app_configs — 로그인하지 않은 호출자가 config-1의 공개 설정을 조회
+- AppConfigAdapter.public_app_configs: 로그인하지 않은 호출자가 config-1의 공개 설정을 조회
 
 Then
 
@@ -508,7 +508,7 @@ Then
 
 <a id="reading_public-a-name-holding-no-public-fragment-answers-an-empty-config"></a>
 
-#### [a-name-holding-no-public-fragment-answers-an-empty-config](/tests/scenario/bai_scenario/manager/app_config/test_reading_public.py) — pass
+#### [a-name-holding-no-public-fragment-answers-an-empty-config](/tests/scenario/bai_scenario/manager/app_config/test_reading_public.py): pass
 
 사용자 조각만 있는 이름을 로그인 없이 조회하면, 빈 설정이 반환된다
 
@@ -529,7 +529,7 @@ Given
 
 When
 
-- AppConfigAdapter.public_app_configs — 로그인하지 않은 호출자가 config-1의 공개 설정을 조회
+- AppConfigAdapter.public_app_configs: 로그인하지 않은 호출자가 config-1의 공개 설정을 조회
 
 Then
 
@@ -540,7 +540,7 @@ Then
 
 <a id="reading_public-a-name-nothing-registers-answers-an-empty-config-too"></a>
 
-#### [a-name-nothing-registers-answers-an-empty-config-too](/tests/scenario/bai_scenario/manager/app_config/test_reading_public.py) — pass
+#### [a-name-nothing-registers-answers-an-empty-config-too](/tests/scenario/bai_scenario/manager/app_config/test_reading_public.py): pass
 
 정의조차 없는 이름을 로그인 없이 조회하면, 공개 조각이 없는 이름과 같은 빈 설정이 반환된다. 이 조회로는 어떤 이름이 등록돼 있는지 알 수 없다
 
@@ -557,7 +557,7 @@ Given
 
 When
 
-- AppConfigAdapter.public_app_configs — 로그인하지 않은 호출자가 unregistered의 공개 설정을 조회
+- AppConfigAdapter.public_app_configs: 로그인하지 않은 호출자가 unregistered의 공개 설정을 조회
 
 Then
 
@@ -568,7 +568,7 @@ Then
 
 <a id="reading_public-a-signed-in-user-granted-nothing-gets-the-same-public-answer"></a>
 
-#### [a-signed-in-user-granted-nothing-gets-the-same-public-answer](/tests/scenario/bai_scenario/manager/app_config/test_reading_public.py) — pass
+#### [a-signed-in-user-granted-nothing-gets-the-same-public-answer](/tests/scenario/bai_scenario/manager/app_config/test_reading_public.py): pass
 
 같은 조각 셋을 아무 권한도 없는 사용자가 로그인한 채 공개 조회로 조회해도, 공개 조각의 값만 반환된다. 이 조회는 호출자를 아예 보지 않는다
 
@@ -593,7 +593,7 @@ Given
 
 When
 
-- AppConfigAdapter.public_app_configs — user-1가 config-1의 공개 설정을 조회
+- AppConfigAdapter.public_app_configs: user-1가 config-1의 공개 설정을 조회
 
 Then
 
@@ -604,7 +604,7 @@ Then
 
 <a id="reading_public-several-names-answer-one-each-in-request-order"></a>
 
-#### [several-names-answer-one-each-in-request-order](/tests/scenario/bai_scenario/manager/app_config/test_reading_public.py) — pass
+#### [several-names-answer-one-each-in-request-order](/tests/scenario/bai_scenario/manager/app_config/test_reading_public.py): pass
 
 이름 셋을 한 번에 로그인 없이 조회하면, 각각의 공개 값이 요청한 순서대로 반환된다
 
@@ -631,7 +631,7 @@ Given
 
 When
 
-- AppConfigAdapter.public_app_configs — 로그인하지 않은 호출자가 config-1, config-2, config-3의 공개 설정을 조회
+- AppConfigAdapter.public_app_configs: 로그인하지 않은 호출자가 config-1, config-2, config-3의 공개 설정을 조회
 
 Then
 

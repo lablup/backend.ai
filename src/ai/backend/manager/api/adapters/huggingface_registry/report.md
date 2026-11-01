@@ -1,20 +1,20 @@
 ## huggingface_registry
 
-[what it guarantees](/src/ai/backend/manager/api/adapters/huggingface_registry/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/huggingface_registry/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/huggingface_registry/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/huggingface_registry/adapter.py)
 
 Scenario: incomplete 7 / 9
 
 - built from ops (1)
-  - batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
+  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
 - direct implementation (8)
-  - create — success absent · refusal absent (global_scope) — SCENARIO-GAP
-  - get — success absent · refusal absent (single_entity) — SCENARIO-GAP
-  - get_many — success absent · refusal absent (global_scope) — SCENARIO-GAP
-  - partial_bulk_purge — success present 3 · refusal absent (partial_bulk) — SCENARIO-GAP
-  - partial_bulk_update — success present 2 · refusal absent (partial_bulk) — SCENARIO-GAP
-  - purge — success present 1 · refusal present 1 (single_entity)
-  - search — success absent · refusal absent (global_scope) — SCENARIO-GAP
-  - update — success present 1 · refusal present 1 (single_entity)
+  - create: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - get: success absent · rejection absent (single_entity): SCENARIO-GAP
+  - get_many: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - partial_bulk_purge: success present 3 · rejection absent (partial_bulk): SCENARIO-GAP
+  - partial_bulk_update: success present 2 · rejection absent (partial_bulk): SCENARIO-GAP
+  - purge: success present 1 · rejection present 1 (single_entity)
+  - search: success absent · rejection absent (global_scope): SCENARIO-GAP
+  - update: success present 1 · rejection present 1 (single_entity)
 
 **partial_bulk_purge**
 
@@ -36,20 +36,20 @@ Scenario: incomplete 7 / 9
 | scenario | verdict |
 |---|---|
 | [레지스트리 purge 권한을 받은 사용자가 purge 하면, purge 한 레지스트리의 id 가 온다](#purging-a-user-granted-purge-purges-a-registry) | answered |
-| [아무 권한도 받지 않은 사용자가 purge 하려 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-registry) | refused |
+| [아무 권한도 받지 않은 사용자가 purge 하려 하면 권한 부족으로 거부된다](#purging-a-user-granted-nothing-may-not-purge-a-registry) | rejected |
 
 **update**
 
 | scenario | verdict |
 |---|---|
 | [레지스트리 수정 권한을 받은 사용자가 주소를 바꾸면, 그 레지스트리가 새 주소로 온다](#editing-a-user-granted-update-edits-a-registry) | answered |
-| [아무 권한도 받지 않은 사용자가 주소를 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-registry) | refused |
+| [아무 권한도 받지 않은 사용자가 주소를 바꾸려 하면 권한 부족으로 거부된다](#editing-a-user-granted-nothing-may-not-edit-a-registry) | rejected |
 
 ### partial_bulk_purge
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-registries"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_purging.py): pass
 
 아무 권한도 받지 않은 사용자가 레지스트리 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -67,7 +67,7 @@ Given
 
 When
 
-- HuggingFaceRegistryAdapter.partial_bulk_purge — user-1이 레지스트리 2개를 한 번에 purge 함
+- HuggingFaceRegistryAdapter.partial_bulk_purge: user-1이 레지스트리 2개를 한 번에 purge 함
 
 Then
 
@@ -81,7 +81,7 @@ Then
 
 <a id="partial_bulk_purging-a-user-granted-purge-purges-several-registries"></a>
 
-#### [a-user-granted-purge-purges-several-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-purge-purges-several-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_purging.py): pass
 
 레지스트리 purge 권한을 받은 사용자가 여럿을 한 번에 purge 하면, 모두의 id 가 처리된 목록에 오고 실패한 것은 없다
 
@@ -103,7 +103,7 @@ Given
 
 When
 
-- HuggingFaceRegistryAdapter.partial_bulk_purge — user-1이 레지스트리 2개를 한 번에 purge 함
+- HuggingFaceRegistryAdapter.partial_bulk_purge: user-1이 레지스트리 2개를 한 번에 purge 함
 
 Then
 
@@ -115,7 +115,7 @@ Then
 
 <a id="partial_bulk_purging-purging-several-answers-for-the-missing-one"></a>
 
-#### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_purging.py) — pass
+#### [purging-several-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_purging.py): pass
 
 슈퍼관리자가 레지스트리 둘과 없는 id 하나를 한 번에 purge 하면, 둘의 id 는 처리된 목록에, 없는 id 는 대상이 없다는 이유로 실패 목록에 온다. 슈퍼관리자는 검사를 모두 통과하므로 대상 없음이 그대로 드러난다
 
@@ -133,7 +133,7 @@ Given
 
 When
 
-- HuggingFaceRegistryAdapter.partial_bulk_purge — user-1이 레지스트리 2개 와 없는 id 하나를 한 번에 purge 함
+- HuggingFaceRegistryAdapter.partial_bulk_purge: user-1이 레지스트리 2개 와 없는 id 하나를 한 번에 purge 함
 
 Then
 
@@ -149,7 +149,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-nothing-edits-none-of-several-registries"></a>
 
-#### [a-user-granted-nothing-edits-none-of-several-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-nothing-edits-none-of-several-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 레지스트리 여럿을 한 번에 고치려 하면, 고쳐진 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -167,7 +167,7 @@ Given
 
 When
 
-- HuggingFaceRegistryAdapter.partial_bulk_update — user-1이 레지스트리 2개의 주소를 한 번에 바꿈
+- HuggingFaceRegistryAdapter.partial_bulk_update: user-1이 레지스트리 2개의 주소를 한 번에 바꿈
 
 Then
 
@@ -181,7 +181,7 @@ Then
 
 <a id="partial_bulk_editing-a-user-granted-update-edits-several-registries"></a>
 
-#### [a-user-granted-update-edits-several-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_editing.py) — pass
+#### [a-user-granted-update-edits-several-registries](/tests/scenario/bai_scenario/manager/huggingface_registry/test_partial_bulk_editing.py): pass
 
 레지스트리 수정 권한을 받은 사용자가 여럿의 주소를 한 번에 바꾸면, 모두 새 주소로 오고 실패한 것은 없다
 
@@ -203,7 +203,7 @@ Given
 
 When
 
-- HuggingFaceRegistryAdapter.partial_bulk_update — user-1이 레지스트리 2개의 주소를 한 번에 바꿈
+- HuggingFaceRegistryAdapter.partial_bulk_update: user-1이 레지스트리 2개의 주소를 한 번에 바꿈
 
 Then
 
@@ -225,7 +225,7 @@ Then
 
 <a id="purging-a-user-granted-purge-purges-a-registry"></a>
 
-#### [a-user-granted-purge-purges-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_purging.py) — pass
+#### [a-user-granted-purge-purges-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_purging.py): pass
 
 레지스트리 purge 권한을 받은 사용자가 purge 하면, purge 한 레지스트리의 id 가 온다
 
@@ -246,7 +246,7 @@ Given
 
 When
 
-- HuggingFaceRegistryAdapter.purge — user-1이 registry-1을 purge 함
+- HuggingFaceRegistryAdapter.purge: user-1이 registry-1을 purge 함
 
 Then
 
@@ -255,7 +255,7 @@ Then
 
 <a id="purging-a-user-granted-nothing-may-not-purge-a-registry"></a>
 
-#### [a-user-granted-nothing-may-not-purge-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_purging.py) — pass
+#### [a-user-granted-nothing-may-not-purge-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_purging.py): pass
 
 아무 권한도 받지 않은 사용자가 purge 하려 하면 권한 부족으로 거부된다
 
@@ -272,7 +272,7 @@ Given
 
 When
 
-- HuggingFaceRegistryAdapter.purge — user-1이 registry-1을 purge 함
+- HuggingFaceRegistryAdapter.purge: user-1이 registry-1을 purge 함
 
 Then
 
@@ -283,7 +283,7 @@ Then
 
 <a id="editing-a-user-granted-update-edits-a-registry"></a>
 
-#### [a-user-granted-update-edits-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_editing.py) — pass
+#### [a-user-granted-update-edits-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_editing.py): pass
 
 레지스트리 수정 권한을 받은 사용자가 주소를 바꾸면, 그 레지스트리가 새 주소로 온다
 
@@ -304,7 +304,7 @@ Given
 
 When
 
-- HuggingFaceRegistryAdapter.update — user-1이 registry-1의 주소를 바꿈
+- HuggingFaceRegistryAdapter.update: user-1이 registry-1의 주소를 바꿈
 
 Then
 
@@ -317,7 +317,7 @@ Then
 
 <a id="editing-a-user-granted-nothing-may-not-edit-a-registry"></a>
 
-#### [a-user-granted-nothing-may-not-edit-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_editing.py) — pass
+#### [a-user-granted-nothing-may-not-edit-a-registry](/tests/scenario/bai_scenario/manager/huggingface_registry/test_editing.py): pass
 
 아무 권한도 받지 않은 사용자가 주소를 바꾸려 하면 권한 부족으로 거부된다
 
@@ -334,7 +334,7 @@ Given
 
 When
 
-- HuggingFaceRegistryAdapter.update — user-1이 registry-1의 주소를 바꿈
+- HuggingFaceRegistryAdapter.update: user-1이 registry-1의 주소를 바꿈
 
 Then
 

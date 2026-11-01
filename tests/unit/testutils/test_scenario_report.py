@@ -115,7 +115,7 @@ def _record(
     seen = (Line(says=f"{Refused.PREFIX}NotEnoughPermission"),) if refused else (Line("id = 1"),)
     return ScenarioRecord(
         summary=summary or f"{operation}-{'refused' if refused else 'answered'}",
-        description=f"{summary or operation} {'is refused' if refused else 'answers'}",
+        description=f"{summary or operation} {'is rejected' if refused else 'answers'}",
         actor="",
         caller="",
         operation=operation,
@@ -198,18 +198,18 @@ class TestMarkdownOperations:
                 "Scenario: incomplete 6 / 7",
                 "",
                 "- built from ops (2)",
-                "  - batch_load — representative success ✗ · representative refusal ✗"
-                " — SCENARIO-GAP",
-                "  - get — representative success ✓ · representative refusal ✓",
+                "  - batch_load: representative success ✗ · representative rejection ✗"
+                ": SCENARIO-GAP",
+                "  - get: representative success ✓ · representative rejection ✓",
                 "- ops + direct implementation (1)",
-                "  - refresh — success present 2 · refusal absent (single_entity, single_get_ops)"
-                " — SCENARIO-GAP",
+                "  - refresh: success present 2 · rejection absent (single_entity, single_get_ops)"
+                ": SCENARIO-GAP",
                 "- direct implementation (3)",
-                "  - approve — success absent · refusal absent (single_field) — SCENARIO-GAP",
-                "  - legacy — success absent · refusal absent (ActionProcessor) — SCENARIO-GAP",
-                "  - rename — success absent · refusal present 1 (single_entity) — SCENARIO-GAP",
+                "  - approve: success absent · rejection absent (single_field): SCENARIO-GAP",
+                "  - legacy: success absent · rejection absent (ActionProcessor): SCENARIO-GAP",
+                "  - rename: success absent · rejection present 1 (single_entity): SCENARIO-GAP",
                 "- no Action (1)",
-                "  - describe — success absent · refusal absent — SCENARIO-GAP",
+                "  - describe: success absent · rejection absent: SCENARIO-GAP",
             ])
             in rendered
         )
@@ -251,14 +251,14 @@ class TestMarkdownOperationTables:
 
         assert (
             "\n".join([
-                "  - describe — success absent · refusal absent — SCENARIO-GAP",
+                "  - describe: success absent · rejection absent: SCENARIO-GAP",
                 "",
                 "**get**",
                 "",
                 "| scenario | verdict |",
                 "|---|---|",
                 "| [get answers](#widget-get-answered) | answered |",
-                "| [get is refused](#widget-get-refused) | refused |",
+                "| [get is rejected](#widget-get-refused) | rejected |",
                 "",
                 "**refresh**",
                 "",
@@ -271,7 +271,7 @@ class TestMarkdownOperationTables:
                 "",
                 "| scenario | verdict |",
                 "|---|---|",
-                "| [rename is refused](#widget-rename-refused) | refused |",
+                "| [rename is rejected](#widget-rename-refused) | rejected |",
                 "",
                 "### get",
             ])
@@ -297,8 +297,8 @@ class TestMarkdownOperationTables:
             "\n".join([
                 "| [c answers](#widget-c) | answered |",
                 "| [d answers](#widget-d) | answered |",
-                "| [a is refused](#widget-a) | refused |",
-                "| [b is refused](#widget-b) | refused |",
+                "| [a is rejected](#widget-a) | rejected |",
+                "| [b is rejected](#widget-b) | rejected |",
             ])
             in rendered
         )
@@ -318,7 +318,7 @@ class TestMarkdownOperationTables:
                 '<a id="widget-get-refused"></a>',
                 "",
                 "#### [get-refused](/tests/scenario/bai_scenario/manager/widget/test_widget.py)"
-                " — pass",
+                ": pass",
             ])
             in rendered
         )
@@ -373,6 +373,10 @@ class TestBilingualReport:
     def test_a_split_report_writes_one_file_per_language(self) -> None:
         assert list(MarkdownFormat().variants()) == ["report.md", "report.ko.md"]
 
+    def test_a_report_does_not_join_parts_with_a_dash(self, report: Report) -> None:
+        for language in (Language.ENGLISH, Language.KOREAN):
+            assert " — " not in MarkdownFormat(language).render_one(report.components[0])
+
     def test_the_record_keeps_both_sentences(self) -> None:
         record = replace(
             _record("get"),
@@ -411,7 +415,7 @@ class TestComponentHeader:
 
         rendered = MarkdownFormat().render_one(component)
 
-        assert "what it guarantees" not in rendered
+        assert "background" not in rendered
         assert "[adapter](/src/ai/backend/manager/api/adapters/widget/adapter.py)" in rendered
 
     def test_a_component_with_knowledge_links_it_too(self, manager: pathlib.Path) -> None:
@@ -420,10 +424,7 @@ class TestComponentHeader:
 
         rendered = MarkdownFormat().render_one(component)
 
-        assert (
-            "[what it guarantees](/src/ai/backend/manager/api/adapters/widget/KNOWLEDGE.md)"
-            in rendered
-        )
+        assert "[background](/src/ai/backend/manager/api/adapters/widget/KNOWLEDGE.md)" in rendered
 
     def test_the_korean_header_uses_the_korean_words(self, manager: pathlib.Path) -> None:
         (manager / "api" / "adapters" / "widget" / "KNOWLEDGE.md").write_text("")
@@ -431,7 +432,7 @@ class TestComponentHeader:
 
         rendered = MarkdownFormat(Language.KOREAN).render_one(component)
 
-        assert "[무엇을 보장하는가](" in rendered
+        assert "[배경](" in rendered
         assert "[어댑터](" in rendered
 
 

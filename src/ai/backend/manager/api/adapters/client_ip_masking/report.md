@@ -1,15 +1,15 @@
 ## client_ip_masking
 
-[what it guarantees](/src/ai/backend/manager/api/adapters/client_ip_masking/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/client_ip_masking/adapter.py)
+[background](/src/ai/backend/manager/api/adapters/client_ip_masking/KNOWLEDGE.md) · [adapter](/src/ai/backend/manager/api/adapters/client_ip_masking/adapter.py)
 
 Scenario: incomplete 2 / 5
 
 - built from ops (5)
-  - admin_search — representative success ✓ · representative refusal ✓
-  - batch_load_by_ids — representative success ✗ · representative refusal ✗ — SCENARIO-GAP
-  - partial_bulk_purge — representative success ✓ · representative refusal ✗ — SCENARIO-GAP
-  - purge — representative success ✓ · representative refusal ✓
-  - upsert — representative success ✓ · representative refusal ✓
+  - admin_search: representative success ✓ · representative rejection ✓
+  - batch_load_by_ids: representative success ✗ · representative rejection ✗: SCENARIO-GAP
+  - partial_bulk_purge: representative success ✓ · representative rejection ✗: SCENARIO-GAP
+  - purge: representative success ✓ · representative rejection ✓
+  - upsert: representative success ✓ · representative rejection ✓
 
 **admin_search**
 
@@ -17,7 +17,7 @@ Scenario: incomplete 2 / 5
 |---|---|
 | [모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다](#searching-the-monitor-searches-masking-policies-like-the-superadmin) | answered |
 | [대상이 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다](#searching-the-superadmin-counts-every-masking-policy-laid) | answered |
-| [슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-masking-policies) | refused |
+| [슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다](#searching-a-user-who-is-not-the-superadmin-may-not-search-masking-policies) | rejected |
 
 **partial_bulk_purge**
 
@@ -32,9 +32,9 @@ Scenario: incomplete 2 / 5
 |---|---|
 | [슈퍼관리자가 정책을 id로 삭제하면 삭제한 정책 전체를 담은 응답이 반환된다](#retiring-the-superadmin-purges-a-masking-policy) | answered |
 | [권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 삭제할 수 있다](#retiring-turning-enforcement-off-lets-a-user-purge-a-masking-policy) | answered |
-| [아무 권한도 없는 사용자가 정책을 삭제하면 권한 부족으로 거부된다. 등록이 역할 부족으로 거부되는 것과는 다른 검사다](#retiring-a-user-granted-nothing-may-not-purge-a-masking-policy) | refused |
-| [아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다](#retiring-a-user-granted-nothing-purging-an-unknown-masking-policy-id-is-refused-for-permission) | refused |
-| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-purging-a-masking-policy-id-nothing-answers-to-is-not-found) | refused |
+| [아무 권한도 없는 사용자가 정책을 삭제하면 권한 부족으로 거부된다. 등록이 역할 부족으로 거부되는 것과는 다른 검사다](#retiring-a-user-granted-nothing-may-not-purge-a-masking-policy) | rejected |
+| [아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다](#retiring-a-user-granted-nothing-purging-an-unknown-masking-policy-id-is-refused-for-permission) | rejected |
+| [슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다](#retiring-purging-a-masking-policy-id-nothing-answers-to-is-not-found) | rejected |
 
 **upsert**
 
@@ -44,15 +44,15 @@ Scenario: incomplete 2 / 5
 | [접두 길이가 있는 정책의 대상에 대상과 모드만 지정해 다시 등록하면 접두 길이가 비워진다. 등록은 기존 값과 병합하지 않고 행을 통째로 바꾼다](#upserting-putting-a-policy-again-without-prefixes-clears-the-stored-prefixes) | answered |
 | [이미 정책이 있는 대상에 다른 모드로 등록하면, 새 행이 아니라 같은 id의 행이 새 모드로 바뀐 노드가 반환된다](#upserting-putting-a-policy-on-a-target-that-has-one-rewrites-the-same-row) | answered |
 | [정책이 없을 때 슈퍼관리자가 대상·모드·두 접두 길이를 지정해 등록하면 지정한 값이 그대로 담긴 노드가 반환된다](#upserting-the-superadmin-puts-a-masking-policy-on-a-target) | answered |
-| [슈퍼관리자가 아닌 사용자가 정책을 등록하면 역할 부족으로 거부된다](#upserting-a-user-who-is-not-the-superadmin-may-not-put-a-masking-policy) | refused |
-| [모니터 역할이 정책을 등록하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다](#upserting-the-monitor-may-not-put-a-masking-policy) | refused |
-| [권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 등록하지 못한다](#upserting-turning-enforcement-off-does-not-let-a-user-put-a-masking-policy) | refused |
+| [슈퍼관리자가 아닌 사용자가 정책을 등록하면 역할 부족으로 거부된다](#upserting-a-user-who-is-not-the-superadmin-may-not-put-a-masking-policy) | rejected |
+| [모니터 역할이 정책을 등록하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다](#upserting-the-monitor-may-not-put-a-masking-policy) | rejected |
+| [권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 등록하지 못한다](#upserting-turning-enforcement-off-does-not-let-a-user-put-a-masking-policy) | rejected |
 
 ### admin_search
 
 <a id="searching-the-monitor-searches-masking-policies-like-the-superadmin"></a>
 
-#### [the-monitor-searches-masking-policies-like-the-superadmin](/tests/scenario/bai_scenario/manager/client_ip_masking/test_searching.py) — pass
+#### [the-monitor-searches-masking-policies-like-the-superadmin](/tests/scenario/bai_scenario/manager/client_ip_masking/test_searching.py): pass
 
 모니터 역할이 필터 없이 조회하면 슈퍼관리자와 같은 응답이 반환된다. 슈퍼관리자 검사는 모니터의 읽기를 허용한다
 
@@ -70,7 +70,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.admin_search — user-1이 필터 없이 전체 조회
+- ClientIPMaskingAdapter.admin_search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -82,7 +82,7 @@ Then
 
 <a id="searching-the-superadmin-counts-every-masking-policy-laid"></a>
 
-#### [the-superadmin-counts-every-masking-policy-laid](/tests/scenario/bai_scenario/manager/client_ip_masking/test_searching.py) — pass
+#### [the-superadmin-counts-every-masking-policy-laid](/tests/scenario/bai_scenario/manager/client_ip_masking/test_searching.py): pass
 
 대상이 다른 정책 둘이 있을 때 슈퍼관리자가 필터 없이 조회하면 둘 다 집계된다
 
@@ -100,7 +100,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.admin_search — user-1이 필터 없이 전체 조회
+- ClientIPMaskingAdapter.admin_search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -112,7 +112,7 @@ Then
 
 <a id="searching-a-user-who-is-not-the-superadmin-may-not-search-masking-policies"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-search-masking-policies](/tests/scenario/bai_scenario/manager/client_ip_masking/test_searching.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-search-masking-policies](/tests/scenario/bai_scenario/manager/client_ip_masking/test_searching.py): pass
 
 슈퍼관리자가 아닌 사용자가 전체 조회를 요청하면 역할 부족으로 거부된다
 
@@ -130,7 +130,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.admin_search — user-1이 필터 없이 전체 조회
+- ClientIPMaskingAdapter.admin_search: user-1이 필터 없이 전체 조회
 
 Then
 
@@ -141,7 +141,7 @@ Then
 
 <a id="partial_bulk_purging-a-user-granted-nothing-purges-none-of-several-masking-policies"></a>
 
-#### [a-user-granted-nothing-purges-none-of-several-masking-policies](/tests/scenario/bai_scenario/manager/client_ip_masking/test_partial_bulk_purging.py) — pass
+#### [a-user-granted-nothing-purges-none-of-several-masking-policies](/tests/scenario/bai_scenario/manager/client_ip_masking/test_partial_bulk_purging.py): pass
 
 아무 권한도 없는 사용자가 정책 여럿을 한 번에 purge 하려 하면, purge 된 것 없이 모두 권한이 없다는 이유로 실패 목록에 온다
 
@@ -159,7 +159,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.partial_bulk_purge — user-1이 정책 2개를 한 번에 purge 함
+- ClientIPMaskingAdapter.partial_bulk_purge: user-1이 정책 2개를 한 번에 purge 함
 
 Then
 
@@ -173,7 +173,7 @@ Then
 
 <a id="partial_bulk_purging-purging-several-masking-policies-answers-for-the-missing-one"></a>
 
-#### [purging-several-masking-policies-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/client_ip_masking/test_partial_bulk_purging.py) — pass
+#### [purging-several-masking-policies-answers-for-the-missing-one](/tests/scenario/bai_scenario/manager/client_ip_masking/test_partial_bulk_purging.py): pass
 
 슈퍼관리자가 정책 둘과 없는 id 하나를 한 번에 purge 하면, 둘은 처리된 목록에 오고 없는 id 는 대상이 없다는 이유로 실패 목록에 온다
 
@@ -191,7 +191,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.partial_bulk_purge — user-1이 정책 2개 와 없는 id 하나를 한 번에 purge 함
+- ClientIPMaskingAdapter.partial_bulk_purge: user-1이 정책 2개 와 없는 id 하나를 한 번에 purge 함
 
 Then
 
@@ -219,7 +219,7 @@ Then
 
 <a id="retiring-the-superadmin-purges-a-masking-policy"></a>
 
-#### [the-superadmin-purges-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py) — pass
+#### [the-superadmin-purges-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py): pass
 
 슈퍼관리자가 정책을 id로 삭제하면 삭제한 정책 전체를 담은 응답이 반환된다
 
@@ -236,7 +236,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.purge — user-1이 default 대상 정책 삭제
+- ClientIPMaskingAdapter.purge: user-1이 default 대상 정책 삭제
 
 Then
 
@@ -251,7 +251,7 @@ Then
 
 <a id="retiring-turning-enforcement-off-lets-a-user-purge-a-masking-policy"></a>
 
-#### [turning-enforcement-off-lets-a-user-purge-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py) — pass
+#### [turning-enforcement-off-lets-a-user-purge-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py): pass
 
 권한 검사를 끄면 아무 권한도 없는 사용자도 정책을 삭제할 수 있다
 
@@ -268,7 +268,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.purge — user-1이 default 대상 정책 삭제
+- ClientIPMaskingAdapter.purge: user-1이 default 대상 정책 삭제
 
 Then
 
@@ -283,7 +283,7 @@ Then
 
 <a id="retiring-a-user-granted-nothing-may-not-purge-a-masking-policy"></a>
 
-#### [a-user-granted-nothing-may-not-purge-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py) — pass
+#### [a-user-granted-nothing-may-not-purge-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py): pass
 
 아무 권한도 없는 사용자가 정책을 삭제하면 권한 부족으로 거부된다. 등록이 역할 부족으로 거부되는 것과는 다른 검사다
 
@@ -300,7 +300,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.purge — user-1이 default 대상 정책 삭제
+- ClientIPMaskingAdapter.purge: user-1이 default 대상 정책 삭제
 
 Then
 
@@ -309,7 +309,7 @@ Then
 
 <a id="retiring-a-user-granted-nothing-purging-an-unknown-masking-policy-id-is-refused-for-permission"></a>
 
-#### [a-user-granted-nothing-purging-an-unknown-masking-policy-id-is-refused-for-permission](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py) — pass
+#### [a-user-granted-nothing-purging-an-unknown-masking-policy-id-is-refused-for-permission](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py): pass
 
 아무 권한도 없는 사용자가 존재하지 않는 id를 삭제하면 대상 없음이 아니라 권한 부족으로 거부된다. 권한 검사가 먼저 실행되고 없는 행에는 부여된 권한도 없기 때문이다
 
@@ -326,7 +326,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.purge — user-1이 존재하지 않는 id 삭제
+- ClientIPMaskingAdapter.purge: user-1이 존재하지 않는 id 삭제
 
 Then
 
@@ -335,7 +335,7 @@ Then
 
 <a id="retiring-purging-a-masking-policy-id-nothing-answers-to-is-not-found"></a>
 
-#### [purging-a-masking-policy-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py) — pass
+#### [purging-a-masking-policy-id-nothing-answers-to-is-not-found](/tests/scenario/bai_scenario/manager/client_ip_masking/test_retiring.py): pass
 
 슈퍼관리자가 존재하지 않는 id를 삭제하면 대상을 찾을 수 없다는 이유로 거부된다
 
@@ -352,7 +352,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.purge — user-1이 존재하지 않는 id 삭제
+- ClientIPMaskingAdapter.purge: user-1이 존재하지 않는 id 삭제
 
 Then
 
@@ -363,7 +363,7 @@ Then
 
 <a id="upserting-a-masking-policy-put-without-prefixes-carries-empty-prefixes"></a>
 
-#### [a-masking-policy-put-without-prefixes-carries-empty-prefixes](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py) — pass
+#### [a-masking-policy-put-without-prefixes-carries-empty-prefixes](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py): pass
 
 대상과 모드만 지정해 등록하면 두 접두 길이가 비어 있는 노드가 반환된다
 
@@ -379,12 +379,12 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.upsert — user-1이 default 대상에 truncate 모드 정책을 등록
+- ClientIPMaskingAdapter.upsert: user-1이 default 대상에 truncate 모드 정책을 등록
 
 Then
 
 - 등록한 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - target_type = 'default'
   - mode = 'truncate'
   - ipv4_prefix = None
@@ -394,7 +394,7 @@ Then
 
 <a id="upserting-putting-a-policy-again-without-prefixes-clears-the-stored-prefixes"></a>
 
-#### [putting-a-policy-again-without-prefixes-clears-the-stored-prefixes](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py) — pass
+#### [putting-a-policy-again-without-prefixes-clears-the-stored-prefixes](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py): pass
 
 접두 길이가 있는 정책의 대상에 대상과 모드만 지정해 다시 등록하면 접두 길이가 비워진다. 등록은 기존 값과 병합하지 않고 행을 통째로 바꾼다
 
@@ -411,7 +411,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.upsert — user-1이 default 대상에 truncate 모드 정책을 다시 등록
+- ClientIPMaskingAdapter.upsert: user-1이 default 대상에 truncate 모드 정책을 다시 등록
 
 Then
 
@@ -426,7 +426,7 @@ Then
 
 <a id="upserting-putting-a-policy-on-a-target-that-has-one-rewrites-the-same-row"></a>
 
-#### [putting-a-policy-on-a-target-that-has-one-rewrites-the-same-row](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py) — pass
+#### [putting-a-policy-on-a-target-that-has-one-rewrites-the-same-row](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py): pass
 
 이미 정책이 있는 대상에 다른 모드로 등록하면, 새 행이 아니라 같은 id의 행이 새 모드로 바뀐 노드가 반환된다
 
@@ -443,7 +443,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.upsert — user-1이 default 대상에 drop 모드 정책을 접두 길이와 함께 다시 등록
+- ClientIPMaskingAdapter.upsert: user-1이 default 대상에 drop 모드 정책을 접두 길이와 함께 다시 등록
 
 Then
 
@@ -458,7 +458,7 @@ Then
 
 <a id="upserting-the-superadmin-puts-a-masking-policy-on-a-target"></a>
 
-#### [the-superadmin-puts-a-masking-policy-on-a-target](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py) — pass
+#### [the-superadmin-puts-a-masking-policy-on-a-target](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py): pass
 
 정책이 없을 때 슈퍼관리자가 대상·모드·두 접두 길이를 지정해 등록하면 지정한 값이 그대로 담긴 노드가 반환된다
 
@@ -474,12 +474,12 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.upsert — user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
+- ClientIPMaskingAdapter.upsert: user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
 
 Then
 
 - 등록한 정책 전체가 반환된다
-  - id: 무시함 — 데이터베이스가 만든다
+  - id: 무시함: 데이터베이스가 만든다
   - target_type = 'default'
   - mode = 'truncate'
   - ipv4_prefix = 24
@@ -489,7 +489,7 @@ Then
 
 <a id="upserting-a-user-who-is-not-the-superadmin-may-not-put-a-masking-policy"></a>
 
-#### [a-user-who-is-not-the-superadmin-may-not-put-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py) — pass
+#### [a-user-who-is-not-the-superadmin-may-not-put-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py): pass
 
 슈퍼관리자가 아닌 사용자가 정책을 등록하면 역할 부족으로 거부된다
 
@@ -505,7 +505,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.upsert — user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
+- ClientIPMaskingAdapter.upsert: user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
 
 Then
 
@@ -514,7 +514,7 @@ Then
 
 <a id="upserting-the-monitor-may-not-put-a-masking-policy"></a>
 
-#### [the-monitor-may-not-put-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py) — pass
+#### [the-monitor-may-not-put-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py): pass
 
 모니터 역할이 정책을 등록하면 역할 부족으로 거부된다. 모니터는 슈퍼관리자 검사에서 읽기만 통과한다
 
@@ -530,7 +530,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.upsert — user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
+- ClientIPMaskingAdapter.upsert: user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
 
 Then
 
@@ -539,7 +539,7 @@ Then
 
 <a id="upserting-turning-enforcement-off-does-not-let-a-user-put-a-masking-policy"></a>
 
-#### [turning-enforcement-off-does-not-let-a-user-put-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py) — pass
+#### [turning-enforcement-off-does-not-let-a-user-put-a-masking-policy](/tests/scenario/bai_scenario/manager/client_ip_masking/test_upserting.py): pass
 
 권한 검사를 꺼도 슈퍼관리자가 아니면 정책을 등록하지 못한다
 
@@ -555,7 +555,7 @@ Given
 
 When
 
-- ClientIPMaskingAdapter.upsert — user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
+- ClientIPMaskingAdapter.upsert: user-1이 default 대상에 truncate 모드 정책을 접두 길이와 함께 등록
 
 Then
 

@@ -31,16 +31,16 @@ class OperationWords:
     COMPLETE: ClassVar[Says] = Says("완성", english="complete")
     INCOMPLETE: ClassVar[Says] = Says("미완", english="incomplete")
     REPRESENTATIVE_SUCCESS: ClassVar[Says] = Says("대표 성공", english="representative success")
-    REPRESENTATIVE_REFUSAL: ClassVar[Says] = Says("대표 실패", english="representative refusal")
+    REPRESENTATIVE_REFUSAL: ClassVar[Says] = Says("대표 실패", english="representative rejection")
     SUCCESS: ClassVar[Says] = Says("성공", english="success")
-    REFUSAL: ClassVar[Says] = Says("실패", english="refusal")
+    REFUSAL: ClassVar[Says] = Says("실패", english="rejection")
     SCENARIO: ClassVar[Says] = Says("시나리오", english="scenario")
     VERDICT: ClassVar[Says] = Says("판정", english="verdict")
     ANSWERED: ClassVar[Says] = Says("성공", english="answered")
-    REFUSED: ClassVar[Says] = Says("거부", english="refused")
+    REFUSED: ClassVar[Says] = Says("거부", english="rejected")
     PRESENT: ClassVar[Says] = Says("있음", english="present")
     ABSENT: ClassVar[Says] = Says("없음", english="absent")
-    GUARANTEES: ClassVar[Says] = Says("무엇을 보장하는가", english="what it guarantees")
+    BACKGROUND: ClassVar[Says] = Says("배경", english="background")
     ADAPTER: ClassVar[Says] = Says("어댑터", english="adapter")
     COVERED: ClassVar[str] = "✓"
     MISSING: ClassVar[str] = "✗"
@@ -209,7 +209,7 @@ class ComponentReport:
         return tuple(one.operation for one in self.operations if not one.complete)
 
     def knowledge(self) -> str:
-        """그 엔티티가 무엇을 보장하는지 적어둔 자리."""
+        """Where the component's background is written."""
         return self.knowledge_doc
 
     def adapter_source(self) -> str:
@@ -610,7 +610,7 @@ class MarkdownFormat(ReportFormat):
         out = [f"## {component.component}", ""]
         links = []
         if doc := component.knowledge():
-            links.append(f"[{self._spoken(words.GUARANTEES)}]({doc})")
+            links.append(f"[{self._spoken(words.BACKGROUND)}]({doc})")
         links.append(f"[{self._spoken(words.ADAPTER)}]({component.adapter_source()})")
         out.append(" · ".join(links))
         out.append("")
@@ -661,18 +661,18 @@ class MarkdownFormat(ReportFormat):
             succeeding = words.COVERED if one.succeeding else words.MISSING
             refused = words.COVERED if one.refused else words.MISSING
             says = (
-                f"{one.operation} — {self._spoken(words.REPRESENTATIVE_SUCCESS)} {succeeding}"
+                f"{one.operation}: {self._spoken(words.REPRESENTATIVE_SUCCESS)} {succeeding}"
                 f" · {self._spoken(words.REPRESENTATIVE_REFUSAL)} {refused}"
             )
         else:
             says = (
-                f"{one.operation} — {self._spoken(words.SUCCESS)} {self._count(one.succeeding)}"
+                f"{one.operation}: {self._spoken(words.SUCCESS)} {self._count(one.succeeding)}"
                 f" · {self._spoken(words.REFUSAL)} {self._count(one.refused)}"
             )
             if one.group_methods:
                 says += f" ({', '.join(one.group_methods)})"
         if not one.complete:
-            says += f" — {words.GAP_MARK}"
+            says += f": {words.GAP_MARK}"
         return says
 
     def _count(self, rows: int) -> str:
@@ -716,7 +716,7 @@ class MarkdownFormat(ReportFormat):
         out = [
             f'<a id="{row.anchor()}"></a>',
             "",
-            f"#### [{row.summary}]({row.source()}) — {row.mark}",
+            f"#### [{row.summary}]({row.source()}): {row.mark}",
             "",
             self._spoken(row.description),
             "",
@@ -724,7 +724,7 @@ class MarkdownFormat(ReportFormat):
             "",
         ]
         out.extend(self._situation(row))
-        out.extend(["", "When", "", f"- {row.called()} — {self._spoken(row.when)}"])
+        out.extend(["", "When", "", f"- {row.called()}: {self._spoken(row.when)}"])
         out.extend(f"  - {one}" for one in row.shows)
         out.extend(["", "Then", "", f"- {self._spoken(row.then)}"])
         out.extend(self._nested(row.seen, depth=1))

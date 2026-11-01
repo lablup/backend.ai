@@ -84,8 +84,8 @@ There are three formats.
 | `summary` | Counts only. One line of build log |
 
 A row looks like this. Only the first sentence is written by a person, and the three parts below it come from the
-run. Rows seeded in a group are indented under that group. Report sentences are still Korean; this example shows
-them in English.
+run. Rows seeded within another seed are indented under it. Report sentences are still Korean; this example
+shows them in English.
 
 ```markdown
 #### a-user-granted-folder-create-makes-one-of-their-own — pass
