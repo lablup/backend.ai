@@ -428,6 +428,29 @@ class TestVFolderServiceGetFolderUsage:
         mock_storage_manager.get_manager_facing_client.assert_not_called()
 
 
+class TestVFolderServiceWatcherInfo:
+    async def test_watcher_port_defaults_to_watcher_service_addr_port(self) -> None:
+        agent_id = "test-agent-watcher"
+        etcd = MagicMock()
+        etcd.get = AsyncMock(
+            side_effect=lambda key: {f"nodes/agents/{agent_id}/ip": "192.168.1.100"}.get(key)
+        )
+        vfolder_service = VFolderService(
+            config_provider=MagicMock(),
+            etcd=etcd,
+            storage_manager=MagicMock(),
+            background_task_manager=MagicMock(),
+            vfolder_repository=MagicMock(),
+            user_repository=MagicMock(),
+            valkey_stat_client=MagicMock(),
+            own_check=MagicMock(),
+        )
+
+        watcher_info = await vfolder_service._get_watcher_info(agent_id)
+
+        assert watcher_info["addr"].port == 6009
+
+
 class TestVFolderServiceBulkLoadMountLevels:
     """The mount level the caller gets on each folder named."""
 
