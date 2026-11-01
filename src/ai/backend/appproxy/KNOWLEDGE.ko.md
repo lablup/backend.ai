@@ -20,14 +20,14 @@
 
 - coordinator 는 circuit 과 worker 등록을 manager 와 분리된 자체 DB 에 저장한다.
 - migration 은 시작 시 적용하지 않는다. 운영자 수동 작업이며, 운영 환경에서는 아예 실행하지 않을 수 있다.
-- 그 결과 오래된 스키마로 부팅하고 조회 시점에 실패할 수 있다. **table, column 추가는 금지**하며 불가피하면 nullable 이거나 default 가 있는 column 만 추가하고 운영자와 배포 일정을 맞춘다.
+- 그 결과 오래된 스키마로 부팅하고 조회 시점에 실패할 수 있다. **table, column 추가는 금지**하며 불가피하면 nullable 이거나 default 가 있는 column 만 추가하고 운영자와 적용 일정을 맞춘다.
 - native ENUM column 은 전면 금지한다(`StrEnumType` 을 사용한다).
 
 ## circuit 은 event bus 로 이동하며, stateful 출처 공유로 옮겨 간다
 
-- 현재: coordinator 는 `SerializableCircuit` 을 담은 broadcast event 로 circuit 갱신을 push 하고, worker 는 자기 authority 로 필터 기반으로 받는다.
-- worker 가 반드시 봐야 하는 attribute 는 `SerializableCircuit` 에도 추가해야 한다. 이전 worker 는 이를 조용히 무시하므로 하위 호환성이 필수다.
-- 방향: circuit 공유는 **Traefik 과 같은 방식의 stateful 출처 조회**로 변경된다. worker 는 push 된 circuit 을 보유하는 대신 출처에서 라우팅 상태를 읽는다(위의 DB 제거와 같은 작업 흐름이다).
+- 현재: coordinator 는 `SerializableCircuit` 을 담은 broadcast event 로 circuit 갱신을 푸시하고, worker 는 자기 authority 로 필터 기반으로 받는다.
+- worker 가 반드시 알아야 하는 attribute 는 `SerializableCircuit` 에도 추가해야 한다. 이전 worker 는 이를 경고 없이 무시하므로 하위 호환성이 필수다.
+- 방향: circuit 공유는 **Traefik 과 같은 방식의 stateful 출처 조회**로 변경된다. worker 는 푸시된 circuit 을 보유하는 대신 출처에서 라우팅 상태를 읽는다이는 위의 DB 제거와 같은 작업 흐름이다..
 
 ## worker 는 stateless 다
 
