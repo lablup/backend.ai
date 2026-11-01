@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
+import graphql
 import pytest
 
 from ai.backend.common import msgpack
@@ -14,22 +16,30 @@ def _packed(path: str) -> bytes:
     return msgpack.packb([{"path": path, "perm": "644", "data": "x"}])
 
 
+def _input(input_class: Any, **values: Any) -> Any:
+    """Build the input the way GraphQL execution does, with omitted fields undefined."""
+    return input_class._meta.container({
+        **dict.fromkeys(input_class._meta.fields, graphql.Undefined),
+        **values,
+    })
+
+
 class TestDomainNodeInputDotfiles:
     @pytest.mark.parametrize("path", ["/etc/passwd", "../config/x", "kconfig.dat"])
     def test_create_rejects(self, path: str) -> None:
         with pytest.raises(InvalidDotfilePath):
-            CreateDomainNodeInput(name="d", dotfiles=_packed(path)).to_action()
+            _input(CreateDomainNodeInput, name="d", dotfiles=_packed(path)).to_action()
 
     @pytest.mark.parametrize("path", ["/etc/passwd", "../config/x", "kconfig.dat"])
     def test_modify_rejects(self, path: str) -> None:
         with pytest.raises(InvalidDotfilePath):
-            ModifyDomainNodeInput(dotfiles=_packed(path)).to_action(DomainID(uuid.uuid4()))
+            _input(ModifyDomainNodeInput, dotfiles=_packed(path)).to_action(DomainID(uuid.uuid4()))
 
     def test_modify_accepts_path_under_work_dir(self) -> None:
-        action = ModifyDomainNodeInput(dotfiles=_packed(".bashrc")).to_action(
-            DomainID(uuid.uuid4())
-        )
-        assert action.updater.dotfiles.value() == _packed(".bashrc")
+        packed = _packed(".bashrc")
+        action = _input(ModifyDomainNodeInput, dotfiles=packed).to_action(DomainID(uuid.uuid4()))
+        assert action.updater.dotfiles.optional_value() == packed
 
     def test_modify_without_dotfiles_skips_the_check(self) -> None:
-        ModifyDomainNodeInput().to_action(DomainID(uuid.uuid4()))
+        action = _input(ModifyDomainNodeInput).to_action(DomainID(uuid.uuid4()))
+        assert action.updater.dotfiles.optional_value() is None

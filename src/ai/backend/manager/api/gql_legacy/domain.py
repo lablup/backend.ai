@@ -427,8 +427,8 @@ class CreateDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
         def value_or_none(value: Any) -> Any:
             return value if value is not graphql.Undefined else None
 
-        if self.dotfiles:
-            DotfileEntries.unpack(self.dotfiles).verify_paths()
+        if dotfiles := value_or_none(self.dotfiles):
+            DotfileEntries.unpack(dotfiles).verify_paths()
         return CreateDomainAction(
             creator=(
                 DomainCreator(
@@ -511,8 +511,9 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
         return field_value
 
     def to_action(self, domain_id: DomainID) -> UpdateDomainAction:
-        if self.dotfiles:
-            DotfileEntries.unpack(self.dotfiles).verify_paths()
+        dotfiles: Any = self.dotfiles
+        if dotfiles:
+            DotfileEntries.unpack(dotfiles).verify_paths()
         updater = DomainUpdater(
             domain_id=domain_id,
             description=TriState[str].from_graphql(

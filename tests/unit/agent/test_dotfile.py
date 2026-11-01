@@ -128,7 +128,7 @@ def prepare_container(
     (config_dir / "resource.txt").write_text("")
 
     async def run(dotfiles: list[dict[str, str]]) -> None:
-        ctx = MagicMock(spec=context_class)
+        ctx = MagicMock()
         ctx.restarting = True
         ctx.scratch_dir = scratch_dir
         ctx.work_dir = scratch_dir / "work"
