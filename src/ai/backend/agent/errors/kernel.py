@@ -105,23 +105,6 @@ class RunIdNotSetError(BackendAIError, web.HTTPInternalServerError):
             operation=ErrorOperation.EXECUTE,
             error_detail=ErrorDetail.NOT_READY,
         )
-<<<<<<< HEAD
-=======
-
-
-class KernelRunnerReplyTimeoutError(BackendAIError, web.HTTPGatewayTimeout):
-    """Raised when the kernel runner does not answer a request within its reply bound."""
-
-    error_type = "https://api.backend.ai/probs/agent/kernel-runner-reply-timeout"
-    error_title = "Kernel runner did not reply in time."
-
-    @override
-    def error_code(self) -> ErrorCode:
-        return ErrorCode(
-            domain=ErrorDomain.KERNEL,
-            operation=ErrorOperation.ACCESS,
-            error_detail=ErrorDetail.TASK_TIMEOUT,
-        )
 
 
 class KernelRunnerInvalidReplyError(BackendAIError, web.HTTPBadGateway):
@@ -137,4 +120,3 @@ class KernelRunnerInvalidReplyError(BackendAIError, web.HTTPBadGateway):
             operation=ErrorOperation.ACCESS,
             error_detail=ErrorDetail.INVALID_DATA_FORMAT,
         )
->>>>>>> 23c06d9c (fix(BA-8788): reject msgpack extension types in kernel runner status replies (#16226))
