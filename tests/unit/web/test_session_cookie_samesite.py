@@ -3,8 +3,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from aiohttp import web
-from pydantic import ValidationError
 
+from ai.backend.common.exception import BackendAISchemaValidationFailed
 from ai.backend.common.web.session import AbstractStorage
 from ai.backend.web.config.unified import CookieSameSite, SecurityConfig
 from ai.backend.web.server import redis_ctx
@@ -20,11 +20,11 @@ class TestCookieSameSiteConfig:
         assert config.cookie_samesite is value
 
     def test_rejects_unknown_value(self) -> None:
-        with pytest.raises(ValidationError):
+        with pytest.raises(BackendAISchemaValidationFailed):
             SecurityConfig.model_validate({"cookie-samesite": "Sometimes"})
 
     def test_none_without_secure_is_rejected(self) -> None:
-        with pytest.raises(ValidationError, match="requires cookie-secure"):
+        with pytest.raises(BackendAISchemaValidationFailed, match="requires cookie-secure"):
             SecurityConfig.model_validate({"cookie-samesite": "None", "cookie-secure": False})
 
     @pytest.mark.parametrize("value", [CookieSameSite.STRICT, CookieSameSite.LAX])
