@@ -12,7 +12,7 @@ generated:
 status: stable
 ---
 
-# Manager DTO — Knowledge
+# Manager DTO: Knowledge
 
 > Rules: `AGENTS.md` in the same directory.
 
@@ -21,7 +21,7 @@ Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 ## Why this package exists
 
 It used to hold the wire types for manager-only API handlers. Today it is
-effectively a bucket for the legacy surface — see below.
+effectively a bucket for the legacy surface: see below.
 
 ## The real boundary is API version, not audience
 
@@ -34,7 +34,7 @@ effectively a bucket for the legacy surface — see below.
 - Request: `BaseRequestModel` / response: `BaseResponseModel` / middleware-injected context (`RequestCtx`, `UserContext`, ...): `MiddlewareParam` with a `from_request()` constructor.
 - All three come from `ai.backend.common.api_handlers`.
 
-## Known drift — do not extend it
+## Known drift: do not extend it
 
-- Some of it reaches below its own layer — `request.py` imports ORM rows and repository updaters to provide `to_updater()`, and `context.py` imports enums from models.
-- These predate the layering rules — new code does not follow them. Conversion is the adapter's job; keep DTOs pure.
+- Some of it reaches below its own layer: `request.py` imports ORM rows and repository updaters to provide `to_updater()`, and `context.py` imports enums from models.
+- These predate the layering rules: new code does not follow them. Conversion is the adapter's job; keep DTOs pure.

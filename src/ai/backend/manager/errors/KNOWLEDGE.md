@@ -15,7 +15,7 @@ generated:
 status: stable
 ---
 
-# Manager errors — Knowledge
+# Manager errors: Knowledge
 
 > Rules: `AGENTS.md` in the same directory.
 
@@ -23,24 +23,24 @@ Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 ## Why this package exists
 
-Domain errors are a public contract — every failure that leaves the manager
+Domain errors are a public contract: every failure that leaves the manager
 carries a machine-readable code and an RFC-7807 body, and clients branch on the
 code instead of parsing messages. This package exists to keep that contract in
 one place per domain.
 
 ## The code triple has exactly one format constraint
 
-- `ErrorCode` is `(domain, operation, error_detail)`, rendered as `domain_operation_detail` and parsed by splitting on `_` — **no underscores in enum values** (hyphenate compound words).
-- There is no central code registry — uniqueness is enforced nowhere, and the only machine-readable surface is the generated OpenAPI document.
+- `ErrorCode` is `(domain, operation, error_detail)`, rendered as `domain_operation_detail` and parsed by splitting on `_`: **no underscores in enum values** (hyphenate compound words).
+- There is no central code registry: uniqueness is enforced nowhere, and the only machine-readable surface is the generated OpenAPI document.
 - Before defining a new error, check both `manager/errors/` and `common/exception.py` (which holds about 40 concrete errors).
 
 ## Code and HTTP status are independent axes
 
-- HTTP status comes solely from the class-base aiohttp mixin (`web.HTTPNotFound` → 404) — the code describes the failure, not the status.
-- That is why concrete exceptions **must inherit a status mixin at definition time** — the defining side cannot know when an exception will surface externally (as an HTTP response), and a mixin-less exception that leaks out becomes a generic 500 instead of a meaningful status.
-- Domain base errors (`RepositoryError` and 8 others) deliberately have no mixin — a status on the base would precede the subclass's own mixin in the MRO. Never raise them directly.
+- HTTP status comes solely from the class-base aiohttp mixin (`web.HTTPNotFound` → 404): the code describes the failure, not the status.
+- That is why concrete exceptions **must inherit a status mixin at definition time**: the defining side cannot know when an exception will surface externally (as an HTTP response), and a mixin-less exception that leaks out becomes a generic 500 instead of a meaningful status.
+- Domain base errors (`RepositoryError` and 8 others) deliberately have no mixin: a status on the base would precede the subclass's own mixin in the MRO. Never raise them directly.
 - GraphQL drops the status and carries only the code string in `extensions.code`; REST renders `problem+json`.
-- A handler that leaks a non-`BackendAIError` exception loses the code — the middleware force-converts it to a generic code.
+- A handler that leaks a non-`BackendAIError` exception loses the code: the middleware force-converts it to a generic code.
 
 ## Reuse by subclassing concrete errors
 
@@ -53,7 +53,7 @@ one place per domain.
 - Declaring the missing `EntityType` or `FieldType` reopens the first case.
 - The second does not reopen: the entity and field bases take an
   `ActionOperationType`, and authenticating is not one, nor is starting an app.
-  Neither gains a member — a permission and an audit record would have to name
+  Neither gains a member: a permission and an audit record would have to name
   it too.
 
 | Error | Why it stays |
@@ -67,7 +67,7 @@ one place per domain.
 | `NotEnoughPermission`, `InsufficientPrivilege`, `ContainerRegistryWebhookAuthorizationFailed`, `ImageAccessForbiddenError` | an authorization denial about the caller, not about a row |
 | `InvalidCredentials`, `InvalidAuthParameters`, `AuthorizationFailed` | the credentials are judged before a subject is settled, so no row is named |
 | `InvalidClientIPConfig` | the manager's own client-address configuration, not a row |
-| `PasswordExpired`, `LoginSessionExpiredError`, `LoginBlockedError`, `TooManyConcurrentLoginSessions` | a row is named, but what failed is the authentication — `ErrorOperation.AUTH`, which no `ActionOperationType` maps to |
+| `PasswordExpired`, `LoginSessionExpiredError`, `LoginBlockedError`, `TooManyConcurrentLoginSessions` | a row is named, but what failed is the authentication: `ErrorOperation.AUTH`, which no `ActionOperationType` maps to |
 | `DeploymentDefinitionFileReadError` | a file inside a vfolder, which no row type declares |
 | `NoUpdatesToApply` | a modifier that changed nothing; the row is whichever one the caller was updating |
 | `AppServiceStartFailed` | an app started inside a session is no row, and `ActionOperationType` has no `start` |
@@ -75,12 +75,12 @@ one place per domain.
 | `NotificationProcessingFailure`, `NotificationTemplateRenderingFailure` | a notification is rendered and delivered, and the message that comes out is no row; only the two notification tables have a type |
 | `InvalidSecretKeyMaterial`, `SecretEncryptionMisconfigured` | the configured encryption keys and key providers, which no stored secret is read to reach |
 | `ExportReportNotFound`, `InvalidExportFieldKeys` | a report is a `ReportDef` in a code-declared registry, not a row, and its field keys with it |
-| `RetentionCategoryNotSupportedError` | a `RetentionCategory` with no cleanup wired — a gap in this build, not in a row |
+| `RetentionCategoryNotSupportedError` | a `RetentionCategory` with no cleanup wired: a gap in this build, not in a row |
 | `QuotaScopeNotFoundError`, `StorageProxyNotFound` | neither quota scopes nor storage proxies declare a row kind |
 | the four `Dotfile*` errors | dotfile paths and per-entity limits use these errors; users edit their default msgpack collection, while domains and projects retain msgpack columns |
 | `VFolderBadRequest`, `VFolderOperationFailed`, `VFolderCreationFailure` | they report the storage-proxy call rather than the row, under a `generic` operation |
 | `StorageProxyConnectionError`, `StorageProxyTimeoutError`, `UnexpectedStorageProxyResponseError` | the external call itself, under a `request` no `ActionOperationType` maps to |
-| `VFolderPermissionError`, `VFolderInvalidParameter`, `InsufficientStoragePermission` | an authorization denial about the caller, or a parameter refused before a row is reached |
+| `VFolderPermissionError`, `VFolderInvalidParameter`, `InsufficientStoragePermission` | an authorization denial about the caller, or a parameter rejected before a row is reached |
 | `ModelCardParseError` | a model-definition file that does not parse, before any model card row exists |
 | `VFolderFilterStatusNotAvailable` | the status-set alias names no entry in a constant map; the row-status half is `VFolderFilterStatusFailed` |
 | `UnsupportedStorageTypeError`, `ObjectStorageOperationNotSupported` | a requested storage type, or a configured one offering no such operation |
@@ -91,7 +91,7 @@ one place per domain.
 | `NoCurrentTaskContext`, `DatabaseConnectionUnavailable`, `ConfigurationLoadFailed`, `DataTransformationFailed`, `DBOperationFailed` | the asyncio context, the connection, the configuration load or the database call itself |
 | `BackendAgentError`, `KernelExecutionFailed`, `InvalidStreamMode` | they report `access` or `execute`, which no `ActionOperationType` maps to |
 | `AgentConnectionUnavailable` | reaching an agent, under that same `access` |
-| `InvalidSessionId`, `InvalidKernelConfig`, `IncompleteSessionSpec` | they refuse a request before it reaches a row; `IncompleteSessionSpec` is one of three `BackendAISchema.build_validation_error` overrides, a hook declared to return `BackendAIError` |
+| `InvalidSessionId`, `InvalidKernelConfig`, `IncompleteSessionSpec` | they reject a request before it reaches a row; `IncompleteSessionSpec` is one of three `BackendAISchema.build_validation_error` overrides, a hook declared to return `BackendAIError` |
 | the three `IdleCheckerAssignment*` errors | the assignment row's id is a `NewType`, with no `EntityType` |
 | `IdlePolicyNotFound` | no idle-policy row type, and it is raised for absent config values rather than a row |
 | `QuotaExceeded` | a resource-policy limit reached, not a condition of one row |
@@ -105,10 +105,10 @@ one place per domain.
 | `ObjectNotFound` raised in `services/resource_group/service.py` | the AppProxy client pool the manager was started without |
 | `ObjectNotFound` raised in `services/auth/service.py` | "no such project or not a member" is one answer for two cases on purpose, so it names no row |
 | `ObjectNotFound` raised in `api/gql_legacy/base.py` `extract_object_uuid` | takes the row kind as a string argument from its caller, so the helper itself names no row |
-| `URLNotFound`, `MethodNotAllowed`, `ServerFrozen`, `NotImplementedAPI`, `InvalidAPIParameters`, `InvalidGraphQLParameters`, `InvalidCursor` | the request — its path, method, parameters or cursor — refused before a row is reached |
+| `URLNotFound`, `MethodNotAllowed`, `ServerFrozen`, `NotImplementedAPI`, `InvalidAPIParameters`, `InvalidGraphQLParameters`, `InvalidCursor` | the request (its path, method, parameters or cursor), rejected before a row is reached |
 | `RateLimitExceeded` | how often the caller asks, not a row |
-| `GenericBadRequest` | the request itself — an unsupported API version, an unknown scheduler operation, a parameter left out — or a Harbor quota that already exists |
-| `GenericForbidden` | every site refuses the caller ("only authorized requests", "not the account owner"), not a row |
+| `GenericBadRequest` | the request itself (an unsupported API version, an unknown scheduler operation, a parameter left out) or a Harbor quota that already exists |
+| `GenericForbidden` | every site rejects the caller ("only authorized requests", "not the account owner"), not a row |
 | `Forbidden` | every site is about a vfolder, but it reports `ErrorOperation.ACCESS`, which no `ActionOperationType` maps to, and the WebUI branches on `vfolder_access_forbidden` |
 | `RejectedByHook` | a plugin hook's answer; `plugin` is a system domain by the `AGENTS.md` table |
 | `InternalServerError`, `ServerMisconfiguredError`, `ServiceUnavailable` | the manager itself |
@@ -118,5 +118,5 @@ one place per domain.
 
 ## The legacy neighbor is a different kind
 
-- `manager/exceptions.py` is internal non-HTTP plumbing (`AgentError`, `RPCError`, the kernel `status_data` TypedDict) — not domain errors.
+- `manager/exceptions.py` is internal non-HTTP plumbing (`AgentError`, `RPCError`, the kernel `status_data` TypedDict): not domain errors.
 - Beware the name collision: its `ErrorDetail` TypedDict is unrelated to the `ErrorDetail` enum in `common/exception.py`.

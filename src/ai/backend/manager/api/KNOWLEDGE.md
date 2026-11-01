@@ -12,7 +12,7 @@ generated:
 status: stable
 ---
 
-# Manager API layer — Knowledge
+# Manager API layer: Knowledge
 
 > For rules, see `AGENTS.md` in the same directory; for implementation patterns, see the `/api-guide` skill.
 
@@ -20,9 +20,9 @@ Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 ## Two surfaces, one adapter
 
-The layer exposes each operation through two surfaces — REST v2 (`api/rest/v2/`),
+The layer exposes each operation through two surfaces: REST v2 (`api/rest/v2/`),
 consumed mainly by the CLI, and GraphQL (`api/gql/`), consumed mainly by the WebUI.
-Every operation ships on **both** surfaces together — adding one without the other
+Every operation ships on **both** surfaces together: adding one without the other
 leaves a client without the feature. Neither surface holds behavior: both call the
 shared per-entity adapter (`api/adapters/{entity}.py`), which owns auth context,
 scope building, and DTO mapping, so the two surfaces cannot drift apart.
@@ -35,14 +35,14 @@ Adapter-side patterns: [adapters/KNOWLEDGE.md](adapters/KNOWLEDGE.md).
 | `admin_*` | global operation across all scopes | superadmin |
 | bare global read (get/search) | public read, served to every authenticated user | authenticated |
 | scoped operation (`scoped/search` paths) | one operation over caller-supplied scopes | RBAC per scope |
-| `my_*` | self-service — the caller is the scope | authenticated (adapter resolves the user) |
+| `my_*` | self-service: the caller is the scope | authenticated (adapter resolves the user) |
 
 ## The v1 surfaces are frozen
 
 REST v1 and the graphene GQL line (`gql_legacy/`) are replacement targets, not
 maintenance targets. Anything built on them raises the cost of the v2
 replacement, and a v1-only change leaves the other surface (and the SDK/CLI)
-behind — so both additions and modifications go to v2; v1 accepts critical
+behind: so both additions and modifications go to v2; v1 accepts critical
 fixes only.
 
 ## v2 endpoint verification

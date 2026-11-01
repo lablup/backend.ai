@@ -16,7 +16,7 @@ generated:
 status: stable
 ---
 
-# Manager models — Knowledge
+# Manager models: Knowledge
 
 > Rules: `AGENTS.md` in the same directory.
 
@@ -24,27 +24,27 @@ Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
 ## Why this package exists
 
-It is the declaration layer of the DB schema — per-domain packages
+It is the declaration layer of the DB schema: per-domain packages
 (`models/{domain}/row.py`) hold the table structure, and `models/specs/` holds
 the write declarations. This document covers why it holds "declarations only,
 no implementation".
 
 ## Rows are declarations and carry no implementation
 
-- A Row is a declaration of table structure — the moment query builders or business methods attach to it, logic appears that gets called outside session/transaction boundaries and the layering collapses.
+- A Row is a declaration of table structure: the moment query builders or business methods attach to it, logic appears that gets called outside session/transaction boundaries and the layering collapses.
 - The per-domain package split exists to narrow the blast radius of a schema change to that domain.
 - The legacy query methods in `session/row.py` are a remaining counterexample, not something to imitate.
 
 ## Object manipulation should go through specs
 
-- Handle create/delete/upsert via the spec declarations in `models/specs/` where possible — preferred over manipulating db objects directly.
-- Reason: RBAC side effects (scope provisioning, membership registration) are decided by the **spec's type** — inserting a Row directly silently skips those side effects ([specs/KNOWLEDGE.md](specs/KNOWLEDGE.md)).
+- Handle create/delete/upsert via the spec declarations in `models/specs/` where possible: preferred over manipulating db objects directly.
+- Reason: RBAC side effects (scope provisioning, membership registration) are decided by the **spec's type**: inserting a Row directly silently skips those side effects ([specs/KNOWLEDGE.md](specs/KNOWLEDGE.md)).
 
 ## Do not manipulate models directly through a session
 
-- Avoid code that opens a db session and manipulates Rows directly — implementation belongs in the repository.
+- Avoid code that opens a db session and manipulates Rows directly: implementation belongs in the repository.
 - Reason one: transaction boundaries are the repository's responsibility, so scattered direct sessions break atomicity guarantees.
-- Reason two: direct sessions become the channel through which Rows leak into layers above the repository — a bypass of the layering rule that Rows do not rise above `repositories/`.
+- Reason two: direct sessions become the channel through which Rows leak into layers above the repository: a bypass of the layering rule that Rows do not rise above `repositories/`.
 
 ## Why every id default is v7
 
@@ -75,7 +75,7 @@ no implementation".
 ## Creator columns and the rows left behind
 
 Since BEP-1077, ownership is answered by the `scope -> virtual_entity -> entity` path
-alone. That is why no row carries an `owner_*` column — it would leave two answers to
+alone. That is why no row carries an `owner_*` column: it would leave two answers to
 the same question, exactly the state the BEP set out to remove.
 
 `creator_id` answers a different question: **which user did this row come into being
@@ -167,6 +167,6 @@ column is nullable, and a registry that leaves it unset is not global.
 Validates that an entity the scope names exists. Every check of every scope is combined
 into one query ahead of the main one.
 
-It is left empty where authorization already settled that existence — a scope naming the
+It is left empty where authorization already settled that existence: a scope naming the
 authenticated requester themselves, and a dangling field whose reachability the bulk
 check already answered. An empty one says in one line what answered instead.
