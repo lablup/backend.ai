@@ -16,6 +16,8 @@ status: stable
 > [message_queue/KNOWLEDGE.md](message_queue/KNOWLEDGE.md) and
 > [events/KNOWLEDGE.md](events/KNOWLEDGE.md).
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Why this package exists
 
 It is the shared foundation every component depends on. The criterion for which

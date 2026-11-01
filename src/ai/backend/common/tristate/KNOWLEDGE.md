@@ -15,6 +15,8 @@ status: draft
 
 # `Unset` sentinel
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## What it solves
 
 It separates "the client did not send this field" from "the client sent null".

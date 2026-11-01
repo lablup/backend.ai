@@ -19,6 +19,8 @@ status: stable
 > Rules: `AGENTS.md` in the same directory. Delivery limits of the transport layer:
 > [../message_queue/KNOWLEDGE.md](../message_queue/KNOWLEDGE.md).
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Why this package exists
 
 It is the inter-component event layer that puts event types, a dispatcher, and a

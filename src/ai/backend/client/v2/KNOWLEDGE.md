@@ -16,6 +16,8 @@ status: stable
 
 > Rules: `AGENTS.md` in the same directory.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Why this package exists
 
 It is the typed Python client for the REST v2 API — one domain client per

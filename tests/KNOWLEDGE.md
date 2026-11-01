@@ -13,6 +13,8 @@ status: stable
 
 > For the rules, see `AGENTS.md` in this directory. For the workflow, patterns, and code examples, see the `/test-guide` skill.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Rationale for the strategy distinction (real DB vs mocked)
 
 - Repository/Model is an integration point where actual behavior matters, so it is verified with a real DB.

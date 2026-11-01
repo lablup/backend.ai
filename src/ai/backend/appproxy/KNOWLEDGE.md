@@ -17,6 +17,8 @@ status: stable
 
 > There is no `AGENTS.md` here yet. This document carries the assumptions.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Why this component exists
 
 It is the traffic path that forwards external requests to kernels (a session's

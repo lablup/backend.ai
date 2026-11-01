@@ -17,6 +17,8 @@ status: stable
 
 > Rules: `AGENTS.md` in the same directory (sample.toml is a generated file — do not edit directly).
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Why this directory exists
 
 It gathers each component's configuration schema view and local development

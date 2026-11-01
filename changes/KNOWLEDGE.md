@@ -17,6 +17,8 @@ status: draft
 
 > Rules: `changes/README.md` (filename convention, writing style)
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Why this directory exists
 
 A PR title and its news fragment (`changes/<PR-number>.<type>.md`) live in different places but share the same classification. This document holds that classification, and the exception it creates because `fix:` triggers an automatic backport (same-release fixes).

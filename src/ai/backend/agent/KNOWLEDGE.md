@@ -18,6 +18,8 @@ status: stable
 
 > Rules: `AGENTS.md` in the same directory.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## Why this component exists
 
 The agent is **the component that actually creates and manages kernels
