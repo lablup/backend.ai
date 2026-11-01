@@ -153,4 +153,6 @@ async def test_skips_stored_paths_by_the_path_rule(
     source = ScheduleDBSource(db_with_cleanup)
     async with db_with_cleanup.begin_readonly_session() as session:
         result = await source._fetch_dotfile_data(session, dotfile_scope, test_access_key)
-    assert result.dotfiles == (_DOMAIN, _USER)
+    # Keypair > group > domain, reversed so higher-priority entries win on apply;
+    # the stored entry from keypair and domain is dropped, the project entry stays
+    assert result.dotfiles == (_DOMAIN, _PROJECT, _USER)
