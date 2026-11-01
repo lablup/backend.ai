@@ -1844,6 +1844,7 @@ class ScheduleDBSource:
                     keypairs.c.ssh_public_key,
                     keypairs.c.ssh_private_key,
                     keypairs.c.dotfiles,
+                    keypairs.c.user,
                 ).where(keypairs.c.access_key == access_key)
             )
         ).first()
