@@ -46,8 +46,9 @@ class ZipArchiveStreamReader(StreamReader):
         """Register file/directory paths into the zip archive.
 
         Each entry's archive name is derived from its path relative to base_path.
-        Directories are walked recursively via os.walk. Symlinks and other
-        non-regular file types raise UnsupportedFileTypeError.
+        Directories are walked recursively via os.walk, skipping the symlinks inside.
+        An entry that is itself a symlink or another non-regular file type raises
+        UnsupportedFileTypeError.
         """
         for file_path in entries:
             # Check for symlinks first before is_file()/is_dir() which follow symlinks
@@ -63,12 +64,13 @@ class ZipArchiveStreamReader(StreamReader):
                 for root, dirs, files in os.walk(file_path):
                     root_path = Path(root)
                     rel_root = root_path.relative_to(file_path)
-                    for f in files:
+                    regular_files = [f for f in files if not (root_path / f).is_symlink()]
+                    for f in regular_files:
                         self._zf.write(
                             root_path / f,
                             arcname=str(Path(arcname) / rel_root / f),
                         )
-                    if len(dirs) == 0 and len(files) == 0:
+                    if len(dirs) == 0 and len(regular_files) == 0:
                         self._zf.write(
                             root_path,
                             arcname=str(Path(arcname) / rel_root),
