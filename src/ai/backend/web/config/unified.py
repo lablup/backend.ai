@@ -4,7 +4,7 @@ import enum
 import os
 import re
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Self
 
 from pydantic import (
     AliasChoices,
@@ -13,6 +13,7 @@ from pydantic import (
     FilePath,
     HttpUrl,
     field_validator,
+    model_validator,
 )
 
 from ai.backend.common.config import BaseConfigSchema
@@ -46,6 +47,12 @@ class ServiceMode(enum.StrEnum):
 class ForceEndpointProtocol(enum.StrEnum):
     HTTPS = "https"
     HTTP = "http"
+
+
+class CookieSameSite(enum.StrEnum):
+    STRICT = "Strict"
+    LAX = "Lax"
+    NONE = "None"
 
 
 class WebSocketProxyConfig(BaseConfigSchema):
@@ -924,6 +931,22 @@ class SecurityConfig(BaseConfigSchema):
             example=ConfigExample(local="false", prod="true"),
         ),
     ]
+    cookie_samesite: Annotated[
+        CookieSameSite,
+        Field(
+            default=CookieSameSite.LAX,
+            validation_alias=AliasChoices("cookie_samesite", "cookie-samesite"),
+            serialization_alias="cookie-samesite",
+        ),
+        BackendAIConfigMeta(
+            description=(
+                "SameSite attribute of session cookies: Strict, Lax, or None. "
+                "None requires cookie-secure to be true."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="Lax", prod="Lax"),
+        ),
+    ]
     request_policies: Annotated[
         list[str],
         Field(
@@ -1002,6 +1025,12 @@ class SecurityConfig(BaseConfigSchema):
             if _CORS_ORIGIN_PATTERN.fullmatch(origin) is None:
                 raise ValueError(f"Invalid CORS origin: {origin!r}")
         return origins
+
+    @model_validator(mode="after")
+    def validate_cookie_samesite(self) -> Self:
+        if self.cookie_samesite == CookieSameSite.NONE and not self.cookie_secure:
+            raise ValueError("cookie-samesite = None requires cookie-secure = true")
+        return self
 
 
 class ResourcesConfig(BaseConfigSchema):
