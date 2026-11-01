@@ -39,11 +39,7 @@ class TestCookieSameSiteConfig:
 class TestSessionCookieAttribute:
     @pytest.fixture
     def setup_session(self) -> Iterator[MagicMock]:
-        monitors = MagicMock()
-        monitors.start = AsyncMock()
-        monitors.close = AsyncMock()
         with (
-            patch("ai.backend.web.server.SentinelMonitorSet", return_value=monitors),
             patch("ai.backend.web.server.ValkeySessionClient.create", AsyncMock()),
             patch("ai.backend.web.server.ValkeyRateLimitClient.create", AsyncMock()),
             patch("ai.backend.web.server.setup_session") as setup_session,
