@@ -14,7 +14,7 @@ from ai.backend.common.configs.volume_status_check import VolumeStatusCheckConfi
 from ai.backend.common.data.entity.storage_volume import StorageVolumeName
 from ai.backend.common.defs import DEFAULT_VFOLDER_PERMISSION_MODE
 from ai.backend.common.types import QuotaScopeID, QuotaScopeType
-from ai.backend.storage.errors import QuotaScopeCreationFailedError
+from ai.backend.storage.errors import InvalidSubpathError, QuotaScopeCreationFailedError
 from ai.backend.storage.types import VFolderID
 from ai.backend.storage.volumes.vfs import BaseVolume
 
@@ -116,6 +116,32 @@ class TestBaseVolume:
         written_path = base_volume.sanitize_vfpath(sample_vfolder, relpath)
         assert written_path.exists()
         assert written_path.read_bytes() == test_content
+
+    async def test_prepare_upload_creates_staging_file(
+        self,
+        base_volume: BaseVolume,
+        sample_vfolder: VFolderID,
+    ) -> None:
+        session_id = await base_volume.prepare_upload(sample_vfolder)
+
+        staging_path = base_volume.mangle_vfpath(sample_vfolder) / ".upload" / session_id
+        assert staging_path.is_file()
+        assert not staging_path.is_symlink()
+
+    async def test_prepare_upload_refuses_symlinked_upload_dir(
+        self,
+        base_volume: BaseVolume,
+        sample_vfolder: VFolderID,
+        tmp_path: Path,
+    ) -> None:
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (base_volume.mangle_vfpath(sample_vfolder) / ".upload").symlink_to(outside)
+
+        with pytest.raises(InvalidSubpathError):
+            await base_volume.prepare_upload(sample_vfolder)
+
+        assert list(outside.iterdir()) == []
 
     async def test_mkdir_with_parents_applies_mode_to_intermediate_dirs(
         self,
