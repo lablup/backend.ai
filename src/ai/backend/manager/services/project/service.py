@@ -1,0 +1,230 @@
+from __future__ import annotations
+
+import logging
+from collections.abc import Sequence
+from datetime import datetime, timedelta
+from uuid import UUID
+
+from dateutil.relativedelta import relativedelta
+
+from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.dotfile import DotfilePath
+from ai.backend.common.exception import (
+    InvalidAPIParameters,
+)
+from ai.backend.logging.structured import StructuredLogger
+from ai.backend.manager.actions.v2.bulk.result import PartialBulkEntityResult, PartialBulkResult
+from ai.backend.manager.actions.v2.ops.result import CreatedEntityOpsResult
+from ai.backend.manager.clients.storage_proxy.session_manager import StorageSessionManager
+from ai.backend.manager.config.provider import ManagerConfigProvider
+from ai.backend.manager.data.dotfile.types import DotfileEntries
+from ai.backend.manager.data.project.types import ProjectData
+from ai.backend.manager.models.project.updaters import ProjectDotfilesUpdater
+from ai.backend.manager.models.resource_usage import (
+    ProjectResourceUsage,
+    parse_resource_usage_groups,
+    parse_total_resource_group,
+)
+from ai.backend.manager.repositories.project.repositories import ProjectRepositories
+from ai.backend.manager.repositories.project.repository import ProjectRepository
+from ai.backend.manager.services.project.actions.clear_default_registry import (
+    ClearProjectDefaultRegistryAction,
+    ClearProjectDefaultRegistryActionResult,
+)
+from ai.backend.manager.services.project.actions.create_project import CreateProjectAction
+from ai.backend.manager.services.project.actions.create_project_dotfile import (
+    CreateProjectDotfileAction,
+    CreateProjectDotfileActionResult,
+)
+from ai.backend.manager.services.project.actions.delete_project_dotfile import (
+    DeleteProjectDotfileAction,
+    DeleteProjectDotfileActionResult,
+)
+from ai.backend.manager.services.project.actions.partial_bulk_update_projects import (
+    PartialBulkUpdateProjectsAction,
+)
+from ai.backend.manager.services.project.actions.purge_project import (
+    PurgeProjectAction,
+    PurgeProjectActionResult,
+)
+from ai.backend.manager.services.project.actions.switch_default_registry import (
+    SwitchProjectDefaultRegistryAction,
+    SwitchProjectDefaultRegistryActionResult,
+)
+from ai.backend.manager.services.project.actions.update_project import (
+    UpdateProjectAction,
+    UpdateProjectActionResult,
+)
+from ai.backend.manager.services.project.actions.update_project_dotfile import (
+    UpdateProjectDotfileAction,
+    UpdateProjectDotfileActionResult,
+)
+from ai.backend.manager.services.project.actions.usage_per_month import (
+    UsagePerMonthAction,
+    UsagePerMonthActionResult,
+)
+from ai.backend.manager.services.project.actions.usage_per_period import (
+    UsagePerPeriodAction,
+    UsagePerPeriodActionResult,
+)
+
+log = StructuredLogger(logging.getLogger(__spec__.name))
+
+
+class ProjectService:
+    _config_provider: ManagerConfigProvider
+    _valkey_stat_client: ValkeyStatClient
+    _storage_manager: StorageSessionManager
+    _group_repository: ProjectRepository
+
+    def __init__(
+        self,
+        storage_manager: StorageSessionManager,
+        config_provider: ManagerConfigProvider,
+        valkey_stat_client: ValkeyStatClient,
+        group_repositories: ProjectRepositories,
+    ) -> None:
+        self._storage_manager = storage_manager
+        self._config_provider = config_provider
+        self._valkey_stat_client = valkey_stat_client
+        self._group_repository = group_repositories.repository
+
+    async def create_project(
+        self, action: CreateProjectAction
+    ) -> CreatedEntityOpsResult[ProjectData]:
+        """Register a project. Not the generic create: a project is also lent the
+        resource policy it is subject to, in the same transaction."""
+        return CreatedEntityOpsResult(
+            data=await self._group_repository.create_project(action.to_creator())
+        )
+
+    async def update_group(self, action: UpdateProjectAction) -> UpdateProjectActionResult:
+        group_data = await self._group_repository.modify_validated(action.updater)
+        return UpdateProjectActionResult(data=group_data)
+
+    async def partial_bulk_update(
+        self, action: PartialBulkUpdateProjectsAction
+    ) -> PartialBulkResult[ProjectData]:
+        result = await self._group_repository.partial_bulk_modify_validated(action.updaters)
+        return PartialBulkResult(
+            items=[
+                PartialBulkEntityResult[ProjectData].succeeded(
+                    updater.project_id, result.successes[updater.project_id]
+                )
+                if updater.project_id in result.successes
+                else PartialBulkEntityResult[ProjectData].failed(
+                    updater.project_id, result.errors[updater.project_id]
+                )
+                for updater in action.updaters
+            ]
+        )
+
+    async def purge_group(self, action: PurgeProjectAction) -> PurgeProjectActionResult:
+        await self._group_repository.purge_group(action.project_id)
+        return PurgeProjectActionResult(project_id=action.project_id)
+
+    async def switch_default_registry(
+        self, action: SwitchProjectDefaultRegistryAction
+    ) -> SwitchProjectDefaultRegistryActionResult:
+        await self._group_repository.switch_default_registry(action.project_id, action.registry_id)
+        return SwitchProjectDefaultRegistryActionResult(registry_id=action.registry_id)
+
+    async def clear_default_registry(
+        self, action: ClearProjectDefaultRegistryAction
+    ) -> ClearProjectDefaultRegistryActionResult:
+        await self._group_repository.clear_default_registry(action.project_id)
+        return ClearProjectDefaultRegistryActionResult(project_id=action.project_id)
+
+    async def _get_project_stats_for_period(
+        self,
+        start_date: datetime,
+        end_date: datetime,
+        project_ids: Sequence[UUID] | None = None,
+    ) -> dict[UUID, ProjectResourceUsage]:
+        kernels, allocated_slots = await self._group_repository.fetch_project_resource_usage(
+            start_date, end_date, project_ids=project_ids
+        )
+        local_tz = self._config_provider.config.system.timezone
+        usage_groups = await parse_resource_usage_groups(
+            kernels, allocated_slots, self._valkey_stat_client, local_tz
+        )
+        total_groups, _ = parse_total_resource_group(usage_groups)
+        return total_groups
+
+    # group (or all the groups)
+    async def usage_per_month(self, action: UsagePerMonthAction) -> UsagePerMonthActionResult:
+        month = action.month
+        local_tz = self._config_provider.config.system.timezone
+
+        try:
+            start_date = datetime.strptime(month, "%Y%m").replace(tzinfo=local_tz)
+            end_date = start_date + relativedelta(months=+1)
+        except ValueError as e:
+            raise InvalidAPIParameters(extra_msg="Invalid date values") from e
+        result = await self._group_repository.get_container_stats_for_period(
+            start_date, end_date, action.group_ids
+        )
+        log.debug("project usage retrieved for month", usage_month=month)
+        return UsagePerMonthActionResult(result=result)
+
+    # group (or all the groups)
+    async def usage_per_period(self, action: UsagePerPeriodAction) -> UsagePerPeriodActionResult:
+        local_tz = self._config_provider.config.system.timezone
+        project_id = action.project_id
+
+        try:
+            start_date = datetime.strptime(action.start_date, "%Y%m%d").replace(tzinfo=local_tz)
+            end_date = datetime.strptime(action.end_date, "%Y%m%d").replace(tzinfo=local_tz)
+            end_date = end_date + timedelta(days=1)  # include sessions in end_date
+            if end_date - start_date > timedelta(days=100):
+                raise InvalidAPIParameters("Cannot query more than 100 days")
+        except ValueError as e:
+            raise InvalidAPIParameters(extra_msg="Invalid date values") from e
+        if end_date <= start_date:
+            raise InvalidAPIParameters(extra_msg="end_date must be later than start_date.")
+        log.trace(
+            "project usage per period requested",
+            project_id=project_id,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        project_ids = [project_id] if project_id is not None else None
+        usage_map = await self._get_project_stats_for_period(
+            start_date, end_date, project_ids=project_ids
+        )
+        result = [p_usage.to_json(child=True) for p_usage in usage_map.values()]
+        log.debug("project usage retrieved for period", start_date=start_date, end_date=end_date)
+        return UsagePerPeriodActionResult(result=result)
+
+    async def create_dotfile(
+        self, action: CreateProjectDotfileAction
+    ) -> CreateProjectDotfileActionResult:
+        DotfilePath(action.entry.path)
+        entries = (await self._read_dotfiles(action.project_id)).added(action.entry)
+        await self._write_dotfiles(action.project_id, entries)
+        return CreateProjectDotfileActionResult(entries=entries.entries)
+
+    async def update_dotfile(
+        self, action: UpdateProjectDotfileAction
+    ) -> UpdateProjectDotfileActionResult:
+        DotfilePath(action.entry.path)
+        entries = (await self._read_dotfiles(action.project_id)).replaced(action.entry)
+        await self._write_dotfiles(action.project_id, entries)
+        return UpdateProjectDotfileActionResult(entries=entries.entries)
+
+    async def delete_dotfile(
+        self, action: DeleteProjectDotfileAction
+    ) -> DeleteProjectDotfileActionResult:
+        entries = (await self._read_dotfiles(action.project_id)).removed(action.path)
+        await self._write_dotfiles(action.project_id, entries)
+        return DeleteProjectDotfileActionResult(entries=entries.entries)
+
+    async def _read_dotfiles(self, project_id: ProjectID) -> DotfileEntries:
+        data = await self._group_repository.get_project(project_id)
+        return DotfileEntries.unpack(data.dotfiles)
+
+    async def _write_dotfiles(self, project_id: ProjectID, entries: DotfileEntries) -> None:
+        await self._group_repository.update_dotfiles(
+            ProjectDotfilesUpdater(project_id=project_id, dotfiles=entries.pack())
+        )

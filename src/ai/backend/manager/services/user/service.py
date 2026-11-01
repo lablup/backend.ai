@@ -4,6 +4,11 @@ from typing import Any, cast
 from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
+<<<<<<< HEAD
+=======
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
+from ai.backend.common.dotfile import DotfilePath
+>>>>>>> 249726371 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.identifier.project import ProjectID
 from ai.backend.common.identifier.user import UserID
@@ -574,3 +579,62 @@ class UserService:
             access_key=action.access_key,
             ssh_public_key=ssh_public_key,
         )
+<<<<<<< HEAD
+=======
+
+    async def create_dotfile(self, action: CreateDotfileAction) -> CreateDotfileActionResult:
+        DotfilePath(action.creator.entry.path)
+        # Variants count too, so creation cannot grow a user's storage without bound.
+        data = await self._user_repository.create_dotfile(action.creator, MAXIMUM_DOTFILE_COUNT)
+        return CreateDotfileActionResult(data=data)
+
+    async def switch_default_dotfile(
+        self, action: SwitchDefaultDotfileAction
+    ) -> SwitchDefaultDotfileActionResult:
+        data = await self._user_repository.switch_default_dotfile(action.user_id, action.dotfile_id)
+        return SwitchDefaultDotfileActionResult(data=data)
+
+    async def get_default_bootstrap_script(
+        self, action: GetDefaultBootstrapScriptAction
+    ) -> GetDefaultBootstrapScriptActionResult:
+        revision = await self._user_repository.default_bootstrap_script(action.user_id)
+        return GetDefaultBootstrapScriptActionResult(
+            script=revision.script if revision is not None else BootstrapScript.empty()
+        )
+
+    async def update_default_bootstrap_script(
+        self, action: UpdateDefaultBootstrapScriptAction
+    ) -> UpdateDefaultBootstrapScriptActionResult:
+        await self._user_repository.add_default_bootstrap_script_revision(
+            action.user_id, action.script, action.creator_id
+        )
+        return UpdateDefaultBootstrapScriptActionResult()
+
+    async def create_bootstrap_script(
+        self, action: CreateBootstrapScriptAction
+    ) -> CreateBootstrapScriptActionResult:
+        revision = await self._user_repository.create_bootstrap_script(
+            action.user_id, action.script, action.creator_id
+        )
+        return CreateBootstrapScriptActionResult(revision=revision)
+
+    async def add_bootstrap_script_revision(
+        self, action: AddBootstrapScriptRevisionAction
+    ) -> AddBootstrapScriptRevisionActionResult:
+        revision = await self._user_repository.add_bootstrap_script_revision(action.creator)
+        return AddBootstrapScriptRevisionActionResult(revision=revision)
+
+    async def switch_default_bootstrap_script(
+        self, action: SwitchDefaultBootstrapScriptAction
+    ) -> SwitchDefaultBootstrapScriptActionResult:
+        script = await self._user_repository.switch_default_bootstrap_script(
+            action.user_id, action.script_id
+        )
+        return SwitchDefaultBootstrapScriptActionResult(script=script)
+
+    async def unset_default_bootstrap_script(
+        self, action: UnsetDefaultBootstrapScriptAction
+    ) -> UnsetDefaultBootstrapScriptActionResult:
+        await self._user_repository.unset_default_bootstrap_script(action.user_id)
+        return UnsetDefaultBootstrapScriptActionResult()
+>>>>>>> 249726371 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))

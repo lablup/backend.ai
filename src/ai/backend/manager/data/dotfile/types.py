@@ -6,6 +6,23 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
+<<<<<<< HEAD
+=======
+from ai.backend.common import msgpack
+from ai.backend.common.data.entity.dotfile import DotfileID
+from ai.backend.common.data.entity.types import FieldData, RuntimeEntityID
+from ai.backend.common.dotfile import DotfilePath
+from ai.backend.common.dto.manager.config.types import MAXIMUM_DOTFILE_SIZE
+from ai.backend.common.exception import InvalidAPIParameters
+from ai.backend.manager.errors.storage import (
+    DotfileAlreadyExists,
+    DotfileCreationFailed,
+    DotfileNotFound,
+)
+
+MAXIMUM_DOTFILE_COUNT = 100
+
+>>>>>>> 249726371 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
 
 class DotfileScope(enum.StrEnum):
     DOMAIN = "domain"
@@ -37,6 +54,71 @@ class DotfileQueryResult:
 
 
 @dataclass(frozen=True)
+<<<<<<< HEAD
+=======
+class DotfileEntries:
+    """Dotfiles with shared path, count and serialized-size constraints."""
+
+    entries: tuple[DotfileEntry, ...] = ()
+
+    @classmethod
+    def unpack(cls, packed: bytes) -> DotfileEntries:
+        rows = msgpack.unpackb(packed) or []
+        return cls(
+            entries=tuple(
+                DotfileEntry(path=row["path"], perm=row["perm"], data=row["data"]) for row in rows
+            )
+        )
+
+    @classmethod
+    def verify_packed(cls, packed: bytes) -> None:
+        try:
+            cls.unpack(packed).verify_paths()
+        except (ValueError, TypeError, KeyError) as e:
+            raise InvalidAPIParameters(
+                "dotfiles must be a msgpack list of path, perm and data entries."
+            ) from e
+
+    def verify_paths(self) -> None:
+        for entry in self.entries:
+            DotfilePath(entry.path)
+
+    def get(self, path: str) -> DotfileEntry:
+        for entry in self.entries:
+            if entry.path == path:
+                return entry
+        raise DotfileNotFound
+
+    def added(self, entry: DotfileEntry) -> DotfileEntries:
+        if any(e.path == entry.path for e in self.entries):
+            raise DotfileAlreadyExists
+        if len(self.entries) >= MAXIMUM_DOTFILE_COUNT:
+            raise DotfileCreationFailed("Dotfile creation limit reached")
+        return DotfileEntries(entries=(*self.entries, entry))
+
+    def replaced(self, entry: DotfileEntry) -> DotfileEntries:
+        kept = tuple(e for e in self.entries if e.path != entry.path)
+        if len(kept) == len(self.entries):
+            raise DotfileNotFound
+        return DotfileEntries(entries=(*kept, entry))
+
+    def removed(self, path: str) -> DotfileEntries:
+        kept = tuple(e for e in self.entries if e.path != path)
+        if len(kept) == len(self.entries):
+            raise DotfileNotFound
+        return DotfileEntries(entries=kept)
+
+    def pack(self) -> bytes:
+        packed = msgpack.packb([
+            {"path": e.path, "perm": e.perm, "data": e.data} for e in self.entries
+        ])
+        if len(packed) > MAXIMUM_DOTFILE_SIZE:
+            raise DotfileCreationFailed("No leftover space for dotfile storage")
+        return packed
+
+
+@dataclass(frozen=True)
+>>>>>>> 249726371 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
 class SSHKeypair:
     """SSH keypair pulled from ``keypairs`` for a user session."""
 

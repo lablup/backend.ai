@@ -22,9 +22,24 @@ from ai.backend.common.exception import (
     DomainNotFound,
 )
 from ai.backend.common.types import ResourceSlot, Sentinel
+<<<<<<< HEAD
 from ai.backend.manager.data.domain.types import (
     DomainData,
     UserInfo,
+=======
+from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.dotfile.types import DotfileEntries
+from ai.backend.manager.data.permission.permission_defs import (
+    DomainPermission,
+    ResourceGroupPermission,
+)
+from ai.backend.manager.models.domain.creators import DomainCreator
+from ai.backend.manager.models.domain.row import DomainRow, domains, get_permission_ctx
+from ai.backend.manager.models.domain.updaters import (
+    DomainRestoreUpdater,
+    DomainSoftDeleteUpdater,
+    DomainUpdater,
+>>>>>>> 249726371 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
 )
 from ai.backend.manager.models.domain import DomainRow, domains, get_permission_ctx
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
@@ -390,9 +405,17 @@ class CreateDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
         def value_or_none(value: Any) -> Any:
             return value if value is not graphql.Undefined else None
 
+<<<<<<< HEAD
         return CreateDomainNodeAction(
             creator=Creator(
                 spec=DomainCreatorSpec(
+=======
+        if dotfiles := value_or_none(self.dotfiles):
+            DotfileEntries.verify_packed(dotfiles)
+        return CreateDomainAction(
+            creator=(
+                DomainCreator(
+>>>>>>> 249726371 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
                     name=self.name,
                     description=value_or_none(self.description),
                     is_active=value_or_none(self.is_active),
@@ -475,8 +498,17 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
             return converter(field_value)
         return field_value
 
+<<<<<<< HEAD
     def to_action(self, name: str, user_info: UserInfo) -> ModifyDomainNodeAction:
         spec = DomainNodeUpdaterSpec(
+=======
+    def to_action(self, domain_id: DomainID) -> UpdateDomainAction:
+        dotfiles: Any = self.dotfiles
+        if dotfiles:
+            DotfileEntries.verify_packed(dotfiles)
+        updater = DomainUpdater(
+            domain_id=domain_id,
+>>>>>>> 249726371 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
             description=TriState[str].from_graphql(
                 self.description,
             ),

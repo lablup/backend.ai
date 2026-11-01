@@ -25,8 +25,32 @@ from sqlalchemy.ext.asyncio import async_sessionmaker
 from sqlalchemy.orm import load_only, selectinload
 
 from ai.backend.common import msgpack
+<<<<<<< HEAD
 from ai.backend.common.data.permission.types import (
     RBACElementType,
+=======
+from ai.backend.common.data.entity.agent import AgentUUID
+from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
+from ai.backend.common.data.entity.domain import DomainID, DomainName
+from ai.backend.common.data.entity.image import ImageID
+from ai.backend.common.data.entity.kernel import KernelID
+from ai.backend.common.data.entity.kernel_group import KernelGroupID, KernelGroupRole
+from ai.backend.common.data.entity.network import NetworkID
+from ai.backend.common.data.entity.project import ProjectID
+from ai.backend.common.data.entity.resource_group import (
+    ResourceGroupID,
+    ResourceGroupName,
+)
+from ai.backend.common.data.entity.resource_slot import ResourceSlotName
+from ai.backend.common.data.entity.session import SessionID
+from ai.backend.common.data.entity.session_group import SessionGroupID
+from ai.backend.common.data.entity.user import UserEntityType, UserID
+from ai.backend.common.data.filter_specs import UUIDInMatchSpec
+from ai.backend.common.dotfile import DotfilePath, InvalidDotfilePath
+from ai.backend.common.events.event_types.kernel.types import (
+    KernelCreationInfo,
+    KernelLifecycleEventReason,
+>>>>>>> 249726371 (fix(BA-8786): keep dotfile paths under the kernel work directory (#16231))
 )
 from ai.backend.common.docker import ImageRef
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
@@ -1878,11 +1902,22 @@ class ScheduleDBSource:
                 )
                 seen_paths.add(entry["path"])
 
+        writable_entries: list[DotfileEntry] = []
+        for ordered_entry in ordered_entries:
+            try:
+                DotfilePath(ordered_entry.path)
+            except InvalidDotfilePath:
+                log.warning(
+                    "dotfile skipped by the path rule", path=ordered_entry.path, user_id=row.user
+                )
+                continue
+            writable_entries.append(ordered_entry)
+
         # Reverse so higher-priority entries win when agents apply
         # dotfiles in list order — matches the legacy behavior.
-        ordered_entries.reverse()
+        writable_entries.reverse()
         return DotfileBundle(
-            dotfiles=tuple(ordered_entries),
+            dotfiles=tuple(writable_entries),
             ssh_keypair=ssh_keypair,
         )
 
