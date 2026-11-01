@@ -7,6 +7,11 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.declarative import declarative_base
 
+<<<<<<< HEAD
+=======
+from ai.backend.manager.errors.api import InvalidAPIParameters
+from ai.backend.manager.models.minilang import ORMFieldItem
+>>>>>>> d38f76bc6 (fix(BA-8798): return filter and order parse failures as invalid requests (#16221))
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.utils import agg_to_array
 
@@ -118,7 +123,7 @@ async def test_select_queries(virtual_grid_db: tuple[Any, Any, Any]) -> None:
     assert test_ret == actual_ret
 
     # invalid syntax
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidAPIParameters):
         parser.append_ordering(
             sa.select(grid.c.id).select_from(grid),
             "xxx",
@@ -142,7 +147,7 @@ async def test_column_map(virtual_grid_db: tuple[Any, Any, Any]) -> None:
     assert test_ret == actual_ret
 
     # non-existent column in the column map
-    with pytest.raises(ValueError):
+    with pytest.raises(InvalidAPIParameters):
         parser.append_ordering(
             sa.select(grid.c.id).select_from(grid),
             "-data1,+data2",
@@ -170,3 +175,48 @@ async def test_aggregated_foreign_fields(virtual_grid_db: tuple[Any, Any, Any]) 
     actual_ret = list(await conn.execute(sa_query))
     test_ret = [(2, ["a"]), (1, ["b", "c"])]
     assert test_ret == actual_ret
+<<<<<<< HEAD
+=======
+
+
+async def test_orm_field_ordering(virtual_grid_db: tuple[Any, Any, Any]) -> None:
+    conn, grid, foreign_grid = virtual_grid_db
+    first_dog_name = (
+        sa.select(foreign_grid.c.name)
+        .where(foreign_grid.c.user_id == grid.c.id)
+        .order_by(foreign_grid.c.name)
+        .limit(1)
+        .correlate(grid)
+        .scalar_subquery()
+    )
+    parser = QueryOrderParser({
+        "dog_name": (ORMFieldItem(first_dog_name), None),
+    })
+    # Users 3 and 4 own no dog, so they would sort on a NULL with no defined order.
+    orig_query = sa.select(grid.c.id).select_from(grid).where(grid.c.id.in_([1, 2]))
+
+    sa_query = parser.append_ordering(orig_query, "+dog_name")
+    actual_ret = list(await conn.execute(sa_query))
+    test_ret = [(2,), (1,)]
+    assert test_ret == actual_ret
+
+    sa_query = parser.append_ordering(orig_query, "-dog_name")
+    actual_ret = list(await conn.execute(sa_query))
+    test_ret = [(1,), (2,)]
+    assert test_ret == actual_ret
+
+
+@pytest.mark.parametrize(
+    "order_expr",
+    [
+        pytest.param("+", id="syntax-error"),
+        pytest.param("+xyz", id="unknown-field"),
+    ],
+)
+def test_order_parse_failure_is_an_invalid_request(order_expr: str) -> None:
+    table = sa.Table("grid", sa.MetaData(), sa.Column("id", sa.Integer))
+    parser = QueryOrderParser({"id": ("id", None)})
+
+    with pytest.raises(InvalidAPIParameters, match="Query ordering parsing error"):
+        parser.parse_order(table, order_expr)
+>>>>>>> d38f76bc6 (fix(BA-8798): return filter and order parse failures as invalid requests (#16221))

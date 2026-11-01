@@ -6,7 +6,13 @@ import sqlalchemy as sa
 from lark import Lark, LarkError, Transformer
 from lark.lexer import Token
 
+<<<<<<< HEAD
 from . import JSONFieldItem, OrderSpecItem, get_col_from_table
+=======
+from ai.backend.manager.errors.api import InvalidAPIParameters
+
+from . import JSONFieldItem, OrderSpecItem, ORMFieldItem, get_col_from_table
+>>>>>>> d38f76bc6 (fix(BA-8798): return filter and order parse failures as invalid requests (#16221))
 
 __all__ = (
     "ColumnMapType",
@@ -110,7 +116,7 @@ class QueryOrderParser:
             )
             return result
         except LarkError as e:
-            raise ValueError(f"Query ordering parsing error: {e}") from e
+            raise InvalidAPIParameters(f"Query ordering parsing error: {e}") from e
 
     def append_ordering(
         self,
