@@ -189,7 +189,6 @@ async def _drain_into_upload_file(
             ) from e
         raise
     return bytes_written
-    return bytes_written
 
 
 class DownloadTokenData(TypedDict):

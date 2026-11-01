@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import secrets
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import pytest
 
