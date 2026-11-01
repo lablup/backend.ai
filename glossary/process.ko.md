@@ -27,7 +27,7 @@
 | 리비전 병합 체인 | revision merge chain | 요청이 비워 둔 model definition 필드를 낮은 우선순위부터 model_mount_destination 기본값, runtime variant baseline, revision preset, deployment-config.yaml, model-definition.yaml, override 순으로 채우는 병합 체인입니다. | merge chain |   |
 | 시나리오 | scenario | 어댑터 하나를 실제 database 와 Valkey 로 돌려 요청 하나가 무엇을 답하는지 확인하는 테스트 단위입니다. |   |   |
 | 스케줄링 이력 | scheduling history | session 의 scheduling 시도마다 phase 와 상태 변화, 결과, 시도 횟수를 남기는 기록입니다. |   |   |
-| seed | seed | mgr seed 명령이 seeds/ 아래 YAML 로 초기 row 를 채우는 기능입니다. |   |   |
+| seed | seed | mgr seed 명령이 seeds/ 아래 YAML 로 초기 row 를 채우는 기능입니다. |   | 테스트 코드의 `TestSeeder`, `seed.within` 은 테스트 데이터를 미리 저장하는 코드 이름입니다 |
 | 서비스 카탈로그 heartbeat | service catalog heartbeat | service catalog entry 가 살아 있음을 갱신하는 신호입니다. | heartbeat |   |
 | 서비스 디스커버리 | service discovery | agent 가 etcd 로 cluster 에 등록하고 service instance 등록을 event 로 알리는 기능입니다. | SD, 서비스 복구 |   |
 | 스킬 | skill | Claude Code 가 개발 작업에 호출하는 안내 문서입니다. |   |   |

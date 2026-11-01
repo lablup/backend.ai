@@ -27,7 +27,7 @@ The style rules are in the [glossary](../GLOSSARY.md). Korean: [process.ko.md](p
 | revision merge chain | A merge chain that fills model definition fields left empty by the request in order from the lowest priority: the model_mount_destination default, the runtime variant baseline, the revision preset, deployment-config.yaml, model-definition.yaml, and override. | merge chain |   |
 | scenario | A test unit that runs one adapter against a real database and Valkey to verify what a single request returns. |   |   |
 | scheduling history | A record that stores the phase, status changes, result, and attempt count for each scheduling attempt of a session. |   |   |
-| seed | A feature where the mgr seed command fills initial rows with YAML files under seeds/. |   |   |
+| seed | A feature where the mgr seed command fills initial rows with YAML files under seeds/. |   | In test code, `TestSeeder` and `seed.within` are code names for storing test data in advance. |
 | service catalog heartbeat | A signal that renews the liveness of a service catalog entry. | heartbeat |   |
 | service discovery | A feature where an agent registers itself with the cluster via etcd and announces service instance registration as an event. | SD |   |
 | skill | A guidance document that Claude Code calls for development tasks. |   |   |
