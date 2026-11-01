@@ -317,6 +317,26 @@ class TestContainerSSHProvisioner:
 
         assert (ssh_dir / "id_rsa").read_bytes() == existing_content
 
+    async def test_populate_ssh_config_keeps_authorized_keys_symlink_target(
+        self,
+        tmp_path: Path,
+        ssh_keypair: ContainerSSHKeyPair,
+        provisioner: ContainerSSHProvisioner,
+        spec_default: ContainerSSHSpec,
+    ) -> None:
+        outside = tmp_path.parent / f"{tmp_path.name}-outside"
+        outside.write_bytes(b"outside")
+        ssh_dir = tmp_path / ".ssh"
+        ssh_dir.mkdir()
+        (ssh_dir / "authorized_keys").symlink_to(outside)
+
+        with patch(f"{_UTILS_OS}.geteuid", return_value=1000):
+            provisioner._populate_ssh_config(spec_default, ssh_keypair)
+
+        assert outside.read_bytes() == b"outside"
+        assert not (ssh_dir / "authorized_keys").is_symlink()
+        assert (ssh_dir / "authorized_keys").read_bytes() == ssh_keypair.public_key.encode("ascii")
+
     async def test_populate_ssh_config_ownership(
         self,
         provisioner: ContainerSSHProvisioner,

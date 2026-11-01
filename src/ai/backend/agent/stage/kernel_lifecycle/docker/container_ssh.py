@@ -10,6 +10,11 @@ from pathlib import Path
 from typing import override
 
 from ai.backend.agent.resources import Mount
+<<<<<<< HEAD
+=======
+from ai.backend.agent.utils import ContainerSSHFileWriter
+from ai.backend.common.asyncio import run_in_executor_with_context
+>>>>>>> 1be73ea31 (fix(BA-8796): write kernel SSH files without following symlinks (#16228))
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
 from ai.backend.common.types import ContainerSSHKeyPair
 
@@ -75,6 +80,7 @@ class ContainerSSHProvisioner(Provisioner[ContainerSSHSpec, ContainerSSHResult])
         ssh_dir = await loop.run_in_executor(None, self._populate_ssh_config, spec)
         return ContainerSSHResult(ssh_dir=ssh_dir)
 
+<<<<<<< HEAD
     def _populate_ssh_config(self, spec: ContainerSSHSpec) -> Path:
         pubkey = spec.ssh_keypair.public_key.encode("ascii")
         privkey = spec.ssh_keypair.private_key.encode("ascii")
@@ -95,15 +101,16 @@ class ContainerSSHProvisioner(Provisioner[ContainerSSHSpec, ContainerSSHResult])
         # Write container key for backward compatibility
         (spec.work_dir / "id_container").write_bytes(privkey)
         (spec.work_dir / "id_container").chmod(0o600)
+=======
+    def _populate_ssh_config(
+        self, spec: ContainerSSHSpec, ssh_keypair: ContainerSSHKeyPair
+    ) -> Path:
+        pubkey = ssh_keypair.public_key.encode("ascii")
+        privkey = ssh_keypair.private_key.encode("ascii")
+        paths = ContainerSSHFileWriter(spec.work_dir, pubkey, privkey).write()
+>>>>>>> 1be73ea31 (fix(BA-8796): write kernel SSH files without following symlinks (#16228))
 
         # Set proper ownership
-        paths = [
-            ssh_dir,
-            ssh_dir / "authorized_keys",
-            ssh_dir / "id_rsa",
-            spec.work_dir / "id_container",
-        ]
-
         chowner = ChownUtil()
         owner_determiner = PathOwnerDeterminer.by_kernel_features(
             spec.agent_config.kernel_uid,
@@ -116,7 +123,7 @@ class ContainerSSHProvisioner(Provisioner[ContainerSSHSpec, ContainerSSHResult])
             )
             chowner.chown_path(path, uid, gid)
 
-        return ssh_dir
+        return spec.work_dir / ".ssh"
 
     @override
     async def teardown(self, resource: ContainerSSHResult) -> None:
