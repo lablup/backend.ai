@@ -28,6 +28,8 @@ A user sits under a domain, so creation is scope-shaped with the domain as the s
 and an operation naming an existing user is single-entity. A keypair is a field row of
 the user, so every operation over a keypair is answered for by the owning user.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## The shape of the keypair operations
 
 A keypair row carries no membership of its own. A request naming a keypair by its

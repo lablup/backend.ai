@@ -18,6 +18,8 @@ status: stable
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 A role preset declares which roles a scope type provisions when an entity of
 that type is created, and which permissions each of those roles carries. The
 package covers two tables because the permission rows have no life apart from

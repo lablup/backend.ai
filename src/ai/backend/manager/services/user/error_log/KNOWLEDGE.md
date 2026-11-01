@@ -18,6 +18,8 @@ status: stable
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 This package records the errors users and components hit, and answers who may
 read them back. It exists as its own domain because the table has two kinds of
 row — one owned by a user, one owned by nobody — and only the first goes through

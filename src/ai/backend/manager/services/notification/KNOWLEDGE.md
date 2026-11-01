@@ -17,6 +17,8 @@ status: stable
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 A channel is somewhere a message can be sent; a rule says which events go to
 which channel. They live in one package because a rule is meaningless without
 the channel it names, and both are system-wide configuration rather than

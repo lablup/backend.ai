@@ -18,6 +18,8 @@ status: draft
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 Roles and the permission entries a role holds. The role is the entity and its
 permission entries are field rows of it. One role group is wired; the operations
 over the entries come from the field sub-group that group hands out.

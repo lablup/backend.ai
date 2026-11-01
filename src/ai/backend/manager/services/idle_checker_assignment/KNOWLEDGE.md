@@ -21,6 +21,8 @@ status: draft
 > rationale: `proposals/BEP-1075-entity-relation-operations.md`. The definition
 > catalog: `../idle_checker/KNOWLEDGE.md`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 ## A binding is a relation
 
 - `idle_checker_bindings` links a scope (a domain, project, resource group, or user) to

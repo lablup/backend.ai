@@ -18,6 +18,8 @@ status: draft
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 A model card names, inside a project, a model held in a VFolder. It states the minimum
 resources the model needs to run alongside it, so this package covers two tables.
 

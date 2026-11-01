@@ -1,7 +1,7 @@
 ---
 name: auth-service-composition
 type: decision-table
-description: 인증 도메인의 액션이 왜 global 과 user 두 그룹으로 갈리는지, 게이트 없는 네 배선이 무엇으로 호출자를 확인하는지, 로그인 세션과 SSH 키페어 조작이 왜 사용자 단위로 기록되는지
+description: why the authentication domain's actions split into the global and user groups, what the three gateway-less wirings verify their caller with, and why login session and SSH keypair operations are recorded per user
 scope: src/ai/backend/manager/services/auth
 keywords:
   - AuthProcessors
@@ -18,63 +18,67 @@ generated:
 status: draft
 ---
 
-# 인증 서비스
+# Authentication service — Knowledge
 
-## 그룹이 둘인 이유
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
 
-`global` 그룹은 어떤 엔티티도 지목하지 않는 동작을 맡는다. 로그인과 만료 비밀번호 교체는
-호출자가 아직 주체를 갖지 않은 채 들어온다. 관리자의 로그인 세션 회수와 로그인 차단 해제는
-소유자를 읽지 않는다. `user` 그룹은 한 사용자의 행, 자격 증명, 로그인 기록이 답하는 것을
-맡는다.
+## Why there are two groups
 
-## 게이트 없는 세 배선
+The `global` group takes operations that name no entity. Login and expired-password change
+arrive before the caller has a principal. An admin revoking a login session or clearing a
+login block reads no owner. The `user` group takes what one user's rows, credentials and
+login records respond for.
 
-`authorize`, `signup`, `update_password_no_auth` 는 `anonymous_global` 로 배선된다.
-셋 다 인증 미들웨어가 없는 라우트(`api/rest/auth/registry.py`)에 걸려 있어 확인할
-호출자 맥락 자체가 없다. 대신 서비스가 호출자를 직접 확인한다 — 비밀번호, 즉 행이
-보관한 비밀과 대조한다. `signup` 은 대조할 행이 아직 없고, 훅 플러그인이 가입 요청을
-판정한다.
+## The three wirings without a gate
 
-`logout` 은 여기 들지 않는다. 로그아웃하는 호출자는 이미 세션을 들고 있으므로
-라우트가 인증을 요구하고, 액션은 그 사용자를 지목한다. 세션 토큰은 그대로 어느 세션을
-끝낼지 고르는 값으로 남는다.
+`authorize`, `signup` and `update_password_no_auth` are wired as `anonymous_global`. All
+three are on routes without the authentication middleware (`api/rest/auth/registry.py`), so
+there is no caller context to verify. The service verifies the caller itself instead: a
+password is compared against the secret the row holds. `signup` has no row to compare yet,
+and the hook plugin decides the signup request.
 
-## 역할 조회와 access key 스코프 해석
+`logout` is not one of them. The caller logging out already has a session, so the route
+requires authentication and the action names that user. The session token stays a value
+that chooses which session to end.
 
-`get_role` 은 요청자 자신을 지목하는 `single_entity` GET 이다.
+## Role lookup and access key scope resolution
 
-`public_resolve_access_key_scope` 는 access key 로 keypair 소유자를 찾는 lookup 에 요청자의
-기본 keypair 읽기와 위임 자격 검사가 섞여 있어 lookup 으로 배선하지 못한다. 답하는 대상이
-user 이므로 user 그룹의 public 이다. 위임 대상을 지목하는 경우는 서비스가 요청자와 대상의
-역할과 도메인을 비교해 판정한다.
+`get_role` is a `single_entity` GET naming the requester.
 
-## 로그인 세션과 SSH 키페어는 사용자로 기록된다
+`public_resolve_access_key_scope` finds the keypair owner by access key, mixed with the
+requester's default keypair read and the delegation credential check, so it cannot be
+wired as a lookup. What it responds for is a user, so it is public in the user group. When
+it names a delegation target, the service compares the roles and domains of the requester
+and the target.
 
-두 행 모두 자기 소속을 갖지 않고 소유한 사용자를 통해서만 읽힌다. 그래서 사용자를
-지목한 조작 — 로그아웃, 세션 회수, SSH 키페어 발급·업로드 — 은 `single_entity` 로 그 사용자를
-지목하고 `UPDATE` 를 선언한다. `DELETE` 를 선언하면 사용자 자체를 지운다는 뜻이 되고,
-권한도 그것으로 확인된다. 계정을 비활성화하는 `signout` 만 `DELETE` 다.
+## Login sessions and SSH keypairs are recorded per user
 
-관리자 쪽 회수(`global_revoke_login_session`)는 소유자를 읽지 않으므로 사용자를 지목할
-수 없고, SUPERADMIN 게이트 뒤의 global 이다.
+Neither row has a membership of its own and is read only through the owning user. So an
+operation naming the user, such as logout, session revocation, or SSH keypair issuance and
+upload, names that user with `single_entity` and declares `UPDATE`. Declaring `DELETE`
+would mean deleting the user itself, and the permission is checked against that. Only
+`signout`, which deactivates the account, is `DELETE`.
 
-## 사용자 도메인의 SSH 키페어 액션과의 관계
+The admin-side revocation (`global_revoke_login_session`) reads no owner, so it cannot name
+a user and is global behind the SUPERADMIN gate.
 
-`services/user` 의 `admin_get_ssh_keypair` · `admin_register_ssh_keypair` ·
-`admin_delete_ssh_keypair` 는 관리자가 남의 키페어를 지목하는 경로다. 여기의
-`get_ssh_keypair` · `generate_ssh_keypair` · `upload_ssh_keypair` 는 로그인한 사용자가
-자기 세션의 액세스 키에 대해 하는 조작이고, 키 생성은 이쪽에만 있다.
+## Relation to the SSH keypair actions in the user domain
 
-## 로그인 세션과 이력은 사용자의 field group 이다
+`admin_get_ssh_keypair`, `admin_register_ssh_keypair` and `admin_delete_ssh_keypair` in
+`services/user` are the path where an admin names another user's keypair. The
+`get_ssh_keypair`, `generate_ssh_keypair` and `upload_ssh_keypair` here are the operations
+a logged-in user does on its own session's access key, and key generation exists only here.
 
-두 행 모두 사용자가 소유하는 field row 이므로 조회는 `user_group.field_group(...)` 이
-내주는 하위 그룹에서 나온다. 소유자 lookup 은 그 그룹이 스스로 만들고, 도메인은 조회
-네 건만 배선한다. 네 건 다 서비스 메서드 없이 `LoginSessionSearcher` ·
-`LoginHistorySearcher` 스펙으로 ops 를 탄다.
+## Login sessions and history are the user's field group
 
-스코프 조회가 `scope_search_ops` 가 아닌 이유는 그 결과가 답하는 데이터가
-`EntityData` 여야 하기 때문이다. field row 는 엔티티가 아니라서 답할 id 가 없고,
-`ScopedFieldsOpsResult` 가 그 자리를 맡는다.
+Both rows are field rows owned by the user, so a read comes from the sub-group that
+`user_group.field_group(...)` provides. That group creates the owner lookup itself, and the
+domain wires only the four reads. All four go through ops with the `LoginSessionSearcher`
+and `LoginHistorySearcher` specs, without a service method.
 
-없는 사용자로 스코프 조회를 하면 ops 가 스코프의 존재 검사를 먼저 돌므로 `UserNotFound`
-가 그대로 난다.
+The scope read is not `scope_search_ops` because the data it responds for has to be
+`EntityData`. A field row is not an entity, so it has no id to respond with, and
+`ScopedFieldsOpsResult` takes that place.
+
+A scope read for a missing user raises `UserNotFound` as is, because ops runs the scope
+existence check first.

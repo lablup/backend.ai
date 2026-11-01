@@ -18,6 +18,8 @@ status: stable
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 A deployment preset is the template a deployment is created from. It states the
 resource slot amounts along with it, so this package covers two tables.
 

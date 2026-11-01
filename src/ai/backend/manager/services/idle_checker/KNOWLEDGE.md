@@ -17,6 +17,8 @@ status: draft
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 An idle checker definition is a system-wide catalog entry; excluding and including a
 session is the edit that turns that definition off for one session. They share a
 package because the latter is meaningless without the former, and they are answered

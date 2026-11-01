@@ -19,6 +19,8 @@ status: stable
 > Rules: `../AGENTS.md`. Design: `proposals/BEP-1075-entity-relation-operations.md`,
 > `proposals/BEP-1076-project-membership.md`, `proposals/BEP-1077-project-scoped-ownership.md`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 The operations that build the permission graph are wired here rather than in the domains
 they are about. A registry's allowed projects and a resource group's domains are the
 same operation on two different pairs, and while each lived in its own domain the

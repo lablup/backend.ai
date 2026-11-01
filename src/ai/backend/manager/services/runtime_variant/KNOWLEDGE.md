@@ -17,6 +17,8 @@ status: draft
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 A runtime variant is a system-wide catalog entry naming the serving runtime a deployment
 revision runs on. The package exists for the two purges: everything else is a spec handed
 to ops.

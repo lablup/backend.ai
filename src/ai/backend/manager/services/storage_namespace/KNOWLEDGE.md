@@ -19,6 +19,8 @@ status: stable
 
 > Rules: `../AGENTS.md`. Spec selection: `../../models/specs/KNOWLEDGE.md`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 A storage namespace is the bucket an object storage exposes or the subpath a VFS
 storage exposes. The package exists because artifacts record where they were
 stored by naming one of these rows, so the namespace needs an identity of its

@@ -19,6 +19,8 @@ status: stable
 
 > Rules: `../AGENTS.md`. Action shapes and the public gate: `../../actions/KNOWLEDGE.md`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 An app config is not stored. It is built on each read by merging the pieces held across
 three tables, so no row corresponds to the value.
 

@@ -23,6 +23,8 @@ status: draft
 
 > Rules: `../AGENTS.md`. Wiring: `backend.ai mgr ops list`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 A system session environ row binds a value of a starting session to an environment variable
 name at the public scope, a domain or a project. The launcher reads the rows through the
 domain repository; this package holds the operations a caller reaches through the API.

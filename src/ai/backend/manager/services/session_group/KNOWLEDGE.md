@@ -21,6 +21,8 @@ status: draft
 
 > Rules: `../AGENTS.md`. Placement policy: `proposals/BEP-1064-session-group-placement.md`.
 
+Korean: [KNOWLEDGE.ko.md](KNOWLEDGE.ko.md)
+
 A session group holds the placement policy of its member sessions. It is owned by a
 project and a user. A deployment makes one with every replica group, and that group is
 managed with its deployment, not by the user.
