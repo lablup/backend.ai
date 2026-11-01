@@ -8,12 +8,17 @@ This file contains the core rules for AI coding agents. For detailed patterns an
 - **`KNOWLEDGE.md`**: Background knowledge (assumptions, rationale, decision tables, caveats) with a fixed frontmatter schema. Read on demand — find documents with `python3 scripts/knowledge/search.py <term>`; the schema and authoring rules live in the `/knowledge` skill. `knowledge-check.yml` validates conformance on PRs.
 - A change that shifts a base assumption — an `AGENTS.md` rule rewrite, a migration completing — updates the affected `KNOWLEDGE.md` in the same change. Routine task-level edits do not.
 - **`README.md`**: A document for humans to understand the component's composition. Should not change often. Does not duplicate AGENTS/KNOWLEDGE.
+- **`GLOSSARY.md`, `glossary/`**: The words and writing style for documents. `GLOSSARY.md` holds the style rules and expressions to avoid, `glossary/<topic>.md` the terms by topic.
+- **Bilingual documents**: `KNOWLEDGE.md`, `report.md`, BEPs and the glossary come in pairs in the same folder: English in `<name>.md`, Korean in `<name>.ko.md`. Keep the same sections and update both in the same change. `AGENTS.md` is English only. `scripts/knowledge/check_bilingual.py` checks the pairs.
+- **`report.md`, `report.ko.md`**: Output of the scenario tests (`scripts/scenario-report.py`). Do not edit them by hand.
+- **Korean goes only in `.ko.md`**: Do not add Korean to a `.md` file.
 - Place a rule **only once, at the highest level** of its scope — global at this root, component-global at the component top level. Do not duplicate an upper-level rule lower down.
 
 ## Writing style
 
 Applies to every generated artifact — docs, code comments, BEPs, PR descriptions.
 
+- Before writing, read `GLOSSARY.md` and the `glossary/<topic>.md` for the topic, and use the words they set.
 - Lead with the conclusion; keep background short.
 - Implementation details live in the code and the PR — docs describe interfaces and contracts, not line-by-line steps.
 - Prefer tables and lists over prose.
@@ -24,9 +29,9 @@ Applies to every generated artifact — docs, code comments, BEPs, PR descriptio
 - Leave out how an individual value is composed and why a choice reads as natural.
 - Do not coin a term to group things. Name what is there and say how many. A term
   invented for one document spreads before anyone agrees it is the right one.
-- 계층이나 값을 가리킬 때는 코드에 있는 이름을 그대로 쓴다. REST handler, GQL resolver,
+- Refer to a layer or value by its name in the code: REST handler, GQL resolver,
   GQL DataLoader, adapter, processor, service, Action, repository, validator, `current_user()`,
-  user id 등. "표면", "행위자" 같은 서술어로 대신하지 않는다.
+  user id and so on. Do not replace it with a descriptive word.
 - A comment or docstring stops at three lines. Anything longer is background: put it
   in `KNOWLEDGE.md` and point at it.
 

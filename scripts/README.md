@@ -53,6 +53,7 @@ current, see `AGENTS.md` in this directory.
 | `check-alembic-revision.py` | Rejects a migration whose `upgrade()` / `downgrade()` is empty | auto — `ci.yml` |
 | `check-init-imports.py` | Fails when an `__init__.py` under the given directories imports anything, apart from the files it allows | auto — `ci.yml` (`check-build-and-lint`) |
 | `knowledge/check.py` | Validates `KNOWLEDGE.md` frontmatter, paths, and body links | auto — `knowledge-check.yml`; person |
+| `knowledge/check_bilingual.py` | Validates `.md` and `.ko.md` pairs and rejects Korean added to a `.md` file | auto — `knowledge-check.yml`; person |
 | `get-platform-suffix.py` | Prints the `<os>-<arch>` suffix used in artifact names | auto — `ci.yml`, `build-test.yml` |
 | `.github/scripts/decide-backport-targets.sh` | Reads `.github/maintained-versions.yml` and the `Backport:` trailer to decide the target branches | auto — `backport.yml` |
 | `.github/scripts/check-backport-migration.sh` | Warns when a pull request both carries a `Backport:` trailer and changes the database schema, since both migrations then have to be idempotent | auto — `backport-migration-check.yml` |
@@ -115,4 +116,4 @@ current, see `AGENTS.md` in this directory.
 | `e2e-model-store/` | Numbered end-to-end model-store scenarios, run in order by `run-all.sh` against a live local stack |
 | `storage-proxy/` | `upgrade.sh` (storage migration entry point) and the Ceph test-cluster provisioning under `ceph/` |
 | `hooks/` | AI-agent hooks; see the "Commit and push" table |
-| `knowledge/` | `KNOWLEDGE.md` tooling — shared frontmatter parser, `search.py`, `check.py` |
+| `knowledge/` | `KNOWLEDGE.md` tooling — shared frontmatter parser, `search.py`, `check.py`, `check_bilingual.py` |
