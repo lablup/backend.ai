@@ -26,6 +26,7 @@ from ai.backend.common.exception import (
 )
 from ai.backend.common.types import ResourceSlot, Sentinel
 from ai.backend.manager.data.domain.types import DomainData
+from ai.backend.manager.data.dotfile.types import DotfileEntries
 from ai.backend.manager.data.permission.permission_defs import (
     DomainPermission,
     ResourceGroupPermission,
@@ -426,6 +427,8 @@ class CreateDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
         def value_or_none(value: Any) -> Any:
             return value if value is not graphql.Undefined else None
 
+        if self.dotfiles:
+            DotfileEntries.unpack(self.dotfiles).verify_paths()
         return CreateDomainAction(
             creator=(
                 DomainCreator(
@@ -508,6 +511,8 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
         return field_value
 
     def to_action(self, domain_id: DomainID) -> UpdateDomainAction:
+        if self.dotfiles:
+            DotfileEntries.unpack(self.dotfiles).verify_paths()
         updater = DomainUpdater(
             domain_id=domain_id,
             description=TriState[str].from_graphql(

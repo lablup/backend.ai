@@ -35,6 +35,7 @@ from ai.backend.agent.agent import (
     ScanImagesResult,
 )
 from ai.backend.agent.config.unified import AgentUnifiedConfig, ScratchType
+from ai.backend.agent.dotfile import DotfileTargetResolver
 from ai.backend.agent.errors import K8sError, UnsupportedResource
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.kernel import AbstractKernel, KernelRegistry
@@ -53,6 +54,7 @@ from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cgroup import CgroupController
 from ai.backend.common.clients.valkey_client.sentinel_monitor.monitor_set import SentinelMonitorSet
 from ai.backend.common.docker import ImageRef, KernelFeatures
+from ai.backend.common.dotfile import InvalidDotfilePath
 from ai.backend.common.dto.agent.response import PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
@@ -644,26 +646,22 @@ class KubernetesKernelCreationContext(AbstractKernelCreationContext[KubernetesKe
                 ])
 
         # higher priority dotfiles are stored last to support overwriting
+        dotfile_targets = DotfileTargetResolver(self.work_dir)
         for dotfile in self.internal_data.get("dotfiles", []):
-            if dotfile["path"].startswith("/"):
-                if dotfile["path"].startswith("/home/"):
-                    path_arr = dotfile["path"].split("/")
-                    file_path: Path = self.scratch_dir / "/".join(path_arr[2:])
-                else:
-                    file_path = Path(dotfile["path"])
-            else:
-                file_path = self.work_dir / dotfile["path"]
+            try:
+                file_path = dotfile_targets.resolve(dotfile["path"])
+            except InvalidDotfilePath:
+                log.warning("dotfile skipped by the path rule", path=dotfile["path"])
+                continue
             file_path.parent.mkdir(parents=True, exist_ok=True)
             await run_in_executor_with_context(None, file_path.write_text, dotfile["data"])
 
-            tmp = Path(file_path)
-            while tmp != self.work_dir:
+            for tmp in dotfile_targets.paths_below_work_dir(file_path):
                 tmp.chmod(int(dotfile["perm"], 8))
                 if KernelFeatures.UID_MATCH in self.kernel_features and os.geteuid() == 0:
                     uid = self.local_config.container.kernel_uid
                     gid = self.local_config.container.kernel_gid
                     os.chown(tmp, uid, gid)
-                tmp = tmp.parent
 
         # TODO: Mark shmem feature as unsupported when advertising agent
 

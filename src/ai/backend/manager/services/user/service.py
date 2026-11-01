@@ -5,6 +5,7 @@ from uuid import UUID
 
 from ai.backend.common.clients.valkey_client.valkey_stat.client import ValkeyStatClient
 from ai.backend.common.data.entity.bootstrap_script import BootstrapScript
+from ai.backend.common.dotfile import DotfilePath
 from ai.backend.common.events.event_types.kernel.types import KernelLifecycleEventReason
 from ai.backend.common.exception import BackendAIError
 from ai.backend.logging.structured import StructuredLogger
@@ -372,6 +373,7 @@ class UserService:
         )
 
     async def create_dotfile(self, action: CreateDotfileAction) -> CreateDotfileActionResult:
+        DotfilePath(action.creator.entry.path)
         # Variants count too, so creation cannot grow a user's storage without bound.
         data = await self._user_repository.create_dotfile(action.creator, MAXIMUM_DOTFILE_COUNT)
         return CreateDotfileActionResult(data=data)
