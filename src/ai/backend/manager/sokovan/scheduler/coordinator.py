@@ -1645,19 +1645,19 @@ class ScheduleCoordinator:
             # Regular scheduling operations with both short and long cycle tasks
             SchedulerTaskSpec(
                 ScheduleType.SCHEDULE,
-                short_interval=2.0,
+                short_interval=1.0,
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
             SchedulerTaskSpec(
                 ScheduleType.CHECK_PRECONDITION,
-                short_interval=2.0,
+                short_interval=1.0,
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
             SchedulerTaskSpec(
                 ScheduleType.START,
-                short_interval=2.0,
+                short_interval=1.0,
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
@@ -1718,13 +1718,13 @@ class ScheduleCoordinator:
             # Progress check operations with both short and long cycle tasks
             SchedulerTaskSpec(
                 ScheduleType.CHECK_PULLING_PROGRESS,
-                short_interval=2.0,
+                short_interval=1.0,
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
             SchedulerTaskSpec(
                 ScheduleType.CHECK_CREATING_PROGRESS,
-                short_interval=2.0,
+                short_interval=1.0,
                 long_interval=60.0,
                 initial_delay=30.0,
             ),
