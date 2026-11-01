@@ -158,6 +158,23 @@ class Circuit(Base, BaseMixin):  # type: ignore[misc]
         return result.scalars().all()
 
     @classmethod
+    async def list_interactive_by_session(
+        cls,
+        session: AsyncSession,
+        session_id: UUID,
+    ) -> Sequence["Circuit"]:
+        query = (
+            sa.select(Circuit)
+            .where(
+                (Circuit.session_ids.contains([session_id]))
+                & (Circuit.app_mode == AppMode.INTERACTIVE)
+            )
+            .options(selectinload(Circuit.worker_row))
+        )
+        result = await session.execute(query)
+        return result.scalars().all()
+
+    @classmethod
     async def find(
         cls,
         session: AsyncSession,

@@ -783,6 +783,18 @@ class ProxyWorkerConfig(BaseSchema):
             example=ConfigExample(local="http", prod="http"),
         ),
     ]
+    tcp_connect_timeout: Annotated[
+        float,
+        Field(default=10.0, gt=0),
+        BackendAIConfigMeta(
+            description=(
+                "Seconds to wait for the TCP connection to a session's upstream to be established "
+                "when proxying with the 'tcp' protocol. A timeout is treated like a refused connection."
+            ),
+            added_version=NEXT_RELEASE_VERSION,
+            example=ConfigExample(local="10.0", prod="10.0"),
+        ),
+    ]
     wildcard_domain: Annotated[
         WildcardDomainConfig | None,
         Field(default=None),
