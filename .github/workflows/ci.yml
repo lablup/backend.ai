@@ -25,7 +25,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: lablup/auto-labeler@main
+      - uses: lablup/auto-labeler@98637c08ff3e0abc1f8706e36cd45d292879dc89  # main
 
 
   detect-changes:
@@ -43,7 +43,7 @@ jobs:
     - name: Detect release PR
       id: release
       uses: ./.github/actions/detect-release-pr
-    - uses: dorny/paths-filter@v3
+    - uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad  # v3
       id: filter
       with:
         filters: |
@@ -114,9 +114,13 @@ jobs:
         REMOTE_CACHE_BACKEND_ENDPOINT: ${{ secrets.PANTS_REMOTE_CACHE_ENDPOINT_ARC }}
       if: ${{ env.REMOTE_CACHE_BACKEND_ENDPOINT != '' }}
     - name: Bootstrap Pants
+<<<<<<< HEAD
       uses: pantsbuild/actions/init-pants@v11
       # See: github.com/pantsbuild/actions/tree/main/init-pants/
       # ref) https://github.com/pantsbuild/example-python/blob/main/.github/workflows/pants.yaml#L30-L49
+=======
+      uses: pantsbuild/actions/init-pants@0aaef864bd133c4055feb6adad0bfdce0de1c2e4  # v11
+>>>>>>> 23de7105 (fix(BA-8813): pin the remaining third-party actions to commit SHAs (#16314))
       with:
         gha-cache-key: v1
         named-caches-hash: ${{ hashFiles('python*.lock', 'tools/*.lock') }}
