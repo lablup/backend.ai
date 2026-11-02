@@ -56,6 +56,7 @@ from ai.backend.agent.config.unified import (
     ContainerSandboxType,
     ScratchType,
 )
+from ai.backend.agent.defs import SESSION_NAME_CONFIG_FILENAME
 from ai.backend.agent.dotfile import DotfileTargetResolver
 from ai.backend.agent.errors import (
     ContainerCreationError,
@@ -1030,7 +1031,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
 
             await run_in_executor_with_context(
                 None,
-                (self.config_dir / "session_name.txt").write_text,
+                (self.config_dir / SESSION_NAME_CONFIG_FILENAME).write_text,
                 self.kernel_config["session_name"],
             )
 

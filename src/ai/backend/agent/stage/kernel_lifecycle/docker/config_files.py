@@ -11,6 +11,7 @@ from io import StringIO
 from pathlib import Path
 from typing import override
 
+from ai.backend.agent.defs import SESSION_NAME_CONFIG_FILENAME
 from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
 from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.stage.types import ArgsSpecGenerator, Provisioner, ProvisionStage
@@ -81,7 +82,7 @@ class ConfigFileProvisioner(Provisioner[ConfigFileSpec, ConfigFileResult]):
         return spec.config_dir / "resource_base.txt"
 
     def _session_name_path(self, spec: ConfigFileSpec) -> Path:
-        return spec.config_dir / "session_name.txt"
+        return spec.config_dir / SESSION_NAME_CONFIG_FILENAME
 
     async def _write_environ(self, spec: ConfigFileSpec) -> None:
         with StringIO() as buf:
