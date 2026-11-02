@@ -559,6 +559,12 @@ class TestSampleTemplate:
         rendered = tomllib.loads(render_config_template(template, {"volume_name": "local"}))
         assert rendered["volume"]["local"]["path"] == "/vfroot"
 
+    def test_dotted_argument_stays_one_key(self) -> None:
+        template = TOMLGenerator().generate(_VolumesConfig)
+
+        rendered = tomllib.loads(render_config_template(template, {"volume_name": "local.ssd"}))
+        assert rendered["volume"]["local.ssd"]["path"] == "/vfroot"
+
     def test_dict_of_tables_without_template_arg_fails(self) -> None:
         with pytest.raises(ConfigTemplateArgMissing):
             TOMLGenerator().generate(_UnnamedVolumesConfig)
