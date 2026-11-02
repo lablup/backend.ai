@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
+from typing import Any
 
 from ai.backend.agent.containerd.rpc import client as rpc_client
 from ai.backend.agent.containerd.rpc import errors as rpc_errors
@@ -13,6 +14,7 @@ from ai.backend.agent.containerd.rpc.types import (
     ContainerRecord,
     ImageTarget,
     MountSpec,
+    RuntimeOptions,
     TaskInfo,
     TaskState,
 )
@@ -50,12 +52,20 @@ def _agent_errors() -> Iterator[None]:
 
 
 class ContainerdClient:
-    """The containerd calls of the agent; every failure is a `BackendAIError`."""
+    """Implements `ContainerdAPI`; every failure is a `BackendAIError`."""
 
     _client: rpc_client.ContainerdClient
 
     def __init__(self, config: ContainerdClientConfig) -> None:
         self._client = rpc_client.ContainerdClient(config)
+
+    @property
+    def snapshotter(self) -> str:
+        return self._client.snapshotter
+
+    @property
+    def namespace(self) -> str:
+        return self._client.namespace
 
     @property
     def connected(self) -> bool:
@@ -76,10 +86,54 @@ class ContainerdClient:
         with _agent_errors():
             return await self._client.read_blob(digest)
 
+    async def prepare_snapshot(self, key: str, parent: str) -> Sequence[MountSpec]:
+        with _agent_errors():
+            return await self._client.prepare_snapshot(key, parent)
+
+    async def remove_snapshot(self, key: str) -> None:
+        with _agent_errors():
+            await self._client.remove_snapshot(key)
+
+    async def create_container(
+        self,
+        record: ContainerRecord,
+        runtime: str,
+        spec: Mapping[str, Any],
+        runtime_options: RuntimeOptions | None = None,
+    ) -> None:
+        with _agent_errors():
+            await self._client.create_container(record, runtime, spec, runtime_options)
+
+    async def get_container(self, container_id: str) -> ContainerRecord | None:
+        with _agent_errors():
+            return await self._client.get_container(container_id)
+
     async def list_containers(self, labels: Mapping[str, str]) -> Sequence[ContainerRecord]:
         with _agent_errors():
             return await self._client.list_containers(labels)
 
+    async def delete_container(self, container_id: str) -> None:
+        with _agent_errors():
+            await self._client.delete_container(container_id)
+
+    async def create_task(
+        self, container_id: str, rootfs: Sequence[MountSpec], stdout: str, stderr: str
+    ) -> int:
+        with _agent_errors():
+            return await self._client.create_task(container_id, rootfs, stdout, stderr)
+
+    async def start_task(self, container_id: str) -> None:
+        with _agent_errors():
+            await self._client.start_task(container_id)
+
     async def get_task(self, container_id: str) -> TaskInfo | None:
         with _agent_errors():
             return await self._client.get_task(container_id)
+
+    async def kill_task(self, container_id: str, signum: int, *, all_processes: bool) -> None:
+        with _agent_errors():
+            await self._client.kill_task(container_id, signum, all_processes=all_processes)
+
+    async def delete_task(self, container_id: str) -> None:
+        with _agent_errors():
+            await self._client.delete_task(container_id)

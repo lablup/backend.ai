@@ -31,7 +31,7 @@ class ContainerdAgentDiscovery(AbstractAgentDiscovery):
     ) -> Mapping[SlotName, Decimal]:
         return await scan_available_resources(compute_device_types)
 
-    # No kernel runner environments: the agent launches no kernel.
+    # No kernel runner environments: runc kernels run their image's own command.
     @override
     async def prepare_krunner_env(self, local_config: Mapping[str, Any]) -> Mapping[str, str]:
         return {}

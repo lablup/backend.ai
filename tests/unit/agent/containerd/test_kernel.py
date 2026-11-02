@@ -60,9 +60,6 @@ _RAISING: list[tuple[str, tuple[Any, ...], dict[str, Any]]] = [
     ("download_single", ("/home/work/a",), {}),
     ("list_files", ("/home/work",), {}),
     ("notify_event", (MagicMock(),), {}),
-    ("start_service", ("jupyter", {}), {}),
-    ("start_model_service", ({},), {}),
-    ("get_service_apps", (), {}),
 ]
 
 
@@ -79,3 +76,12 @@ class TestContainerdKernelVerbs:
 
         with pytest.raises(KernelVerbNotSupported, match=method):
             await verb(*args, **kwargs)
+
+    async def test_get_service_apps_stub(self, kernel: ContainerdKernel) -> None:
+        assert await kernel.get_service_apps() == {"status": "ok", "data": []}
+
+    async def test_start_service_stub(self, kernel: ContainerdKernel) -> None:
+        assert await kernel.start_service("jupyter", {}) == {"status": "started"}
+
+    async def test_start_model_service_stub(self, kernel: ContainerdKernel) -> None:
+        assert await kernel.start_model_service({}) == {"status": "started"}

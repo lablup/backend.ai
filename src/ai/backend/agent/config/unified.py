@@ -794,7 +794,7 @@ class CommonAgentConfig(BaseConfigSchema):
                 "'docker' uses Docker daemon for container management (default for most deployments); "
                 "'kubernetes' uses Kubernetes API for container management in K8s clusters; "
                 "'dummy' is a mock backend for testing without actual containers; "
-                "'containerd' uses containerd's native API for container management."
+                "'containerd' uses containerd's native API to run runc kernels."
             ),
             added_version="25.12.0",
             example=ConfigExample(local="docker", prod="docker"),
