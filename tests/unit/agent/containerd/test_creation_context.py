@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import uuid
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
@@ -16,9 +17,10 @@ from ai.backend.agent.containerd.agent import (
     KERNEL_IP_LABEL,
     ContainerdKernelCreationContext,
 )
-from ai.backend.agent.containerd.client import MountSpec
+from ai.backend.agent.containerd.client import MountSpec, RuntimeOptions
 from ai.backend.agent.containerd.kernel import ContainerdKernel
 from ai.backend.agent.containerd.network import KernelNetwork
+from ai.backend.agent.containerd.profile.base import GeneratedMountKind, LaunchPlan
 from ai.backend.agent.containerd.scratch import CONFIG_DIR_LABEL
 from ai.backend.agent.errors import UnsupportedResource
 from ai.backend.agent.errors.containerd import (
@@ -26,10 +28,11 @@ from ai.backend.agent.errors.containerd import (
     ContainerdOperationFailed,
     KernelNetworkSetupFailed,
     KernelVerbNotSupported,
+    ProfileSpecRejected,
 )
 from ai.backend.agent.errors.resources import PortPoolExhaustedError
 from ai.backend.agent.port_pool import PortPool
-from ai.backend.agent.resources import ComputerContext, KernelResourceSpec
+from ai.backend.agent.resources import ComputerContext, KernelResourceSpec, Mount
 from ai.backend.agent.types import KernelOwnershipData, MountInfo
 from ai.backend.common.types import (
     DeviceId,
@@ -43,8 +46,10 @@ from ai.backend.common.types import (
     SlotName,
 )
 
+from .conftest import FakeProfile
 from .fakes import FakeCommandRunner, FakeContainerd
 
+SLOTS = {SlotName("cpu"): Decimal(1), SlotName("mem"): Decimal(1024)}
 PORT_RANGE = (30000, 30009)
 BRIDGE = "bai-t"
 
@@ -64,6 +69,7 @@ def _local_config(scratch_root: Path) -> MagicMock:
 def _make_context(
     ownership_data: KernelOwnershipData,
     kernel_config: KernelCreationConfig,
+    profile: FakeProfile,
     *,
     scratch_root: Path,
     client: FakeContainerd | None = None,
@@ -80,6 +86,8 @@ def _make_context(
         "ubuntu22.04",
         _local_config(scratch_root),
         computers or {},
+        profile=profile,
+        slots=SLOTS,
         client=client or FakeContainerd(),
         port_pool=port_pool or PortPool(PORT_RANGE, cooldown_sec=0),
         network=network
@@ -137,17 +145,20 @@ def launch_kernel_config(kernel_config: KernelCreationConfig) -> KernelCreationC
 
 
 class TestPrepareContainer:
-    async def test_base_spec_carries_the_kernel_resources(
+    async def test_plan_is_called_once_with_the_launch(
         self,
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
         resource_spec: KernelResourceSpec,
         computers: dict[DeviceName, ComputerContext],
     ) -> None:
+        profile = FakeProfile("runc", accepts=True, plan_result=launch_plan)
         ctx = _make_context(
             ownership_data,
             launch_kernel_config,
+            profile,
             scratch_root=tmp_path,
             computers=computers,
         )
@@ -156,11 +167,17 @@ class TestPrepareContainer:
         kernel = await ctx.prepare_container(resource_spec, {"A": "1"}, [], MagicMock())
 
         assert isinstance(kernel, ContainerdKernel)
-        base_spec = ctx._base_spec
-        assert base_spec["linux"]["resources"]["cpu"]["cpus"] == "1,3"
-        assert base_spec["linux"]["resources"]["memory"]["limit"] == 1073741824
-        assert base_spec["hostname"] == "main1"
-        assert base_spec["linux"]["namespaces"][4] == {
+        assert kernel.launch_plan is launch_plan
+        assert len(profile.plan_calls) == 1
+        launch = profile.plan_calls[0]
+        assert launch.kernel_id == ownership_data.kernel_id
+        assert launch.session_id == ownership_data.session_id
+        assert launch.config is launch_kernel_config
+        assert launch.slots is SLOTS
+        assert launch.base_spec["linux"]["resources"]["cpu"]["cpus"] == "1,3"
+        assert launch.base_spec["linux"]["resources"]["memory"]["limit"] == 1073741824
+        assert launch.base_spec["hostname"] == "main1"
+        assert launch.base_spec["linux"]["namespaces"][4] == {
             "type": "network",
             "path": f"/run/netns/{BRIDGE}-{ownership_data.kernel_id}",
         }
@@ -170,12 +187,15 @@ class TestPrepareContainer:
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
         resource_spec: KernelResourceSpec,
         computers: dict[DeviceName, ComputerContext],
     ) -> None:
+        profile = FakeProfile("runc", accepts=True, plan_result=launch_plan)
         ctx = _make_context(
             ownership_data,
             launch_kernel_config,
+            profile,
             scratch_root=tmp_path,
             computers=computers,
         )
@@ -186,6 +206,55 @@ class TestPrepareContainer:
         config_dir = tmp_path / str(ownership_data.kernel_id) / "config"
         assert (config_dir / "environ.txt").read_text() == "A=1\nB=2\n"
         assert "CPU_SHARES=1:1,3:1" in (config_dir / "resource.txt").read_text()
+
+    async def test_profile_rejection_propagates(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+    ) -> None:
+        profile = FakeProfile("coco-tdx", accepts=True, plan_error=ProfileSpecRejected("bad"))
+        ctx = _make_context(
+            ownership_data,
+            launch_kernel_config,
+            profile,
+            scratch_root=tmp_path,
+            computers=computers,
+        )
+        await ctx.prepare_scratch()
+
+        with pytest.raises(ProfileSpecRejected):
+            await ctx.prepare_container(resource_spec, {}, [], MagicMock())
+
+    async def test_netns_exists_before_plan_and_is_removed_when_plan_fails(
+        self,
+        tmp_path: Path,
+        ownership_data: KernelOwnershipData,
+        launch_kernel_config: KernelCreationConfig,
+        resource_spec: KernelResourceSpec,
+        computers: dict[DeviceName, ComputerContext],
+    ) -> None:
+        runner = FakeCommandRunner()
+        profile = FakeProfile("coco-tdx", accepts=True, plan_error=ProfileSpecRejected("bad"))
+        ctx = _make_context(
+            ownership_data,
+            launch_kernel_config,
+            profile,
+            scratch_root=tmp_path,
+            computers=computers,
+            runner=runner,
+        )
+        await ctx.prepare_scratch()
+
+        with pytest.raises(ProfileSpecRejected):
+            await ctx.prepare_container(resource_spec, {}, [], MagicMock())
+
+        ns = f"{BRIDGE}-{ownership_data.kernel_id}"
+        assert runner.calls[0] == ("ip", "netns", "add", ns)
+        assert len(profile.plan_calls) == 1
+        assert runner.matching("ip", "link", "show")  # the teardown ran
 
     async def test_setup_failing_part_way_removes_the_netns_and_frees_the_address(
         self,
@@ -202,9 +271,11 @@ class TestPrepareContainer:
         network = KernelNetwork(
             BRIDGE, IPv4Network("172.30.9.0/24"), "10.0.0.5", PORT_RANGE, run=runner
         )
+        profile = FakeProfile("runc", accepts=True)
         ctx = _make_context(
             ownership_data,
             launch_kernel_config,
+            profile,
             scratch_root=tmp_path,
             computers=computers,
             network=network,
@@ -215,6 +286,7 @@ class TestPrepareContainer:
             await ctx.prepare_container(resource_spec, {}, [], MagicMock())
 
         assert ("ip", "netns", "del", ns) in runner.calls
+        assert profile.plan_calls == []
         runner.failing.clear()
         assert await network.setup(KernelId(uuid.uuid4())) == IPv4Address("172.30.9.2")
 
@@ -226,7 +298,9 @@ class TestCreationContextMembers:
         ownership_data: KernelOwnershipData,
         kernel_config: KernelCreationConfig,
     ) -> None:
-        ctx = _make_context(ownership_data, kernel_config, scratch_root=tmp_path)
+        ctx = _make_context(
+            ownership_data, kernel_config, FakeProfile("runc", accepts=True), scratch_root=tmp_path
+        )
 
         with pytest.raises(KernelVerbNotSupported, match="repl_ports"):
             _ = ctx.repl_ports
@@ -239,7 +313,9 @@ class TestCreationContextMembers:
         ownership_data: KernelOwnershipData,
         kernel_config: KernelCreationConfig,
     ) -> None:
-        ctx = _make_context(ownership_data, kernel_config, scratch_root=tmp_path)
+        ctx = _make_context(
+            ownership_data, kernel_config, FakeProfile("runc", accepts=True), scratch_root=tmp_path
+        )
 
         assert await ctx.get_extra_envs() == {}
 
@@ -250,7 +326,9 @@ class TestCreationContextMembers:
         kernel_config: KernelCreationConfig,
     ) -> None:
         config = cast(KernelCreationConfig, {**kernel_config, "resource_slots": {"mem": "1"}})
-        ctx = _make_context(ownership_data, config, scratch_root=tmp_path)
+        ctx = _make_context(
+            ownership_data, config, FakeProfile("runc", accepts=True), scratch_root=tmp_path
+        )
 
         with pytest.raises(UnsupportedResource):
             await ctx.prepare_resource_spec()
@@ -261,7 +339,9 @@ class TestCreationContextMembers:
         ownership_data: KernelOwnershipData,
         kernel_config: KernelCreationConfig,
     ) -> None:
-        ctx = _make_context(ownership_data, kernel_config, scratch_root=tmp_path)
+        ctx = _make_context(
+            ownership_data, kernel_config, FakeProfile("runc", accepts=True), scratch_root=tmp_path
+        )
 
         await ctx.apply_network(MagicMock())
 
@@ -273,7 +353,9 @@ class TestIntrinsicMounts:
         ownership_data: KernelOwnershipData,
         kernel_config: KernelCreationConfig,
     ) -> None:
-        ctx = _make_context(ownership_data, kernel_config, scratch_root=tmp_path)
+        ctx = _make_context(
+            ownership_data, kernel_config, FakeProfile("runc", accepts=True), scratch_root=tmp_path
+        )
 
         mounts = {str(m.target): m for m in await ctx.get_intrinsic_mounts()}
 
@@ -290,17 +372,23 @@ class TestAccelerators:
         return FakeContainerd()
 
     @pytest.fixture
+    def profile(self, launch_plan: LaunchPlan) -> FakeProfile:
+        return FakeProfile("runc", accepts=True, plan_result=launch_plan)
+
+    @pytest.fixture
     def ctx(
         self,
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
         computers: dict[DeviceName, ComputerContext],
+        profile: FakeProfile,
         fake: FakeContainerd,
     ) -> ContainerdKernelCreationContext:
         return _make_context(
             ownership_data,
             launch_kernel_config,
+            profile,
             scratch_root=tmp_path,
             client=fake,
             computers=computers,
@@ -310,6 +398,7 @@ class TestAccelerators:
     async def test_intrinsic_slots_are_accepted(
         self,
         ctx: ContainerdKernelCreationContext,
+        profile: FakeProfile,
         fake: FakeContainerd,
         resource_spec: KernelResourceSpec,
         slot: str,
@@ -346,6 +435,32 @@ class TestAccelerators:
         assert mounts == [info]
         plugin.generate_mounts.assert_awaited_once_with(source_dir, alloc)
         assert source_dir.is_dir()
+
+    async def test_accelerator_mounts_are_tagged_accelerator(
+        self,
+        tmp_path: Path,
+        ctx: ContainerdKernelCreationContext,
+        profile: FakeProfile,
+        resource_spec: KernelResourceSpec,
+    ) -> None:
+        await ctx.prepare_scratch()
+        src = tmp_path / "acc-src"
+        info = MountInfo(MountTypes.BIND, src, Path("/opt/accel"))
+        plugin = _accelerator_plugin("cuda", {}, mounts=[info])
+        alloc = {SlotName("cuda.shares"): {DeviceId("0"): Decimal(1)}}
+        await ctx.generate_accelerator_mounts(plugin, alloc)
+
+        await ctx.process_mounts([
+            Mount(MountTypes.BIND, src, Path("/opt/accel")),
+            Mount(MountTypes.BIND, tmp_path, Path("/mnt/vfolder")),
+        ])
+        await ctx.prepare_container(resource_spec, {}, [], MagicMock())
+
+        kinds = {m.target: m.kind for m in profile.plan_calls[0].mounts}
+        assert kinds == {
+            "/opt/accel": GeneratedMountKind.ACCELERATOR,
+            "/mnt/vfolder": GeneratedMountKind.VFOLDER,
+        }
 
     async def test_plugin_with_container_arguments_is_refused_and_removes_the_scratch(
         self,
@@ -395,6 +510,7 @@ class TestStartContainer:
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
         kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
         resource_spec: KernelResourceSpec,
         computers: dict[DeviceName, ComputerContext],
         client: FakeContainerd,
@@ -402,9 +518,11 @@ class TestStartContainer:
         runner: FakeCommandRunner | None = None,
         service_ports: list[ServicePort] | None = None,
     ) -> tuple[ContainerdKernelCreationContext, ContainerdKernel]:
+        profile = FakeProfile("runc", accepts=True, plan_result=launch_plan)
         ctx = _make_context(
             ownership_data,
             kernel_config,
+            profile,
             scratch_root=tmp_path,
             client=client,
             port_pool=port_pool,
@@ -427,6 +545,7 @@ class TestStartContainer:
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
         resource_spec: KernelResourceSpec,
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
@@ -436,6 +555,7 @@ class TestStartContainer:
             tmp_path,
             ownership_data,
             launch_kernel_config,
+            launch_plan,
             resource_spec,
             computers,
             fake,
@@ -469,20 +589,24 @@ class TestStartContainer:
             f"/run/netns/{BRIDGE}-{ownership_data.kernel_id}"
         )
 
-    async def test_the_container_runs_on_runc(
+    async def test_plan_runtime_options_reach_the_container(
         self,
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
         resource_spec: KernelResourceSpec,
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
     ) -> None:
+        options = RuntimeOptions(type_url="runtimeoptions.v1.Options", value=b"\x12\x03abc")
+        plan = dataclasses.replace(launch_plan, runtime_options=options)
         pool = PortPool(PORT_RANGE, cooldown_sec=0)
         ctx, kernel = await self._prepared(
             tmp_path,
             ownership_data,
             launch_kernel_config,
+            plan,
             resource_spec,
             computers,
             fake,
@@ -491,13 +615,14 @@ class TestStartContainer:
 
         data = await ctx.start_container(kernel, [], None, [], MagicMock())
 
-        assert fake.runtimes[data["container_id"]] == "io.containerd.runc.v2"
+        assert fake.runtime_options[data["container_id"]] == options
 
     async def test_labels_identify_the_kernel_and_its_owner(
         self,
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
         resource_spec: KernelResourceSpec,
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
@@ -507,6 +632,7 @@ class TestStartContainer:
             tmp_path,
             ownership_data,
             launch_kernel_config,
+            launch_plan,
             resource_spec,
             computers,
             fake,
@@ -530,6 +656,7 @@ class TestStartContainer:
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
         resource_spec: KernelResourceSpec,
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
@@ -539,6 +666,7 @@ class TestStartContainer:
             tmp_path,
             ownership_data,
             launch_kernel_config,
+            launch_plan,
             resource_spec,
             computers,
             fake,
@@ -555,6 +683,7 @@ class TestStartContainer:
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
         resource_spec: KernelResourceSpec,
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
@@ -581,6 +710,7 @@ class TestStartContainer:
             tmp_path,
             ownership_data,
             launch_kernel_config,
+            launch_plan,
             resource_spec,
             computers,
             fake,
@@ -616,6 +746,7 @@ class TestStartContainer:
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
         resource_spec: KernelResourceSpec,
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
@@ -626,6 +757,7 @@ class TestStartContainer:
             tmp_path,
             ownership_data,
             launch_kernel_config,
+            launch_plan,
             resource_spec,
             computers,
             fake,
@@ -644,6 +776,7 @@ class TestStartContainer:
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
         resource_spec: KernelResourceSpec,
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
@@ -660,6 +793,7 @@ class TestStartContainer:
             tmp_path,
             ownership_data,
             launch_kernel_config,
+            launch_plan,
             resource_spec,
             computers,
             fake,
@@ -678,6 +812,7 @@ class TestStartContainer:
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
         resource_spec: KernelResourceSpec,
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
@@ -689,6 +824,7 @@ class TestStartContainer:
             tmp_path,
             ownership_data,
             launch_kernel_config,
+            launch_plan,
             resource_spec,
             computers,
             fake,
@@ -705,6 +841,7 @@ class TestStartContainer:
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
         resource_spec: KernelResourceSpec,
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
@@ -714,6 +851,7 @@ class TestStartContainer:
             tmp_path,
             ownership_data,
             launch_kernel_config,
+            launch_plan,
             resource_spec,
             computers,
             fake,
@@ -730,6 +868,7 @@ class TestStartContainer:
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
         resource_spec: KernelResourceSpec,
         computers: dict[DeviceName, ComputerContext],
     ) -> None:
@@ -740,6 +879,7 @@ class TestStartContainer:
             tmp_path,
             ownership_data,
             launch_kernel_config,
+            launch_plan,
             resource_spec,
             computers,
             empty,
@@ -761,6 +901,7 @@ class TestStartContainer:
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
         resource_spec: KernelResourceSpec,
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
@@ -772,6 +913,7 @@ class TestStartContainer:
             tmp_path,
             ownership_data,
             launch_kernel_config,
+            launch_plan,
             resource_spec,
             computers,
             fake,
@@ -792,6 +934,7 @@ class TestStartContainer:
         tmp_path: Path,
         ownership_data: KernelOwnershipData,
         launch_kernel_config: KernelCreationConfig,
+        launch_plan: LaunchPlan,
         resource_spec: KernelResourceSpec,
         computers: dict[DeviceName, ComputerContext],
         fake: FakeContainerd,
@@ -804,6 +947,7 @@ class TestStartContainer:
             tmp_path,
             ownership_data,
             launch_kernel_config,
+            launch_plan,
             resource_spec,
             computers,
             fake,

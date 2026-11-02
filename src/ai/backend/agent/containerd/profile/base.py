@@ -1,0 +1,92 @@
+from __future__ import annotations
+
+import enum
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from decimal import Decimal
+from pathlib import Path
+from typing import Any, Protocol, runtime_checkable
+
+from ai.backend.agent.containerd.rpc.types import RuntimeOptions
+from ai.backend.common.types import KernelCreationConfig, KernelId, SessionId, SlotName
+
+
+class GeneratedMountKind(enum.StrEnum):
+    KRUNNER = "krunner"
+    CONFIG_DIR = "config"
+    SCRATCH = "scratch"
+    VFOLDER = "vfolder"
+    ACCELERATOR = "accelerator"
+    LOG_WRITER = "log-writer"
+
+
+class StdioMode(enum.StrEnum):
+    LOG_FILE = "log-file"
+    NULL = "null"
+
+
+@dataclass(frozen=True)
+class GeneratedMount:
+    kind: GeneratedMountKind
+    source: Path
+    target: str
+    read_only: bool
+
+
+@dataclass(frozen=True)
+class KernelRunnerReadiness:
+    timeout_s: float
+
+
+@dataclass(frozen=True)
+class KernelLaunch:
+    kernel_id: KernelId
+    session_id: SessionId
+    config: KernelCreationConfig  # after RuntimeProfile.prepare()
+    slots: Mapping[SlotName, Decimal]  # the kernel's resource_slots, as seen by accepts()
+    mounts: Sequence[GeneratedMount]
+    base_spec: Mapping[str, Any]  # the agent's generic OCI spec, read-only
+
+
+@dataclass(frozen=True)
+class LaunchPlan:
+    runtime_handler: str  # e.g. "io.containerd.runc.v2"
+    rootfs_image: str  # image reference the rootfs is unpacked from
+    spec_patch: Mapping[str, Any]  # merged over base_spec by the agent
+    allowed_mount_kinds: frozenset[GeneratedMountKind]
+    stdio: StdioMode
+    readiness: KernelRunnerReadiness
+    runtime_options: RuntimeOptions | None = None  # runc: None
+
+
+@runtime_checkable
+class RuntimeProfile(Protocol):
+    """Chooses how a kernel runs; pure data out, the agent performs all I/O."""
+
+    @property
+    def name(self) -> str: ...
+
+    def accepts(self, slots: Mapping[SlotName, Decimal]) -> bool: ...
+
+    def plan(self, kernel: KernelLaunch) -> LaunchPlan:
+        """May raise ProfileSpecRejected."""
+        ...
+
+    async def prepare(self, config: KernelCreationConfig) -> KernelCreationConfig:
+        """
+        Do the profile's own async lookups before plan(); return the config plan() will see.
+        Return a new config rather than mutating the argument. Errors propagate unchanged.
+        Only the creation context and plan() see the returned config.
+        """
+        return config
+
+
+async def prepare_kernel_config(
+    profile: RuntimeProfile, config: KernelCreationConfig
+) -> KernelCreationConfig:
+    """Call profile.prepare(); a third-party profile written against the two-method seam is a no-op."""
+    prepare = getattr(profile, "prepare", None)
+    if prepare is None:
+        return config
+    prepared: KernelCreationConfig = await prepare(config)
+    return prepared

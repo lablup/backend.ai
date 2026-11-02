@@ -8,9 +8,12 @@ from typing import Any, Final, override
 
 from tenacity import TryAgain
 
+from ai.backend.agent.containerd.profile.base import LaunchPlan
 from ai.backend.agent.errors.containerd import ContainerdOperationFailed, KernelVerbNotSupported
 from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
-from ai.backend.agent.types import AgentEventData
+from ai.backend.agent.resources import KernelResourceSpec
+from ai.backend.agent.types import AgentEventData, KernelOwnershipData
+from ai.backend.common.docker import ImageRef
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import CommitStatus, KernelId
@@ -20,6 +23,35 @@ _PROBE_TIMEOUT_SEC: Final = 2.0
 
 
 class ContainerdKernel(AbstractKernel):
+    launch_plan: LaunchPlan
+
+    def __init__(
+        self,
+        ownership_data: KernelOwnershipData,
+        network_id: str,
+        image: ImageRef,
+        version: int,
+        *,
+        agent_config: Mapping[str, Any],
+        resource_spec: KernelResourceSpec,
+        service_ports: Any,  # TODO: type-annotation
+        environ: Mapping[str, Any],
+        data: dict[str, Any],
+        launch_plan: LaunchPlan,
+    ) -> None:
+        super().__init__(
+            ownership_data,
+            network_id,
+            image,
+            version,
+            agent_config=agent_config,
+            resource_spec=resource_spec,
+            service_ports=service_ports,
+            data=data,
+            environ=environ,
+        )
+        self.launch_plan = launch_plan
+
     @override
     async def init(self, event_producer: EventProducer) -> None:
         # The containerd agent creates no code runner.
@@ -40,7 +72,7 @@ class ContainerdKernel(AbstractKernel):
         raise KernelVerbNotSupported("create_code_runner")
 
     # FIXME(containerd-mvp): probe only; no kernel status without a code runner.
-    # The readiness probe: the kernel runner listens on its REPL port in the kernel netns.
+    # The runc readiness probe: the kernel runner listens on its REPL port in the kernel netns.
     # TryAgain makes the create_kernel readiness loop retry.
     @override
     async def check_status(self) -> dict[str, Any] | None:

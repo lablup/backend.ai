@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
+from ai.backend.agent.containerd.profile.base import GeneratedMount, GeneratedMountKind
 from ai.backend.agent.containerd.spec import (
     CPU_PERIOD_US,
-    BindMount,
     SpecInput,
     build_base_spec,
     build_launch_spec,
     merge_env,
+    merge_patch,
 )
 
 
@@ -31,8 +32,10 @@ def _input(
     )
 
 
-def _mount(target: str, *, ro: bool = True) -> BindMount:
-    return BindMount(source=Path("/host") / target.lstrip("/"), target=target, read_only=ro)
+def _mount(kind: GeneratedMountKind, target: str, *, ro: bool = True) -> GeneratedMount:
+    return GeneratedMount(
+        kind=kind, source=Path("/host") / target.lstrip("/"), target=target, read_only=ro
+    )
 
 
 class TestBaseSpec:
@@ -125,12 +128,20 @@ class TestBaseSpec:
 class TestLaunchSpec:
     base = build_base_spec(_input())
 
-    def _build(self, *, mounts: Sequence[BindMount] = ()) -> dict[str, Any]:
+    def _build(
+        self,
+        *,
+        mounts: Sequence[GeneratedMount] = (),
+        allowed_mount_kinds: frozenset[GeneratedMountKind] = frozenset(GeneratedMountKind),
+        spec_patch: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
         return build_launch_spec(
             self.base,
             args=["/opt/kernel/entrypoint.sh", "python"],
             env=["A=1"],
             mounts=mounts,
+            allowed_mount_kinds=allowed_mount_kinds,
+            spec_patch=spec_patch or {},
             cgroups_path="/ns/c1",
         )
 
@@ -144,7 +155,7 @@ class TestLaunchSpec:
         assert self._build()["linux"]["cgroupsPath"] == "/ns/c1"
 
     def test_base_spec_is_not_mutated(self) -> None:
-        self._build(mounts=[_mount("/opt/kernel/su-exec")])
+        self._build(mounts=[_mount(GeneratedMountKind.KRUNNER, "/opt/kernel/su-exec")])
 
         assert self.base["process"]["args"] == []
         assert "cgroupsPath" not in self.base["linux"]
@@ -153,9 +164,9 @@ class TestLaunchSpec:
     def test_mounts_are_binds_ordered_by_depth(self) -> None:
         spec = self._build(
             mounts=[
-                _mount("/opt/backend.ai/lib/site/kernel"),
-                _mount("/opt/backend.ai"),
-                _mount("/home/work", ro=False),
+                _mount(GeneratedMountKind.KRUNNER, "/opt/backend.ai/lib/site/kernel"),
+                _mount(GeneratedMountKind.KRUNNER, "/opt/backend.ai"),
+                _mount(GeneratedMountKind.SCRATCH, "/home/work", ro=False),
             ]
         )
 
@@ -168,6 +179,53 @@ class TestLaunchSpec:
         assert binds[0]["options"] == ["rbind", "rprivate", "ro"]
         assert binds[1]["options"] == ["rbind", "rprivate", "rw"]
         assert binds[1]["source"] == "/host/home/work"
+
+    def test_disallowed_mount_kinds_are_dropped(self) -> None:
+        spec = self._build(
+            mounts=[
+                _mount(GeneratedMountKind.KRUNNER, "/opt/kernel/su-exec"),
+                _mount(GeneratedMountKind.CONFIG_DIR, "/home/config"),
+            ],
+            allowed_mount_kinds=frozenset({GeneratedMountKind.CONFIG_DIR}),
+        )
+
+        binds = [m["destination"] for m in spec["mounts"] if m["type"] == "bind"]
+        assert binds == ["/home/config"]
+
+    def test_profile_patch_is_applied_last(self) -> None:
+        spec = self._build(
+            spec_patch={
+                "annotations": {"io.katacontainers.config_path": "/etc/kata.toml"},
+                "process": {"cwd": "/srv"},
+            }
+        )
+
+        assert spec["annotations"] == {"io.katacontainers.config_path": "/etc/kata.toml"}
+        assert spec["process"]["cwd"] == "/srv"
+        assert spec["process"]["args"] == ["/opt/kernel/entrypoint.sh", "python"]
+
+
+class TestMergePatch:
+    def test_dicts_merge_recursively(self) -> None:
+        assert merge_patch({"a": {"b": 1, "c": 2}}, {"a": {"c": 3, "d": 4}}) == {
+            "a": {"b": 1, "c": 3, "d": 4}
+        }
+
+    def test_lists_and_scalars_replace(self) -> None:
+        assert merge_patch({"a": [1, 2], "b": 1}, {"a": [3], "b": 2}) == {"a": [3], "b": 2}
+
+    def test_null_deletes(self) -> None:
+        assert merge_patch({"a": 1, "b": 2}, {"a": None}) == {"b": 2}
+
+    def test_inputs_are_not_mutated(self) -> None:
+        base = {"a": {"b": 1}}
+        patch = {"a": {"c": [1]}}
+
+        merged = merge_patch(base, patch)
+        merged["a"]["c"].append(2)
+
+        assert base == {"a": {"b": 1}}
+        assert patch == {"a": {"c": [1]}}
 
 
 class TestMergeEnv:

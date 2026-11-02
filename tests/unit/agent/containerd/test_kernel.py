@@ -13,13 +13,14 @@ from tenacity import TryAgain
 
 from ai.backend.agent.containerd import kernel as kernel_module
 from ai.backend.agent.containerd.kernel import ContainerdKernel
+from ai.backend.agent.containerd.profile.base import LaunchPlan
 from ai.backend.agent.errors.containerd import ContainerdOperationFailed, KernelVerbNotSupported
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.types import KernelId
 
 
 @pytest.fixture
-def kernel(ownership_data: KernelOwnershipData) -> ContainerdKernel:
+def kernel(ownership_data: KernelOwnershipData, launch_plan: LaunchPlan) -> ContainerdKernel:
     return ContainerdKernel(
         ownership_data,
         "net-1",
@@ -30,6 +31,7 @@ def kernel(ownership_data: KernelOwnershipData) -> ContainerdKernel:
         service_ports=[],
         environ={},
         data={},
+        launch_plan=launch_plan,
     )
 
 
@@ -48,6 +50,11 @@ class TestContainerdKernelInit:
 
     async def test_close_is_a_noop(self, kernel: ContainerdKernel) -> None:
         await kernel.close()
+
+    async def test_launch_plan_is_kept(
+        self, kernel: ContainerdKernel, launch_plan: LaunchPlan
+    ) -> None:
+        assert kernel.launch_plan is launch_plan
 
 
 _RAISING: list[tuple[str, tuple[Any, ...], dict[str, Any]]] = [
