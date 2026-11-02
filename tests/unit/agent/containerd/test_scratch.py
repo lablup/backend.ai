@@ -299,10 +299,12 @@ class TestRemoveScratch:
     def test_removes_the_kernel_dir(self, tmp_path: Path) -> None:
         dirs = _dirs(tmp_path)
         create_scratch(dirs, None, clone_dotfiles=True)
+        dirs.spec_jws.write_text("a.b.c")
 
         remove_scratch(tmp_path, "k1")
 
         assert not dirs.root.exists()
+        assert not dirs.spec_jws.exists()
 
     def test_missing_dir_is_tolerated(self, tmp_path: Path) -> None:
         remove_scratch(tmp_path, "absent")

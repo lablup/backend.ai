@@ -178,3 +178,33 @@ class KernelAddressExhausted(BackendAIError, web.HTTPServiceUnavailable):
             operation=ErrorOperation.CREATE,
             error_detail=ErrorDetail.UNAVAILABLE,
         )
+
+
+class ReadinessTimeout(BackendAIError, web.HTTPGatewayTimeout):
+    """Raised when a kernel is not ready within the readiness timeout of its launch plan."""
+
+    error_type = "https://api.backend.ai/probs/agent/kernel-readiness-timeout"
+    error_title = "The kernel did not become ready within the profile's readiness timeout."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.TIMEOUT,
+        )
+
+
+class SealedSpecMissing(BackendAIError, web.HTTPBadRequest):
+    """Raised when a sealed kernel is created without the signature of its launch spec."""
+
+    error_type = "https://api.backend.ai/probs/agent/sealed-spec-missing"
+    error_title = "A sealed kernel has no spec signature."
+
+    @override
+    def error_code(self) -> ErrorCode:
+        return ErrorCode(
+            domain=ErrorDomain.KERNEL,
+            operation=ErrorOperation.CREATE,
+            error_detail=ErrorDetail.INVALID_PARAMETERS,
+        )

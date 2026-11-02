@@ -5,7 +5,7 @@ import dataclasses
 import logging
 import signal
 import uuid
-from collections.abc import AsyncGenerator, Callable, Mapping, Sequence
+from collections.abc import AsyncGenerator, Callable, Mapping, MutableMapping, Sequence
 from decimal import Decimal
 from functools import partial
 from importlib.resources import files
@@ -47,6 +47,7 @@ from ai.backend.agent.containerd.profile.base import (
     RuntimeProfile,
     StdioMode,
     prepare_kernel_config,
+    profile_skips_host_krunner,
 )
 from ai.backend.agent.containerd.profile.loader import load_runtime_profiles, select_profile
 from ai.backend.agent.containerd.profile.runc import RuncProfile
@@ -62,6 +63,7 @@ from ai.backend.agent.containerd.scratch import (
     write_hosts_file,
     write_resolv_conf,
 )
+from ai.backend.agent.containerd.sealed import spec_jws_mount, spec_signature, write_spec_jws
 from ai.backend.agent.containerd.spec import (
     SpecInput,
     build_base_spec,
@@ -215,6 +217,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     _dirs: ScratchDirs
     _generated_mounts: list[GeneratedMount]
     _base_spec: dict[str, Any]
+    _spec_signature: str | None
     _accelerator_targets: set[str]
 
     def __init__(
@@ -257,6 +260,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         )
         self._generated_mounts = []
         self._base_spec = {}
+        # Before the scratch dir exists: a sealed kernel without a signature fails here.
+        self._spec_signature = spec_signature(kernel_config)
         self._accelerator_targets = set()
 
     def _owner(self) -> Owner | None:
@@ -399,6 +404,32 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         return mounts
 
     @override
+    async def mount_krunner(
+        self,
+        resource_spec: KernelResourceSpec,
+        environ: MutableMapping[str, str],
+    ) -> None:
+        if not profile_skips_host_krunner(self._profile):
+            await super().mount_krunner(resource_spec, environ)
+            return
+        # The image carries its own krunner: skip the host runner and libbaihook resolution,
+        # but keep the accelerator allocation and mounts that the base does in the same step.
+        # Plugin hooks and LD_PRELOAD are skipped too: they chain onto the host libbaihook preload.
+        for device_view in resource_spec.device_list:
+            computer_ctx = self.computers[device_view.device]
+            alloc = {device_view.slot: device_view.device_alloc}
+            await self.apply_accelerator_allocation(computer_ctx.instance, alloc)
+            for mount_info in await self.generate_accelerator_mounts(computer_ctx.instance, alloc):
+                resource_spec.mounts.append(
+                    self.get_runner_mount(
+                        mount_info.mode,
+                        mount_info.src_path,
+                        mount_info.dst_path.as_posix(),
+                        MountPermission.READ_ONLY,
+                    )
+                )
+
+    @override
     def resolve_krunner_filepath(self, filename: str) -> Path:
         return Path(str(files("ai.backend.runner").joinpath("../" + filename))).resolve()
 
@@ -427,6 +458,21 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         service_ports: list[ServicePort],
         cluster_info: ClusterInfo,
     ) -> ContainerdKernel:
+        try:
+            return await self._prepare_kernel(resource_spec, environ, service_ports)
+        except BaseException:
+            # The kernel is not registered yet, so no clean_kernel removes its scratch dir.
+            await run_in_executor_with_context(
+                None, remove_scratch, self.local_config.container.scratch_root, str(self.kernel_id)
+            )
+            raise
+
+    async def _prepare_kernel(
+        self,
+        resource_spec: KernelResourceSpec,
+        environ: Mapping[str, str],
+        service_ports: list[ServicePort],
+    ) -> ContainerdKernel:
         await self._write_config_files(resource_spec, environ)
         extra_caps = (
             ("CAP_SYS_PTRACE",)
@@ -447,6 +493,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 extra_caps=extra_caps,
             )
         )
+        if self._spec_signature is not None:
+            await self._add_spec_jws(self._spec_signature)
         launch = KernelLaunch(
             kernel_id=self.kernel_id,
             session_id=self.session_id,
@@ -474,6 +522,12 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             data={},
             launch_plan=launch_plan,
         )
+
+    async def _add_spec_jws(self, signature: str) -> None:
+        await _run_scratch_work(write_spec_jws, self._dirs.spec_jws, signature)
+        # Appended to the base spec, not a GeneratedMount: a profile's spec_patch["mounts"] keeps
+        # the base mounts (coco-tdx replaces the list with base mounts + resolver binds).
+        self._base_spec["mounts"].append(spec_jws_mount(self._dirs.spec_jws))
 
     async def _write_config_files(
         self, resource_spec: KernelResourceSpec, environ: Mapping[str, str]
@@ -601,6 +655,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             "stdout_port": 0,
             "host_ports": host_ports,
             "kernel_ip": str(address),
+            "published_host": self._network.published_host,
         }
 
     def _container_labels(self, host_ports: Sequence[int], address: IPv4Address) -> dict[str, str]:
