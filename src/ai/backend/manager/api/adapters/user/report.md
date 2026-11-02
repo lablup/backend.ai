@@ -2191,7 +2191,7 @@ when the superadmin gives a default key switch to another user's key along with 
 
 Given
 
-- one domain and one target user, 1 more users, the caller is a superadmin, one more user holds an extra key that is not the default
+- one domain and one target user, 1 more user, the caller is a superadmin, one more user holds an extra key that is not the default
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name
@@ -2989,7 +2989,7 @@ when a user holding the permission gives a username another user already holds, 
 
 Given
 
-- one domain and one target user, 1 more users, the caller is a user and holds UPDATE in the target user scope
+- one domain and one target user, 1 more user, the caller is a user and holds UPDATE in the target user scope
   - Domain home-1
   - Prepare one user in the domain
     - Project resource policy default: the personal project created along with a user looks it up by this name

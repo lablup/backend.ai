@@ -291,7 +291,7 @@ class SomeoneEditingAnother(Given[Any, AnEdit]):
         parts_en = ["one domain and one target user"]
         if self.others:
             parts_ko.append(f"사용자 {self.others}명 더")
-            parts_en.append(f"{self.others} more users")
+            parts_en.append(f"{self.others} more {'user' if self.others == 1 else 'users'}")
         target_names = ", ".join(str(p.name) for p in self.on_target)
         domain_names = ", ".join(str(p.name) for p in self.on_domain)
         if target_names and domain_names:
