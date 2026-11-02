@@ -6,7 +6,7 @@ names as its default registry. A project not allowed on that registry is left wi
 one: the backfill grants no project a registry it was not allowed on.
 
 Revision ID: b3e53701440e
-Revises: 46d84960bae3
+Revises: de3577e66bae
 Create Date: 2026-11-02
 
 """
@@ -18,7 +18,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "b3e53701440e"
-down_revision = "46d84960bae3"
+down_revision = "de3577e66bae"
 # Part of: NEXT_RELEASE_VERSION
 branch_labels = None
 depends_on = None
