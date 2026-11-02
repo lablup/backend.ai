@@ -144,7 +144,7 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
         with with_log_context(circuit_id=backend.circuit.id):
             try:
                 ingress = await self._read_registered_ingress(
-                    self.circuits[circuit_key].to_ingress_frontend().key()
+                    backend.circuit.to_ingress_frontend().key()
                 )
             except IngressFrontendNotRegisteredError:
                 log.trace("rejecting a TCP connection to a slot with no ingress")
