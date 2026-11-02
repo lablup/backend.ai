@@ -48,10 +48,10 @@ status: stable
 
 ## quota 연산은 프로젝트를 거쳐 레지스트리에 닿는다
 
-- `get_project_registry`는 프로젝트의 default 레지스트리를 읽는다. default 레지스트리는
-  `association_container_registries_groups`에서 `is_default`가 켜진 행이다. 그런 행이 없으면
-  `ContainerRegistryNotFound`다. session commit도 같은 조회로 레지스트리를 찾는다.
-- `groups.container_registry` JSON 컬럼은 더 이상 읽지 않는다.
+- `get_project_registry` reads the project's default registry: the
+  `association_container_registries_groups` row with `is_default` set. Without one it is
+  `ContainerRegistryNotFound`. Session commit finds its registry through the same lookup.
+- The `groups.container_registry` JSON column is no longer read.
 - 클라이언트 pool은 레지스트리 타입으로 클라이언트를 고른다. 구현은 `HARBOR2`뿐이라 다른 타입은
   `ContainerRegistryQuotaNotSupported`다.
 - `project`·`username`·`password` 중 하나라도 null인 레지스트리는 Harbor를 부르기 전에

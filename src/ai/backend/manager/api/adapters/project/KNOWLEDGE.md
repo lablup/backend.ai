@@ -46,6 +46,6 @@ status: draft
 
 일반 프로젝트 조회에는 image commit을 위한 Container Registry 조회가 포함되지 않는다. GraphQL에서 해당 필드를 요청하면 별도로 일괄 조회한다.
 
-- 이 조회는 프로젝트의 default 레지스트리를 읽는다. default 레지스트리는 `association_container_registries_groups`에서
-  `is_default`가 켜진 행이다. `groups.container_registry` JSON은 읽지 않는다.
-- 프로젝트마다 읽기 권한을 검사한다. default 레지스트리가 없는 프로젝트는 빈 값으로 응답한다.
+- It reads the project's default registry: the `association_container_registries_groups` row with
+  `is_default` set. The `groups.container_registry` JSON is not read.
+- Read permission is checked per project. A project without a default registry answers empty.
