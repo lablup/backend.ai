@@ -641,6 +641,7 @@ jobs:
       contents: write
     env:
       SCIENCE_AUTH_API_GITHUB_COM_BEARER: ${{ secrets.GITHUB_TOKEN }}
+      TAG: ${{ github.ref_name }}
     steps:
     - name: Check out the revision
       uses: actions/checkout@v6
@@ -692,21 +693,21 @@ jobs:
       # the release that already exists, instead of re-running the whole tag workflow.
       # On the first run the release does not exist yet and this step does nothing.
       run: |
-        if ! gh release view "${{ github.ref_name }}" > /dev/null 2>&1; then
-          echo "Release ${{ github.ref_name }} does not exist yet; make-final-release uploads these."
+        if ! gh release view "$TAG" > /dev/null 2>&1; then
+          echo "Release $TAG does not exist yet; make-final-release uploads these."
           exit 0
         fi
         for artifact in dist/*; do
           [ -f "${artifact}" ] || continue
-          gh release upload "${{ github.ref_name }}" "${artifact}" --clobber
+          gh release upload "$TAG" "${artifact}" --clobber
         done
         # Rebuild checksum.txt from every per-platform file now on the release, so that a
         # platform that lands late is not missing from it.
         checksum_dir="$(mktemp -d)"
-        gh release download "${{ github.ref_name }}" \
+        gh release download "$TAG" \
           --pattern 'checksum-*.txt' --dir "${checksum_dir}"
         cat "${checksum_dir}"/checksum-*.txt | sort -u -k2 > "${checksum_dir}/checksum.txt"
-        gh release upload "${{ github.ref_name }}" "${checksum_dir}/checksum.txt" --clobber
+        gh release upload "$TAG" "${checksum_dir}/checksum.txt" --clobber
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Upload pants log
@@ -829,13 +830,15 @@ jobs:
       && needs.build-wheels.result == 'success'
     runs-on: ubuntu-latest
 
+    env:
+      TAG: ${{ github.ref_name }}
     steps:
       - name: Trigger Isla Sorna repo image build
         run: |
           gh api /repos/lablup/isla-sorna/dispatches \
               --method POST \
               -f 'event_type=build-images' \
-              -F "client_payload[version]=${{ github.ref_name }}"
+              -F "client_payload[version]=$TAG"
         env:
           GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
 
@@ -854,6 +857,8 @@ jobs:
       contents: write
       id-token: write
     environment: deploy-to-pypi
+    env:
+      TAG: ${{ github.ref_name }}
     steps:
     - uses: actions/checkout@v6
     - name: Fetch remote tags
@@ -918,19 +923,19 @@ jobs:
         path: dist
     - name: Create GitHub Release
       run: |
-        if gh release view "${{ github.ref_name }}" > /dev/null 2>&1; then
+        if gh release view "$TAG" > /dev/null 2>&1; then
           echo "Release already exists, updating..."
-          gh release edit "${{ github.ref_name }}" \
-            --title "${{ github.ref_name }}" \
+          gh release edit "$TAG" \
+            --title "$TAG" \
             --notes-file "CHANGELOG_RELEASE.md"
-        elif [ "${{ env.IS_PRERELEASE }}" = "true" ]; then
-          gh release create "${{ github.ref_name }}" \
-            --title "${{ github.ref_name }}" \
+        elif [ "$IS_PRERELEASE" = "true" ]; then
+          gh release create "$TAG" \
+            --title "$TAG" \
             --notes-file "CHANGELOG_RELEASE.md" \
             --prerelease
         else
-          gh release create "${{ github.ref_name }}" \
-            --title "${{ github.ref_name }}" \
+          gh release create "$TAG" \
+            --title "$TAG" \
             --notes-file "CHANGELOG_RELEASE.md"
         fi
       env:
@@ -944,7 +949,7 @@ jobs:
           fi
           echo "Uploading $file..."
           for attempt in 1 2 3; do
-            if gh release upload "${{ github.ref_name }}" "$file" --clobber; then
+            if gh release upload "$TAG" "$file" --clobber; then
               echo "Successfully uploaded $file"
               break
             fi
@@ -987,40 +992,38 @@ jobs:
     - name: Extract stable release version
       id: extract_stable_release_version
       run: |
-        release_version=$(awk -F'.' '{print $1"."$2}' <<< "${{ github.ref_name }}")
+        release_version=$(awk -F'.' '{print $1"."$2}' <<< "$TAG")
         echo "RELEASE_VERSION=$release_version" >> $GITHUB_OUTPUT
     - name: Update stable macOS installer shorten URL
       # Skipped while the macOS scie is missing, so the shortened URL keeps pointing at
       # the last release that has one instead of at a 404.
       if: ${{ env.IS_PRERELEASE == 'false' && vars.STABLE_RELEASE == steps.extract_stable_release_version.outputs.RELEASE_VERSION && env.HAS_MACOS_INSTALLER == 'true' }}
+      env:
+        SHLINK_TOKEN: ${{ secrets.SHLINK_TOKEN }}
       run: |
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-stable-macos-aarch64' \
           -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H "X-Api-Key: $SHLINK_TOKEN" \
           -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-aarch64"
-        }'
+          -d "$(jq -n --arg longUrl "https://github.com/lablup/backend.ai/releases/download/$TAG/backendai-install-macos-aarch64" '{longUrl: $longUrl}')"
     - name: Update stable Linux installer shorten URLs
       if: ${{ env.IS_PRERELEASE == 'false' && vars.STABLE_RELEASE == steps.extract_stable_release_version.outputs.RELEASE_VERSION }}
+      env:
+        SHLINK_TOKEN: ${{ secrets.SHLINK_TOKEN }}
       run: |
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-stable-linux-aarch64' \
           -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H "X-Api-Key: $SHLINK_TOKEN" \
           -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-linux-aarch64"
-        }'
+          -d "$(jq -n --arg longUrl "https://github.com/lablup/backend.ai/releases/download/$TAG/backendai-install-linux-aarch64" '{longUrl: $longUrl}')"
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-stable-linux-x86_64' \
           -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H "X-Api-Key: $SHLINK_TOKEN" \
           -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-linux-x86_64"
-        }'
+          -d "$(jq -n --arg longUrl "https://github.com/lablup/backend.ai/releases/download/$TAG/backendai-install-linux-x86_64" '{longUrl: $longUrl}')"
     - name: Extract edge release version
       id: extract_edge_release_version
       run: |
@@ -1030,34 +1033,32 @@ jobs:
       # Skipped while the macOS scie is missing, so the shortened URL keeps pointing at
       # the last release that has one instead of at a 404.
       if: ${{ startsWith(github.ref_name, steps.extract_edge_release_version.outputs.RELEASE_VERSION) && env.HAS_MACOS_INSTALLER == 'true' }}
+      env:
+        SHLINK_TOKEN: ${{ secrets.SHLINK_TOKEN }}
       run: |
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-edge-macos-aarch64' \
           -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H "X-Api-Key: $SHLINK_TOKEN" \
           -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-macos-aarch64"
-        }'
+          -d "$(jq -n --arg longUrl "https://github.com/lablup/backend.ai/releases/download/$TAG/backendai-install-macos-aarch64" '{longUrl: $longUrl}')"
     - name: Update edge Linux installer shorten URLs
       if: ${{ startsWith(github.ref_name, steps.extract_edge_release_version.outputs.RELEASE_VERSION) }}
+      env:
+        SHLINK_TOKEN: ${{ secrets.SHLINK_TOKEN }}
       run: |
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-edge-linux-aarch64' \
           -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H "X-Api-Key: $SHLINK_TOKEN" \
           -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-linux-aarch64"
-        }'
+          -d "$(jq -n --arg longUrl "https://github.com/lablup/backend.ai/releases/download/$TAG/backendai-install-linux-aarch64" '{longUrl: $longUrl}')"
         curl -X 'PATCH' \
           'https://bnd.ai/rest/v3/short-urls/installer-edge-linux-x86_64' \
           -H 'accept: application/json' \
-          -H 'X-Api-Key: ${{ secrets.SHLINK_TOKEN }}' \
+          -H "X-Api-Key: $SHLINK_TOKEN" \
           -H 'Content-Type: application/json' \
-          -d '{
-          "longUrl": "https://github.com/lablup/backend.ai/releases/download/${{ github.ref_name }}/backendai-install-linux-x86_64"
-        }'
+          -d "$(jq -n --arg longUrl "https://github.com/lablup/backend.ai/releases/download/$TAG/backendai-install-linux-x86_64" '{longUrl: $longUrl}')"
 
 
   build-conda-pack-for-windows:
@@ -1067,6 +1068,8 @@ jobs:
     permissions:
       contents: write
 
+    env:
+      TAG: ${{ github.ref_name }}
     steps:
     - name: Check out the revision
       uses: actions/checkout@v6
@@ -1107,9 +1110,9 @@ jobs:
         conda create -n backend.ai-client python=${{ env.PROJECT_PYTHON_VERSION }}
         conda activate backend.ai-client
         pip install dist/backend_ai_client-${{ env.PKGVER }}-py3-none-any.whl dist/backend_ai_cli-${{ env.PKGVER }}-py3-none-any.whl dist/backend_ai_common-${{ env.PKGVER }}-py3-none-any.whl dist/backend_ai_plugin-${{ env.PKGVER }}-py3-none-any.whl
-        conda-pack -o backend.ai-client-${{ github.ref_name }}-windows-conda.zip
+        conda-pack -o "backend.ai-client-${env:TAG}-windows-conda.zip"
     - name: Upload conda-pack to GitHub release
       run: |
-        gh release upload ${{ github.ref_name }} backend.ai-client-${{ github.ref_name }}-windows-conda.zip
+        gh release upload "${env:TAG}" "backend.ai-client-${env:TAG}-windows-conda.zip"
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
