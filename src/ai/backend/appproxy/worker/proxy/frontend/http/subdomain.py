@@ -90,7 +90,7 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
     def parse_slot(self, request: web.Request) -> str:
         # exclude port number when evaluating the subdomain
         subdomain = request.host.partition(":")[0].replace(self.wildcard_config.domain, "").lower()
-        if subdomain not in self.circuits:
+        if subdomain not in self.backends:
             raise IngressFrontendNotRegisteredError(f"E20009: Subdomain {subdomain} not registered")
         return subdomain
 
@@ -100,8 +100,8 @@ class SubdomainFrontend(BaseHTTPFrontend[str]):
     ) -> web.StreamResponse:
         async def _exception_safe_handler(request: web.Request) -> web.StreamResponse:
             slot = self.parse_slot(request)
-            circuit = self.circuits[slot]
             backend = self.backends[slot]
+            circuit = backend.circuit
             with with_log_context(circuit_id=circuit.id):
                 ingress = await self._read_registered_ingress(circuit.to_ingress_frontend().key())
                 self.ensure_allowed_ip(request, ingress.access)

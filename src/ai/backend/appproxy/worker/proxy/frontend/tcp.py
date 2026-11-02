@@ -122,8 +122,8 @@ class TCPFrontend(BaseFrontend[TCPBackend, int]):
     async def list_inactive_circuits(self, threshold: int) -> list[Circuit]:
         now = time.time()
         return [
-            self.circuits[key]
-            for key, backend in self.backends.items()
+            backend.circuit
+            for backend in self.backends.values()
             if (backend.last_used - now) >= threshold
         ]
 

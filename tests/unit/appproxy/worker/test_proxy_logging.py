@@ -110,7 +110,6 @@ class TestHTTPProxyLogging:
         frontend = PortFrontend(root_context)
         circuit = _create_circuit(ProxyProtocol.HTTP, kernel_port=_closed_port())
         backend = HTTPBackend(circuit.route_info, root_context, circuit)
-        frontend.circuits[PORT] = circuit
         root_context.ingress_state.reader.get = AsyncMock(
             return_value=circuit.to_ingress(AUTHORITY)
         )
@@ -180,7 +179,6 @@ class TestTCPProxyLogging:
         frontend = TCPFrontend(root_context)
         circuit = _create_circuit(ProxyProtocol.TCP, kernel_port=_closed_port())
         backend = TCPBackend(circuit.route_info, root_context, circuit)
-        frontend.circuits[PORT] = circuit
         root_context.ingress_state.reader.get = AsyncMock(
             return_value=circuit.to_ingress(AUTHORITY)
         )
