@@ -7,9 +7,10 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, field_validator
 
 from ai.backend.common.api_handlers import BaseRequestModel
+from ai.backend.common.dotfile import DotfilePath
 
 from .types import MAXIMUM_DOTFILE_SIZE, DotfilePermission
 
@@ -50,6 +51,12 @@ class CreateUserDotfileRequest(BaseRequestModel):
         default=None,
         description="Access key of the target user (for superadmin delegation)",
     )
+
+    @field_validator("path")
+    @classmethod
+    def validate_path(cls, value: str) -> str:
+        DotfilePath(value)
+        return value
 
 
 class GetUserDotfileRequest(BaseRequestModel):

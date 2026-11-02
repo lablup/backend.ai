@@ -56,6 +56,7 @@ from ai.backend.agent.config.unified import (
     ContainerSandboxType,
     ScratchType,
 )
+from ai.backend.agent.dotfile import DotfileTargetResolver
 from ai.backend.agent.errors import (
     ContainerCreationError,
     InvalidArgumentError,
@@ -131,6 +132,7 @@ from ai.backend.common.docker import (
     KernelFeatures,
     LabelName,
 )
+from ai.backend.common.dotfile import InvalidDotfilePath
 from ai.backend.common.dto.agent.response import PurgeImageResp, PurgeImagesResp
 from ai.backend.common.dto.manager.rpc_request import PurgeImagesReq
 from ai.backend.common.events.dispatcher import EventProducer
@@ -971,7 +973,7 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                         "ReadOnly": (
                             fix_unsupported_perm(mount.permission) == MountPermission.READ_ONLY
                         ),
-                        f"{mount.type.value.capitalize()}Options": mount.opts if mount.opts else {},
+                        f"{mount.type.value.capitalize()}Options": mount.opts or {},
                     }
                     for mount in mounts
                 ],
@@ -1099,15 +1101,13 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 await loop.run_in_executor(None, _populate_ssh_config)
 
         # higher priority dotfiles are stored last to support overwriting
+        dotfile_targets = DotfileTargetResolver(self.work_dir)
         for dotfile in self.internal_data.get("dotfiles", []):
-            if dotfile["path"].startswith("/"):
-                if dotfile["path"].startswith("/home/"):
-                    path_arr = dotfile["path"].split("/")
-                    file_path: Path = self.scratch_dir / "/".join(path_arr[2:])
-                else:
-                    file_path = Path(dotfile["path"])
-            else:
-                file_path = self.work_dir / dotfile["path"]
+            try:
+                file_path = dotfile_targets.resolve(dotfile["path"])
+            except InvalidDotfilePath:
+                log.warning("dotfile skipped by the path rule", path=dotfile["path"])
+                continue
             file_path.parent.mkdir(parents=True, exist_ok=True)
 
             dotfile_content = dotfile["data"]
@@ -1115,12 +1115,9 @@ class DockerKernelCreationContext(AbstractKernelCreationContext[DockerKernel]):
                 dotfile_content += "\n"
             await loop.run_in_executor(None, file_path.write_text, dotfile_content)
 
-            tmp = Path(file_path)
-            tmp_paths: list[Path] = []
-            while tmp != self.work_dir:
+            tmp_paths = dotfile_targets.paths_below_work_dir(file_path)
+            for tmp in tmp_paths:
                 tmp.chmod(int(dotfile["perm"], 8))
-                tmp_paths.append(tmp)
-                tmp = tmp.parent
             if ouid is not None or ogid is not None:
                 self._chown_paths_if_root(tmp_paths, ouid, ogid)
             else:

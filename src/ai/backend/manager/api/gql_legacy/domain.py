@@ -28,6 +28,7 @@ from ai.backend.manager.data.domain.types import (
     DomainData,
     UserInfo,
 )
+from ai.backend.manager.data.dotfile.types import DotfileEntries
 from ai.backend.manager.data.permission.permission_defs import (
     DomainPermission,
     ResourceGroupPermission,
@@ -412,6 +413,8 @@ class CreateDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
         def value_or_none(value: Any) -> Any:
             return value if value is not graphql.Undefined else None
 
+        if dotfiles := value_or_none(self.dotfiles):
+            DotfileEntries.verify_packed(dotfiles)
         return CreateDomainNodeAction(
             creator=(
                 DomainCreator(
@@ -509,6 +512,9 @@ class ModifyDomainNodeInput(graphene.InputObjectType):  # type: ignore[misc]
         sgroup_ids_to_add: set[ResourceGroupID] | None,
         sgroup_ids_to_remove: set[ResourceGroupID] | None,
     ) -> UpdateDomainNodeAction:
+        dotfiles: Any = self.dotfiles
+        if dotfiles:
+            DotfileEntries.verify_packed(dotfiles)
         updater = DomainUpdater(
             domain_id=domain_id,
             description=TriState[str].from_graphql(
