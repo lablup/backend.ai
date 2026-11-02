@@ -102,46 +102,6 @@ class _PortSlotSituation:
     ensure_credential: MagicMock
 
 
-@pytest.fixture
-def port_slot_situation(
-    mocker: pytest_mock.MockerFixture, case: _PortSlotCase
-) -> _PortSlotSituation:
-    circuit = create_circuit(_PORT)
-    access = IngressAccess(
-        mode=IngressAccessMode.PUBLIC,
-        allowed_client_ips=[ip_network(cidr) for cidr in case.allowed_client_ips],
-    )
-    root_context = mocker.MagicMock()
-    match case.ingress_presence:
-        case _IngressPresence.HELD:
-            root_context.ingress_state.reader.get = mocker.AsyncMock(
-                return_value=circuit.to_ingress(_AUTHORITY).model_copy(update={"access": access})
-            )
-        case _IngressPresence.REMOVED:
-            root_context.ingress_state.reader.get = mocker.AsyncMock(return_value=None)
-        case _IngressPresence.NEVER_HELD:
-            root_context.ingress_state.reader.get = mocker.AsyncMock(
-                side_effect=IngressNotRegisteredError("no layer holds the frontend")
-            )
-    frontend = PortFrontend(root_context=root_context)
-    backend = mocker.MagicMock()
-    if case.circuit_registered:
-        frontend.circuits[_PORT] = circuit
-        frontend.backends[_PORT] = backend
-    app = web.Application()
-    app["port"] = _PORT
-    return _PortSlotSituation(
-        frontend=frontend,
-        request=make_mocked_request(method="GET", path="/", headers={}, app=app).clone(
-            remote=case.client_ip
-        ),
-        handler=mocker.AsyncMock(return_value=web.Response(text="success")),
-        circuit=circuit,
-        backend=backend,
-        ensure_credential=mocker.patch.object(frontend, "ensure_credential"),
-    )
-
-
 @dataclass(frozen=True)
 class _ServingPortFrontend:
     port: int
@@ -183,6 +143,47 @@ async def serving_port_frontend(
 
 
 class TestPortFrontend:
+    @pytest.fixture
+    def port_slot_situation(
+        self, mocker: pytest_mock.MockerFixture, case: _PortSlotCase
+    ) -> _PortSlotSituation:
+        circuit = create_circuit(_PORT)
+        access = IngressAccess(
+            mode=IngressAccessMode.PUBLIC,
+            allowed_client_ips=[ip_network(cidr) for cidr in case.allowed_client_ips],
+        )
+        root_context = mocker.MagicMock()
+        match case.ingress_presence:
+            case _IngressPresence.HELD:
+                root_context.ingress_state.reader.get = mocker.AsyncMock(
+                    return_value=circuit.to_ingress(_AUTHORITY).model_copy(
+                        update={"access": access}
+                    )
+                )
+            case _IngressPresence.REMOVED:
+                root_context.ingress_state.reader.get = mocker.AsyncMock(return_value=None)
+            case _IngressPresence.NEVER_HELD:
+                root_context.ingress_state.reader.get = mocker.AsyncMock(
+                    side_effect=IngressNotRegisteredError("no layer holds the frontend")
+                )
+        frontend = PortFrontend(root_context=root_context)
+        backend = mocker.MagicMock()
+        if case.circuit_registered:
+            frontend.circuits[_PORT] = circuit
+            frontend.backends[_PORT] = backend
+        app = web.Application()
+        app["port"] = _PORT
+        return _PortSlotSituation(
+            frontend=frontend,
+            request=make_mocked_request(method="GET", path="/", headers={}, app=app).clone(
+                remote=case.client_ip
+            ),
+            handler=mocker.AsyncMock(return_value=web.Response(text="success")),
+            circuit=circuit,
+            backend=backend,
+            ensure_credential=mocker.patch.object(frontend, "ensure_credential"),
+        )
+
     @pytest.mark.parametrize(
         "case",
         [
