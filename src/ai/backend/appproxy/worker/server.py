@@ -600,21 +600,6 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
     if announce_addr is None:
         raise MissingAnnounceAddressError("Announce address is not configured")
     proxy_worker_config = root_ctx.local_config.proxy_worker
-    wildcard_domain: str | None = None
-    match proxy_worker_config.frontend_mode:
-        case FrontendServerMode.WILDCARD_DOMAIN:
-            if proxy_worker_config.wildcard_domain is not None:
-                wildcard_domain = proxy_worker_config.wildcard_domain.domain
-        case FrontendServerMode.TRAEFIK:
-            traefik_config = proxy_worker_config.traefik
-            if (
-                traefik_config is not None
-                and traefik_config.frontend_mode == FrontendMode.WILDCARD_DOMAIN
-                and traefik_config.wildcard_domain is not None
-            ):
-                wildcard_domain = traefik_config.wildcard_domain.domain
-        case FrontendServerMode.PORT:
-            pass
     service_discovery_labels = {
         WORKER_AUTHORITY_LABEL: proxy_worker_config.authority,
         WORKER_INGRESS_DELIVERY_MODE_LABEL: proxy_worker_config.ingress.delivery_mode,
@@ -623,8 +608,9 @@ async def service_discovery_ctx(root_ctx: RootContext) -> AsyncIterator[None]:
         ).host,
         WORKER_TLS_LISTEN_LABEL: str(proxy_worker_config.tls_listen).lower(),
     }
-    if wildcard_domain is not None:
-        service_discovery_labels[WORKER_WILDCARD_DOMAIN_LABEL] = wildcard_domain
+    served_wildcard_domain = proxy_worker_config.served_wildcard_domain()
+    if served_wildcard_domain is not None:
+        service_discovery_labels[WORKER_WILDCARD_DOMAIN_LABEL] = served_wildcard_domain
     sd_loop = ServiceDiscoveryLoop(
         sd_type,
         service_discovery,
