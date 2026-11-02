@@ -817,6 +817,7 @@ Then
   - successes[0].entity_id: 미리 만든 프리셋의 id와 같다
   - successes[0].name = 'preset-1'
   - successes[0].scope_type = 'project'
+  - successes[0].scope_id = None
   - successes[0].auto_assign = False
   - successes[0].deleted = False
   - successes[0].created_at: 이 실행이 쓴 시각
@@ -900,6 +901,7 @@ Then
   - entity_id: 미리 만든 프리셋의 id와 같다
   - name = 'preset-1'
   - scope_type = 'project'
+  - scope_id = None
   - auto_assign = False
   - deleted = False
   - created_at: 이 실행이 쓴 시각
