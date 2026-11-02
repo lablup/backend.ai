@@ -1,4 +1,4 @@
-"""Moving the default of a dotfile path, run against a real database."""
+"""Moving the default of an auto-generated file path, run against a real database."""
 
 from __future__ import annotations
 
@@ -93,7 +93,7 @@ class TestSwitchDefaultDotfile:
         current = await self._add(db, user_id, ".bashrc", is_default=True)
         variant = await self._add(db, user_id, ".bashrc", is_default=False)
 
-        data = await repository.switch_default_dotfile(user_id, variant)
+        data = await repository.switch_default_auto_generated_file(user_id, variant)
 
         assert data.id == variant
         assert data.is_default is True
@@ -104,7 +104,7 @@ class TestSwitchDefaultDotfile:
     ) -> None:
         created = await self._add(db, user_id, ".vimrc", is_default=False)
 
-        await repository.switch_default_dotfile(user_id, created)
+        await repository.switch_default_auto_generated_file(user_id, created)
 
         assert await self._defaults(db, user_id) == {created: True}
 
@@ -114,7 +114,7 @@ class TestSwitchDefaultDotfile:
         other_path = await self._add(db, user_id, ".profile", is_default=True)
         target = await self._add(db, user_id, ".bashrc", is_default=False)
 
-        await repository.switch_default_dotfile(user_id, target)
+        await repository.switch_default_auto_generated_file(user_id, target)
 
         assert await self._defaults(db, user_id) == {other_path: True, target: True}
 
@@ -128,7 +128,7 @@ class TestSwitchDefaultDotfile:
         theirs = await self._add(db, other_user_id, ".bashrc", is_default=False)
 
         with pytest.raises(DotfileNotFound):
-            await repository.switch_default_dotfile(user_id, theirs)
+            await repository.switch_default_auto_generated_file(user_id, theirs)
         assert await self._defaults(db, other_user_id) == {theirs: False}
 
     async def test_another_users_default_on_the_same_path_stays(
@@ -141,7 +141,7 @@ class TestSwitchDefaultDotfile:
         theirs = await self._add(db, other_user_id, ".bashrc", is_default=True)
         mine = await self._add(db, user_id, ".bashrc", is_default=False)
 
-        await repository.switch_default_dotfile(user_id, mine)
+        await repository.switch_default_auto_generated_file(user_id, mine)
 
         assert await self._defaults(db, other_user_id) == {theirs: True}
 
@@ -151,7 +151,7 @@ class TestSwitchDefaultDotfile:
         switches = []
         for _ in range(8):
             variant = await self._add(db, user_id, ".bashrc", is_default=False)
-            switches.append(repository.switch_default_dotfile(user_id, variant))
+            switches.append(repository.switch_default_auto_generated_file(user_id, variant))
 
         await asyncio.gather(*switches)
 
