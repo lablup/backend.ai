@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import threading
 import uuid
+from ipaddress import IPv4Address, IPv4Network
 from pathlib import Path
 from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
@@ -11,11 +13,16 @@ import pytest
 from pytest_mock import MockerFixture
 
 from ai.backend.agent.config.unified import ContainerdConfig
-from ai.backend.agent.containerd.agent import ContainerdAgent, _run_scratch_work
+from ai.backend.agent.containerd.agent import (
+    HOST_PORTS_LABEL,
+    ContainerdAgent,
+    _run_scratch_work,
+)
 from ai.backend.agent.containerd.client import ContainerRecord, TaskInfo, TaskState
 from ai.backend.agent.containerd.network import KernelNetwork
 from ai.backend.agent.errors.agent import UnsupportedBaseDistroError
 from ai.backend.agent.errors.containerd import KernelVerbNotSupported
+from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.types import KernelOwnershipData
 from ai.backend.common.types import (
     AgentId,
@@ -43,9 +50,13 @@ def agent(monkeypatch: pytest.MonkeyPatch, runner: FakeCommandRunner) -> Contain
     instance.local_config = MagicMock()
     instance.computers = {}
     instance.id = AgentId("i-test")
+    instance.port_pool = PortPool((30000, 30009), cooldown_sec=0)
     instance.resource_lock = asyncio.Lock()
     instance._client = FakeContainerd()
-    instance._network = KernelNetwork(run=runner)
+    instance._orphan_ports = {}
+    instance._network = KernelNetwork(
+        "bai-t", IPv4Network("172.30.9.0/24"), "", (30000, 30009), run=runner
+    )
     instance.kernel_registry = {}
     instance.error_monitor = MagicMock(capture_exception=AsyncMock())
     monkeypatch.setattr(instance, "reconstruct_resource_usage", AsyncMock())
@@ -139,11 +150,13 @@ def _add_container(
     owner: str = OWNER,
     kernel_id: uuid.UUID | None = None,
     session_id: str | None = "session-1",
+    host_ports: str = "30000,30001",
 ) -> KernelId:
     kid = kernel_id or uuid.uuid4()
     labels = {
         "ai.backend.owner": owner,
         "ai.backend.kernel-id": str(kid),
+        HOST_PORTS_LABEL: host_ports,
     }
     if session_id is not None:
         labels["ai.backend.session-id"] = session_id
@@ -177,7 +190,10 @@ class TestEnumerateContainers:
         assert container.status == ContainerStatus.RUNNING
         assert container.image == "img:1"
         assert container.labels["ai.backend.session-id"] == "session-1"
-        assert container.ports == []
+        assert [(p.host, p.private_port, p.host_port) for p in container.ports] == [
+            ("127.0.0.1", 30000, 30000),
+            ("127.0.0.1", 30001, 30001),
+        ]
 
     async def test_stopped_container_is_exited_and_hidden_from_the_active_filter(
         self, agent: ContainerdAgent, fake: FakeContainerd
@@ -242,6 +258,15 @@ class TestEnumerateContainers:
         )
 
         assert await agent.enumerate_containers() == []
+
+    async def test_container_without_ports_label_has_no_ports(
+        self, agent: ContainerdAgent, fake: FakeContainerd
+    ) -> None:
+        _add_container(fake, "c1", state=TaskState.RUNNING, host_ports="")
+
+        [(_, container)] = await agent.enumerate_containers()
+
+        assert container.ports == []
 
 
 class TestDestroyKernel:
@@ -311,6 +336,71 @@ class TestCleanKernel:
         assert not scratch.exists()
         assert b"".join(collected) == b"hello\n"
 
+    async def test_ports_of_a_container_found_at_startup_are_released_once(
+        self,
+        agent: ContainerdAgent,
+        scratch_root: Path,
+        collected: list[bytes],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = _add_container(fake, "c1", state=TaskState.RUNNING, host_ports="30000,30001")
+        for port in (30000, 30001):
+            agent.port_pool.discard(port)
+        await agent._record_orphans()
+        released: list[int] = []
+        real_release = agent.port_pool.release_many
+
+        def spy(ports: Any) -> None:
+            ports = list(ports)
+            released.extend(ports)
+            real_release(ports)
+
+        monkeypatch.setattr(agent.port_pool, "release_many", spy)
+
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+
+        assert released == [30000, 30001]
+        assert agent.port_pool.used_ports() == set()
+
+    async def test_ports_of_a_kernel_cleaned_by_the_registry_loop_are_not_released_again(
+        self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = _add_container(fake, "c1", state=TaskState.STOPPED, host_ports="30000,30001")
+        # the base released both ports with the registry entry; a new kernel took them
+        in_use = {agent.port_pool.acquire(), agent.port_pool.acquire()}
+
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+
+        assert agent.port_pool.used_ports() == in_use
+
+    async def test_a_container_dead_at_startup_releases_no_ports(
+        self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = _add_container(fake, "c1", state=TaskState.UNKNOWN, host_ports="30000,30001")
+        in_use = {agent.port_pool.acquire(), agent.port_pool.acquire()}
+        await agent._record_orphans()
+
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+
+        assert agent.port_pool.used_ports() == in_use
+
+    async def test_ports_of_a_registered_kernel_are_left_to_the_base(
+        self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
+    ) -> None:
+        fake = cast(FakeContainerd, agent._client)
+        kid = _add_container(fake, "c1", state=TaskState.STOPPED, host_ports="30000,30001")
+        agent.kernel_registry[kid] = MagicMock()
+        for port in (30000, 30001):
+            agent.port_pool.discard(port)
+
+        await agent.clean_kernel(kid, ContainerId("c1"), False)
+
+        assert agent.port_pool.used_ports() == {30000, 30001}
+
     async def test_unknown_container_is_tolerated(
         self, agent: ContainerdAgent, scratch_root: Path, collected: list[bytes]
     ) -> None:
@@ -321,13 +411,13 @@ class TestCleanKernel:
     ) -> None:
         kid = KernelId(uuid.uuid4())
         (scratch_root / str(kid)).mkdir()
-        runner.script(["ip", "netns", "list"], f"bai-{kid}\n")
+        runner.script(["ip", "netns", "list"], f"bai-t-{kid}\n")
 
         await agent.clean_kernel(kid, None, False)
 
         assert not (scratch_root / str(kid)).exists()
         assert cast(FakeContainerd, agent._client).calls == []
-        assert ("ip", "netns", "del", f"bai-{kid}") in runner.calls
+        assert ("ip", "netns", "del", f"bai-t-{kid}") in runner.calls
 
     async def test_network_teardown_failure_does_not_stop_the_scratch_removal(
         self, agent: ContainerdAgent, scratch_root: Path, runner: FakeCommandRunner
@@ -420,6 +510,34 @@ class TestAinit:
 
         assert order == ["connect", "base"]
         connect.assert_awaited_once()
+
+    async def test_network_is_initialised_restored_and_swept_before_the_base_scan(
+        self, agent: ContainerdAgent, mocker: MockerFixture
+    ) -> None:
+        order: list[str] = []
+        cast(MagicMock, agent.local_config).containerd = ContainerdConfig.model_validate({})
+        fake = cast(FakeContainerd, agent._client)
+        alive = _add_container(fake, "c1", state=TaskState.RUNNING)
+        record = fake.containers["c1"]
+        fake.containers["c1"] = dataclasses.replace(
+            record, labels={**record.labels, "ai.backend.containerd.kernel-ip": "172.30.9.2"}
+        )
+        network = MagicMock(
+            init=AsyncMock(side_effect=lambda: order.append("init")),
+            sweep=AsyncMock(side_effect=lambda ids: order.append("sweep")),
+            restore=MagicMock(side_effect=lambda *a: order.append("restore")),
+        )
+        agent._network = network
+        mocker.patch(
+            "ai.backend.agent.agent.AbstractAgent.__ainit__",
+            new=AsyncMock(side_effect=lambda: order.append("base")),
+        )
+
+        await agent.__ainit__()
+
+        assert order == ["init", "restore", "sweep", "base"]
+        network.restore.assert_called_once_with(alive, IPv4Address("172.30.9.2"))
+        network.sweep.assert_awaited_once_with([alive])
 
     async def test_enumerate_before_connect_returns_nothing(self, agent: ContainerdAgent) -> None:
         fake = cast(FakeContainerd, agent._client)

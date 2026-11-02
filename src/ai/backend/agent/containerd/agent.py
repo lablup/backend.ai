@@ -9,6 +9,7 @@ from decimal import Decimal
 from functools import partial
 from importlib.resources import files
 from io import StringIO
+from ipaddress import IPv4Address, ip_address
 from pathlib import Path
 from typing import Any, Final, cast, override
 
@@ -37,7 +38,7 @@ from ai.backend.agent.containerd.lifecycle import (
     launch_container,
 )
 from ai.backend.agent.containerd.mounts import host_system_mounts, to_bind_mounts
-from ai.backend.agent.containerd.network import KernelNetwork
+from ai.backend.agent.containerd.network import KernelNetwork, PortForward
 from ai.backend.agent.containerd.scratch import (
     CONFIG_DIR_LABEL,
     Owner,
@@ -47,6 +48,7 @@ from ai.backend.agent.containerd.scratch import (
     write_config_files,
     write_dotfiles,
     write_hosts_file,
+    write_resolv_conf,
 )
 from ai.backend.agent.containerd.spec import (
     BindMount,
@@ -56,10 +58,11 @@ from ai.backend.agent.containerd.spec import (
     merge_env,
 )
 from ai.backend.agent.errors import UnsupportedResource
-from ai.backend.agent.errors.agent import UnsupportedBaseDistroError
-from ai.backend.agent.errors.containerd import KernelVerbNotSupported
+from ai.backend.agent.errors.agent import InvalidAgentConfigError, UnsupportedBaseDistroError
+from ai.backend.agent.errors.containerd import KernelNetworkSetupFailed, KernelVerbNotSupported
 from ai.backend.agent.etcd import AgentEtcdClientView
 from ai.backend.agent.kernel import AbstractKernel
+from ai.backend.agent.port_pool import PortPool
 from ai.backend.agent.resources import (
     AbstractComputePlugin,
     ComputerContext,
@@ -67,7 +70,7 @@ from ai.backend.agent.resources import (
     Mount,
     known_slot_types,
 )
-from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo
+from ai.backend.agent.types import Container, KernelOwnershipData, MountInfo, Port
 from ai.backend.agent.utils import get_arch_name
 from ai.backend.common.asyncio import run_in_executor_with_context
 from ai.backend.common.cgroup import CgroupController
@@ -118,6 +121,8 @@ async def _run_scratch_work[**P, T](func: Callable[P, T], *args: P.args, **kwarg
         raise
 
 
+HOST_PORTS_LABEL: Final = "ai.backend.containerd.host-ports"
+KERNEL_IP_LABEL: Final = "ai.backend.containerd.kernel-ip"
 _LOG_COLLECT_TIMEOUT_SEC: Final = 60.0
 _LOG_CHUNK_BYTES: Final = 64 * 1024
 _CONTAINER_STATUS: Final[Mapping[TaskState, ContainerStatus]] = {
@@ -141,21 +146,53 @@ def _kernel_id_of(record: ContainerRecord) -> KernelId | None:
         return None
 
 
+def _check_bind_host(host: str) -> None:
+    """The DNAT match needs an IPv4 literal; loopback is never DNATed."""
+    if host in ("", "0.0.0.0"):
+        return
+    try:
+        usable = not IPv4Address(host).is_loopback
+    except ValueError:
+        usable = False
+    if not usable:
+        raise InvalidAgentConfigError(
+            "container.bind-host must be empty, 0.0.0.0 or a non-loopback IPv4 address: " + host
+        )
+
+
+def _check_advertised_host(host: str) -> None:
+    try:
+        loopback = ip_address(host).is_loopback
+    except ValueError:
+        loopback = host.lower() == "localhost"
+    if loopback:
+        raise InvalidAgentConfigError(
+            f"container.advertised-host must not be a loopback address: {host}"
+        )
+
+
+def _host_ports_of(record: ContainerRecord) -> list[int]:
+    return [int(p) for p in record.labels.get(HOST_PORTS_LABEL, "").split(",") if p]
+
+
 def _to_container(record: ContainerRecord, status: ContainerStatus) -> Container:
-    """The kernel publishes no port."""
+    """Only host_port is meaningful: the base discards it from the pool on clean."""
+    ports = [Port("127.0.0.1", p, p) for p in _host_ports_of(record)]
     return Container(
         id=ContainerId(record.id),
         status=status,
         image=record.image,
         labels=record.labels,
-        ports=[],
+        ports=ports,
         backend_obj=record,
     )
 
 
 class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKernel]):
     _client: ContainerdAPI
+    _port_pool: PortPool
     _network: KernelNetwork
+    _address: IPv4Address | None
     _resource_lock: asyncio.Lock
     _dirs: ScratchDirs
     _bind_mounts: list[BindMount]
@@ -173,6 +210,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         restarting: bool = False,
         *,
         client: ContainerdAPI,
+        port_pool: PortPool,
         network: KernelNetwork,
         resource_lock: asyncio.Lock,
     ) -> None:
@@ -187,7 +225,9 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             restarting=restarting,
         )
         self._client = client
+        self._port_pool = port_pool
         self._network = network
+        self._address = None
         self._resource_lock = resource_lock
         self._dirs = ScratchDirs.for_kernel(
             local_config.container.scratch_root, str(ownership_data.kernel_id)
@@ -260,7 +300,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 MountTypes.BIND, self._dirs.config, Path("/home/config"), MountPermission.READ_ONLY
             ),
             Mount(MountTypes.BIND, self._dirs.work, Path("/home/work"), MountPermission.READ_WRITE),
-            *host_system_mounts(self._dirs.hosts),
+            *host_system_mounts(self._dirs.hosts, self._dirs.resolv_conf),
         ]
         coredump = self.local_config.debug.coredump
         if coredump.enabled:
@@ -281,8 +321,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     def protected_services(self) -> Sequence[str]:
         raise KernelVerbNotSupported("protected_services")
 
-    # FIXME(containerd-mvp): cluster networking; each kernel has its own netns with loopback
-    # only, so cluster sessions get no inter-kernel hostnames
+    # FIXME(containerd-mvp): cluster networking; each kernel has its own netns on the bridge, so
+    # cluster sessions get no inter-kernel hostnames
     @override
     async def apply_network(self, cluster_info: ClusterInfo) -> None:
         return None
@@ -377,7 +417,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
         )
         # A failure in setup tears down what it created.
         try:
-            await self._network.setup(self.kernel_id)
+            self._address = await self._network.setup(self.kernel_id)
         except BaseException:
             await self._teardown_network()
             raise
@@ -414,8 +454,19 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             )
             write_dotfiles(self._dirs, self.internal_data.get("dotfiles", []), owner)
             write_hosts_file(self._dirs, self.kernel_config["cluster_hostname"])
+            write_resolv_conf(self._dirs)
 
         await _run_scratch_work(_write)
+
+    def _acquire_host_ports(self, count: int) -> list[int]:
+        acquired: list[int] = []
+        try:
+            for _ in range(count):
+                acquired.append(self._port_pool.acquire())
+        except BackendAIError:
+            self._port_pool.release_many(acquired)
+            raise
+        return acquired
 
     async def _teardown_network(self) -> None:
         try:
@@ -428,7 +479,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             for dev_name, device_alloc in resource_spec.allocations.items():
                 self.computers[dev_name].alloc_map.free(device_alloc)
 
-    # No port is published: the REPL and service ports stay inside the kernel netns.
+    # Every container port of the service ports gets a pool host port and a DNAT rule. The REPL
+    # ports stay inside the kernel netns, so the four REPL entries are 0.
     @override
     async def start_container(
         self,
@@ -440,8 +492,25 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
     ) -> Mapping[str, Any]:
         image_name = self.kernel_config["image"]["canonical"]
         container_id = f"{self.kernel_id}-{uuid.uuid4().hex[:8]}"
+        service_ports = kernel_obj.service_ports
+        address = self._address
+        if address is None:
+            raise KernelNetworkSetupFailed("start_container ran before prepare_container")
+        host_ports = self._acquire_host_ports(
+            sum(len(sport["container_ports"]) for sport in service_ports)
+        )
         try:
             image = await resolve_image(self._client, image_name, get_arch_name())
+            pending = iter(host_ports)
+            forwards = [
+                PortForward(next(pending), cport)
+                for sport in service_ports
+                for cport in sport["container_ports"]
+            ]
+            await self._network.publish(self.kernel_id, forwards)
+            pending = iter(host_ports)
+            for sport in service_ports:
+                sport["host_ports"] = tuple(next(pending) for _ in sport["container_ports"])
             spec = build_launch_spec(
                 self._base_spec,
                 args=["/opt/kernel/entrypoint.sh", *cmdargs],
@@ -455,7 +524,7 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
                 image=image_name,
                 snapshotter=self._client.snapshotter,
                 snapshot_key=container_id,
-                labels=self._container_labels(),
+                labels=self._container_labels(host_ports, address),
             )
             await launch_container(
                 self._client,
@@ -467,14 +536,25 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             )
         except BaseException:
             await self._teardown_network()
+            self._port_pool.release_many(host_ports)
             await self._free_allocations(kernel_obj.resource_spec)
             await run_in_executor_with_context(
                 None, remove_scratch, self.local_config.container.scratch_root, str(self.kernel_id)
             )
             raise
-        return {"container_id": container_id}
+        container = self.local_config.container
+        return {
+            "container_id": container_id,
+            "kernel_host": str(container.advertised_host or container.bind_host),
+            "repl_in_port": 0,
+            "repl_out_port": 0,
+            "stdin_port": 0,
+            "stdout_port": 0,
+            "host_ports": host_ports,
+            "kernel_ip": str(address),
+        }
 
-    def _container_labels(self) -> dict[str, str]:
+    def _container_labels(self, host_ports: Sequence[int], address: IPv4Address) -> dict[str, str]:
         return {
             LabelName.AGENT_ID: str(self.agent_id),
             LabelName.KERNEL_ID: str(self.kernel_id),
@@ -485,6 +565,8 @@ class ContainerdKernelCreationContext(AbstractKernelCreationContext[ContainerdKe
             LabelName.BLOCK_SERVICE_PORTS: (
                 "1" if self.internal_data.get("block_service_ports", False) else "0"
             ),
+            HOST_PORTS_LABEL: ",".join(map(str, host_ports)),
+            KERNEL_IP_LABEL: str(address),
             CONFIG_DIR_LABEL: str(self._dirs.config),
         }
 
@@ -494,6 +576,7 @@ class ContainerdAgent(
 ):
     _client: ContainerdAPI
     _network: KernelNetwork
+    _orphan_ports: dict[KernelId, list[int]]
 
     def __init__(
         self,
@@ -501,9 +584,17 @@ class ContainerdAgent(
         local_config: AgentUnifiedConfig,
         **kwargs: Any,
     ) -> None:
+        _check_bind_host(local_config.container.bind_host)
+        _check_advertised_host(local_config.container.advertised_host or "0.0.0.0")
         super().__init__(etcd, local_config, **kwargs)
         containerd_config = local_config.containerd
-        self._network = KernelNetwork()
+        self._orphan_ports = {}
+        self._network = KernelNetwork(
+            containerd_config.bridge_name,
+            containerd_config.bridge_subnet,
+            local_config.container.bind_host,
+            local_config.container.port_range,
+        )
         # The base class starts a registry cleanup loop in its __init__, which needs the client.
         self._client = ContainerdClient(
             ContainerdClientConfig(
@@ -520,7 +611,25 @@ class ContainerdAgent(
         config = self.local_config.containerd
         await self._client.connect()
         log.info("containerd connected", address=config.address, namespace=config.namespace)
+        await self._network.init()
+        await self._record_orphans()
         await super().__ainit__()
+
+    async def _record_orphans(self) -> None:
+        """Recovery is a stub, so each container found at startup has no kernel object.
+
+        Its ports are returned once, by its clean; its address is kept until then, and the
+        network of any kernel without a container is swept.
+        """
+        found = await self.enumerate_containers(frozenset(ContainerStatus))
+        for kernel_id, container in found:
+            if container.status in ACTIVE_STATUS_SET:
+                self._orphan_ports[kernel_id] = [
+                    p.host_port for p in container.ports if p.host_port is not None
+                ]
+            if address := container.labels.get(KERNEL_IP_LABEL):
+                self._network.restore(kernel_id, IPv4Address(address))
+        await self._network.sweep([kernel_id for kernel_id, _ in found])
 
     @override
     async def shutdown(self, stop_signal: signal.Signals) -> None:
@@ -646,6 +755,7 @@ class ContainerdAgent(
             self.computers,
             restarting=restarting,
             client=self._client,
+            port_pool=self.port_pool,
             network=self._network,
             resource_lock=self.resource_lock,
         )
@@ -677,6 +787,8 @@ class ContainerdAgent(
     ) -> None:
         dirs = ScratchDirs.for_kernel(self.local_config.container.scratch_root, str(kernel_id))
         if container_id is not None:
+            # Ports of kernels created by this process are released by the base.
+            self.port_pool.release_many(self._orphan_ports.pop(kernel_id, []))
             await self._collect_task_log(kernel_id, container_id, dirs)
             if not self.local_config.debug.skip_container_deletion:
                 try:

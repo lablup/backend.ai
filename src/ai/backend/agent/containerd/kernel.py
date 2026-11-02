@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import os
 from collections.abc import Mapping
-from typing import Any, override
+from typing import Any, Final, override
 
-from ai.backend.agent.errors.containerd import KernelVerbNotSupported
+from tenacity import TryAgain
+
+from ai.backend.agent.errors.containerd import ContainerdOperationFailed, KernelVerbNotSupported
 from ai.backend.agent.kernel import AbstractCodeRunner, AbstractKernel
 from ai.backend.agent.types import AgentEventData
 from ai.backend.common.dto.agent.response import CodeCompletionResp
 from ai.backend.common.events.dispatcher import EventProducer
 from ai.backend.common.types import CommitStatus, KernelId
+
+REPL_IN_PORT: Final = 2000
+_PROBE_TIMEOUT_SEC: Final = 2.0
 
 
 class ContainerdKernel(AbstractKernel):
@@ -32,11 +39,23 @@ class ContainerdKernel(AbstractKernel):
     ) -> AbstractCodeRunner:
         raise KernelVerbNotSupported("create_code_runner")
 
-    # FIXME(containerd-mvp): the kernel netns has loopback only, so the agent cannot reach the
-    # runner's REPL port and the readiness wait fails at once.
+    # FIXME(containerd-mvp): probe only; no kernel status without a code runner.
+    # The readiness probe: the kernel runner listens on its REPL port in the kernel netns.
+    # TryAgain makes the create_kernel readiness loop retry.
     @override
     async def check_status(self) -> dict[str, Any] | None:
-        raise KernelVerbNotSupported("check_status")
+        kernel_ip = self.data.get("kernel_ip")
+        if not kernel_ip:
+            raise ContainerdOperationFailed("the kernel data has no kernel IP")
+        try:
+            async with asyncio.timeout(_PROBE_TIMEOUT_SEC):
+                _, writer = await asyncio.open_connection(kernel_ip, REPL_IN_PORT)
+        except (OSError, TimeoutError) as e:
+            raise TryAgain from e
+        writer.close()
+        with contextlib.suppress(OSError):
+            await writer.wait_closed()
+        return {}
 
     @override
     async def get_completions(self, text: str, opts: Mapping[str, Any]) -> CodeCompletionResp:
