@@ -347,7 +347,8 @@ def create(
     spec = _load_spec(spec_path, image)
     kernel_id = kernel_id or str(uuid.uuid4())
     session_id = session_id or str(uuid.uuid4())
-    session_name = spec.session_name or f"ag-kernel-{session_id}"
+    # A kernel created without a manager has no session name, so the shell prompt shows "[]".
+    session_name = spec.session_name or ""
     owner_user_id = spec.owner_user_id or str(uuid.uuid4())
 
     async def _run() -> None:
