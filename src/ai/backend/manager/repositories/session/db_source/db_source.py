@@ -7,7 +7,7 @@ from typing import Any, cast
 
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, noload, selectinload
+from sqlalchemy.orm import noload, selectinload
 from sqlalchemy.orm.strategy_options import _AbstractLoad
 
 from ai.backend.common.data.entity.session import SessionID
@@ -195,7 +195,6 @@ class SessionDBSource:
                     selectinload(KernelRow.agent_row).noload("*"),
                 ),
             ])
-        options.append(joinedload(SessionRow.user))
         cond = SessionRow.id == session_id
         if not allow_stale:
             cond = cond & ~SessionRow.status.in_(DEAD_SESSION_STATUSES)
