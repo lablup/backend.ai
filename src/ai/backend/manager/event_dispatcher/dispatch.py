@@ -226,6 +226,7 @@ class Dispatchers:
         self._session_event_handler = SessionEventHandler(
             args.agent_registry,
             args.db,
+            args.repositories.session.repository,
             args.event_dispatcher_plugin_ctx,
             args.scheduling_controller,
             args.valkey_live,
