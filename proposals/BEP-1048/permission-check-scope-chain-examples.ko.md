@@ -196,7 +196,7 @@ CTE 는 두 경로를 동시에 찾는다.
 
 두 경로 모두 auto edge 로 이뤄지므로 scope 집합에 기여한다. 찾은 scope 중 **어느 하나**에서 사용자 C 의 role 이 `kernel:read` 를 가지면 검사를 통과한다. CTE 의 union 은 겹치는 scope(예: 두 경로에서 모두 이르는 `domain:dom-1`)를 중복 제거한다.
 
-### 검사: 사용자 C 가 Kernel kern-1 에 쓴다 (쓰기 권한 없음)
+### 검사: 사용자 C 가 Kernel kern-1 에 쓰기를 시도한다 (쓰기 권한 없음)
 
 `check_permission_with_scope_chain(user_id=user-C, target=Kernel:kern-1, op=write)`
 

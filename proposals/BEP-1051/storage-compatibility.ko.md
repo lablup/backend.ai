@@ -4,7 +4,7 @@ parent: BEP-1051 (Kata Containers Agent Backend)
 scope: Volume mount compatibility between host filesystem and Kata guest VM; intrinsic mount evaluation; storage I/O analysis
 depends-on: [kata-agent-backend.md, configuration-deployment.md]
 key-decisions:
-  - VFolder data does NOT use virtio-fs (RDMA breakage); storage volumes mounted directly inside guest VM via native NFS/Lustre kernel client; container bind-mounts vfolder subdirs — same model as Docker
+  - VFolder data does NOT use virtio-fs (RDMA breakage); storage volumes mounted directly inside guest VM via native NFS/Lustre kernel client; container bind-mounts vfolder subdirs, the same model as Docker
   - virtio-fs retained only for scratch/config directories (non-performance-critical, host-originated data)
   - Existing Mount abstraction (BIND, source, target, permission) reused unchanged for container-level bind mounts
   - lxcfs mounts skipped (guest kernel provides accurate /proc and /sys natively)
@@ -13,7 +13,7 @@ key-decisions:
   - Agent socket skipped entirely (only used by jail/C binaries, both irrelevant for Kata)
   - /tmp uses guest-side tmpfs (no need to cross VM boundary)
   - Accelerator plugin mounts differ entirely (VFIO PCI passthrough replaces Docker DeviceRequests)
-  - krunner binaries baked into attested guest rootfs (CoCo — host is untrusted, no virtio-fs sharing of executables)
+  - krunner binaries baked into attested guest rootfs (CoCo: host is untrusted, no virtio-fs sharing of executables)
 -->
 # BEP-1051: 스토리지와 볼륨 mount 호환성
 
@@ -204,10 +204,10 @@ Red Hat virtio-fs mailing list, Kata Containers issue, Proxmox 커뮤니티 테�
 |----------|-------------------|-----------------|-----------|--------|
 | 순차 읽기 (psync, 4K) | 98 MB/s | 660 MB/s | 99 MB/s | Red Hat ML |
 | 순차 읽기 (mmap, thread 4개) | ~219 MB/s | 2,849-3,107 MB/s | 140 MB/s | LWN RFC |
-| 순차 쓰기 (psync) | ~98 MB/s | 487 MB/s | — | Red Hat ML |
-| 임의 4K 읽기 IOPS | 36.2k | 64.2k | — | Proxmox |
-| 임의 4K 쓰기 IOPS | 15.5k | 21.4k | — | Proxmox |
-| 큰 file 임의 R/W (4 GB) | 211 / 70.6 MB/s | — | 43 / 14 MB/s | Kata #2815 |
+| 순차 쓰기 (psync) | ~98 MB/s | 487 MB/s | 없음 | Red Hat ML |
+| 임의 4K 읽기 IOPS | 36.2k | 64.2k | 없음 | Proxmox |
+| 임의 4K 쓰기 IOPS | 15.5k | 21.4k | 없음 | Proxmox |
+| 큰 file 임의 R/W (4 GB) | 211 / 70.6 MB/s | 없음 | 43 / 14 MB/s | Kata #2815 |
 
 **native 호스트 성능 대비** (tuned, kernel 6.11 이상, `cache=never`, `direct-io=1`):
 

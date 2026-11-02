@@ -1,7 +1,7 @@
 <!-- context-for-ai
 type: detail-doc
 parent: BEP-1051 (Kata Containers Agent Backend)
-scope: Multi-container networking for Kata VMs — Calico CNI integration, inter-VM communication, network policy, service port exposure
+scope: Multi-container networking for Kata VMs: Calico CNI integration, inter-VM communication, network policy, service port exposure
 depends-on: [kata-agent-backend.md, configuration-deployment.md]
 key-decisions:
   - Calico CNI for inter-VM networking (multi-host routing, network policy enforcement)

@@ -398,4 +398,4 @@ sequenceDiagram
 ## 참고
 
 - [BEP-1045: Prometheus Client Extraction and Querier Interface Abstraction](BEP-1045-prometheus-client-extraction-and-querier-interface-abstraction.md)
-- [Prometheus HTTP API — Range Queries](https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries)
+- [Prometheus HTTP API: Range Queries](https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries)

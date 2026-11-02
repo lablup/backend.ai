@@ -2,8 +2,8 @@
 
 ## 관련 이슈
 
-- JIRA: [BA-4179](https://lablup.atlassian.net/browse/BA-4179) — RBAC 엔티티 관계 모델 구현
-- JIRA: [BA-4218](https://lablup.atlassian.net/browse/BA-4218) — BEP-1048 문서 등록
+- JIRA: [BA-4179](https://lablup.atlassian.net/browse/BA-4179) - RBAC 엔티티 관계 모델 구현
+- JIRA: [BA-4218](https://lablup.atlassian.net/browse/BA-4218) - BEP-1048 문서 등록
 - GitHub: #8531
 - 관련 BEP:
   - [BEP-1008: RBAC](BEP-1008-RBAC.md) - 원래 RBAC 기술 설계

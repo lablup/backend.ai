@@ -7,7 +7,7 @@ key-decisions:
   - Full AbstractAgent implementation with Kata-specific lifecycle
   - Container management via containerd gRPC with Kata shim
   - VFolder storage via direct guest-side NFS/Lustre mount (RDMA-preserving); virtio-fs only for scratch/config
-  - All executables (krunner, Python libs) baked into attested guest rootfs (CoCo — host untrusted)
+  - All executables (krunner, Python libs) baked into attested guest rootfs (CoCo: host untrusted)
   - ZMQ TCP for agent↔kernel-runner communication (already TCP-based, works across VM boundary)
   - Agent socket (/opt/kernel/agent.sock) not needed for Kata (only used by jail/C binaries, both skipped)
   - entrypoint.sh requires Kata-specific variant (skip LD_PRELOAD/libbaihook, skip jail references)
@@ -85,16 +85,16 @@ sequenceDiagram
 
 ### /home/config 의 설정 파일
 
-에이전트는 컨테이너 생성 전에 `scratch_dir/config/` 에 여러 파일을 쓴다. 이 파일들은 컨테이너 안의 `/home/config` 에 읽기 전용으로 마운트된다.
+에이전트는 컨테이너 생성 전에 `scratch_dir/config/` 에 여러 파일을 기록한다. 이 파일들은 컨테이너 안의 `/home/config` 에 읽기 전용으로 마운트된다.
 
-| 파일 | 쓰는 쪽 | 읽는 쪽 | 목적 |
+| 파일 | 기록하는 쪽 | 읽는 쪽 | 목적 |
 |------|--------|--------|---------|
 | `environ.txt` | 에이전트(`docker/agent.py:844-854`) | **kernel runner**(`BaseRunner.__init__`, 187번째 줄) | `key=value` 짝. 모든 하위 프로세스 실행에 사용하도록 `child_env` 와 `os.environ` 에 로드한다 |
 | `resource.txt` | 에이전트(`docker/agent.py:856-867`) | **에이전트만**(복구: `resources.py:887-910`, `scratch/utils.py:100-103`) | 직렬화한 `KernelResourceSpec`. 자원 슬롯 할당, 마운트, 장치 매핑. kernel runner 는 읽지 않는다 |
 | `intrinsic-ports.json` | 에이전트 | **kernel runner**(`BaseRunner._init`, 244번째 줄) | 서비스 이름을 포트에 매핑한다: `{"replin": 2000, "replout": 2001, "sshd": 2200, "ttyd": 7681}` |
 | `ssh/id_cluster` | 에이전트 | **kernel runner**(`intrinsic.py:89-130`) | 다중 노드 세션에서 컨테이너 간 SSH 용 개인 키 |
 | `ssh/id_cluster.pub` | 에이전트 | **kernel runner**(`intrinsic.py:130-140`) | `~/.ssh/authorized_keys` 에 추가하는 공개 키 |
-| `ssh/port-mapping.json` | 에이전트 | **kernel runner**(`intrinsic.py:100-112`) | 클러스터 노드 SSH 포트 매핑. `~/.ssh/config` 에 쓴다 |
+| `ssh/port-mapping.json` | 에이전트 | **kernel runner**(`intrinsic.py:100-112`) | 클러스터 노드 SSH 포트 매핑. `~/.ssh/config` 에 기록한다 |
 | `docker-creds.json` | 에이전트 | 컨테이너 bootstrap | Docker 전용이다. **Kata 에는 사용하지 않는다.** 이미지는 KBS 가 전달한 자격 증명으로 `image-rs` 가 guest 측에서 내려받는다 |
 | `environ_base.txt` | 에이전트(백업 사본) | 에이전트(복구) | hot update diff 용 environ.txt 기준 사본 |
 | `resource_base.txt` | 에이전트(백업 사본) | 에이전트(복구) | hot update diff 용 resource.txt 기준 사본 |
@@ -237,7 +237,7 @@ async def prepare_scratch(self):
     (scratch_dir / "work").mkdir(parents=True, exist_ok=True)
 ```
 
-**`write_config_files()`**: environ.txt 와 resource.txt 를 쓴다.
+**`write_config_files()`**: environ.txt 와 resource.txt 를 기록한다.
 
 ```python
 async def write_config_files(self, environ, resource_spec):
