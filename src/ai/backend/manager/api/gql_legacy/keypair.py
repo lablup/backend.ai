@@ -39,21 +39,26 @@ __all__ = (
     "UserInfo",
 )
 
+from ai.backend.common.data.entity.keypair import KeyPairID
 from ai.backend.common.data.entity.user import UserID
 from ai.backend.manager.models.minilang import FieldSpecItem, OrderSpecItem
 from ai.backend.manager.models.minilang.ordering import QueryOrderParser
 from ai.backend.manager.models.minilang.queryfilter import QueryFilterParser
 from ai.backend.manager.models.user.row import UserRole
 from ai.backend.manager.models.utils import agg_to_array
-from ai.backend.manager.services.user.actions.keypair_ops import AdminCreateKeypairAction
+from ai.backend.manager.services.user.actions.keypair_ops import (
+    AdminCreateKeypairAction,
+    UpdateKeypairAction,
+)
 from ai.backend.manager.services.user.actions.lookup import LookupUserAction
+from ai.backend.manager.services.user.actions.lookup_keypair import LookupKeypairByAccessKeyAction
+from ai.backend.manager.types import OptionalState
 
 from .base import (
     Item,
     PaginatedList,
     batch_multiresult,
     batch_result,
-    set_if_set,
     simple_db_mutate,
 )
 
@@ -511,6 +516,15 @@ class ModifyKeyPairInput(graphene.InputObjectType):  # type: ignore[misc]
     concurrency_limit = graphene.Int(required=False)  # deprecated and ignored
     rate_limit = graphene.Int(required=False)
 
+    def to_action(self, keypair_id: KeyPairID) -> UpdateKeypairAction:
+        return UpdateKeypairAction(
+            keypair_id=keypair_id,
+            is_active=OptionalState.from_graphql(self.is_active),
+            is_admin=OptionalState.from_graphql(self.is_admin),
+            resource_policy=OptionalState.from_graphql(self.resource_policy),
+            rate_limit=OptionalState.from_graphql(self.rate_limit),
+        )
+
 
 class CreateKeyPair(graphene.Mutation):  # type: ignore[misc]
     allowed_roles = (UserRole.SUPERADMIN,)
@@ -560,19 +574,15 @@ class ModifyKeyPair(graphene.Mutation):  # type: ignore[misc]
         access_key: AccessKey,
         props: ModifyKeyPairInput,
     ) -> ModifyKeyPair:
-        ctx: GraphQueryContext = info.context
-        data: dict[str, Any] = {}
-        set_if_set(props, data, "is_active")
-        set_if_set(props, data, "is_admin")
-        set_if_set(props, data, "resource_policy")
-        set_if_set(props, data, "rate_limit")
+        graph_ctx: GraphQueryContext = info.context
+        keypair = await graph_ctx.processors.user.lookup_keypair.run(
+            LookupKeypairByAccessKeyAction(access_key=access_key)
+        )
         # props.concurrency_limit is always ignored
-        update_query = sa.update(keypairs).values(data).where(keypairs.c.access_key == access_key)
-        if data.get("is_active") is False:
-            # An inactive default keypair locks its user out, so the marker is a
-            # precondition carried in the statement.
-            update_query = update_query.where(sa.not_(keypairs.c.is_default))
-        return await simple_db_mutate(cls, ctx, update_query)
+        await graph_ctx.processors.user.update_keypair.run(
+            props.to_action(KeyPairID(keypair.field_id))
+        )
+        return cls(ok=True, msg="success")
 
 
 class DeleteKeyPair(graphene.Mutation):  # type: ignore[misc]
